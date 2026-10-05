@@ -176,9 +176,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     val appearance by vm.appearance.collectAsStateWithLifecycle()
     val notif by vm.notifications.collectAsStateWithLifecycle()
     val firstRun = mode == OnboardingMode.FirstRun
-    // Notifications are REQUIRED on the setup card (API 33+), so the grant must be visible to
-    // the Next gate here, not only to the card's own button. Re-checked on resume so returning
-    // from the system permission screen updates it without a relaunch.
+    // Notifications are required on the setup card (API 33+), so the grant is visible to the Next gate; re-checked on resume.
     var notifGranted by remember { mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context)) }
     val notifLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(notifLifecycle) {
@@ -191,17 +189,14 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         onDispose { notifLifecycle.lifecycle.removeObserver(obs) }
     }
 
-    // The deck is a pager, like the app's own. Its length is held here because the step list is
-    // computed from the card the user has reached.
+    // The deck is a pager whose length is held here because the step list depends on the card reached.
     var pageCount by remember { mutableIntStateOf(1) }
     val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { pageCount })
     val pageIndex = pagerState.currentPage
     val pageScope = androidx.compose.runtime.rememberCoroutineScope()
 
-    // Cars a restored backup already configured, frozen once the user is past the restore and
-    // setup cards, so configuring a car on its card can't retroactively shrink the deck out from
-    // under the card being looked at. The freeze LATCHES: going back to an earlier card must not
-    // re-take the snapshot, or the cars configured in between would vanish from the deck.
+    // Cars a restored backup already configured, frozen (latched) once past the setup card so configuring
+    // a car can't shrink the deck under the visible card.
     var preConfiguredVins by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pastSetup by remember { mutableStateOf(false) }
     LaunchedEffect(state.powertrains.keys, pageIndex) {
@@ -335,8 +330,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     Box(
         Modifier
             .fillMaxSize()
-            // Opaque, and a pointer target of its own so touches never fall through to what the
-            // deck sits over; it takes none of them, so the cards and buttons above get every one.
+            // Opaque pointer target so touches never fall through to what the deck sits over.
             .graphicsLayer {
                 val e = exit
                 alpha = 1f - e
@@ -345,10 +339,8 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             .background(scheme.background)
             .pointerInput(Unit) {},
     ) {
-        // A cheap, static backdrop: the theme's own surface with a wash of the colour of the card you're
-        // on, easing from one accent to the next as you swipe. No aurora and no backdrop blur here: a
-        // full-screen blur plus a blur per card was the whole of this screen's lag. The accent is read in
-        // the draw block, so the colour change costs a redraw, not a recomposition.
+        // A cheap static backdrop: the surface plus a wash of the current card's accent. No aurora or blur
+        // (their cost was this screen's lag); the accent is read in the draw block so it never recomposes.
         val accent by androidx.compose.animation.animateColorAsState(
             onboardingAccent(steps.getOrNull(pageIndex)?.kind ?: OnboardingStepKind.WELCOME),
             androidx.compose.animation.core.tween(MotionLong),
@@ -388,10 +380,8 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 beyondViewportPageCount = 0,
             ) { idx ->
                 val step = steps.getOrNull(idx) ?: return@HorizontalPager
-                // How far this card is from the centre: 0 on it, 1 a full card away. The cards
-                // shrink, fade and tilt away as they leave, so the deck has depth.
-                // Read INSIDE graphicsLayer, never here: a read in this scope recomposed every page's
-                // whole content on every drag frame, which is what made swiping lag.
+                // Distance from the centre card (0 on it, 1 a card away) drives shrink/fade/tilt.
+                // Read inside graphicsLayer, never here, or every page recomposes per drag frame.
                 Column(
                     Modifier
                         .fillMaxSize()

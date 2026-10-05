@@ -48,33 +48,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
 /**
- * The hero's car-photo rendering: the tonal fallback brush, photo backdrop, and
- * the shared charge/fuel bar (also used by Cover.kt and EnergyPebble.kt). Split
- * out of Hero.kt to separate this reusable visual layer from HeroHeader itself.
+ * The hero's car-photo rendering: tonal fallback brush, photo backdrop, and the shared
+ * charge/fuel bar (also used by Cover.kt and EnergyPebble.kt).
  */
 
-/** The tonal primary→tertiary→secondary gradient used as the fallback fill
- *  behind car photos across the garage/settings surfaces. Callers apply their
- *  own `.alpha(...)` where they want it dimmed -- this returns only the brush. */
+/** Tonal primary-tertiary-secondary gradient used as the fallback fill behind car photos.
+ *  Callers apply their own `.alpha(...)`; this returns only the brush. */
 @Composable
 internal fun carTonalBrush(scheme: ColorScheme): Brush {
-    // appIsDarkTheme() (Theme.kt), not a raw isSystemInDarkTheme() read -- the same fix
-    // already made in pebbleCardEdge/glassTint (GlassChrome.kt) and CarMap
-    // (WeatherPebble.kt). isSystemInDarkTheme() only ever sees the PHONE's setting.
-    // This brush is the hero's whole backdrop for any car without a photo, and it picked
-    // its branch off the wrong source while the [scheme] it draws from is the app's real
-    // (possibly force-dark, possibly a custom palette) one: an app forced to Light
-    // on a dark phone got the "vivid primary/tertiary" branch under light-theme content,
-    // and an app forced to Dark on a light phone got the near-white surfaceContainerLowest
-    // branch -- the two cases where the hero's fallback fill and everything drawn on it
-    // disagreed about which theme they were in.
+    // appIsDarkTheme(), not isSystemInDarkTheme(): the latter only sees the phone's setting, and
+    // the [scheme] drawn from may be force-dark or a custom palette.
     val dark = appIsDarkTheme()
-    // A five-stop diagonal sweep through the theme's accent family (primary / tertiary /
-    // secondary, plus the two containers as mid-tones) at the scheme's own hue, rather than a
-    // flat 3-colour wash: primary -> primaryContainer -> tertiary -> secondaryContainer ->
-    // secondary, angled off the top-left so it reads as a lit surface with travel, not a band.
-    // Every colour comes from [scheme], so it tracks dynamic colour and the user's palette. The
-    // alphas keep the hero's light-on-photo text legible (soft in light mode, vivid in dark).
+    // Five-stop diagonal sweep through the accent family (primary, primaryContainer, tertiary,
+    // secondaryContainer, secondary) so it reads as a lit surface. Every colour comes from
+    // [scheme]; alphas keep light-on-photo text legible.
     val a = if (dark) 1f else 0.82f
     val colors = listOf(
         scheme.primary.copy(alpha = a),
@@ -83,8 +70,7 @@ internal fun carTonalBrush(scheme: ColorScheme): Brush {
         scheme.secondaryContainer.copy(alpha = a * 0.9f),
         scheme.secondary.copy(alpha = a),
     )
-    // A diagonal (top-left -> bottom-right) sweep reads livelier than a flat horizontal one and
-    // lets the two accent ends sit in opposite corners.
+    // Diagonal (top-left to bottom-right) reads livelier than horizontal.
     return Brush.linearGradient(
         colors,
         start = androidx.compose.ui.geometry.Offset.Zero,
@@ -92,33 +78,18 @@ internal fun carTonalBrush(scheme: ColorScheme): Brush {
     )
 }
 
-/** The Coil model for a stored car photo: a [java.io.File] for a locally-cropped
- *  absolute path, or the raw URL string for a pasted one. */
+/** Coil model for a stored car photo: a [java.io.File] for a cropped local path, else the raw URL. */
 @Composable
 internal fun rememberPhotoModel(url: String): Any =
     remember(url) { if (url.startsWith("/")) java.io.File(url) else url }
 
-// collapseEnter / collapseExit -- the app's one collapse spec -- now live in UiTokens.kt,
-// with the reasoning that goes with them. 14 call sites in this file still use them.
+// collapseEnter / collapseExit (the app's one collapse spec) live in UiTokens.kt.
 
 /**
- * The car photo plus the contrast scrim that makes text on top of it legible. The phone
- * hero's expanded background uses it.
- *
- * Contrast, not decoration. Every element overlaid on the hero -- title, chevron, the whole
- * charge readout -- sits on an arbitrary car photo, and against a light car they all
- * disappear. A scrim under the text is the cheap, reliable answer and is what the hero does.
- *
- * The gradient covers the FULL height and never reaches transparent. An earlier version
- * scrimmed only the top strip and faded to clear by 45%, on the assumption that only the
- * header row was overlaid -- it is not, the readout is over the image too. Heaviest at the
- * top and bottom because those are the two bands that carry content (title and chevron up
- * top, the charge readout along the bottom); the middle can afford to be clear because
- * nothing sits there, which is what lets the photo still read as a photo.
- *
- * remember-ed: Brush.verticalGradient allocates a stop list, and this sits inside a card
- * that recomposes on every status change.
- *
+ * The car photo plus a contrast scrim so overlaid text (title, chevron, charge readout) stays
+ * legible on any photo. The gradient covers the FULL height and never reaches transparent;
+ * heaviest at top and bottom, where content sits.
+ * Remembered because Brush.verticalGradient allocates and the card recomposes on every status change.
  * [aspectRatio] null means size by [height]; the phone hero passes 16:9.
  */
 @Composable
@@ -131,12 +102,9 @@ internal fun HeroPhotoBackdrop(
 ) {
     Box(Modifier.fillMaxWidth()) {
         HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio)
-        // A photo needs a full contrast scrim. The scrim INVERTS with the theme to match the
-        // now-inverted on-photo text (heroOnPhoto): LIGHT theme draws near-white text, so the
-        // scrim darkens; DARK theme draws near-black text, so the scrim LIGHTENS. Both keep the
-        // text legible against an arbitrary car photo, which is the whole job of this layer.
-        // With no photo in light mode the fallback is already a colour wash and the heavy scrim
-        // only darkened its edges, so it gets a gentle one.
+        // The scrim inverts with the theme to match heroOnPhoto text: light theme draws near-white
+        // text over a darkening scrim, dark theme the opposite. Without a photo in light mode the
+        // fallback is already a colour wash, so it gets a gentle scrim.
         val dark = appIsDarkTheme()
         val gentle = imageUrl.isNullOrBlank() && !dark
         val scrim = remember(gentle, dark) {
@@ -169,27 +137,11 @@ internal fun HeroPhotoBackdrop(
 }
 
 /**
- * Spaces out hero photo loads that start within a short window of each other, so a
- * multi-car account's cars don't all decode and upload their (still individually
- * capped, see [HeroVisual]'s own `.size(1080, 1080)`) hero bitmaps on the very same
- * frame.
- *
- * A real device report showed a single ~2.3s frame with a ~255MB heap jump the
- * instant two cars' hero photos both composed for the first time on a wide/dual-
- * column layout (this device's Z Fold showing two cars side by side) -- worse than
- * the single-photo version of this same report, which the per-request `.size()` cap
- * was already added for. That cap bounds each decode's OWN cost, but does nothing
- * about two independently-bounded decodes landing in the same frame: Coil already
- * decodes off the main thread, but two large bitmaps finishing at once still forces
- * two GPU texture uploads and two full page recompositions into the same Choreographer
- * frame, which is what actually froze the UI.
- *
- * Coalescing, not a flat per-instance index: a car expanded much later in the same
- * session (long after cold start) must load its photo immediately, not wait out a
- * delay computed from how many hero photos have EVER loaded this process. Only a
- * request that starts within [COALESCE_WINDOW_MS] of the previous one is treated as
- * "the same burst" and pushed back by [STAGGER_STEP_MS]; anything after a quiet gap
- * starts immediately and resets the burst.
+ * Spaces out hero photo loads that start close together so a multi-car account doesn't decode
+ * and upload several bitmaps in the same frame (the per-request `.size()` cap bounds each
+ * decode, not simultaneous ones).
+ * Coalescing: only a request within [COALESCE_WINDOW_MS] of the previous one is pushed back by
+ * [STAGGER_STEP_MS]; after a quiet gap a load starts immediately.
  */
 private object HeroLoadStagger {
     private const val COALESCE_WINDOW_MS = 80L
@@ -198,9 +150,7 @@ private object HeroLoadStagger {
     private var lastClaimAtMs = 0L
     private var burstSlot = 0
 
-    /** Call once per actual load attempt (i.e. from inside a `remember(model) {}`), never
-     *  from a plain composable body -- see the class doc for why this must not be charged
-     *  against every recomposition. */
+    /** Call once per load attempt (inside `remember(model) {}`), never from a plain composable body. */
     fun claimDelayMs(): Long = synchronized(lock) {
         val now = android.os.SystemClock.uptimeMillis()
         burstSlot = if (now - lastClaimAtMs < COALESCE_WINDOW_MS) burstSlot + 1 else 0
@@ -209,16 +159,14 @@ private object HeroLoadStagger {
     }
 }
 
-/** Default = a clean brand gradient. If the user set a photo, show that instead. */
+/** Clean brand gradient by default; the user's photo if set. */
 @Composable
 internal fun HeroVisual(
     v: Vehicle,
     imageUrl: String?,
     height: Dp,
     corner: Dp = 18.dp,
-    /** When set, size by aspect ratio instead of [height] -- 16:9 for the phone hero, so
-     *  the image keeps its shape at any screen width instead of being letterboxed or
-     *  cropped by a fixed dp height. */
+    /** When set, size by aspect ratio instead of [height] (16:9 on the phone hero). */
     aspectRatio: Float? = null,
 ) {
     com.bloo.bluelink.data.StartupTrace.once("hero-visual-${v.vin}", "HeroVisual composing for ${v.name}")
@@ -239,24 +187,9 @@ internal fun HeroVisual(
         // A transparent PNG renders edge-to-edge with no opaque box, so it blends
         // seamlessly into the pebble (fit, not crop, so the whole subject shows).
         val transparent = imageUrl.endsWith(".png", ignoreCase = true)
-        // The car photo ARRIVES instead of popping. This is the one hero element that
-        // had no animation of any kind: the pebble's collapse animates, the readout's
-        // numbers roll, the bar's fill springs -- and then the photo itself appeared
-        // between two frames. The map tiles below already did a plain Coil crossfade;
-        // the hero, the largest image in the app and the one the eye lands on first,
-        // got the same treatment first -- but a bare alpha fade read as flat next to
-        // everything else here springing or sliding into place, so this now does its
-        // own fade+slide+scale "arrival" (same language as ReorderColumn's cold-start
-        // row intro: alpha 0->1 alongside a short upward translation) instead of
-        // leaning on Coil's built-in crossfade.
-        //
-        // `loadedFrom` (not a plain Boolean) carries WHICH kind of success this was,
-        // because a memory-cache hit must NOT replay the arrival -- scrolling back to
-        // an already-decoded photo (flipping cars and back on the pager, most commonly)
-        // should show it instantly, not fade it in again every time. This is exactly
-        // the distinction Coil's own `crossfade(true)` already made automatically; doing
-        // the animation by hand means re-deriving that distinction from the callback's
-        // own DataSource instead of getting it for free.
+        // The photo arrives with a fade+slide+scale rather than popping (same language as
+        // ReorderColumn's intro). `loadedFrom` records the success kind so a memory-cache hit
+        // (flipping back to a decoded photo) shows instantly instead of replaying.
         var loadedFrom by remember(model) { mutableStateOf<DataSource?>(null) }
         val entrance = remember(model) { Animatable(0f) }
         LaunchedEffect(loadedFrom) {
@@ -266,17 +199,9 @@ internal fun HeroVisual(
                 else -> entrance.animateTo(1f, tween(360, easing = FastOutSlowInEasing))
             }
         }
-        // See HeroLoadStagger's own doc: claimed once per model (a fresh photo, not every
-        // recomposition), and only actually delays anything when another hero load just
-        // started within the same short burst window -- an isolated load (expanding one
-        // car well after cold start, say) claims 0ms and starts immediately.
+        // See HeroLoadStagger: claimed once per model; delays only when another hero load just started.
         var staggerReady by remember(model) { mutableStateOf(false) }
-        // Cold-start diagnostic: when AsyncImage actually starts (right after the stagger
-        // delay, if any), so the Success callback below can log how long THIS photo's own
-        // decode took -- distinct from `hero photo decoded`'s old single shared key, which
-        // could only ever report the FIRST of a multi-car account's photos (StartupTrace.once
-        // dedupes by key, and every car used the same one), leaving every later photo's own
-        // timing invisible in every report so far.
+        // Cold-start diagnostic: marks when AsyncImage starts so Success can log this photo's own decode time.
         var loadStartedAtMs by remember(model) { mutableLongStateOf(0L) }
         LaunchedEffect(model) {
             val delayMs = HeroLoadStagger.claimDelayMs()
@@ -284,35 +209,19 @@ internal fun HeroVisual(
             loadStartedAtMs = System.currentTimeMillis()
             staggerReady = true
         }
-        // Memoized like the map tiles: creating a fresh ImageRequest every recomposition
-        // would trigger unnecessary reloads and cause visible flicker/jank.
+        // Memoized like the map tiles: a fresh ImageRequest per recomposition would reload and flicker.
         val context = LocalContext.current
         val imageRequest = remember(model) {
             ImageRequest.Builder(context)
                 .data(model)
-                // Explicit upper bound, not left to Coil's automatic view-constraint
-                // sizing: a real device report showed a ~280MB heap spike and a
-                // ~1.4s main-thread stall the instant two cars' hero photos first
-                // composed for a real account with photos actually set. The crop
-                // screen's own export already caps a NEWLY saved photo at 1080px
-                // wide, but that cap does nothing for a photo saved by an OLDER
-                // build (this app ships a fresh build on every commit; nothing
-                // re-processes a file already on disk), a Drive-synced photo from
-                // another device, or automatic view-based sizing simply not
-                // engaging the way it's expected to for this Modifier chain. This
-                // bounds the decode itself to roughly the crop export's own target
-                // regardless of what the source file on disk actually is, the same
-                // "never trust the input, always cap the output" rule
-                // downscaledJpegBytes (SettingsStore.kt) already follows for the
-                // Drive-sync path.
+                // Explicit decode cap (not Coil's automatic sizing): photos from older builds or Drive sync
+                // may be larger than the crop export's 1080px, and two large decodes stall the main thread.
+                // Never trust the input, always cap the output.
                 .size(1080, 1080)
                 .build()
         }
         if (!staggerReady) {
-            // Same tonal fallback the no-photo branch above shows -- a car whose hero
-            // load is being held back by the stagger looks exactly like one that simply
-            // hasn't loaded yet, for the brief window (a couple hundred ms, at most, and
-            // only when another hero just started loading) until its turn comes.
+            // Same tonal fallback as the no-photo branch, shown while the stagger holds the load back.
             val scheme = MaterialTheme.colorScheme
             Box(
                 sizeModifier
@@ -327,18 +236,8 @@ internal fun HeroVisual(
                 onState = { state ->
                     if (state is AsyncImagePainter.State.Success) {
                         loadedFrom = state.result.dataSource
-                        // Cold-start: when the car photo actually finished DECODING and is
-                        // being drawn, not when the request was dispatched. A hero photo
-                        // arriving late is one of the few startup costs that visibly pops in.
-                        // Keyed per-VIN (not one shared key) and carrying its own elapsed time
-                        // and source file size -- a real device log showed a ~270MB heap jump
-                        // and ~188MB of NATIVE heap growth (a bitmap-decode signature, not a
-                        // JSON-parse one) in this same window despite the `.size(1080, 1080)`
-                        // decode cap, which two properly-capped ARGB_8888 bitmaps could never
-                        // need (under 10MB combined). Either that cap isn't taking effect for
-                        // these particular files, or the source files themselves are large
-                        // enough that decode needs far more transient memory than the final
-                        // bitmap does -- this is what will actually show which.
+                        // Cold-start trace: when the photo finished decoding, keyed per-VIN with elapsed time and
+                        // source file size, to diagnose bitmap-decode memory.
                         val elapsedMs = if (loadStartedAtMs > 0) System.currentTimeMillis() - loadStartedAtMs else -1
                         val sourceSize = (model as? java.io.File)?.let {
                             runCatching { it.length() }.getOrNull()
@@ -354,11 +253,7 @@ internal fun HeroVisual(
                     .then(if (transparent) Modifier else Modifier.clip(RoundedCornerShape(corner)))
                     .graphicsLayer {
                         alpha = entrance.value
-                        // A short upward drift, not a full ReorderColumn-sized 28dp one -- this
-                        // is a photo arriving into place it already occupies, not a row sliding
-                        // in from off-list, so the motion is a hint of settling rather than a
-                        // real journey. Same reasoning for the scale: 0.97->1 reads as the photo
-                        // gently coming forward, not a distracting zoom.
+                        // A short upward drift and 0.97-1 scale: a hint of settling into a place the photo already occupies.
                         translationY = (1f - entrance.value) * 10.dp.toPx()
                         val s = 0.97f + 0.03f * entrance.value
                         scaleX = s
@@ -370,13 +265,9 @@ internal fun HeroVisual(
 }
 
 /**
- * The battery/fuel percentage readout: headline percent + range, a status
- * line beneath (charging details > driving/parked > plain "Battery"/"Fuel"
- * label, in that priority order), and a gradient progress bar. The bar's
- * fill animates via a spring (`animatedFrac`) rather than snapping to the
- * new percentage, and -- when plugged in -- a small dot marks the
- * charge-limit target percentage on the track so the user can see at a
- * glance how much further it'll charge.
+ * The battery/fuel percentage readout: headline percent + range, a status line (charging
+ * details > driving/parked > plain label), and a gradient progress bar with a charge-limit
+ * marker when plugged in. The bar fill springs rather than snapping.
  */
 @Composable
 internal fun ChargeFuelBar(
@@ -386,33 +277,16 @@ internal fun ChargeFuelBar(
     drivingLabel: String? = null,
     metric: Boolean = false,
 ) {
-    // Now literally [HeroMorphReadout] held at its expanded end. There is ONE readout
-    // implementation in the app, and every surface that shows this -- the hero on the phone,
-    // the flip cover's tile, the EV Charge pebble -- renders that same one.
-    //
-    // This function had grown a near-duplicate of it: a ChargeStatsBlock with the same Row,
-    // the same weighted spacer, the same two RollingNumbers at the same two type steps, then
-    // the same fuel row and the same bar. Two implementations of one readout is how the
-    // collapsed bar ended up silently dropping the charge-limit marker the expanded one drew,
-    // and how the morph pass dropped the fuel icon this file had always had. `t = 1f` is a
-    // constant, so nothing here animates -- the morph is inert at its endpoint.
+    // [HeroMorphReadout] held at its expanded end (`t = 1f`, inert): the one readout
+    // implementation shared by the hero, the flip cover tile and the EV Charge pebble.
     HeroMorphReadout(chargeReadoutOf(status, hasBattery, hasFuel, drivingLabel, metric), t = 1f)
 }
 
 /**
- * Everything the charge/fuel readout says, derived ONCE.
- *
- * The hero renders this readout at two densities — one line in the collapsed header,
- * the full block at the bottom of the expanded card — and until now those were two
- * independent derivations of the same numbers: two answers to "battery percentage or
- * fuel percentage", two copies of the charging > driving > plain priority order for
- * the state line, two charging-colour rules. That is this codebase's recurring class
- * of bug (a rule that exists in one place and is re-typed in another), and here it
- * had already produced a visible one — both copies on screen simultaneously,
- * disagreeing about whether to mention charging.
- *
- * Now both densities render from one of these, and only the LAYOUT differs.
+ * Everything the charge/fuel readout says, derived once so the collapsed one-line and expanded
+ * block densities agree on the percentage, the charging > driving > plain priority order and
+ * the charging colour. Only the layout differs.
  */
 
 // Colours, sizes and motion specs shared across screens live in UiTokens.kt.
-// The shared floating/card edge (glassRim) now lives solely in GlassChrome.kt.
+// The shared floating/card edge (glassRim) lives in GlassChrome.kt.

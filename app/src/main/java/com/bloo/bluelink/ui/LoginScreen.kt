@@ -72,36 +72,20 @@ import kotlin.math.max
 import androidx.core.net.toUri
 
 /**
- * Sign-in form supporting every brand (US Hyundai/Genesis/Kia plus the three
- * Canada brands) from one screen. All fields
- * (email/password/pin/brand) are local `mutableStateOf` -- nothing is
- * persisted until [onLogin] fires, so switching brands mid-entry doesn't
- * lose the typed email/password. Selecting a brand via [MorphSegmented]
- * only changes copy/labels/validation shape shown here; brand-specific
- * strings (subtitle, email label, forgot-password URL, sign-in button
- * label) are recomputed from `brand` on every recomposition and each swap
- * cross-fades via [AnimatedContent] rather than snapping instantly.
- * The PIN field is only shown for brands that need one (`brand.requiresPin`
- * -- every brand except Kia US); Kia and Canada instead get a one-time-
- * passcode dialog elsewhere ([KiaOtpDialog]/[CanadaOtpDialog]) after
- * submitting -- Canada still shows the PIN field first since its commands
- * are PIN-gated even though sign-in itself goes through OTP. `formVisible`
- * flips true one
- * frame after first composition purely to trigger the initial slide-up-and-
- * fade-in entrance animation.
+ * Sign-in form for every brand (US, Canada, Europe) on one screen. Field state is local until [onLogin] fires,
+ * so switching brands keeps typed values. Brand copy cross-fades via [AnimatedContent]. The PIN field shows for
+ * brands with `requiresPin` (Canada's commands are PIN-gated though sign-in uses OTP); Kia and Canada get a
+ * one-time-passcode dialog after submit ([KiaOtpDialog]/[CanadaOtpDialog]).
  */
 @Composable
 internal fun LoginScreen(
     loading: Boolean,
     onLogin: (String, String, String, Brand) -> Unit,
     onCancel: (() -> Unit)? = null,
-    /** The app's own update flow, offered on the logged-out screen too: a user stuck on an old
-     *  build (e.g. one that can no longer sign in) otherwise has no way to update from inside the
-     *  app, since the update surface lives in Settings behind sign-in. */
+    /** Offers the update flow on the logged-out screen too, since the normal surface lives in Settings behind sign-in. */
     onCheckForUpdates: () -> Unit = {},
     updateChecking: Boolean = false,
-    /** Set once a check finds a newer build; the button then reads "Update available" and opens
-     *  the release page. */
+    /** Set once a check finds a newer build; the button then reads "Update available" and opens the release page. */
     updateAvailableUrl: String? = null,
 ) {
     var email by remember { mutableStateOf("") }
@@ -109,15 +93,11 @@ internal fun LoginScreen(
     var pin by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
     var showPin by remember { mutableStateOf(false) }
-    // Region picks which 3 brands the segmented picker offers; the Canadian ones run on a different
-    // backend (see CanadaApi), so switching region also resets `brand` to its first entry.
+    // Region picks which brands the picker offers (Canadian ones use a different backend, CanadaApi); switching resets `brand`.
     var region by remember { mutableStateOf("US") }
     var brand by remember { mutableStateOf(Brand.HYUNDAI) }
     val scheme = MaterialTheme.colorScheme
-    // LocalWindowInfo, not LocalConfiguration: the latter reports the whole SCREEN, which is
-    // wrong in split-screen/multi-window (the app is shorter than the screen then, so the
-    // "short screen" branch fired for a tall window and vice versa). containerSize is the
-    // window the app is actually drawing into.
+    // LocalWindowInfo, not LocalConfiguration: containerSize is the app's window, correct in multi-window.
     val shortScreen = with(LocalDensity.current) {
         LocalWindowInfo.current.containerSize.height.toDp() < 520.dp
     }
@@ -145,12 +125,10 @@ internal fun LoginScreen(
 
     if (onCancel != null) BackHandler { onCancel() }
 
-    // Backs the StatusBarScrim call below with a REAL backdrop blur of the Aurora
-    // background -- same pattern GarageScreen.kt uses for its own two pagers. See
-    // StatusBarScrim's own doc for why plain Modifier.blur never worked here.
+    // Backs StatusBarScrim with a real backdrop blur of the Aurora background.
     val hazeState = remember { HazeState() }
     Box(Modifier.fillMaxSize()) {
-        // Same gate as LoadingScreen -- see its comment.
+        // Same gate as LoadingScreen.
         if (LocalAppearance.current.auroraBackground) AuroraBackground(Modifier.matchParentSize().hazeSource(hazeState))
         Column(
             Modifier
@@ -350,10 +328,7 @@ internal fun LoginScreen(
                             }
                         }
 
-                        // Update affordance, available WITHOUT signing in. Reads "Update available"
-                        // and opens the release page once a check finds a build; otherwise it checks
-                        // (or re-checks) on tap. A logged-out user on an old build could not reach the
-                        // Settings update surface at all before this.
+                        // Update affordance without signing in: opens the release page once a build is found, else checks on tap.
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             SafeMorphTextButton(
                                 text = when {
@@ -396,8 +371,7 @@ internal fun LoginScreen(
 @Composable
 internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
     var code by remember(otp.sentTo) { mutableStateOf("") }
-    // Standardized on the shared GlassAlertDialog shell (frosted card, 28dp
-    // corners, stacked full-width buttons) instead of a raw M3 AlertDialog.
+    // Shared GlassAlertDialog shell with stacked full-width buttons.
     GlassAlertDialog(
         onDismissRequest = { if (!loading) vm.kiaCancelOtp() },
         icon = Icons.Filled.Lock,
@@ -430,8 +404,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
             }
         },
         buttons = {
-            // Verify shown only once a code's been sent; Cancel always. Stacked
-            // full-width (primary on top) per the shell's convention.
+            // Verify only once a code is sent; Cancel always. Stacked, primary on top.
             if (otp.sentTo != null) {
                 SafeMorphTextButton(
                     text = "Verify",
@@ -452,9 +425,8 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
 }
 
 /**
- * Canada sign-in verification: unlike [KiaOtpDialog] there's no destination to
- * pick (email only), and the code is already sent by the time this shows
- * (see AppViewModel.loginCanada), so it goes straight to code entry.
+ * Canada sign-in verification: unlike [KiaOtpDialog] there is no destination to pick, since the code is
+ * already sent (see AppViewModel.loginCanada), so it goes straight to code entry.
  */
 @Composable
 internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewModel) {
@@ -488,12 +460,7 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
     )
 }
 
-/**
- * The one-time-code entry field shared by [KiaOtpDialog] and [CanadaOtpDialog]. Both
- * hoist their own `code` state (the Verify button reads it), so this takes the value
- * and its setter rather than owning the buffer -- everything else (the "Code" label,
- * single line, number keyboard, [FieldShape] and full width) is identical.
- */
+/** The one-time-code field shared by [KiaOtpDialog] and [CanadaOtpDialog]; callers hoist `code` since Verify reads it. */
 @Composable
 internal fun OtpCodeField(code: String, onCodeChange: (String) -> Unit) {
     BlooTextField(

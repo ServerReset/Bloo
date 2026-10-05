@@ -79,9 +79,8 @@ import kotlin.math.max
 import com.bloo.uicommon.blockPageSwipe
 
 /**
- * Lightweight, crash-free crop: pinch-zoom + drag the picked image inside a 16:9
- * frame, then export the framed region to a file. Drawn via a Canvas + Matrix so
- * what you see is what gets saved.
+ * Crash-free crop: pinch-zoom + drag the picked image inside a 16:9 frame, then export the framed region.
+ * Drawn via Canvas + Matrix so what you see is what is saved.
  */
 @Composable
 internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, onSave: (String) -> Unit) {
@@ -104,7 +103,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                 val opts = BitmapFactory.Options().apply { inSampleSize = sample }
                 val raw = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
                     ?: return@runCatching null
-                // Apply the photo's EXIF orientation (camera photos are often rotated).
+                // Apply the photo's EXIF orientation.
                 val orientation = context.contentResolver.openInputStream(uri)?.use {
                     androidx.exifinterface.media.ExifInterface(it).getAttributeInt(
                         androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
@@ -175,8 +174,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                                     .apply { postScale(outScale, outScale) }
                                 canvas.drawBitmap(image, m, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
                                 val dir = java.io.File(context.filesDir, "cars").apply { mkdirs() }
-                                // Preserve transparency: alpha sources are saved as PNG (so the
-                                // background stays see-through and renders seamlessly), others JPEG.
+                                // Preserve transparency: alpha sources save as PNG, others as JPEG.
                                 val alpha = image.hasAlpha()
                                 val ext = if (alpha) "png" else "jpg"
                                 val file = java.io.File(dir, "car_${vin}_${System.currentTimeMillis()}.$ext")
@@ -203,8 +201,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
 }
 
 // --- Settings -------------------------------------------------------------
-// (The settings screen is owned by SettingsScreen.kt's family: SettingsScreen,
-// SettingsCards, SettingsIndex, SettingsSearch, SettingsWidgets.)
+// (The settings screen lives in SettingsScreen.kt's family.)
 
 // --- Small reusable pieces ------------------------------------------------
 
@@ -212,63 +209,31 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
 internal fun StatusRow(label: String, value: String, valueMono: Boolean = false) {
     Row(
         Modifier.fillMaxWidth(),
-        // Top-align so that if the value wraps to a 2nd line (a long value at a
-        // large display/font size), the label stays anchored to the first line
-        // rather than floating to the vertical center of a now-taller row.
+        // Top-align so a wrapped value leaves the label on the first line.
         verticalAlignment = Alignment.Top,
     ) {
         Text(
             label,
-            // NOT weight(1f) any more. A flat 50/50 split between label and value gave
-            // every label -- "Email", "VIN", "Doors", all short, static, developer-written
-            // strings -- exactly HALF the row regardless of how little of that it actually
-            // needed, which starved the other half (the value, the one side whose length
-            // varies and is often the longest thing in the row) into wrapping to two lines
-            // even on a row with plenty of total width to spare -- reported directly on
-            // the Email row, whose value is the row's only genuinely long content.
-            // Natural width instead: the label takes only what its own text needs, and
-            // the value below (still the row's one weighted child) gets everything that
-            // labelled width didn't use.
+            // Natural width, not weight(1f): a 50/50 split starved the value (the long side) into wrapping.
+            // The value below is the row's one weighted child.
             style = MaterialTheme.typography.bodyMedium,
-            // MutedContentAlpha (0.7) where LocalContentColor is full onSurface reads as a
-            // deliberately secondary label. StatusRow is the single most-reused row in the
-            // app (Diagnostics, Trips, Charge, Weather, ...), but a forced-open context
-            // (LocalForceExpanded) is already the emphasized reading, so 0.92 there: the
-            // important half shouldn't be barely distinguishable from its caption.
+            // MutedContentAlpha reads as a secondary label; 0.92 in a forced-open context (LocalForceExpanded) so the pair stays distinguishable.
             color = LocalContentColor.current.copy(
                 alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
             ),
-            // Still capped defensively -- these labels are short, static, developer-
-            // written strings today, but a future one that isn't should still clip
-            // to one line rather than wrap CHARACTER-by-character ("Coordin/ates").
+            // Capped defensively so a long label clips to one line instead of wrapping per character.
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.width(GapRow))
-        // Right-aligning Box that owns whatever the label's natural width left over
-        // (weight(1f), the row's only remaining weighted child, now that the label
-        // above measures at its own content width instead of a forced half-share)
-        // with the value end-aligned inside it. This keeps the classic label-left /
-        // value-right column: a SHORT value ("Off", "90%", "Locked") sits flush to
-        // the row's right edge, while a LONG value (coordinates, VIN, email) gets
-        // the label's now-unclaimed width too, and only wraps to a 2nd line if it
-        // still doesn't fit the row's actual total width. (An earlier version put
-        // weight(1f, fill = false) directly on the value; because AnimatedValue's
-        // leaf text hugs its content, fill=false made a short value measure to its
-        // intrinsic width and pack just past row-center — floating in the middle
-        // with dead space to its right, since textAlign=End has no room to act in a
-        // content-width box. The filling Box gives End something to align against.)
+        // Right-aligning Box owns the label's leftover width: short values sit flush right, long ones (coordinates, VIN, email)
+        // use the extra width. A filling Box gives textAlign=End something to align against.
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-            // Was a hand-rolled AnimatedContent + WiggleText -- uicommon's shared
-            // AnimatedValue already implements this (used elsewhere in this file).
-            // Colour pinned to full-strength onSurface
-            // rather than inherited -- Pebble's Card sets its content color from
-            // containerColor (usually surfaceVariant), so an uncoloured value here
-            // rendered at onSurfaceVariant strength, barely distinguishable from the
-            // dimmed label right next to it despite being the important half.
+            // AnimatedValue (uicommon). Colour pinned to onSurface: Pebble's Card would otherwise give onSurfaceVariant,
+            // barely distinct from the dimmed label.
             val baseStyle = LocalTextStyle.current
             val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-            // Memoized to avoid recreating the TextStyle.copy() on every recomposition.
+            // Memoized to avoid recreating TextStyle.copy() every recomposition.
             val valueStyle = remember(baseStyle, onSurfaceColor, valueMono) {
                 baseStyle.copy(
                     fontWeight = FontWeight.Medium,
@@ -302,7 +267,7 @@ internal fun SectionLabel(text: String) {
 @Composable
 internal fun StepRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        // Use bodySmall instead of bodyMedium to keep slider labels compact
+        // bodySmall keeps slider labels compact.
         Text(
             label,
             Modifier.weight(1f),
@@ -324,38 +289,21 @@ internal fun StepRow(label: String, value: String, valueColor: Color = Color.Uns
 
 
 /**
- * The app's one toggle control for boolean settings. Ground-up redesign away
- * from a plain label next to a stock Material [Switch] -- a custom pill
- * track+thumb (spring-timed like [MorphButton]) stands in for the Switch so
- * this shares that pill-morph vocabulary too instead of being the one
- * default-Material holdout in an otherwise fully custom UI.
- *
- * An earlier version of this also washed the whole row toward the primary
- * color and rounded its corners when checked, matching how MorphButton fills
- * solid on activation -- dropped after feedback that stacked next to a
- * card's own background it read as a second nested box rather than a
- * highlight, especially over the AI toggle's already-boxed row.
+ * The app's one toggle control for boolean settings: a custom pill track+thumb (spring-timed like [MorphButton])
+ * in place of a stock Material [Switch].
  */
 @Composable
 fun ToggleRow(
     label: String,
     checked: Boolean,
     /**
-     * The explanatory line under the switch, if the setting needs one.
-     *
-     * A parameter and not a Text the caller writes itself: Settings had eleven of those,
-     * hand-written at their call sites, and they had drifted -- some carried a 10dp bottom
-     * padding, some none, and the gap above them was whatever the previous control happened
-     * to leave. Owning the caption here means one style and one rhythm for all of them, and
-     * it stays outside the toggleable below so TalkBack still reports the row as a single
-     * switch rather than a switch followed by a paragraph.
+     * The explanatory line under the switch. Owning it here gives one style and rhythm, and keeps it outside the
+     * toggleable so TalkBack reports a single switch.
      */
     description: String? = null,
     onChange: (Boolean) -> Unit,
 ) {
-    // No wrapper at all when there is no caption, so every existing call site keeps exactly
-    // the layout it had -- a Column around a single fillMaxWidth Row measures the same, but
-    // "the same" is not worth asserting across ~25 call sites for a branch that costs nothing.
+    // No wrapper when there is no caption, so existing call sites keep their layout.
     if (description == null) {
         ToggleRowControl(label, checked, onChange)
     } else {
@@ -368,18 +316,15 @@ fun ToggleRow(
 
 
 /**
- * The caption style shared by [ToggleRow]'s own `description` and by the settings rows that
- * need one without a switch attached. Bottom padding, not top: it belongs to the control it
- * explains, and the gap that matters is the one before the NEXT control.
+ * The caption style shared by [ToggleRow]'s `description` and switchless settings rows.
+ * Bottom padding: it belongs to the control it explains.
  */
 @Composable
 internal fun SettingsCaption(
     text: String,
     modifier: Modifier = Modifier,
     /**
-     * The gap below. The default is the group gap, because a caption normally trails the
-     * control it explains and what matters is the distance to the NEXT one. Pass a smaller one
-     * where the caption instead LEADS its own control, so the two read as a pair.
+     * The gap below; defaults to the group gap. Pass a smaller one where the caption leads its control.
      */
     bottomGap: Dp = GapGroup,
 ) {
@@ -393,17 +338,11 @@ internal fun SettingsCaption(
 
 
 /**
- * A bare toggle, with no row and no label around it -- what a card puts on its own title row
- * when the whole card IS one setting.
- *
- * The same MorphToggleTrack every ToggleRow draws, with the same toggleable semantics, so an
- * inline card and an expanded one are the same control in two places rather than two controls
- * that happen to look alike.
+ * A bare toggle (no row or label) for a card whose whole body is one setting; same track and semantics as [ToggleRow].
  */
 /**
- * The `toggleable` (not `clickable`, for the checked/Role.Switch semantics node) + no-ripple
- * + toggle-haptics boilerplate both [InlineToggle] and [ToggleRowControl] wrapped around
- * their track/row -- one copy instead of two.
+ * The `toggleable` (for checked/Role.Switch semantics), no-ripple and toggle-haptics wrapper shared by
+ * [InlineToggle] and [ToggleRowControl].
  */
 @Composable
 private fun Modifier.hapticToggleable(checked: Boolean, onChange: (Boolean) -> Unit): Modifier {
@@ -434,12 +373,7 @@ private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean
     Row(
         Modifier
             .fillMaxWidth()
-            // toggleable (not clickable) gives this its own Role.Switch + checked
-            // semantics node -- the track below clears its own (identical) node
-            // so TalkBack sees ONE correctly-announced toggle for the row
-            // instead of two adjacent focus stops (a generic "double tap to
-            // activate" for the row, then the real on/off announcement for the
-            // track a swipe later).
+            // toggleable gives a Role.Switch + checked node; the track clears its own so TalkBack sees one toggle.
             .hapticToggleable(checked, onChange)
             .padding(vertical = GapHairline),
         verticalAlignment = Alignment.CenterVertically,
@@ -449,9 +383,7 @@ private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean
             Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (checked) FontWeight.Medium else FontWeight.Normal,
-            // Cap at 2 lines: the toggle track is fixed-width so it can't be pushed
-            // off, but a long setting label at a large font size should wrap at
-            // spaces to two lines rather than growing the row indefinitely.
+            // Cap at 2 lines; long labels wrap at spaces rather than growing the row.
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -462,9 +394,8 @@ private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean
 
 
 /**
- * The matrix that draws an image of [imgW] x [imgH] into a [wpx] x [hpx] frame the way the crop
- * editor shows it: scaled to cover the frame, zoomed by [scale], panned by [offset] but never far
- * enough to show an edge. The preview and the saved bitmap both use it, so they cannot disagree.
+ * The matrix drawing an [imgW] x [imgH] image into a [wpx] x [hpx] frame as the crop editor shows it: scaled to cover,
+ * zoomed by [scale], panned by [offset] but never past an edge. Preview and saved bitmap share it.
  */
 private fun cropMatrix(imgW: Int, imgH: Int, wpx: Float, hpx: Float, scale: Float, offset: androidx.compose.ui.geometry.Offset): android.graphics.Matrix {
     val s = max(wpx / imgW, hpx / imgH) * scale

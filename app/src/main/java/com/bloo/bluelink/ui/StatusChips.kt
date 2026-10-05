@@ -43,38 +43,21 @@ import com.bloo.uicommon.coldStartIntroPlayed
 import com.bloo.uicommon.animatePlacement
 
 /**
- * Small status-chip widgets: MetaChip, StatusChip, the update-available chip/dot/
- * badged-card family, and LastUpdatedLabel. Split out of Widgets.kt to group this
- * cohesive cluster on its own.
+ * Small status-chip widgets: MetaChip, StatusChip, the update-available chip/dot/badge family,
+ * LastUpdatedLabel, and ReorderColumn.
  */
 
 /**
- * Small pill-shaped fact badge -- [CarHeaderRow]'s own model/powertrain and
- * "updated x ago" facts, which used to be two stacked plain caption lines
- * with no container of their own, reading as an afterthought next to the
- * rest of the app's chip/pill chrome.
+ * Small pill-shaped fact badge ([CarHeaderRow]'s model/powertrain and "updated x ago").
  *
- * Uses the SAME floating-pill rim/shadow treatment as everything else that
- * has to stay legible over unpredictable content (the map's own name pill,
- * FloatingIcon), but a genuinely NEUTRAL fill -- plain black/white by theme,
- * not `surfaceContainerHighest`. That token is a Material3 tonal "neutral"
- * role, which is only ever a near-hueless gray for a plain, undynamic
- * theme; this app's own custom/dynamic palette feeds it a seed colour, and
- * a "neutral" tone that inherits even a little of a blue seed reads as a
- * flatly blue chip -- reported directly ("it should be a neutral colour...
- * not a primary") after an earlier fix here picked exactly that token. A
- * flat, un-rimmed `surfaceContainerHigh` (this composable's ORIGINAL
- * design) was ALSO reported, twice, as effectively invisible over the
- * wide/dual-car header's plain black background -- so this needs to be
- * both hue-independent AND definitely visible regardless of theme, which a
- * theme-role color token can't promise on its own either way.
+ * Uses the floating-pill rim/shadow treatment, with a NEUTRAL fill (plain black/white by theme)
+ * rather than a theme role like `surfaceContainerHighest`: dynamic palettes tint those with the
+ * seed colour, and `surfaceContainerHigh` without a rim is invisible on the dark dual-car header.
  */
 @Composable
 internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, hazeState: HazeState? = null) {
-    // GlassSurface (GlassChrome.kt): hazeState is now threaded through from the hero
-    // header's own screen-level HazeState (see CarHeaderRow), so this chip gets a real
-    // backdrop blur wherever a caller can supply one -- callers with none in scope still
-    // fall back to the same plain tint this always had.
+    // GlassSurface (GlassChrome.kt): hazeState comes from the hero header's screen-level
+    // HazeState for a real backdrop blur; callers without one fall back to the plain tint.
     GlassSurface(
         shape = RoundedCornerShape(50),
         modifier = modifier,
@@ -100,23 +83,12 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
 }
 
 /**
- * The tinted sibling of [MetaChip]: a small pill for a LIVE status readout -- something
- * that changes while you are looking at it and whose colour carries meaning (AutoLock's
- * detection state, [SettingsHeroCard]'s update-check result).
+ * The tinted sibling of [MetaChip]: a pill for a LIVE status readout whose colour carries
+ * meaning (AutoLock's detection state, [SettingsHeroCard]'s update-check result).
  *
- * Separate from [MetaChip] rather than a `tint` parameter on it, because the two answer
- * different questions. MetaChip is a static fact over unpredictable content (a photo, the
- * map), so it is deliberately hue-free glass with a rim and a shadow -- see its own doc for
- * how hard-won that is. This one always sits on a known settings card, carries no rim, and
- * is tinted on purpose.
- *
- * It exists because two screens had hand-rolled the same pill at different sizes and fills:
- * AutoLock's detection state as a solid `primaryContainer` [Surface] at 12/6 padding,
- * [SettingsHeroCard]'s update status as a 0.15-alpha tint at 12/8. Same content, same place
- * in the app (both are Settings cards), two chips -- so both route through this now. The 0.15-alpha
- * fill is the one that survived: a status chip has to work in any of the tints a caller
- * passes (tertiary, error, a muted onSurfaceVariant "nothing to report"), and only the
- * alpha-of-the-tint form has a matching container tone for every one of them.
+ * Separate from [MetaChip], which is hue-free glass with a rim over unpredictable content;
+ * this one sits on a known settings card, has no rim, and is tinted on purpose. The 0.15-alpha
+ * tint fill has a matching container tone for any tint a caller passes.
  */
 @Composable
 internal fun StatusChip(text: String, tint: Color, modifier: Modifier = Modifier, icon: ImageVector? = null) {
@@ -124,10 +96,8 @@ internal fun StatusChip(text: String, tint: Color, modifier: Modifier = Modifier
 }
 
 /**
- * [StatusChip] with the label as a slot, for the callers that animate the text itself
- * ([SettingsHeroCard]'s own chip crossfades between "Checking…" / "Build N ready" /
- * "Up to date"). The style and the tint are still applied here, through LocalContentColor /
- * LocalTextStyle, so an animating caller cannot drift away from a static one.
+ * [StatusChip] with the label as a slot, for callers that animate the text itself. Style and
+ * tint are applied through LocalContentColor / LocalTextStyle so they match a static chip.
  */
 @Composable
 internal fun StatusChip(
@@ -159,15 +129,8 @@ internal fun StatusChip(
 
 
 /**
- * The small "there's something new" notification dot every update card now wears on
- * its own top-end corner -- [SettingsHeroCard] and the garage's [UpdateAvailableTile]
- * pebble both host it identically, via [Modifier.updateAvailableBadge], rather than the
- * card's own full status chip/summary text being the only cue: a glance at either
- * card's corner, even collapsed, should say "go look at this" the same way an app
- * icon's own unread badge would, without needing to read anything.
- *
- * A plain dot, not a count -- there is only ever "an update" or not, never a number of
- * them, so a badge count would just be a fixed 1 with extra ceremony.
+ * The "there's something new" dot on the top-end corner of update cards ([SettingsHeroCard],
+ * [UpdateAvailableTile]), applied via [Modifier.updateAvailableBadge]. A plain dot, not a count.
  */
 @Composable
 private fun UpdateAvailableDot(modifier: Modifier = Modifier) {
@@ -175,25 +138,15 @@ private fun UpdateAvailableDot(modifier: Modifier = Modifier) {
         modifier
             .size(12.dp)
             .background(UpdateAvailableAmber, CircleShape)
-            // A hairline ring in the card's own container tone -- otherwise the dot's
-            // edge, sitting right at the card's rounded corner, has nothing separating
-            // it from whatever happens to be directly behind that corner (status bar
-            // icons, another card peeking from the next page over).
+            // A hairline ring in the card's container tone separates the dot from whatever is behind the corner.
             .border(2.dp, MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
     )
 }
 
 /**
- * Wraps [content] in a [Box] and overlays [UpdateAvailableDot] on its top-end corner,
- * scaling in/out as [visible] flips -- the shared entry point both update-card call
- * sites ([SettingsHeroCard], [UpdateAvailableTile]) use so the badge's position, size,
- * offset and pop animation can't drift between them.
- *
- * The dot sits slightly outside the corner (a small negative offset on both axes)
- * rather than flush against it, the same "notification badge overlaps the icon's own
- * edge" placement Android's own app-icon badges use -- flush against a card's own
- * ROUNDED corner would have the dot's bottom-left quarter sitting on the transparent
- * area the corner radius cuts away, reading as clipped rather than round.
+ * Wraps [content] in a [Box] and overlays [UpdateAvailableDot] on its top-end corner, scaling
+ * in/out as [visible] flips. The dot sits slightly outside the corner (negative offset), since
+ * flush against a rounded corner it would read as clipped.
  */
 @Composable
 internal fun UpdateBadgedCard(visible: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
@@ -215,8 +168,7 @@ internal fun UpdateBadgedCard(visible: Boolean, modifier: Modifier = Modifier, c
 }
 
 
-/** "Updated x ago" fact, as a [MetaChip]. Null (renders nothing) until a
- *  first fetch has actually landed for [v]. */
+/** "Updated x ago" fact as a [MetaChip]; null (renders nothing) until a first fetch lands for [v]. */
 @Composable
 internal fun LastUpdatedLabel(fetchedAt: Long?, modifier: Modifier = Modifier, hazeState: HazeState? = null) {
     val rel = rememberRelativeTime(fetchedAt) ?: return
@@ -227,25 +179,11 @@ internal fun LastUpdatedLabel(fetchedAt: Long?, modifier: Modifier = Modifier, h
 
 
 /**
- * A vertical list whose items can be reordered by long-pressing the supplied
- * [dragHandle] and dragging. Item heights are measured so variable-height rows
- * reorder correctly; the live order is committed via [onReorder] on drop.
+ * A vertical list whose items reorder by long-pressing the [dragHandle] and dragging; the
+ * order is committed via [onReorder] on drop. A plain Column, meant for an existing scroll container.
  *
- * Designed to live inside an existing scroll container (it is a plain Column).
- *
- * Drag mechanism: `order` is local mutable state (re-synced from [items]
- * whenever nothing is being dragged). `draggingKey` identifies which item is
- * currently held; that item is excluded from [animatePlacement] and instead
- * manually translated by `offsetY`, a running total of vertical drag delta
- * (via [detectDragGesturesAfterLongPress]'s `onDrag`). On every drag tick,
- * `offsetY` is compared against the *next* or *previous* item's measured
- * height (tracked per-key in `heights`, populated by each row's own
- * `onSizeChanged`): once the drag has moved past half that neighbor's
- * height, the two items swap places in `order` and `offsetY` is reduced by
- * that neighbor's height, so the dragged item's on-screen position stays
- * continuous through the swap rather than jumping. Every other (non-dragged)
- * row uses [animatePlacement] to glide smoothly to its new slot when the
- * list order changes underneath it. [staggerInOnColdStart]/[introKey] are
- * unrelated to dragging -- they drive a one-time entrance stagger, see
- * [coldStartIntroPlayed].
+ * `order` is local state (re-synced from [items] when not dragging). The held item (`draggingKey`)
+ * is translated by `offsetY`; past half a neighbour's measured height (`heights`) the two swap
+ * and `offsetY` shrinks by that height so the item stays continuous. Others use [animatePlacement].
+ * [staggerInOnColdStart]/[introKey] drive a one-time entrance stagger, see [coldStartIntroPlayed].
  */

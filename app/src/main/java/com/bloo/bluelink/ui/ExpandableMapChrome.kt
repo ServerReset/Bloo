@@ -79,10 +79,8 @@ internal fun rememberShowMyLocation(
 }
 
 /**
- * The buttons under a map: one standard [MorphActionButton] per [MapFeature] in the app's standard
- * [ExpressiveButtonRow] -- as many to a line as fit, each line balanced and filled edge to edge,
- * a press pushing its neighbours, a button alone on its line resting on the start edge and widening
- * when pressed. Nothing here is special to maps: it is the same row every other group of buttons is.
+ * The buttons under a map: one [MorphActionButton] per [MapFeature] in the standard [ExpressiveButtonRow]
+ * (balanced lines, a press pushes neighbours, a lone button rests at the start edge and widens when pressed).
  */
 @Composable
 internal fun MapFeatureRow(
@@ -105,33 +103,11 @@ internal fun MapFeatureRow(
 }
 
 /**
- * Everything that used to float over the top of an expanded map sheet as three
- * separate glass pills -- the vehicle-name pill (top-left), the drag handle
- * (top-center), and the refresh chip (top-right) -- consolidated into ONE bar
- * with one shared floating pill background. They used to each carry their own
- * hand-rolled (or near-identical) [GlassSurface], each with its own blur, its
- * own shadow, its own rim -- three separate pieces of glass chrome doing what
- * reads, and should always have read, as a single control strip. Giving up on
- * making that strip feel "uniform" with every other floating surface in the
- * app in some deeper sense and just building it as one plain bar was the
- * actual ask: a name on the left, a drag handle centered above a divider, and
- * a refresh action on the right, all inside one rounded rect.
+ * The one-bar header over an expanded map sheet: name (and status) at start, drag handle centred, refresh at end,
+ * positioned independently in one [Box] so the handle stays centred whatever the name length.
  *
- * [onRefreshLocation] null (the [CarMapSheet]/[CarMapSheetBody] default) omits
- * the refresh side entirely rather than showing a dead button.
- *
- * [dragModifier] carries the vertical-drag-to-dismiss gesture -- built by the
- * caller, since the two call sites each close over their own [dragPx]/`scope`/
- * `close()`, and passing the finished modifier in is simpler than exporting a
- * matching set of callback params for the same thing.
- *
- * ONE line, not the old two-row layout (a drag-handle row stacked above a
- * name/refresh row) -- name at [Alignment.CenterStart], the drag handle nub
- * genuinely centred on the bar regardless of the name's length or whether a
- * refresh icon is showing, and the refresh icon at [Alignment.CenterEnd], all
- * three positioned independently in one [Box] rather than flowing through a
- * [Row]. Reported directly as wanting one line with bigger text and the
- * handle in the middle.
+ * [onRefreshLocation] null omits the refresh side. [dragModifier] carries the drag-to-dismiss gesture, built by
+ * the caller because each call site closes over its own drag state.
  */
 @Composable
 internal fun MapTopBar(
@@ -142,23 +118,11 @@ internal fun MapTopBar(
     /** "88% · 415 km": the car's charge and range, under its name. Null leaves the name alone. */
     statusLine: String? = null,
     onRefreshLocation: (() -> Unit)? = null,
-    /** True while a refresh this bar's own [onRefreshLocation] kicked off is
-     *  still in flight -- the real command-pending flag from the caller
-     *  (state.isPending(vin, "locate")), not a locally-faked timer, so the
-     *  icon's spin genuinely tracks "still fetching" rather than a guessed
-     *  duration. */
+    /** True while the refresh from [onRefreshLocation] is in flight (the real command-pending flag); drives the icon spin. */
     refreshing: Boolean = false,
 ) {
-    // Press-and-hold "pop" on the WHOLE pill -- not just the drag handle nub --
-    // the instant any part of it is touched, before any actual drag motion,
-    // reading as "I feel you, go ahead" rather than staying inert until it
-    // moves. Reported directly as wanting the entire bar (name, handle AND
-    // refresh indicator together) to pop, not just the nub in isolation.
-    // requireUnconsumed = false: this OBSERVES the down/up sequence without
-    // consuming it, so the same touch still reaches dragModifier's own gesture
-    // detector -- popping must never steal the drag it's advertising, and the
-    // refresh button's own click still fires normally (a click is a down+up
-    // with no net movement, exactly what this passes through unconsumed).
+    // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without consuming,
+    // so dragModifier and the refresh click still receive the touch.
     var pillPressed by remember { mutableStateOf(false) }
     val pillScale by animateFloatAsState(
         targetValue = if (pillPressed) 1.04f else 1f,
@@ -179,48 +143,18 @@ internal fun MapTopBar(
             }
             .graphicsLayer { scaleX = pillScale; scaleY = pillScale },
         hazeState = mapHazeState,
-        // No contentColor override: [GlassSurface]'s own default (onSurface) is the
-        // right answer here, and the `Color.White` this used to force was wrong in
-        // light mode. This bar is glass over the MAP, and the map follows the app's
-        // theme -- CarMap dark-filters these same OSM tiles only when
-        // appIsDarkTheme() (see darkMapFilter's own doc), so in light mode the
-        // backdrop behind this pill is a BRIGHT raster map. Unlike the hero's photo,
-        // there is no dark scrim under it to make white legible: the only fill is
-        // glassTint, which in light mode is surfaceContainer at 0.08-0.12 alpha, so
-        // the car's name, the drag nub and the refresh glyph were near-white on
-        // near-white -- the bar read as empty. onSurface tracks the same theme the
-        // map filter does, so it is dark-on-light map and light-on-dark map by
-        // construction, and it honours an active custom palette the way
-        // the pin beside it already does. It is also what the map's own
-        // MapFeatureRow buttons below already use.
+        // No contentColor override: the map follows the app theme (dark filter only in dark mode), so a forced white
+        // glyph vanishes on a light map. GlassSurface's onSurface default tracks the theme and custom palettes.
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .then(dragModifier)
-                // 48dp: tall enough for the bigger titleLarge name and a comfortable
-                // touch target for both the drag handle and the refresh icon, all on
-                // one line -- the old two-row layout (a 14dp handle strip stacked
-                // above a name/refresh row) took noticeably more vertical space for
-                // the same content.
-                // heightIn(min), not a fixed 60dp: the bar stacks the car name over its
-                // charge/range status line, and at a large font that two-line block is taller
-                // than 60dp -- a hard height clipped the status line. A minimum keeps the
-                // single-line look while letting the bar grow with the text.
+                // heightIn(min), not fixed: at large font sizes the two-line name + status block exceeds 60dp and would clip.
                 .heightIn(min = 60.dp)
                 .padding(horizontal = 18.dp),
         ) {
-            // Name and bigger, titleLarge (was titleMedium) -- reported directly as
-            // wanting bigger text. Reserves room on the end for the refresh icon
-            // (never under it) regardless of alignment, since both float independently
-            // in this Box rather than sharing a Row's own space-distribution. Reserves
-            // the SAME 40dp the refresh circle itself occupies (see below) -- previously
-            // this reserved 44dp against a 36dp circle, a mismatched pair that was the
-            // "refresh button is in the incorrect place, not equal" report: the circle
-            // sat 8dp closer to the edge than the space carved out for it implied, so it
-            // read as off-centre against its own reserved slot.
-            // The car icon, its name, and under it the charge and range: the pill says which car this map
-            // is and how it is doing, not just what it is called.
+            // Car icon, name, and the charge/range line beneath. Reserves room at the end so the name never runs under the refresh circle.
             Row(
                 Modifier
                     .align(Alignment.CenterStart)
@@ -245,17 +179,7 @@ internal fun MapTopBar(
                     }
                 }
             }
-            // The drag handle: a frosted glass pill, the same GlassSurface treatment as the
-            // refresh circle at the other end of the row, so the whole header reads as one
-            // glass material. It replaces a flat 28x3dp muted bar pinned to TopCenter, which
-            // was reported as too small, misaligned against the name and refresh circle (both
-            // vertically centred), and missing the frost the rest of the chrome has.
-            //
-            // CENTRE-aligned so its middle lines up with the name block and the refresh
-            // circle's centre; 44x18dp with a 24x4dp inner bar, a real handle silhouette
-            // rather than a hairline. Purely visual -- the pop and the drag are the whole
-            // bar's (see `dragModifier` and the press tracker above), so this carries no
-            // pointerInput of its own.
+            // Frosted drag handle, centre-aligned. Purely visual: the pop and drag belong to the whole bar (`dragModifier`).
             GlassSurface(
                 shape = RoundedCornerShape(50),
                 modifier = Modifier.align(Alignment.Center).size(width = 44.dp, height = 18.dp),
@@ -269,27 +193,17 @@ internal fun MapTopBar(
                 )
             }
             if (onRefreshLocation != null) {
-                // Icon-only: a refresh indicator that spins while it is actually working (the real
-                // pending flag), in the same ramp-up/steady-spin language as every in-progress icon.
+                // Icon-only; spins while the real pending flag is set.
                 val angle = rememberSpinAngle(refreshing)
-                // 40dp, matching the Text's own reserved end space above exactly --
-                // was 36dp against a 44dp reservation, a mismatched pair (see the
-                // Text's own comment). Centred in the 48dp-tall bar the same way the
-                // drag handle and the name both are, so all three read as one row.
-                // Extra right padding pushes the button further right (away from the edges).
+                // 40dp circle, centred in the bar like the handle and name; end padding keeps it off the edge.
                 GlassSurface(
                     shape = CircleShape,
                     modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp).size(40.dp),
                     hazeState = mapHazeState,
                     onClick = onRefreshLocation,
                     contentDescription = "Refresh location",
-                    // Same reason the bar around it dropped its own white override
-                    // (see the outer GlassSurface): this nested circle is over the
-                    // same theme-following map, and a forced white glyph vanished on
-                    // a light one. Inherits GlassSurface's onSurface default.
-                    // Nested inside the bar's own already-elevated GlassSurface --
-                    // see glassEdge's own doc for why a nested panel skips the second
-                    // shadow (GlassChrome.kt).
+                    // Over the same theme-following map, so it inherits GlassSurface's onSurface default.
+                    // Nested in the bar's elevated GlassSurface, so it skips the second shadow (see glassEdge, GlassChrome.kt).
                     shadow = false,
                 ) {
                     Icon(
@@ -333,9 +247,7 @@ internal fun Modifier.pullDownToDismiss(
 
 
 /** "88% · 415 km": a car's charge and range for the map pill, or null when it has neither yet. */
-// chargeReadoutOf is @Composable (it reads MaterialTheme/LocalContentColor for the state-colour
-// pair it derives), so this wrapper must be too -- not for composition itself, but because a
-// plain function cannot resolve those locals.
+// @Composable because chargeReadoutOf resolves theme locals.
 @Composable
 internal fun mapStatusLine(state: UiState, v: com.bloo.bluelink.data.Vehicle, metric: Boolean): String? {
     val r = chargeReadoutOf(state.statusFor(v), state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric)

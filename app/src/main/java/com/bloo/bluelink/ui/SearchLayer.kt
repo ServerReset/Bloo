@@ -65,27 +65,9 @@ import com.bloo.bluelink.data.setSearchBubblePosition
 internal enum class SearchForm { BUBBLE, PILL, BAR }
 
 /**
- * THE search element, hoisted to the app root so it is a single object that
- * OUTLIVES the screen transition.
- *
- * It used to be instantiated separately by Settings, the garage and the cover,
- * which meant three of them: leaving Settings destroyed one and created
- * another, so the only transition available was a cross-fade between two
- * different things that happened to look alike. Hosted here, above the
- * screen-switching AnimatedContent, there is exactly one -- so moving between
- * the garage and Settings genuinely morphs it, a circle in the corner growing
- * into the bar across the bottom and back, because it is the same Surface the
- * whole way.
- *
- * The shape follows the screen, not the user:
- *  - Settings: the full bar, centred at the bottom. This is a screen you came
- *    to in order to find something.
- *  - Garage: a small circle in the bottom-right corner, icon only. Search is
- *    available, not advertised; the car is what you came to look at.
- *  - Cover: the same circle, smaller, and DRAGGABLE -- on a one-inch screen
- *    anything parked in a corner is covering something, and which corner is
- *    free depends on the tile you are on, so the answer has to be the user's.
- *  - Open, anywhere: the bar, because at that point it is a text field.
+ * The single search element, hoisted to the app root so it outlives screen transitions and morphs between them.
+ * Shape follows the screen: Settings = full bar at the bottom; Garage = small corner circle;
+ * Cover = smaller, draggable circle (the free corner depends on the tile); open anywhere = the bar.
  */
 @Composable
 internal fun SearchLayer(
@@ -94,57 +76,34 @@ internal fun SearchLayer(
     appearance: SettingsStore.Appearance,
     notif: SettingsStore.NotificationPrefs,
     onSettings: Boolean,
-    /** Reports whether the search UI is open (pill/panel showing) -- the
-     *  ambient blurred aurora behind it pauses while this is true, so the
-     *  keyboard/typing frames don't contend with a full-screen blur redraw. */
+    /** Reports whether the search UI is open; the ambient aurora pauses while true so typing frames stay cheap. */
     onOpenChanged: ((Boolean) -> Unit)? = null,
-    /** Screens.kt's own shared instance -- the same one whichever of
-     *  GarageScreen/SettingsScreen is actually showing underneath marks its own
-     *  content with. Null (the old, silent default here) meant the bar/panel's own
-     *  glass fill had no real blur source to ask for regardless of which screen was
-     *  showing, so it fell back to a flat, more opaque tint that visibly didn't
-     *  match every other piece of glass chrome in the app -- reported directly. */
+    /** Screens.kt's shared instance that the underlying screens mark their content with; null leaves the
+     *  glass fill without a blur source (flat tint). */
     hazeState: HazeState? = null,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var submitted by rememberSaveable { mutableStateOf("") }
     var focused by rememberSaveable { mutableStateOf(false) }
     val open = focused || query.isNotEmpty()
-    // Where the bubble was dragged, in dp from the top-left (NaN = never, so it rests in its corner).
-    // Saved so it survives rotation. mutableStateOf, not mutableFloatStateOf: rememberSaveable's
-    // guaranteed Saver path; this changes twice a gesture, so the boxing doesn't matter.
+    // Dragged bubble position in dp from the top-left (NaN = resting corner). Saved across rotation;
+    // mutableStateOf for rememberSaveable's guaranteed Saver path.
     @Suppress("AutoboxingStateCreation")
     var dragX by rememberSaveable { mutableStateOf(Float.NaN) }
     // Normal (phone) layout only: which of three docks the bubble sits in, and how fast the last drag move was.
     var dockName by rememberSaveable { mutableStateOf(SearchDock.RIGHT.name) }
     val dock = SearchDock.valueOf(dockName)
     var lastDx by remember { mutableFloatStateOf(0f) }
-    // True only between finger-down and finger-up on the bubble. The position
-    // animation is BYPASSED while it is true -- see the spec choice below.
+    // True only between finger-down and finger-up; position animation is bypassed meanwhile.
     var dragging by remember { mutableStateOf(false) }
-    // The app's own tuned vocabulary (Haptics.kt), not the generic platform
-    // LocalHapticFeedback this used to reach for -- search is one of the most
-    // prominent, most-animated surfaces in the app (it morphs shape, position AND
-    // opens a whole panel) and was the one major interaction still running on a
-    // borrowed system-default feel instead of the app's own composed effects
-    // everything else (pebbles, toggles, buttons) uses.
+    // The app's own haptic vocabulary (Haptics.kt), not the platform LocalHapticFeedback.
     val haptics = LocalHaptics.current
 
     BackHandler(enabled = open) { query = ""; focused = false }
-    // Say when the open-state flips, so the aurora behind this layer can
-    // pause while the panel is up (see AuroraBackground's `paused`).
+    // Report open-state so the aurora can pause (see AuroraBackground `paused`).
     SideEffect { onOpenChanged?.invoke(open) }
-    // A click when it opens, a tick when it closes -- the same asymmetry
-    // PebbleShell's own header tap uses (expand is the weightier confirm; collapse
-    // is the lighter step), so search reads as one more instance of the app's
-    // single expand/collapse feel rather than its own separate gesture language.
-    // The morph is the visual half of a state change the user just caused; the
-    // haptic is the half they feel, and it lands on the frame the shape starts
-    // moving rather than when it arrives, so the gesture reads as having been
-    // received immediately.
-    // Armed only after the first composition: a LaunchedEffect keyed on a
-    // boolean also runs when that boolean is simply born false, so without
-    // this the app buzzes once on launch, for nothing happening.
+    // Click on open, tick on close (same asymmetry as PebbleShell's header), on the frame the shape starts moving.
+    // Armed after first composition so a LaunchedEffect born false does not buzz on launch.
     var hapticArmed by remember { mutableStateOf(false) }
     LaunchedEffect(open) {
         if (hapticArmed) {
@@ -152,68 +111,40 @@ internal fun SearchLayer(
         }
         hapticArmed = true
     }
-    // Drop any stale AI answer once the box is cleared, and forget the last
-    // submission with it -- otherwise reopening search shows the previous
-    // question's answer under an empty field.
+    // Clear the stale AI answer and last submission once the box is emptied.
     LaunchedEffect(query.isBlank()) {
         if (query.isBlank()) { vm.clearAiReply(); submitted = "" }
     }
 
-    // IME/nav observation, hoisted OUT of the BoxWithConstraints lambda
-    // below. The insets API works by snapshot reads: each read site is one
-    // subscription, and the reads happen ONCE per SearchLayer recomposition
-    // here instead of once per re-run of the BoxWithConstraints lambda
-    // (whose scope re-runs on every relevant state change a keystroke
-    // produces). One reader slot, one subscriber, and the box only re-runs
-    // when the value it actually drew from changes -- the panel re-measures
-    // when the keyboard crosses the open/closed threshold, not on every
-    // keystroke tick. (The older claim that inline reads accumulate N
-    // WINDOW LISTENERS per keystroke no longer holds with the modern
-    // siteless insets API, but the hoist is exactly right for the same
-    // reason: the inner lambda runs for unrelated recompositions, and
-    // subscribing to IME state inside it feeds those recompositions with
-    // fake insets changes every time any of them happens.)
+    // IME/nav insets are read here, outside the BoxWithConstraints lambda, so keystroke-driven re-runs of
+    // that lambda do not resubscribe; the panel re-measures only when the keyboard crosses open/closed.
     val keyboardUp = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 80.dp
     val bottomInset = WindowInsets.navigationBars.union(WindowInsets.ime)
         .asPaddingValues().calculateBottomPadding()
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // With the keyboard up, the panel and the bar together are competing
-        // for the sliver of screen that is left -- on a phone that is a couple
-        // of hundred dp, not the 360 the panel would otherwise take. Measure
-        // what is actually free rather than guessing: the panel gets what
-        // remains above the bar, minus a margin so it never looks wedged.
-        // (The heavy cost that used to make this read as "laggy while typing"
-        // -- the blurred aurora redrawing underneath every IME frame -- is
-        // handled at the source: AuroraBackground's `paused`, which the root
-        // drives from this layer's `onOpenChanged`.)
+        // With the keyboard up only a sliver is free; the panel gets what remains above the bar minus a margin.
+        // The blur cost is handled by AuroraBackground's `paused`.
         val edge = 16.dp
         val bubble = 52.dp
         val barW = minOf(maxWidth - edge * 2, 640.dp)
         val barH = 52.dp
         val freeAbovePill = (maxHeight - bottomInset - barH - edge * 2 - 24.dp).coerceAtLeast(96.dp)
-        // A medium pill: wide enough for the icon and the word with room
-        // around them, and nowhere near the bar's span.
+        // A medium pill: wide enough for icon and word, far short of the bar.
         val pillW = minOf(168.dp, barW)
         val form = when {
             open -> SearchForm.BAR
             onSettings || dock == SearchDock.CENTER -> SearchForm.PILL
             else -> SearchForm.BUBBLE
         }
-        // Publish where the search element is so the toast stack can clear it: a corner dock
-        // (beside the bubble) or CENTER (above the pill OR the open bottom bar). While the
-        // search is HIDDEN, null. Crucially the OPEN bar publishes CENTER too -- it used to
-        // publish null here, so an open bottom search bar got no clearance at all and a toast
-        // landed right over it. The bar is a bottom-centered element just like the pill, so
-        // CENTER is the correct clearance for both. SideEffect, not a bare write: this runs
-        // after composition, and the registry is state other composables read.
+        // Publish the search element's location so toasts clear it: a corner dock or CENTER (pill or open bar);
+        // null while hidden. SideEffect because the registry is state read by other composables.
         val floatingRegistry = LocalFloatingRegistry.current
         SideEffect {
             floatingRegistry.searchDock = if (open) SearchDock.CENTER else dock
         }
         DisposableEffect(Unit) { onDispose { floatingRegistry.searchDock = null } }
 
-        // Resting corner for the bubble, and the drag bounds that keep it on
-        // screen no matter where it was left.
+        // Resting corner for the bubble and drag bounds that keep it on screen.
         val minX = edge
         val maxX = (maxWidth - bubble - edge).coerceAtLeast(edge)
         val minY = edge
@@ -244,45 +175,22 @@ internal fun SearchLayer(
         }
         val targetY = if (form == SearchForm.BUBBLE) bubbleY else maxHeight - barH - edge - bottomInset
 
-        // Two springs: SIZE overshoots a little so the pill arrives with some give, POSITION stays
-        // critically damped (one bouncy spring made the whole element slide past its rest and come
-        // back). Width and height share theirs so the shape stays coherent. The numbers are the shared
-        // PebbleBounceDamping/PebbleBounceStiffness tokens, so this is the same spring as the pebbles.
+        // Two springs: SIZE overshoots a little, POSITION is critically damped (one bouncy spring slides past rest).
+        // Width and height share theirs; numbers are the shared PebbleBounce tokens.
         val sizeSpec = lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
-        // A spring is right for the morph and WRONG for a drag: routing the
-        // finger's position through one meant the bubble trailed behind the
-        // touch for the whole gesture and then coasted past it on release --
-        // it felt like dragging something on elastic, not like moving it.
-        // While the finger is down the position snaps (1:1 with touch); the
-        // moment it lifts, the spring is back to carry the settle.
+        // A spring is wrong for a drag (trails the finger); position snaps 1:1 while the finger is down.
         val posSpec = if (dragging) snap<Dp>() else {
-            // Bouncier than a critically-damped snap, and deliberately so: this is
-            // what plays when the bubble snaps to an edge on release, and a snap
-            // with no overshoot reads as the value being SET, not as the bubble
-            // landing somewhere. A bit of give past the edge and back is what
-            // makes it read as physical contact -- it bounced off the edge --
-            // rather than a UI correcting a number. Same shared bounce spring as
-            // `sizeSpec` above, for the same "one system" reason.
+            // Bouncy on purpose: the edge-snap should read as landing, with the same shared bounce as `sizeSpec`.
             lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         }
-        // key(compact) so entering or leaving flip mode RESTARTS these
-        // animations at their new target rather than animating to it. The cover
-        // screen's resting corner is a different point in a differently-sized
-        // box, so without this the ball crawled across the whole screen from
-        // wherever the other layout had left it -- a long slide that had
-        // nothing to do with anything the user just did. Restarted, it is
-        // already home when the mode appears, and the entrance spring inside
-        // SearchPill is what you see instead.
+        // key(compact) restarts these animations at the new target so the ball does not crawl across the
+        // screen when the layout flips; SearchPill's entrance spring takes over.
         val w = animateDpAsState(targetW, sizeSpec, label = "searchW").value
         val h = animateDpAsState(targetH, sizeSpec, label = "searchH").value
         val x = animateDpAsState(targetX, posSpec, label = "searchX").value
         val y = animateDpAsState(targetY, posSpec, label = "searchY").value
 
-        // Dismiss scrim. Below the pill in this Box, so it never eats its taps. Same
-        // effects spec collapseEnter/collapseExit use for every pebble's own fade,
-        // not its own hand-picked tween durations (180ms/140ms) -- one fade curve
-        // for "something is fading" across the whole app, not a slightly different
-        // one wherever a fade happened to get added separately.
+        // Dismiss scrim, below the pill so it never eats its taps; uses the shared collapse effects spec for the fade.
         AnimatedVisibility(
             visible = open,
             enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
@@ -297,9 +205,7 @@ internal fun SearchLayer(
             )
         }
 
-        // Results / suggestions, anchored to the bottom rather than to the
-        // pill: the pill is always at the bottom centre while open, so this
-        // never has to chase a bubble around the screen.
+        // Results/suggestions anchored to the bottom, where the pill always sits while open.
         AnimatedVisibility(
             visible = open,
             enter = expandEnter(Alignment.Bottom),
@@ -308,10 +214,7 @@ internal fun SearchLayer(
                 .padding(bottom = barH + edge + bottomInset + 8.dp),
         ) {
             val panelShape = ExtraLargeShape
-            // GlassSurface (GlassChrome.kt): the one shared fill/rim/shadow, replacing
-            // this panel's own one-off alpha and its own separately-hand-rolled flat
-            // BorderStroke rim (yet another divergent one, next to appGlassRim's shared
-            // gradient rim) -- no more per-site variations.
+            // GlassSurface (GlassChrome.kt): the shared fill/rim/shadow.
             GlassSurface(
                 shape = panelShape,
                 modifier = Modifier.width(barW),
@@ -326,17 +229,10 @@ internal fun SearchLayer(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (query.isNotBlank()) {
-                        // Fewer results while the keyboard is up. This is what
-                        // the new ranking buys: cutting to the top few is only
-                        // honest when the top few really are the best ones, and
-                        // a scrollable list you cannot see the bottom of is
-                        // worse than a short list you can.
+                        // Fewer results while the keyboard is up; a short list beats one you cannot see the bottom of.
                         SettingsSearchResults(
                             query, submitted, vm, state.value, appearance, notif,
-                            // The cover screen with the keyboard up is the
-                            // hard case: a ~260dp square, most of it keyboard.
-                            // Two results that are fully visible beat six you
-                            // have to scroll blind through.
+                            // Cover with keyboard up (~260dp square, mostly keyboard): two visible results beat six to scroll through.
                             limit = when {
                                 keyboardUp -> 4
                                 else -> Int.MAX_VALUE
@@ -362,12 +258,7 @@ internal fun SearchLayer(
             onQueryChange = { query = it },
             onFocusChange = { focused = it },
             onSubmit = { submitted = query },
-            // Dragging only exists for the bubble. A bar spans the screen --
-            // there is nowhere to move it to -- and while it is a text field
-            // a drag would fight the keyboard and the panel above it.
-            // Docked into a camera band, there is nowhere to drag it TO --
-            // the whole point of the fixed spot is that it's the one place
-            // guaranteed not to cover something else.
+            // Dragging exists only for the bubble: a bar spans the screen, and a docked camera band has nowhere to go.
             onDrag = if (form != SearchForm.BAR) {
                 { dx, _ ->
                     dragX = ((if (dragX.isNaN()) x else dragX.dp) + dx).coerceIn(minX, maxX).value
@@ -388,10 +279,7 @@ internal fun SearchLayer(
                 dragX = Float.NaN
                 vm.setSearchBubblePosition(next.xFrac, 1f)
                 dragging = false
-                // click(), not the generic platform feedback this used to fire --
-                // matches the edge-snap spring's own "bounced off the edge" physical
-                // read (see posSpec's doc above) with a real confirm-weight landing
-                // instead of a borrowed system default.
+                // click() for a confirm-weight landing, matching the edge-snap bounce.
                 haptics?.click()
             },
             modifier = Modifier.align(Alignment.TopStart).offset(x = x, y = y),

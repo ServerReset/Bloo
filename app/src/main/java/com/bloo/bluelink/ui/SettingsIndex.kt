@@ -39,19 +39,8 @@ internal val SearchStopwords = setOf(
 
 
 /**
- * Words people use for things this app calls something else.
- *
- * The index is written in the app's own vocabulary, which is the vocabulary of
- * someone who already knows where everything is. A search box is used by
- * someone who does not: they type "vibrate", not "haptic feedback"; "dark
- * mode", not "theme"; "gps", not "location". Rather than stuff every synonym
- * into every entry's keyword string -- which has to be remembered at each of
- * the ~60 call sites, and silently is not -- each query token expands to
- * itself plus its synonyms, and an entry matching ANY of them counts as
- * matching the token.
- *
- * Written token -> app vocabulary, not the reverse: this maps what a person
- * types onto what the index contains.
+ * Words people use for things this app calls something else. Each query token expands to itself plus its
+ * synonyms (token -> app vocabulary), and an entry matching any form counts as matching the token.
  */
 internal val SearchSynonyms: Map<String, List<String>> = mapOf(
     "vibrate" to listOf("haptic"),
@@ -181,31 +170,20 @@ internal fun aiCommandLabel(cmd: String): String = when (cmd) {
 
 
 internal class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit) {
-    // Memoized lowercase title to avoid recomputing on every search score call
+    // Memoized lowercase title; avoids recomputing per score call.
     val titleLowercase: String = title.lowercase()
 }
 
 
 /**
- * Declarative description of one plain on/off setting, so a new simple toggle
- * needs exactly one entry here to become searchable -- not a hand-written
- * [SearchEntry] closure duplicating the same `ToggleRow(label, checked) { onToggle }`
- * shape every other toggle already uses. This is the "dynamic index" for the
- * subset of settings that fit it: anything that is genuinely just a checked
- * state and a setter reads its search row from this single list instead of a
- * bespoke `add(...)` call. Settings whose search behaviour has to be more than
- * a toggle -- a segmented picker, a confirm-gated biometric prompt, a slider,
- * anything per-vehicle -- still declare themselves explicitly below; forcing
- * those through this shape would be the same regression the biometric entry's
- * own comment warns about (a search shortcut skipping a step the real row
- * enforces).
+ * Declarative description of one plain on/off setting: one entry here makes it searchable. Settings that
+ * need more than a toggle (pickers, confirm-gated prompts, sliders, per-vehicle) declare themselves
+ * explicitly so a search shortcut can't skip a step the real row enforces.
  */
 internal class ToggleSpec(
     val title: String,
     val keywords: String,
-    /** Shown on the row itself; defaults to [title] since most toggles read
-     *  identically in both places. Only a few (e.g. "Dynamic color (Material
-     *  You)") spell the row out more fully than the search title. */
+    /** Shown on the row itself; defaults to [title]. */
     val label: String = title,
     /** How a person would ask for it in a sentence; matched like keywords. */
     val phrases: String = "",
@@ -215,9 +193,7 @@ internal class ToggleSpec(
 )
 
 
-/** Every plain app-wide toggle, in the order it should appear when searched.
- *  Add a new one here -- not a new `add(...)` call in [SettingsSearchResults]
- *  -- and it is searchable with no other change. */
+/** Every plain app-wide toggle, in the order it should appear when searched. */
 internal val ToggleSettings = listOf(
     ToggleSpec(
         title = "Haptic feedback", keywords = "vibration vibrate buzz sound",
@@ -275,15 +251,12 @@ internal val ToggleSettings = listOf(
         title = "Pebble outline", keywords = "border rim card theme appearance",
         checked = { a, _, _ -> a.pebbleOutline }, onToggle = { vm, v -> vm.setPebbleOutline(v) },
     ),
-    // Same top-level gate the AI card itself uses -- these two only mean
-    // anything on a device Gemini Nano actually supports, same reason the
-    // card is hidden entirely rather than shown disabled.
+    // Gated like the AI card itself: only meaningful where Gemini Nano is supported.
     ToggleSpec(
         title = "On-device AI", label = "On-device AI (Gemini Nano)", keywords = "gemini nano ai summary assistant privacy on-device",
         visible = { it.aiSupported }, checked = { _, _, s -> s.aiEnabled }, onToggle = { vm, v -> vm.setAiEnabled(v) },
     ),
-    // Same gate as the row itself (Backup & sync): only meaningful with
-    // Shizuku actually installed and running.
+    // Gated like the Backup & sync row: needs Shizuku installed and running.
     ToggleSpec(
         title = "Install updates seamlessly", label = "Install updates seamlessly (Shizuku)", keywords = "shizuku silent install update",
         visible = { it.shizukuAvailable }, checked = { a, _, _ -> a.seamlessInstallShizuku }, onToggle = { vm, v -> vm.setSeamlessInstallShizuku(v) },
@@ -292,14 +265,8 @@ internal val ToggleSettings = listOf(
 
 
 /**
- * The per-vehicle counterpart of [ToggleSpec]: a plain on/off setting that
- * exists once PER CAR -- a seat's heat/cool flag, the heated-steering-wheel
- * flag, whether a dashboard section shows for that car -- rather than once
- * for the whole app. [CarSettingsCard] (the real "Cars" settings card) is
- * the source of truth for all of these; this list is what makes them
- * searchable without a hand-written [SearchEntry] closure per car per
- * toggle, the same duplication [ToggleSettings] already removed on the
- * app-wide side.
+ * The per-vehicle counterpart of [ToggleSpec]: a plain on/off setting that exists once per car.
+ * [CarSettingsCard] is the source of truth; this list makes them searchable.
  */
 internal class VehicleToggleSpec(
     val title: (Vehicle) -> String,
@@ -311,11 +278,8 @@ internal class VehicleToggleSpec(
 )
 
 
-/** Every plain per-car toggle: the four seat positions' heat and cool flags, and the
- *  heated steering wheel flag -- generated once per position here instead of needing
- *  its own [SearchEntry] written out by hand. Reuses [SeatPositions] (Screens.kt), the
- *  same list [CarSettingsCard] itself builds its seat rows from, so the two can't drift
- *  out of sync with each other on label or key. */
+/** Every plain per-car toggle: each seat position's heat and cool flags plus the heated steering wheel.
+ *  Built from [SeatPositions] (Screens.kt), the same list [CarSettingsCard] uses. */
 internal val VehicleToggleSettings: List<VehicleToggleSpec> = buildList {
     SeatPositions.forEach { pos ->
         add(
@@ -349,9 +313,8 @@ internal val VehicleToggleSettings: List<VehicleToggleSpec> = buildList {
 }
 
 
-/** True if any WORD in [hay] starts with [prefix] -- "lim" hits "charge limit"
- *  but not "unlimited". Scanning for the boundary beats splitting the string,
- *  which would allocate a list per entry per keystroke. */
+/** True if any word in [hay] starts with [prefix] ("lim" hits "charge limit", not "unlimited"). Scans for the
+ *  boundary instead of splitting, to avoid allocating per entry per keystroke. */
 internal fun hasWordStarting(hay: String, prefix: String): Boolean {
     var i = hay.indexOf(prefix)
     while (i >= 0) {
@@ -362,9 +325,7 @@ internal fun hasWordStarting(hay: String, prefix: String): Boolean {
 }
 
 
-/** Within one insertion, deletion or substitution. Deliberately not a full
- *  Levenshtein: one typo is what people actually make, and bounding it at one
- *  keeps this O(n) and keeps "haptic" from matching "static". */
+/** Within one insertion, deletion or substitution. Not full Levenshtein: O(n), and keeps "haptic" from matching "static". */
 internal fun withinOneEdit(a: String, b: String): Boolean {
     if (a == b) return true
     val (short, long) = if (a.length <= b.length) a to b else b to a
@@ -398,27 +359,14 @@ internal fun hasFuzzyWord(hay: String, token: String): Boolean {
 /**
  * How well one entry answers the query, or null for "not at all".
  *
- * The old engine was `tokens.all { it in haystack }` and then showed whatever
- * survived IN DECLARATION ORDER. Two problems, and the second is the one you
- * feel: a bare substring test makes "car" hit "carbon", and with no ranking at
- * all the best match for "charge" was whichever charge-related setting happened
- * to be added to the list first. Ranking is most of what makes a search feel
- * like it understands the question.
- *
- * Every token must still match something ([tokens] are ANDed) -- narrowing by
- * adding a word is the one behaviour people rely on. What changed is WHERE a
- * token matched now counts: the title outranks the keywords, the start of a
- * word outranks the middle of one, and shorter titles win ties, so "charge
- * limit" beats "charge limit notification threshold" for the query "charge
- * limit".
+ * Every token must match something ([tokens] are ANDed). Title outranks keywords, a word start outranks
+ * the middle of one, and shorter titles win ties.
  */
 internal fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): Int? {
-    val title = e.titleLowercase  // Use memoized lowercase title instead of recomputing
+    val title = e.titleLowercase
     var total = 0
     for (t in tokens) {
-        // Best hit across the token and its synonyms. A synonym that lands is
-        // worth less than the literal word: someone who typed "haptic" meant
-        // the haptics entry more certainly than someone who typed "vibrate".
+        // Best hit across the token and its synonyms; a synonym is worth less than the literal word.
         var hit = 0
         for ((i, form) in expandToken(t).withIndex()) {
             val penalty = if (i == 0) 0 else 30
@@ -437,46 +385,24 @@ internal fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): 
         if (hit == 0) return null
         total += hit
     }
-    // Tie-break on brevity: among equally-matched entries the shortest title is
-    // the most specific answer, not the least.
+    // Tie-break on brevity: the shortest title is the most specific answer.
     return total * 100 - title.length
 }
 
 
-/** A vehicle command recognised in a free-form search query. [cmd]/[climateTarget]
- *  map directly onto [com.bloo.bluelink.data.VehicleCommandRunner]'s own command
- *  vocabulary, so search runs commands through the exact same path the Quick
- *  Settings tiles use. */
+/** A vehicle command recognised in a free-form search query. [cmd]/[climateTarget] use
+ *  [com.bloo.bluelink.data.VehicleCommandRunner]'s command vocabulary. */
 internal class ParsedVehicleCommand(val cmd: String, val climateTarget: String = "default", val label: String)
 
 
-/** Recognises a small, deliberately-conservative set of command phrasings --
- *  lock/unlock, start/stop/smart climate, start/stop charging -- rather than
- *  attempting general natural-language command parsing. Order matters:
- *  "unlock" is checked before the bare "lock" pattern so "unlock" doesn't
- *  also match as "lock".
- *
- *  Direction is encoded IN the command itself, never left for the runner to
- *  re-derive from the last-known snapshot. When the phrasing says start / stop
- *  / turn on / turn off / begin, we emit the explicit directional token
- *  (`climate_on`/`climate_off`, `charge_on`/`charge_off`) so the runner forces
- *  that direction. Before this, both "start climate" and "stop climate"
- *  collapsed to the bare `"climate"` toggle and the runner flipped against the
- *  snapshot -- so "stop the climate" while climate was already off would
- *  *start* it on the real car. The bare toggle tokens ("climate"/"charge") are
- *  reserved for genuinely ambiguous phrasing (none currently produced here). */
+/** Recognises a small, conservative set of command phrasings (lock/unlock, start/stop/smart climate,
+ *  start/stop charging). "unlock" is checked before "lock". Direction is encoded in the command itself
+ *  (`climate_on`/`climate_off`, `charge_on`/`charge_off`) so the runner never re-derives it from the snapshot. */
 /**
  * The temperature asked for, in Fahrenheit, or null if the query names none.
  *
- * Superlatives resolve to the ends of [CLIMATE_TEMP_RANGE_F], which is the
- * honest reading of "coldest" -- it means the coldest the car will accept, not
- * absolute zero, and the range is the same one the climate slider offers.
- *
- * A BARE number is deliberately not a temperature. "Ioniq 5", "Model 3" and
- * "EV6 GT" all put digits in a query that is naming a car, so a number only
- * counts when a preposition introduces it ("at 64", "to 64") or a unit follows
- * it ("64 degrees", "64F"). Getting this wrong would start climate at 5 degrees
- * because the car is called an Ioniq 5.
+ * Superlatives resolve to the ends of [CLIMATE_TEMP_RANGE_F]. A bare number is not a temperature
+ * ("Ioniq 5"): it needs a preposition ("at 64") or a unit ("64 degrees", "64F").
  */
 internal fun parseClimateTemperature(q: String, metric: Boolean): Int? {
     if (RxColdest.containsMatchIn(q)) {
@@ -493,8 +419,7 @@ internal fun parseClimateTemperature(q: String, metric: Boolean): Int? {
     val f = when {
         unit == "c" -> ambientFahrenheit(n.toDouble())
         unit == "f" -> n
-        // No unit given: believe the user's own setting rather than assuming
-        // Fahrenheit. "start climate at 20" from someone on metric means 20C.
+        // No unit: follow the user's own metric setting.
         metric -> ambientFahrenheit(n.toDouble())
         else -> n
     }

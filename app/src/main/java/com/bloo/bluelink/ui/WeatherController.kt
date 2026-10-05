@@ -1,11 +1,8 @@
 package com.bloo.bluelink.ui
 
 /**
- * Owns all weather logic for the app: the home/car weather fetch through
- * [WeatherApi], the TTL-based cache guard ([WEATHER_TTL_MS]), and the
- * weather-location persistence in [SettingsStore]. Extracted verbatim from
- * [AppViewModel], which keeps thin forwarders so every existing call site
- * (settings screens, home/car weather pebbles) is untouched.
+ * Owns the weather logic: home/car/device fetches via [WeatherApi], the TTL cache guard ([WEATHER_TTL_MS]),
+ * and weather-location persistence in [SettingsStore]. [AppViewModel] keeps thin forwarders.
  */
 import android.app.Application
 import android.location.Geocoder
@@ -29,8 +26,7 @@ internal class WeatherController(
     private val state: MutableStateFlow<UiState>,
     private val scope: CoroutineScope,
 ) {
-    /** Un-set the "home" weather location: clears the saved lat/lon/label and
-     *  drops any already-fetched reading so the weather pebble hides itself. */
+    /** Clears the "home" weather location (lat/lon/label) and any fetched reading so the pebble hides. */
     fun clearWeatherLocation() = scope.launch {
         settingsStore.setWeatherLocation(null, null, null)
         state.update { it.copy(homeWeather = null) }
@@ -40,9 +36,7 @@ internal class WeatherController(
     fun setWeatherPlace(query: String) = scope.launch {
         val q = query.trim()
         if (q.isBlank()) return@launch
-        // @Suppress("DEPRECATION"): see SettingsStore's identical note -- the sync
-        // Geocoder form is the only one that exists below API 33, where this app
-        // still runs; the async listener overload would need an API-level branch.
+        // @Suppress("DEPRECATION"): the sync Geocoder is the only form below API 33.
         @Suppress("DEPRECATION")
         val hit = withContext(Dispatchers.IO) {
             runCatching {
@@ -70,24 +64,9 @@ internal class WeatherController(
     }
 
     /**
-     * Silently re-syncs the weather location to the device's CURRENT position, but only
-     * when [SettingsStore.Appearance.weatherFollowsDevice] is set -- i.e. it was last put
-     * into this state by [useDeviceLocationForWeather], not a typed place. That call used
-     * to be the only time this location was ever fetched: fine for a one-shot "set my
-     * location" action, but the reported bug was that it then stayed frozen at that one
-     * fix forever, never moving even as the app refreshed everything else. Meant to be
-     * called alongside [AppViewModel]'s own [UiState.deviceLocation] refresh -- cold
-     * start, pull-to-refresh, and "Locate" -- so both device-position readings stay in
-     * step on the same schedule. Fails soft and silently (no `state.message`) on a
-     * missing fix: this is a background refresh nobody explicitly asked for right now,
-     * not a user-initiated action that deserves an error toast.
-     *
-     * [preloaded] is that same-schedule guarantee made literal: AppViewModel passes the
-     * exact fused-location fix it just used for [UiState.deviceLocation] (the one drawn
-     * as the dot on the car map), so this ends up storing THE SAME reading as the
-     * weather location instead of a second, independently-fetched one that could
-     * legitimately disagree with it -- reported directly as the map dot, the home
-     * weather card and "distance to car" not agreeing on where "here" is.
+     * Silently re-syncs the weather location to the device's current position, only when
+     * [SettingsStore.Appearance.weatherFollowsDevice] is set. Fails soft (no `state.message`) on a missing fix.
+     * [preloaded] is the fix AppViewModel just used for [UiState.deviceLocation], so the map dot and weather agree.
      */
     fun refreshDeviceLocationForWeather(preloaded: android.location.Location? = null) = scope.launch {
         if (!settingsStore.appearance.first().weatherFollowsDevice) return@launch
@@ -106,9 +85,7 @@ internal class WeatherController(
             return@launch
         }
         val cached = state.value.homeWeather
-        // withinWindow, not `now - fetchedAt < TTL`: the latter is also true for a
-        // fetchedAt in the FUTURE, which a backwards clock correction produces, and
-        // that froze the weather until real time caught up. See withinWindow.
+        // withinWindow, not `now - fetchedAt < TTL`: a future fetchedAt (clock correction) would freeze the weather.
         if (!force && cached != null &&
             com.bloo.bluelink.data.withinWindow(System.currentTimeMillis(), cached.fetchedAt, WEATHER_TTL_MS)
         ) return@launch
@@ -129,17 +106,13 @@ internal class WeatherController(
     }
 
     /**
-     * Fetch weather at the PHONE's own last-known position ([UiState.deviceLocation]) so the
-     * Location & Weather pebble can show "here" beside "at the car". Called from
-     * [AppViewModel.refreshDeviceLocation] on the same schedule as the device dot, so the two
-     * never disagree about where "here" is. Fails soft (leaves the prior reading, or null) on
-     * no fix -- this is a background refresh nobody explicitly asked for.
+     * Fetch weather at the phone's own last-known position ([UiState.deviceLocation]) for the "here" reading.
+     * Called from [AppViewModel.refreshDeviceLocation]; fails soft (keeps the prior reading) on no fix.
      */
     fun loadPhoneWeather(force: Boolean = false) = scope.launch {
         val loc = state.value.deviceLocation ?: return@launch
         val cached = state.value.phoneWeather
-        // Same TTL guard as the other loaders -- a reading older than WEATHER_TTL_MS is
-        // re-fetched, so a real drive doesn't keep showing the old city's weather.
+        // Same TTL guard as the other loaders, so a drive does not keep the old city's weather.
         if (!force && cached != null &&
             com.bloo.bluelink.data.withinWindow(System.currentTimeMillis(), cached.fetchedAt, WEATHER_TTL_MS)
         ) return@launch

@@ -38,10 +38,7 @@ data class RemoteAction(
     val details: String? = null,
 )
 
-/**
- * Color for action status badge.
- * Maps status string to Material theme color for visual feedback.
- */
+/** Color for an action status badge, mapped from the status string. */
 @Composable
 private fun statusColor(status: String) = when (status.lowercase()) {
     "success" -> MaterialTheme.colorScheme.primary
@@ -51,13 +48,8 @@ private fun statusColor(status: String) = when (status.lowercase()) {
 }
 
 /**
- * One action, on one line: a status dot, the action's name, and when it happened.
- *
- * Deliberately flat -- no badge chrome, no card, no second type size for the timestamp. This
- * list is revealed INSIDE the lock pebble, so every box drawn here is a box inside a box, and
- * the earlier version (a filled status pill, a monospace time on its own line, and details in a
- * third) turned six entries into a wall three times taller than the pebble it hangs off. Status
- * is the one thing worth colour, so it is the dot and nothing else.
+ * One action on one line: a status dot, the name, and the time. Deliberately flat: this list sits inside
+ * the lock pebble, so status is the only thing worth colour.
  */
 @Composable
 private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
@@ -81,8 +73,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
-        // Details ride on the SAME line, muted, and give up their space first -- a failure
-        // reason is worth showing but never worth a row of its own here.
+        // Details share the line, muted, and give up space first.
         if (action.details != null) {
             Spacer(Modifier.width(6.dp))
             Text(
@@ -105,63 +96,34 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
     }
 }
 
-/**
- * The action's own recorded instant, as a plain wall-clock time ("14:32") -- or the date too if
- * it did not happen today. [RemoteAction.timestamp] is a raw `Instant.toString()`, which is
- * exactly what this used to render: "2026-08-31T21:33:15.123456Z" in an 11sp monospace label
- * under every row.
- */
+/** The action's recorded instant as a wall-clock time ("14:32"), with the date too if not today. */
 private fun shortTime(iso: String, use24Hour: Boolean): String = runCatching {
     val at = java.time.Instant.parse(iso).atZone(java.time.ZoneId.systemDefault())
     val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault())
-    // Clock style follows the DEVICE's 12/24h setting rather than being hardcoded. This is the
-    // app's only user-facing wall-clock string (the other patterns in the codebase are wire
-    // formats and the debug log), so there was no house convention to inherit -- and a fixed
-    // "21:33" is the wrong default for a US-market Hyundai/Genesis/Kia app whose units already
-    // default to imperial.
+    // Clock style follows the device's 12/24h setting.
     val clock = if (use24Hour) "HH:mm" else "h:mm a"
     val fmt = if (at.toLocalDate() == today) clock else "d MMM $clock"
-    // NOT hoisted to four file-scope DateTimeFormatters the way SettingsIndex.kt's Rx*
-    // patterns are, even though ofPattern() does parse its pattern on every construction.
-    // ofPattern() with no explicit Locale captures Locale.getDefault() AT CONSTRUCTION, so a
-    // file-scope formatter would freeze this row's month name and AM/PM marker to whatever
-    // locale the process started in -- a device language change recreates activities but not
-    // the process, so the stale text would survive until the app was killed. Six rows in a
-    // panel you have to press a pebble's background to reveal is not worth that.
+    // Not hoisted to file scope: ofPattern() captures Locale.getDefault() at construction, so a
+    // file-scope formatter would keep a stale locale after a device language change.
     at.format(java.time.format.DateTimeFormatter.ofPattern(fmt))
 }.getOrDefault(iso)
 
 /**
- * Recent remote commands for one car, rendered inline -- no card of its own, no header, and no
- * disclosure control.
- *
- * This is deliberately not a card. It is revealed by pressing the lock pebble's own background
- * (see ControlsPebble), so it is already inside a pebble: a second card with its own chrome and
- * its own "▶" toggle -- which is what the previous RemoteActionsHistoryCard was -- would be a
- * card inside a card, disclosed twice. It also drops that card's nested LazyColumn, which was a
- * standing hazard: a lazy list inside another scrollable needs a height cap to avoid an infinite
- * -constraint crash, and a plain Column over a handful of already-capped rows cannot hit it at all.
+ * Recent remote commands for one car, rendered inline with no card, header or disclosure control (it is
+ * revealed inside the lock pebble). A plain Column avoids a nested lazy list's infinite-constraint crash.
  */
 @Composable
 internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
-    // The panel owns ALL of its own insets, and they are the PEBBLE's insets, not arbitrary
-    // ones. It is revealed inside the lock pebble's rounded Surface, directly beneath a row
-    // whose content starts at 16dp, so anything narrower than that reads as misaligned -- and
-    // the bottom needs real clearance or the last row runs into the corner radius, which is
-    // exactly how it looked: text flush to the left edge and touching the bottom curve.
+    // The panel owns its insets: the pebble's content inset on the sides and real bottom clearance for the corner radius.
     Column(
         Modifier
             .fillMaxWidth()
             .padding(start = PebbleContentInset, end = PebbleContentInset, bottom = 16.dp),
     ) {
-        // A hairline between the controls and the history, so the revealed panel reads as a
-        // second section of the same pebble rather than loose text under the buttons.
+        // A hairline separating the controls from the history.
         SectionDivider(alpha = 0.35f, modifier = Modifier.padding(bottom = 6.dp))
         if (actions.isEmpty()) {
-            // NOT nothing. This panel is revealed by pressing the pebble's background -- a
-            // gesture with no chrome to announce it -- so drawing nothing for a car that has
-            // not been commanded yet made a working gesture indistinguishable from a missing
-            // one. The empty state is the only feedback that the press did something.
+            // Not nothing: the press that reveals this panel has no chrome, so the empty state is its only feedback.
             Text(
                 text = "No remote actions yet",
                 style = MaterialTheme.typography.labelSmall,
@@ -170,8 +132,7 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
             )
             return@Column
         }
-        // Resolved once here, not per row: is24HourFormat reads a system setting, and every row
-        // in the list would otherwise ask the same question again.
+        // Resolved once, not per row: is24HourFormat reads a system setting.
         val use24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
         actions.take(max).forEach { RemoteActionItem(it, use24Hour) }
         if (actions.size > max) {

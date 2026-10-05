@@ -68,11 +68,9 @@ typealias SegmentOption = com.bloo.uicommon.SegmentOption
 
 
 /**
- * A full-width segmented selector built from the app's button vocabulary: a
- * tonal track whose active segment fills with the primary accent and morphs to a
- * rounded-square, the rest staying pill-calm. Thin wrapper over the shared
- * :uicommon [com.bloo.uicommon.MorphSegmented], supplying the phone's Material 3
- * colours, label typography and haptics.
+ * A full-width segmented selector: a tonal track whose active segment fills with the primary
+ * accent. Thin wrapper over [com.bloo.uicommon.MorphSegmented] supplying M3 colours, label
+ * typography and haptics.
  */
 @Composable
 fun MorphSegmented(
@@ -93,30 +91,22 @@ fun MorphSegmented(
         indicatorColor = scheme.primary,
         selectedTextColor = scheme.onPrimary,
         unselectedTextColor = scheme.onSurfaceVariant,
-        // The one button label style. A segmented picker is a row of tappable labels, so it sat
-        // a size below every button beside it -- which is exactly the "different family on the
-        // same card" the standardisation is for.
+        // The one button label style, so a picker matches the buttons beside it.
         textStyle = ButtonLabelStyle,
         onTick = { haptics?.tick() },
         modifier = modifier,
         trackHeight = trackHeight ?: (if (options.any { it.icon != null }) 48.dp else 44.dp),
-        // Every other interactive surface (Pebble, floating pills, dialogs)
-        // got a hairline rim once real glass blur stopped giving flat
-        // surfaces a second depth cue; this control was the one left out.
+        // Hairline rim like every other interactive surface.
         borderColor = scheme.outline.copy(alpha = 0.18f),
     )
 }
 
 
 
-/** A car's powertrain (Gas/Hybrid/PHEV/EV) is a fixed 4-way choice between
- *  equal alternatives — one shared MorphSegmented instead of the MorphChip
- *  row this was duplicated as in both CarSettingsCard and its settings-search
- *  mirror. */
+/** A car's powertrain (Gas/Hybrid/PHEV/EV): a fixed 4-way choice on one MorphSegmented. */
 @Composable
 internal fun PowertrainPicker(current: com.bloo.bluelink.data.Powertrain, onSelect: (com.bloo.bluelink.data.Powertrain) -> Unit) {
-    // An icon per option (Gas/Hybrid/PHEV/EV) instead of text-only segments --
-    // a quick visual "shape" for each choice, not just a label to read.
+    // An icon per option as a quick visual shape for each choice.
     MorphSegmented(
         options = listOf(
             SegmentOption(com.bloo.bluelink.data.Powertrain.GAS.name, "Gas", Icons.Filled.LocalGasStation),
@@ -130,12 +120,8 @@ internal fun PowertrainPicker(current: com.bloo.bluelink.data.Powertrain, onSele
 }
 
 
-/** A car's confirmed head-unit generation (Gen5W / ccNC) -- the same shape
- *  [PowertrainPicker] is, a fixed choice between equal alternatives on one
- *  [MorphSegmented]. Only ever shown for a vehicle where
- *  [com.bloo.bluelink.data.platformOverridable] is true -- see that
- *  property's own doc for why every other vehicle has nothing here to
- *  confirm. */
+/** A car's confirmed head-unit generation (Gen5W / ccNC). Only shown where
+ *  [com.bloo.bluelink.data.platformOverridable] is true. */
 @Composable
 internal fun PlatformPicker(current: com.bloo.bluelink.data.VehiclePlatform, onSelect: (com.bloo.bluelink.data.VehiclePlatform) -> Unit) {
     MorphSegmented(
@@ -149,19 +135,14 @@ internal fun PlatformPicker(current: com.bloo.bluelink.data.VehiclePlatform, onS
 }
 
 
-/** The three theme modes as segment options, stated once: three call sites
- *  (the onboarding look page, the Display card, the Settings search entry) had
- *  copied the same list, and a fourth mode added to [ThemeMode] would have had
- *  to be remembered in each. */
+/** The three theme modes as segment options, defined once for every call site. */
 val ThemeModeOptions = listOf(
     SegmentOption(ThemeMode.SYSTEM.name, "System", null),
     SegmentOption(ThemeMode.LIGHT.name, "Light", null),
     SegmentOption(ThemeMode.DARK.name, "Dark", null),
 )
 
-/** The Display card's own "Appearance" segmented row, shared with its two
- *  clones (the Settings search entry renders the same control in the same
- *  card shape; onboarding shows it during setup). */
+/** The Display card's "Appearance" segmented row, shared with the Settings search entry and onboarding. */
 @Composable
 fun ThemeModeSegmentedRow(
     appearance: SettingsStore.Appearance,
@@ -176,16 +157,15 @@ fun ThemeModeSegmentedRow(
 }
 
 /**
- * A labelled [MorphSegmented]: a small caption above a full-width segmented
- * control. The expressive replacement for a switch when the setting is really a
- * choice between two equal alternatives (°C/°F, in-app/browser) rather than on/off.
+ * A labelled [MorphSegmented]: a caption above a full-width segmented control. Use instead of a
+ * switch when the setting is a choice between two equal alternatives (°C/°F) rather than on/off.
  */
 @Composable
 fun SettingsSegmentedRow(
     label: String,
     options: List<SegmentOption>,
     selectedKey: String,
-    /** See ToggleRow's own `description` doc -- same caption, same rhythm. */
+    /** See ToggleRow's `description`. */
     description: String? = null,
     onSelect: (String) -> Unit,
 ) {
@@ -204,40 +184,15 @@ fun SettingsSegmentedRow(
 
 
 /**
- * Re-architected onto [PebbleShell] -- the exact expandable-card system every garage
- * pebble uses (bounce-open / calm-close springs, the staggered per-row reveal via
- * [StaggeredRevealColumn], the tonal `surfaceVariant` fill, the morphing pill<->square
- * corner radius) -- instead of the bespoke always-expanded `Card` + `animateContentSize`
- * this used to be. Settings was otherwise the one screen in the app whose collapsible
- * surfaces didn't actually collapse and ran on their own separate motion spec (the
- * now-deleted `AdvancedModeStiffness`/[SoftDamping]) rather than the shared bounce
- * tokens ([PebbleBounceDamping]/[PebbleCloseDamping]) every other expandable surface
- * in the app converged on this session.
- *
- * Every card starts EXPANDED (`rememberSaveable` keyed on its own [title], so a
- * rotation or a process restore puts it back where the user left it) -- nothing that
- * was visible before this change is hidden by default. The only real behaviour change
- * is that a card's header is now a genuine toggle: tapping it collapses the card, the
- * same as every pebble in the garage, instead of Settings being the one screen where
- * every section stayed permanently open whether you cared about it or not.
- *
- * [vm] is used for the card's own expand/collapse state (the shared `collapsedSections`
- * store, via [AppViewModel.togglePebble]) -- it is not just threading.
- *
- * [icon] stays nullable at the call-site API (unchanged from before) but PebbleShell's
- * own `icon` parameter is not, so a null here falls back to a generic settings glyph --
- * in practice this only ever fires for the single "Car"/"Cars" card, which had no icon
- * of its own to begin with.
+ * A Settings card built on [PebbleShell], the same expandable-card system as garage pebbles
+ * (shared bounce/close springs, [StaggeredRevealColumn], tonal fill). Starts EXPANDED;
+ * open/closed lives in the shared `collapsedSections` store via [AppViewModel.togglePebble].
+ * A null [icon] falls back to a generic settings glyph.
  */
 
 /**
- * The outer wrapper every top-level Settings pebble sits in: full width, the inter-card
- * gap, and TalkBack heading semantics -- see [SettingsCard]'s own body for why each of
- * those three lives specifically on this wrapper rather than PebbleShell itself or the
- * parent Column. Pulled out so the single-car special case in SettingsScreen (which
- * renders a bare [CarSettingsCard] instead of wrapping it in [SettingsCard], to avoid
- * stacking two pebble headers for one car) gets the exact same wrapper by calling this,
- * instead of hand-reproducing it a second time.
+ * The outer wrapper every top-level Settings pebble sits in: full width, inter-card gap and
+ * TalkBack heading semantics. Shared with the single-car case in SettingsScreen.
  */
 @Composable
 internal fun Modifier.settingsCardSlot(): Modifier =
@@ -253,51 +208,27 @@ internal fun SettingsCard(
     icon: ImageVector? = null,
     vm: AppViewModel,
     /**
-     * For a card whose entire body is ONE control: render that control on the title row and drop
-     * the expand/collapse entirely. A card holding a single switch had nothing worth disclosing
-     * -- you tapped a chevron to reveal one toggle, then tapped it again to put it away.
-     *
-     * Unconditional, not gated on simple mode (unlike Pebble's own
-     * `inlineSettingInSimpleMode`, which exists because a car pebble has genuinely more to show
-     * in advanced): a card that declares an inline setting has nothing else to show in ANY mode,
-     * so a chevron there is never right.
+     * For a card whose body is ONE control: render it on the title row and drop the
+     * expand/collapse. Unconditional (not gated on simple mode) since there is nothing else to show.
      */
     inlineSetting: (@Composable () -> Unit)? = null,
     /**
-     * A short piece of state for the title row -- "2 accounts", "On · auto", "Atkinson".
-     *
-     * This is the pebble treatment brought across: a car pebble tells you what it knows while
-     * collapsed, and a Settings card had no way to, so the only method of finding out what a
-     * setting was currently set to was to open the card and read the control. Ignored when the
-     * card has an [inlineSetting], because then the control itself is already on that row and
-     * says it better than a word could.
+     * A short state string for the title row ("2 accounts", "On · auto"). Ignored when the card
+     * has an [inlineSetting], whose control already says it.
      */
     status: String? = null,
     content: @Composable () -> Unit,
 ) {
-    // Open/closed now lives where a car pebble's does -- the literal same collapse set and
-    // TOGGLE FUNCTION (togglePebble, via the placeholder SettingsPseudoVehicle), not a
-    // separate toggleSettingsCard that used to duplicate togglePebble's own body byte for
-    // byte under SETTINGS_CARD_VIN. This used to be a local `rememberSaveable`, which is why
-    // a Settings card forgot whether it was open whenever the process was killed while a
-    // car's pebble two screens away remembered.
+    // Open/closed uses the car pebbles' collapse set and togglePebble (via SettingsPseudoVehicle),
+    // so it survives process death like they do.
     val collapsed by vm.collapsedSections.collectAsStateWithLifecycle()
     val inline = inlineSetting != null
     val expanded = !inline && "$SETTINGS_CARD_VIN:$title" !in collapsed
-    // heading() on the outer wrapper, not inside PebbleShell's own header Text -- PebbleShell
-    // doesn't expose a hook into its title's own Modifier, so this is applied one level up
-    // instead. PebbleShell's header row is already ONE merged TalkBack stop (tap-to-toggle),
-    // so marking that whole stop as a heading preserves the "headings" navigation shortcut
-    // across Settings' ~15 cards that the old Card-based header set up explicitly for.
-    // The inter-card gap lives on this wrapper (via settingsCardSlot()), not as the parent
-    // Column's `Arrangement.spacedBy`. That is not a style preference, it is the fix for
-    // the Advanced->Simple collapse leaving gaps behind: `spacedBy` inserts its spacing
-    // between EVERY pair of children regardless of their height, so an advanced-only card
-    // shrunk to zero by its own outer AnimatedVisibility still contributed a full gap that
-    // `spacedBy` held open on its own schedule and then dropped in one frame once the node
-    // left composition -- "extra space between the cards, then it snaps". Living on this
-    // wrapper instead means the gap sits INSIDE that same outer AnimatedVisibility and
-    // shrinks away with the card.
+    // heading() sits on the outer wrapper because PebbleShell exposes no hook into its title
+    // Modifier; its header row is already one merged TalkBack stop.
+    // The inter-card gap lives on this wrapper (settingsCardSlot()), not the parent Column's
+    // spacedBy: spacedBy would keep a full gap for a card shrunk to zero by its outer
+    // AnimatedVisibility, then drop it in one frame. On the wrapper it shrinks with the card.
     Box(Modifier.entrance("settings:$title").settingsCardSlot()) {
         PebbleShell(
             expanded = expanded,
@@ -316,13 +247,9 @@ internal fun SettingsCard(
                     )
                 }
             },
-            // Hard right, like every other settings control -- see titleTrailingAtEnd. Without
-            // it the switch sat flush against the end of the label text, mid-row, which is what
-            // made the single-setting cards read as broken rather than compact.
+            // Hard right like every other settings control (titleTrailingAtEnd).
             titleTrailingAtEnd = true,
-            // Settings cards space their own rows with explicit Spacers (the gap tokens), so
-            // the shell must not ALSO insert its default row gap -- that double-spaced every
-            // card and is what made the gaps read as uneven.
+            // Cards space their own rows with explicit Spacers, so the shell must not add its row gap.
             contentGap = 0.dp,
             content = { content() },
         )
@@ -333,12 +260,8 @@ internal fun SettingsCard(
 @Composable
 internal fun SecretRow(label: String, value: String) {
     var show by remember { mutableStateOf(false) }
-    // A clean three-part row: label hugs the left, value hugs the button on
-    // the right, no midpoint reservation. The old value used
-    // `weight(1f, fill = false)`, which still RESERVED half the width and
-    // parked the value mid-row with a void behind it -- the "weirdly
-    // indented password" report. SpaceBetween on the row does the exact
-    // thing that existed for nothing.
+    // Three-part row: label left, value hugging the button on the right. SpaceBetween, since
+    // `weight(1f, fill = false)` still reserves half the width.
     Row(
         Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -361,8 +284,7 @@ internal fun SecretRow(label: String, value: String) {
             modifier = Modifier.widthIn(max = 168.dp),
         )
         Spacer(Modifier.width(10.dp))
-        // The eye icon, matching the login screen's password field -- an icon reads as
-        // "reveal this" at a glance where the old Show/Hide text button needed reading.
+        // Eye icon, matching the login screen's password field.
         MorphIconButton(onClick = { show = !show }) {
             Icon(
                 if (show) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
@@ -376,27 +298,17 @@ internal fun SecretRow(label: String, value: String) {
 
 @Composable
 internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
-    // The same MorphButton every selectable option uses: pill at rest,
-    // primaryContainer rounded square once chosen, pressed-state included.
-    // With expansion animation.
+    // The same MorphButton every selectable option uses, with expansion animation.
     val choiceSource = remember { MutableInteractionSource() }
     MorphButton(
         onClick = { onSelect() },
         active = selected,
         interactionSource = choiceSource,
-        // Idle container/content left at MorphButton's own defaults (the tonal fill
-        // + hairline rim every idle button in the app now shares) instead of the old
-        // bespoke buttonContainer()/onSurface -- only the SELECTED state stays a
-        // distinct explicit colour here, since that's this row's own state, not the
-        // shared idle look.
+        // Idle colours stay at MorphButton's defaults; only SELECTED gets an explicit colour.
         activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
         activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = GapGroup),
-        // The standard target height and the standard button label, like everything else
-        // tappable. A choice row IS a button; it was the last one still setting its own
-        // height (none) and its own type (bodyLarge, a body style rather than the button
-        // one), which is why a list of them sat visibly shorter and lighter than the
-        // buttons directly above them in the same card.
+        // Standard target height and button label type, like every tappable.
         minHeight = ButtonTargetHeight,
         modifier = Modifier.fillMaxWidth(),
         expressive = true,

@@ -50,41 +50,17 @@ import com.bloo.bluelink.data.TempValue
 // --- Climate --------------------------------------------------------------
 
 /**
- * The climate control pebble -- by far the most stateful pebble in the app.
- * Local editable state (temp, duration, defrost, steering-wheel heat, and
- * all four seat levels) is `remember(v.vin)`-keyed so switching cars resets
- * to that car's own values rather than carrying over the previous car's.
+ * The climate control pebble. Editable state (temp, duration, defrost, wheel heat, seats) is keyed on
+ * `v.vin` so switching cars resets it.
  *
- * Three things keep this state in sync with the outside world:
- *  1. On first composition per car, `vm.loadSavedClimate` restores whatever
- *     was last saved for this car (`settingsLoaded` gates the debounced
- *     save below so it doesn't immediately re-save the values it just
- *     loaded).
- *  2. `remoteClimate` (from `state.climateSync`) mirrors whatever another
- *     LIVE composition of this same car's climate pebble just set -- the dual-
- *     column hotspot can pin "controls" to a secondary slot while the full
- *     pebble list still renders it too, so the same car's climate can be on
- *     screen twice at once; a [LaunchedEffect] keyed on it snaps all the
- *     local state to match whenever either instance changes it.
- *  3. A single debounced [LaunchedEffect] keyed on `(currentReq,
- *     activePresetId)` persists + publishes the current settings back out
- *     (to storage, and to `state.climateSync` for the other instance above)
- *     after they stop changing -- the actual 400ms debounce lives in the
- *     ViewModel's own coroutine scope rather than in this effect, specifically
- *     so a car-switch or pebble collapse
- *     that removes this composable from the tree within that window can't
- *     silently cancel and drop the pending save.
+ * Kept in sync three ways: `vm.loadSavedClimate` restores the saved values on first composition
+ * (`settingsLoaded` stops the save effect re-saving them); `remoteClimate` mirrors another live instance of
+ * this car's pebble (the dual-column hotspot can show it twice); and one debounced effect persists and
+ * publishes changes, with the debounce in the ViewModel so leaving composition can't drop the save.
  *
- * `activePresetId` tracks which saved preset (if any) matches the live
- * settings exactly; it's cleared automatically the moment any control
- * drifts away from that preset's exact values, so the "active" highlight
- * only ever marks a true match, never a stale one.
- *
- * The header's Start/Stop button is context-sensitive: while climate is
- * already on it stops it; while the pebble is expanded (sliders visible) it
- * starts with exactly what's shown; while collapsed in Simple mode it
- * computes a "smart" one-tap target temperature from the current weather
- * instead of making the user open the pebble first.
+ * `activePresetId` is cleared once any control drifts from that preset, so the highlight is always a true match.
+ * The header Start/Stop button stops a running climate, starts the shown values when expanded, and when
+ * collapsed in Simple mode starts a weather-based "smart" target.
  */
 @Composable
 internal fun ClimatePebble(
@@ -107,12 +83,8 @@ internal fun ClimatePebble(
     var rearRight by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
     var settingsLoaded by remember(v.vin) { mutableStateOf(false) }
 
-    // Copy a ClimateRequest's nine fields into the sliders' state. Defined up here so the
-    // restore effect just below and the preset-apply buttons further down share ONE copy of the
-    // assignment -- it was written out twice, byte-for-byte, and "restore last-used" and "apply
-    // preset" are the same operation (set the sliders from a request). Captures only the nine
-    // `var` setters above it. NOT reused by the cross-composition sync effect below, which maps
-    // through SeatLevel.fromApi and so is genuinely different.
+    // Copies a ClimateRequest into the slider state; shared by restore and preset-apply. The cross-composition
+    // sync below maps through SeatLevel.fromApi, so it doesn't reuse this.
     val applyRequest: (ClimateRequest) -> Unit = { r ->
         tempF = r.tempF
         duration = r.durationMinutes
@@ -140,40 +112,32 @@ internal fun ClimatePebble(
         seatRearLeft = rearLeft,
         seatRearRight = rearRight,
     )
-    // Persist + cross-composition mirror is handled by ONE debounced call further
-    // down (after activePresetId exists) - see the LaunchedEffect near the
-    // climate sync block.
 
     val presets = state.climatePresets[v.vin].orEmpty()
     var showAddPreset by remember { mutableStateOf(false) }
     var presetName by remember { mutableStateOf("") }
 
-    // Helper to warn if the car engine is on before changing AC/climate settings
+    // Warn if the engine is on before changing climate settings.
     val startClimateWithEngineCheck: (ClimateRequest) -> Unit = { req ->
         if (status?.engine == true) {
             vm.reportInfo("Climate changes may be rejected while the car is running")
         }
         vm.startClimate(v, req)
     }
-    // Which preset (if any) is currently applied: set when you start one, and
-    // cleared automatically once the live settings drift away from it (e.g. you
-    // nudge a slider) so the highlight only marks a true match.
+    // The preset currently applied; cleared when the live settings drift from it.
     var activePresetId by remember(v.vin) { mutableStateOf<String?>(null) }
     // Start at [target] degrees F with defrost off, clearing any highlighted preset: the one-tap "smart" start.
     val startAtTarget: (Int, ClimateRequest) -> Unit = { target, base ->
         tempF = target; defrost = false; activePresetId = null
         startClimateWithEngineCheck(base.copy(tempF = target, defrost = false))
     }
-    // applyPreset was here; it was the same body as applyRequest (defined above, next to the
-    // sliders' state). The preset buttons below call applyRequest directly now.
     LaunchedEffect(currentReq, activePresetId, presets) {
         val active = presets.firstOrNull { it.id == activePresetId }
         if (active != null && active.request != currentReq) activePresetId = null
     }
 
     // --- Cross-composition climate sync ---------------------------------------
-    // Reflect whatever another live composition of this same car's climate
-    // pebble just set: sliders + active preset.
+    // Reflect another live composition of this car's pebble: sliders + active preset.
     val remoteClimate = state.climateSync[v.vin]
     LaunchedEffect(remoteClimate) {
         val r = remoteClimate ?: return@LaunchedEffect
@@ -187,33 +151,22 @@ internal fun ClimatePebble(
         rearRight = SeatLevel.fromApi(r.seatRearRight)
         activePresetId = r.activePresetId
     }
-    // Persist + cross-composition publish once settings stop changing, not on every
-    // drag tick: publishClimateState updates the shared ViewModel StateFlow the whole
-    // screen collects, so per-tick commits recomposed far more than the slider
-    // being dragged (read as "the sliders don't react until long after you
-    // change them"). The 400ms debounce lives in the ViewModel (viewModelScope),
-    // NOT here: an effect-side delay was cancelled whenever this pebble left
-    // composition within 400ms of the last adjustment (cover-screen tile swipe,
-    // car switch, collapse), silently reverting the user's change.
+    // Persist + publish once settings stop changing, not per drag tick (which recomposed the whole screen).
+    // The debounce lives in the ViewModel: an effect-side delay was cancelled when the pebble left composition.
     LaunchedEffect(currentReq, activePresetId) {
         if (settingsLoaded) vm.saveClimateDebounced(v, currentReq, activePresetId)
     }
 
     val climateOn = status?.airCtrlOn == true
-    // The car rejects remote climate commands while it's moving, so the whole
-    // control goes read-only when driving - and if it's already on, we show
-    // what it's currently set to at the car instead of editable inputs.
+    // The car rejects remote climate while moving, so the control is read-only when driving and shows the car's current values.
     val driving = state.isDriving(v)
     val startClimate = { vm.startClimate(v, currentReq) }
     val weather = state.carWeather[v.vin] ?: state.homeWeather
     val simpleMode = state.settingsMode != "advanced"
-    // Whether the pebble's own body (the live sliders below) is actually on
-    // screen right now -- mirrors Pebble()'s own expanded computation exactly
-    // so this and the header's Start button agree on what "expanded" means.
+    // Mirrors Pebble()'s own expanded computation so this and the header Start button agree.
     val expanded = LocalForceExpanded.current || state.isPebbleExpanded(v.vin, "climate")
 
-    // While climate runs the controls are locked, so they should show what the CAR is doing, not
-    // whatever the sliders last held. Only the fields the car reports back are mirrored.
+    // While climate runs the controls are locked and show what the car reports, not the last slider values.
     val carTempF = status?.airTemp?.asFahrenheit()
     val carDefrost = status?.defrost
     val carWheelHeat = status?.steerWheelHeat
@@ -223,8 +176,7 @@ internal fun ClimatePebble(
         carWheelHeat?.let { steeringHeat = WheelHeatLevel.fromApi(it) }
     }
     LaunchedEffect(climateOn, carTempF, carDefrost, carWheelHeat) { if (climateOn) syncFromCar() }
-    // Collapsing throws away edits that were never sent: re-opening shows the car's real settings
-    // while it runs, or the last climate actually started while it doesn't.
+    // Collapsing discards unsent edits: re-opening shows the car's settings while running, else the last started climate.
     LaunchedEffect(expanded) {
         if (!expanded && settingsLoaded) {
             if (climateOn) syncFromCar() else vm.loadSavedClimate(v)?.let(applyRequest)
@@ -249,10 +201,7 @@ internal fun ClimatePebble(
                 if (climateOn) {
                     vm.stopClimate(v); activePresetId = null
                 } else if (expanded) {
-                    // The sliders are visible and live-editable right here --
-                    // Start should do exactly what they're currently set to,
-                    // not second-guess with the smart/preset logic meant for
-                    // the collapsed one-tap case below.
+                    // The sliders are live, so Start sends exactly what they show, not the smart/preset logic.
                     startClimateWithEngineCheck(currentReq)
                 } else if (simpleMode && weather != null) {
                     startAtTarget(smartClimateTargetF(ambientFahrenheit(weather.tempC)), currentReq)
@@ -274,9 +223,7 @@ internal fun ClimatePebble(
             spinning = climateOn,
         ),
     ) {
-        // No hero here: this pebble's summary ("On · driving" / "On" / "Off") is the
-        // identical expression, and it already renders as the tile headline.
-        // Two lines saying "On" ten dp apart was the duplication, not the glance.
+        // No hero: the summary is the same expression and already renders as the tile headline.
         if (driving) {
             if (climateOn) {
                 Text(
@@ -325,14 +272,8 @@ internal fun ClimatePebble(
             onReorder = { vm.reorderClimatePresets(v, it) },
         )
 
-        // Smart climate: read the weather where the car is (falling back to home)
-        // and pick a target -- see smartClimateTargetF, the same rule the tile
-        // command runner uses: ~10°F off ambient normally, or the car's most
-        // aggressive setting on a genuinely extreme day, always within what the
-        // car's own climate range actually accepts.
-        // Its own PopVisible: weather can arrive AFTER the pebble is already open (it's
-        // a separate fetch), so this section pops in live rather than only ever being
-        // present from the first frame.
+        // Smart climate: a target from the weather at the car (falling back to home) via smartClimateTargetF.
+        // Its own PopVisible because weather can arrive after the pebble opens.
         PopVisible(visible = weather != null) {
             val w = weather
             if (w != null) {
@@ -377,7 +318,7 @@ internal fun ClimatePebble(
         )
 
         if (showAddPreset) {
-            // Standardized on the shared GlassAlertDialog shell (stacked buttons).
+            // Shared GlassAlertDialog shell (stacked buttons).
             GlassAlertDialog(
                 onDismissRequest = { showAddPreset = false },
                 icon = Icons.Filled.Thermostat,

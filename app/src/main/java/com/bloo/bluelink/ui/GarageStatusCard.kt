@@ -44,48 +44,21 @@ import kotlin.math.max
 // --- Garage status card -----------------------------------------------
 
 /**
- * Folded into the garage's own pager (GarageScreen.kt's collapsed pager) as
- * a page in place of a car when there are
- * none -- exactly the way Settings is folded in as the page after it. Used
- * to be a full standalone screen (`Screen.Empty`) with its own "Bloo" title
- * bar, floating Reload/Settings icons, and buttons that jumped to a separate
- * standalone Settings route. Reported directly: this -- and the "API is
- * down" / "no connection" states it can show -- should "just be another
- * card like the rest of them," reached and left the same way every other
- * page in the pager is: swipe, not a button, a menu, or a back press.
- *
- * GarageScreen already provides the Aurora backdrop, status-bar
- * scrim, and blur source this card sits on top of, so this composable is
- * only the card's own content -- the same division VehicleDetailContent and
- * CompactCar keep for a real car page. [Refreshable] (Pebbles.kt) supplies
- * the retry action: pulling down here calls [AppViewModel.loadGarage] the
- * exact same way pulling down on a car page calls
- * [AppViewModel.refreshStatus] -- one standard gesture, not a one-off Reload
- * button this page alone had.
+ * The garage pager's page shown in place of a car when there are none, like Settings after it.
+ * Only the card's content: GarageScreen supplies the backdrop, scrim and blur source. [Refreshable] provides
+ * the retry, so pulling down calls [AppViewModel.loadGarage].
  */
 @Composable
 internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState: HazeState? = null) {
-    // Derived reads rather than `val s = state.value`: this card is a pager page, so a body
-    // read subscribed it (and its first-paint Animatable effects) to every UiState emission.
-    // It draws exactly four fields; only those four can invalidate it now.
+    // Derived reads of the four fields it draws, so other UiState emissions don't recompose this pager page.
     val accounts by remember { derivedStateOf { state.value.accounts } }
     val garageLoadError by remember { derivedStateOf { state.value.garageLoadError } }
     val garageLoadOffline by remember { derivedStateOf { state.value.garageLoadOffline } }
     val loading by remember { derivedStateOf { state.value.loading } }
     val scheme = MaterialTheme.colorScheme
 
-    // Four distinct causes used to collapse into the same "No vehicles found" /
-    // "Not signed in" copy -- including a real network/API failure (including
-    // the manufacturer's own servers being down), which then looked exactly
-    // like the app had silently signed the user out. Each now gets its own
-    // icon and headline so the actual cause is always clear. A true
-    // connectivity failure (garageLoadOffline) gets its own plain "no
-    // connection" copy instead of a raw exception message -- there's nothing
-    // actionable in that message beyond "check your connection", which the
-    // dedicated copy already says -- and, gated the other way, an error that
-    // happens while the device IS online (an auth failure, Hyundai/Kia's own
-    // API returning a 500, etc.) keeps the more specific message since that
-    // one might actually help.
+    // Each cause gets its own icon and headline. A connectivity failure gets plain "no connection"
+    // copy; an error while online keeps the specific message, which may help.
     val loadFailed = accounts.isNotEmpty() && garageLoadError != null
     val offline = loadFailed && garageLoadOffline
     val (icon, headline, body) = when {
@@ -111,8 +84,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
         )
     }
 
-    // Fade + slide up on first composition, matching HeroHeader and every
-    // other first-paint card elsewhere in the app.
+    // Fade + slide up on first composition, like other first-paint cards.
     val contentAlpha = remember { Animatable(0f) }
     val contentOffset = remember { Animatable(16f) }
     LaunchedEffect(Unit) {
@@ -120,10 +92,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
         launch { contentOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
 
-    // loadGarage() sets state.loading (not state.refreshing, which only ever
-    // covers a single car's own status fetch) -- that's the flag this card's
-    // pull gesture needs to reflect for the indicator/release behaviour to
-    // track the request it actually triggers.
+    // loadGarage() sets state.loading (not state.refreshing, which covers one car's fetch), so the pull gesture tracks that.
     Refreshable(refreshing = loading, onRefresh = { vm.loadGarage() }) {
         Box(
             Modifier
@@ -133,10 +102,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                 .padding(horizontal = 20.dp),
             contentAlignment = Alignment.Center,
         ) {
-            // GlassSurface (GlassChrome.kt): the same card shell every other piece of
-            // content in the app sits on top of (Garage's pebbles, Settings' cards, the
-            // lock overlay's own PIN card) -- blurring the real Aurora behind it, exactly
-            // like a real car page's own content does.
+            // The shared GlassSurface card shell, blurring the real Aurora behind it.
             GlassSurface(
                 shape = ExtraLargeShape,
                 liquid = false,
@@ -145,9 +111,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                     .fillMaxWidth()
                     .graphicsLayer {
                         alpha = contentAlpha.value
-                        // .dp.toPx(), not the raw Animatable value: translationY is in
-                        // PIXELS, so feeding it 16f slid this 16px -- about 5dp on a
-                        // 3x-density phone, and a different distance on every device.
+                        // .dp.toPx(): translationY is in pixels, not dp.
                         translationY = contentOffset.value.dp.toPx()
                     },
                 hazeState = hazeState,
@@ -157,9 +121,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                     verticalArrangement = Arrangement.spacedBy(GapSection),
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 32.dp),
                 ) {
-                    // Same tonal icon-badge every SettingsCard header uses (StatusHeaderRow,
-                    // SettingsHeader.kt) -- one badge treatment for "an icon summarizing this
-                    // card's state," not a one-off radial-gradient glow of its own.
+                    // The tonal icon badge shared with SettingsCard headers.
                     val badgeTint = if (loadFailed) scheme.error else scheme.onSurfaceVariant
                     IconBadge(
                         icon,

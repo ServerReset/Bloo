@@ -25,29 +25,11 @@ import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.snapshot
 
 /**
- * Reads this device's 17 local per-car / per-tile config values for [vehicles] from one
- * [prefs] snapshot and returns a UiState transform that folds them into `copy()`, plus the
- * resolved shortcut set (the one value a caller needs OUTSIDE the copy, to re-push launcher
- * shortcuts).
- *
- * This block was duplicated byte-for-byte between [loadGarageInner] and
- * [refreshLocalCarConfig] -- all 17 vals with identical right-hand sides. The comment at the
- * old refreshLocalCarConfig copy recorded the exact bug that duplication caused: fields it
- * had OMITTED (pebble visibility, collapse, hotspots, tile config, shortcuts) wrote DataStore
- * on a sync but never reached the running UiState, so "hid a pebble / moved a Quick-tile,
- * synced, nothing changed". Two copies is how one falls behind the other; there is now one.
- *
- * `firstRun` -> empty collapsed set is preserved (all pebbles start expanded on first open),
- * and callers layer their own distinct fields (loadGarageInner adds vehicles/screen/
- * garageLoadError; refreshLocalCarConfig adds nothing) on top of the returned transform.
+ * Reads this device's per-car / per-tile config for [vehicles] from one [prefs] snapshot and returns a UiState
+ * transform folding them in, plus the resolved shortcut set (needed outside the copy to re-push launcher shortcuts).
+ * `firstRun` yields an empty collapsed set, so all pebbles start expanded on first open.
  */
-// Dispatchers.Default, same reasoning as SettingsStore.appearance's own .flowOn(Default):
-// climatePresets(vin, prefs) below JSON-decodes each car's saved preset list, and this whole
-// function runs right on the Loading -> Garage transition frame (loadGarageInner) or a
-// settings-import refresh -- exactly the "decode ran on the main thread while the first
-// frame was trying to draw" cost that fix already called out elsewhere. Everything else here
-// is a pure, already-in-memory Preferences read (no real suspension), so hopping dispatchers
-// once for the whole function costs one context switch, not one per getter.
+// Runs on Dispatchers.Default: decoding each car's preset list must not run on the main thread during the Loading -> Garage frame.
 internal suspend fun AppViewModel.perCarConfig(
     vehicles: List<Vehicle>,
     prefs: androidx.datastore.preferences.core.Preferences,
@@ -62,7 +44,7 @@ internal suspend fun AppViewModel.perCarConfig(
     val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
     val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin, prefs) }
     val firstRun = !settingsStore.onboardingSeen(prefs)
-    // On first open all pebbles start expanded regardless of any stored state.
+    // First open: all pebbles start expanded regardless of stored state.
     val collapsed = if (firstRun) emptySet()
     else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
     val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspots(v.vin, prefs)?.let { v.vin to it } }.toMap()
@@ -90,8 +72,7 @@ internal suspend fun AppViewModel.perCarConfig(
 
 
 internal suspend fun AppViewModel.refreshLocalCarConfig() {
-    // ONE Preferences read for every per-car setting below, instead of one per
-    // getter per car. See SettingsStore.snapshot().
+    // One Preferences read for every per-car setting; see SettingsStore.snapshot().
     val prefs = settingsStore.snapshot()
     val vehicles = _state.value.vehicles
     if (vehicles.isEmpty()) return
@@ -99,48 +80,20 @@ internal suspend fun AppViewModel.refreshLocalCarConfig() {
     val cfg = perCarConfig(vehicles, prefs)
     com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: perCarConfig done")
     _state.update { cfg.apply(it) }
-    // Quick-tile / shortcut changes must also re-push the launcher shortcuts,
-    // exactly as loadGarageInner does, so an imported shortcut-set change is
-    // reflected in the app-icon long-press menu and not just in-app.
+    // Also re-push launcher shortcuts so an imported shortcut-set change reaches the app-icon menu.
     com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, cfg.shortcutSet)
 }
 
 
 /**
- * One-time Drive-sync bootstrap: restore the saved sync URI / settings-mode /
- * last-sync-time / per-car default climate presets, then start the
- * bidirectional auto-sync collector (download-then-upload whenever a refresh
- * settles). Guarded by [driveSyncBootstrapped] so calling this more than once
- * (the garage can reload after a re-login) never starts a second collector.
+ * Seeds [UiState.defaultClimatePresets] from the current vehicle list.
  *
- * This used to be spliced into the middle of [loadStatus] — which runs on
- * every single vehicle status fetch — so every manual refresh started a
- * brand-new, permanent `_state.refreshing` collector that itself did a full
- * Drive download + merge + upload. None of those collectors ever completed,
- * so a long session accumulated an unbounded pile of them, and each later
- * refresh fired ALL of them at once: redundant network calls and concurrent
- * writes to the same Drive file racing each other.
- */
-/**
- * Seeds [UiState.defaultClimatePresets] from the CURRENT vehicle list.
- *
- * Lives outside [bootstrapDriveSync] because it is per-GARAGE-LOAD work, and that function
- * is once-per-PROCESS (an AtomicBoolean). The two were the same block, and the empty/failed
- * cold-start path calls bootstrapDriveSync BEFORE any vehicle exists -- deliberately, so the
- * sync collector still starts. That consumed the guard, so this map was computed from an
- * empty list and the later call on the real load was a documented no-op: every car's default
- * climate preset silently fell back to "smart" for the whole process, ignoring what the user
- * had chosen, until an app restart whose first garage load happened to succeed.
- *
- * Two different lifetimes had been given one guard. Splitting them is the fix.
+ * Runs per garage load, not inside the once-per-process [bootstrapDriveSync], which can run before any vehicle exists.
  */
 internal suspend fun AppViewModel.seedDefaultClimatePresets() {
     val vehicles = _state.value.vehicles
     if (vehicles.isEmpty()) return
-    // ONE Preferences read, not one suspend data.first() per car -- this runs right on
-    // the cold-start critical path (called from loadGarageInner immediately after the
-    // Loading -> Garage flip), the exact "N getters x N cars" shape SettingsStore.snapshot()
-    // exists to eliminate everywhere else in this file.
+    // One Preferences read, not one per car: this is on the cold-start critical path.
     val prefs = settingsStore.snapshot()
     val presets = vehicles.associate { v ->
         v.vin to (settingsStore.defaultClimatePreset(v.vin, prefs) ?: "smart")

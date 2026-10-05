@@ -26,11 +26,8 @@ data class VehicleSnapshot(
     val name: String,
     val model: String,
     val isEv: Boolean,
-    /** Whether this car has a chargeable battery, per the user's manual
-     *  powertrain override on the phone (a PHEV the API misreports as gas
-     *  still needs its charge readouts). Defaults to [isEv] so snapshots
-     *  built without an override (e.g. from the account's vehicle list)
-     *  behave exactly as before. */
+    /** Whether this car has a chargeable battery, per the user's manual powertrain override
+     *  (a PHEV the API reports as gas). Defaults to [isEv]. */
     val hasBattery: Boolean = isEv,
     val regId: String = "",
     val generation: String = "2",
@@ -43,46 +40,23 @@ data class VehicleSnapshot(
     val engineOn: Boolean? = null,
     val lat: Double? = null,
     val lon: Double? = null,
-    /** mph, from the last fetched status's vehicleLocation.speed, if the car
-     *  reported one. Lets the bare-Context command runners (CarCommandRunner,
-     *  TileCommandRunner) apply the same "car rejects climate commands while
-     *  driving" gate the main phone UI's own AppViewModel.isDriving() already
-     *  does -- those runners only ever see a [VehicleSnapshot], never the live
-     *  location state the main UI tracks separately. */
-    /** CAUTION -- the name is not a promise. This is the car's raw reported
-     *  speed VALUE, copied straight from the API's `{value, unit}` pair with
-     *  the unit code thrown away at capture (see AppViewModel, and Speed.unit
-     *  in Models.kt). Nothing in this codebase decodes those unit codes for
-     *  speed, distance or time, so which unit this actually holds is not
-     *  established anywhere.
-     *
-     *  That has never mattered, because [isDriving] -- its only reader --
-     *  merely asks whether it is above zero, which is true in any unit. It
-     *  would matter immediately for anything that DISPLAYS it: a UI row
-     *  reading "62 mph" off a km/h value is worse than showing no
-     *  speed at all. Resolve the unit against a real car before rendering
-     *  this, and if you convert it, rename the field at the same time. */
+    /** The car's raw reported speed VALUE from the API's `{value, unit}` pair, unit discarded at capture,
+     *  so the actual unit is unestablished. Only safe for "above zero" checks ([isDriving]); resolve the
+     *  unit (and rename) before displaying it. */
     val speedMph: Double? = null,
     val updated: String? = null,
-    /** Wall-clock (ms) when this snapshot last got fresh data from the car; 0 =
-     *  unknown. Lets glanceable surfaces flag stale data instead of showing an
-     *  hours-old lock/charge state as if it were live. */
+    /** Wall-clock (ms) of the last fresh data from the car; 0 = unknown. Lets surfaces flag stale data. */
     val fetchedAt: Long = 0L,
     val odometer: String? = null,
-    /** User-entered license plate and service-due tracking (phone Settings),
-     *  mirrored so other snapshot readers besides the phone's own Info pebble
-     *  can show the same maintenance info. */
+    /** User-entered license plate and service-due tracking, mirrored for other snapshot readers. */
     val licensePlate: String? = null,
     val lastServiceMiles: Int? = null,
     val serviceIntervalMiles: Int? = null,
-    /** The car's charge limit for the plug it's currently on (see
-     *  [EvStatus.targetForCurrentPlug]), 1..100, or null when it isn't
-     *  plugged in or didn't report one. Mirrored so the out-of-process
-     *  surfaces can draw the same "will charge / won't" split the phone
-     *  hero and the live charging notification both show. */
+    /** The car's charge limit for the plug it is on (see [EvStatus.targetForCurrentPlug]), 1..100,
+     *  or null when unplugged or unreported. */
     val chargeLimitPct: Int? = null,
 ) {
-    /** Rebuild the command-capable Vehicle (used by the command runners). */
+    /** Rebuild the command-capable Vehicle. */
     fun toVehicle(): Vehicle = Vehicle(
         vin = vin,
         regId = regId,
@@ -95,37 +69,20 @@ data class VehicleSnapshot(
     )
 }
 
-/** True when the last known speed reading says the car is moving -- the
- *  snapshot-based equivalent of AppViewModel.isDriving(), for the
- *  out-of-process command runners that only ever see a [VehicleSnapshot]. */
+/** True when the last known speed reading says the car is moving (snapshot-based AppViewModel.isDriving()). */
 val VehicleSnapshot.isDriving: Boolean get() = (speedMph ?: 0.0) > 0.0
 
 /**
  * Fold a freshly fetched status into an existing snapshot.
  *
- * [location] is a separately-fetched position for the brands whose STATUS carries none.
- * Canada and Europe both expose GPS only through a dedicated find-my-car endpoint, so their
- * parsed VehicleStatus has no vehicleLocation at all -- which meant every background path
- * through this function (the alert worker, the live-charge poller, the command runners) left
- * lat/lon/speed exactly as they were, however far the car had driven. The phone worked around
- * it in its own layer years ago (see Snapshots.kt's note on locate()); the shared fold that
- * every out-of-process surface uses never got the equivalent, so the fix only existed while
- * the app was open.
- *
- * The status still wins when it has a coordinate -- it is same-fetch fresh.
+ * [location] is a separately-fetched position for brands (Canada, Europe) whose STATUS carries
+ * none. The status wins when it has a coordinate.
  */
 fun VehicleSnapshot.merged(status: VehicleStatus, location: GeoLocation? = null): VehicleSnapshot {
-    // Use hasBattery (the user's manual powertrain override), not the raw
-    // isEv flag -- this reimplemented percentFor/rangeMiFor's own logic with
-    // the wrong flag, so a PHEV the API misreports as gas would have every
-    // refresh through this path (CarCommandRunner.refresh) clobber percent/rangeMi
-    // with fuel data instead of battery data.
+    // hasBattery (the user's powertrain override), not isEv: a misreported PHEV must not get fuel data in percent/range.
     val pct = status.percentFor(hasBattery)
     val range = status.rangeMiFor(hasBattery)
-    // Hoisted to a local: a nullable property of another class is only
-    // smart-castable under conditions this file has already been bitten by
-    // once (see rangeMi's note in AppViewModel). A local is free and removes
-    // the question.
+    // Local so the nullable property smart-casts.
     val ev = status.evStatus
     return copy(
         percent = pct ?: percent,
@@ -134,54 +91,23 @@ fun VehicleSnapshot.merged(status: VehicleStatus, location: GeoLocation? = null)
         charging = status.evStatus?.batteryCharge ?: charging,
         climateOn = status.airCtrlOn ?: climateOn,
         engineOn = status.engine ?: engineOn,
-        // GeoLocation is flat (latitude/longitude/speed); VehicleLocation nests them under
-        // coord/speed.value. Two different shapes for the same idea, so they are spelled out
-        // separately rather than looking interchangeable.
+        // GeoLocation is flat (latitude/longitude/speed); VehicleLocation nests them under coord/speed.value.
         lat = status.vehicleLocation?.coord?.lat ?: location?.latitude ?: lat,
         lon = status.vehicleLocation?.coord?.lon ?: location?.longitude ?: lon,
         speedMph = status.vehicleLocation?.speed?.value ?: location?.speed ?: speedMph,
         updated = status.dateTime ?: updated,
-        // The charge limit, which this function never carried -- so the only
-        // path that set it was the phone app's own snapshotOf(). Every OTHER
-        // refresh goes through here (the command runners, the background
-        // pollers), and each of those left the limit at whatever the
-        // phone last wrote, or at null forever for a car the phone app had
-        // never refreshed while plugged in. That limit readout is on several
-        // surfaces now; the rest were reading a field nothing kept current.
-        //
-        // NOT the `new ?: old` shape the fields above use, deliberately. A status
-        // with no evStatus at all (a gas car, a partial fetch) is still the only
-        // case where the old value stands.
-        //
-        // displayChargeLimit, not targetForCurrentPlug -- this WAS
-        // "unplugged genuinely means no limit applies, so trust an unplugged
-        // status's null completely", on the reasoning that the old limit MARKER
-        // should disappear once you unplug. That reasoning doesn't hold any more:
-        // the marker is gone, replaced by a three-segment bar that's meant to show
-        // the car's own configured limit "always," not just mid-session (see the
-        // blue stuck-at-limit fill, which was explicitly asked to work the same way
-        // regardless of active charging) -- so an EV status that's merely unplugged
-        // right now still resolves to its AC default via displayChargeLimit rather
-        // than genuinely clearing the field. Reported from a real device: a parked,
-        // unplugged car's hero card lost its whole limit-aware bar.
+        // Not the `new ?: old` shape: only a status with no evStatus keeps the old value.
+        // displayChargeLimit (not targetForCurrentPlug) so an unplugged EV still resolves to its configured limit.
         chargeLimitPct = if (ev != null) ev.displayChargeLimit() else chargeLimitPct,
-        // merged() folds in a status we JUST fetched, so this data is now current.
+        // A just-fetched status makes the data current.
         fetchedAt = System.currentTimeMillis(),
     )
 }
 
 /**
- * This snapshot, with any status field it does not know filled in from [old].
- *
- * The snapshot-to-snapshot counterpart of [merged] (which folds in a live
- * [VehicleStatus]), for [SnapshotStore.saveVehiclesKeepingStatus]. Same `new ?: old`
- * rule per field, so a fresh value always wins and an absent one never blanks a
- * stored one.
- *
- * Identity and user-entered fields are deliberately NOT carried forward -- name,
- * model, powertrain flags, regId, generation, brand, odometer, plate and the
- * service figures all come from the caller, which just read them. Carrying those
- * would make a renamed or re-plated car un-updatable.
+ * This snapshot with any status field it lacks filled in from [old] (`new ?: old` per field, as in
+ * [merged]), for [SnapshotStore.saveVehiclesKeepingStatus]. Identity and user-entered fields come
+ * from the caller and are not carried forward, so a renamed or re-plated car stays updatable.
  */
 internal fun VehicleSnapshot.keepingStatusOf(old: VehicleSnapshot): VehicleSnapshot = copy(
     percent = percent ?: old.percent,
@@ -195,50 +121,32 @@ internal fun VehicleSnapshot.keepingStatusOf(old: VehicleSnapshot): VehicleSnaps
     speedMph = speedMph ?: old.speedMph,
     updated = updated ?: old.updated,
     chargeLimitPct = chargeLimitPct ?: old.chargeLimitPct,
-    // 0 is this field's "unknown", not a timestamp, so it takes the same rule.
+    // 0 means "unknown", so it follows the same rule.
     fetchedAt = if (fetchedAt > 0L) fetchedAt else old.fetchedAt,
 )
 
-/** The exact shape persisted to disk as a single JSON string under one
- *  DataStore key — kept as one blob (rather than one DataStore entry per
- *  field) so a read or write is always a single atomic operation over the
- *  whole vehicle list + selection together. */
+/** The payload persisted as a single JSON string under one DataStore key, so reads and writes
+ *  are atomic over the whole vehicle list and selection. */
 @Serializable
 private data class SnapshotPayload(
     val vehicles: List<VehicleSnapshot> = emptyList(),
     val selectedVin: String? = null,
 )
 
-// A corruption handler so a file damaged by an interrupted write/power loss
-// resets to empty prefs instead of rethrowing an uncaught exception out of
-// every read — this store is read from background workers and command runners,
-// every one of which would otherwise crash on a corrupt file.
+// Corruption resets to empty prefs instead of crashing every background reader.
 private val Context.snapshotDataStore by preferencesDataStore(
     name = "bloo_snapshots",
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
 
 /**
- * Reads and writes the on-disk [VehicleSnapshot] cache described above.
- * Every mutating method follows the same read-modify-write shape via
- * DataStore's [edit]: decode whatever's currently on disk, apply the change,
- * re-encode the whole payload back. DataStore's edit block itself is
- * transactional (backed by a single file + mutex), so concurrent callers
- * (a background poll writing while a command's optimistic flip also writes,
- * for instance) don't stomp on each other's writes.
+ * Reads and writes the on-disk [VehicleSnapshot] cache. Mutations are read-modify-write inside
+ * DataStore's transactional [edit], so concurrent writers do not stomp on each other.
  */
 /**
- * Apply [updates] onto [existing] by VIN. Extracted from [SnapshotStore.updateVehicles]
- * so the batch-merge semantics are testable with no Android context in the way.
- *
- * Three properties the callers depend on:
- *  - ORDER is the existing list's. The vehicle order is user-visible (it's the car
- *    pager's order), so a refresh must never reshuffle it.
- *  - A VIN in [updates] that isn't in [existing] is IGNORED, not appended. Adding cars
- *    is saveVehicles' job; a stale update for a car that has since been removed from
- *    the account must not resurrect it.
- *  - On a duplicate VIN within [updates], the LAST entry wins, matching what repeated
- *    single-vehicle writes in the same order would have produced.
+ * Apply [updates] onto [existing] by VIN (extracted for JVM testing). Order is the existing
+ * list's (user-visible pager order); VINs not in [existing] are ignored, not appended; the last
+ * duplicate in [updates] wins.
  */
 internal fun mergeVehicleUpdates(
     existing: List<VehicleSnapshot>,
@@ -257,35 +165,23 @@ class SnapshotStore(private val context: Context) {
         val PAYLOAD = stringPreferencesKey("payload")
     }
 
-    /** Live stream of the current snapshot data — re-emits whenever the
-     *  underlying DataStore file changes, so a Compose UI collecting this can
-     *  react immediately to a write made from a different process. */
+    /** Live stream of the snapshot data; re-emits when the DataStore file changes, even from another process. */
     val payload: Flow<SnapshotData> = context.snapshotDataStore.data.map { prefs ->
         decode(prefs[Keys.PAYLOAD])
     }
-        // decode() is a full Json parse of every vehicle, and DataStore only guarantees the FILE
-        // read is off the main thread -- a map{} transform runs in the collector's context, so
-        // without this the whole blob would be parsed on whatever thread collects (and a command
-        // tap deliberately emits twice, optimistic then settled).
+        // decode() parses every vehicle; keep it off the collector's (often main) thread.
         .flowOn(Dispatchers.IO)
 
-    /** One-shot read of the current snapshot data (first() takes just the
-     *  latest emission and then stops collecting), for callers that don't
-     *  need to keep observing. */
+    /** One-shot read of the current snapshot data. */
     suspend fun current(): SnapshotData = withContext(Dispatchers.IO) {
         StartupTrace.markIfStarting("SnapshotStore.current(): begin (disk read)")
-        // withContext for the same reason as `payload` above: .first() resumes on the CALLER's
-        // dispatcher, and the caller is often the main thread. StatusCache.load already does
-        // exactly this; this store -- the one every module reads -- had been missed.
+        // .first() resumes on the caller's dispatcher, often main.
         decode(context.snapshotDataStore.data.first()[Keys.PAYLOAD])
     }
 
     /**
-     * Force this store's first DataStore read now -- the same file-open + protobuf-parse cost
-     * [SettingsStore.warmUp] and [StatusCache.warmUp] exist for, moved onto the startup warm-up
-     * thread. [current] is the first thing the cold-start garage publish reads, so paying the
-     * file-open here (over a second earlier, in the background) takes that disk read out of the
-     * garage path entirely.
+     * Forces the first DataStore read now (file-open + parse) on the startup warm-up thread,
+     * so the cold-start garage publish via [current] skips that disk read.
      */
     suspend fun warmUp() {
         runCatching { context.snapshotDataStore.data.first() }
@@ -294,38 +190,14 @@ class SnapshotStore(private val context: Context) {
     /**
      * Replace the vehicle LIST while keeping each surviving car's last-known status.
      *
-     * For the "we just re-fetched the account's vehicles" case, which knows every
-     * car's identity (name, model, odometer, plate) and nothing about its state.
-     * [saveVehicles] replaces the payload wholesale, so calling it with
-     * status-less snapshots wipes percent, range, lock, charge, climate, engine,
-     * location and fetchedAt for every car on disk -- and the background pollers
-     * and command runners read exactly that file. The result was that every cold
-     * start, every login and every pull-to-refresh blanked all of them until N
-     * sequential network round trips had completed, one car at a time through
-     * statusMutex. fetchedAt = 0 also trips the stale-data gate.
-     *
-     * Not fixed by passing the in-memory status cache instead: that cache is
-     * restored on a SEPARATE viewModelScope.launch from the login path, so
-     * whether it has arrived first is a race. This reads what is actually on
-     * disk, inside the same edit transaction, so there is no window and no
-     * second decode.
-     *
-     * Carry-forward is per field and only where the incoming value is absent, the
-     * same `new ?: old` shape [merged] uses -- so a genuine update always wins and
-     * a missing one can never blank a known value. Identity and user-entered
-     * fields always take the incoming value, since those were just read fresh.
-     *
-     * [saveVehicles] is deliberately left alone: sign-out calls it with an empty
-     * list to clear everything, and a full account refresh uses it to apply the
-     * phone's authoritative payload. Both want replacement.
+     * For re-fetches that know identity (name, model, odometer, plate) but not state. Reads the
+     * on-disk payload inside the same edit transaction (no race with the status cache). Carry-forward
+     * is per field where the incoming value is absent ([merged]'s `new ?: old`); identity and
+     * user-entered fields take the incoming value. [saveVehicles] stays wholesale (sign-out clears with it).
      */
     suspend fun saveVehiclesKeepingStatus(vehicles: List<VehicleSnapshot>) {
         if (vehicles.isEmpty()) return
-        // withContext(Dispatchers.IO) for the same reason as `current()` above: every caller
-        // here is a viewModelScope.launch (or worse, called directly on it -- see loadStatus)
-        // on Main.immediate, and this decodes/re-encodes the WHOLE vehicle payload on every
-        // call. Missed when `current()` got this fix; this is called once per car as each
-        // car's status arrives, landing squarely on the cold-start card-loading path.
+        // IO: decodes/re-encodes the whole payload, called per car from Main.immediate coroutines.
         withContext(Dispatchers.IO) {
             context.snapshotDataStore.edit { prefs ->
                 val existing = decode(prefs[Keys.PAYLOAD])
@@ -341,12 +213,9 @@ class SnapshotStore(private val context: Context) {
         }
     }
 
-    /** Replace the entire vehicle list (e.g. after a full account refresh).
-     *  Mechanism: preserves the previously-selected VIN if that car is still
-     *  present in the new list; otherwise falls back to the first vehicle so
-     *  there's always a selection as long as the list isn't empty. */
+    /** Replace the entire vehicle list. Keeps the selected VIN if still present, else selects the first car. */
     suspend fun saveVehicles(vehicles: List<VehicleSnapshot>) {
-        // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
+        // IO, as in saveVehiclesKeepingStatus.
         withContext(Dispatchers.IO) {
             context.snapshotDataStore.edit { prefs ->
                 val existing = decode(prefs[Keys.PAYLOAD])
@@ -364,21 +233,13 @@ class SnapshotStore(private val context: Context) {
     suspend fun updateVehicle(snapshot: VehicleSnapshot) = updateVehicles(listOf(snapshot))
 
     /**
-     * Merge several vehicles in ONE store write.
-     *
-     * Every write here costs a full decode of the whole vehicle payload, a full
-     * re-encode of it, and a DataStore commit -- the cost is per WRITE, not per
-     * vehicle, because the payload is one JSON blob. So a "refresh all" that called
-     * [updateVehicle] once per car paid N decodes, N encodes and N fsyncs to change N
-     * cars, where one of each would do. It also produced N emissions on [payload], so
-     * every observer of it repainted N times for one refresh.
-     *
-     * A VIN in [snapshots] that isn't in the store is ignored rather than added, which
-     * is [updateVehicle]'s existing behaviour -- adding cars is [saveVehicles]' job.
+     * Merge several vehicles in ONE store write: cost and [payload] emissions are per write
+     * (the payload is one JSON blob), not per vehicle. VINs not in the store are ignored;
+     * adding cars is [saveVehicles]' job.
      */
     suspend fun updateVehicles(snapshots: List<VehicleSnapshot>) {
         if (snapshots.isEmpty()) return
-        // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
+        // IO, as in saveVehiclesKeepingStatus.
         withContext(Dispatchers.IO) {
             context.snapshotDataStore.edit { prefs ->
                 val existing = decode(prefs[Keys.PAYLOAD])
@@ -391,24 +252,14 @@ class SnapshotStore(private val context: Context) {
     }
 
     /**
-     * Fold freshly-fetched statuses into the stored snapshots, keyed by VIN, in one
-     * atomic read-modify-write.
-     *
-     * For background pollers, which have a [VehicleStatus] in hand and no snapshot to
-     * build one from. The alternative -- [current], then [merged] per car, then
-     * [updateVehicles] -- costs an extra full decode of the payload and leaves a window
-     * in which another writer (a command's optimistic flip, the app itself) can land
-     * between the read and the write and be silently overwritten. Doing the fold inside
-     * `edit` closes that window and drops the read.
-     *
-     * A VIN with no stored snapshot is skipped, matching [updateVehicles]: a poller
-     * should not be able to invent a car the app has never seen. Per-field semantics
-     * are [merged]'s -- `new ?: old` -- so a partial status can only ADD information,
-     * never blank out a lock or charge state the store already had.
+     * Fold freshly-fetched statuses into the stored snapshots by VIN in one atomic
+     * read-modify-write, for pollers that hold a [VehicleStatus] but no snapshot. Doing it inside
+     * `edit` avoids overwriting a concurrent writer. Unknown VINs are skipped; per-field semantics
+     * are [merged]'s, so a partial status only adds information.
      */
     suspend fun mergeStatuses(statuses: Map<String, VehicleStatus>) {
         if (statuses.isEmpty()) return
-        // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
+        // IO, as in saveVehiclesKeepingStatus.
         withContext(Dispatchers.IO) {
             context.snapshotDataStore.edit { prefs ->
                 val existing = decode(prefs[Keys.PAYLOAD])
@@ -426,12 +277,7 @@ class SnapshotStore(private val context: Context) {
         }
     }
 
-    /** Parse the raw stored JSON string into [SnapshotData]. A null [raw]
-     *  (nothing saved yet) or a JSON parse failure (corrupt/incompatible
-     *  data — belt-and-suspenders alongside the DataStore-level
-     *  corruptionHandler above) both fall back to an empty [SnapshotPayload]
-     *  rather than throwing, since every caller of this store expects to be
-     *  able to read from it even before anything has ever been written. */
+    /** Parse the stored JSON into [SnapshotData]; null or corrupt input yields an empty payload rather than throwing. */
     private fun decode(raw: String?): SnapshotData {
         val payload = raw?.let {
             runCatching { json.decodeFromString(SnapshotPayload.serializer(), it) }.getOrNull()
@@ -439,16 +285,12 @@ class SnapshotStore(private val context: Context) {
         return SnapshotData(payload.vehicles, payload.selectedVin)
     }
 
-    /** Decoded view of the store: every known vehicle plus which VIN is
-     *  currently selected. */
+    /** Decoded view of the store: every known vehicle plus the selected VIN. */
     data class SnapshotData(
         val vehicles: List<VehicleSnapshot>,
         val selectedVin: String?,
     ) {
-        /** The selected vehicle's snapshot, or the first vehicle if the
-         *  recorded selection doesn't match any known VIN (e.g. that car was
-         *  removed from the account since the selection was last saved), or
-         *  null if there are no vehicles at all. */
+        /** The selected vehicle's snapshot, else the first vehicle, else null. */
         val selected: VehicleSnapshot?
             get() = vehicles.firstOrNull { it.vin == selectedVin } ?: vehicles.firstOrNull()
     }

@@ -1,11 +1,6 @@
 package com.bloo.bluelink.ui
 
-/**
- * Settings' screen-header cluster, peeled out of SettingsScreen.kt (which still owns
- * the big `SettingsScreen` composable): the mode-stagger constant and
- * staggeredAdvancedVisible helper, the tonal StatusHeaderRow badge, and the floating
- * SettingsHeaderRow title row.
- */
+/** Settings' screen-header cluster: the mode-stagger helpers, the StatusHeaderRow badge and the SettingsHeaderRow title row. */
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedContent
@@ -57,54 +52,34 @@ import com.bloo.bluelink.data.collapsedSections
 import com.bloo.bluelink.data.setSeamlessInstallShizuku
 
 /**
- * Delays an advanced-only card's own entrance by `index * STAGGER_STEP_MS` once [advanced]
- * flips true, so switching into Advanced mode cascades card by card instead of every
- * advanced-only section overshooting on the exact same frame -- the same "one shared
- * progress, remapped per item" idea [StaggeredRevealColumn] uses for a pebble's rows,
- * adapted here for a handful of independent [AnimatedVisibility] instances rather than one
- * Layout's worth of children (there's no single shared container to run a Layout-based
- * cascade over: these are whole, separately-composed [SettingsCard]s scattered through one
- * long screen, not rows of one component).
+ * Delays an advanced-only card's entrance by `index * STAGGER_STEP_MS` once [advanced] flips
+ * true, so Advanced mode cascades card by card instead of every card overshooting on one frame.
  *
- * The flip back to Simple mode is immediate -- no stagger, no delay -- on purpose, not by
- * omission: [StaggeredRevealColumn]'s own close side went through exactly this mistake
- * first. Staggering a HIDE means most items sit fully visible doing nothing while they wait
- * their turn, then disappear abruptly right at the end, which reads as broken rather than
- * polished (see that composable's doc for the fuller account). Revealing in sequence looks
- * deliberate; hiding in sequence looks like a bug, so only the reveal gets one.
+ * The flip back to Simple is immediate: staggering a hide leaves items visible and idle, then
+ * vanishing abruptly, which reads as broken.
  */
 internal const val STAGGER_STEP_MS = 45L
 
-/** How many advanced-only cards Settings staggers in as whole grid items. Kept beside the
- *  stagger itself so the count and the sequence cannot drift apart when a card is added.
- *
- *  Two, not eight: three further advanced blocks are nested INSIDE other cards and drive
- *  themselves through [staggeredAdvancedVisible], which takes its own index and never touches
- *  this list. The count only ever covers the cards this screen gates as items. */
+/** How many advanced-only cards Settings staggers in as whole grid items. Nested advanced blocks
+ *  drive themselves through [staggeredAdvancedVisible] with their own index and are not counted. */
 internal const val ADVANCED_CARD_COUNT = 2
 
 /**
- * The same staggered reveal as [staggeredAdvancedVisible], but for ALL advanced cards at once,
- * hoisted OUT of the lazy list's item content and into the screen's own composition.
+ * The same staggered reveal as [staggeredAdvancedVisible] for ALL advanced cards, hoisted out of
+ * the lazy list's item content into the screen's composition.
  *
- * That hoist is the point. Read from inside `item { AnimatedVisibility(visible = ...) }`, the
- * visibility can only ever hide a card's CONTENT -- the `item {}` itself still occupies a slot
- * in the LazyColumn, and the list still applies its own item spacing around
- * that now zero-height slot. Every advanced-only card left a phantom gap behind in simple mode,
- * which is what "bad spacing when pebbles are hidden" is: not one wrong padding, but eight
- * invisible items each holding a list gap open. Returned as a plain list the list's DSL can
- * read, the screen can decide not to emit the item at all -- no slot, no spacing, no gap.
+ * Returned as a plain list so the screen can skip emitting an item entirely; a hidden item
+ * would still hold a slot and its list spacing open (a phantom gap).
  */
 @Composable
 internal fun rememberAdvancedVisibility(advanced: Boolean, count: Int): List<Boolean> {
     val visible = remember { mutableStateListOf(*Array(count) { false }) }
     LaunchedEffect(advanced) {
         if (advanced) {
-            // Cumulative delay == the index * STAGGER_STEP_MS the per-card version used.
+            // Cumulative delay equals the per-card index * STAGGER_STEP_MS.
             repeat(count) { i -> delay(STAGGER_STEP_MS); visible[i] = true }
         } else {
-            // Immediate, never staggered -- see STAGGER_STEP_MS' own doc on why hiding in
-            // sequence reads as a bug where revealing in sequence reads as deliberate.
+            // Immediate, never staggered (see STAGGER_STEP_MS).
             repeat(count) { i -> visible[i] = false }
         }
     }
@@ -112,27 +87,12 @@ internal fun rememberAdvancedVisibility(advanced: Boolean, count: Int): List<Boo
 }
 
 /**
- * Drives one advanced-only grid item's [AnimatedVisibility] AND decides whether the caller's
- * `if (...) item { ... }` should still emit that item at all -- the two used to be the same
- * raw boolean ([rememberAdvancedVisibility]'s own per-index flag), gating the grid `item {}`
- * directly while an inner `AnimatedVisibility(visibleState = rememberAppearedState(), ...)`
- * sat inside it purely for its enter spring.
+ * Drives one advanced-only grid item's [AnimatedVisibility] and decides whether the caller's
+ * `if (...) item { ... }` still emits that item.
  *
- * That was the bug behind "expanding/collapsing is entirely broken, the animations don't
- * work": [rememberAppearedState] only ever goes false -> true, once, and nothing inside the
- * card ever set it back to false -- its `exit` spec was dead code. The actual disappearance was
- * the OUTER `if` flipping false and tearing the whole item out of the grid on the very next
- * recomposition, same frame, with no transition able to run at all. Advanced -> simple didn't
- * play a broken collapse; it played no collapse, which reads exactly as "the animation doesn't
- * work" -- the grid item, and everything on it, was just gone.
- *
- * The transition returned here is both the [AnimatedVisibility]'s own `visibleState` (so its
- * enter/exit specs are what actually plays, in both directions) and the item-emission gate:
- * `transition.targetState || !transition.isIdle` stays true for as long as an exit is still
- * mid-flight, so the grid keeps the item mounted until the shrink/fade genuinely finishes, and
- * only then lets it fall away -- preserving the "no phantom gap" reason the item was skipped
- * entirely in the first place ([rememberAdvancedVisibility]'s own doc), just no longer skipping
- * the one animation the whole flip is supposed to show.
+ * The returned transition is the [AnimatedVisibility]'s `visibleState`, so enter/exit play in both
+ * directions. `transition.targetState || !transition.isIdle` keeps the item mounted until an
+ * exit finishes; a plain boolean gate would tear it out on the next frame with no collapse.
  */
 @Composable
 internal fun rememberGridItemVisibility(visible: Boolean): MutableTransitionState<Boolean> {
@@ -144,11 +104,10 @@ internal fun rememberGridItemVisibility(visible: Boolean): MutableTransitionStat
 }
 
 /**
- * An [AnimatedVisibility] state that starts hidden and animates itself in on first composition.
+ * An [AnimatedVisibility] state that starts hidden and animates in on first composition.
  *
- * Needed by anything only COMPOSED once it should already be visible (see
- * [rememberAdvancedVisibility]): there is no false -> true flip left inside composition for a
- * plain `visible =` boolean to animate from, so it would otherwise just appear.
+ * For anything only composed once it should be visible (see [rememberAdvancedVisibility]), where
+ * a plain `visible =` boolean has no false-to-true flip to animate.
  */
 @Composable
 internal fun rememberAppearedState(): MutableTransitionState<Boolean> =
@@ -169,17 +128,10 @@ internal fun staggeredAdvancedVisible(advanced: Boolean, index: Int): Boolean {
 }
 
 /**
- * The tonal icon badge + bold title + colour-coded status line used at the top
- * of several SettingsCard bodies (Accounts, AI, Backup & sync, Notifications,
- * Security, Theme) to give an at-a-glance read of the card's current state
- * before it's opened any further.
+ * The tonal icon badge, bold title and colour-coded status line at the top of several
+ * SettingsCard bodies, giving an at-a-glance read of the card's state.
  *
- * [icon], [tint] and [status] all animate on change -- the same transition
- * PebbleShell's own header summary uses for its `summary` text -- rather than
- * snapping instantly the moment the setting behind them flips. Every other
- * piece of state change in Settings springs or fades; a status line that
- * just jump-cut to "Off" when everything around it animates was the one
- * inconsistency left.
+ * [icon], [tint] and [status] animate on change, matching PebbleShell's header summary.
  */
 @Composable
 internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, status: String) {
@@ -208,34 +160,19 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
 }
 
 /**
- * Settings' page-top hero card: the app's own identity (name, version/build,
- * update status) in the same big-number hero language the garage's photo hero
- * uses for %/range. It plays the role a car page's hero photo plays, so the
- * Settings page reads as one standard page in the pager -- hero up top, cards
- * below -- instead of a header bolted onto a grid.
+ * Settings' page-top hero card: the app's identity (name, version/build, update status) in the
+ * same hero language as the garage's photo hero.
  *
- * Also THE one home for updates now -- there used to be a separate "Updates"
- * SettingsCard further down the grid, carrying its own (duplicate) copy of the
- * build-number stat plus the actual check/download/install controls. Reported
- * directly as one card too many: this hero already shows the build number and
- * an at-a-glance update chip, so a whole second card just to act on it read as
- * the same information twice with the action bolted onto the wrong copy.
- * Collapsed, this card is unchanged -- identity, car count, update chip, big
- * build number. Expanded (the same chevron/[AppViewModel.togglePebble]
- * persistence every other card and every car pebble uses, under the "Updates"
- * key so a prior collapse/expand choice carries over), it reveals the
- * Check/GitHub row, the Shizuku toggle, and -- only when one is actually
- * available -- the full download/install flow with release notes, exactly
- * what the old card showed once opened.
+ * Also the one home for updates. Collapsed it shows identity, car count, update chip and the big
+ * build number; expanded (persisted via [AppViewModel.togglePebble] under the "Updates" key) it
+ * reveals the Check/GitHub row, the Shizuku toggle and, when available, the download/install flow.
  */
 @Composable
 internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
     val number = vm.currentBuildNumber
     val label = com.bloo.bluelink.data.buildLabel(number, com.bloo.bluelink.BuildConfig.BUILD_BRANCH)
     val carCount = state.vehicles.size
-    // Same collapse store every SettingsCard persists through, under the "Updates" key --
-    // this card replaces that one entirely, so it inherits whatever expand/collapse choice
-    // was already saved for it rather than starting every install back at one default.
+    // Same collapse store every SettingsCard persists through, under the "Updates" key.
     val collapsed by vm.collapsedSections.collectAsStateWithLifecycle()
     val expanded = "$SETTINGS_CARD_VIN:Updates" !in collapsed
     val context = LocalContext.current
@@ -247,9 +184,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(Modifier.padding(20.dp)) {
-            // Used to gate the update chip on a measured width (a narrow pane dropped the
-            // chip's words); BoxWithConstraints was a SubcomposeLayout pass for a branch that
-            // no longer exists -- the chip's own compactness is handled by MorphButtonLabel.
+            // The chip's compactness is handled by MorphButtonLabel.
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconBadge(
                     AppIcons.Settings,
@@ -279,9 +214,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                 )
             }
             Spacer(Modifier.height(16.dp))
-            // The build number is the app's real version here (versionName stays
-            // "0.1" on purpose), so it carries the hero stat the same way a car's
-            // charge % or range does -- with the full label as its caption.
+            // The build number is the app's real version (versionName stays "0.1"), so it carries
+            // the hero stat like a car's charge % or range, with the full label as caption.
             val headline = state.updateAvailable?.takeIf { !state.updateTileDismissed }
             if (headline != null) {
                 // Update waiting: the version jump IS the headline (2463 to 2464), not a second line below it.
@@ -302,10 +236,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
             ) {
                 Column {
                     Spacer(Modifier.height(GapGroup))
-                    // Both update sources share one row instead of two stacked full-width
-                    // pills: the in-app checker (primary) and the GitHub Releases page (a
-                    // second source that still works when the checker says up-to-date or
-                    // GitHub's API is flaky).
+                    // Both update sources share one row: the in-app checker (primary) and the GitHub
+                    // Releases page (works when the checker says up-to-date or GitHub's API is flaky).
                     ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
                         SafeMorphTextButton(
                             "Check",
@@ -324,18 +256,15 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                             },
                         )
                     }
-                    // Shizuku silent-install: the ROW is gated on Shizuku being present, but
-                    // the card is not -- so the update controls above always show.
+                    // The Shizuku row is gated on Shizuku being present; the card and update controls are not.
                     if (state.shizukuAvailable) {
                         Spacer(Modifier.height(GapHairline))
                         ToggleRow("Install seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
                             vm.setSeamlessInstallShizuku(it)
                         }
                     }
-                    // The full download -> install flow, right here in the card. Drives the
-                    // same state machine the update pebble does -- download, progress,
-                    // install -- rendered through the shared UpdateStatusLine so neither
-                    // surface can drift.
+                    // The full download-install flow, driven by the same state machine as the update
+                    // pebble and rendered through the shared UpdateStatusLine.
                     val updateInfo = state.updateAvailable
                     PopVisible(visible = updateInfo != null && !state.updateTileDismissed, sizeAnimated = true) {
                         if (updateInfo != null) {
@@ -346,8 +275,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                 "${com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber)} → $newLabel"
                             } else newLabel
                             Spacer(Modifier.height(GapGroup))
-                            // One tinted panel, no second outline inside the card's own: the version jump is
-                            // already the big number at the top, so this holds only what you do about it.
+                            // One tinted panel, no second outline: the version jump is already the big number above.
                             Column(
                                 Modifier
                                     .fillMaxWidth()
@@ -364,8 +292,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                 )
                                 // The status line carries the download's own progress bar.
                                 UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = false)
-                                // Both actions full width, one under the other: side by side they fought
-                                // over a narrow row and the download button collapsed to a bare icon.
+                                // Both actions full width, stacked: side by side the download button collapsed to an icon.
                                 MorphButton(
                                     onClick = { runUpdateAction(state, vm, updateInfo, context) },
                                     modifier = Modifier.fillMaxWidth(),
@@ -377,9 +304,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                 ) {
                                     MorphButtonLabel(act.icon, act.label, pending = false)
                                 }
-                                // Shared dismissal row -- gives the Settings card the SAME
-                                // undo window the app tile has (it had only "Not now" and no way
-                                // back, which read as "dismissal doesn't work here").
+                                // Shared dismissal row, giving the same undo window as the app tile.
                                 UpdateDismissRow(state, vm)
                                 UpdateReleaseNotes(updateInfo, collapsedLines = 3)
                             }

@@ -10,21 +10,13 @@ import com.bloo.bluelink.data.setAiEnabled
 
 // --- On-device AI (Gemini Nano): summaries, free-form questions, command resolution (extracted from AppViewModel) --
 
-/** The only actions [AppViewModel.aiResolveCommand] may return -- exactly the
- *  ids VehicleCommandRunner has a case for. Deliberately NOT derived from a
- *  broader list: if the runner cannot execute it, the model must not be able to
- *  name it. */
+/** The only actions [AppViewModel.aiResolveCommand] may return: exactly the ids VehicleCommandRunner can execute. */
 private val AI_COMMANDS = setOf(
     "lock", "unlock", "charge_on", "charge_off", "climate_on", "climate_off",
     "lights", "horn",
 )
-// charge_limit is deliberately NOT here. Every action above is a verb with no
-// argument, so validating it means checking one word against this set. A charge
-// limit carries a NUMBER, and a model that picks the wrong number sets the wrong
-// limit with no way for this layer to tell -- 80 and 90 are equally plausible
-// strings. The deterministic parser reads that number out of the query itself,
-// where it is either present and correct or absent, so that is where the limit
-// stays.
+// charge_limit is deliberately absent: it carries a number a model could get wrong undetectably, so the
+// deterministic parser reads it from the query instead.
 
 
 fun AppViewModel.setAiEnabled(value: Boolean) {
@@ -33,10 +25,8 @@ fun AppViewModel.setAiEnabled(value: Boolean) {
 }
 
 /**
- * Auto-summarize a car (called after open/refresh/command) whenever on-device AI is
- * enabled -- summaries always refresh on their own now, no separate opt-in.
- * Silent: no "refresh first" nudge and no error toast, since the user didn't
- * explicitly ask — they can always tap Summarize for the surfaced version.
+ * Auto-summarize a car (after open/refresh/command) when on-device AI is enabled. Silent: no nudge and
+ * no error toast, since the user didn't ask.
  */
 internal fun AppViewModel.autoSummarize(v: Vehicle) {
     val s = _state.value
@@ -61,13 +51,8 @@ internal fun AppViewModel.autoSummarize(v: Vehicle) {
 }
 
 /**
- * Manual "Summarize" tap. Requires a status already in [UiState.statuses]
- * (if there isn't one, it asks the user to refresh first rather than
- * triggering a fetch itself); marks the VIN busy so the button can show a
- * spinner and a second tap is ignored via the guard above, runs the model
- * off the main thread inside [viewModelScope], and always clears the busy
- * flag on either branch of [Result.fold] -- success writes the summary
- * into [UiState.aiSummaries], failure logs and surfaces a snackbar.
+ * Manual "Summarize" tap. Needs a status already in [UiState.statuses] (otherwise asks the user to
+ * refresh); marks the VIN busy and always clears it on both branches of [Result.fold].
  */
 fun AppViewModel.summarizeCar(v: Vehicle) {
     if (v.vin in _state.value.aiBusy) return
@@ -77,7 +62,7 @@ fun AppViewModel.summarizeCar(v: Vehicle) {
     }
     _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
     viewModelScope.launch {
-        // Build the prompt for THIS car only, so the result reflects just it.
+        // Prompt for this car only.
         val prompt = summaryPrompt(v, status, _state.value)
         val result = runCatching { ai.summarize(prompt) }
         _state.update { st ->
@@ -86,9 +71,7 @@ fun AppViewModel.summarizeCar(v: Vehicle) {
                     st.copy(aiBusy = st.aiBusy - v.vin, aiSummaries = st.aiSummaries + (v.vin to s))
                 },
                 onFailure = { e ->
-                    // The exception text is AICore/Gemini-Nano implementation
-                    // detail ("Feature not available: ...", binder/ExecutionException
-                    // strings). Log it for diagnostics; show the user a sentence.
+                    // The exception text is AICore implementation detail: log it, show the user a sentence.
                     AppLog.log("⚠ AI summary: ${e.message}")
                     st.copy(aiBusy = st.aiBusy - v.vin, message = "Couldn't summarize ${v.name} right now.")
                 },
@@ -108,10 +91,7 @@ fun AppViewModel.askAi(query: String) {
         val reply = runCatching {
             ai.summarize("Answer this question using only the data below.\nQuestion: $query\n\nData:\n$data")
         }.onFailure { AppLog.log("⚠ AI search: ${it.message}") }.getOrNull()
-        // On failure both `thinking` and `reply` go false/null, and the answer
-        // card renders on `thinking || reply != null` — so without a message the
-        // whole card just silently vanished after "Thinking…", with no log line
-        // either. Say something, like the per-car summary path already does.
+        // On failure the card would silently vanish (it renders on `thinking || reply != null`), so say something.
         _state.update {
             it.copy(
                 aiBusy = it.aiBusy - "search",
@@ -130,25 +110,11 @@ internal suspend fun AppViewModel.enhanceCommandParsing(
     enhanceCommandWithAi(query, initialCommand, ai)
 
 /**
- * Maps a free-form command to a structured one the app can actually run,
- * or null if it cannot be mapped SAFELY.
+ * Maps a free-form command to a structured one the app can run, or null if it cannot be mapped safely.
  *
- * The deterministic parser in the search UI handles the phrasings it knows;
- * this is the fallback for everything else ("make it toasty in the Ioniq
- * before I head out"). Gemini Nano is a small on-device model with no
- * function calling, so it is asked for one line in a fixed shape and every
- * part of that line is then checked against reality:
- *
- *  - the action must be one of the runner's own command ids. Anything else,
- *    including a plausible-sounding invention like "open_trunk", is
- *    discarded rather than attempted.
- *  - the car must match one of THIS user's cars by name. The model never
- *    supplies a VIN and is never trusted to; it names a car, and the name
- *    is resolved here.
- *
- * So a hallucination cannot reach the vehicle: the worst case is this
- * returns null and the user is told it did not understand. That property is
- * the reason this returns a validated pair rather than a command string.
+ * Gemini Nano has no function calling, so it returns one fixed-shape line that is validated: the action
+ * must be one of the runner's command ids, and the car must match one of this user's cars by name (the
+ * model never supplies a VIN). A hallucination can only produce null, never reach the vehicle.
  */
 suspend fun AppViewModel.aiResolveCommand(query: String): Pair<String, String>? {
     if (!_state.value.aiEnabled || query.isBlank()) return null
@@ -168,8 +134,7 @@ suspend fun AppViewModel.aiResolveCommand(query: String): Pair<String, String>? 
     val raw = runCatching { ai.summarize(prompt) }
         .onFailure { AppLog.log("⚠ AI command: ${it.message}") }
         .getOrNull() ?: return null
-    // The model will sometimes wrap the line in prose despite being asked
-    // not to; take the first line that actually has the separator in it.
+    // The model sometimes wraps the line in prose; take the first line containing the separator.
     val line = raw.lineSequence().map { it.trim() }.firstOrNull { it.contains('|') } ?: return null
     val action = line.substringBefore('|').trim().lowercase().removePrefix("action:").trim()
     val carName = line.substringAfter('|').trim().removePrefix("car:").trim()

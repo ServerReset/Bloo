@@ -17,16 +17,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-// No `motionScheme` import: it is a member of the MaterialTheme object (verified as
-// MaterialTheme.getMotionScheme in the resolved material3 AAR), as are defaultEffectsSpec
-// and defaultSpatialSpec on MotionScheme. Screens.kt imports none of them either.
+// `motionScheme` is a MaterialTheme member; no import needed.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-// State<T>'s `by` delegate isn't a member -- it resolves to this file-scope operator
-// extension, which the compiler will not find without an explicit import (unlike most of
-// this file's other extension functions, which show up as unresolved-reference errors
-// instead of this one's more oblique "has no method getValue... cannot serve as a delegate").
+// The `by` State delegate is a file-scope operator extension and needs this explicit import.
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,17 +34,13 @@ import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.blockPageSwipe
 
 /**
- * Small shared composables built on UiTokens' design tokens: text styles, icon badges,
- * dividers, and Modifier extensions for padding/no-ripple-clickable. Split out of
- * UiTokens.kt to keep that file to plain design tokens -- see its own doc.
+ * Small shared composables built on UiTokens: text styles, icon badges, dividers, and padding/no-ripple Modifiers.
  */
 
 // ---- Common Composable Helpers -----------------------------------------------
 
 /**
- * Body text styling (bodySmall, onSurfaceVariant) for secondary/muted content.
- * Use this instead of `Text(text, style = MaterialTheme.typography.bodySmall, color = ...)`
- * to consolidate the most-repeated text pattern in the app (27+ sites).
+ * Body text (bodySmall, onSurfaceVariant) for secondary/muted content.
  */
 @Composable
 internal fun MutedText(text: String, modifier: Modifier = Modifier) {
@@ -73,7 +64,6 @@ internal fun <T : Any> PebbleStatusGate(status: T?, refreshing: Boolean, content
 
 /**
  * Label text styling (labelMedium) for subtle secondary text.
- * Consolidates another common text pattern.
  */
 @Composable
 internal fun LabelText(text: String, modifier: Modifier = Modifier) {
@@ -87,7 +77,6 @@ internal fun LabelText(text: String, modifier: Modifier = Modifier) {
 
 /**
  * Body text (bodySmall, onSurfaceVariant) -- muted/secondary content.
- * Consolidates the single most common text pattern (54 sites).
  */
 @Composable
 internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
@@ -101,7 +90,6 @@ internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: C
 
 /**
  * Body text (bodyMedium, onSurface) -- regular secondary content.
- * Used for descriptions, supplementary text (41 sites).
  */
 @Composable
 internal fun BodyMediumText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
@@ -114,7 +102,7 @@ internal fun BodyMediumText(text: String, modifier: Modifier = Modifier, color: 
 }
 
 /**
- * Label text (labelSmall) -- compact labels and captions (27 sites).
+ * Label text (labelSmall) -- compact labels and captions.
  */
 @Composable
 internal fun LabelSmallText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
@@ -127,7 +115,7 @@ internal fun LabelSmallText(text: String, modifier: Modifier = Modifier, color: 
 }
 
 /**
- * Label text (labelLarge) -- prominent labels and tags (16 sites).
+ * Label text (labelLarge) -- prominent labels and tags.
  */
 @Composable
 internal fun LabelLargeText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
@@ -140,10 +128,7 @@ internal fun LabelLargeText(text: String, modifier: Modifier = Modifier, color: 
 }
 
 /**
- * Title text (titleSmall) -- section headers, card titles. Bold by default:
- * every real call site pairs titleSmall with FontWeight.Bold (or SemiBold),
- * which the original signature had no parameter for at all -- the actual
- * reason this had zero adopters despite the "15 sites" this doc once claimed.
+ * Title text (titleSmall) -- section headers and card titles; bold by default.
  */
 @Composable
 internal fun TitleSmallText(
@@ -162,15 +147,9 @@ internal fun TitleSmallText(
 }
 
 /**
- * The circular tinted container [IconBadge] draws itself into -- pulled out under its own,
- * non-overloaded name (rather than a second `IconBadge` overload) after that overload was the
- * trigger for a Kotlin "recursive type checking" compiler error at several call sites that fed
- * it a conditional (`if (x) iconA else iconB`) [ImageVector]: overload resolution across a
- * lambda-slot and an icon+tint overload, combined with a branch whose two arms' common
- * supertype the compiler has to infer, sent K2 into that recursive loop. [content] is a plain
- * [Icon] in the common case, but takes a full `@Composable` slot so sites that animate the icon
- * (e.g. `AnimatedContent` between install-state icons) can still share the same
- * circle/size/tint chrome instead of hand-rolling it.
+ * The circular tinted container [IconBadge] draws into. A separate name (not an `IconBadge` overload) avoids a K2
+ * "recursive type checking" error when callers pass a conditional [ImageVector]. [content] is a full `@Composable`
+ * slot so animated icons share the chrome.
  */
 @Composable
 internal fun IconBadgeContainer(
@@ -187,12 +166,8 @@ internal fun IconBadgeContainer(
 }
 
 /**
- * [IconBadgeContainer] pre-filled with a single centered [Icon] -- the common case, and the
- * only thing named `IconBadge` (see [IconBadgeContainer]'s own doc for why the lambda-slot
- * version is not a second overload of this name). [containerColor] defaults to a 14%-alpha
- * tint of [tint] itself (the "soft tonal chip" look used by search results and the update
- * pebble); pass an explicit container colour (e.g. a *Container role) for the "solid tonal
- * circle" look settings headers and onboarding steps use instead.
+ * [IconBadgeContainer] with a single centered [Icon]. [containerColor] defaults to a 14%-alpha tint of [tint];
+ * pass a *Container role for the solid tonal look.
  */
 @Composable
 internal fun IconBadge(
@@ -209,10 +184,8 @@ internal fun IconBadge(
 }
 
 /**
- * The "[IconBadge] leading a title + optional muted subtitle, with the text column claiming
- * the rest of the row" skeleton -- copied verbatim across settings card headers, onboarding
- * step rows, search results and the guard PIN prompt before this existed. [trailing] is an
- * optional slot after the text column (a chevron, a switch, a status chip).
+ * An [IconBadge] leading a title + optional muted subtitle, text column filling the row.
+ * [trailing] is an optional slot after the text (chevron, switch, status chip).
  */
 @Composable
 internal fun IconLeadRow(
@@ -241,10 +214,7 @@ internal fun IconLeadRow(
 }
 
 /**
- * A [HorizontalDivider] at the app's standard faint weight. [SettingsScreen] alone had this
- * spelled out inline six separate times with the alpha drifting between 0.3/0.4/0.5 from
- * site to site with no apparent reason -- one call site, one alpha, chosen as the most
- * common of the three.
+ * A [HorizontalDivider] at the app's standard faint weight.
  */
 @Composable
 internal fun SectionDivider(modifier: Modifier = Modifier, alpha: Float = 0.3f) {
@@ -252,12 +222,7 @@ internal fun SectionDivider(modifier: Modifier = Modifier, alpha: Float = 0.3f) 
 }
 
 /**
- * `Modifier.clickable` with the ripple suppressed and a fresh, unshared interaction
- * source -- the app's standard "tappable but no visual press feedback" treatment for
- * full-bleed scrims and tap-swallowing surfaces (a sheet's backdrop, a lock screen's
- * backdrop, a sheet's own body eating taps so they don't fall through to the scrim
- * behind it). Copy-pasted as the same `interactionSource = remember { MutableInteractionSource() },
- * indication = null` pair at 8 separate call sites before this existed.
+ * `Modifier.clickable` with no ripple and a fresh interaction source, for full-bleed scrims and tap-swallowing surfaces.
  */
 @Composable
 internal fun Modifier.noRippleClickable(onClickLabel: String? = null, onClick: () -> Unit): Modifier =
@@ -269,11 +234,7 @@ internal fun Modifier.noRippleClickable(onClickLabel: String? = null, onClick: (
     )
 
 /**
- * The app's standard tappable modifier for controls that are NOT [MorphButton]-shaped (an
- * inline link, a swatch, a picker row's own body): the same ripple-suppressed click as
- * [noRippleClickable], plus the shared click haptic every real button already plays. Use this
- * instead of a bare `Modifier.clickable { ... }` so a custom tappable still feels like the rest
- * of the app rather than the one silent square on the screen.
+ * Tappable modifier for non-[MorphButton] controls: [noRippleClickable] plus the shared click haptic.
  */
 @Composable
 internal fun Modifier.hapticClickable(

@@ -10,18 +10,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.bloo.bluelink.data.Vehicle
 
 /**
- * Command index for the search system: intent-based commands that execute
- * actions on vehicles or app state, distinct from settings searches.
- *
- * Commands are organized by category and support multiple natural language
- * variations for each action. The search system can:
- * - Recognize commands by partial matching and synonyms
- * - Execute commands through VehicleCommandRunner
- * - Track recently used commands for quick access
- * - Provide suggestions based on vehicle capabilities
- *
- * This complements SettingsIndex (which searches settings by name/keywords)
- * by making the search bar function as a command palette for vehicle actions.
+ * Command index for the search system: intent-based commands that act on vehicles or app state,
+ * as a command palette complementing SettingsIndex. Each action has natural-language variations,
+ * matched by partial matching and synonyms and executed through VehicleCommandRunner.
  */
 
 internal enum class CommandCategory {
@@ -199,11 +190,8 @@ internal val CommandCatalog = listOf(
     ),
 )
 
-/** The command index's own word splitter, compiled once -- the sibling of SettingsIndex.kt's
- *  [RxSearchTokens] (which is the same pattern plus `%`, and is what tokenises the QUERY side
- *  below). Separate rather than shared because the two genuinely differ: a percent sign is
- *  meaningful in a typed query ("charge to 80%") and is not a word character in a command's
- *  own title or aliases. */
+/** The command index's word splitter, compiled once. Separate from SettingsIndex's [RxSearchTokens]
+ *  because `%` is meaningful in a typed query ("charge to 80%") but not in a command title or alias. */
 private val RxCommandWords = Regex("[^a-z0-9]+")
 
 /**
@@ -238,13 +226,8 @@ internal fun commandSearchScore(query: String, command: CommandMetadata, fuzzy: 
     }
 
     // Word-boundary matching (e.g., "start" matches "start climate" but not "restart")
-    // RxCommandWords, not a fresh Regex(...) here: this is the innermost loop of the command
-    // search -- once per catalog entry per query token, so ~17 x n per keystroke -- and
-    // `Regex(...)` parses its pattern and builds a matcher on every CONSTRUCTION. Exactly the
-    // cost SettingsIndex.kt's own Rx* block was extracted to kill on the settings half of the
-    // same search bar; this file's copy of the same splitter had simply never been updated
-    // with it. See that block's doc for the full reasoning and for why file scope (the pattern
-    // is constant) rather than a `remember`.
+    // RxCommandWords, not a fresh Regex(...): this is the innermost search loop (per entry per
+    // query token) and constructing a Regex parses its pattern each time.
     val words = (command.title + " " + command.keywords + " " + command.aliases.joinToString(" "))
         .lowercase()
         .split(RxCommandWords)
@@ -280,10 +263,7 @@ internal fun getAvailableCommands(vehicles: List<Vehicle>): List<CommandMetadata
  */
 internal fun searchCommands(query: String, vehicles: List<Vehicle>, fuzzy: Boolean = false): List<CommandMetadata> {
     val available = getAvailableCommands(vehicles)
-    // RxSearchTokens (SettingsIndex.kt), not a fresh Regex: this is the exact same pattern,
-    // for the exact same job, as the settings half of this one search bar -- it had been
-    // re-declared inline here, so the file-scope compile that fixed it there never applied on
-    // this path at all.
+    // RxSearchTokens (SettingsIndex.kt), the same pattern as the settings half of this search bar.
     val tokens = query.lowercase().split(RxSearchTokens)
         .filter { it.isNotBlank() && it !in SearchStopwords }
 
@@ -307,7 +287,6 @@ internal fun searchCommands(query: String, vehicles: List<Vehicle>, fuzzy: Boole
  * This is a simplified check; the real app would check the powertrain/capabilities.
  */
 internal fun Vehicle.canCharge(): Boolean {
-    // In a real implementation, check the vehicle's powertrain (EV, Hybrid, PHEV)
-    // For now, assume all vehicles can charge (the actual command will fail appropriately)
+    // Simplified: assumes all vehicles can charge (the actual command fails appropriately).
     return true
 }

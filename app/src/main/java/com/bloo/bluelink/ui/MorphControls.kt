@@ -32,24 +32,10 @@ import androidx.compose.foundation.shape.CircleShape
 import kotlinx.coroutines.flow.first
 
 /**
- * The morph family's icon-only member.
- *
- * [MorphButton] is the wrong tool for a bare icon affordance -- a snackbar
- * action, a text-field's clear button, a 28dp edit glyph in a swatch grid -- since
- * it would wrap each one in a filled pill and change the design rather than unify
- * it. So this keeps [IconButton]'s containerless chrome and 40dp target exactly,
- * and adds the two things every other member of the family provides and these
- * were missing:
- *
- *  - **The click haptic.** Of the six bare IconButtons in this file, exactly ONE
- *    remembered to call `haptics?.click()` itself. Every Morph* control fires one;
- *    a containerless icon is no less of a button to the finger.
- *  - **A press response.** With no container there is no corner to morph, so the
- *    equivalent is a scale dip, on the family's own [SoftDamping] spring.
- *
- * Same parameter shape as [IconButton] so converting a call site is mechanical.
- * If you are converting one that already called the haptic by hand, delete that
- * call -- it fires here now, and two in a row is a stutter, not emphasis.
+ * The morph family's icon-only member: [IconButton]'s containerless chrome and 40dp target, plus
+ * the family's click haptic and a press scale dip on the [SoftDamping] spring (no container
+ * corner to morph). Same parameters as [IconButton]; remove any hand-called haptic at converted
+ * call sites since it fires here.
  */
 @Composable
 fun MorphIconButton(
@@ -76,8 +62,7 @@ fun MorphIconButton(
             content = content,
         )
     }
-    // Joins a group when it is in one -- see MorphButton's own note. An icon button is just as
-    // likely to sit in a row of peers (the snackbar's copy/dismiss pair) as a labelled one.
+    // Joins a group when in one (see MorphButton), e.g. the snackbar's copy/dismiss pair.
     if (LocalExpressiveGroup.current) {
         SafeExpansiveButton(
             interactionSource = interactionSource,
@@ -89,9 +74,7 @@ fun MorphIconButton(
 }
 
 /**
- * A unified selectable chip: a **pill** when unselected, morphing smoothly into a
- * filled **rounded box** when selected. Replaces ad-hoc FilterChips so selection
- * feels the same everywhere.
+ * A unified selectable chip: a pill when unselected, morphing into a filled rounded box when selected.
  */
 @Composable
 fun MorphChip(
@@ -103,42 +86,26 @@ fun MorphChip(
 ) {
     val haptics = LocalHaptics.current
     val chipSelected = selected
-    // Wrapped like every other button, so a chip presses the same way: inside an
-    // ExpressiveButtonRow it takes width from its neighbours, and on its own it grows. Chips
-    // were the one tappable control with no press wrapper at all, which is why a row of them
-    // sat still while the buttons above them moved.
+    // Wrapped like every other button so a chip presses the same way (takes width from neighbours
+    // in an ExpressiveButtonRow, grows on its own).
     val chipSource = remember { MutableInteractionSource() }
     SafeExpansiveButton(interactionSource = chipSource, enabled = true) {
-    // The same MorphButton as everywhere: pill when idle, primary fill +
-    // rounded box when selected, standard corner-percent animation. The chip's
-    // historic 22dp/12dp corners on its ~40dp height are just under the
-    // framework's 50/28 defaults, so it uses the shared defaults verbatim.
+    // The same MorphButton as everywhere: pill when idle, primary fill + rounded box when selected,
+    // with the shared default corner percents.
     MorphButton(
         onClick = { onClick() },
         onClickHaptic = { haptics?.tick() },
         interactionSource = chipSource,
         active = selected,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = GapRow),
-        // Same target height as every other button. A chip was 0-min and so ended up shorter
-        // than the buttons beside it, which is most of why the seat-heat row read as a
-        // different family from the rest of a card.
+        // Same target height as every other button.
         minHeight = ButtonTargetHeight,
-        // Same gap MorphSegmented had: a selectable pill with no `selected`
-        // semantics reaching TalkBack, which announced every chip identically
-        // regardless of which one was actually active. Captured into a
-        // differently-named local first -- inside semantics{}, `selected` on
-        // its own resolves to the SemanticsPropertyReceiver's own property,
-        // not this composable's `selected` parameter of the same name.
+        // `selected` semantics for TalkBack. Captured into a differently-named local because inside
+        // semantics{} `selected` resolves to the SemanticsPropertyReceiver's property.
         modifier = modifier.semantics { this.selected = chipSelected },
     ) {
-        // The shared label, like every other button, rather than a hand-assembled icon and
-        // text. Two things follow from that: the glyph gets the standard gap beside it (these
-        // two were emitted with NO spacer between them at all), and a row of chips can compact
-        // to glyphs when it runs out of room, which a hand-assembled pair cannot.
-        //
-        // A selected chip is SemiBold like every other button label now, not Bold. Its
-        // selection already reads from the filled container and the rounded-square morph; a
-        // third signal was the sort of per-control exception this pass exists to remove.
+        // The shared label (standard glyph gap, compacts to glyphs when short on room). SemiBold when
+        // selected like every button label; the filled container already signals selection.
         if (icon != null) {
             MorphButtonLabel(icon, label, pending = false)
         } else {
@@ -156,37 +123,28 @@ fun MorphChip(
 }
 
 /**
- * Right-side expand control for pebbles with no action button — the whole
- * right handle is a pill that morphs to a rounded-square when the section is
- * open, giving a clear visual indicator of state.
+ * Right-side expand control for pebbles with no action button: a pill that morphs to a
+ * rounded square when the section is open.
  */
 @Composable
 internal fun MorphExpandButton(
     expanded: Boolean,
     onToggle: () -> Unit,
-    /** Reports this button's own pressed (held-down) state to the caller, live --
-     *  so the pebble card this chevron belongs to can square its own outer shape
-     *  off together with the chevron's, instead of only the small chevron itself
-     *  reacting to the hold. Null (the default) for every caller that doesn't
-     *  care. */
+    /** Reports this button's live pressed state so the pebble card can square its outer shape
+     *  with the chevron's. Null for callers that don't care. */
     onPressChange: ((Boolean) -> Unit)? = null,
 ) {
     val haptics = LocalHaptics.current
-    // Shared with SplitExpandButton's own chevron -- see [rememberChevronSpin].
+    // Shared with SplitExpandButton's chevron; see [rememberChevronSpin].
     val chevron = rememberChevronSpin(expanded, label = "morphChevron")
-    // This button is a FIXED 50dp square, so a 50% corner is a true circle and
-    // 10dp is exactly 20%. The default 28 (the app's standard rounded square)
-    // is deliberately overridden to keep this control's 10dp corners, which
-    // the shared percent model expresses cleanly for a fixed-size button.
-    // With expansion animation.
+    // A FIXED 50dp square: 50% is a true circle and 10dp is 20%; overrides the default 28 to keep
+    // the 10dp corners. With expansion animation.
     val chevronSource = remember { MutableInteractionSource() }
     if (onPressChange != null) {
         val pressed by chevronSource.collectIsPressedAsState()
         LaunchedEffect(pressed) { onPressChange(pressed) }
-        // Whatever was true when this leaves the composition (a collapse that
-        // unmounts this button mid-press, say) shouldn't leave the pebble
-        // permanently squared -- the effect above only reacts to CHANGES, not
-        // to being torn down.
+        // Clear on leaving composition (e.g. a collapse unmounting mid-press); the effect above
+        // only reacts to changes.
         DisposableEffect(Unit) { onDispose { onPressChange(false) } }
     }
     SafeExpansiveButton(
@@ -201,20 +159,16 @@ internal fun MorphExpandButton(
                 chevron.spin()
                 haptics?.heavy()
             },
-            // Expanded highlight = the SAME active state as lock/unlock: primary
-            // fill, onPrimary content, straight from MorphButton's defaults.
+            // Expanded highlight = the same active state as lock/unlock (MorphButton defaults).
             active = expanded,
             interactionSource = chevronSource,
             contentPadding = PaddingValues(0.dp),
             pillCornerPercent = 50f,
             morphedCornerPercent = 20f,
             minHeight = 0.dp,
-            // Same as SplitExpandButton's chevron: the icon's contentDescription is
-            // the next action, this is the current state -- both together instead
-            // of only announcing what tapping does. Tap toggles; holding spins the
-            // chevron (easter egg) without toggling.
-            // ButtonTargetHeight, like everything else tappable -- it was a lone 50dp so it
-            // stood 2dp proud of every button beside it for no reason anyone chose.
+            // As SplitExpandButton's chevron: contentDescription is the next action, this is the current
+            // state. Tap toggles; holding spins the chevron without toggling.
+            // ButtonTargetHeight like everything tappable.
             modifier = Modifier
                 .size(ButtonTargetHeight)
                 .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },

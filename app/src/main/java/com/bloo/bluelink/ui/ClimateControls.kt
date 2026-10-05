@@ -1,9 +1,6 @@
 package com.bloo.bluelink.ui
 
-/**
- * Climate controls: ClimatePebble, SeatControl, seatTint, preset section,
- * PresetPill, ChargeLimitPill -- extracted from Pebbles.kt.
- */
+/** Climate controls: ClimatePebble, SeatControl, seatTint, preset section, PresetPill, ChargeLimitPill. */
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -71,11 +68,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import com.bloo.uicommon.ReorderColumn
 
-/**
- * Reusable climate-control pieces: seat/wheel heat controls, preset pills, and the
- * charge-limit pill (also used by EnergyPebble). Split out of ClimatePebble.kt to
- * separate the main pebble from these smaller, independently reusable components.
- */
+/** Reusable climate-control pieces: seat/wheel heat controls, preset pills and the charge-limit pill (also used by EnergyPebble). */
 
 @Composable
 internal fun SeatControl(
@@ -89,27 +82,22 @@ internal fun SeatControl(
     if (range.size <= 1) return
     val index = range.indexOf(level).let { if (it < 0) range.indexOf(SeatLevel.OFF) else it }
     val current = range.getOrNull(index) ?: range.firstOrNull() ?: return
-    // Deeper colour the stronger the setting; smoothly cross-fades as you slide
-    // through neutral between cooling (blues) and heating (reds).
+    // Deeper colour the stronger the setting; cross-fades through neutral between cooling (blues) and heating (reds).
     val tint by androidx.compose.animation.animateColorAsState(
         targetValue = seatTint(current),
         animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "seatTint",
     )
     Column {
-        // The level text (e.g. "High cool") wears the slider's colour, so OFF is
-        // neutral, cooling reads blue and heating reads red - no caption needed.
+        // The level text wears the slider's colour, so no caption is needed.
         StepRow(label, current.label, valueColor = tint)
         LevelSlider(index, range, tint, onChange)
     }
 }
 
 /**
- * Steering wheel heat, as a real Low/High level control rather than a plain on/off
- * toggle -- see [WheelHeatLevel]'s own doc for why most brands still only ever get a
- * boolean out of this at the network layer, while Kia's request gets a real second
- * step. Same slider/tint shape as [SeatControl] just below, minus the cool half (the
- * steering wheel has no cooling mode).
+ * Steering wheel heat as a Low/High level control (see [WheelHeatLevel]; most brands only get a
+ * boolean at the network layer). Same slider/tint shape as [SeatControl], minus the cool half.
  */
 @Composable
 internal fun WheelHeatControl(level: WheelHeatLevel, onChange: (WheelHeatLevel) -> Unit) {
@@ -126,9 +114,7 @@ internal fun WheelHeatControl(level: WheelHeatLevel, onChange: (WheelHeatLevel) 
     }
 }
 
-/** Steering wheel heat tint by intensity -- the same light->dark red ramp [seatTint] uses
- *  for a seat's own heat half, both derived from the canonical heat red so the two never
- *  drift onto different pastels. */
+/** Steering wheel heat tint by intensity: the same light-to-dark red ramp as [seatTint]'s heat half. */
 @Composable
 internal fun wheelHeatTint(level: WheelHeatLevel): Color = when (level) {
     WheelHeatLevel.OFF -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -136,8 +122,7 @@ internal fun wheelHeatTint(level: WheelHeatLevel): Color = when (level) {
     WheelHeatLevel.HIGH -> Heat
 }
 
-/** Seat colour by intensity: light->dark blue for cool, light->dark red for heat, both on
- *  the canonical [Cool]/[Heat] tokens (the light end is that token toward the surface). */
+/** Seat colour by intensity: light-to-dark blue for cool, red for heat, on the canonical [Cool]/[Heat] tokens. */
 @Composable
 internal fun seatTint(level: SeatLevel): Color = when {
     level.isCool -> androidx.compose.ui.graphics.lerp(
@@ -174,10 +159,7 @@ internal fun ClimatePresetSection(
         exit = expandExitSized(Alignment.Bottom),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // The heading lives INSIDE the visibility gate. Outside it, a user with no saved
-            // presets got a "Presets" heading over nothing at all -- a whole line of a cover
-            // screen spent announcing an empty section. It also means the label animates away
-            // with the last preset instead of being left behind.
+            // The heading lives inside the visibility gate so an empty section shows no heading and it animates away with the last preset.
             SectionLabel("Presets")
             Spacer(Modifier.height(GapHairline))
             // Full-width reorderable rows: drag handle to re-rank, tap to apply.
@@ -221,10 +203,7 @@ internal fun ClimatePresetSection(
 /** A compact "79° · Defrost · Heat" summary of what a preset will set. */
 internal fun presetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
     val parts = mutableListOf<String>()
-    // Bare "°" rather than degLabel's "°F"/"°C": this is a compact one-line summary
-    // where the unit is already established by everything around it. The CONVERSION
-    // is shared now though -- this used to re-inline the °F-to-°C arithmetic, so the
-    // rounding rule lived here as well as in degLabel and could drift from it.
+    // Bare "°" rather than degLabel's "°F"/"°C": the unit is established by context. Conversion is shared with degLabel.
     parts += "${degValue(req.tempF.toDouble(), fahrenheit)}°"
     if (req.defrost) parts += "Defrost"
     val seats = listOf(req.seatFrontLeft, req.seatFrontRight, req.seatRearLeft, req.seatRearRight)
@@ -236,16 +215,12 @@ internal fun presetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
 
 
 /**
- * A two-segment split button for a saved preset, styled after M3 Expressive
- * connected-button group #5: a wider "start" half and a narrow "delete" half,
- * each a pill on its outer edge with a smaller radius on the inner edge. The two
- * are separated by a real gap (not a drawn line) so the pebble background shows
- * through and they read as distinct buttons.
+ * A two-segment split button for a saved preset (M3 Expressive connected-button group): a wider
+ * "start" half and a narrow "delete" half, pill on the outer edge and smaller radius on the inner,
+ * separated by a real gap.
  *
- * Tapping the start half loads the preset into the climate controls and fires it;
- * while it is the [active] (currently applied) preset, that half morphs from a
- * pill into a rounded rectangle and fills with the running-climate highlight,
- * exactly like the Start button when climate is on. The delete half removes it.
+ * The start half loads and fires the preset; while [active] it morphs to a rounded rectangle with
+ * the running-climate highlight. The delete half removes it.
  */
 @Composable
 internal fun PresetPill(
@@ -257,24 +232,10 @@ internal fun PresetPill(
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHaptics.current
-    // Delete was a single un-confirmable tap right beside the much larger,
-    // frequently-tapped Apply half -- a slightly mis-aimed tap silently and
-    // irreversibly dropped a saved preset. Now requires a second tap, same
-    // "tap again to confirm" pattern (with the same 4s auto-reset) used for
-    // Sign out.
+    // Delete needs a second tap to confirm (same 4s auto-reset as Sign out); a mis-aimed tap beside Apply dropped a preset irreversibly.
     val confirm = rememberConfirmArm()
-    // No measured row height any more. These shapes used to be derived from one -- the row was
-    // measured with onSizeChanged, the height written to state, and the whole row recomposed to
-    // rebuild the shapes, a measure -> state -> recompose loop that ran whenever the height
-    // changed. All it was computing was "16dp, expressed as a percent of this row", which
-    // CornerSize(Dp) states directly. The morphed OUTER corner goes back to the app-wide
-    // MorphedCornerPercent every other button uses, which is one less thing these two pills do
-    // differently from everything around them.
-    // Remembered, not rebuilt every recomposition: this composable is one item's body inside
-    // a ReorderColumn (one call per preset, per recomposition of ANY preset's row), and these
-    // two capture nothing that ever changes -- splitPillShapes is a pure function of its own
-    // arguments -- so a fresh lambda pair here bought nothing but per-item allocation on every
-    // reorder-driven recomposition of the list.
+    // Corners use CornerSize(Dp) directly, with no measured row height. Remembered because this is
+    // one item body per preset in a ReorderColumn and splitPillShapes is a pure function.
     val leftShapeForCorner: (Float, Int) -> Shape = remember {
         { morph, cp -> splitPillShapes(morph, cp).first }
     }
@@ -283,20 +244,16 @@ internal fun PresetPill(
     }
 
     // The drag handle wraps the whole pill so long-press anywhere reorders.
-    // A real button group, not a Row of separately-wrapped buttons. groupWeight on the Apply
-    // half is what makes it span the row (Modifier.weight cannot reach a group member), and
-    // being members is what lets pressing either half take width from the other instead of
-    // shoving it.
+    // A real button group: groupWeight on Apply makes it span the row (Modifier.weight cannot
+    // reach a member), and membership lets either half take width from the other on press.
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min),
         spacing = 3.dp,
         verticalAlignment = Alignment.CenterVertically,
-        // One split pill, not two buttons that happen to be adjacent -- see `wrap`.
+        // One split pill, not two adjacent buttons (see `wrap`).
         wrap = false,
     ) {
-        // Apply half — snowflake icon plus the preset name. The shared
-        // MorphButton: pill when idle, rounded rectangle + primary fill when
-        // this preset is the applied one. With expansion animation.
+        // Apply half: snowflake icon plus preset name; MorphButton, primary fill when applied.
         val applySource = remember { MutableInteractionSource() }
         MorphButton(
             onClick = { onStart() },
@@ -332,9 +289,7 @@ internal fun PresetPill(
                 }
             }
         }
-        // Delete nub — inner (left) corners match the gap, outer (right) corners
-        // are pill-rounded; same MorphButton as the Apply half, just mirrored
-        // corners and error colours while armed. With expansion animation.
+        // Delete nub: inner (left) corners match the gap, outer (right) are pill-rounded; error colours while armed.
         val deleteSource = remember { MutableInteractionSource() }
         MorphButton(
             onClick = {
@@ -379,11 +334,7 @@ internal fun ChargeLimitPill(
     onApply: () -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    // Same split-pill geometry as the preset pill above, and the same reason there is no
-    // measured row height here any more -- see that one's note. Remembered for the same
-    // reason too: this pill recomposes on every slider-drag tick (onValueChange), so an
-    // unremembered lambda pair here was rebuilt on every single drag frame, not just once
-    // per reorder like PresetPill's.
+    // Same split-pill geometry as the preset pill. Remembered because this pill recomposes on every slider-drag tick.
     val leftShapeForCorner: (Float, Int) -> Shape = remember {
         { morph, cp -> splitPillShapes(morph, cp).first }
     }
@@ -392,14 +343,13 @@ internal fun ChargeLimitPill(
     }
 
     Column(Modifier.fillMaxWidth()) {
-        // Same group conversion as PresetPill above -- see its note.
+        // Same group conversion as PresetPill.
         ExpressiveButtonRow(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             spacing = 3.dp,
             wrap = false,
         ) {
-            // Left half — label. Tapping bumps the limit up by one step, wrapping
-            // back to 50% after 100%, for quick keyboard-free adjustment. With expansion.
+            // Left half: label. Tapping bumps the limit one step, wrapping to 50% after 100%.
             val incrementSource = remember { MutableInteractionSource() }
             MorphButton(
                 onClick = { onValueChange(if (limit >= 100) 50 else limit + 10) },
@@ -411,10 +361,7 @@ internal fun ChargeLimitPill(
                 pillCornerPercent = 50f,
                 morphedCornerPercent = MorphedCornerPercent,
                 minHeight = 0.dp,
-                // Both the current value and what tapping actually does (bump
-                // by 10%, wrapping at 100%) were purely visual -- TalkBack
-                // announced only the label text with no indication this half
-                // was itself a stepper, distinct from "Set" on the right.
+                // Announce both the value and that this half is a stepper, distinct from "Set".
                 groupWeight = 1f,
                 modifier = Modifier.fillMaxHeight()
                     .semantics(mergeDescendants = true) {
@@ -441,9 +388,7 @@ internal fun ChargeLimitPill(
                     )
                 }
             }
-            // Right half — "Set" nub. Inner (left) corners match the gap; outer
-            // (right) are pill-rounded. Active while the command is in flight.
-            // With expansion animation.
+            // Right half: "Set" nub. Inner (left) corners match the gap, outer are pill-rounded; active while the command is in flight.
             val applySource = remember { MutableInteractionSource() }
             MorphButton(
                 onClick = { onApply() },
@@ -456,8 +401,7 @@ internal fun ChargeLimitPill(
                 pillCornerPercent = 50f,
                 morphedCornerPercent = MorphedCornerPercent,
                 minHeight = 0.dp,
-                // The pending spinner must not fade with the disabled content
-                // (Surface didn't dim it before), so pin the full tone.
+                // The pending spinner must not fade with the disabled content, so pin the full tone.
                 disabledContentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.fillMaxHeight(),
             ) {
@@ -480,11 +424,8 @@ internal fun ChargeLimitPill(
 }
 
 /**
- * The stepped level slider both [SeatControl] and [WheelHeatControl] drive: a
- * discrete [range] of levels, the current [index] into it, and the tint the level
- * (and its label above) wears. The two callers had this block verbatim -- a
- * `steps = (range.size - 2)` index-to-value mapping is easy to get subtly wrong,
- * so it lives once.
+ * The stepped level slider both [SeatControl] and [WheelHeatControl] drive: a discrete [range],
+ * the current [index] into it, and the tint the level (and its label) wears.
  */
 @Composable
 private fun <T> LevelSlider(index: Int, range: List<T>, tint: Color, onChange: (T) -> Unit) {

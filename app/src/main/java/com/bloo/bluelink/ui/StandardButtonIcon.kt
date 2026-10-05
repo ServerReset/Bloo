@@ -55,35 +55,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * The standard glyph for a button label.
- *
- * Keyed on the user-facing string, which is unusual and worth justifying: the alternative was
- * editing 45 call sites across a dozen files and adding an icon import to each, for a decision
- * ("Copy takes the copy glyph") that is the same everywhere and belongs in one place. Keeping it
- * central means the app cannot drift into three different icons for Clear, and a new button gets
- * the right one for free.
- *
- * It fails safe: an unrecognised label simply has no icon, and any call site can pass its own.
- * The cost is that renaming a label silently drops its glyph, which is why the map is grouped by
- * meaning rather than alphabetised -- a rename lands next to its neighbours.
+ * The standard glyph for a button label, keyed on the user-facing string so one decision ("Copy takes the
+ * copy glyph") lives in one place. Unrecognised labels have no icon and call sites may pass their own;
+ * the map is grouped by meaning so a renamed label lands next to its neighbours.
  */
 fun standardButtonIcon(label: String): ImageVector? = when (label) {
     // Dismissive
     "Cancel", "Not now", "Dismiss" -> Icons.Filled.Close
-    // Destructive. Close, not a bin: this app's vocabulary has no delete glyph, and every icon
-    // here is one the codebase already uses -- see the note above on why that constraint exists.
+    // Destructive: Close, since the app has no delete glyph and only reuses existing icons.
     "Clear", "Remove", "Delete", "Remove PIN" -> Icons.Filled.Close
     "Sign out" -> Icons.AutoMirrored.Filled.Logout
     "Unpin" -> Icons.Filled.PushPin
     "Done" -> Icons.Filled.Check
-    // Confirmation -- the second tap of a two-step action, so it takes the affirmative glyph
-    // rather than the destructive one it is confirming.
+    // Confirmation: the second tap of a two-step action takes the affirmative glyph.
     "Tap again to confirm", "Tap again to reset", "Keep it", "Keep PIN" -> Icons.Filled.Check
-    // Content. "Choose photo" takes FileOpen rather than a camera or gallery glyph: it opens the
-    // system picker, and every icon in this map is one the codebase already uses -- see the note
-    // above on why that constraint exists. It was the one button label left with no glyph, which
-    // matters more now than it did: a button with no glyph cannot fall back to one, so it is the
-    // one thing that can stop a whole row from compacting.
+    // Content. "Choose photo" opens the system picker; a label with no glyph can't compact its row.
     "Choose photo" -> Icons.Filled.FileOpen
     "Choose device" -> Icons.Filled.Bluetooth
     "Copy" -> Icons.Filled.ContentCopy
@@ -91,8 +77,7 @@ fun standardButtonIcon(label: String): ImageVector? = when (label) {
     "Restore" -> Icons.Filled.CloudDone
     "Save" -> Icons.Filled.Check
     "Save as preset" -> Icons.Filled.Star
-    // Disclosure. KeyboardArrowDown for both directions: the chevron this app already uses for
-    // every expand control, rather than a second pair of glyphs meaning the same thing.
+    // Disclosure: one chevron for both directions.
     "Show", "Full notes", "Trouble installing?" -> Icons.Filled.KeyboardArrowDown
     "Hide", "Hide install help", "Hide diagnostics" -> Icons.Filled.KeyboardArrowDown
     // Navigation / external
@@ -128,9 +113,7 @@ private fun MorphButtonGlyph(
         LoadingIndicator(Modifier.size(iconSize))
     } else {
         val angle = rememberSpinAngle(spinning)
-        // The glyph cross-fades when it changes (lock to unlock, play to stop); the spin is on the
-        // wrapper, in the draw phase: `angle` loops `while (true)` while pending, so reading it
-        // through Modifier.rotate() recomposed the Icon on EVERY FRAME for as long as it ran.
+        // The glyph cross-fades on change; the spin is applied in the draw phase so `angle` never recomposes the Icon per frame.
         androidx.compose.animation.Crossfade(
             targetState = icon,
             modifier = Modifier.size(iconSize).graphicsLayer { rotationZ = angle.value },
@@ -140,9 +123,7 @@ private fun MorphButtonGlyph(
             Icon(
                 glyph,
                 contentDescription = null,
-                // Unspecified means "whatever the content colour is", which is Icon's own default.
-                // It cannot simply be passed through: Icon treats Unspecified as "draw the vector's
-                // own colours", which is a different thing entirely.
+                // Unspecified falls back to the content colour; Icon would otherwise draw the vector's own colours.
                 tint = if (tint.isSpecified) tint else LocalContentColor.current,
                 modifier = Modifier.size(iconSize),
             )
@@ -156,18 +137,10 @@ val ButtonIconGap = 8.dp
 
 
 /**
- * A button's glyph and label as ONE layout that can drop the label when it is not given the room
- * for it -- the app's fit rule, in the one place every button's content already goes through.
+ * A button's glyph and label as one layout that drops the label when it lacks room, the app's fit rule.
  *
- * The contract is stated through intrinsics, which is what lets the button group act on it
- * without knowing anything about labels: maxIntrinsicWidth is the full glyph + gap + label, and
- * minIntrinsicWidth is the glyph alone. So "how small can this button get and still make sense"
- * is a question the layout above can simply ask, and the answer is icon-only rather than a
- * truncated word.
- *
- * A label is never ellipsized and never wrapped on the way down. It is shown whole or not at
- * all: half a word in a button is worse than a glyph, and a wrapped one turns a one-line button
- * into a two-line one mid-press, which shoves the whole row's height around.
+ * Intrinsics carry the contract: maxIntrinsicWidth is glyph + gap + label, minIntrinsicWidth the glyph alone.
+ * The label is shown whole or not at all, never ellipsized or wrapped (which would change the row height mid-press).
  */
 @Composable
 fun MorphButtonLabel(
@@ -176,33 +149,22 @@ fun MorphButtonLabel(
     pending: Boolean,
     iconSize: Dp = ButtonIconSize,
     spinning: Boolean = false,
-    /**
-     * An accent for the glyph alone, where it carries state the label does not -- a charging
-     * bolt, a snowflake for climate. Unspecified (the default) keeps every button's glyph on
-     * the same content colour as its text, which is what almost all of them want.
-     */
+    /** An accent for the glyph alone, where it carries state the label doesn't; Unspecified uses the content colour. */
     iconTint: Color = Color.Unspecified,
 ) {
-    // Icon only, genuinely -- not icon-plus-an-empty-label. Skipping the whole Layout below
-    // when there is no label to place avoids reserving ButtonIconGap for a gap with nothing on
-    // the other side of it, which is a real, visible difference: an icon-only header action
-    // (DiagnosticsPebble's warning glyph, say) would otherwise sit a gap's width off-centre in
-    // its own button.
+    // Icon only: skip the Layout so no gap is reserved and the glyph stays centred.
     if (label.isEmpty()) {
         MorphButtonGlyph(icon, pending, iconSize, spinning, iconTint)
         return
     }
     val gap = ButtonIconGap
-    // The button this label sits in (if it is a MorphButton) learns what to say and whether it has
-    // shrunk to its symbol, so a long press can show the name. Plain fields: nothing recomposes.
+    // Lets the enclosing MorphButton learn the label and whether it shrank to its symbol (for the long-press hint).
     val hint = LocalLabelHint.current
     SideEffect { hint?.describe(label, icon) }
     Layout(
         content = {
             MorphButtonGlyph(icon, pending, iconSize, spinning, iconTint)
-            // The one button label style, shared with MorphTextButton -- this pair is the
-            // reference the rest of the app standardises on, so the size lives in a token
-            // rather than being whatever each button happened to inherit.
+            // The one button label style, shared with MorphTextButton.
             AnimatedText(
                 label,
                 style = ButtonLabelStyle,
@@ -221,20 +183,13 @@ fun MorphButtonLabel(
                     val gapPx = gap.roundToPx()
                     val free = constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity, minHeight = 0)
                     val glyph = measurables[0].measure(free)
-                    // Measure the label at its OWN natural size (unbounded), NOT
-                    // maxIntrinsicWidth(). The button GROUP drives a member's width on every
-                    // frame of a press, and each width change re-runs this measure; measuring the
-                    // label under the SAME `free` constraints every time lets Compose cache the
-                    // text layout, where maxIntrinsicWidth() re-laid-out the label on every single
-                    // frame of the press -- the actual source of the "button group press is janky"
-                    // report on the map toolbar and the accounts card.
+                    // Measure the label unbounded under the same `free` constraints so Compose caches its layout;
+                    // maxIntrinsicWidth() re-laid it out every frame of a button-group press.
                     val text = measurables[1].measure(free)
-                    // Whole label or no label -- anything in between is a truncated word. (Holding a
-                    // symbol-only button shows its name in a bubble above it instead, see LabelHint.)
+                    // Whole label or no label; a symbol-only button shows its name on long press (see LabelHint).
                     if (constraints.maxWidth < glyph.width + gapPx + text.width) {
                         val w = glyph.width.coerceAtMost(constraints.maxWidth)
-                        // Height still accounts for the label that is NOT being drawn (its own
-                        // natural height, already measured above).
+                        // Height still accounts for the undrawn label.
                         val h = maxOf(glyph.height, text.height)
                         return layout(w, h) {
                             hint?.collapsed = true

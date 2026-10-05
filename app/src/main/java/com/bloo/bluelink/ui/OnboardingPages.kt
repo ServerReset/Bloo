@@ -47,11 +47,7 @@ import com.bloo.bluelink.data.setBiometricLock
 import com.bloo.bluelink.data.setSyncUri
 import com.bloo.bluelink.data.syncUri
 
-/**
- * Step 1: a short welcome + feature highlights. See [OnboardingTipListPage]'s own doc for why
- * this shares that shape (including its no-per-item-entrance-animation rule) with the two
- * closing pages -- this page is where that rule was originally learned the hard way.
- */
+/** Step 1: a short welcome + feature highlights, sharing [OnboardingTipListPage]'s shape (no per-item entrance animation). */
 @Composable
 internal fun OnboardingWelcomePage() {
     OnboardingTipListPage(
@@ -65,17 +61,9 @@ internal fun OnboardingWelcomePage() {
 
 
 /**
- * Step 2: get the app set up to actually work. Two things are REQUIRED before Next unlocks,
- * because the app is genuinely worse without them and "I'll do it later" reliably means never:
- *
- *  - **Notifications**, so charge/alerts/updates can reach the user at all (API 33+).
- *  - **A lock** -- biometrics when the device has them, otherwise a PIN. Without one of these
- *    the app can never lock itself, so the lock card SWAPS to whichever the device supports
- *    instead of showing both and letting the user skip the one that actually matters.
- *
- * Drive/manual sync stays optional: a restored backup can still skip the per-car setup screens
- * later in this flow for any car it already configured (see [buildOnboardingSteps]'
- * `preConfiguredVins`).
+ * Step 2: set the app up to work. Notifications and a lock (biometrics if available, else a PIN) are
+ * required before Next unlocks; the lock card swaps to whichever the device supports. Drive sync stays
+ * optional (see [buildOnboardingSteps]' `preConfiguredVins`).
  */
 @Composable
 internal fun OnboardingSetupPage(
@@ -109,7 +97,7 @@ internal fun OnboardingSetupPage(
         }
     }
 
-    // ONE lock card, swapped to whatever this device can actually authenticate with.
+    // One lock card, swapped to what this device can authenticate with.
     if (canBio) {
         val bioEnabled = biometricLock
         OnboardingSetupCard(
@@ -188,13 +176,6 @@ internal fun OnboardingSetupPage(
 }
 
 
-/** One card in the onboarding Setup step: icon + title + body on a solid
- *  surface -- not directly on the animated Aurora background, which made
- *  plain text here hard to read against a busy, colourful, moving backdrop
- *  -- with [content] (a MorphButton or a "done" status row) below. [done]
- *  tints the icon chip to the primary color as a lightweight "this one's
- *  handled" cue, matching the checkmark treatment MorphButton itself already
- *  uses for its own active state. */
 /**
  * First-run only: bring this device's setup in from another one. Picking a sync file joins it and
  * re-resolves where this device lands (straight to the app if the file already covered everything).
@@ -247,12 +228,8 @@ internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppVie
 
 
 /**
- * The create-a-PIN mini form used by onboarding (and, in a slimmer re-use,
- * the building block of the Settings set/change/remove dialogs): two
- * matching 4-8 digit fields, a haptic'd Save only once valid. [existing]
- * true just swaps the call to "Replace PIN" semantics -- the caller handles
- * what that means; this form only ever validates and reports a valid new
- * PIN.
+ * The create-a-PIN mini form (also the base of the Settings PIN dialogs): two matching 4-8 digit fields,
+ * Save enabled once valid. The caller decides what [existing] means; this form only reports a valid new PIN.
  */
 @Composable
 internal fun OnboardingPinForm(
@@ -309,6 +286,7 @@ internal fun OnboardingPinForm(
 }
 
 
+/** One onboarding Setup card: icon, title and body on a solid surface (not the busy Aurora backdrop). */
 @Composable
 internal fun OnboardingSetupCard(
     icon: ImageVector,
@@ -359,9 +337,7 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
         border = androidx.compose.foundation.BorderStroke(1.dp, hairlineColor()),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        // The same leading-circle icon badge the search results list, the update pebble,
-        // and the settings hero stats all already use -- a bare tinted icon here was the
-        // one place left still doing it differently for no reason tied to this screen.
+        // Same leading-circle icon badge as search results, the update pebble and the settings hero stats.
         IconLeadRow(
             icon,
             tint = scheme.primary,

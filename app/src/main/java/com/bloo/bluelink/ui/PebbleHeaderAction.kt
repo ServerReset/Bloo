@@ -1,13 +1,6 @@
 package com.bloo.bluelink.ui
 
-/**
- * The collapsible "pebble" shell family, peeled out of Pebbles.kt (which keeps
- * the per-section pebble composites and list plumbing). This file owns the
- * generic [Pebble] wrapper, the [PebbleShell] expand/collapse card, its
- * [PebbleHeaderAction] action model, and the split [SplitExpandButton] control
- * (action + chevron nub). Same package, so Pebbles.kt's call sites stay
- * internal-visible and verbatim.
- */
+/** The collapsible "pebble" shell family: [Pebble], [PebbleShell], [PebbleHeaderAction] and [SplitExpandButton]. */
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -60,12 +53,6 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/**
- * The pebble header action model and its split-button control. Split out of
- * PebbleShell.kt -- Pebble/PebbleShell (staying there) reference PebbleHeaderAction
- * only as a parameter type, needing no import for the same-package reference.
- */
-
 internal class PebbleHeaderAction(
     val label: String,
     val icon: ImageVector,
@@ -78,18 +65,11 @@ internal class PebbleHeaderAction(
     val activeContainer: Color? = null,
     val activeContent: Color? = null,
     val isWarning: Boolean = false,
-    /** Explicit TalkBack label for icon-only actions (empty [label]) -- without
-     *  it, an empty-label button inside a Surface (which doesn't merge
-     *  descendant semantics) announces only "Button" with no indication of
-     *  what it does. Only needed when [label] is blank. */
+    /** TalkBack label for icon-only actions (blank [label]); a Surface doesn't merge descendant semantics. */
     val contentDescription: String? = null,
 )
 
-/**
- * Right-side expand control for pebbles that also have an action button.
- * Left half: the action (label + icon); right half: chevron nub. Together
- * they form a connected split pill, identical in style to [PresetPill].
- */
+/** Right-side expand control: action half plus chevron nub, a connected split pill like [PresetPill]. */
 @Composable
 internal fun SplitExpandButton(
     action: PebbleHeaderAction,
@@ -97,81 +77,30 @@ internal fun SplitExpandButton(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
     canToggle: Boolean = true,
-    /** Caps how much of the header row this whole control may claim -- see the call
-     *  site's own doc (PebbleShell's header Row) for why this exists: without it, this
-     *  being a plain (non-weighted) Row sibling meant it was always measured against
-     *  the row's FULL width, so its own already-existing compact-to-icon fit rule never
-     *  had a reason to fire even when the weighted title beside it was starved for room
-     *  and had to ellipsize instead. */
+    /** Reports whether the chevron half is pressed, so the pebble can square off while it is held. */
     onChevronPressChange: ((Boolean) -> Unit)? = null,
 ) {
     val haptics = LocalHaptics.current
-    // Shared with MorphExpandButton's own chevron -- see [rememberChevronSpin]. A long press
-    // does NOT toggle the pebble; only a plain tap does.
+    // Shared with MorphExpandButton's chevron ([rememberChevronSpin]). A long press does not toggle; only a tap does.
     val chevron = rememberChevronSpin(expanded, label = "splitChevron")
 
-    // The row's own real, measured height. The halves' corners are expressed
-    // as a PERCENT of the short side (the shared MorphButton model -- exact
-    // pills by construction, no fixed-dp radius that could exceed an edge),
-    // and the chevron's FULLY MORPHED corner needs to land on the exact same
-    // absolute radius seamCorner's own morphed end does (16dp -- see its
-    // default params) so the two corners of the SAME half converge to one
-    // consistent curve once fully pressed, instead of the seam opening to
-    // 16dp while the outer corner (percent-based, so its absolute radius
-    // depends on THIS row's own height) settled on a different number. This
-    // used to be based on 10dp -- seamCorner's IDLE value, not its morphed
-    // one -- which is why holding the chevron (reported from a real
-    // screenshot: "the shape is not consistent on the corners") showed two
-    // visibly different radii on the one shape at the exact moment (fully
-    // pressed) they should have matched.
+    // Measured row height: corner percents are relative to the short side, and the chevron's fully morphed
+    // corner must land on seamCorner's morphed radius (16dp) so both corners of the half converge.
     var rowHeightDp by remember { mutableStateOf(52.dp) }
     val density = LocalDensity.current
     val morphedPercent = 100f * 16.dp.value / rowHeightDp.value
-    // Expansion pushes the CHEVRON's own outer corner toward the morphed (squarer)
-    // shape -- reported directly: the header's chevron nub stayed a full pill even
-    // once its own card had squared off on expand (PebbleShell's own `corner` a few
-    // hundred lines up), reading as a mismatched leftover shape on an otherwise-square
-    // card. The ACTION half (Start/Summarize/Locate/...) deliberately does NOT square
-    // the same way -- a follow-up report ("the other buttons should still stay
-    // rounded") after a first attempt did exactly that to both halves. Only the
-    // chevron's own free corner is the "right side" either report was ever about.
-    //
-    // This is NOT the same thing as passing `active = expanded` to the chevron's own
-    // MorphButton -- that is deliberately excluded (see MorphButtonCore's own doc: a
-    // connected half's outer corner must not react to a STANDING active state, because
-    // two independent `active` flags -- one per half -- can disagree and leave the
-    // pair PERMANENTLY mismatched, e.g. Charge's "Stop" squared while its neighbour
-    // chevron stayed round). `expandedMorph` sidesteps that differently: it only ever
-    // feeds the SEAM (both halves' shared inner edge, so it still converges the way it
-    // always did) and the chevron's own OUTER corner -- never the action half's own
-    // outer corner, which stays exactly the press-only shape it always was.
+    // Expansion squares the chevron's outer corner (matching the card); the action half stays a pill.
+    // Not `active = expanded` on the MorphButton: independent per-half active flags can disagree and leave the
+    // pair mismatched (see MorphButtonCore). expandedMorph only feeds the seam and the chevron's outer corner.
     val expandedMorph by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
         animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitExpandCorner",
     )
-    // Each half gets its own shape: the OUTER corner morphs (pill when idle, rounded square
-    // when that half's own state says morphed), the INNER corner is the shared seamCorner() --
-    // the SAME idle/morphed nub the lock/horn/lights connected group and the split pills draw,
-    // rather than a bespoke static 6dp this header was still carrying on its own. That
-    // mismatch was real: every OTHER seamed pair in the app opens up as it presses (10dp ->
-    // 16dp), and this one -- used by literally every card's own header -- did not, which is
-    // what made a card's action+chevron read as a slightly different kind of control from the
-    // connected lock group right below it on the same screen. Both halves are the same
-    // MorphButton component; each one's own active/pressed state drives its OWN morph, forwarded
-    // here as `morph`.
-    //
-    // That seam nub is wrong when canToggle is false: the chevron half is never
-    // rendered then (see the `if (canToggle)` below), so the action button sits
-    // alone with nothing to seam against -- a small fixed corner on a side with
-    // no neighbor just reads as a broken/half-finished pill (reported from a
-    // real screenshot: the Summarize action, whose pebble is permanently
-    // expanded in simple mode and so never shows a chevron). Full pill on both
-    // sides in that case instead.
+    // Each half: outer corner morphs, inner corner is the shared seamCorner() like every other connected pair.
+    // With canToggle false there is no chevron to seam against, so the action is a full pill on both sides.
     val leftShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
-        // `cp` (MorphButtonCore's own resolved percent) is press-only, unmodified by
-        // expandedMorph -- the action half's outer corner stays a pill regardless of
-        // the pebble's expanded state; see this val's own doc above.
+        // `cp` is press-only; the action half's outer corner stays a pill regardless of expansion.
         val seamMorph = maxOf(morph, expandedMorph)
         val end = if (canToggle) seamCorner(seamMorph) else CornerSize(percent = cp)
         RoundedCornerShape(
@@ -180,12 +109,7 @@ internal fun SplitExpandButton(
         )
     }
     val rightShapeForCorner: (Float, Int) -> Shape = { morph, _ ->
-        // Unlike the left half, this free corner (top/bottom-end) IS meant to square
-        // off on expand, so it can't just reuse the passed-in `cp` (press-only, per
-        // MorphButtonCore's shapeForCorner-gated exclusion of `active`) -- recomputed
-        // here from the same combined value the seam uses, off this half's own
-        // pillCornerPercent/morphedCornerPercent (50f / morphedPercent, passed to its
-        // MorphButton call below).
+        // This free corner squares off on expand, so it is recomputed from the combined morph, not the press-only `cp`.
         val combined = maxOf(morph, expandedMorph)
         val cp = (50f + (morphedPercent - 50f) * combined).roundToInt()
         val start = seamCorner(combined)
@@ -195,12 +119,7 @@ internal fun SplitExpandButton(
         )
     }
 
-    // secondaryContainer/onSecondaryContainer, not buttonContainer()/onSurface: this header
-    // action (Locate, Summarize, Start, Stop...) is the app's other big case of an idle
-    // button not already carrying its own colour override, exactly the case MorphButton's
-    // own bare defaults now cover -- matching it here explicitly (rather than just omitting
-    // containerColor/contentColor below and letting them fall through) because this `when`
-    // also needs its warning/active branches, which a bare default can't express.
+    // secondaryContainer matches MorphButton's bare idle defaults; set explicitly because warning/active need overrides.
     val defaultContainer = MaterialTheme.colorScheme.secondaryContainer
     val leftContainer = if (action.isWarning) MaterialTheme.colorScheme.errorContainer else defaultContainer
     val leftFg = when {
@@ -212,38 +131,23 @@ internal fun SplitExpandButton(
     // Bounce animation for the location button's icon.
     val bounceY = remember { Animatable(0f) }
     val bounceScope = rememberCoroutineScope()
-    // Read here, at composable scope, not inline inside bounceScope.launch{} below --
-    // lowPowerAwareSpring is itself @Composable, so it can't be called from a suspend lambda.
+    // Read at composable scope: lowPowerAwareSpring is @Composable, so it can't be called inside launch{}.
     val bounceUpSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh)
     val bounceDownSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
     var bouncing by remember { mutableStateOf(false) }
 
-    // The climate icon's own spin now comes from MorphButtonLabel's `spinning` param below --
-    // it already carries this exact ramp-up/hold/decelerate shape internally, so a second,
-    // external copy of the same animation had nothing left to drive.
-
-    // ExpressiveButtonGroup, not a plain Row: these two halves are the app's clearest case of
-    // buttons that should physically shove each other on press (they are a single connected
-    // pill), and the group is what makes that safe -- it redistributes width BETWEEN the halves
-    // so its own outer size never changes, which matters because this header also renders inside
-    // Settings' LazyColumn items, where a size change during scroll crashes a lazy layout.
-    // See ExpressiveButtons.kt for the full why.
+    // ExpressiveButtonGroup: the halves shove each other on press while its outer size stays constant
+    // (a size change during scroll crashes Settings' lazy items). See ExpressiveButtons.kt.
     ExpressiveButtonGroup(
         modifier = modifier
-            // A fixed 52dp target (the old content-driven ~40dp pill read as
-            // undersized next to the 76dp header it sits in -- reported from
-            // a real screenshot). IntrinsicSize.Min still reconciles the two
-            // halves to the SAME height; heightIn supplies the floor.
+            // Fixed 52dp floor; IntrinsicSize.Min keeps both halves the same height.
             .height(IntrinsicSize.Min)
             .heightIn(min = rowHeightDp)
-            // Real measured height, so the 10dp corner percent above lands on
-            // the right radius -- see that val's own doc.
+            // Real measured height, feeding the corner percent above.
             .onSizeChanged { rowHeightDp = with(density) { it.height.toDp() } },
         spacing = 3.dp,
         verticalAlignment = Alignment.CenterVertically,
-        // An action half joined to a chevron half is one control with a seam, so it must not
-        // break onto two lines however narrow the header gets -- see `wrap`. It compacts to
-        // glyphs instead, which is exactly right for a header running out of room.
+        // Action + chevron is one seamed control: never wrap, compact to glyphs instead.
         wrap = false,
     ) {
         // Left half — the action (label + icon) button with expansion animation.
@@ -273,15 +177,11 @@ internal fun SplitExpandButton(
                 shapeForCorner = leftShapeForCorner,
                 morphedCornerPercent = morphedPercent,
                 pillCornerPercent = 50f,
-                // The halves keep their measured ~42-46dp height; the standard
-                // 48dp touch floor would inflate the whole pebble header.
+                // Keeps the measured ~42-46dp height; the 48dp touch floor would inflate the header.
                 minHeight = 0.dp,
                 modifier = Modifier.fillMaxHeight().then(
                     run {
-                        // Local copy so the smart cast works inside the semantics
-                        // lambda (class properties are not stable for smart-cast
-                        // capture; the !! form read fine but would crash if the
-                        // guard and the call ever drifted apart).
+                        // Local copy so the smart cast works inside the semantics lambda.
                         val desc = action.contentDescription
                         if (action.label.isEmpty() && desc != null) {
                             Modifier.semantics { contentDescription = desc }
@@ -289,34 +189,9 @@ internal fun SplitExpandButton(
                     },
                 ),
             ) {
-                // The shared label -- same icon size, gap and type as every other button in
-                // the app, including PrimaryActions' lock/horn/lights row, which this one
-                // still drew nothing like: a bespoke 16dp icon, labelLarge text and a 6dp gap
-                // that predated MorphButtonLabel entirely. Every card's own header action goes
-                // through this one call site, so that mismatch was "the control pebble looks
-                // different from the rest of the app" for literally every OTHER pebble at once.
-                //
-                // `spinning` replaces the hand-rolled `spinAngle` Animatable above -- the exact
-                // same ramp-up/hold/decelerate shape already lives inside MorphButtonLabel's own
-                // glyph, so driving a second, external copy of it here was duplicated animation
-                // state for the same visual effect.
-                //
-                // widthIn still caps the label so a long action ("Downloading…") at a large font
-                // size cannot grow this button unbounded and squeeze the pebble title -- but past
-                // the cap this now compacts to the icon alone (the app's one fit rule) instead of
-                // ellipsizing a half-cut word.
-                //
-                // 132dp, not 110: at 110 a perfectly ordinary short label ("Summarize", nine
-                // letters and two wide 'm's at SemiBold) already landed past the cap and compacted
-                // to the bare glyph -- a WIDE dark pill with a lone sparkle floating in it, reported
-                // from a real screenshot. The group had already reserved this button its full,
-                // uncapped intrinsic width (it measures the same subtree, cap included, so the
-                // reservation and this box's own ceiling should describe the same content but did
-                // not once the label was long enough to graze the old cap) -- so the pill stayed
-                // wide while its content silently gave up the word inside it. 132dp comfortably
-                // clears every short action label in the app ("Summarize", "Lock", "Stop", "Start",
-                // "Install now") while still catching the genuinely long ones ("Downloading…",
-                // "Installing…"), which is what this cap exists for.
+                // widthIn caps the label so a long action ("Downloading…") can't squeeze the pebble title; past the cap it
+                // compacts to the icon. 132dp clears every short label ("Summarize", "Install now"); a lower cap compacts
+                // ordinary labels to a lone glyph in a wide pill.
                 Box(Modifier.widthIn(max = 132.dp).graphicsLayer { translationY = bounceY.value }) {
                     MorphButtonLabel(
                         action.icon,
@@ -334,9 +209,7 @@ internal fun SplitExpandButton(
             if (onChevronPressChange != null) {
                 val pressed by chevronSource.collectIsPressedAsState()
                 LaunchedEffect(pressed) { onChevronPressChange(pressed) }
-                // See MorphExpandButton's identical DisposableEffect for why: a
-                // collapse that unmounts this half mid-press must not leave the
-                // pebble permanently squared behind it.
+                // As in MorphExpandButton: a collapse unmounting this half mid-press must not leave the pebble squared.
                 DisposableEffect(Unit) { onDispose { onChevronPressChange(false) } }
             }
             GroupButton(
@@ -358,13 +231,8 @@ internal fun SplitExpandButton(
                     morphedCornerPercent = morphedPercent,
                     pillCornerPercent = 50f,
                     minHeight = 0.dp,
-                    // The icon's own contentDescription below is the NEXT action
-                    // ("Expand"/"Collapse"); this is the CURRENT state -- without it
-                    // TalkBack only ever hears what tapping will do, never whether the
-                    // pebble is presently open, so distinguishing the two took a
-                    // double-tap-and-listen-again instead of being announced on focus.
-                    // widthIn(min = rowHeightDp) keeps the nub a square at the row's
-                    // fixed height so its pill end is a true semicircle by percent.
+                    // The icon's description is the next action; this announces the current state on focus.
+                    // widthIn(min = rowHeightDp) keeps the nub square so its pill end is a true semicircle.
                     modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp)
                         .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
                 ) {

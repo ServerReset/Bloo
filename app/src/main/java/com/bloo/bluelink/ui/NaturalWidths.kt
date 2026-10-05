@@ -11,22 +11,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.unit.Density
 
-/** Cache of resting child widths for one [ExpressiveButtonGroup]. See its own comment for why
- *  this is a plain object and not snapshot state. */
+/** Cache of resting child widths for one [ExpressiveButtonGroup]; a plain object, not snapshot state. */
 internal class NaturalWidths {
     /**
-     * Whether this group's last layout dropped its members to their symbols. Sticky: the group only
-     * goes back to words once there is a clear margin to spare (see ExpressiveButtonGroup's fit rule),
-     * so a width that hovers around the threshold (a rotation, a keyboard, a pane drag) cannot make
-     * the buttons flip between icon and text on every pixel.
+     * Whether the last layout dropped members to their symbols. Sticky: it returns to words only
+     * with a clear margin, so a width hovering at the threshold doesn't flip icon/text per pixel.
      */
     var compacted: Boolean = false
 
     /**
-     * The standalone button's own single resting width, cached from its last resting measure.
-     *
-     * Only [SafeExpansiveButton]'s non-group path uses this; the group derives its widths from
-     * intrinsics instead ([content]/[compact]) and needs no measured cache at all.
+     * The standalone button's single resting width from its last resting measure; only
+     * [SafeExpansiveButton]'s non-group path uses it.
      */
     var widths: IntArray? = null
 
@@ -38,19 +33,13 @@ internal class NaturalWidths {
 }
 
 
-/** Carries a child's live press fraction to [ExpressiveButtonGroup]'s measure policy. The
- *  fraction is a lambda, not a value, so the group reads it during layout instead of the child
- *  having to recompose to report it. */
+/** Carries a child's live press fraction to the group's measure policy; a lambda so the group
+ *  reads it during layout without the child recomposing. */
 internal data class ExpressiveGroupData(
     val pressFraction: () -> Float,
     /**
-     * Share of the row's leftover space this member takes, 0 to opt out.
-     *
-     * The group's own answer to Modifier.weight, which cannot reach it: weight is RowScope
-     * parent data read by a Row's measure policy, and a child of this group is not a child of a
-     * Row. Every attempt to size a group member with Modifier.weight in this app was therefore
-     * silently dead. Declaring it here means filling the row and redistributing on press are
-     * the same calculation, instead of a Row doing one and the group doing the other.
+     * Share of the row's leftover space this member takes, 0 to opt out. The group's own
+     * Modifier.weight: RowScope weight cannot reach a child of this group.
      */
     val weight: Float,
 ) : ParentDataModifier {
@@ -70,9 +59,8 @@ internal const val GroupWeightProportional = -1f
 @Stable
 object ExpressiveButtonGroupScope {
     /**
-     * One button in the group. Its own press grows it and squeezes its neighbours; being
-     * squeezed by a neighbour is what makes the effect read as buttons physically pushing each
-     * other rather than each one popping in isolation.
+     * One button in the group. Its press grows it and squeezes its neighbours, so buttons read as
+     * pushing each other.
      */
     @Composable
     fun GroupButton(
@@ -86,17 +74,12 @@ object ExpressiveButtonGroupScope {
         val press by expressivePressFraction(interactionSource, enabled)
         Box(
             modifier
-                // propagateMinConstraints (below) so the button itself fills the width the
-                // group hands it -- otherwise it would sit at its own natural width inside a
-                // slot growing and shrinking around it, and nothing would appear to move.
+                // propagateMinConstraints (below) so the button fills the width the group hands it.
                 .then(ExpressiveGroupData({ press }, groupWeight)),
             propagateMinConstraints = true,
         ) {
-            // FALSE inside, exactly as SafeExpansiveButton's own group branch does it: this
-            // slot has already joined the group on the child's behalf, and without this the
-            // MorphButton inside would join a second time (it does that itself now), adding a
-            // redundant layout node and a second press spring per half whose parent data the
-            // group would never read.
+            // FALSE inside, as SafeExpansiveButton's group branch does: this slot already joined the group,
+            // so the MorphButton must not join a second time.
             CompositionLocalProvider(LocalExpressiveGroup provides false) { content() }
         }
     }
@@ -105,12 +88,8 @@ object ExpressiveButtonGroupScope {
 
 /**
  * Splits buttons of the given [widths] into lines for a group [maxWidth] wide, [gap] apart.
- *
- * First greedily, exactly as a FlowRow would: as many buttons as fit on each line. Then BALANCED:
- * the same number of lines, but with the break points moved so the lines are as even as they can be
- * (the narrowest cap that still fits in that many lines) -- not a full line over a stray button.
- * Each line then stretches to the full width, so evenly filled lines make evenly sized buttons.
- * Order is always preserved, and an unbounded width is one line.
+ * Greedy like a FlowRow first, then balanced: same line count, break points moved so lines are
+ * as even as possible. Order is preserved; an unbounded width is one line.
  */
 internal fun balancedLineBreaks(widths: IntArray, gap: Int, maxWidth: Int): List<IntArray> {
     fun breakInto(cap: Int): List<IntArray> {

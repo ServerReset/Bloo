@@ -13,28 +13,15 @@ import kotlin.math.max
 
 internal fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedVehicleCommand? {
     val q = query.lowercase()
-    // Only meaningful for a climate START, and only when the phrasing is not
-    // already asking for smart climate (which computes its own target from the
-    // weather -- naming a temperature and asking for smart at once is a
-    // contradiction, and smart is the more specific request).
+    // Only for a climate start, and not when smart climate is asked (it computes its own target).
     val temp = parseClimateTemperature(q, metric)
-    // degLabel owns the F<->C-and-round rule (this was an inline third copy of it). `temp` is an
-    // Int °F from parseClimateTemperature, and fahrenheit = !metric, so the two branches map
-    // exactly onto degValue's two branches -- verified against FormatUtils.degValue.
+    // degLabel owns the F<->C-and-round rule; `temp` is an Int in °F and fahrenheit = !metric.
     val tempLabel = temp?.let { degLabel(it.toString(), fahrenheit = !metric) }
-    // Defrost implies climate at full heat -- "clear the windscreen" is a
-    // request about ice, not about a number, so it picks its own temperature
-    // unless the query also named one.
+    // Defrost implies climate at full heat unless the query also names a temperature.
     val wantsDefrost = RxDefrost.containsMatchIn(q)
     return when {
-        // Checked first: "open Bluelink"/"open the app"/"open Kia Access" is a
-        // request to launch the OEM companion app (OwnerLinks' own "<appName>
-        // app" button, see InfoPebble.kt), not a car command -- it has no
-        // VehicleCommandRunner id at all, so it's dispatched separately in
-        // SearchResults.kt via openApp() using the target vehicle's own
-        // BrandLinks. Every brand's app name/aliases are matched generically
-        // rather than hard-coded per-brand, so a new brand only needs its
-        // BrandLinks entry, not a new regex here.
+        // Checked first: "open Bluelink"/"open the app" launches the OEM companion app (dispatched in
+        // SearchResults.kt via openApp with the vehicle's BrandLinks), not a car command.
         RxOpenApp.containsMatchIn(q) ->
             ParsedVehicleCommand("open_app", label = "Opening the app for")
         // Unlock before lock: "unlock" contains "lock".
@@ -44,8 +31,7 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
             ParsedVehicleCommand("lock", label = "Locking")
         RxSmartClimate.containsMatchIn(q) ->
             ParsedVehicleCommand("climate_on", "smart", "Starting smart climate for")
-        // Defrost on its own is a start-climate request, so it is matched
-        // before the generic stop/start climate patterns below.
+        // Defrost is a start-climate request, matched before the generic stop/start patterns.
         wantsDefrost && !RxNegation.containsMatchIn(q) -> {
             val f = temp ?: CLIMATE_TEMP_RANGE_F.last
             ParsedVehicleCommand(
@@ -66,18 +52,10 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
             } else {
                 ParsedVehicleCommand("climate_on", "default", "Starting climate for")
             }
-        // Bare "heat <car> to 80" / "cool <car> to 65" / "warm <car> to 70" --
-        // no start/turn-on prefix, no "up" -- the pattern above requires one
-        // of those, so a query that's just the verb plus a target temperature
-        // fell through to "not a command" entirely. Requiring temp != null is
-        // what keeps this safe: it's the same guard that stops "Ioniq 5" from
-        // being read as a temperature (see parseClimateTemperature's own doc),
-        // so a bare "heat" with no number attached still isn't a command here
-        // either -- it needs a real "to/at N" or "N degrees" alongside it.
+        // Bare "heat <car> to 80": needs a real temperature, the same guard that stops "Ioniq 5" reading as one.
         temp != null && RxHeatCoolVerb.containsMatchIn(q) ->
             ParsedVehicleCommand("climate_on", VehicleCommandRunner.TEMP_PREFIX + temp, "Starting climate at $tempLabel for")
-        // Charge LIMIT before charge start/stop: "set the charge limit to 80"
-        // contains "charg", and the limit is the more specific request.
+        // Charge limit before charge start/stop: "set the charge limit to 80" contains "charg".
         RxChargeLimit
             .containsMatchIn(q) -> {
             val pct = RxPercent.find(q)?.groupValues?.get(1)?.toIntOrNull()
@@ -101,23 +79,8 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
 
 
 /**
- * Every CONSTANT search/command pattern, compiled once at class init instead of per call.
- *
- * `Regex(...)` parses its pattern and builds a matcher every time it is CONSTRUCTED, and all
- * of these were constructed inside the functions using them. Two distinct costs:
- *
- *  - The token splitter ran inside SettingsSearchResults, a composable whose `query`
- *    parameter changes on every KEYSTROKE -- a regex compiled per character typed, on the
- *    input path, with the keyboard up. That is the one a user can feel.
- *  - The command-parser vocabulary was ~17 compilations per parse, on every submitted query.
- *
- * File scope rather than `remember`: the patterns are constant, so that is their correct
- * lifetime, and a `remember` would still recompile once per composition that mis-keyed it.
- * Any pattern built from a runtime value (a vehicle's own name) is left where it is, since
- * it genuinely cannot be constant.
- *
- * Generated by extracting the literals from this file rather than by retyping them: doing it
- * by hand through two layers of escaping mangled the degree sign and several `\b` anchors.
+ * Every constant search/command pattern, compiled once at class init instead of per call (the token
+ * splitter would otherwise compile on every keystroke). Patterns built from runtime values stay inline.
  */
 internal val RxColdest = Regex("coldest|as cold as|max(imum)? (cold|cool)|lowest temp|full (cold|cool)")
 
@@ -129,12 +92,8 @@ internal val RxTempDegrees = Regex("\\b(\\d{2,3})\\s*°?\\s*(?:degrees?\\b|([fc]
 
 internal val RxDefrost = Regex("defrost|defog|demist|clear (the )?(wind(screen|shield)|glass|ice)|de-ice")
 
-// "open" + a known companion-app name/alias, or the generic "the app"/"my app" --
-// deliberately NOT bare "open" (that would swallow "open the car"/"open the
-// doors", RxUnlock's own territory below) and NOT bare "app" (too broad).
-// Brand names are lowercase, matching how they're compared against `q` (also
-// lowercased) -- kept in sync with BrandLinks.appName (Brand.kt) by hand since
-// that list is a fixed, rarely-changing set of OEM brands, not per-vehicle data.
+// "open" plus a known companion-app name/alias or "the app"/"my app"; not bare "open" (that is RxUnlock's
+// territory) or bare "app". Brand names are lowercase and kept in sync with BrandLinks.appName (Brand.kt) by hand.
 internal val RxOpenApp = Regex(
     "\\bopen\\b.*(bluelink|kia access|kia connect|uvo|genesis( app| connected)?|" +
         "\\bthe app\\b|\\bmy app\\b|\\bowner('?s)? app\\b|\\bcar app\\b|\\bcompanion app\\b)",
@@ -150,10 +109,7 @@ internal val RxNegation = Regex("stop|turn off|cancel")
 
 internal val RxClimateOff = Regex("(stop|turn off|cancel|kill|end) (the )?(climate|ac|a/c|heat(er)?|aircon|air con|cooling|warming)")
 
-// Was constructed fresh inline at its one call site, unlike every other
-// pattern in this block -- missed when the rest were hoisted (see the
-// doc above this block for why that hoist mattered: once per submitted
-// query, not once per frame, but still worth not re-parsing).
+// Start-climate phrasings.
 internal val RxClimateStart = Regex(
     "(start|turn on|run|fire up|kick on) (the )?(climate|ac|a/c|heat(er)?|aircon|air con)" +
         "|pre.?(heat|cool|condition)|warm (it|the car|my car) up|cool (it|the car|my car) down" +
@@ -172,32 +128,29 @@ internal val RxChargeStop = Regex("(stop|turn off|cancel|halt|end) (the )?charg|
 
 internal val RxChargeStart = Regex("(start|begin|turn on|resume) (the )?charg|charge (it|the car|my car)( now)?|top (it )?up")
 
-// Bare verb, no "start"/"turn on"/"up" needed -- paired with `temp != null` at
-// its one call site, which is what stops it from firing on every unrelated
-// sentence that happens to contain "heat" or "cool".
+// Bare verb; always paired with `temp != null` at its call site so it doesn't fire on unrelated sentences.
 internal val RxHeatCoolVerb = Regex("\\b(heat|cool|warm)\\b")
 
 internal val RxSearchTokens = Regex("[^a-z0-9%]+")
 
 
 /**
- * Try to enhance command parsing using Gemini Nano when available. If the query
- * is ambiguous or the initial parse didn't match, use AI to understand intent.
- * Gracefully falls back if Gemini Nano is unavailable or fails.
+ * Enhances command parsing with Gemini Nano when available and the regex parse found nothing;
+ * falls back gracefully if it is unavailable or fails.
  */
 internal suspend fun enhanceCommandWithAi(
     query: String,
     initialCommand: ParsedVehicleCommand?,
     ai: com.bloo.bluelink.data.Ai,
 ): ParsedVehicleCommand? {
-    // If we already have a confident match, return it
+    // Keep a confident regex match.
     if (initialCommand != null) return initialCommand
 
-    // Only try AI enhancement if the query didn't match regex patterns
+    // Only try AI when the regex patterns didn't match.
     if (query.isBlank()) return null
 
     return try {
-        // Build a prompt asking the model to identify vehicle command intent
+        // Ask the model to identify the command intent.
         val availableCommands = listOf(
             "lock - lock the car doors",
             "unlock - unlock the car doors",
@@ -216,7 +169,7 @@ Available vehicle commands: $commandsList
 
 What is the user most likely trying to do? Answer with ONLY the command name (e.g., "lock", "unlock", "charge_on") or "none" if no clear command."""
 
-        // Pad to meet minimum character requirement
+        // Padded to meet the model's minimum character requirement.
         val paddedPrompt = if (prompt.length < 400) {
             prompt + "\n\n" + prompt.repeat((400 / prompt.length) + 1)
         } else {
@@ -225,7 +178,7 @@ What is the user most likely trying to do? Answer with ONLY the command name (e.
 
         val result = ai.summarize(paddedPrompt).trim().lowercase()
 
-        // Parse the AI's response
+        // Map the AI's answer to a command.
         return when {
             result.contains("lock") && !result.contains("unlock") -> ParsedVehicleCommand("lock", label = "Locking")
             result.contains("unlock") -> ParsedVehicleCommand("unlock", label = "Unlocking")
@@ -239,7 +192,7 @@ What is the user most likely trying to do? Answer with ONLY the command name (e.
         }
     } catch (e: Exception) {
         if (e is kotlinx.coroutines.CancellationException) throw e
-        // Graceful fallback - return original parse result
+        // Fall back to the original parse result.
         null
     }
 }

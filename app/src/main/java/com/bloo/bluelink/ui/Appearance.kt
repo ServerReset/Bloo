@@ -60,8 +60,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.toColorInt
 
 /**
- * A round colour swatch for the palette picker. Shows the palette's seed colour
- * and a ring + check when selected.
+ * A round colour swatch for the palette picker: the seed colour, with a ring + check when selected.
  */
 @Composable
 internal fun PaletteSwatch(
@@ -84,12 +83,7 @@ internal fun PaletteSwatch(
                 .padding(ring)
                 .clip(CircleShape)
                 .background(palette.swatch)
-                // The colour name was only ever rendered as a sibling Text
-                // below, outside this clickable's own semantics -- TalkBack
-                // announced an unlabelled "double tap to activate" with no
-                // colour name and no sense of which swatch is selected (the
-                // ring/check are purely visual). RadioButton matches the
-                // "pick exactly one" behaviour of this swatch row.
+                // Exposed as a RadioButton so TalkBack announces the colour name and selection state.
                 .semantics {
                     contentDescription = palette.label
                     role = Role.RadioButton
@@ -133,7 +127,7 @@ internal fun CustomPaletteSwatch(
     )
     val swatchColor = Color(palette.primaryArgb.toLong() and 0xFFFFFFFFL)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Outer container is sized to accommodate the 1.12x scale without clipping.
+        // Outer container fits the 1.12x scale without clipping.
         Box(
             modifier = Modifier
                 .size(58.dp)
@@ -148,8 +142,7 @@ internal fun CustomPaletteSwatch(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    // Read at DRAW time, not in composition -- see Widgets.kt's
-                    // FloatingIcon for the same change and why it matters.
+                    // Read at draw time, not in composition (see FloatingIcon in Widgets.kt).
                     .graphicsLayer {
                         scaleX = scale
                         scaleY = scale
@@ -167,27 +160,15 @@ internal fun CustomPaletteSwatch(
             }
         }
         Spacer(Modifier.height(2.dp))
-        // Standard gap between connected button elements (matches SplitExpandButton's
-        // own 3dp gap for visual consistency across all grouped controls).
+        // Standard gap between connected button elements (matches SplitExpandButton's 3dp).
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 palette.name,
                 style = MaterialTheme.typography.labelSmall,
                 color = swatchLabelColor(selected),
             )
-            // A bare 10dp clickable Icon (no IconButton) was well under the
-            // minimum touch target guideline and had no button semantics --
-            // TalkBack announced it with no "double tap to activate" cue and
-            // it was genuinely hard to hit with a finger. IconButton gives
-            // both a real touch target and the Button role for free.
-            // Manual haptics?.click() dropped: MorphIconButton fires it. This was
-            // the one bare IconButton in the file that remembered to.
-            //
-            // 32dp, not the full 48dp guideline: this sits in a caption row
-            // (Text + this button) inside a 58dp-wide swatch column, itself one
-            // of several in a tight grid -- 48dp here would overflow that
-            // column or push its touch target into the neighbouring swatch's.
-            // 32dp is a real improvement over the old 28dp that still fits.
+            // IconButton gives a real touch target and the Button role. Haptics come from MorphIconButton.
+            // 32dp, not 48dp: it sits in a caption row inside a 58dp-wide swatch column in a tight grid.
             MorphIconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Filled.Settings,
@@ -203,19 +184,8 @@ internal fun CustomPaletteSwatch(
 
 /**
  * Canvas-based colour picker: hue bar + saturation/value square.
- *
- * Internal state is plain HSV floats (`hue`/`sat`/`value`), seeded once from
- * the incoming [color] on first composition and never re-synced from it
- * afterward -- each drag on either Canvas computes a new HSV component
- * straight from the touch position (`awaitEachGesture` + a manual
- * down/while-pressed loop, since neither Canvas needs multi-touch or a
- * standard drag-gesture detector) and calls `update()`, which converts back
- * to RGB and reports it via [onColorChange]. `hexInput` is a separate text
- * mirror of the same colour: it's kept in sync from `picked` (but only
- * refreshed when the *canvas* changes the colour, not on every keystroke),
- * so a manually typed hex value only overwrites the canvas state once
- * `commitHex()` runs (on Done/focus-loss), not while the user is still
- * mid-edit.
+ * HSV state is seeded once from [color] and never re-synced; drags report via [onColorChange].
+ * `hexInput` mirrors the colour and only overwrites the canvas on `commitHex()` (Done/focus-loss).
  */
 @Composable
 internal fun ColorPickerCanvas(
@@ -249,20 +219,12 @@ internal fun ColorPickerCanvas(
     val hueGradient = remember(Unit) {
         (0..12).map { i -> Color(android.graphics.Color.HSVToColor(floatArrayOf(i * 30f, 1f, 1f))) }
     }
-    // Both brushes only depend on colours that change far less often than the
-    // Canvas redraws while dragging (sat/value redraw on every pointer move):
-    // satValueBrush only needs to change when the hue itself changes, and
-    // hueBrush's gradient stops never change at all. Hoisting them out of the
-    // draw scope avoids allocating a new List + Brush on every drag frame.
+    // Hoisted out of the draw scope to avoid per-frame List + Brush allocation: satValueBrush changes only with hue.
     val satValueBrush = remember(pureHue) { Brush.horizontalGradient(listOf(Color.White, pureHue)) }
     val hueBrush = remember(hueGradient) { Brush.horizontalGradient(hueGradient) }
     fun hexOf(c: Color) = String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and c.toArgb())
-    // A plain text field is the accessible alternative to the two drag-only
-    // Canvases below, which have no TalkBack path at all -- a screen-reader
-    // user can name and save a palette but never actually choose or perceive
-    // its colour otherwise. Only re-synced when the CANVAS changes the colour
-    // (picked), never on every keystroke, so it doesn't fight an in-progress
-    // edit -- typing itself only updates `picked` once, on a successful commit.
+    // A text field is the accessible alternative to the drag-only canvases (no TalkBack path).
+    // Re-synced only when the canvas changes the colour, so it never fights an in-progress edit.
     var hexInput by remember { mutableStateOf(hexOf(picked)) }
     var hexError by remember { mutableStateOf(false) }
     LaunchedEffect(picked) { if (hexInput != hexOf(picked)) { hexInput = hexOf(picked); hexError = false } }
@@ -366,10 +328,7 @@ internal fun ColorPickerCanvas(
             onValueChange = { hexInput = it; hexError = false },
             label = { Text("Hex colour") },
             singleLine = true,
-            // FieldShape, like every other text field in the app -- this one was the
-            // single call site that never passed it, so it drew M3's default 4dp
-            // corners directly above the "Name" field of the very dialog it lives in
-            // (which does pass FieldShape). Same field, two corner radii, one dialog.
+            // FieldShape like every other text field (matches the "Name" field above).
             isError = hexError,
             supportingText = if (hexError) { { Text("Not a valid colour") } } else null,
             keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
@@ -380,11 +339,10 @@ internal fun ColorPickerCanvas(
 }
 
 
-/** Rounds [v] to the nearest multiple of [step]: the colour picker only offers fixed values, never free ones. */
+/** Rounds [v] to the nearest multiple of [step]; the picker only offers fixed values. */
 private fun snapStep(v: Float, step: Float): Float = Math.round(v / step) * step
 
-/** The check mark a chosen swatch wears. Shared by the two swatch rows (the built-in
- *  palettes and the custom ones) so the chosen marker is identical in both. */
+/** The check mark a chosen swatch wears, shared by both swatch rows. */
 @Composable
 private fun SelectedCheck() {
     Icon(
@@ -395,8 +353,7 @@ private fun SelectedCheck() {
     )
 }
 
-/** A swatch caption's colour: full-strength when its swatch is the chosen one, muted
- *  otherwise -- the same pairing in both swatch rows. */
+/** A swatch caption's colour: full-strength when chosen, muted otherwise. */
 @Composable
 private fun swatchLabelColor(selected: Boolean): Color =
     if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant

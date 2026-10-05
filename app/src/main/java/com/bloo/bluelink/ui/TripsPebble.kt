@@ -1,8 +1,7 @@
 package com.bloo.bluelink.ui
 
 /**
- * Trips/drive-history pebbles: TripsPebble, TripRow, tripDate and
- * climateChunksLabel -- extracted from Pebbles.kt so the UI file stays smaller.
+ * Trips/drive-history pebbles: TripsPebble, TripRow, tripDate and climateChunksLabel.
  */
 
 import androidx.compose.foundation.layout.Arrangement
@@ -39,30 +38,21 @@ import kotlin.math.max
 
 
 /**
- * Recent drives from the Hyundai/Genesis US trip-details feed, with distance,
- * time, speeds and (for EVs) the energy/regen breakdown. Loaded lazily the
- * first time the pebble is composed, once per session. Shown for every car;
- * cars whose head unit doesn't report trips simply show an empty state.
+ * Recent drives from the Hyundai/Genesis US trip-details feed: distance, time, speeds and (EVs)
+ * the energy/regen breakdown. Loaded lazily once per session; head units that report no trips
+ * show an empty state.
  */
 @Composable
 internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Modifier) {
-    // The evTripDetails feed isn't served by Gen5W (generation 2) head units -
-    // they report nothing, EV or not - so the pebble is hidden for them rather
-    // than sitting permanently empty. Kia US doesn't report a generation, so it's
-    // excluded from the check and keeps the pebble. Reads the user's own
-    // confirmed generation (Settings/onboarding) over the raw API guess when
-    // one's been set -- see UiState.isGen5WEffective.
+    // Gen5W head units don't serve evTripDetails, so the pebble is hidden for them. Kia US reports
+    // no generation and keeps it. Uses the user-confirmed generation (UiState.isGen5WEffective).
     val isGen5W = state.isGen5WEffective(v)
     if (isGen5W) return
-    // Same reasoning one step further out: a Gen5W head unit reports nothing,
-    // and neither does a backend with no trips endpoint. Kia US, Canada and
-    // Europe all inherit the repository's empty default, so without this they
-    // show the pebble and it never fills.
+    // Same for backends with no trips endpoint (Kia US, Canada, Europe inherit an empty default).
     if (!v.brand.supportsTrips) return
     val trips = state.trips[v.vin]
     val loading = state.isPending(v.vin, "trips")
-    // Only load trips if they haven't been fetched yet; prevent redundant loads
-    // on recomposition or when data is already available/loading
+    // Load only if not yet fetched, to avoid redundant loads on recomposition.
     LaunchedEffect(v.vin) {
         if (trips == null && !loading) vm.loadTrips(v)
     }
@@ -71,19 +61,15 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
         trips.isEmpty() -> "No recent trips"
         else -> "${trips.size} recent"
     }
-    // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting
-    // that reads better inline without an expand/collapse control (see its own doc).
-    // This one renders a list of up to 8 trips, so forcing it always open in simple
-    // mode just removed the ability to collapse it.
+    // Not alwaysExpandedInSimpleMode: this renders up to 8 trips and must stay collapsible.
     Pebble(v, "trips", "Trips", Icons.Filled.Route, state, vm, modifier, summary = summary) {
         when {
             trips == null -> Text(if (loading) "Fetching trip history…" else "No trip data yet.")
             trips.isEmpty() -> Text("No recent trips reported by this car.")
             else -> Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 val tMetric = LocalAppearance.current.metricDistance
-                // In a forced-open/glance context only the 3 most recent trips show, so the
-                // tile fits without scrolling and you land at the top; the full pebble keeps
-                // up to 8. Gated on LocalForceExpanded (pinned pebbles / full-screen glance).
+                // In a forced-open/glance context (LocalForceExpanded) only the 3 most recent trips show so the
+                // tile fits without scrolling; the full pebble keeps up to 8.
                 val glance = LocalForceExpanded.current
                 trips.take(if (glance) 3 else 8).forEach { TripRow(it, metric = tMetric) }
             }
@@ -93,13 +79,8 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
 
 @Composable
 internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
-    // TripsPebble renders this list under the pebble's own hero with no
-    // color override of its own, so every Text below inherits whatever the
-    // pebble's own container hands out -- surfaceVariant's onSurfaceVariant by
-    // default. Pinning the primary date/distance line to full onSurface (it was
-    // entirely unstyled before, not just muted) is the same "the important half
-    // shouldn't be barely distinguishable from the caption below it" fix
-    // StatusRow's own value already has.
+    // No color override here, so Text inherits onSurfaceVariant; the primary date/distance line is
+    // pinned to full onSurface so it stands apart from the caption.
     val primaryColor = MaterialTheme.colorScheme.onSurface
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -114,21 +95,15 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
             }
         }
         val pace = remember(trip, metric) { buildList {
-            // fmtMinutes for these two exact fields -- without it, one trip read
-            // "95 min" instead of the friendlier "1h 35m".
+            // fmtMinutes for these fields ("1h 35m" rather than "95 min").
             trip.driveMinutes?.let { add(fmtMinutes(it)) }
             trip.idleMinutes?.takeIf { it > 0 }?.let { add("${fmtMinutes(it)} idle") }
-            // formatSpeedMph, not formatSpeed: these are mph (EvTrip's KDoc, corroborated
-            // by its sibling `distance` being treated as miles on both surfaces), and
-            // formatSpeed's input is km/h. 62 mph used to render as "38 mph" in imperial
-            // and "62 km/h" in metric. `.value` is already Double, so no toDouble().
+            // formatSpeedMph, not formatSpeed: these values are mph and formatSpeed takes km/h.
             trip.avgspeed?.value?.let { add("avg ${formatSpeedMph(it, metric)}") }
             trip.maxspeed?.value?.let { add("max ${formatSpeedMph(it, metric)}") }
         } }
-        // Same color-role swap as DiagnosticsPebble's indented rows: onSurfaceVariant
-        // is already full-alpha as a raw color, so its dimness is the ROLE, not
-        // something an alpha bump alone would fix. Boosted on the cover, where this
-        // whole list has no other contrast handling of its own.
+        // Same color-role swap as DiagnosticsPebble's indented rows: onSurfaceVariant is full alpha, so
+        // dimness is the role. Boosted on the cover, which has no other contrast handling.
         val captionColor = if (LocalForceExpanded.current) {
             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
         } else {
@@ -149,10 +124,7 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
 
 internal fun tripDate(raw: String?): String = com.bloo.bluelink.data.tripDate(raw)
 
-/** "10 + 3 min" for a 13-minute request -- the per-command chunks
- *  [climateChunks] splits an auto-extended climate run into, shown on the
- *  Climate pebble's Run time slider so it's clear a request past the car's
- *  single-command cap becomes more than one command rather than one longer
- *  one. */
+/** "10 + 3 min" for a 13-minute request: the per-command chunks [climateChunks] splits an
+ *  auto-extended climate run into, shown on the Run time slider. */
 internal fun climateChunksLabel(totalMinutes: Int): String =
     climateChunks(totalMinutes).joinToString(" + ") + " min"

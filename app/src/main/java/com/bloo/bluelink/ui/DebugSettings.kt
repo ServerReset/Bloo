@@ -30,13 +30,7 @@ import android.os.Build
 import com.bloo.bluelink.BuildConfig
 
 /**
- * Represents a debug information item displayed in DebugSettingsPanel.
- * Each item shows a label and associated value/information.
- *
- * @param label Human-readable label ("App Version", "Device Model", etc.)
- * @param value The actual value to display
- * @param icon Optional material icon for visual identification
- * @param copyable Whether tapping the item copies value to clipboard
+ * A debug information item shown in DebugSettingsPanel; [copyable] lets a tap copy the value.
  */
 data class DebugInfo(
     val label: String,
@@ -46,8 +40,7 @@ data class DebugInfo(
 )
 
 /**
- * Single debug information row.
- * Shows label and value with optional icon and copy functionality.
+ * Single debug information row: label, value, optional icon and copy.
  */
 @Composable
 private fun DebugInfoItem(
@@ -69,9 +62,7 @@ private fun DebugInfoItem(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            // Theme typography, not raw sp -- every other row in the app sizes off
-            // MaterialTheme.typography so it scales with the user's own font-size setting;
-            // this panel was the one place still stating pixel-locked sp values by hand.
+            // Theme typography so it scales with the user's font-size setting.
             Text(
                 text = info.label,
                 style = MaterialTheme.typography.labelSmall,
@@ -86,10 +77,7 @@ private fun DebugInfoItem(
             )
         }
 
-        // A real Icon, not a "📋" emoji glyph in a hand-backgrounded box -- the app's
-        // copy affordance everywhere else (the snackbar in Screens.kt) is
-        // Icons.Filled.ContentCopy, and an emoji renders inconsistently across devices
-        // and doesn't tint/theme the way a vector icon does.
+        // A vector Icon, not an emoji: consistent with the app's ContentCopy affordance and tintable.
         if (info.copyable && onCopy != null) {
             Icon(
                 Icons.Filled.ContentCopy,
@@ -102,16 +90,7 @@ private fun DebugInfoItem(
 }
 
 /**
- * Collects all debug information for the device and app.
- * Used to populate DebugSettingsPanel with relevant data.
- *
- * **Include:**
- * - App version and build number
- * - Device model, OS, API level
- * - Runtime info (memory, network)
- * - Feature flags and configuration
- *
- * @return List of DebugInfo items ready for display
+ * Collects the debug information (app, device, runtime) shown in DebugSettingsPanel.
  */
 @Composable
 fun getDebugInfo(): List<DebugInfo> {
@@ -168,21 +147,7 @@ fun getDebugInfo(): List<DebugInfo> {
 
 /**
  * Debug settings panel showing technical information about the app and device.
- * Useful for:
- * - Support troubleshooting and diagnostics
- * - Verifying app/OS versions for feature compatibility
- * - Debugging device-specific issues
- * - Monitoring runtime performance metrics
- *
- * **Usage:**
- * ```kotlin
- * DebugSettingsPanel(
- *     onCopyToClipboard = { text -> clipboard.setText(AnnotatedString(text)) }
- * )
- * ```
- *
- * @param onCopyToClipboard Callback when user wants to copy a value to clipboard
- * @param modifier Optional modifier for the container
+ * [onCopyToClipboard] is called when the user copies a value.
  */
 @Composable
 fun DebugSettingsPanel(
@@ -191,13 +156,7 @@ fun DebugSettingsPanel(
 ) {
     val debugInfo = getDebugInfo()
 
-    // No self-styled outer card any more: this panel only ever renders inside
-    // SettingsCard("Debug", ...) (see SettingsScreen.kt), whose own title row already says
-    // "Debug" with a matching icon -- the "Debug Information" header this used to draw was a
-    // second, redundant copy of that same fact in its own bespoke surfaceContainer/surface
-    // stack, the "Redundant/duplicate content" pattern flagged elsewhere in the app. This is
-    // now a plain caption plus the list, drawn straight on the card's own body like every
-    // other SettingsCard's content.
+    // No self-styled card: it renders inside SettingsCard("Debug", ...), whose title row already says so.
     Column(modifier.fillMaxWidth()) {
         Text(
             "Tap a copyable value to copy it to the clipboard.",
@@ -206,12 +165,8 @@ fun DebugSettingsPanel(
         )
         Spacer(Modifier.height(GapRow))
 
-        // heightIn is NOT optional here. This panel is rendered inside the Settings screen's
-        // LazyColumn item{}, which measures its content with an UNBOUNDED max
-        // height, and a vertically scrollable component measured with an infinite max height
-        // throws outright -- so entering Advanced mode, which is the only way this card is
-        // composed, crashed the screen every time. The Logs card already caps itself at
-        // 300.dp against this exact failure; this panel was the one that did not.
+        // heightIn is required: the Settings LazyColumn item measures with unbounded max height, which a
+        // vertically scrollable child cannot take (crash).
         LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
             items(debugInfo) { info ->
                 DebugInfoItem(

@@ -71,18 +71,12 @@ import kotlinx.coroutines.delay
 
 /**
  * The search bar itself (SearchPill) and its suggestions list (SearchSuggestions).
- * Split out of SettingsSearch.kt to separate these from SearchLayer, which hosts
- * and calls both.
  */
 
 /**
- * The pill itself: one Surface at whatever [width]/[height] [SearchLayer] has
- * animated it to, with a glow behind it and its content chosen by [form].
- *
- * Sized by the caller rather than by a width FRACTION of its own parent, which
- * is what it used to do. A fraction cannot express "a circle in that corner"
- * and "a bar across the bottom" as the same element, and it is the sameness
- * that makes the screen-to-screen morph possible at all.
+ * The pill: one Surface at the [width]/[height] [SearchLayer] animates it to, with its content
+ * chosen by [form]. Caller-sized (not a width fraction) so circle-in-corner and bottom bar are
+ * the same element and can morph.
  */
 @Composable
 internal fun SearchPill(
@@ -106,13 +100,8 @@ internal fun SearchPill(
     val density = LocalDensity.current
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    // Focus is DRIVEN by `focused`, both ways. It used to only ever be
-    // requested, never released: dismissing the bar -- scrim tap, close
-    // button, back -- collapsed the pill and left the keyboard standing over
-    // it, because nothing ever told the field to let go. Clearing focus here
-    // is safe in a way that listening for blur is not (see the note on the
-    // text field's modifier): this reacts to the state that OWNS the bar,
-    // not to a transient focus event that arrives before the field is ready.
+    // Focus is driven by `focused` both ways: clearing it here releases the keyboard on dismiss,
+    // which reacting to a blur event could not do safely (blur fires before the field is ready).
     LaunchedEffect(focused) {
         if (focused) {
             runCatching { focusRequester.requestFocus() }
@@ -122,34 +111,17 @@ internal fun SearchPill(
         }
     }
     val interaction = remember { MutableInteractionSource() }
-    // Springs in on first appearance; because SearchLayer keys the animations
-    // on the layout mode, "first appearance" includes arriving from a different
-    // docked position. The ball lands in its corner rather than sliding to it.
+    // Springs in on first appearance, including arriving from a different docked position.
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { appeared = true }
-    // DampingRatioMediumBouncy (0.5) on BOTH of these compounded badly: they multiply into
-    // the same scaleX/scaleY below, so a press landing anywhere near the entrance pop (or
-    // just the two overshoots being visually close together on a small, frequently-tapped
-    // control) read as noticeably more bounce than either spring alone would suggest --
-    // reported as "overly bouncy," and this is the same lesson the pebble bounce work
-    // already paid for: 0.5 reads as a lot on a real device, repeatedly, not occasionally.
-    // Entrance keeps some spring (it plays once, arriving) on the literal shared
-    // PebbleBounceDamping/Stiffness tokens rather than its own separately-tuned numbers --
-    // an "arrival" pop is the same kind of event a pebble opening is, so it gets the exact
-    // same spring, not a lookalike.
+    // Not DampingRatioMediumBouncy on both: entrance and press springs multiply into the same
+    // scale and read as too bouncy. The entrance uses the shared PebbleBounceDamping/Stiffness tokens.
     val entrance by animateFloatAsState(
         targetValue = if (appeared) 1f else 0.55f,
         animationSpec = lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
         label = "searchEntrance",
     )
-    // No ambient glow. This used to carry a travelling-hotspot bloom that
-    // swept the pill's rim and breathed continuously the entire time the
-    // search element was on screen, plus a separate fade-and-shrink once it
-    // went idle. Reported as bad-looking and distracting, and it earned
-    // that: a permanent light show on a control that is visible almost all
-    // the time competes with everything the user is actually looking at. The
-    // pill's affordance is now just its filled shape and border below --
-    // legible without needing to move to prove it's there.
+    // No ambient glow: the pill's affordance is its filled shape and border.
     val latestDrag = androidx.compose.runtime.rememberUpdatedState(onDrag)
     val latestDragStart = androidx.compose.runtime.rememberUpdatedState(onDragStart)
     val latestDragEnd = androidx.compose.runtime.rememberUpdatedState(onDragEnd)
@@ -158,49 +130,27 @@ internal fun SearchPill(
             scaleX = entrance
             scaleY = entrance
         }
-            // Publishes wherever this ended up -- dragged to an edge, docked in a camera band,
-            // or spanning the screen as a bar -- so other floating chrome can avoid it. Bounds
-            // only: this deliberately does NOT use floatingOverlay, because the pull shift and
-            // refresh fade are for chrome the page owns, and this one is placed by the person
-            // using it. Attached after .size so the rect is the pill's real one.
+            // Publishes the pill's bounds (after .size) so other floating chrome can avoid it. Does not use
+            // floatingOverlay: this pill is placed by the user, not owned by the page.
             .floatingElement(FloatingIds.Search),
     ) {
-        // canBlur/pillShape hoisted above the Surface call so both the fill colour
-        // and the blur layer chained onto its modifier agree on the same values --
-        // see the modifier chain below for why this needed its own explicit clip
-        // rather than relying on Surface's own (which applies AFTER this whole
-        // caller-supplied modifier, too late to bound a blur added inside it).
+        // canBlur/pillShape are hoisted so the fill and the blur layer agree; the blur needs its own
+        // explicit clip because Surface's clip applies after the caller's modifier.
         val pillShape = RoundedCornerShape(50)
         val canBlur = hazeState != null && canBlurBackdrops()
         Surface(
             onClick = { if (!expanded) onFocusChange(true) },
             shape = pillShape,
-            // glassTint (GlassChrome.kt): the one shared neutral fill every other
-            // glass surface in the app uses, blurred or not exactly like every one
-            // of them -- no more hardcoded `blurred = false`, no one-off compact/
-            // non-compact alpha split. The Settings-screen collapsed pill (form ==
-            // PILL && !expanded) used to get its own opaque tonal container
-            // (secondaryContainer/onSecondaryContainer, no border) instead of this
-            // fill -- reported as an inconsistent, different-looking search control
-            // on that one screen; fixed by dropping that override in favour of the
-            // one shared fill everywhere, the same direction this goes further in.
+            // glassTint (GlassChrome.kt): the shared neutral fill every glass surface uses.
             color = glassTint(blurred = canBlur),
             contentColor = scheme.onSurface,
-            // No tonalElevation: it is a per-frame spot shadow baked into this Surface's
-            // layer, and the pill's whole layer is scaled by the entrance/press graphicsLayer
-            // above, so the shadow re-rasterized on every frame of the pop. The border below
-            // carries the depth; the shadow was a second, redundant depth cue on a control
-            // that is animated constantly.
+            // No tonalElevation: its spot shadow re-rasterizes every frame under the entrance/press
+            // graphicsLayer scale. The border carries the depth.
             tonalElevation = 0.dp,
             border = BorderStroke(
                 if (expanded) 1.5.dp else 1.dp,
-                // Static. This is an argument to Surface, i.e. COMPOSITION
-                // scope -- it used to multiply in glowPulse, which meant every
-                // 33ms tick of the glow clock recomposed this whole composable
-                // and the text field inside it, thirty times a second, for the
-                // entire time the app was open. The moving light belongs in
-                // the drawBehind gradients above, where a tick invalidates
-                // draw and nothing else; the rim just needs to be lit.
+                // Static: this is composition scope, so multiplying in glowPulse would recompose the whole
+                // pill and text field on every tick.
                 Brush.verticalGradient(
                     listOf(
                         scheme.primary.copy(alpha = if (expanded) 0.65f else 0.4f),
@@ -211,42 +161,19 @@ internal fun SearchPill(
             interactionSource = interaction,
             modifier = Modifier
                 .fillMaxSize()
-                // The cover screen gets neither the drop shadow nor the glass
-                // rim. Both are tuned for a 52dp pill or a full-width bar; on a
-                // 40dp circle they are a soft dark halo and a bright outline
-                // stacked on a shape barely wider than the two of them, which
-                // is what made this read as a smudge rather than a button. The
-                // border below plus the glow behind carry it there.
-                //
-                // glassEdge, not a hand-chained dropShadow + glassRim: those two lines
-                // ARE glassEdge (GlassChrome.kt) -- it is literally defined as that pair,
-                // in that order -- and spelling them out here meant this pill silently
-                // opted OUT of the theme-aware shadow weight glassEdge grew when the
-                // "black shadow behind floating elements" report was finally tracked down
-                // (see glassDropShadow's own doc: bare dropShadow() is 0.38-alpha black
-                // with no light/dark gate, which on a light theme is the smudge in the
-                // screenshots). One call now, so the next change to what a floating edge
-                // looks like reaches this pill too instead of stopping one file short.
-                //
-                // shadow = !expanded: a small floating pill wants the contact shadow that
-                // separates it from an arbitrary backdrop, but the EXPANDED bar spans the
-                // screen, and a full-width shadow at that size reads as the whole background
-                // behind the bar being darkened, not as the bar's own depth -- reported as
-                // "the background is darker behind the tint of the search bar". The rim stays
-                // either way; only the bar's shadow is dropped.
+                // The cover screen gets neither shadow nor glass rim: on a 40dp circle they read as a smudge.
+                // glassEdge (GlassChrome.kt) is the dropShadow + glassRim pair with the theme-aware
+                // shadow weight, so a change there reaches this pill too.
+                // shadow = !expanded: a full-width shadow on the expanded bar darkens the whole backdrop.
+                // The rim stays either way.
                 .glassEdge(pillShape, shadow = !expanded)
-                // appHazeEffect, clipped to pillShape explicitly -- this whole
-                // modifier chain runs BEFORE Surface's own internal shape-clip
-                // (Surface appends that itself, after everything the caller
-                // passes in), so a blur added here without its own clip would
-                // render as a soft-edged rectangle poking past the pill's actual
-                // rounded/stadium outline instead of stopping at it.
+                // appHazeEffect clipped to pillShape explicitly: this chain runs before Surface's own shape
+                // clip, so an unclipped blur would poke past the rounded outline.
                 .then(if (canBlur && hazeState != null) Modifier.clip(pillShape).appGlassEffect(hazeState, pillShape) else Modifier)
                 .then(
                     if (onDrag != null) {
-                        // The callbacks are read through rememberUpdatedState: pointerInput(key) keeps the
-                        // lambda of the composition that installed it, so reading `onDrag`/`onDragEnd`
-                        // directly acted on stale dock, position and form values.
+                        // Callbacks read via rememberUpdatedState: pointerInput(key) keeps the installing
+                        // composition's lambda, so direct reads see stale dock, position and form.
                         Modifier.pointerInput(Unit) {
                             detectDragGestures(
                                 onDragStart = { latestDragStart.value() },
@@ -263,17 +190,8 @@ internal fun SearchPill(
             AnimatedContent(
                 targetState = form to expanded,
                 transitionSpec = {
-                    // Cross-fade only, fast, and NOT delayed.
-                    //
-                    // This used to scale the content in from 0.9 after a 90ms
-                    // hold. Both were wrong for what is happening around it:
-                    // the container is already springing to a new size, so a
-                    // second scale on the content inside it is two different
-                    // rates of growth fighting over the same pixels, and the
-                    // delay meant the shape arrived somewhere before its
-                    // contents admitted they were moving. The old content
-                    // leaving quickly and the new one arriving over the top,
-                    // while the shape carries the motion, is the whole effect.
+                    // Cross-fade only, fast, not delayed: the container's spring carries the motion, so a
+                    // second scale or delay on the content would fight it.
                     fadeIn(tween(MotionFast)) togetherWith fadeOut(tween(90))
                 },
                 label = "searchContentMorph",
@@ -293,16 +211,10 @@ internal fun SearchPill(
                                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
                                 cursorBrush = SolidColor(scheme.primary),
                                 keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-                                // Submitting puts the keyboard away. The answer
-                                // to what you just asked appears in the panel
-                                // directly above this bar, which is exactly
-                                // where the keyboard was covering.
+                                // Submitting puts the keyboard away so the answer panel above the bar is visible.
                                 keyboardActions = KeyboardActions(onSearch = { onSubmit(); keyboard?.hide() }),
-                                // No auto-collapse on blur: onFocusChanged fires
-                                // with isFocused = false the instant this field
-                                // composes, before the requestFocus above lands,
-                                // and that false positive used to close the bar in
-                                // the same beat it opened.
+                                // No auto-collapse on blur: onFocusChanged fires isFocused = false as the field composes,
+                                // before requestFocus lands, and would close the bar as it opens.
                                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                                 decorationBox = { inner ->
                                     if (query.isEmpty()) {
@@ -335,15 +247,12 @@ internal fun SearchPill(
                         Spacer(Modifier.width(10.dp))
                         Text("Search", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
                     }
-                    // Closed BUBBLE: the glyph alone. contentDescription is on
-                    // the icon rather than the label, since there isn't one.
+                    // Closed BUBBLE: the glyph alone; contentDescription is on the icon since there is no label.
                     else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Filled.Search,
                             contentDescription = "Search",
-                            // 18dp inside a 40dp circle left a ring of empty
-                            // surface wider than the glyph; the button read as
-                            // a blob with something small in it.
+                            // 18dp in a 40dp circle left an oversized empty ring.
                             modifier = Modifier.size(22.dp),
                         )
                     }
@@ -354,22 +263,16 @@ internal fun SearchPill(
 }
 
 /**
- * Example queries shown while the search bar is focused but empty --
- * without these there's no way to discover that search answers data
- * questions ("what's my odometer") and runs commands ("lock my car"), not
- * just finds settings by name.
+ * Example queries shown while the search bar is focused but empty, to show that search answers
+ * data questions and runs commands, not just finds settings.
  */
 @Composable
 internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: (String) -> Unit) {
-    // Plain Surface chips, not MorphButton -- so unlike most taps in this app they
-    // don't get a click() automatically and needed it wired in by hand.
+    // Plain Surface chips, not MorphButton, so click() is wired by hand.
     val haptics = LocalHaptics.current
     val carName = state.vehicles.firstOrNull()?.name
-    // Short forms when the room is short -- on a cover screen with the keyboard
-    // up, "odometer for Ioniq 5" wraps to two lines and pushes the next chip
-    // off the panel, so a hint about what you can ask costs you the ability to
-    // see what else you can ask. The long forms teach the syntax; the short
-    // ones just have to fit and still work when tapped.
+    // Short forms when room is short (cover screen with keyboard up): a long hint would wrap and
+    // push the next chip off the panel. Long forms teach the syntax.
     val examples = buildList {
         if (compact) {
             add("lock")
@@ -397,22 +300,15 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
         "Try commands, settings, or ask about your car",
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.Bold,
-        // Floating directly over the aurora/scrolling content behind it with
-        // nothing opaque underneath -- onSurfaceVariant (a deliberately muted
-        // secondary-text tone) read as low-contrast there. Full-strength
-        // onSurface instead.
+        // Floats over the aurora with nothing opaque behind it; full-strength onSurface for contrast.
         color = MaterialTheme.colorScheme.onSurface,
     )
     FlowRow(horizontalArrangement = Arrangement.spacedBy(GapRow), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        // Same staggered pop as the search RESULT cards (staggeredResultVisible), reused
-        // as-is: this list is just as much a "search UI" element as the results below it,
-        // and giving one a cascade while the other snaps in flat is exactly the kind of
-        // per-surface inconsistency that was reported.
+        // Same staggered pop as the search result cards (staggeredResultVisible).
         val examplesKey = examples.joinToString("|")
         examples.forEachIndexed { i, example ->
             PopVisible(visible = staggeredResultVisible(examplesKey, i)) {
-                // Same MorphButton every selector chip in the app uses, with
-                // the search screen's tonal fill kept as its standard colours.
+                // Same MorphButton as every selector chip, with the search screen's tonal fill.
                 val exampleSource = remember { MutableInteractionSource() }
                 MorphButton(
                     onClick = { onPick(example) },
@@ -421,15 +317,8 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
                     minHeight = 0.dp,
-                    // Theme-weighted, not a bare dropShadow(). These chips float
-                    // over the aurora with nothing opaque behind them (see the
-                    // heading's own comment just above), so they do want a real
-                    // shadow -- but dropShadow's default colour is 0.38-alpha
-                    // black, and on a light theme that is the "black halo behind
-                    // a floating pill" this app has now been reported for from
-                    // three different surfaces. Same split, and the same reasoning,
-                    // as glassDropShadow (GlassChrome.kt): unchanged in dark, a
-                    // soft contact shadow in light.
+                    // Theme-weighted, not a bare dropShadow() (0.38-alpha black is a halo on light themes);
+                    // same split as glassDropShadow (GlassChrome.kt).
                     modifier = Modifier.themedDropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
                     expressive = true,
                 ) {
