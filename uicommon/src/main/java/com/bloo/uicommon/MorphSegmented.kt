@@ -2,8 +2,6 @@ package com.bloo.uicommon
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
@@ -346,18 +344,7 @@ fun MorphSegmented(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                // The label eases between its chosen and squashed size instead of snapping a font size.
-                val emphasis by animateFloatAsState(
-                    if (isSelected) 1f else 0f,
-                    spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
-                    label = "segEmphasis",
-                )
                 Row(
-                    Modifier.graphicsLayer {
-                        val k = 0.88f + 0.12f * emphasis
-                        scaleX = k
-                        scaleY = k
-                    },
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

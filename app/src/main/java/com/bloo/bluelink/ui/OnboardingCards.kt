@@ -161,21 +161,12 @@ internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean, 
         spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "heroPop",
     )
-    // Poke it and it squishes: a small reward for curiosity (see the deck for what five pokes do).
-    var squish by remember { androidx.compose.runtime.mutableStateOf(false) }
-    val squishScale by animateFloatAsState(
-        if (squish) 0.78f else 1f,
-        spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessMedium),
-        label = "heroSquish",
-        finishedListener = { squish = false },
-    )
     Box(
         Modifier
             .size(92.dp)
-            .graphicsLayer { translationY = bob.value; scaleX = pop * squishScale; scaleY = pop * squishScale }
+            .graphicsLayer { translationY = bob.value; scaleX = pop; scaleY = pop }
             .clip(CircleShape)
             .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
-                squish = true
                 onTap()
             }
             .drawBehind {

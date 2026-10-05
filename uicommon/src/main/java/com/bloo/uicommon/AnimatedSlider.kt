@@ -26,7 +26,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
@@ -285,20 +284,7 @@ fun AnimatedSlider(
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .height(thumbH)
-                .graphicsLayer {
-                    // Hit the end and the whole slider stretches out along the edge it is pulled past
-                    // (anchored at the far end), thinning a little, then snaps back with the settle spring.
-                    val lo = valueRange.start
-                    val hi = valueRange.endInclusive
-                    val spanNow = (hi - lo).coerceAtLeast(0.001f)
-                    val pastEnd = ((anim.value - hi) / spanNow).coerceAtLeast(0f)
-                    val pastStart = ((lo - anim.value) / spanNow).coerceAtLeast(0f)
-                    val pull = maxOf(pastEnd, pastStart)
-                    scaleX = 1f + pull * 4f
-                    scaleY = 1f - pull * 2f
-                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(if (pastStart > 0f) 1f else 0f, 0.5f)
-                },
+                .height(thumbH),
         ) {
             // Where the thumb sits along the track, as a 0..1 fraction of valueRange.
             val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
