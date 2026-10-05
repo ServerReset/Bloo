@@ -73,7 +73,7 @@ internal fun ClimateControlsSection(
             exit = expandExitSized(),
         ) {
             Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                MutedText("Set temperature")
+                BodySmallText("Set temperature")
                 // color resolved explicitly to onSurface -- same fix, same reason as the update
                 // pebble's own AnimatedValue calls: BasicText (which this renders through) doesn't
                 // fall back to LocalContentColor the way a plain Text() does, so this rendered
@@ -95,7 +95,7 @@ internal fun ClimateControlsSection(
         // The label + value readout is the same in either unit -- only degLabel's suffix (°F/°C)
         // and the slider below differ -- so it's hoisted out of the branch.
         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            MutedText("Temperature")
+            BodySmallText("Temperature")
             RollingNumber(
                 text = degLabel(tempF.toString(), fahrenheit),
                 style = MaterialTheme.typography.bodySmall,
@@ -157,7 +157,7 @@ internal fun ClimateControlsSection(
             enter = expandEnterSized(Alignment.Bottom),
             exit = expandExitSized(Alignment.Bottom),
         ) {
-            LabelSmallText(
+            BodySmallText(
                 "Sent as ${climateChunksLabel(duration)}, continued automatically",
             )
         }

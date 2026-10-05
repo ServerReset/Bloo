@@ -110,7 +110,7 @@ internal fun NotificationsCardContent(
                     ToggleRow("Car started", notif.carStarted) { vm.setNotifyCarStarted(it) }
                 }
             }
-            MutedText("Checks run about every 30 minutes. Door and running alerts include a one-tap action.")
+            BodySmallText("Checks run about every 30 minutes. Door and running alerts include a one-tap action.")
         }
 
         // Only worth a line for someone using AutoLock; in advanced mode it is always listed so the

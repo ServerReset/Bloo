@@ -2,7 +2,6 @@ package com.bloo.bluelink.data
 
 import androidx.compose.runtime.Immutable
 import android.content.Context
-import android.os.Build
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -114,7 +113,7 @@ class SettingsStore(internal val context: Context) {
          * [com.bloo.bluelink.ui.GlassStops]). Defaults to "Clear" (0.90) -- the second clearest
          * stop, so the glass reads as glass out of the box.
          */
-        val glassClarity: Float = 0.95f,
+        val glassClarity: Float = 0.8f,
         /**
          * Ultra glass: glass on EVERY surface, not just the floating chrome -- cards and panels
          * included. See GlassChrome.glassCardFill.
@@ -176,7 +175,7 @@ class SettingsStore(internal val context: Context) {
             // value can never take effect.
             uiScale = (prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f).coerceIn(0.85f, 1.3f),
             vibrancy = (prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f).coerceIn(0.5f, 1.6f),
-            glassClarity = (prefs[Keys.GLASS_CLARITY]?.toFloatOrNull() ?: 0.95f).coerceIn(0f, 1f),
+            glassClarity = (prefs[Keys.GLASS_CLARITY]?.toFloatOrNull() ?: 0.8f).coerceIn(0f, 1f),
             ultraGlass = prefs[Keys.ULTRA_GLASS]?.toBooleanStrictOrNull() ?: false,
             hapticsEnabled = prefs[Keys.HAPTICS]?.toBooleanStrictOrNull() ?: true,
             auroraBackground = prefs[Keys.AURORA]?.toBooleanStrictOrNull() ?: false,

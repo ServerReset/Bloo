@@ -186,7 +186,7 @@ private fun PaletteChooser(appearance: SettingsStore.Appearance, vm: AppViewMode
                 MorphIconButton(onClick = { editing = null; showEditor = true }) {
                     Icon(Icons.Filled.Add, contentDescription = "New custom palette")
                 }
-                LabelSmallText("New")
+                BodySmallText("New")
             }
         }
     }

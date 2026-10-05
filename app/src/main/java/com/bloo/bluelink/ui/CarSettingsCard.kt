@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,7 +15,6 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -110,13 +108,13 @@ internal fun CarSettingsCard(
             // a picker there would be a control with no effect.
             if (v.platformOverridable) {
                 LabelText("Head unit")
-                MutedText("Confirm this car's head unit -- the API can't always tell. Some features only show when supported.")
+                BodySmallText("Confirm this car's head unit -- the API can't always tell. Some features only show when supported.")
                 PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
             }
         }
 
         SettingsGroup("Climate") {
-            MutedText("Which seats your car has, and whether each can heat, cool, or both.")
+            BodySmallText("Which seats your car has, and whether each can heat, cool, or both.")
             SeatPositions.forEach { pos ->
                 SeatConfigRow(pos.label, pos.heat(seats), pos.cool(seats),
                     { vm.setSeatFlag(v, pos.heatKey, it) }, { vm.setSeatFlag(v, pos.coolKey, it) })
@@ -127,7 +125,7 @@ internal fun CarSettingsCard(
                     SectionDivider(alpha = 0.5f)
                     Spacer(Modifier.height(GapRow))
                     LabelText("Default start")
-                    MutedText("What the Start button runs: smart climate, or one of your presets.")
+                    BodySmallText("What the Start button runs: smart climate, or one of your presets.")
                     val carPresets = state.climatePresets[v.vin].orEmpty()
                     MorphSegmented(
                         options = buildList {

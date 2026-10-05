@@ -1,7 +1,6 @@
 
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -39,17 +38,6 @@ import com.bloo.uicommon.blockPageSwipe
  */
 
 // ---- Common Composable Helpers -----------------------------------------------
-
-/** Body text (bodySmall, onSurfaceVariant) for secondary/muted content. */
-@Composable
-internal fun MutedText(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        modifier = modifier,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
 
 /**
  * A pebble body that needs live status: shows [content] with it once there is one, else the loading
@@ -193,7 +181,7 @@ internal fun IconLeadRow(
         IconBadge(icon, tint, containerColor = containerColor, size = badgeSize)
         Column(Modifier.weight(1f)) {
             TitleSmallText(title, color = titleColor)
-            if (subtitle != null) MutedText(subtitle)
+            if (subtitle != null) BodySmallText(subtitle)
         }
         trailing?.invoke()
     }

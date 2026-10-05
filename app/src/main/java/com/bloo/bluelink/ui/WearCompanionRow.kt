@@ -108,7 +108,7 @@ fun CompanionActionRow(label: String, caption: String, modifier: Modifier = Modi
         Spacer(Modifier.width(GapRow))
         Column(Modifier.weight(1f)) {
             SafeMorphTextButton(label, onClick = onClick, icon = Icons.Filled.Watch)
-            LabelSmallText(caption)
+            BodySmallText(caption)
         }
     }
 }
