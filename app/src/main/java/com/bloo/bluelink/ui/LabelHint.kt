@@ -13,11 +13,14 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,7 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +68,13 @@ internal class LabelHintState {
     var collapsed: Boolean = false
     /** True while the button is held and its bubble should be up. */
     var shown by mutableStateOf(false)
+    /** The button's own look, copied each composition, so the lifted copy is the same element. */
+    var containerColor: Color = Color.Unspecified
+    var contentColor: Color = Color.Unspecified
+    var borderColor: Color = Color.Transparent
+    var cornerPercent: Int = 50
+    /** The button's laid-out size in px; the lifted copy starts at exactly this. */
+    var sizePx: IntSize = IntSize.Zero
     /** True from the bubble's first frame until its fold-away finishes. */
     var present by mutableStateOf(false)
     /** The button's own wobble in degrees, read in a graphics layer (draw phase only). */
@@ -129,63 +138,76 @@ private fun LabelHintBubbleHost(state: LabelHintState) {
         }
     }
     val icon = state.icon ?: return
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val gapPx = with(density) { LIFT_GAP.toPx() }
     Popup(
         popupPositionProvider = remember { AboveAnchorPositionProvider },
         properties = PopupProperties(focusable = false, clippingEnabled = false),
     ) {
         LabelHintBubble(
-            state.label,
+            state,
             icon,
             unfolded,
             Modifier.graphicsLayer {
+                // The same button, lifting off its own spot to above the finger: it starts on top of
+                // where the original sits and rises by its own height plus a gap.
                 val p = pop.value
-                val s = 0.4f + 0.6f * p
-                scaleX = s
-                scaleY = s
-                alpha = (p * 2f).coerceIn(0f, 1f)
-                // Rises from the button's own spot to above the finger.
-                translationY = (1f - p) * 22.dp.toPx()
-                transformOrigin = TransformOrigin(0.5f, 1f)
+                translationY = (1f - p) * (state.sizePx.height + gapPx)
             },
+            pop.value,
         )
     }
 }
 
-/** The bubble: a glass-toned pill, the symbol in an accent disc, and the name that unfolds beside it. */
+/** Space left between the lifted button and the one it came from. */
+private val LIFT_GAP = 14.dp
+
+/**
+ * The lifted copy of the button: its own container colour, border, corner shape and content tone, at its
+ * own size, then widening to put the name beside the symbol.
+ */
 @Composable
-private fun LabelHintBubble(label: String, icon: ImageVector, unfolded: Boolean, modifier: Modifier) {
+private fun LabelHintBubble(state: LabelHintState, icon: ImageVector, unfolded: Boolean, modifier: Modifier, lift: Float) {
     val scheme = MaterialTheme.colorScheme
-    Box(modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val shape = RoundedCornerShape(state.cornerPercent)
+    val container = state.containerColor.takeIf { it != Color.Unspecified } ?: scheme.secondaryContainer
+    val content = state.contentColor.takeIf { it != Color.Unspecified } ?: scheme.onSecondaryContainer
+    val minW = with(density) { state.sizePx.width.toDp() }
+    val minH = with(density) { state.sizePx.height.toDp() }
+    Box(modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(
             Modifier
-                .dropShadow(CircleShape, color = scheme.primary.copy(alpha = 0.35f), blurRadius = 16.dp, offsetY = 5.dp)
-                .background(scheme.primaryContainer.copy(alpha = 0.97f), CircleShape)
-                .border(1.dp, scheme.primary.copy(alpha = 0.45f), CircleShape)
-                .padding(6.dp),
+                .graphicsLayer {
+                    // A touch bigger as it comes up, like a button being picked up.
+                    val s = 1f + 0.08f * lift
+                    scaleX = s
+                    scaleY = s
+                }
+                .dropShadow(shape, color = Color.Black.copy(alpha = 0.28f * lift), blurRadius = 18.dp, offsetY = 6.dp)
+                .background(container, shape)
+                .border(1.dp, state.borderColor, shape)
+                .defaultMinSize(minWidth = minW, minHeight = minH)
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
         ) {
-            Box(
-                Modifier.size(34.dp).background(scheme.primary, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(20.dp))
-            }
+            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(20.dp))
             AnimatedVisibility(
                 visible = unfolded,
                 enter = expandHorizontally(spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow), expandFrom = Alignment.Start) + fadeIn(tween(120)),
                 exit = shrinkHorizontally(tween(120), shrinkTowards = Alignment.Start) + fadeOut(tween(90)),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.width(10.dp))
+                    Box(Modifier.width(ButtonIconGap))
                     Text(
-                        label,
-                        style = MaterialTheme.typography.labelLarge,
+                        state.label,
+                        style = ButtonLabelStyle,
                         fontWeight = FontWeight.SemiBold,
-                        color = scheme.onPrimaryContainer,
+                        color = content,
                         maxLines = 1,
                         softWrap = false,
                     )
-                    Box(Modifier.width(12.dp))
                 }
             }
         }

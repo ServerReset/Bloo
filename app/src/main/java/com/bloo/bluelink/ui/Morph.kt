@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -205,6 +206,13 @@ fun MorphButton(
             }
         }
     }
+    // The lifted copy of this button (see LabelHint) is drawn from these, so it is the same element.
+    SideEffect {
+        hint.containerColor = if (active) activeContainerColor else containerColor
+        hint.contentColor = resolvedContent
+        hint.borderColor = if (active) Color.Transparent else (border?.brush as? androidx.compose.ui.graphics.SolidColor)?.value ?: Color.Transparent
+        hint.cornerPercent = pillCornerPercent.toInt()
+    }
     val providedContent = if (enabled) {
         resolvedContent
     } else {
@@ -226,7 +234,9 @@ fun MorphButton(
                     // the app's one button framework, so this is the single highest-
                     // leverage place to fix it.
                     .semantics { selected = active }
-                    .graphicsLayer { rotationZ = hint.shakeDegrees }
+                    .onSizeChanged { hint.sizePx = it }
+                    // While its lifted copy is up, the original steps aside: it is one button, not two.
+                    .graphicsLayer { rotationZ = hint.shakeDegrees; alpha = if (hint.present) 0f else 1f }
                     // Can't be pressed right now: iced out, the app's one disabled look (see [frosted]).
                     .then(frost)
                     // Skipped while SafeExpansiveButton is already smoothly driving this
