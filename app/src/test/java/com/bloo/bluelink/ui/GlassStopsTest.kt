@@ -6,8 +6,8 @@ import kotlin.test.assertTrue
 
 class GlassStopsTest {
     @Test
-    fun stopsAreFrostedMediumClearVeryClearThenUltra() {
-        assertEquals(listOf("Frosted", "Medium", "Clear", "Very clear", "Ultra"), GlassStops.map { it.name })
+    fun stopsRunFrostedToCrystalThenUltra() {
+        assertEquals(listOf("Frosted", "Medium", "Soft clear", "Clear", "Crystal", "Ultra"), GlassStops.map { it.name })
     }
 
     @Test
@@ -18,9 +18,15 @@ class GlassStopsTest {
 
     @Test
     fun nearestStopNeverPicksUltra() {
-        // Ultra shares Very clear's transparency (1.0), so a stored 1.0 must resolve to Very clear.
-        assertEquals(GlassStops.indexOfFirst { it.name == "Very clear" }, nearestGlassStop(1f))
+        // Ultra shares Crystal's transparency (1.0), so a stored 1.0 must resolve to Crystal.
+        assertEquals(GlassStops.indexOfFirst { it.name == "Crystal" }, nearestGlassStop(1f))
         assertTrue(!GlassStops[nearestGlassStop(0.95f)].ultra)
+    }
+
+    @Test
+    fun softClearSitsHalfwayBetweenMediumAndClear() {
+        val t = { n: String -> GlassStops.first { it.name == n }.transparency }
+        assertEquals((t("Medium") + t("Clear")) / 2f, t("Soft clear"), 0.06f)
     }
 
     @Test

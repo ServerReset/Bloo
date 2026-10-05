@@ -36,7 +36,7 @@ internal val RangeSettings: List<SettingSpec> = listOf(
     ) { a, _, _, vm -> UiScaleSlider(a, vm, label = "Scale") },
     SettingSpec(
         title = "Glass clarity", kind = SettingKind.Range,
-        keywords = "liquid glass transparency frosted medium clear very clear ultra refraction edge blur backing everywhere",
+        keywords = "liquid glass transparency frosted medium soft clear crystal ultra refraction edge blur backing everywhere",
         phrases = "make it see through make the glass clearer more transparent less blurry stronger glass edge",
     ) { a, _, _, vm -> GlassClaritySlider(a, vm) },
     SettingSpec(

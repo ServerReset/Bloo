@@ -14,7 +14,7 @@ import kotlin.math.roundToInt
  */
 @Composable
 internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
-    // Five fixed stops, never a free value. The last, Ultra, turns every glass effect up past maximum on
+    // Six fixed stops, never a free value. The last, Ultra, turns every glass effect up past maximum on
     // EVERY surface; the rest set how transparent the floating glass is.
     var index by remember(appearance.glassClarity, appearance.ultraGlass) {
         mutableFloatStateOf((if (appearance.ultraGlass) GlassStops.lastIndex else nearestGlassStop(appearance.glassClarity)).toFloat())
@@ -43,8 +43,9 @@ internal class GlassStop(val name: String, val transparency: Float, val ultra: B
 internal val GlassStops = listOf(
     GlassStop("Frosted", 0.25f),
     GlassStop("Medium", 0.7f),
+    GlassStop("Soft clear", 0.8f),
     GlassStop("Clear", 0.9f),
-    GlassStop("Very clear", 1f),
+    GlassStop("Crystal", 1f),
     GlassStop("Ultra", 1f, ultra = true),
 )
 

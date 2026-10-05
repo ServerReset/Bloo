@@ -1,5 +1,11 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.ScrollState
 import android.content.Context
 import android.content.Intent
 import androidx.browser.customtabs.CustomTabsIntent
@@ -159,10 +165,14 @@ private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
     if (hours.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         Text("Next hours", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val scroll = rememberScrollState()
+        val viewportPx = remember { androidx.compose.runtime.mutableIntStateOf(0) }
+        val blurOk = canBlurBackdrops()
         Row(
             Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+                .onSizeChanged { viewportPx.intValue = it.width }
+                .horizontalScroll(scroll),
             horizontalArrangement = Arrangement.spacedBy(GapRow),
         ) {
             hours.forEachIndexed { i, h ->
@@ -170,6 +180,7 @@ private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
                     hour = h,
                     fahrenheit = fahrenheit,
                     label = if (i == 0) "Now" else hourLabel(h.hour),
+                    modifier = Modifier.scrollEdgeBlur(scroll, viewportPx, blurOk),
                 )
             }
         }
@@ -184,10 +195,10 @@ private fun hourLabel(hour: Int?): String {
 }
 
 @Composable
-private fun HourCell(hour: HourPoint, fahrenheit: Boolean, label: String) {
+private fun HourCell(hour: HourPoint, fahrenheit: Boolean, label: String, modifier: Modifier = Modifier) {
     val tint = weatherTint(hour.condition, isDay = true)
     Column(
-        Modifier.width(56.dp).outlinedPanel(10.dp),
+        modifier.width(56.dp).outlinedPanel(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -418,4 +429,43 @@ internal fun openApp(context: Context, packages: List<String>, fallbackUrl: Stri
 
 internal fun dial(context: Context, number: String) {
     context.tryStart(Intent(Intent.ACTION_DIAL, "tel:$number".toUri()))
+}
+
+
+/** How wide the strip's soft edge is: cells blur and fade as they slide into it and sharpen as they leave it. */
+private val ScrollEdgeFade = 72.dp
+
+/**
+ * A cell of a horizontally scrolling strip that melts into blur as it nears an edge that has more
+ * content past it, and comes back into focus as it scrolls toward the middle -- the same soft edge a
+ * faded list has, with focus going as well as opacity. An edge with nothing beyond it stays sharp, so a
+ * strip at rest is never blurry. Everything is read in the layer block, so scrolling re-records the
+ * layer only, never recomposes; [blur] false (battery saver, pre-Android 12) keeps just the fade.
+ */
+@Composable
+private fun Modifier.scrollEdgeBlur(scroll: ScrollState, viewportPx: androidx.compose.runtime.State<Int>, blur: Boolean): Modifier {
+    var x by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var w by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val fadePx = with(density) { ScrollEdgeFade.toPx() }
+    val maxBlurPx = with(density) { 12.dp.toPx() }
+    return this
+        .onPlaced { x = it.positionInParent().x; w = it.size.width.toFloat() }
+        .graphicsLayer {
+            val vp = viewportPx.value.toFloat()
+            if (vp <= 0f) return@graphicsLayer
+            val left = x - scroll.value
+            val right = left + w
+            val leftGate = (scroll.value / fadePx).coerceIn(0f, 1f)
+            val rightGate = ((scroll.maxValue - scroll.value) / fadePx).coerceIn(0f, 1f)
+            val intoLeft = ((fadePx - left) / fadePx).coerceIn(0f, 1f) * leftGate
+            val intoRight = ((right - (vp - fadePx)) / fadePx).coerceIn(0f, 1f) * rightGate
+            val t = maxOf(intoLeft, intoRight)
+            alpha = 1f - 0.8f * t
+            renderEffect = if (blur && t > 0.03f) {
+                androidx.compose.ui.graphics.BlurEffect(maxBlurPx * t, maxBlurPx * t, androidx.compose.ui.graphics.TileMode.Decal)
+            } else {
+                null
+            }
+        }
 }
