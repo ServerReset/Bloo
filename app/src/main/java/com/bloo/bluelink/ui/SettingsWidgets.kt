@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.VehiclePlatform
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -36,7 +37,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,12 +46,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -103,44 +101,39 @@ fun MorphSegmented(
 
 
 
-/** A car's powertrain (Gas/Hybrid/PHEV/EV): a fixed 4-way choice on one MorphSegmented. */
+/** A [MorphSegmented] over every entry of an enum: the option key is the enum's name, so call sites state only labels and icons. */
 @Composable
-internal fun PowertrainPicker(current: com.bloo.bluelink.data.Powertrain, onSelect: (com.bloo.bluelink.data.Powertrain) -> Unit) {
-    // An icon per option as a quick visual shape for each choice.
+internal fun <T : Enum<T>> EnumSegmented(
+    entries: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    icon: (T) -> ImageVector? = { null },
+) {
     MorphSegmented(
-        options = listOf(
-            SegmentOption(com.bloo.bluelink.data.Powertrain.GAS.name, "Gas", Icons.Filled.LocalGasStation),
-            SegmentOption(com.bloo.bluelink.data.Powertrain.HYBRID.name, "Hybrid", Icons.Filled.Bolt),
-            SegmentOption(com.bloo.bluelink.data.Powertrain.PHEV.name, "PHEV", Icons.Filled.Power),
-            SegmentOption(com.bloo.bluelink.data.Powertrain.EV.name, "EV", Icons.Filled.FlashOn),
-        ),
-        selectedKey = current.name,
-        onSelect = { key -> onSelect(com.bloo.bluelink.data.Powertrain.valueOf(key)) },
+        options = entries.map { SegmentOption(it.name, label(it), icon(it)) },
+        selectedKey = selected.name,
+        onSelect = { key -> entries.firstOrNull { it.name == key }?.let(onSelect) },
     )
 }
 
-
-/** A car's confirmed head-unit generation (Gen5W / ccNC). Only shown where
- *  [com.bloo.bluelink.data.platformOverridable] is true. */
+/** A car's powertrain (Gas/Hybrid/PHEV/EV), an icon per option. */
 @Composable
-internal fun PlatformPicker(current: com.bloo.bluelink.data.VehiclePlatform, onSelect: (com.bloo.bluelink.data.VehiclePlatform) -> Unit) {
-    MorphSegmented(
-        options = listOf(
-            SegmentOption(com.bloo.bluelink.data.VehiclePlatform.GEN5W.name, "Gen5W", null),
-            SegmentOption(com.bloo.bluelink.data.VehiclePlatform.CCNC.name, "ccNC", null),
-        ),
-        selectedKey = current.name,
-        onSelect = { key -> onSelect(com.bloo.bluelink.data.VehiclePlatform.valueOf(key)) },
-    )
-}
+internal fun PowertrainPicker(current: Powertrain, onSelect: (Powertrain) -> Unit) = EnumSegmented(
+    Powertrain.entries, current, onSelect = onSelect,
+    label = { when (it) { Powertrain.GAS -> "Gas"; Powertrain.HYBRID -> "Hybrid"; Powertrain.PHEV -> "PHEV"; Powertrain.EV -> "EV" } },
+    icon = { when (it) { Powertrain.GAS -> Icons.Filled.LocalGasStation; Powertrain.HYBRID -> Icons.Filled.Bolt; Powertrain.PHEV -> Icons.Filled.Power; Powertrain.EV -> Icons.Filled.FlashOn } },
+)
 
+/** A car's confirmed head-unit generation (Gen5W / ccNC). Only shown where [platformOverridable] is true. */
+@Composable
+internal fun PlatformPicker(current: VehiclePlatform, onSelect: (VehiclePlatform) -> Unit) = EnumSegmented(
+    VehiclePlatform.entries, current, onSelect = onSelect,
+    label = { when (it) { VehiclePlatform.GEN5W -> "Gen5W"; VehiclePlatform.CCNC -> "ccNC" } },
+)
 
 /** The three theme modes as segment options, defined once for every call site. */
-val ThemeModeOptions = listOf(
-    SegmentOption(ThemeMode.SYSTEM.name, "System", null),
-    SegmentOption(ThemeMode.LIGHT.name, "Light", null),
-    SegmentOption(ThemeMode.DARK.name, "Dark", null),
-)
+val ThemeModeOptions = ThemeMode.entries.map { SegmentOption(it.name, it.name.lowercase().replaceFirstChar(Char::uppercase), null) }
 
 /** The Display card's "Appearance" segmented row, shared with the Settings search entry and onboarding. */
 @Composable
