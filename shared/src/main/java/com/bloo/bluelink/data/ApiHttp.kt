@@ -39,3 +39,31 @@ object ApiHttp {
 fun parseJsonOrThrow(json: Json, text: String, code: Int, message: String): kotlinx.serialization.json.JsonElement =
     runCatching { json.parseToJsonElement(text) }
         .getOrElse { throw BlueLinkException(message, code = code) }
+
+/**
+ * The shared request skeleton of the brand clients that report failures in-band (Canada, Kia US): runs [request],
+ * retrying once on a fresh connection when a GET's body cannot be framed (see [ResponseFraming]), turns any non-2xx
+ * into a [BlueLinkException] carrying [friendly]'s message, parses the body (blank = empty object), and hands the
+ * parsed root to [checkInBand], which throws for the brand's own in-band error codes and otherwise returns.
+ */
+internal fun executeJson(
+    client: OkHttpClient,
+    json: Json,
+    request: okhttp3.Request,
+    friendly: (code: Int, body: String) -> String,
+    checkInBand: (root: kotlinx.serialization.json.JsonElement, request: okhttp3.Request, httpCode: Int) -> Unit,
+): kotlinx.serialization.json.JsonElement =
+    ResponseFraming.retryOnceOnFreshConnection(request) { req ->
+        client.newCall(req).execute().use { resp ->
+            val text = resp.bodyWithSlowReadLog()
+            if (!resp.isSuccessful) {
+                val msg = friendly(resp.code, text)
+                AppLog.log("ERROR ${resp.code} ${req.method} ${req.url.encodedPath}: $msg")
+                throw BlueLinkException(msg, code = resp.code)
+            }
+            val root = if (text.isBlank()) kotlinx.serialization.json.JsonObject(emptyMap())
+            else parseJsonOrThrow(json, text, resp.code, friendly(resp.code, text))
+            checkInBand(root, req, resp.code)
+            root
+        }
+    }

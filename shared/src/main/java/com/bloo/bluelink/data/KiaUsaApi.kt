@@ -369,26 +369,8 @@ class KiaUsaApi {
 
     // --- Plumbing --------------------------------------------------------
 
-    /**
-     * Run a request and return the parsed JSON body. Throws on non-2xx, and on
-     * Kia's in-band errors: HTTP 200 with status.statusCode != 0. An expired
-     * session (errorType 1, errorCode 1003/1005) is surfaced as a 401 so the
-     * repository layer can re-authenticate with the rmtoken and retry.
-     */
-    /** The retrying entry point: a GET whose body can't be framed is retried once on a fresh
-     *  connection (see [ResponseFraming]); POSTs are never retried here. */
-    internal fun call(request: Request): JsonElement =
-        ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it) }
-
-    internal fun rawCall(request: Request): JsonElement = raw(request).use { resp ->
-        // on a slow/cellular connection with a real payload.
-        val text = resp.bodyWithSlowReadLog()
-        if (!resp.isSuccessful) {
-            val msg = friendly(resp.code, text)
-            AppLog.log("ERROR ${resp.code} ${request.method} ${request.url.encodedPath}: $msg")
-            throw BlueLinkException(msg, code = resp.code)
-        }
-        val root = if (text.isBlank()) JsonObject(emptyMap()) else parseJson(text, resp.code)
+    /** Runs [request]: non-2xx and Kia's in-band errors throw; an expired session surfaces as 401 so the repository re-authenticates with the rmtoken. */
+    internal fun call(request: Request): JsonElement = executeJson(client, json, request, ::friendly) { root, req, httpCode ->
         val status = root.path("status")
         val statusCode = status.path("statusCode").int()
         if (statusCode != null && statusCode != 0) {
@@ -398,10 +380,9 @@ class KiaUsaApi {
                 throw BlueLinkException("Kia session expired", code = 401)
             }
             val msg = status.path("errorMessage").str() ?: "Kia request failed (error $errorCode)"
-            AppLog.log("ERROR ${request.method} ${request.url.encodedPath}: $msg")
-            throw BlueLinkException(msg, code = resp.code)
+            AppLog.log("ERROR ${req.method} ${req.url.encodedPath}: $msg")
+            throw BlueLinkException(msg, code = httpCode)
         }
-        root
     }
 
     internal fun raw(request: Request): Response = client.newCall(request).execute()

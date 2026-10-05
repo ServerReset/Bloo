@@ -8,13 +8,11 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import java.util.Base64
 import java.util.Locale
 import java.util.UUID
@@ -314,49 +312,26 @@ class CanadaApi(private val brand: Brand) {
 
     // --- Plumbing ----------------------------------------------------------
 
-    /**
-     * Runs [request] and returns the parsed JSON body. Throws on non-2xx and on an expired session
-     * (surfaced as 401 so the repository re-authenticates).
-     */
-    /**
-     * The retrying entry point: a GET whose body can't be framed is retried once on a fresh
-     * connection (see [ResponseFraming]); POSTs are never retried here.
-     */
-    internal fun call(request: Request): JsonElement =
-        ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it) }
-
-    internal fun rawCall(request: Request): JsonElement = raw(request).use { resp ->
-        // on a slow/cellular connection with a real payload.
-        val text = resp.bodyWithSlowReadLog()
-        if (!resp.isSuccessful) {
-            val msg = friendly(resp.code, text)
-            AppLog.log("ERROR ${resp.code} ${request.method} ${request.url.encodedPath}: $msg")
-            throw BlueLinkException(msg, code = resp.code)
-        }
-        val root = if (text.isBlank()) JsonObject(emptyMap()) else parseJson(text, resp.code)
-        // A successful HTTP status can still carry an in-band error. Verified against the
-        // KiaUvoApiCA reference this client is ported from.
+    /** Runs [request]: non-2xx and Canada's in-band error codes throw; an expired session surfaces as 401 so the repository re-authenticates. */
+    internal fun call(request: Request): JsonElement = executeJson(client, json, request, ::friendly) { root, req, httpCode ->
+        // A successful HTTP status can still carry an in-band error. Verified against the KiaUvoApiCA reference
+        // this client is ported from.
         val respCode = root.path("responseHeader", "responseCode").int()
         if (respCode != null && respCode != 0) {
             val errCode = root.path("error", "errorCode").str()
-            // 7110 = "device not remembered, OTP required" — NOT a failure: authUser relies on
-            // call() returning normally here so it can fall through to the MFA flow. Throwing on it
-            // would break Canadian sign-in entirely.
-            if (errCode == "7110") return@use root
+            // 7110 = "device not remembered, OTP required" -- NOT a failure: authUser relies on call() returning
+            // normally here so it can fall through to the MFA flow.
+            if (errCode == "7110") return@executeJson
             val msg = root.path("error", "errorDesc").str()
                 ?: root.path("error", "errorMessage").str()
                 ?: "Canada request failed (${errCode ?: respCode})"
-            // These codes mean the session/token is dead (locked, expired, wrong creds, OTP failed,
-            // token deleted, IP-bound token rejected). Surface as 401 so
-            // CanadaRepository.withSession remaps + withCommandAuth retries.
+            // These codes mean the session/token is dead (locked, expired, wrong creds, OTP failed, token deleted,
+            // IP-bound token rejected). Surface as 401 so CanadaRepository.withSession remaps + retries.
             val expired = errCode in setOf("7402", "7403", "7404", "7549", "7602", "7606")
-            AppLog.log("ERROR ${request.method} ${request.url.encodedPath}: $msg (code $errCode)")
-            throw BlueLinkException(msg, code = if (expired) 401 else resp.code)
+            AppLog.log("ERROR ${req.method} ${req.url.encodedPath}: $msg (code $errCode)")
+            throw BlueLinkException(msg, code = if (expired) 401 else httpCode)
         }
-        root
     }
-
-    internal fun raw(request: Request): Response = client.newCall(request).execute()
 
     internal fun friendly(code: Int, body: String): String {
         val msg = runCatching {
@@ -366,7 +341,4 @@ class CanadaApi(private val brand: Brand) {
         }.getOrNull()
         return msg?.takeIf { it.isNotBlank() } ?: "Canada request failed (HTTP $code)"
     }
-
-    internal fun parseJson(text: String, code: Int): JsonElement =
-        parseJsonOrThrow(json, text, code, friendly(code, text))
 }
