@@ -39,6 +39,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -115,7 +120,6 @@ internal fun LoginScreen(
     val shortScreen = with(LocalDensity.current) {
         LocalWindowInfo.current.containerSize.height.toDp() < 520.dp
     }
-    val heroHeight = if (shortScreen) 96.dp else 160.dp
     val context = LocalContext.current
 
     // Brand-specific copy
@@ -153,19 +157,39 @@ internal fun LoginScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Wordmark hero — subtitle crossfades when the brand changes.
-            Box(
+            // Hero: the app tile and wordmark, with the brand line beneath crossfading as it changes.
+            Row(
                 Modifier
                     .fillMaxWidth()
-                    .height(heroHeight),
-                contentAlignment = Alignment.BottomStart,
+                    .widthIn(max = 480.dp)
+                    .statusBarsPadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(top = if (shortScreen) 16.dp else 48.dp, bottom = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(GapGroup),
             ) {
-                Column(Modifier.padding(24.dp)) {
+                Box(
+                    Modifier
+                        .size(if (shortScreen) 52.dp else 68.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(
+                            Brush.linearGradient(listOf(scheme.primary, scheme.tertiary)),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        AppIcons.DirectionsCar,
+                        contentDescription = null,
+                        tint = scheme.onPrimary,
+                        modifier = Modifier.size(if (shortScreen) 28.dp else 36.dp),
+                    )
+                }
+                Column {
                     Text(
                         "Bloo",
-                        style = if (shortScreen) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge,
+                        style = if (shortScreen) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayMedium,
                         fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = scheme.onSurface,
                     )
                     AnimatedContent(
                         targetState = brandSubtitle,
@@ -175,198 +199,156 @@ internal fun LoginScreen(
                         },
                         label = "loginSubtitle",
                     ) { subtitle ->
-                        Text(
-                            subtitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
+                        Text(subtitle, style = MaterialTheme.typography.titleSmall, color = scheme.onSurfaceVariant)
                     }
                 }
             }
 
-            // Form slides up from below on first composition.
+            // The form, on one liquid-glass card, slides up on first composition.
             AnimatedVisibility(
                 visible = formVisible,
-                enter = slideInVertically(tween(420, easing = LinearOutSlowInEasing)) { it / 3 } +
+                enter = slideInVertically(tween(MotionLong, easing = LinearOutSlowInEasing)) { it / 3 } +
                     fadeIn(tween(MotionLong)),
             ) {
-                Column(
-                    Modifier
+                GlassSurface(
+                    shape = ExtraLargeShape,
+                    hazeState = hazeState,
+                    modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 480.dp)
-                        .padding(horizontal = 24.dp)
-                        .padding(top = 8.dp, bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(GapGroup),
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 24.dp),
+                    contentAlignment = Alignment.TopStart,
                 ) {
-                    val fieldColors = borderlessFieldColors()
-
-                    Text(
-                        "Region",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = scheme.onSurface,
-                    )
-                    MorphSegmented(
-                        options = listOf(
-                            SegmentOption("US", "United States", null),
-                            SegmentOption("CA", "Canada", null),
-                            SegmentOption("EU", "Europe", null),
-                        ),
-                        selectedKey = region,
-                        onSelect = { key ->
-                            region = key
-                            // Reset to the region's first (only, for EU) brand,
-                            // since each region's backend/sign-in shape differs.
-                            brand = Brand.brandsForRegion(key).first()
-                        },
-                    )
-
-                    Text(
-                        "Sign in with",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = scheme.onSurface,
-                    )
-                    // Brand.brandsForRegion is the single source for this list --
-                    // a hand-written copy had silently stopped at the three US brands.
-                    val brandOptions = Brand.brandsForRegion(region)
-                    MorphSegmented(
-                        options = brandOptions.map { b ->
-                            SegmentOption(b.name, Brand.shortLabel(b), null)
-                        },
-                        selectedKey = brand.name,
-                        onSelect = { key -> brand = Brand.valueOf(key) },
-                    )
-
-                    // Email field — label and placeholder animate with brand. Same
-                    // fadeIn/fadeOut durations (220/160) as the sign-in button's own
-                    // label and the privacy note below -- all three are driven by the
-                    // same brand-selection change, so they should settle together.
-                    AnimatedContent(
-                        targetState = emailLabel,
-                        transitionSpec = {
-                            fadeIn(tween(220)) togetherWith fadeOut(tween(MotionShort))
-                        },
-                        label = "emailLabel",
-                    ) { label ->
-                        MutedText(label)
-                    }
-                    BlooTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        placeholder = { Text(emailLabel) },
-                        singleLine = true,
-                        colors = fieldColors,
-                        leadingIcon = { Icon(Icons.Filled.MailOutline, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    MutedText("Password")
-                    BlooTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        placeholder = { Text("Password") },
-                        singleLine = true,
-                        colors = fieldColors,
-                        leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        trailingIcon = {
-                            MorphIconButton(onClick = { showPassword = !showPassword }) {
-                                Icon(
-                                    if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                    contentDescription = if (showPassword) "Hide password" else "Show password",
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        },
-                        visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    // PIN — every brand except Kia US (Kia's own commands need
-                    // no PIN at all; Canada still needs one for CanadaApi.pinAuth
-                    // even though its sign-in also goes through OTP).
-                    AnimatedVisibility(
-                        visible = brand.requiresPin,
-                        enter = expandEnterSized(Alignment.Bottom),
-                        exit = expandExitSized(Alignment.Bottom),
+                    Column(
+                        Modifier.fillMaxWidth().padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(GapGroup),
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-                            MutedText(if (brand.pinRequiredToSignIn) "Service PIN" else "Service PIN (optional)")
-                            if (!brand.pinRequiredToSignIn) {
-                                BodySmallText("Only needed to run remote commands. Leave it blank if you never set one in the Hyundai app; you can add it later in Settings.")
-                            }
-                            BlooTextField(
-                                value = pin,
-                                onValueChange = { pin = it },
-                                placeholder = { Text("Service PIN") },
-                                singleLine = true,
-                                colors = fieldColors,
-                                trailingIcon = {
-                                    MorphIconButton(onClick = { showPin = !showPin }) {
-                                        Icon(
-                                            if (showPin) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                            contentDescription = if (showPin) "Hide service PIN" else "Show service PIN",
-                                            modifier = Modifier.size(20.dp),
-                                        )
-                                    }
-                                },
-                                visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
+                        // Where the car lives, then which account: two selectors, one thought.
+                        LabelText("Where is your account?")
+                        MorphSegmented(
+                            options = listOf(
+                                SegmentOption("US", "United States", null),
+                                SegmentOption("CA", "Canada", null),
+                                SegmentOption("EU", "Europe", null),
+                            ),
+                            selectedKey = region,
+                            onSelect = { key ->
+                                region = key
+                                brand = Brand.brandsForRegion(key).first()
+                            },
+                        )
+                        val brandOptions = Brand.brandsForRegion(region)
+                        MorphSegmented(
+                            options = brandOptions.map { b -> SegmentOption(b.name, Brand.shortLabel(b), null) },
+                            selectedKey = brand.name,
+                            onSelect = { key -> brand = Brand.valueOf(key) },
+                        )
 
-                    // Sign in CTA — label reflects the chosen brand.
-                    SafeMorphTextButton(
-                        text = "Sign in to ${brand.label}",
-                        onClick = { onLogin(email, password, pin, brand) },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !loading,
-                        pending = loading,
-                        emphasis = ButtonEmphasis.Primary,
-                    )
-
-                    if (onCancel != null) {
-                        SafeMorphTextButton(
-                            text = "Cancel",
-                            onClick = onCancel,
+                        BlooTextField(
+                            value = email,
+                            onValueChange = { email = it },
+                            label = { Text(emailLabel) },
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Filled.MailOutline, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             modifier = Modifier.fillMaxWidth(),
                         )
-                    }
-
-                    // Forgot password — MorphTextButton that routes to the right brand portal.
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        SafeMorphTextButton(
-                                text = "Forgot password?",
-                            onClick = {
-                                val forgotUrl = when (brand) {
-                                    Brand.HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgot-password"
-                                    Brand.GENESIS -> "https://owners.genesis.com/us/en/forgot-password.html"
-                                    Brand.KIA     -> "https://owners.kia.com/us/en/kia-owner-portal.html"
-                                    Brand.HYUNDAI_CA -> "https://www.hyundaicanada.com/en/owners-section"
-                                    Brand.GENESIS_CA -> "https://www.genesis.com/ca/en/support/contact-us.html"
-                                    Brand.KIA_CA -> "https://www.kia.ca/en/owners"
-                                    Brand.HYUNDAI_EU -> "https://www.hyundai.com/eu/en/owners.html"
+                        BlooTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text("Password") },
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            trailingIcon = {
+                                MorphIconButton(onClick = { showPassword = !showPassword }) {
+                                    Icon(
+                                        if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                        contentDescription = if (showPassword) "Hide password" else "Show password",
+                                        modifier = Modifier.size(20.dp),
+                                    )
                                 }
-                                context.startActivity(Intent(Intent.ACTION_VIEW, forgotUrl.toUri()))
                             },
-                            contentColor = scheme.onSurfaceVariant,
+                            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            modifier = Modifier.fillMaxWidth(),
                         )
-                    }
 
-                    AnimatedContent(
-                        targetState = brand.label,
-                        // Same duration as this form's other two brand-driven crossfades
-                        // (the email label and the sign-in button label) -- see there.
-                        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(MotionShort)) },
-                        label = "privacyNote",
-                    ) { label ->
-                        Text(
-                            "Sent only to $label's servers; stored encrypted on this device.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = scheme.onSurfaceVariant,
+                        AnimatedVisibility(
+                            visible = brand.requiresPin,
+                            enter = expandEnterSized(Alignment.Bottom),
+                            exit = expandExitSized(Alignment.Bottom),
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                                BlooTextField(
+                                    value = pin,
+                                    onValueChange = { pin = it },
+                                    label = { Text(if (brand.pinRequiredToSignIn) "Service PIN" else "Service PIN (optional)") },
+                                    singleLine = true,
+                                    trailingIcon = {
+                                        MorphIconButton(onClick = { showPin = !showPin }) {
+                                            Icon(
+                                                if (showPin) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                                contentDescription = if (showPin) "Hide service PIN" else "Show service PIN",
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                        }
+                                    },
+                                    visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                if (!brand.pinRequiredToSignIn) {
+                                    BodySmallText("Only needed to run remote commands. Leave it blank if you never set one in the Hyundai app; you can add it later in Settings.")
+                                }
+                            }
+                        }
+
+                        SafeMorphTextButton(
+                            text = "Sign in to ${brand.label}",
+                            onClick = { onLogin(email, password, pin, brand) },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !loading,
+                            pending = loading,
+                            emphasis = ButtonEmphasis.Primary,
                         )
+
+                        // Secondary actions share one row, the app's standard button group.
+                        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
+                            SafeMorphTextButton(
+                                text = "Forgot password?",
+                                onClick = {
+                                    val forgotUrl = when (brand) {
+                                        Brand.HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgot-password"
+                                        Brand.GENESIS -> "https://owners.genesis.com/us/en/forgot-password.html"
+                                        Brand.KIA     -> "https://owners.kia.com/us/en/kia-owner-portal.html"
+                                        Brand.HYUNDAI_CA -> "https://www.hyundaicanada.com/en/owners-section"
+                                        Brand.GENESIS_CA -> "https://www.genesis.com/ca/en/support/contact-us.html"
+                                        Brand.KIA_CA -> "https://www.kia.ca/en/owners"
+                                        Brand.HYUNDAI_EU -> "https://www.hyundai.com/eu/en/owners.html"
+                                    }
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, forgotUrl.toUri()))
+                                },
+                            )
+                            if (onCancel != null) {
+                                SafeMorphTextButton(text = "Cancel", onClick = onCancel)
+                            }
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
+                            Icon(AppIcons.Lock, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                            AnimatedContent(
+                                targetState = brand.label,
+                                transitionSpec = { fadeIn(tween(MotionShort)) togetherWith fadeOut(tween(MotionShort)) },
+                                label = "privacyNote",
+                            ) { label ->
+                                Text(
+                                    "Sent only to $label's servers; stored encrypted on this device.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = scheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
 
                     // Update affordance, available WITHOUT signing in. Reads "Update available"

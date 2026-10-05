@@ -35,9 +35,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.animation.core.spring
@@ -240,32 +239,30 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
     val scope = rememberCoroutineScope()
     val dismissPx = with(LocalDensity.current) { 110.dp.toPx() }
     val offsetX by remember { derivedStateOf { if (dragging) dragPx.floatValue else settle.value } }
-    // The toast BLOBS OUT of the search bubble: it starts as a disc exactly over the bubble and swells,
-    // corners easing from a circle to a card, into its slot. [origin] is the bubble's last known place
-    // (null when search isn't on screen, and then the toast simply appears).
+    // The toast POPS UP out of the search bubble: the whole pill, text and all, starts small and centred on
+    // the bubble, then springs up to size and slides into its slot, overshooting a touch before it settles.
+    // A uniform scale, not a clip: the words are never cut off and never stretched. [origin] is the
+    // bubble's last known place (null when search isn't on screen, and then it simply pops in place).
     val registry = LocalFloatingRegistry.current
     val origin = remember(toast.id) { registry.boundsOf(FloatingIds.Search) }
-    val emerge = remember(toast.id) { Animatable(if (origin == null) 1f else 0f) }
+    val emerge = remember(toast.id) { Animatable(0f) }
     LaunchedEffect(toast.id) {
-        emerge.animateTo(1f, spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessLow))
+        emerge.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow))
     }
-    var slotTopLeft by remember(toast.id) { mutableStateOf<Offset?>(null) }
+    var slotCenter by remember(toast.id) { mutableStateOf<Offset?>(null) }
     Box(
         Modifier
-            .onGloballyPositioned { slotTopLeft = it.positionInRoot() }
+            .onGloballyPositioned { slotCenter = it.boundsInRoot().center }
             .graphicsLayer {
                 val e = emerge.value
                 val o = origin
-                val tl = slotTopLeft
-                if (o != null && e < 1f) {
-                    if (tl == null) {
-                        alpha = 0f
-                    } else {
-                        clip = true
-                        val full = Rect(0f, 0f, size.width, size.height)
-                        val start = Rect(o.left - tl.x, o.top - tl.y, o.right - tl.x, o.bottom - tl.y)
-                        shape = BlobShape(lerp(start, full, e), 0.5f)
-                    }
+                val c = slotCenter
+                scaleX = 0.2f + 0.8f * e
+                scaleY = 0.2f + 0.8f * e
+                alpha = if (c == null) 0f else (e * 3f).coerceIn(0f, 1f)
+                if (o != null && c != null) {
+                    translationX = (o.center.x - c.x) * (1f - e)
+                    translationY = (o.center.y - c.y) * (1f - e)
                 }
             },
     ) {
@@ -273,7 +270,7 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
         // A rounded card, not the search bar's own pill shape: a one-line toast read fine as
         // a pill, but a five-line error became a stadium with fully-round ends, which looked
         // like a sliver of text wrapped in a lozenge. The blob STILL emerges from the search
-        // circle (see `origin`/`BlobShape`, which morphs rect -> full over `emerge`), so the
+        // circle (see `origin`, which `emerge` pops it up from), so the
         // "it came out of search" read is unchanged; only the resting shape is.
         // A pill (fully rounded ends), not a fixed 24dp corner: the toasts read as smooth
         // rounded pills, the app's floating-chrome language.
@@ -326,10 +323,7 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
             },
     ) {
         Row(
-            Modifier
-                // The words arrive once the blob is most of the way out.
-                .graphicsLayer { alpha = ((emerge.value - 0.45f) / 0.55f).coerceIn(0f, 1f) }
-                .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            Modifier.padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconBadge(icon = icon, tint = accent, size = 36.dp, iconSize = 20.dp)
@@ -372,20 +366,6 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
     }
 }
 
-
-/** A rounded rectangle at [rect] whose corner radius is [cornerFraction] of its shorter side: the blob. */
-private class BlobShape(private val rect: Rect, private val cornerFraction: Float) : androidx.compose.ui.graphics.Shape {
-    override fun createOutline(
-        size: androidx.compose.ui.geometry.Size,
-        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
-        density: androidx.compose.ui.unit.Density,
-    ): androidx.compose.ui.graphics.Outline {
-        val r = minOf(rect.width, rect.height) * cornerFraction
-        return androidx.compose.ui.graphics.Outline.Rounded(
-            androidx.compose.ui.geometry.RoundRect(rect, androidx.compose.ui.geometry.CornerRadius(r, r)),
-        )
-    }
-}
 
 /**
  * The bottom toast's inset and the stack's lift, from where the search element is.
