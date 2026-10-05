@@ -69,7 +69,6 @@ internal val CommandCatalog = listOf(
         icon = Icons.Filled.Bolt,
         keywords = "start charging begin charge on",
         aliases = listOf("start charge", "charge the car", "plug in"),
-        isAvailable = { it.canCharge() },
     ),
     CommandMetadata(
         id = "charge_off",
@@ -79,7 +78,6 @@ internal val CommandCatalog = listOf(
         icon = Icons.Filled.Bolt,
         keywords = "stop charging end unplug halt",
         aliases = listOf("stop charge", "unplug the car", "cancel charging"),
-        isAvailable = { it.canCharge() },
     ),
     CommandMetadata(
         id = "charge_limit",
@@ -91,7 +89,6 @@ internal val CommandCatalog = listOf(
         aliases = listOf("charge to", "set charge target"),
         requiresArg = true,
         argLabel = "percentage (20-100)",
-        isAvailable = { it.canCharge() },
     ),
 
     // CLIMATE COMMANDS
@@ -263,9 +260,7 @@ internal fun getAvailableCommands(vehicles: List<Vehicle>): List<CommandMetadata
 /** Get commands that match the query, sorted by relevance. */
 internal fun searchCommands(query: String, vehicles: List<Vehicle>, fuzzy: Boolean = false): List<CommandMetadata> {
     val available = getAvailableCommands(vehicles)
-    // RxSearchTokens (SettingsIndex.kt), the same pattern as the settings half of this search bar.
-    val tokens = query.lowercase().split(RxSearchTokens)
-        .filter { it.isNotBlank() && it !in SearchStopwords }
+    val tokens = searchTokens(query)
 
     if (tokens.isEmpty()) return available
 
@@ -280,13 +275,4 @@ internal fun searchCommands(query: String, vehicles: List<Vehicle>, fuzzy: Boole
     }
 
     return scored.sortedByDescending { it.second }.map { it.first }
-}
-
-/**
- * Extension function to check if a vehicle supports charging. This is a simplified check; the real
- * app would check the powertrain/capabilities.
- */
-internal fun Vehicle.canCharge(): Boolean {
-    // Simplified: assumes all vehicles can charge (the actual command fails appropriately).
-    return true
 }

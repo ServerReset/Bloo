@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.material3.MaterialTheme
@@ -78,8 +77,7 @@ internal fun SplitExpandButton(
 ) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
-    // Shared with MorphExpandButton's chevron ([rememberChevronSpin]). A long press does not toggle; only a tap does.
-    val chevron = rememberChevronSpin(expanded, label = "splitChevron")
+    val chevron = rememberChevronRotation(expanded, label = "splitChevron")
     val opening by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
         animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
@@ -131,8 +129,6 @@ internal fun SplitExpandButton(
     val chevronButton = ClusterButton(
         onClick = onToggle,
         onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
-        // Easter egg: hold the chevron to spin it and vibrate.
-        onLongClick = { chevron.spin(); haptics?.heavy() },
         active = expanded,
         openness = opening,
         square = true,

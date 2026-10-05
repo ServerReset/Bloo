@@ -325,8 +325,6 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         if (lastCarsDone >= 0 && state.powertrains.size > lastCarsDone) celebrate(big = false)
         lastCarsDone = state.powertrains.size
     }
-    // Poke the glyph five times and it's a party.
-    var pokes by remember { mutableIntStateOf(0) }
 
     Box(
         Modifier
@@ -405,11 +403,6 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                         spec = onboardingCardSpec(step.kind, vehicle?.name, newCar = mode is OnboardingMode.NewCars),
                         accent = onboardingAccent(step.kind),
                         current = idx == pageIndex,
-                        onHeroTap = {
-                            haptics?.click()
-                            pokes++
-                            if (pokes % 5 == 0) celebrate(big = true)
-                        },
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
                             when (step.kind) {

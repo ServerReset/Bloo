@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -144,7 +143,7 @@ internal fun onboardingAccent(kind: OnboardingStepKind): Color {
  * card's accent colour, and springs up when its card becomes the current one.
  */
 @Composable
-internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean, onTap: () -> Unit = {}) {
+internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean) {
     // Only the card in view breathes and floats; the neighbours the pager keeps ready stay still,
     // so a deck of seven runs one animation, not seven. States, read only inside the draw and layer
     // lambdas below, so a frame of the animation redraws the glyph without recomposing it.
@@ -168,9 +167,6 @@ internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean, 
             .size(92.dp)
             .graphicsLayer { translationY = bob.value; scaleX = pop; scaleY = pop }
             .clip(CircleShape)
-            .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
-                onTap()
-            }
             .drawBehind {
                 drawCircle(
                     Brush.radialGradient(listOf(accent.copy(alpha = 0.55f * glow.value), Color.Transparent), radius = size.minDimension * 0.95f),
@@ -203,7 +199,6 @@ internal fun OnboardingGlassCard(
     spec: OnboardingCardSpec,
     accent: Color,
     current: Boolean,
-    onHeroTap: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -216,7 +211,7 @@ internal fun OnboardingGlassCard(
         contentAlignment = Alignment.TopStart,
     ) {
         Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-            OnboardingHero(spec.icon, accent, current, onHeroTap)
+            OnboardingHero(spec.icon, accent, current)
             Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                 Text(
                     spec.title,
