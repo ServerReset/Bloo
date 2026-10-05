@@ -2,18 +2,15 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.ui.semantics.contentDescription
@@ -29,13 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -45,7 +42,6 @@ import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 
 /**
  * The hero's car-photo rendering: tonal fallback brush, photo backdrop, and the shared
@@ -56,23 +52,16 @@ import kotlinx.coroutines.flow.first
  *  Callers apply their own `.alpha(...)`; this returns only the brush. */
 @Composable
 internal fun carTonalBrush(scheme: ColorScheme): Brush {
-    // appIsDarkTheme(), not isSystemInDarkTheme(): the latter only sees the phone's setting, and
-    // the [scheme] drawn from may be force-dark or a custom palette.
-    val dark = appIsDarkTheme()
-    // Five-stop diagonal sweep through the accent family (primary, primaryContainer, tertiary,
-    // secondaryContainer, secondary) so it reads as a lit surface. Every colour comes from
-    // [scheme]; alphas keep light-on-photo text legible.
-    val a = if (dark) 1f else 0.82f
-    val colors = listOf(
-        scheme.primary.copy(alpha = a),
-        scheme.primaryContainer.copy(alpha = a * 0.9f),
-        scheme.tertiary.copy(alpha = a),
-        scheme.secondaryContainer.copy(alpha = a * 0.9f),
-        scheme.secondary.copy(alpha = a),
-    )
-    // Diagonal (top-left to bottom-right) reads livelier than horizontal.
+    // Deepened accent family (primary -> container -> tertiary -> secondary) so the hero's light text
+    // always has contrast, in light and dark themes alike, and the card reads as one lit, saturated surface.
+    val deepen = { c: Color -> lerp(c, Color.Black, if (appIsDarkTheme()) 0.25f else 0.38f) }
     return Brush.linearGradient(
-        colors,
+        listOf(
+            deepen(scheme.primary),
+            deepen(scheme.primaryContainer),
+            deepen(scheme.tertiary),
+            deepen(scheme.secondary),
+        ),
         start = androidx.compose.ui.geometry.Offset.Zero,
         end = androidx.compose.ui.geometry.Offset.Infinite,
     )
@@ -102,35 +91,18 @@ internal fun HeroPhotoBackdrop(
 ) {
     Box(Modifier.fillMaxWidth()) {
         HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio)
-        // The scrim inverts with the theme to match heroOnPhoto text: light theme draws near-white
-        // text over a darkening scrim, dark theme the opposite. Without a photo in light mode the
-        // fallback is already a colour wash, so it gets a gentle scrim.
-        val dark = appIsDarkTheme()
-        val gentle = imageUrl.isNullOrBlank() && !dark
-        val scrim = remember(gentle, dark) {
-            if (dark) {
-                // Dark theme: lighten behind the dark text.
-                Brush.verticalGradient(
-                    0f to Color.White.copy(alpha = 0.55f),
-                    0.30f to Color.White.copy(alpha = 0.22f),
-                    0.62f to Color.White.copy(alpha = 0.28f),
-                    1f to Color.White.copy(alpha = 0.62f),
-                )
-            } else if (gentle) {
-                Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.14f),
-                    0.30f to Color.Black.copy(alpha = 0.04f),
-                    0.62f to Color.Black.copy(alpha = 0.06f),
-                    1f to Color.Black.copy(alpha = 0.20f),
-                )
-            } else {
-                Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.55f),
-                    0.30f to Color.Black.copy(alpha = 0.22f),
-                    0.62f to Color.Black.copy(alpha = 0.28f),
-                    1f to Color.Black.copy(alpha = 0.62f),
-                )
-            }
+        // Always a dark scrim with light text, in both themes: a photo is its own backdrop, and a
+        // light veil over it (the old dark-theme look) just washes the car out. A colour wash with no
+        // photo needs only a gentle one.
+        val gentle = imageUrl.isNullOrBlank()
+        val scrim = remember(gentle) {
+            val (top, mid, low, bottom) = if (gentle) listOf(0.12f, 0.02f, 0.05f, 0.22f) else listOf(0.5f, 0.16f, 0.2f, 0.62f)
+            Brush.verticalGradient(
+                0f to Color.Black.copy(alpha = top),
+                0.30f to Color.Black.copy(alpha = mid),
+                0.62f to Color.Black.copy(alpha = low),
+                1f to Color.Black.copy(alpha = bottom),
+            )
         }
         Spacer(Modifier.matchParentSize().background(scrim))
     }

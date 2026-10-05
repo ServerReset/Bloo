@@ -32,7 +32,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.platform
 
 /**
  * The phone UI's shared design vocabulary: the sizes, colours and motion that more than one
@@ -64,15 +63,11 @@ internal const val MutedContentAlpha = 0.7f
 internal fun mutedContentColor(): androidx.compose.ui.graphics.Color =
     androidx.compose.material3.LocalContentColor.current.copy(alpha = MutedContentAlpha)
 
-/**
- * Text and icons drawn on the hero's car photo.
- * Inverted against the theme on purpose (near-white in light, near-black in dark) because a photo
- * backdrop is the opposite of the surface's own pairing. Uses [appIsDarkTheme], not
- * `isSystemInDarkTheme()`; off pure white/black to avoid harshness.
- */
+/** Text and icons drawn on the hero's car photo: always near-white, because the hero is always scrimmed dark. */
+internal val HeroOnPhoto = Color(0xFFF7F7FA)
+
 @Composable
-internal fun heroOnPhoto(): Color =
-    if (appIsDarkTheme()) Color(0xFF1A1B20) else Color(0xFFF2F2F5)
+internal fun heroOnPhoto(): Color = HeroOnPhoto
 
 // ---- Sizing -------------------------------------------------------------------
 

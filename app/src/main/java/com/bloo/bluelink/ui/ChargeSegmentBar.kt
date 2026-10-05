@@ -104,7 +104,7 @@ internal fun ChargeSegmentBar(
 ) {
     val scheme = MaterialTheme.colorScheme
     val limit = limitPct?.takeIf { it in 1..99 }
-    val trackColor = scheme.onSurface.copy(alpha = if (collapsed) 0.28f else 0.16f)
+    val trackColor = if (collapsed) Color.White.copy(alpha = 0.28f) else scheme.onSurface.copy(alpha = 0.16f)
     // The past-the-limit zone. It used to be a genuinely darker BACKDROP (fixed
     // black, deliberately not a theme colour, on the "a black scrim is what
     // already keeps text legible over the photo" argument) -- but that made it
@@ -127,7 +127,7 @@ internal fun ChargeSegmentBar(
     //
     // The theme already inverts the hero card (light mode = darker hero, dark mode = lighter
     // hero), so the base is the theme's dark-mode flag; `collapsed` toggles it once more.
-    val darkCardBehind = appIsDarkTheme() == collapsed
+    val darkCardBehind = collapsed || appIsDarkTheme()
     val heavyScrim = darkCardBehind
     val farBackdropColor = if (heavyScrim) Color.White.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.24f)
     val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else scheme.onSurface.copy(alpha = 0.14f)
