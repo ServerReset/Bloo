@@ -19,13 +19,14 @@ import androidx.compose.ui.graphics.graphicsLayer
  * Ultra glass bends the WHOLE picture, not only the glass: everything under this modifier (the aurora,
  * the backdrop, every card) is slowly refracted by a travelling liquid ripple, as if the entire app sat
  * behind one sheet of moving glass. Android 13+ (AGSL); a no-op elsewhere. Frozen (still warped, no
- * motion) under reduce-motion or battery saver, so it costs no continuous frames there.
+ * motion) under reduce-motion, and off entirely under battery saver.
  */
 @Composable
 internal fun Modifier.ultraWarp(enabled: Boolean): Modifier {
-    if (!enabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return this
+    // Battery saver drops the whole-screen shader entirely, like every other blur/refraction in the app.
+    if (!enabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || isBatterySaverOn()) return this
     val shader = remember { RuntimeShader(WARP_AGSL) }
-    val animate = !LocalReduceMotion.current && !isBatterySaverOn()
+    val animate = !LocalReduceMotion.current
     val phase = if (animate) {
         rememberInfiniteTransition(label = "ultraWarp").animateFloat(
             0f, (2 * Math.PI).toFloat(),
