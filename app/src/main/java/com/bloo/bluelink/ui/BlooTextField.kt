@@ -1,5 +1,10 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -91,4 +96,16 @@ internal fun PinField(
         ),
         keyboardActions = if (onDone != null) KeyboardActions(onDone = { onDone() }) else KeyboardActions.Default,
     )
+}
+
+/** The eye button that shows or hides a secret ([noun] is what it reveals, for TalkBack): password fields and secret rows. */
+@Composable
+internal fun RevealToggle(shown: Boolean, noun: String, onToggle: () -> Unit) {
+    MorphIconButton(onClick = onToggle) {
+        Icon(
+            if (shown) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+            contentDescription = if (shown) "Hide $noun" else "Show $noun",
+            modifier = Modifier.size(20.dp),
+        )
+    }
 }

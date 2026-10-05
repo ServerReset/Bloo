@@ -16,8 +16,6 @@ import androidx.compose.foundation.background
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.MailOutline
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -249,15 +247,7 @@ internal fun LoginScreen(
                             label = { Text("Password") },
                             singleLine = true,
                             leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            trailingIcon = {
-                                MorphIconButton(onClick = { showPassword = !showPassword }) {
-                                    Icon(
-                                        if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                        contentDescription = if (showPassword) "Hide password" else "Show password",
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                            },
+                            trailingIcon = { RevealToggle(showPassword, "password") { showPassword = !showPassword } },
                             visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             modifier = Modifier.fillMaxWidth(),
@@ -276,15 +266,7 @@ internal fun LoginScreen(
                                     digitsOnly = false,
                                     revealed = showPin,
                                     colors = OutlinedTextFieldDefaults.colors(),
-                                    trailingIcon = {
-                                        MorphIconButton(onClick = { showPin = !showPin }) {
-                                            Icon(
-                                                if (showPin) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                                contentDescription = if (showPin) "Hide service PIN" else "Show service PIN",
-                                                modifier = Modifier.size(20.dp),
-                                            )
-                                        }
-                                    },
+                                    trailingIcon = { RevealToggle(showPin, "service PIN") { showPin = !showPin } },
                                 )
                                 if (!brand.pinRequiredToSignIn) {
                                     BodySmallText("Only needed to run remote commands. Leave it blank if you never set one in the Hyundai app; you can add it later in Settings.")

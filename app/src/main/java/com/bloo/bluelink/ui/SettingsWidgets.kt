@@ -29,8 +29,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.heading
@@ -277,14 +275,7 @@ internal fun SecretRow(label: String, value: String) {
             modifier = Modifier.widthIn(max = 168.dp),
         )
         Spacer(Modifier.width(10.dp))
-        // Eye icon, matching the login screen's password field.
-        MorphIconButton(onClick = { show = !show }) {
-            Icon(
-                if (show) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                contentDescription = if (show) "Hide $label" else "Show $label",
-                modifier = Modifier.size(20.dp),
-            )
-        }
+        RevealToggle(show, label) { show = !show }
     }
 }
 
