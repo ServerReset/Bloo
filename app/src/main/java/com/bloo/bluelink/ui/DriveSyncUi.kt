@@ -74,13 +74,13 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     }
 
     val primaryName = ordered.firstOrNull { it.id == state.syncPrimaryId }?.name?.ifBlank { null }
+    val phones = remember(ordered) { ordered.filter { !it.isWatch } }
+    val registryWatches = remember(ordered) { ordered.filter { it.isWatch } }
     BodySmallText(
-        "${devices.count { !it.isWatch }} phone${if (devices.count { !it.isWatch } == 1) "" else "s"}" +
+        "${phones.size} phone${if (phones.size == 1) "" else "s"}" +
             (primaryName?.let { " · $it is primary" } ?: "") +
             ". Drag to reorder: the top device is primary, and a paired watch rides under its phone.",
     )
-    val phones = ordered.filter { !it.isWatch }
-    val registryWatches = ordered.filter { it.isWatch }
     val watchHost = phones.firstOrNull { it.id == state.syncPrimaryId } ?: phones.firstOrNull()
     val context = LocalContext.current
     val liveWatch by com.bloo.bluelink.wear.WatchPresence.watch.collectAsStateWithLifecycle()
