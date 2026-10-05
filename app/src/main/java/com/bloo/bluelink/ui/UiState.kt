@@ -255,10 +255,6 @@ data class UiState(
      *  Available result clears it — see checkForUpdate). "Remind me" also sets
      *  this but pairs it with a snooze + a 1-day reminder worker. */
     val updateTileDismissed: Boolean = false,
-    /** True during the brief undo/call-back window after the user dismisses the
-     *  update tile: the tile stays visible with an "Undo" strip; a short timer
-     *  then commits [updateTileDismissed] unless the user calls it back. */
-    val updatePendingDismiss: Boolean = false,
     /** True while the update APK is being downloaded in-app (see
      *  AppViewModel.downloadUpdateInBackground). */
     val updateDownloading: Boolean = false,

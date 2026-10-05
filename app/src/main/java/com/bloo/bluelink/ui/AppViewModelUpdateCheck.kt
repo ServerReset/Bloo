@@ -17,18 +17,6 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
             val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication(), force = force)
             when (result) {
                 is com.bloo.bluelink.update.UpdateCheckResult.Available -> {
-                    // Cancel the undo-window job, not just its flags. Clearing
-                    // updatePendingDismiss below without cancelling left the countdown
-                    // RUNNING, and when it elapsed it set updateTileDismissed = true and hid
-                    // the tile -- the exact opposite of what the comment a few lines down
-                    // promises ("a refresh mid-countdown just keeps the tile"). So a refresh
-                    // during the undo window appeared to keep the tile, then silently lost it
-                    // seconds later.
-                    //
-                    // undoDismissUpdate() has always done both, which is what made the
-                    // asymmetry easy to miss: the same intent expressed correctly in one place
-                    // and half-expressed in another.
-                    updateDismissJob?.cancel()
                     _state.update {
                         // A previously-downloaded APK is only still good if it's
                         // for this same build -- a newer one showing up means the
@@ -39,15 +27,12 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
                             updateApkReady = it.updateApkReady && sameBuild,
                             // "Not now" only hides the tile until the NEXT check: any
                             // Available result (even the same build re-found on a
-                            // refresh) clears the dismissed flag so the tile comes
-                            // back. ("Remind me" is the one that stays hidden longer —
-                            // it sets a snooze so checkPhone short-circuits to UpToDate
-                            // until the reminder worker clears it, so we never reach
-                            // this branch while snoozed.) A pending (undo-window)
-                            // dismiss is also cleared so a refresh mid-countdown just
-                            // keeps the tile.
+                            // refresh) clears the dismissed flag so the tile comes back.
+                            // ("Remind me" is the one that stays hidden longer — it sets a
+                            // snooze so checkPhone short-circuits to UpToDate until the
+                            // reminder worker clears it, so we never reach this branch
+                            // while snoozed.)
                             updateTileDismissed = false,
-                            updatePendingDismiss = false,
                         )
                     }
                     // Tell a paired watch about the newer WATCH build (if this release

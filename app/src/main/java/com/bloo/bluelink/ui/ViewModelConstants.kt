@@ -40,10 +40,6 @@ internal const val AUTO_PUSH_DEBOUNCE_MS = 2000L
 // the first Drive pass and composition rather than competing with them.
 internal const val PHOTO_SWEEP_DELAY_MS = 8000L
 
-// How long the update tile lingers with an "Undo" strip after "Not now" before
-// the dismiss commits — the call-back window.
-internal const val UPDATE_DISMISS_UNDO_MS = 4500L
-
 // "Remind me": both the reminder-notification worker delay and the matching
 // snooze window. Kept as one value so the two stay aligned (see snoozeUpdate).
 internal const val UPDATE_REMINDER_DELAY_MS = 24L * 60 * 60 * 1000L

@@ -200,9 +200,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val updateDownloadProgress: StateFlow<Float?> = _updateDownloadProgress.asStateFlow()
 
-    /** The pending "Not now" undo-window timer (see dismissUpdate). */
-    internal var updateDismissJob: kotlinx.coroutines.Job? = null
-
     internal val statusInFlight = mutableSetOf<String>()
 
     /** Subset of [statusInFlight] whose call used surfaceErrors=true (drives the spinner + settle haptic). */

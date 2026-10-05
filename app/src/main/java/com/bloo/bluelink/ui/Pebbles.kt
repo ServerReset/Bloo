@@ -276,7 +276,6 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
                 listOf(
                     s.updateAvailable, s.updateTileDismissed, s.shizukuAvailable,
                     s.updateInstalling, s.updateDownloading, s.updateApkReady,
-                    s.updatePendingDismiss,
                 )
             }
             UpdateAvailableTile(updateState, vm, modifier)

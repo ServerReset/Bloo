@@ -7,41 +7,22 @@ import kotlinx.coroutines.launch
 
 // --- In-app update tile: dismiss/snooze, background download, and install (extracted from AppViewModel) --
 //
-// The two pieces of state these share ([AppViewModel.updateDismissJob], the download-progress flow) stay
-// on the ViewModel because they must survive the calls; everything else is plain logic over UiState.
+// The download-progress flow stays on the ViewModel because it must survive the calls;
+// everything else is plain logic over UiState.
 
-/** "Not now" on the update tile — but with a brief call-back window: instead
- *  of hiding the tile instantly, this starts an undo countdown ([updatePending-
- *  Dismiss]) during which the tile stays visible with an "Undo" strip. After
- *  [UPDATE_DISMISS_UNDO_MS] the dismiss commits (tile hides until the next
- *  update check re-surfaces it — see checkForUpdate, which clears the flag on
- *  any Available result). The job is cancel-and-restart so tapping dismiss
- *  again just restarts the window; [undoDismissUpdate] cancels it. */
+/** "Not now" on the update tile: hides the tile immediately (until the next update check
+ *  re-surfaces it -- see checkForUpdate, which clears the flag on any Available result).
+ *  There is no undo window any more; the old "Dismissing…" + "Keep it" strip was reported
+ *  as janky and removed. */
 fun AppViewModel.dismissUpdate() {
-    updateDismissJob?.cancel()
-    updateDismissJob = null
-    // INSTANT dismiss: "Not now" hides the update the moment it is tapped. The previous
-    // undo-window ("Dismissing…" + "Keep it") was reported as janky and unwanted -- now it
-    // just goes. A later update check that still finds this build available re-surfaces it
-    // (see checkForUpdate), so nothing is lost by hiding immediately.
-    _state.update { it.copy(updateTileDismissed = true, updatePendingDismiss = false) }
-}
-
-/** "Undo" during the call-back window: cancel the pending dismiss so the tile
- *  stays. No-op if the window already elapsed (the tile is gone by then, but
- *  the next refresh brings it back anyway). */
-fun AppViewModel.undoDismissUpdate() {
-    updateDismissJob?.cancel()
-    _state.update { it.copy(updatePendingDismiss = false, updateTileDismissed = false) }
+    _state.update { it.copy(updateTileDismissed = true) }
 }
 
 /** "Remind me": hide the tile now, snooze checks so it doesn't re-surface on
  *  every refresh in the meantime, and schedule a one-time worker that in ~1 day
- *  posts a reminder notification AND clears the snooze so the tile comes back.
- *  Skips the undo window — "Remind me" is already an explicit deferral. */
+ *  posts a reminder notification AND clears the snooze so the tile comes back. */
 fun AppViewModel.snoozeUpdate() {
-    updateDismissJob?.cancel()
-    _state.update { it.copy(updateTileDismissed = true, updatePendingDismiss = false) }
+    _state.update { it.copy(updateTileDismissed = true) }
     viewModelScope.launch {
         // Snooze for 1 day to match the reminder worker's 1-day delay: if the
         // worker is delayed by Doze, a normal refresh still revives the tile at
@@ -74,13 +55,11 @@ fun AppViewModel.downloadUpdateInBackground() {
     // Starting a download is an explicit "keep this update" signal: abort any
     // in-flight dismiss (undo-window) timer and un-hide the tile, so the pending
     // dismiss can't fire mid-download and strand the finished APK behind a hidden tile.
-    updateDismissJob?.cancel()
-    updateDismissJob = null
     // Progress starts at 0f, not null: a server with no Content-Length never fires
     // onProgress (UpdateApi gates on total > 0), so leaving it null would flip the bar from
     // determinate-0% to indeterminate. Kept the exact value sequence the UiState field had.
     _updateDownloadProgress.value = 0f
-    _state.update { it.copy(updateDownloading = true, updatePendingDismiss = false, updateTileDismissed = false) }
+    _state.update { it.copy(updateDownloading = true, updateTileDismissed = false) }
     viewModelScope.launch {
         val dest = apkCacheFile()
         // Throttled to whole percents. UpdateApi calls back once per 64KB buffer, which on
