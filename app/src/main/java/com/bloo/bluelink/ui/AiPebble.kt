@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.heading
 import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme

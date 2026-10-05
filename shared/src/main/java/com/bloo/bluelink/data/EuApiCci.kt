@@ -2,7 +2,6 @@ package com.bloo.bluelink.data
 
 import kotlinx.serialization.json.JsonObject
 import com.bloo.bluelink.data.EuApi.Companion.sharedClient
-import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody

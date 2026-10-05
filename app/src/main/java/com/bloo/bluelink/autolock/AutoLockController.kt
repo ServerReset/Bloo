@@ -2,11 +2,8 @@ package com.bloo.bluelink.autolock
 
 import android.content.Context
 import com.bloo.bluelink.data.AppLog
-import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.BlueLinkGate
-import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Notifications
-import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.Vehicle
