@@ -7,20 +7,17 @@ package com.bloo.bluelink.ui
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.autolock.AutoLockConfig
-import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.SettingsStore
@@ -30,14 +27,11 @@ import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.parseOdometerMiles
-import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.lastServiceMiles
 import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.serviceIntervalMiles
-import com.bloo.bluelink.data.setBiometricLock
 import com.bloo.bluelink.data.setLastServiceMiles
 import com.bloo.bluelink.data.setLicensePlate
-import com.bloo.bluelink.data.setLockTiming
 import com.bloo.bluelink.data.setPlatform
 import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setServiceIntervalMiles
@@ -82,56 +76,8 @@ internal fun buildSettingsSearchEntries(
     // step the real row enforces would be a genuine regression, not just a
     // visual inconsistency.
     if (canBio) {
-        add("Require biometrics to open", "biometric lock security app unlock") {
-            // LocalContext.current itself has to stay inside this entry's own @Composable
-            // content lambda, not hoisted above -- reading a CompositionLocal is a composable
-            // call, and the entries list above is built inside a plain (non-composable)
-            // remember calculation now.
-            val bioContext = LocalContext.current
-            SettingsSegmentedRow(
-                label = "Require biometrics to open",
-                options = listOf(
-                    SegmentOption("off", "Off", null),
-                    SegmentOption("on", "On", null),
-                ),
-                selectedKey = if (appearance.biometricLock) "on" else "off",
-                onSelect = { key ->
-                    if (key == "on") {
-                        bioContext.findFragmentActivity()?.let { activity ->
-                            showBiometricPrompt(
-                                activity = activity,
-                                title = "Enable biometric lock",
-                                subtitle = "Confirm to require it on launch",
-                                onSuccess = { vm.setBiometricLock(true) },
-                                onError = { },
-                            )
-                        }
-                    } else {
-                        val activity = bioContext.findFragmentActivity()
-                        if (activity == null) {
-                            vm.reportInfo("Couldn't verify it's you. The lock is still on.")
-                        } else {
-                            showBiometricPrompt(
-                                activity = activity,
-                                title = "Disable biometric lock",
-                                subtitle = "Confirm to stop requiring it",
-                                onSuccess = { vm.setBiometricLock(false) },
-                                onError = { },
-                            )
-                        }
-                    }
-                },
-            )
-        }
-        if (appearance.biometricLock) {
-            add("Lock timing", "lock the app grace period timeout re-lock security") {
-                SettingsSegmentedRow(
-                    label = "Lock the app",
-                    options = LockTiming.entries.map { t -> SegmentOption(t.name, t.label, null) },
-                    selectedKey = appearance.lockTiming.name,
-                    onSelect = { key -> runCatching { vm.setLockTiming(LockTiming.valueOf(key)) } },
-                )
-            }
+        add("App lock", "biometric biometrics fingerprint face lock security app unlock require timing grace re-lock screen off immediate") {
+            AppLockRow(state, appearance, vm, LocalContext.current)
         }
     }
     // Every range and every picker, straight from the registry: no per-setting code here.

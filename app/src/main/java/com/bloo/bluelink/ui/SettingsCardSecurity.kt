@@ -14,7 +14,6 @@ import com.bloo.bluelink.data.SettingsStore
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.key
 import android.content.Context
 import androidx.compose.material.icons.filled.LockReset
@@ -43,97 +42,7 @@ internal fun SecurityCardContent(
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             SettingsGroup("App lock") {
                 if (canBio) {
-                    val timingOn = appearance.biometricLock
-                    SettingsSegmentedRow(
-                        label = "Ask for biometrics",
-                        options = listOf(
-                            SegmentOption("off", LockTiming.OFF.label, null),
-                            SegmentOption("screen_off", LockTiming.SCREEN_OFF.label, null),
-                            SegmentOption("immediate", LockTiming.IMMEDIATE.label, null),
-                        ),
-                        selectedKey = when {
-                            !timingOn -> "off"
-                            appearance.lockTiming == LockTiming.IMMEDIATE -> "immediate"
-                            else -> "screen_off"
-                        },
-                        onSelect = { key ->
-
-                            when (key) {
-                                "off" -> {
-                                    // Turning the lock OFF needs the same authentication
-                                    // turning it on does, otherwise reaching Settings from an
-                                    // already-unlocked app lets a single unauthenticated tap
-                                    // permanently remove the lock on future cold launches --
-                                    // turning momentary physical access into standing access
-                                    // to unlocking the car. Failing to authenticate keeps the
-                                    // lock on.
-                                    val activity = context.findFragmentActivity()
-                                    // The cold-start lock decision is (biometricLock && canBio)
-                                    // OR a PIN being set (see AppViewModel's own doc) -- clearing
-                                    // ONLY biometricLock here used to leave the app locking on
-                                    // every launch anyway whenever a PIN was also set, reported
-                                    // directly as "turn off locking, it still asks every time".
-                                    // "App lock: Off" is this control's own promise that the app
-                                    // stops asking at all, so it has to clear BOTH mechanisms --
-                                    // the same biometric confirmation already required to get
-                                    // here is treated as proof of identity everywhere else in
-                                    // this screen (enabling/disabling the lock itself), so
-                                    // reusing it to also drop the PIN isn't a weaker gate than
-                                    // the PIN removal dialog's own "enter the current PIN" check,
-                                    // just a different, already-trusted proof of the same thing.
-                                    val pinAlsoSet = state.appPinSet
-                                    if (activity == null) {
-                                        // Fail closed -- keep the lock -- but say so,
-                                        // rather than leaving the control looking stuck.
-                                        vm.reportInfo("Couldn't verify it's you. The lock is still on.")
-                                    } else {
-                                        showBiometricPrompt(
-                                            activity = activity,
-                                            title = "Turn off app lock",
-                                            subtitle = if (pinAlsoSet) {
-                                                "Confirm to stop requiring it. This also removes your PIN."
-                                            } else {
-                                                "Confirm to stop requiring it"
-                                            },
-                                            onSuccess = {
-                                                vm.setBiometricLock(false)
-                                                if (pinAlsoSet) vm.removeAppPin()
-                                            },
-                                            onError = { },
-                                        )
-                                    }
-                                }
-                                else -> {
-                                    val timing = if (key == "immediate") LockTiming.IMMEDIATE else LockTiming.SCREEN_OFF
-                                    if (timingOn) {
-                                        // Already locked: changing *when* it re-locks needs no
-                                        // extra proof -- the user just proved who they are to
-                                        // be in here, and tightening the timing is harmless.
-                                        vm.setLockTiming(timing)
-                                    } else {
-                                        // Turning the lock ON proves who you are first, then
-                                        // both arms it and sets when it re-locks.
-                                        val activity = context.findFragmentActivity()
-                                        if (activity == null) {
-                                            vm.reportInfo("Couldn't verify it's you. The lock wasn't turned on.")
-                                        } else {
-                                            showBiometricPrompt(
-                                                activity = activity,
-                                                title = "Enable biometric lock",
-                                                subtitle = "Confirm to require it on launch",
-                                                onSuccess = {
-                                                    vm.setBiometricLock(true)
-                                                    vm.setLockTiming(timing)
-                                                },
-                                                onError = { },
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        
-                        },
-                    )
+                    AppLockRow(state, appearance, vm, context)
                 } else {
                     BodySmallText("No biometrics are enrolled on this device.")
                 }
@@ -157,4 +66,70 @@ internal fun SecurityCardContent(
         }
         PinDialogs(mode = pinDialog, onDismiss = { pinDialog = null }, vm = vm, state = state, canBio = canBio)
     }
+}
+
+
+/**
+ * The app-lock control: Off / Screen off / Immediate. Shared by the Security card and settings search, so
+ * the two can never disagree about what turning the lock off means.
+ *
+ * Turning it OFF or ON needs a biometric confirmation (otherwise one tap from an already-unlocked app could
+ * remove the lock for good); failing to confirm keeps things as they were. "Off" also removes the app PIN,
+ * since the cold-start lock is "biometrics on OR a PIN set" and leaving the PIN would keep asking on every
+ * launch. Changing only WHEN it re-locks needs no extra proof.
+ */
+@Composable
+internal fun AppLockRow(state: UiState, appearance: SettingsStore.Appearance, vm: AppViewModel, context: Context) {
+    val lockOn = appearance.biometricLock
+    SettingsSegmentedRow(
+        label = "Ask for biometrics",
+        options = listOf(
+            SegmentOption("off", LockTiming.OFF.label, null),
+            SegmentOption("screen_off", LockTiming.SCREEN_OFF.label, null),
+            SegmentOption("immediate", LockTiming.IMMEDIATE.label, null),
+        ),
+        selectedKey = when {
+            !lockOn -> "off"
+            appearance.lockTiming == LockTiming.IMMEDIATE -> "immediate"
+            else -> "screen_off"
+        },
+        onSelect = { key ->
+            val activity = context.findFragmentActivity()
+            if (key == "off") {
+                val pinAlsoSet = state.appPinSet
+                if (activity == null) {
+                    vm.reportInfo("Couldn't verify it's you. The lock is still on.")
+                } else {
+                    showBiometricPrompt(
+                        activity = activity,
+                        title = "Turn off app lock",
+                        subtitle = if (pinAlsoSet) "Confirm to stop requiring it. This also removes your PIN." else "Confirm to stop requiring it",
+                        onSuccess = {
+                            vm.setBiometricLock(false)
+                            if (pinAlsoSet) vm.removeAppPin()
+                        },
+                        onError = { },
+                    )
+                }
+            } else {
+                val timing = if (key == "immediate") LockTiming.IMMEDIATE else LockTiming.SCREEN_OFF
+                if (lockOn) {
+                    vm.setLockTiming(timing)
+                } else if (activity == null) {
+                    vm.reportInfo("Couldn't verify it's you. The lock wasn't turned on.")
+                } else {
+                    showBiometricPrompt(
+                        activity = activity,
+                        title = "Enable biometric lock",
+                        subtitle = "Confirm to require it on launch",
+                        onSuccess = {
+                            vm.setBiometricLock(true)
+                            vm.setLockTiming(timing)
+                        },
+                        onError = { },
+                    )
+                }
+            }
+        },
+    )
 }
