@@ -54,8 +54,8 @@ internal class RefreshIndicatorState {
 internal val LocalRefreshIndicator =
     staticCompositionLocalOf<RefreshIndicatorState?> { null }
 
-private val IndicatorSize = 64.dp
-private val SpinnerSize = 38.dp
+private val IndicatorSize = 52.dp
+private val SpinnerSize = 40.dp
 
 /** How far below the status bar's lower edge the indicator rests. */
 private val RestBelowStatusBar = 72.dp
@@ -102,6 +102,9 @@ internal fun PullRefreshIndicatorHost(
                     scaleY = k
                 },
             hazeState = hazeState,
+            // Bare liquid glass: the rim bends what is behind it, nothing milky over the middle.
+            tint = androidx.compose.ui.graphics.Color.Transparent,
+            clear = true,
             shadow = true,
         ) {
             if (state.refreshing) {

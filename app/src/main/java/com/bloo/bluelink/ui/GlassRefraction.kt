@@ -28,6 +28,8 @@ import dev.chrisbanes.haze.glass.hazeGlass
 internal fun Modifier.appGlassEffect(
     state: HazeState,
     shape: Shape,
+    /** Bare glass: no backing and the clearest blur, so only the bending rim and the specular show. */
+    clear: Boolean = false,
 ): Modifier {
     if (shape !is RoundedCornerShape) return this.appHazeEffect(state)
     // A theme-matched backing behind the refracted backdrop, so a floating element is never a black
@@ -38,7 +40,7 @@ internal fun Modifier.appGlassEffect(
     // Ultra glass: no backing at all (pure refraction) and the clearest possible blur, so the
     // material reads as bare glass over whatever is behind it.
     val ultra = appearance.ultraGlass
-    val clarity = if (ultra) 1f else appearance.glassClarity
+    val clarity = if (ultra || clear) 1f else appearance.glassClarity
     // `surface` matches the app's own base tone, so the backing only ever lifts or matches, never
     // darkens. Its alpha still falls to ~0 at high clarity, so clear glass has no tint at all.
     val backing = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f * (1f - clarity))

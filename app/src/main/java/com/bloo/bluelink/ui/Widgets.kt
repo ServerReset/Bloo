@@ -53,13 +53,11 @@ import com.bloo.uicommon.SegmentOption
  */
 internal var inMultiWindowMode by mutableStateOf(false)
 
-/** How far the status bar's glass hangs below the system icons, so its lower rim is a real, visible edge. */
-private val StatusGlassDrop = 10.dp
 private val StatusGlassCorner = 24.dp
 
 /**
- * The status bar as a pane of liquid glass: the content scrolling under it is blurred and bent along its lower
- * rim exactly like every other glass chip in the app, so the system icons never fight what is behind them.
+ * The status bar as a thin pane of bare liquid glass: just the strip behind the system icons, clear in the middle,
+ * bending the content scrolling under it along its rounded lower edge like every other glass chip in the app.
  * [hazeState] marks the content behind it; without one (or without blur support) it is a soft tinted fade.
  * Skipped in [inMultiWindowMode].
  */
@@ -72,10 +70,10 @@ internal fun StatusBarScrim(hazeState: HazeState? = null) {
     Box(
         Modifier
             .fillMaxWidth()
-            .height(topInset + StatusGlassDrop)
+            .height(topInset)
             .then(
                 if (glass) {
-                    Modifier.clip(shape).appGlassEffect(hazeState!!, shape)
+                    Modifier.clip(shape).appGlassEffect(hazeState!!, shape, clear = true)
                 } else {
                     val tint = glassTint(false)
                     Modifier.background(Brush.verticalGradient(listOf(tint.copy(alpha = tint.alpha * 0.5f), Color.Transparent)))

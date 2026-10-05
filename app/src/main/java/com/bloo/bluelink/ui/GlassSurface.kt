@@ -45,6 +45,8 @@ internal fun GlassSurface(
      * [shadow] by default.
      */
     liquid: Boolean = shadow,
+    /** Bare glass (see [appGlassEffect]): the caller passes a transparent [tint] too. */
+    clear: Boolean = false,
     content: @Composable () -> Unit = {},
 ) {
     val canBlur = hazeState != null && canBlurBackdrops()
@@ -79,7 +81,7 @@ internal fun GlassSurface(
                 .then(
                     when {
                         !canBlur -> Modifier
-                        liquid && hazeState != null -> Modifier.appGlassEffect(hazeState, shape)
+                        liquid && hazeState != null -> Modifier.appGlassEffect(hazeState, shape, clear)
                         else -> Modifier.hazeWhenAble(hazeState)
                     },
                 )
