@@ -89,7 +89,6 @@ class EuApi(private val brand: Brand) {
     // Kia/Genesis EU are added these become brand-keyed (idpconnect-eu.kia.com,
     // redirect_uri .../oauth2/redirect for Kia).
     internal val loginFormHost get() = "https://idpconnect-eu.hyundai.com"
-    internal val redirectUri get() = userApi + "oauth2/token"
 
     // --- OneApp/CCI login (Hyundai EU) --------------------------------------
     // Hyundai's WAF blocks the LEGACY IDPConnect authorize by client_id, so the old
