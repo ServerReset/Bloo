@@ -119,7 +119,7 @@ private fun LabelHintBubbleHost(state: LabelHintState) {
         } else {
             unfolded = false
             delay(120)
-            pop.animateTo(0f, tween(140))
+            pop.animateTo(0f, tween(MotionFast))
             state.present = false
         }
     }

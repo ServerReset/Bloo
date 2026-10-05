@@ -78,7 +78,7 @@ private const val LOCK_BLUR_DP = 22f
 internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     val lockAlpha = animateFloatAsState(
         targetValue = if (locked) 1f else 0f,
-        animationSpec = tween(durationMillis = 450),
+        animationSpec = tween(MotionLong),
         label = "lockAlpha",
     )
     // Composition only sees the on/off threshold; the per-frame fade is read in the layer block.

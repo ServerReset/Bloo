@@ -181,7 +181,7 @@ internal fun LoginScreen(
                     AnimatedContent(
                         targetState = brandSubtitle,
                         transitionSpec = {
-                            (fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 3 }) togetherWith
+                            (fadeIn(tween(MotionMedium)) + slideInVertically(tween(MotionMedium)) { it / 3 }) togetherWith
                                 (fadeOut(tween(MotionShort)) + slideOutVertically(tween(MotionShort)) { -it / 3 })
                         },
                         label = "loginSubtitle",

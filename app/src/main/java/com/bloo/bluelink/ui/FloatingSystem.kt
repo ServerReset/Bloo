@@ -160,7 +160,7 @@ fun Modifier.floatingOverlay(
     )
     val alphaState = animateFloatAsState(
         targetValue = if (fade && registry.chromeHidden) 0f else 1f,
-        animationSpec = tween(durationMillis = 200),
+        animationSpec = tween(MotionShort),
         label = "floatingFade",
     )
     this

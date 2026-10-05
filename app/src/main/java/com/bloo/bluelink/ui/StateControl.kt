@@ -114,7 +114,7 @@ internal fun StateControl(
             }
             val stateColor by androidx.compose.animation.animateColorAsState(
                 stateColorTarget,
-                animationSpec = tween(250),
+                animationSpec = tween(MotionMedium),
                 label = "stateColor",
             )
             when {
@@ -143,7 +143,7 @@ internal fun StateControl(
                             targetState = Pair(stateIcon, stateText),
                             transitionSpec = {
                                 (fadeIn(tween(MotionShort)) + scaleIn(initialScale = 0.85f, animationSpec = tween(MotionShort))) togetherWith
-                                (fadeOut(tween(150)) + scaleOut(targetScale = 1.1f, animationSpec = tween(150)))
+                                (fadeOut(tween(MotionFast)) + scaleOut(targetScale = 1.1f, animationSpec = tween(MotionFast)))
                             },
                             // Centre-aligned: "Locked"/"Unlocked" differ in intrinsic height, which
                             // nudged the control.

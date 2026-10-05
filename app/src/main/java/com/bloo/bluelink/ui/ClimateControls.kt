@@ -185,10 +185,10 @@ internal fun ClimatePresetSection(
             ) { preset, itemDragHandle, _ ->
                 AnimatedVisibility(
                     visible = preset.id !in deletingIds,
-                    enter = scaleIn(tween(240, easing = LinearOutSlowInEasing), initialScale = 0.88f) +
-                        expandVertically(tween(260)) + fadeIn(tween(MotionShort)),
-                    exit = scaleOut(tween(180, easing = FastOutLinearInEasing), targetScale = 0.88f) +
-                        shrinkVertically(tween(220)) + fadeOut(tween(MotionShort)),
+                    enter = scaleIn(tween(MotionMedium, easing = LinearOutSlowInEasing), initialScale = 0.88f) +
+                        expandVertically(tween(MotionMedium)) + fadeIn(tween(MotionShort)),
+                    exit = scaleOut(tween(MotionShort, easing = FastOutLinearInEasing), targetScale = 0.88f) +
+                        shrinkVertically(tween(MotionShort)) + fadeOut(tween(MotionShort)),
                 ) {
                     PresetPill(
                         name = preset.name,

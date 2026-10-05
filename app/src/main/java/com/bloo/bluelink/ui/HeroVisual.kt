@@ -168,7 +168,7 @@ internal fun HeroVisual(
             when (loadedFrom) {
                 null -> {} // still loading -- nothing to animate to yet.
                 DataSource.MEMORY_CACHE -> entrance.snapTo(1f)
-                else -> entrance.animateTo(1f, tween(360, easing = FastOutSlowInEasing))
+                else -> entrance.animateTo(1f, tween(MotionLong, easing = FastOutSlowInEasing))
             }
         }
         // See HeroLoadStagger: claimed once per model; delays only when another hero load just
