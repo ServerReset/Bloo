@@ -85,17 +85,6 @@ internal fun BodyMediumText(text: String, modifier: Modifier = Modifier, color: 
     )
 }
 
-/** Label text (labelLarge) -- prominent labels and tags. */
-@Composable
-internal fun LabelLargeText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
-    Text(
-        text,
-        modifier = modifier,
-        style = MaterialTheme.typography.labelLarge,
-        color = color,
-    )
-}
-
 /** Title text (titleSmall) -- section headers and card titles; bold by default. */
 @Composable
 internal fun TitleSmallText(
@@ -209,5 +198,3 @@ internal fun Modifier.hapticClickable(
     return blockPageSwipe()
         .clickable(interactionSource = source, indication = null, onClickLabel = onClickLabel) { haptics?.click(); onClick() }
 }
-
-internal fun Modifier.padding16() = padding(16.dp)

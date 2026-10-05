@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -85,41 +84,16 @@ internal fun PaletteEditorDialog(
                     singleLine = true,
                 )
 
-                // Primary colour picker
-                LabelLargeText(
-                    "Primary colour",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                ColorPickerCanvas(primaryColor, { primaryColor = it })
-
-                // Secondary colour (optional) ToggleRow, not a hand-rolled label+Switch: identical
-                // layout and the same bodyMedium label, but it brings the morph pill track, the
-                // toggleOn/toggleOff haptics and the single-focus-stop TalkBack semantics that
-                // every other boolean setting in the app has.
+                ColorPickerSection("Primary colour", primaryColor) { primaryColor = it }
+                // Optional accents use ToggleRow (not a hand-rolled label + Switch): the same layout, plus the morph track,
+                // haptics and single-focus-stop TalkBack semantics every other boolean setting has.
                 ToggleRow("Custom secondary", useSecondary) { useSecondary = it }
                 AnimatedVisibility(useSecondary, enter = expandEnterSized(), exit = expandExitSized()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                        LabelLargeText(
-                            "Secondary colour",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        ColorPickerCanvas(secondaryColor, { secondaryColor = it })
-                    }
+                    ColorPickerSection("Secondary colour", secondaryColor) { secondaryColor = it }
                 }
-
-                // Tertiary colour (optional) ToggleRow, not a hand-rolled label+Switch: identical
-                // layout and the same bodyMedium label, but it brings the morph pill track, the
-                // toggleOn/toggleOff haptics and the single-focus-stop TalkBack semantics that
-                // every other boolean setting in the app has.
                 ToggleRow("Custom tertiary", useTertiary) { useTertiary = it }
                 AnimatedVisibility(useTertiary, enter = expandEnterSized(), exit = expandExitSized()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                        LabelLargeText(
-                            "Tertiary colour",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        ColorPickerCanvas(tertiaryColor, { tertiaryColor = it })
-                    }
+                    ColorPickerSection("Tertiary colour", tertiaryColor) { tertiaryColor = it }
                 }
         },
         buttons = {
@@ -191,4 +165,13 @@ internal fun UiScaleSlider(appearance: SettingsStore.Appearance, vm: AppViewMode
         steps = 4,
         onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
     )
+}
+
+/** A labelled colour picker. */
+@Composable
+private fun ColorPickerSection(label: String, color: Color, onColor: (Color) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ColorPickerCanvas(color, onColor)
+    }
 }

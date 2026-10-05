@@ -124,7 +124,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
     }
 
     Surface(Modifier.fillMaxSize(), color = Color.Black) {
-        Column(Modifier.fillMaxSize().padding16(), verticalArrangement = Arrangement.spacedBy(GapSection)) {
+        Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(GapSection)) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 val image = bmp
                 when {
