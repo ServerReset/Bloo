@@ -34,9 +34,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
@@ -53,56 +53,32 @@ import com.bloo.uicommon.SegmentOption
  */
 internal var inMultiWindowMode by mutableStateOf(false)
 
+/** How far the status bar's glass hangs below the system icons, so its lower rim is a real, visible edge. */
+private val StatusGlassDrop = 10.dp
+private val StatusGlassCorner = 24.dp
+
 /**
- * A soft blurred scrim behind the status bar so content underneath doesn't fight the system icons.
- * Skipped in [inMultiWindowMode]; the blur is always on when [hazeState] and [canBlurBackdrops]
- * allow it.
+ * The status bar as a pane of liquid glass: the content scrolling under it is blurred and bent along its lower
+ * rim exactly like every other glass chip in the app, so the system icons never fight what is behind them.
+ * [hazeState] marks the content behind it; without one (or without blur support) it is a soft tinted fade.
+ * Skipped in [inMultiWindowMode].
  */
 @Composable
-internal fun StatusBarScrim(
-    /**
-     * The [HazeState] whose [dev.chrisbanes.haze.hazeSource] marks the content behind this scrim.
-     * Null falls back to a self-blur, which only softens the flat gradient (so it's nearly a
-     * no-op).
-     */
-    hazeState: HazeState? = null,
-) {
+internal fun StatusBarScrim(hazeState: HazeState? = null) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    // Modifier.blur (the hazeState == null fallback path below) is backed by RenderEffect, which
-    // the Android framework only implements from API 31 (S) onward -- Compose has no software
-    // fallback for it, and neither does Haze's own blur. minSdk here is 26, so on any API 26-30
-    // device both paths are a visual no-op: the gradient alone -- with no blur softening it -- is
-    // the only thing anyone on those devices ever actually sees.
-    val canBlur = canBlurBackdrops()
-    // The same glassTint every other glass surface resolves to for this canBlur state.
-    val tint = glassTint(canBlur)
+    val shape = RoundedCornerShape(bottomStart = StatusGlassCorner, bottomEnd = StatusGlassCorner)
+    val glass = hazeState != null && canBlurBackdrops()
     Box(
         Modifier
             .fillMaxWidth()
-            // Exactly the status bar's real inset, so it never reaches past the icons.
-            .height(topInset)
+            .height(topInset + StatusGlassDrop)
             .then(
-                if (hazeState != null && canBlur) {
-                    // Blurs what is drawn behind this scrim via the screen's hazeSource. fadeOut
-                    // tapers the blur toward the bottom; edgeWarp = false uses the Surface profile,
-                    // since a full-width strip has no curved rim for the Edge profile to bend.
-                    Modifier.fadeOutBottom().appGlassEffect(hazeState, RoundedCornerShape(0.dp), fadeOut = true, edgeWarp = false)
+                if (glass) {
+                    Modifier.clip(shape).appGlassEffect(hazeState!!, shape)
                 } else {
-                    Modifier
-                },
-            )
-            .background(
-                Brush.verticalGradient(
-                    // Half-strength tint: legible without being heavy.
-                    listOf(tint.copy(alpha = tint.alpha * 0.5f), Color.Transparent),
-                ),
-            )
-            .then(
-                if (hazeState == null && canBlur) {
-                    Modifier.blur(14.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                } else {
-                    Modifier
+                    val tint = glassTint(false)
+                    Modifier.background(Brush.verticalGradient(listOf(tint.copy(alpha = tint.alpha * 0.5f), Color.Transparent)))
                 },
             ),
     )

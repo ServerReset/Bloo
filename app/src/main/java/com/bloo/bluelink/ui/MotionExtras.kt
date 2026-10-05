@@ -9,8 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
@@ -89,18 +87,3 @@ internal fun Modifier.entrance(key: String): Modifier {
             translationY = (1f - p) * 14.dp.toPx()
         }
 }
-
-/**
- * Fades everything this modifier's content draws to nothing at the bottom edge, so the effect gets
- * weaker the further down it goes (the status bar's glass). Place it BEFORE the effect it should
- * fade.
- */
-internal fun Modifier.fadeOutBottom(): Modifier = this
-    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
-    .drawWithContent {
-        drawContent()
-        drawRect(
-            Brush.verticalGradient(listOf(Color.Black, Color.Black.copy(alpha = 0.55f), Color.Transparent)),
-            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
-        )
-    }
