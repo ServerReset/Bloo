@@ -239,12 +239,6 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         }
     }
     val blockedHere = blockReason(pageIndex)
-    val gateIndex = steps.indices.firstOrNull { blockReason(it) != null } ?: Int.MAX_VALUE
-    // Swiping is free, but not past a card whose question is still open: the deck settles back onto it,
-    // the same gate the Next button enforces.
-    LaunchedEffect(pagerState.settledPage, gateIndex) {
-        if (pagerState.settledPage > gateIndex) pagerState.animateScrollToPage(gateIndex)
-    }
 
     fun finish() = when (mode) {
         OnboardingMode.FirstRun -> vm.finishOnboarding()

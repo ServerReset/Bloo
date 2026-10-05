@@ -260,12 +260,9 @@ fun MorphButtonLabel(
                     // frame of the press -- the actual source of the "button group press is janky"
                     // report on the map toolbar and the accounts card.
                     val text = measurables[1].measure(free)
-                    // While the button is HELD (hint.expanded), lay out the full glyph + label
-                    // regardless of the incoming width: this is the in-place expansion, and the
-                    // parent button's own animateContentSize springs its width out to match (and
-                    // back on release). Otherwise: whole label or no label -- anything in between
-                    // is a truncated word.
-                    if (!(hint?.expanded == true) && constraints.maxWidth < glyph.width + gapPx + text.width) {
+                    // Whole label or no label -- anything in between is a truncated word. (Holding a
+                    // symbol-only button shows its name in a bubble above it instead, see LabelHint.)
+                    if (constraints.maxWidth < glyph.width + gapPx + text.width) {
                         val w = glyph.width.coerceAtMost(constraints.maxWidth)
                         // Height still accounts for the label that is NOT being drawn (its own
                         // natural height, already measured above).

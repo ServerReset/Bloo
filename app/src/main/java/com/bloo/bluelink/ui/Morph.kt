@@ -28,6 +28,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
@@ -172,12 +174,10 @@ fun MorphButton(
     } else {
         Modifier
     }
-    // Press and hold a symbol-only button: after a short hold it EXPANDS IN PLACE to show its
-    // name (hint.onHoldStart -> the label layout reports its full width -> the button's own
-    // animateContentSize springs wider), and collapses back the moment the finger lifts. The
-    // phone also builds a vibration during the hold so the expansion is felt coming. This
-    // replaces the old glass BUBBLE that popped up above the button and auto-hid on a timer --
-    // reported directly as wanting the control to grow where it is instead of a popup.
+    // Press and hold a symbol-only button: the phone builds a vibration (ticks coming faster, then
+    // harder), then the button shakes, a heavy pulse lands, and a bubble pops up above the finger and
+    // unfolds to show the symbol AND the name. Lifting folds it away. Nothing happens on a button that
+    // is already showing its label, and the hold never touches the button's own layout.
     if (enabled && onLongClick == null) {
         LaunchedEffect(interactionSource) {
             interactionSource.interactions.collectLatest { interaction ->
@@ -186,16 +186,19 @@ fun MorphButton(
                         if (!hint.collapsed) return@collectLatest
                         val built = launch {
                             delay(120)
-                            var gap = 85L
-                            repeat(6) { i ->
-                                if (i < 3) haptics?.tick() else haptics?.click()
+                            var gap = 70L
+                            repeat(3) { i ->
+                                haptics?.tick()
                                 delay(gap)
                                 gap = (gap * 0.8f).toLong().coerceAtLeast(30L)
                             }
                         }
                         delay(HOLD_TO_EXPAND_MS)
+                        built.cancel()
+                        haptics?.heavy()
                         hint.onHoldStart()
-                        built.join()
+                        launch { hint.shake() }
+                        awaitCancellation()
                     }
                     is PressInteraction.Release, is PressInteraction.Cancel -> hint.onHoldEnd()
                 }
@@ -223,6 +226,7 @@ fun MorphButton(
                     // the app's one button framework, so this is the single highest-
                     // leverage place to fix it.
                     .semantics { selected = active }
+                    .graphicsLayer { rotationZ = hint.shakeDegrees }
                     // Can't be pressed right now: iced out, the app's one disabled look (see [frosted]).
                     .then(frost)
                     // Skipped while SafeExpansiveButton is already smoothly driving this
@@ -262,6 +266,7 @@ fun MorphButton(
                 shapeForCorner = shapeForCorner,
                 content = {
                     content()
+                    LabelHintPopup(hint)
                 },
             )
         }

@@ -61,27 +61,12 @@ internal fun ExpandedGaragePage(
             HorizontalPager(
                 state = exPager,
                 modifier = Modifier.fillMaxSize().hazeSource(hazeState),
-                // Finger swipe between cars is disabled per user request (the
-                // page-to-page swipe felt bad). To view a different car
-                // full-screen the user collapses back to the grid (the "Back to
-                // all cars" button / system back) and expands another car, which
-                // re-seeds this pager on that car via rememberWrapPager above.
-                userScrollEnabled = false,
-                // Paired with userScrollEnabled=false above: the expanded pager
-                // has NO finger swipe, so its neighbour pages can never be shown
-                // or scrolled to — pre-warming them is pure dead weight. Worse,
-                // ExpandedCar is heavier than a collapsed page (dual column, two
-                // scrolls, force-expanded hotspot) and UiState is unstable, so
-                // every state emission (poll/refresh tick/command) recomposes
-                // EVERY in-composition page. beyondViewportPageCount=1 keeps 3
-                // ExpandedCars in composition (current + 2 unreachable neighbours);
-                // 0 keeps just the visible one → the per-emission recompose cost
-                // (and the expand-entry burst under the fade/scale) drops ~3x.
-                // Dots/settle read pure PagerState, so nothing visible changes.
-                // If finger-swipe is ever re-enabled here, restore this to 1 — a
-                // live swipe needs the neighbour pre-warmed (see collapsed pager
-                // below for why).
-                beyondViewportPageCount = 0,
+                // Swipe left/right between cars, free of any lock. One neighbour is pre-warmed on each side
+                // so a live drag has something to reveal, but never more pages than real cars (two virtual
+                // pages resolving to the same car while both composed is the crash the garage pager's own
+                // comment below describes): count + wrap means pages composed = 1 + 2 * beyond <= count.
+                userScrollEnabled = true,
+                beyondViewportPageCount = ((count - 1) / 2).coerceIn(0, 1),
                 pageSize = androidx.compose.foundation.pager.PageSize.Fill,
                 key = { page -> page },
             ) { page ->
@@ -114,10 +99,7 @@ internal fun ExpandedGaragePage(
                         flipped = columnsFlipped,
                         onCollapse = { vm.collapse() },
                         hazeState = hazeState,
-                        // A horizontal swipe on the hero card moves to the neighbouring
-                        // car. The expanded pager itself has no finger swipe
-                        // (userScrollEnabled = false below), so this programmatic page
-                        // step is the one car-switch gesture the expanded view offers.
+                        // A horizontal swipe on the hero card steps to the neighbouring car too.
                         onSwipeCar = { dir ->
                             garageScope.launch {
                                 exPager.animateScrollToPage(
