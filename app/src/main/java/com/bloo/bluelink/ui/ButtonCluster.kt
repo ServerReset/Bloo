@@ -122,7 +122,7 @@ internal fun ButtonCluster(
  * as it is pressed) wherever it meets a neighbour. A button with [ClusterButton.openness] morphs its outer corner
  * too, and the seams beside it open with it.
  */
-private fun clusterShape(buttons: List<ClusterButton>, index: Int, morph: Float, cornerPercent: Int): Shape {
+internal fun clusterShape(buttons: List<ClusterButton>, index: Int, morph: Float, cornerPercent: Int): Shape {
     val button = buttons[index]
     val own = max(morph, button.openness)
     val outerPercent = if (button.openness > 0f) {

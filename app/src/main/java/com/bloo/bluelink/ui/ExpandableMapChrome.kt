@@ -77,28 +77,22 @@ internal fun rememberShowMyLocation(
 }
 
 /**
- * The buttons under a map: one [MorphActionButton] per [MapFeature] in the standard
- * [ExpressiveButtonRow] (balanced lines, a press pushes neighbours, a lone button rests at the
- * start edge and widens when pressed).
+ * The buttons under a map: one connected [ButtonCluster] with a button per [MapFeature], sharing the row in
+ * proportion to their labels (and compacting to symbols when the row is narrow).
  */
 @Composable
 internal fun MapFeatureRow(
     features: List<MapFeature>,
     modifier: Modifier = Modifier,
 ) {
-    ExpressiveButtonRow(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = GapRow),
-        spacing = GapRow,
-    ) {
-        features.forEach { feature ->
-            MorphActionButton(
-                label = feature.label,
-                icon = feature.icon,
-                onClick = feature.onClick,
-                enabled = feature.enabled,
-            )
-        }
-    }
+    ButtonCluster(
+        features.map { feature ->
+            ClusterButton(onClick = feature.onClick, enabled = feature.enabled, weight = GroupWeightProportional) {
+                MorphButtonLabel(feature.icon, feature.label, pending = false)
+            }
+        },
+        modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = GapRow),
+    )
 }
 
 /**
