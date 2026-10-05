@@ -142,12 +142,10 @@ fun SafeExpansiveButton(
      * (left in LTR, right in RTL) and, pressed, widens to fill the row.
      */
     fillOnPress: Boolean = false,
-    /** True while the button is lifted out of its row: it takes no part in the press redistribution. */
-    suppressPress: () -> Boolean = { false },
     content: @Composable () -> Unit,
 ) {
     val rawPress by expressivePressFraction(interactionSource, enabled)
-    val press = { if (suppressPress()) 0f else rawPress }
+    val press = { rawPress }
     // Inside an [ExpressiveButtonRow]/[ExpressiveButtonGroup] this button joins the group, which
     // takes the extra width off its NEIGHBOURS so the row's own footprint never changes.
     if (LocalExpressiveGroup.current) {

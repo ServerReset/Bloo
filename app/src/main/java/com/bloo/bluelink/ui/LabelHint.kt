@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
@@ -16,16 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.IntrinsicMeasurable
-import androidx.compose.ui.layout.IntrinsicMeasureScope
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.LayoutModifier
-import androidx.compose.ui.layout.Measurable
-import androidx.compose.ui.layout.MeasureResult
-import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -60,7 +55,13 @@ internal class LabelHintState {
     var icon: ImageVector? = null
 
     /** True while the button is showing only its symbol. Written from placement. */
-    var collapsed: Boolean = false
+    var collapsed by mutableStateOf(false)
+
+    /** True while a finger is down on the button (even if it has slipped off it); read by the hold. */
+    var fingerDown by mutableStateOf(false)
+
+    /** True from the moment the button lifts until it has dropped back. */
+    var lifting by mutableStateOf(false)
 
     /** 0 = the button sits in its slot; 1 = it is lifted above the finger and out of the layout. */
     var lift by mutableFloatStateOf(0f)
@@ -95,6 +96,7 @@ internal class LabelHintState {
         anchor = coordinates?.takeIf { it.isAttached }?.boundsInWindow() ?: Rect.Zero
         suppressClick = true
         showName = false
+        lifting = true
     }
 
     /** Fold the name away and drop the button back into its slot. */
@@ -103,6 +105,7 @@ internal class LabelHintState {
         showName = false
         if (lift > 0f) animate(lift, 0f, animationSpec = spring(dampingRatio = 0.7f, stiffness = 380f)) { v, _ -> lift = v }
         lift = 0f
+        lifting = false
     }
 
     /** The lift itself: out of the row and up above the finger. */
@@ -130,29 +133,16 @@ internal class LabelHintState {
 internal val LocalLabelHint = androidx.compose.runtime.staticCompositionLocalOf<LabelHintState?> { null }
 
 /**
- * Takes a lifted button out of its layout: its slot's width follows `1 - lift`, so a group's neighbours close the
- * gap as it rises and are pushed apart again as it lands, while the button itself keeps its full size.
+ * Watches whether a finger is down on the button without ever consuming an event, so it can sit over a button's own
+ * gesture handling. The hold reads it to keep the button popped out for as long as the finger stays down.
  */
-internal fun Modifier.liftCollapse(hint: LabelHintState): Modifier = this.then(LiftCollapse(hint))
-
-private class LiftCollapse(val hint: LabelHintState) : LayoutModifier {
-    override fun MeasureScope.measure(measurable: Measurable, constraints: Constraints): MeasureResult {
-        // The lift spring overshoots 1; a slot can never be narrower than nothing.
-        val lift = hint.lift.coerceIn(0f, 1f)
-        if (lift <= 0f) {
-            val placeable = measurable.measure(constraints)
-            return layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+internal fun Modifier.trackFinger(hint: LabelHintState): Modifier = pointerInput(hint) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            hint.fingerDown = event.changes.any { it.pressed }
         }
-        val natural = measurable.maxIntrinsicWidth(if (constraints.hasBoundedHeight) constraints.maxHeight else 0)
-        val placeable = measurable.measure(constraints.copy(minWidth = natural, maxWidth = natural))
-        return layout((natural * (1f - lift)).roundToInt(), placeable.height) { placeable.place(0, 0) }
     }
-
-    override fun IntrinsicMeasureScope.minIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int): Int =
-        (measurable.minIntrinsicWidth(height) * (1f - hint.lift.coerceIn(0f, 1f))).roundToInt()
-
-    override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int): Int =
-        (measurable.maxIntrinsicWidth(height) * (1f - hint.lift.coerceIn(0f, 1f))).roundToInt()
 }
 
 /**

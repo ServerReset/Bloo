@@ -1,5 +1,9 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.flow.first
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.Job
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.BorderStroke
@@ -28,10 +32,8 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onPlaced
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -135,35 +137,49 @@ fun MorphButton(
     } else {
         Modifier
     }
-    // Press and hold a symbol-only button: haptic ticks build, the button shakes, a heavy pulse lands, and then
-    // the button itself lifts out of its row above the finger and widens to show its name (see LabelHint).
-    // Letting go drops it back, and the hold never presses it.
+    // Press and hold a symbol-only button: haptic ticks build, the button shakes, a heavy pulse lands, and then the
+    // button pops out above the finger and widens to show its name (see LabelHint). The row never rearranges, and the
+    // button stays popped out for as long as the finger stays down, wherever it drifts; lifting the finger drops it
+    // back and the hold never presses it.
     if (enabled && onLongClick == null) {
+        val holdScope = rememberCoroutineScope()
+        var hold by remember { mutableStateOf<Job?>(null) }
         LaunchedEffect(interactionSource) {
-            interactionSource.interactions.collectLatest { interaction ->
+            interactionSource.interactions.collect { interaction ->
                 when (interaction) {
                     is PressInteraction.Press -> {
                         hint.suppressClick = false
-                        if (!hint.collapsed) return@collectLatest
-                        val build = launch {
-                            delay(120)
-                            var gap = 70L
-                            repeat(3) {
-                                haptics?.tick()
-                                delay(gap)
-                                gap = (gap * 0.8f).toLong().coerceAtLeast(30L)
+                        hint.fingerDown = true
+                        if (!hint.collapsed) return@collect
+                        hold?.cancel()
+                        hold = holdScope.launch {
+                            val build = launch {
+                                delay(120)
+                                var gap = 70L
+                                repeat(3) {
+                                    haptics?.tick()
+                                    delay(gap)
+                                    gap = (gap * 0.8f).toLong().coerceAtLeast(30L)
+                                }
                             }
+                            delay(HOLD_TO_EXPAND_MS)
+                            build.cancel()
+                            haptics?.heavy()
+                            hint.shake()
+                            if (!hint.fingerDown) return@launch
+                            haptics?.heavy()
+                            hint.beginLift()
+                            hint.raise()
+                            snapshotFlow { hint.fingerDown }.first { !it }
+                            hint.endLift()
                         }
-                        delay(HOLD_TO_EXPAND_MS)
-                        build.cancel()
-                        haptics?.heavy()
-                        hint.shake()
-                        haptics?.heavy()
-                        hint.beginLift()
-                        hint.raise()
-                        awaitCancellation()
                     }
-                    is PressInteraction.Release, is PressInteraction.Cancel -> hint.endLift()
+                    // Released or cancelled before the hold finished: an ordinary press. Once popped out, only the
+                    // finger lifting ends it.
+                    is PressInteraction.Release, is PressInteraction.Cancel -> if (!hint.lifting) {
+                        hold?.cancel()
+                        hint.shakeDegrees = 0f
+                    }
                 }
             }
         }
@@ -216,7 +232,7 @@ fun MorphButton(
                 .semantics { selected = active }
                 .onPlaced { hint.coordinates = it }
                 // Out of the layout while its lifted copy is up, and out of sight.
-                .liftCollapse(hint)
+                .then(if (hint.collapsed) Modifier.trackFinger(hint) else Modifier)
                 .graphicsLayer { rotationZ = hint.shakeDegrees; alpha = if (hint.lifted) 0f else 1f }
                 // Inert: the app's one disabled look (see [frosted]).
                 .then(frost)
@@ -257,7 +273,6 @@ fun MorphButton(
             enabled = enabled,
             groupWeight = groupWeight,
             fillOnPress = fillOnPress || standalone,
-            suppressPress = { hint.lifted },
         ) { body() }
     } else {
         body()
@@ -424,7 +439,7 @@ fun MorphActionButton(
 )
 
 /** Every button in the app is this tall, so a row of them lines up whatever it contains. */
-val ButtonTargetHeight = 48.dp
+val ButtonTargetHeight = 50.dp
 
 /** The glyph beside a label. One size for push buttons, chips and cover actions alike. */
 val ButtonIconSize = 18.dp

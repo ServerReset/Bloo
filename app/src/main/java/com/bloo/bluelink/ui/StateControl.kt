@@ -190,7 +190,7 @@ internal fun StateControl(
         // square) than on the phone (mouse-precise finger taps in a full pebble). Only the cover
         // provides LocalPebbleFillHeight (see its doc in Widgets.kt), so that is the one that
         // actually means "cover".
-        val groupBtnSize = 50.dp
+        val groupBtnSize = ButtonTargetHeight
         val actionIconSize = 22.dp
         // Modifier.size on a segment is coerced to the width the group assigns.
         val mainSource = remember { MutableInteractionSource() }
