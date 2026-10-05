@@ -227,6 +227,7 @@ internal fun StateControl(
                         onClick = action.onClick,
                         enabled = action.enabled,
                         contentPadding = PaddingValues(0.dp),
+                        weight = GroupWeightProportional,
                         modifier = Modifier.size(groupBtnSize),
                     ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
                 } + ClusterButton(
@@ -237,6 +238,7 @@ internal fun StateControl(
                     activeContainerColor = highlightColor,
                     activeContentColor = highlightContentColor,
                     interactionSource = mainSource,
+                    weight = GroupWeightProportional,
                     modifier = Modifier.heightIn(min = groupBtnSize),
                 ) { lockContent() },
                 // Caps the group's room at groupMaxWidth (see above).

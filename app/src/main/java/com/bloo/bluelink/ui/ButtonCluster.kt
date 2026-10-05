@@ -26,8 +26,6 @@ import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.MorphedCornerPercent
 import com.bloo.uicommon.PillCornerPercent
 import com.bloo.uicommon.seamCorner
-import kotlin.math.max
-import kotlin.math.roundToInt
 
 /**
  * One button of a [ButtonCluster]. Its shape, its seams and its sizing are the cluster's job; this only says what
@@ -49,8 +47,6 @@ internal class ClusterButton(
     val weight: Float = 0f,
     /** Never narrower than the cluster is tall, so an icon-only button is a true circle (or a round nub in a cluster). */
     val square: Boolean = false,
-    /** 0..1: pushes this button toward its open silhouette (an expanded chevron); the seams beside it follow. */
-    val openness: Float = 0f,
     val onClickHaptic: (() -> Unit)? = null,
     val onLongClick: (() -> Unit)? = null,
     /** Pass one to observe presses from outside; otherwise the cluster makes its own. */
@@ -131,23 +127,6 @@ internal fun connectedShape(first: Boolean, last: Boolean, outerPercent: Int, st
 internal fun slotShape(slot: ClusterSlot, morph: Float, cornerPercent: Int): RoundedCornerShape =
     connectedShape(slot.index == 0, slot.index == slot.count - 1, cornerPercent, morph, morph)
 
-/**
- * The silhouette of button [index] in a cluster. A button with [ClusterButton.openness] morphs its outer corner too,
- * and the seams beside it open with it.
- */
-internal fun clusterShape(buttons: List<ClusterButton>, index: Int, morph: Float, cornerPercent: Int): Shape {
-    val button = buttons[index]
-    val own = max(morph, button.openness)
-    val outerPercent = if (button.openness > 0f) {
-        (PillCornerPercent + (MorphedCornerPercent - PillCornerPercent) * own).roundToInt()
-    } else {
-        cornerPercent
-    }
-    return connectedShape(
-        first = index == 0,
-        last = index == buttons.lastIndex,
-        outerPercent = outerPercent,
-        startSeamMorph = max(own, buttons.getOrNull(index - 1)?.openness ?: 0f),
-        endSeamMorph = max(own, buttons.getOrNull(index + 1)?.openness ?: 0f),
-    )
-}
+/** The silhouette of button [index] in a cluster: round at the cluster's ends, a seam corner wherever it meets a neighbour. */
+internal fun clusterShape(buttons: List<ClusterButton>, index: Int, morph: Float, cornerPercent: Int): Shape =
+    connectedShape(index == 0, index == buttons.lastIndex, cornerPercent, morph, morph)

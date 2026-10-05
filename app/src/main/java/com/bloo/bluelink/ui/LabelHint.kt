@@ -137,7 +137,8 @@ internal fun Modifier.liftCollapse(hint: LabelHintState): Modifier = this.then(L
 
 private class LiftCollapse(val hint: LabelHintState) : LayoutModifier {
     override fun MeasureScope.measure(measurable: Measurable, constraints: Constraints): MeasureResult {
-        val lift = hint.lift
+        // The lift spring overshoots 1; a slot can never be narrower than nothing.
+        val lift = hint.lift.coerceIn(0f, 1f)
         if (lift <= 0f) {
             val placeable = measurable.measure(constraints)
             return layout(placeable.width, placeable.height) { placeable.place(0, 0) }
@@ -148,10 +149,10 @@ private class LiftCollapse(val hint: LabelHintState) : LayoutModifier {
     }
 
     override fun IntrinsicMeasureScope.minIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int): Int =
-        (measurable.minIntrinsicWidth(height) * (1f - hint.lift)).roundToInt()
+        (measurable.minIntrinsicWidth(height) * (1f - hint.lift.coerceIn(0f, 1f))).roundToInt()
 
     override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int): Int =
-        (measurable.maxIntrinsicWidth(height) * (1f - hint.lift)).roundToInt()
+        (measurable.maxIntrinsicWidth(height) * (1f - hint.lift.coerceIn(0f, 1f))).roundToInt()
 }
 
 /**

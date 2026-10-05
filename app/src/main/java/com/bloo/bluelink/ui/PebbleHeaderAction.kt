@@ -7,7 +7,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -78,12 +77,6 @@ internal fun SplitExpandButton(
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
     val chevron = rememberChevronRotation(expanded, label = "splitChevron")
-    val opening by animateFloatAsState(
-        targetValue = if (expanded) 1f else 0f,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "splitExpandCorner",
-    )
-
     // The location button's icon bounces when it is tapped.
     val bounceY = remember { Animatable(0f) }
     val bounceScope = rememberCoroutineScope()
@@ -130,7 +123,6 @@ internal fun SplitExpandButton(
         onClick = onToggle,
         onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
         active = expanded,
-        openness = opening,
         square = true,
         contentPadding = PaddingValues(start = 13.dp, end = 12.dp),
         interactionSource = chevronSource,
