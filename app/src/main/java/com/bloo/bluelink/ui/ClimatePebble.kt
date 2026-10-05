@@ -159,6 +159,11 @@ internal fun ClimatePebble(
     // cleared automatically once the live settings drift away from it (e.g. you
     // nudge a slider) so the highlight only marks a true match.
     var activePresetId by remember(v.vin) { mutableStateOf<String?>(null) }
+    // Start at [target] degrees F with defrost off, clearing any highlighted preset: the one-tap "smart" start.
+    val startAtTarget: (Int, ClimateRequest) -> Unit = { target, base ->
+        tempF = target; defrost = false; activePresetId = null
+        startClimateWithEngineCheck(base.copy(tempF = target, defrost = false))
+    }
     // applyPreset was here; it was the same body as applyRequest (defined above, next to the
     // sliders' state). The preset buttons below call applyRequest directly now.
     LaunchedEffect(currentReq, activePresetId, presets) {
@@ -250,10 +255,7 @@ internal fun ClimatePebble(
                     // the collapsed one-tap case below.
                     startClimateWithEngineCheck(currentReq)
                 } else if (simpleMode && weather != null) {
-                    val ambientF = ambientFahrenheit(weather.tempC)
-                    val smartTarget = smartClimateTargetF(ambientF)
-                    tempF = smartTarget; defrost = false; activePresetId = null
-                    startClimateWithEngineCheck(currentReq.copy(tempF = smartTarget, defrost = false))
+                    startAtTarget(smartClimateTargetF(ambientFahrenheit(weather.tempC)), currentReq)
                 } else {
                     val defaultId = state.defaultClimatePresets[v.vin]
                     val matchingPreset = defaultId?.let { id -> presets.firstOrNull { it.id == id } }
@@ -262,10 +264,7 @@ internal fun ClimatePebble(
                         startClimateWithEngineCheck(matchingPreset.request)
                         activePresetId = matchingPreset.id
                     } else if (weather != null) {
-                        val ambientF = ambientFahrenheit(weather.tempC)
-                        val smartTarget = smartClimateTargetF(ambientF)
-                        tempF = smartTarget; defrost = false; activePresetId = null
-                        startClimateWithEngineCheck(currentReq.copy(tempF = smartTarget, defrost = false))
+                        startAtTarget(smartClimateTargetF(ambientFahrenheit(weather.tempC)), currentReq)
                     } else startClimateWithEngineCheck(currentReq)
                 }
             },
@@ -347,12 +346,7 @@ internal fun ClimatePebble(
                     MorphActionButton(
                         label = smartLabel,
                         icon = Icons.Filled.AcUnit,
-                        onClick = {
-                            tempF = smartTarget
-                            defrost = false
-                            activePresetId = null
-                            startClimateWithEngineCheck(currentReq.copy(tempF = smartTarget, defrost = false))
-                        },
+                        onClick = { startAtTarget(smartTarget, currentReq) },
                         enabled = !pending && !climateOn,
                     )
                     Text(

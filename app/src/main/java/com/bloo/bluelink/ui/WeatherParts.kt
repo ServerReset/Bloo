@@ -44,6 +44,17 @@ import kotlin.math.roundToInt
 internal fun weatherIcon(code: WeatherCode, isDay: Boolean): ImageVector =
     com.bloo.uicommon.weatherIcon(code.toCode(), isDay)
 
+/** A weather symbol in its condition's own tint -- the icon + tint + size every weather surface repeated. */
+@Composable
+internal fun WeatherGlyph(code: WeatherCode, isDay: Boolean, size: Dp, describe: Boolean = true) {
+    Icon(
+        weatherIcon(code, isDay),
+        contentDescription = if (describe) code.label else null,
+        tint = weatherTint(code, isDay),
+        modifier = Modifier.size(size),
+    )
+}
+
 @Composable
 internal fun weatherTint(code: WeatherCode, isDay: Boolean): Color =
     com.bloo.uicommon.weatherTint(code.toCode(), isDay, MaterialTheme.colorScheme.onSurfaceVariant)
@@ -55,7 +66,6 @@ internal fun weatherTint(code: WeatherCode, isDay: Boolean): Color =
  */
 @Composable
 internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: String) {
-    val tint = weatherTint(weather.condition, weather.isDay)
     Row(
         Modifier
             .fillMaxWidth()
@@ -63,7 +73,7 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
-        Icon(weatherIcon(weather.condition, weather.isDay), contentDescription = null, tint = tint, modifier = Modifier.size(30.dp))
+        WeatherGlyph(weather.condition, weather.isDay, 30.dp, describe = false)
         Column(Modifier.weight(1f)) {
             Text(weather.condition.label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
             Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -114,9 +124,8 @@ internal fun WeatherBlock(
 /** The small "where this weather is" heading shared by a standalone and a merged block. */
 @Composable
 private fun WeatherLocationHeading(title: String, subtitle: String?, weather: Weather) {
-    val tint = weatherTint(weather.condition, weather.isDay)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
-        Icon(weatherIcon(weather.condition, weather.isDay), contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+        WeatherGlyph(weather.condition, weather.isDay, 16.dp, describe = false)
         Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         if (!subtitle.isNullOrBlank()) {
             Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -196,14 +205,13 @@ private fun hourLabel(hour: Int?): String {
 
 @Composable
 private fun HourCell(hour: HourPoint, fahrenheit: Boolean, label: String, modifier: Modifier = Modifier) {
-    val tint = weatherTint(hour.condition, isDay = true)
     Column(
         modifier.width(56.dp).outlinedPanel(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-        Icon(weatherIcon(hour.condition, isDay = true), contentDescription = hour.condition.label, tint = tint, modifier = Modifier.size(22.dp))
+        WeatherGlyph(hour.condition, true, 22.dp)
         Text(
             com.bloo.bluelink.data.weatherTemp(hour.tempC, fahrenheit),
             style = MaterialTheme.typography.labelLarge,
@@ -241,7 +249,6 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
         Text("Forecast", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         days.forEachIndexed { i, day ->
-            val tint = weatherTint(day.condition, isDay = true)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
                 Text(
                     if (i == 0) "Today" else weekdayName(day.date),
@@ -250,7 +257,7 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
                     modifier = Modifier.width(72.dp),
                     maxLines = 1,
                 )
-                Icon(weatherIcon(day.condition, isDay = true), contentDescription = day.condition.label, tint = tint, modifier = Modifier.size(20.dp))
+                WeatherGlyph(day.condition, true, 20.dp)
                 Text(
                     day.condition.label,
                     style = MaterialTheme.typography.bodySmall,
