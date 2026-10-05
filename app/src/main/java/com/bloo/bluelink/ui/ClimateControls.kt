@@ -16,7 +16,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Column
@@ -39,7 +38,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -88,18 +86,8 @@ internal fun SeatControl(
     if (range.size <= 1) return
     val index = range.indexOf(level).let { if (it < 0) range.indexOf(SeatLevel.OFF) else it }
     val current = range.getOrNull(index) ?: range.firstOrNull() ?: return
-    // Deeper colour the stronger the setting; cross-fades through neutral between cooling (blues)
-    // and heating (reds).
-    val tint by androidx.compose.animation.animateColorAsState(
-        targetValue = seatTint(current),
-        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
-        label = "seatTint",
-    )
-    Column {
-        // The level text wears the slider's colour, so no caption is needed.
-        StepRow(label, current.label, valueColor = tint)
-        LevelSlider(index, range, tint, onChange)
-    }
+    // Deeper colour the stronger the setting; cross-fades through neutral between cooling (blues) and heating (reds).
+    TintedLevelControl(label, current.label, seatTint(current), "seatTint", range, index, onChange)
 }
 
 /**
@@ -109,14 +97,27 @@ internal fun SeatControl(
 @Composable
 internal fun WheelHeatControl(level: WheelHeatLevel, onChange: (WheelHeatLevel) -> Unit) {
     val range = WheelHeatLevel.entries.toList()
-    val index = range.indexOf(level).coerceAtLeast(0)
+    TintedLevelControl("Steering wheel heat", level.label, wheelHeatTint(level), "wheelHeatTint", range, range.indexOf(level).coerceAtLeast(0), onChange)
+}
+
+/** A labelled level slider whose value text and thumb share one animated tint. */
+@Composable
+private fun <T> TintedLevelControl(
+    label: String,
+    valueLabel: String,
+    targetTint: Color,
+    tintLabel: String,
+    range: List<T>,
+    index: Int,
+    onChange: (T) -> Unit,
+) {
     val tint by androidx.compose.animation.animateColorAsState(
-        targetValue = wheelHeatTint(level),
+        targetValue = targetTint,
         animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
-        label = "wheelHeatTint",
+        label = tintLabel,
     )
     Column {
-        StepRow("Steering wheel heat", level.label, valueColor = tint)
+        StepRow(label, valueLabel, valueColor = tint)
         LevelSlider(index, range, tint, onChange)
     }
 }
