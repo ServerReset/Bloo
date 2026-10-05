@@ -112,7 +112,7 @@ internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel, opaqueBackdrop:
  * The app lock, drawn as an overlay on top of the blurred app. High-contrast
  * white-on-scrim text reads over any wallpaper of cars behind it; a floating
  * back arrow returns to the login screen. Centered + width-capped so it sits
- * well on phones, flip-phone cover screens and tablets alike.
+ * well on phones and tablets alike.
  *
  * Two mechanisms, one overlay:
  *  - **Biometric/biometric** when the device has biometrics enrolled AND

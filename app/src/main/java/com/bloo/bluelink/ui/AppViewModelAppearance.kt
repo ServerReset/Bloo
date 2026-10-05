@@ -71,7 +71,7 @@ fun AppViewModel.setHapticsEnabled(value: Boolean) = viewModelScope.launch { set
 // background's speed; its colors always derive from the current theme.
 fun AppViewModel.setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
 
-/** Where the cover screen's floating search bubble was last dragged to (fractions
+/** Where the floating search bubble was last dragged to (fractions
  *  of its own drag range), or null if never dragged. See SettingsStore's own doc. */
 suspend fun AppViewModel.searchBubblePosition(): Pair<Float, Float>? = settingsStore.searchBubblePosition()
 fun AppViewModel.setSearchBubblePosition(xFrac: Float, yFrac: Float) =

@@ -61,8 +61,8 @@ class SettingsStore(internal val context: Context) {
         val HAPTICS = stringPreferencesKey("haptics_enabled")
         val PEBBLE_OUTLINE = stringPreferencesKey("pebble_outline")
         val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey("seamless_install_shizuku")
-        // Fractions (0f..1f) of the cover screen's own drag range, not raw dp -- the
-        // physical cover display doesn't change size between sessions, but a fraction
+        // Fractions (0f..1f) of the search bubble's own drag range, not raw dp -- the
+        // display doesn't change size between sessions, but a fraction
         // still degrades gracefully if it ever did, where a raw dp coordinate could
         // clamp to a corner it wasn't actually dropped near. Kept OUT of the Appearance
         // bundle deliberately: that flow is collected by most of the app's UI (theme,

@@ -93,7 +93,7 @@ suspend fun SettingsStore.setDoorOpenSince(vin: String, value: Long?) {
 }
 
 /**
- * Where the user last parked the cover screen's floating search bubble, as
+ * Where the user last parked the floating search bubble, as
  * fractions (0f..1f) of its own drag range -- null until it has been dragged
  * at least once. A plain one-shot suspend read, not a collected Flow: the
  * bubble's own composable seeds itself from this once (see SearchLayer),
