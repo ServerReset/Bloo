@@ -4,11 +4,8 @@ package com.bloo.bluelink.ui
  *  timing constant, and the per-result pop-in helper. Peeled out of
  *  SettingsSearch.kt into its own file. */
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
@@ -38,14 +35,12 @@ import com.bloo.bluelink.data.lastServiceMiles
 import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.setBiometricLock
-import com.bloo.bluelink.data.setFontChoice
 import com.bloo.bluelink.data.setLastServiceMiles
 import com.bloo.bluelink.data.setLicensePlate
 import com.bloo.bluelink.data.setLockTiming
 import com.bloo.bluelink.data.setPlatform
 import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setServiceIntervalMiles
-import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.settingsMode
 
 /**
@@ -75,7 +70,7 @@ internal fun buildSettingsSearchEntries(
         if (!spec.visible(state)) return@forEach
         // Additional mode filter for ToggleSettings
         if (!isSettingAvailableInMode(spec.title, state.settingsMode)) return@forEach
-        add(spec.title, spec.keywords) {
+        add(spec.title, "${spec.keywords} ${spec.phrases}") {
             ToggleRow(spec.label, spec.checked(appearance, notif, state)) { spec.onToggle(vm, it) }
         }
     }
@@ -139,40 +134,10 @@ internal fun buildSettingsSearchEntries(
             }
         }
     }
-    add("Text & layout scale", "display size zoom bigger") {
-        // Deferred-commit, same as the main Appearance card's slider — see there.
-        UiScaleSlider(appearance, vm, label = "Scale")
-    }
-    add("Glass clarity", "liquid glass transparency frosted misted crystal ultra warp refraction blur backing everywhere") {
-        GlassClaritySlider(appearance, vm)
-    }
-    add("Colour vibrancy", "color saturation vivid material you monochrome best buy tv") {
-        // Deferred-commit, same as the main Appearance card's slider — see there.
-        VibrancySlider(appearance, vm)
-    }
-    add("Units", "unit system metric imperial temperature distance speed miles km") {
-        UnitSystemRow(appearance, vm)
-    }
-    add("Temperature unit", "temperature celsius fahrenheit degrees c f units") {
-        TempUnitRow(appearance, vm)
-    }
-    add("Distance unit", "distance mileage odometer range miles kilometres km units") {
-        DistanceUnitRow(appearance, vm)
-    }
-    add("Font", "typeface atkinson hyperlegible google sans accessibility low vision") {
-        val labels = mapOf(
-            FontChoice.SYSTEM to "System default",
-            FontChoice.ATKINSON to "Atkinson Hyperlegible",
-            FontChoice.GOOGLE_SANS to "Google Sans",
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            FontChoice.entries.forEach { choice ->
-                ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
-            }
-        }
-    }
-    add("Display mode", "theme light dark amoled oled system appearance") {
-        ThemeModeSegmentedRow(appearance) { vm.setThemeMode(it) }
+    // Every range and every picker, straight from the registry: no per-setting code here.
+    (RangeSettings + ChoiceSettings).forEach { spec ->
+        if (!spec.visible(state)) return@forEach
+        add(spec.title, "${spec.keywords} ${spec.phrases}") { spec.content(appearance, notif, state, vm) }
     }
     // --- Per-car ---
     state.vehicles.forEach { v ->
@@ -267,6 +232,15 @@ internal fun buildSettingsSearchEntries(
         // pattern AutoLockSettingsGroup's own Settings card already uses.
         add("AutoLock · ${v.name}", "autolock automatic lock leave walk away bluetooth disconnect ${v.name}") {
             AutoLockSearchToggle(v, vm, "Enabled", { it.enabled }, { c, x -> c.copy(enabled = x) })
+        }
+        add("AutoLock grace period · ${v.name}", "autolock grace period seconds wait delay countdown before locking ${v.name} how long before it locks") {
+            AutoLockGraceSearchRow(v, vm)
+        }
+        com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
+            val action = com.bloo.bluelink.Shortcuts.actionLabel(cmd)
+            add("Shortcut: $action · ${v.name}", "app shortcut launcher icon long press quick action $action ${v.name}") {
+                ToggleRow(action, state.isShortcutEnabled(v.vin, cmd)) { vm.setShortcutEnabled(v.vin, cmd, it) }
+            }
         }
         add("AutoLock dry run · ${v.name}", "autolock dry run test simulate safety ${v.name}") {
             AutoLockSearchToggle(v, vm, "Dry run", { it.dryRun }, { c, x -> c.copy(dryRun = x) })

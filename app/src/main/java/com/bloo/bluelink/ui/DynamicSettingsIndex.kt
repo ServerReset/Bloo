@@ -22,6 +22,12 @@ internal val ADVANCED_ONLY_SETTINGS = setOf(
     "Default climate start", // Car settings card - advanced-only per-car setting
     "Temperature unit", // Units group - per-measurement override
     "Distance unit", // Units group - per-measurement override
+    "Car-running alerts", // Notifications card - advanced-only
+    "Car-started alerts", // Notifications card - advanced-only
+    "Left-unlocked alert delay", // Notifications card - advanced-only minutes field
+    "Door-open alert delay", // Notifications card - advanced-only minutes field
+    "Car-running alert delay", // Notifications card - advanced-only minutes field
+    "Aurora motion", // Look card - advanced-only background group
 
     // App-wide settings in Advanced mode only
     "Palette override", // Appearance card - custom palette override

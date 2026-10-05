@@ -4,6 +4,7 @@ package com.bloo.bluelink.ui
  *  timing constant, and the per-result pop-in helper. Peeled out of
  *  SettingsSearch.kt into its own file. */
 
+import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
@@ -88,10 +89,7 @@ internal fun SettingsSearchResults(
     // compiled once at file scope (RxSearchTokens); the split + filter it drives were still
     // re-running per emission, and their result is the `results` memo's key below, so an
     // equal-but-new list would have defeated that memo on every recomposition.
-    val tokens = remember(query) {
-        query.lowercase().split(RxSearchTokens)
-            .filter { it.isNotBlank() && it !in SearchStopwords }
-    }
+    val tokens = remember(query) { searchTokens(query) }
     // Same source the main Settings screen uses for its own Security card gate.
     val canBio = remember { vm.canUseBiometrics() }
 
@@ -483,4 +481,25 @@ internal fun AutoLockSearchToggle(
         config = updated
         vm.setAutoLockConfig(v.vin, updated)
     }
+}
+
+
+/** AutoLock's grace period as a search result: the same slider the AutoLock card shows, loaded and saved the same way. */
+@Composable
+internal fun AutoLockGraceSearchRow(v: Vehicle, vm: AppViewModel) {
+    var config by remember(v.vin) { mutableStateOf<AutoLockConfig?>(null) }
+    LaunchedEffect(v.vin) { config = vm.autoLockConfig(v.vin) }
+    val current = config ?: return
+    StepRow("Grace period", "${current.graceSeconds}s")
+    AnimatedSlider(
+        value = current.graceSeconds.toFloat(),
+        onValueChange = { config = current.copy(graceSeconds = it.roundToInt()) },
+        onValueSettled = {
+            val updated = current.copy(graceSeconds = it.roundToInt())
+            config = updated
+            vm.setAutoLockConfig(v.vin, updated)
+        },
+        valueRange = 10f..120f,
+        steps = 10,
+    )
 }
