@@ -165,51 +165,33 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 Column(
                     verticalArrangement = Arrangement.spacedBy(GapGroup)
                 ) {
-                // A live CarMap sharing expandedMap.mapStateFor(v.vin) with the full-screen overlay
-                // (same pan/zoom/tile cache).
+                // A live CarMap; inside the garage it shares pan/zoom/tiles with the full-screen map and can expand into it.
                 val expandedMap = LocalExpandedMap.current
-                if (expandedMap != null) {
-                    val isExpanded = expandedMap.vin == v.vin
-                    CarMap(
-                        loc,
-                        Modifier
-                            .fillMaxWidth()
-                            .height(if (glance) 130.dp else 220.dp)
-                            .clip(StandardShape)
-                            .onGloballyPositioned {
-                                expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
-                                expandedMap.locationFor(v.vin).value = loc
-                            }
-                            .graphicsLayer { alpha = if (isExpanded) 0f else 1f },
-                        state = expandedMap.mapStateFor(v.vin),
-                        deviceLocation = state.deviceLocation,
-                    )
-                    // Real buttons under the map, same MapFeature shape as the full-screen map's
-                    // toolbar.
-                    MapFeatureRow(
-                        features = listOf(
-                            MapFeature(Icons.Filled.Fullscreen, "Expand") { expandedMap.vin = v.vin },
-                            MapFeature(Icons.Filled.Map, "Open in Maps") { openInExternalMaps(context, loc, v.name) },
+                val isExpanded = expandedMap?.vin == v.vin
+                val ownMapState = remember { CarMapState() }
+                CarMap(
+                    loc,
+                    Modifier
+                        .fillMaxWidth()
+                        .height(if (glance) 130.dp else 220.dp)
+                        .clip(StandardShape)
+                        .then(
+                            if (expandedMap == null) Modifier else Modifier
+                                .onGloballyPositioned {
+                                    expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
+                                    expandedMap.locationFor(v.vin).value = loc
+                                }
+                                .graphicsLayer { alpha = if (isExpanded) 0f else 1f },
                         ),
-                    )
-                } else {
-                    // Not inside the garage's expandable map host: a plain map, with no expand to
-                    // offer.
-                    CarMap(
-                        loc,
-                        Modifier
-                            .fillMaxWidth()
-                            .height(if (glance) 130.dp else 220.dp)
-                            .clip(StandardShape),
-                        state = remember { CarMapState() },
-                        deviceLocation = state.deviceLocation,
-                    )
-                    MapFeatureRow(
-                        features = listOf(
-                            MapFeature(Icons.Filled.Map, "Open in Maps") { openInExternalMaps(context, loc, v.name) },
-                        ),
-                    )
-                }
+                    state = expandedMap?.mapStateFor(v.vin) ?: ownMapState,
+                    deviceLocation = state.deviceLocation,
+                )
+                MapFeatureRow(
+                    features = listOfNotNull(
+                        expandedMap?.let { host -> MapFeature(Icons.Filled.Fullscreen, "Expand") { host.vin = v.vin } },
+                        MapFeature(Icons.Filled.Map, "Open in Maps") { openInExternalMaps(context, loc, v.name) },
+                    ),
+                )
                 if (!glance && place == null) StatusRow("Location", loc.coordString())
                 // Phone-to-car distance; absent (not zero) until a device fix exists.
                 if (!glance) {
