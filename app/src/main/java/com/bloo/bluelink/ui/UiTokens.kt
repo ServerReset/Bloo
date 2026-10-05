@@ -70,13 +70,11 @@ internal fun mutedContentColor(): androidx.compose.ui.graphics.Color =
     androidx.compose.material3.LocalContentColor.current.copy(alpha = MutedContentAlpha)
 
 /**
- * Text and icons drawn on the hero's car photo: always near-white, because the hero is always
- * scrimmed dark.
+ * Text and icons drawn on the hero card, which is always the OPPOSITE tone of the theme (a dark card in
+ * the light theme, a light card in the dark theme), so its text is the opposite of the surface's own.
  */
-internal val HeroOnPhoto = Color(0xFFF7F7FA)
-
 @Composable
-internal fun heroOnPhoto(): Color = HeroOnPhoto
+internal fun heroOnPhoto(): Color = if (appIsDarkTheme()) Color(0xFF1A1B20) else Color(0xFFF7F7FA)
 
 // ---- Sizing -------------------------------------------------------------------
 

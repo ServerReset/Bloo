@@ -54,18 +54,15 @@ import kotlinx.coroutines.delay
  */
 @Composable
 internal fun carTonalBrush(scheme: ColorScheme): Brush {
-    // Deepened accent family (primary -> container -> tertiary -> secondary) so the hero's light
-    // text always has contrast, in light and dark themes alike, and the card reads as one lit,
-    // saturated surface.
-    val amount = if (appIsDarkTheme()) 0.25f else 0.38f
-    val deepen = { c: Color -> lerp(c, Color.Black, amount) }
+    // The hero is the opposite tone of the theme: deep, saturated accents in the light theme (under light text),
+    // pale tints of the same accents in the dark theme (under dark text). Primary leads, tertiary and secondary
+    // sweep across it, so the card always reads as the palette's own colours.
+    val dark = appIsDarkTheme()
+    val toward = if (dark) Color.White else Color.Black
+    val amount = if (dark) 0.62f else 0.5f
+    val tone = { c: Color -> lerp(c, toward, amount) }
     return Brush.linearGradient(
-        listOf(
-            deepen(scheme.primary),
-            deepen(scheme.primaryContainer),
-            deepen(scheme.tertiary),
-            deepen(scheme.secondary),
-        ),
+        listOf(tone(scheme.primary), tone(scheme.tertiary), tone(scheme.secondary)),
         start = androidx.compose.ui.geometry.Offset.Zero,
         end = androidx.compose.ui.geometry.Offset.Infinite,
     )
@@ -95,15 +92,22 @@ internal fun HeroPhotoBackdrop(
 ) {
     Box(Modifier.fillMaxWidth()) {
         HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio)
-        // A colour wash with no photo needs only a gentle one.
+        // The scrim is the card's own opposite tone: darkening in the light theme (light text), lightening in the
+        // dark theme (dark text). A colour wash with no photo needs only a gentle one.
+        val dark = appIsDarkTheme()
         val gentle = imageUrl.isNullOrBlank()
-        val scrim = remember(gentle) {
-            val (top, mid, low, bottom) = if (gentle) listOf(0.12f, 0.02f, 0.05f, 0.22f) else listOf(0.5f, 0.16f, 0.2f, 0.62f)
+        val scrim = remember(gentle, dark) {
+            val tone = if (dark) Color.White else Color.Black
+            val (top, mid, low, bottom) = when {
+                gentle -> listOf(0.10f, 0.02f, 0.04f, 0.16f)
+                dark -> listOf(0.55f, 0.22f, 0.28f, 0.62f)
+                else -> listOf(0.5f, 0.16f, 0.2f, 0.62f)
+            }
             Brush.verticalGradient(
-                0f to Color.Black.copy(alpha = top),
-                0.30f to Color.Black.copy(alpha = mid),
-                0.62f to Color.Black.copy(alpha = low),
-                1f to Color.Black.copy(alpha = bottom),
+                0f to tone.copy(alpha = top),
+                0.30f to tone.copy(alpha = mid),
+                0.62f to tone.copy(alpha = low),
+                1f to tone.copy(alpha = bottom),
             )
         }
         Spacer(Modifier.matchParentSize().background(scrim))

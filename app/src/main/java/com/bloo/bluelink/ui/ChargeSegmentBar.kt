@@ -11,15 +11,11 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
-import androidx.compose.animation.core.snap
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
@@ -38,7 +33,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.composed
 
 /**
  * The hero's segmented charge bar and its layout math. Split out of HeroReadout.kt to separate this
@@ -63,10 +57,10 @@ internal fun ChargeSegmentBar(
 ) {
     val scheme = MaterialTheme.colorScheme
     val limit = limitPct?.takeIf { it in 1..99 }
-    val trackColor = if (collapsed) Color.White.copy(alpha = 0.28f) else scheme.onSurface.copy(alpha = 0.16f)
+    val trackColor = if (collapsed) heroOnPhoto().copy(alpha = 0.28f) else scheme.onSurface.copy(alpha = 0.16f)
     // The past-the-limit zone. The trailing (dimmed) segments FLIP between collapsed and expanded,
     // on top of the theme's own inversion.
-    val darkCardBehind = collapsed || appIsDarkTheme()
+    val darkCardBehind = appIsDarkTheme() == collapsed
     val heavyScrim = darkCardBehind
     val farBackdropColor = if (heavyScrim) Color.White.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.24f)
     val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else scheme.onSurface.copy(alpha = 0.14f)
