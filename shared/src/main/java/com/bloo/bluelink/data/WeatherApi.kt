@@ -25,6 +25,20 @@ data class Weather(
     val isDay: Boolean,
     /** WMO weather interpretation code (see [WeatherCode]). */
     val code: Int,
+    /**
+     * The next several hours at this point, oldest first and starting at the hour the
+     * reading was taken -- feeds the "next hours" strip in the redesigned weather block.
+     * Empty when Open-Meteo's hourly block is absent (an old cached reading, or a
+     * malformed response), in which case the strip simply doesn't render rather than
+     * inventing points.
+     */
+    val hourly: List<HourPoint> = emptyList(),
+    /**
+     * The daily forecast, today first. [highC]/[lowC] above are the FIRST element of this
+     * for backward compatibility; the rest drive the multi-day rows. Empty when the daily
+     * block is absent, same "render nothing rather than invent one" rule as [hourly].
+     */
+    val daily: List<DayPoint> = emptyList(),
     /** When this reading was fetched (wall-clock millis). */
     val fetchedAt: Long = System.currentTimeMillis(),
 ) {
@@ -65,6 +79,39 @@ data class Weather(
 
     /** Maps the raw WMO [code] to the coarser [WeatherCode] bucket used by the UI. */
     val condition: WeatherCode get() = WeatherCode.from(code)
+}
+
+/**
+ * One hour of the forecast: the ISO-local timestamp Open-Meteo labels the hour with
+ * (kept as the raw string, e.g. "2024-06-01T14:00", since the API returns the location's
+ * own local wall-clock when `timezone=auto` and re-parsing it through the device's zone
+ * would shift the label), the air temperature in Celsius, the WMO code, and the
+ * precipitation probability as an integer percent when the API supplied one.
+ */
+data class HourPoint(
+    val time: String,
+    val tempC: Double,
+    val code: Int,
+    val precipProbability: Int?,
+) {
+    /** The hour-of-day (0..23) parsed off [time]'s "…THH:00" tail, or null if unparseable. */
+    val hour: Int? get() = time.substringAfter('T', "").substringBefore(':').toIntOrNull()
+    val condition: WeatherCode get() = WeatherCode.from(code)
+}
+
+/**
+ * One day of the forecast: the ISO-local date ("2024-06-01"), the max/min temperature in
+ * Celsius, and the WMO code representative of the day.
+ */
+data class DayPoint(
+    val date: String,
+    val highC: Double?,
+    val lowC: Double?,
+    val code: Int,
+) {
+    val condition: WeatherCode get() = WeatherCode.from(code)
+    /** The "MM-DD" tail of [date], or the whole string if it has no dash. */
+    val shortDate: String get() = date.substringAfter('-').takeIf { it.isNotBlank() } ?: date
 }
 
 /**
@@ -137,6 +184,7 @@ object WeatherApi {
     private data class Response(
         val current: Current? = null,
         val daily: Daily? = null,
+        val hourly: Hourly? = null,
     )
 
     @Serializable
@@ -151,8 +199,18 @@ object WeatherApi {
 
     @Serializable
     private data class Daily(
+        val time: List<String>? = null,
         @SerialName("temperature_2m_max") val max: List<Double>? = null,
         @SerialName("temperature_2m_min") val min: List<Double>? = null,
+        @SerialName("weather_code") val weatherCode: List<Int>? = null,
+    )
+
+    @Serializable
+    private data class Hourly(
+        val time: List<String>? = null,
+        @SerialName("temperature_2m") val temperature: List<Double>? = null,
+        @SerialName("weather_code") val weatherCode: List<Int>? = null,
+        @SerialName("precipitation_probability") val precipProbability: List<Int?>? = null,
     )
 
     /**
@@ -160,12 +218,13 @@ object WeatherApi {
      *
      * Mechanism: runs on [Dispatchers.IO] since this is a blocking network call
      * (OkHttp's synchronous `execute()`, not the async callback API). Builds a
-     * single GET request asking Open-Meteo for both the "current" block (temp,
-     * feels-like, humidity, wind, day/night, weather code) and a one-day "daily"
-     * block (used only for today's high/low), with wind pre-converted to km/h by
-     * the API itself and the timezone auto-detected from the coordinates so the
-     * "day" for the high/low matches the location's own calendar day rather than
-     * the device's.
+     * single GET request asking Open-Meteo for the "current" block (temp,
+     * feels-like, humidity, wind, day/night, weather code), a multi-day "daily"
+     * block (today's high/low plus the next several days' high/low and condition),
+     * and an "hourly" block (the next day-plus of temperature, condition and
+     * precipitation chance), with wind pre-converted to km/h by the API itself and
+     * the timezone auto-detected from the coordinates so the days and hours are the
+     * location's own local wall-clock rather than the device's.
      *
      * The whole body is wrapped in [runCatching] and every failure path --
      * network/IO exception, non-2xx response, empty body, malformed JSON, or a
@@ -178,6 +237,8 @@ object WeatherApi {
      * missing "feels like" falls back to the actual temperature, missing wind
      * falls back to 0, and a missing/malformed day flag defaults to daytime (1).
      * A missing weather code becomes -1, which [WeatherCode.from] maps to UNKNOWN.
+     * The hourly/daily forecast lists are best-effort: a missing block leaves them
+     * empty (the UI renders no strip/rows) rather than failing the whole fetch.
      */
     suspend fun fetch(lat: Double, lon: Double): Weather? = withContext(Dispatchers.IO) {
         runCatching {
@@ -185,8 +246,9 @@ object WeatherApi {
                 "?latitude=$lat&longitude=$lon" +
                 "&current=temperature_2m,apparent_temperature,relative_humidity_2m," +
                 "wind_speed_10m,is_day,weather_code" +
-                "&daily=temperature_2m_max,temperature_2m_min" +
-                "&wind_speed_unit=kmh&forecast_days=1&timezone=auto"
+                "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+                "&hourly=temperature_2m,weather_code,precipitation_probability" +
+                "&wind_speed_unit=kmh&forecast_days=7&timezone=auto"
             val request = Request.Builder().url(url).get().build()
             // .use{} ensures the response body/connection is closed either way,
             // even on one of the early return@use null exits below.
@@ -205,8 +267,41 @@ object WeatherApi {
                     humidity = c.humidity,
                     isDay = (c.isDay ?: 1) == 1,
                     code = c.weatherCode ?: -1,
+                    hourly = parsed.hourly?.toPoints().orEmpty(),
+                    daily = parsed.daily?.toPoints().orEmpty(),
                 )
             }
         }.getOrNull()
+    }
+
+    /** Zips the hourly block's parallel arrays into [HourPoint]s, dropping any hour whose
+     *  timestamp or temperature the API omitted (rather than emitting a hole the strip
+     *  would have to special-case). */
+    private fun Hourly.toPoints(): List<HourPoint> {
+        val times = time ?: return emptyList()
+        val temps = temperature ?: return emptyList()
+        return times.indices.mapNotNull { i ->
+            val t = times.getOrNull(i) ?: return@mapNotNull null
+            val temp = temps.getOrNull(i) ?: return@mapNotNull null
+            HourPoint(
+                time = t,
+                tempC = temp,
+                code = weatherCode?.getOrNull(i) ?: -1,
+                precipProbability = precipProbability?.getOrNull(i),
+            )
+        }
+    }
+
+    /** Zips the daily block's parallel arrays into [DayPoint]s the same "no holes" way. */
+    private fun Daily.toPoints(): List<DayPoint> {
+        val days = time ?: return emptyList()
+        return days.mapIndexed { i, d ->
+            DayPoint(
+                date = d,
+                highC = max?.getOrNull(i),
+                lowC = min?.getOrNull(i),
+                code = weatherCode?.getOrNull(i) ?: -1,
+            )
+        }
     }
 }

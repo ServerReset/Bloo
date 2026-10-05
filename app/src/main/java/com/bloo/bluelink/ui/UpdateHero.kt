@@ -18,6 +18,12 @@ import androidx.compose.ui.unit.dp
  * The version jump at a glance, shared by the update pebble and the Settings update card: the build
  * you have, an arrow, and the build waiting, the new one in the accent colour and larger. Replaces a
  * line of "Build 2440 → Build 2441" text.
+ *
+ * Colour-matched to the idle build number it replaces (see [SettingsHeroCard]): the number you HAVE
+ * uses `onSurface` -- the SAME role the idle big build number uses -- so switching between "2463" and
+ * "2463 → 2464" doesn't change that element's tone; only the NEW build is accented in `primary`, and
+ * the "build" caption matches [LabelText]'s own `onSurfaceVariant` tone. The used number was
+ * `onSurfaceVariant` here, which made the same element a different weight in each state.
  */
 @Composable
 internal fun UpdateDeltaHero(currentBuild: Int, newBuild: Int, modifier: Modifier = Modifier) {
@@ -32,7 +38,7 @@ internal fun UpdateDeltaHero(currentBuild: Int, newBuild: Int, modifier: Modifie
                 "$currentBuild",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Normal,
-                color = scheme.onSurfaceVariant,
+                color = scheme.onSurface,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
             Icon(AppIcons.ArrowForward, contentDescription = "to", tint = scheme.onSurfaceVariant, modifier = Modifier.size(18.dp).padding(bottom = 2.dp))
@@ -45,7 +51,7 @@ internal fun UpdateDeltaHero(currentBuild: Int, newBuild: Int, modifier: Modifie
         )
         Text(
             "build",
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             color = scheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp),
         )

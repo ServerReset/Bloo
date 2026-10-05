@@ -167,7 +167,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     // Show the place name (or a hint) in the header so it's visible even collapsed.
     val summary = place ?: if (location != null) "Located" else "Not located yet"
     Pebble(
-        v, "location", "Location", Icons.Filled.LocationOn, state, vm, modifier, summary = summary,
+        v, "location", "Location & Weather", Icons.Filled.LocationOn, state, vm, modifier, summary = summary,
         headerAction = PebbleHeaderAction(
             label = "Locate",
             icon = Icons.Filled.LocationOn,
@@ -279,20 +279,38 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 LaunchedEffect(loc.latitude, loc.longitude) {
                     if (carWeather == null && !weatherLoading) vm.loadCarWeather(v)
                 }
+                // The phone's own weather, on the same schedule as its location dot --
+                // refreshed by refreshDeviceLocation, but nudged here too in case the
+                // pebble is opened after a fix that didn't trigger a refresh yet.
+                val phoneWeather = state.phoneWeather
+                LaunchedEffect(state.deviceLocation?.latitude, state.deviceLocation?.longitude) {
+                    if (state.deviceLocation != null && phoneWeather == null) vm.loadPhoneWeather()
+                }
                 // Its own PopVisible: weather can arrive AFTER this pebble is already
                 // open (it's a separate fetch triggered above), so this row pops in
                 // live rather than only ever being present from the first frame --
-                // same idiom the Climate pebble's smart-climate section uses. Full detail
-                // (feels like, high/low, humidity, wind), not just the compact WeatherStripe
-                // -- this absorbed the old standalone Weather pebble, which showed exactly
-                // this, so folding it in here as a one-line stripe would have been a real
-                // loss of detail, not just a relocation.
+                // same idiom the Climate pebble's smart-climate section uses.
+                //
+                // Full detail (current + hourly + multi-day forecast), and now BOTH
+                // locations: the car's weather and the phone's own, merged into one
+                // "Here & at the car" readout when you're within ~7 miles (same weather,
+                // so two copies would be redundant) or shown as two labelled blocks when
+                // you're apart. This absorbed the old standalone Weather pebble.
                 PopVisible(visible = carWeather != null) {
-                    if (carWeather != null) {
+                    val cw = carWeather
+                    if (cw != null) {
                         if (glance) {
-                            WeatherStripe(carWeather, fahrenheit, place ?: "At the car")
+                            WeatherStripe(cw, fahrenheit, place ?: "At the car")
                         } else {
-                            WeatherDetail(carWeather, fahrenheit, appearance.metricDistance)
+                            WeatherLocations(
+                                car = cw,
+                                phone = phoneWeather,
+                                place = place,
+                                devicePlace = state.devicePlace,
+                                milesApart = state.deviceLocation?.let { it.distanceMilesTo(loc) },
+                                fahrenheit = fahrenheit,
+                                metric = appearance.metricDistance,
+                            )
                         }
                     }
                 }

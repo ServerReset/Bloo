@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.layout
@@ -124,14 +125,21 @@ internal fun chargeReadoutOf(
             charging -> ChargeGreen
             drivingLabel == "Driving" || drivingLabel == "Running" -> MaterialTheme.colorScheme.primary
             // "Parked" is a real state, not a caption, and it sits on the hero's photo when
-            // the card is open. It reads the SAME colour the title and the numbers use on
-            // that photo -- heroOnPhoto(), which is near-WHITE in light mode and near-black in
-            // dark mode -- rather than LocalContentColor. LocalContentColor is right when the
-            // card is open but equals the card's own onSurface while collapsed, and the parked
-            // line is the one piece the user called out as needing to stay light over the photo
-            // in light mode specifically ("because of the contrast"). "Battery"/"Fuel" (the
+            // the card is open. It must read the SAME colour the title and the numbers use on
+            // that photo -- near-WHITE in light mode, near-black in dark -- AND fall back to
+            // the card's own regular content colour when the card is COLLAPSED (the photo is
+            // gone then, so near-white text on the flat surfaceVariant card was invisible in
+            // light mode; reported as the hero not going back to its regular colour on close).
+            //
+            // Color.Unspecified is the sentinel for that: the render site resolves it to
+            // LocalContentColor.current, which IS the hero's own provider -- it travels
+            // onSurface -> heroOnPhoto() as the card opens and sits at onSurface when closed,
+            // so Parked tracks the morph in both directions without chargeReadoutOf having to
+            // know the transition's current value (this object is derived once and shared by
+            // both densities, so it cannot hold a frame-varying colour). Baking heroOnPhoto()
+            // in here is what made the collapsed Parked line wrong. "Battery"/"Fuel" (the
             // fallback descriptors) keep the muted tone.
-            drivingLabel == "Parked" -> heroOnPhoto()
+            drivingLabel == "Parked" -> Color.Unspecified
             else -> {
                 // The inherited content colour, muted -- NOT a surface role or a raw
                 // isSystemInDarkTheme() test. Reading LocalContentColor tracks the active
@@ -394,7 +402,8 @@ internal fun HeroNumbers(
             ) {
                 if (t > 0.01f) {
                     val statusColor by androidx.compose.animation.animateColorAsState(
-                        data.statusColor, animationSpec = tween(MotionMedium), label = "statusLineColor",
+                        data.statusColor.takeOrElse { LocalContentColor.current },
+                        animationSpec = tween(MotionMedium), label = "statusLineColor",
                     )
                     RollingNumber(
                         data.statusLine,

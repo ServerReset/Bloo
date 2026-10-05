@@ -28,6 +28,12 @@ internal fun AppViewModel.refreshDeviceLocation() {
     viewModelScope.launch {
         val loc = com.bloo.bluelink.autolock.LocationHelper.currentLocation(getApplication()) ?: return@launch
         _state.update { it.copy(deviceLocation = loc.toDeviceGeoLocation()) }
+        // Reverse-geocode the phone's fix so the Location & Weather pebble can label the
+        // "your location" block with a place name, not just coordinates. Best-effort: a
+        // failure leaves the prior name (or null) and is never surfaced as an error.
+        reverseGeocode(loc.toDeviceGeoLocation())?.let { place ->
+            _state.update { it.copy(devicePlace = place.full) }
+        }
         // Hands this SAME fused-location fix to the weather-follows-device path
         // (its own persisted flag, checked inside) rather than letting it do its
         // own separate LocationManager fetch -- see
@@ -35,6 +41,9 @@ internal fun AppViewModel.refreshDeviceLocation() {
         // reported directly as the map's device dot, the home weather card and
         // "distance to car" not agreeing on where "here" is.
         weather.refreshDeviceLocationForWeather(loc)
+        // And the live device-position weather readout for the Location & Weather
+        // pebble's "where you are" half -- same fix, same schedule as the dot.
+        weather.loadPhoneWeather()
     }
 }
 

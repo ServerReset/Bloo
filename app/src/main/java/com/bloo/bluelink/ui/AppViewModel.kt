@@ -462,6 +462,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadCarWeather(v: Vehicle, force: Boolean = false) = weather.loadCarWeather(v, force)
 
+    fun loadPhoneWeather(force: Boolean = false) = weather.loadPhoneWeather(force)
+
     // setColumnsFlipped / setUiScaleSoon / setVibrancySoon / setHapticsEnabled /
     // setPebbleOutline / setShowSearch / searchBubblePosition / setSearchBubblePosition /
     // setSeamlessInstallShizuku / refreshShizukuAvailable / setAuroraBackground /

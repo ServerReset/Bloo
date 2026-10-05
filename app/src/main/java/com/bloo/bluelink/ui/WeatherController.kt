@@ -127,4 +127,24 @@ internal class WeatherController(
             state.update { it.copy(carWeather = it.carWeather + (v.vin to w)) }
         }
     }
+
+    /**
+     * Fetch weather at the PHONE's own last-known position ([UiState.deviceLocation]) so the
+     * Location & Weather pebble can show "here" beside "at the car". Called from
+     * [AppViewModel.refreshDeviceLocation] on the same schedule as the device dot, so the two
+     * never disagree about where "here" is. Fails soft (leaves the prior reading, or null) on
+     * no fix -- this is a background refresh nobody explicitly asked for.
+     */
+    fun loadPhoneWeather(force: Boolean = false) = scope.launch {
+        val loc = state.value.deviceLocation ?: return@launch
+        val cached = state.value.phoneWeather
+        // Same TTL guard as the other loaders -- a reading older than WEATHER_TTL_MS is
+        // re-fetched, so a real drive doesn't keep showing the old city's weather.
+        if (!force && cached != null &&
+            com.bloo.bluelink.data.withinWindow(System.currentTimeMillis(), cached.fetchedAt, WEATHER_TTL_MS)
+        ) return@launch
+        WeatherApi.fetch(loc.latitude, loc.longitude)?.let { w ->
+            state.update { it.copy(phoneWeather = w) }
+        }
+    }
 }

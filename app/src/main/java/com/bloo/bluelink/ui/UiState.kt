@@ -159,6 +159,12 @@ data class UiState(
      * between those moments.
      */
     val deviceLocation: GeoLocation? = null,
+    /**
+     * A short human-readable name for [deviceLocation] (reverse-geocoded on refresh), shown
+     * as the phone-side location label in the Location & Weather pebble. Null until a fix has
+     * been geocoded -- geocoding fails routinely and is never treated as an error.
+     */
+    val devicePlace: String? = null,
     /** Recent EV trips by VIN (loaded lazily when the Trips pebble is shown). */
     val trips: Map<String, List<EvTrip>> = emptyMap(),
     /** User-named climate presets by VIN. */
@@ -184,6 +190,14 @@ data class UiState(
     val homeWeather: Weather? = null,
     /** Current weather at each car's last-known location, keyed by VIN. */
     val carWeather: Map<String, Weather> = emptyMap(),
+    /**
+     * Weather at the PHONE's own last-known position ([deviceLocation]), if fetched -- the
+     * "where you are" half of the Location & Weather pebble's two-location readout. Distinct
+     * from [homeWeather], which follows a user-configured place (or the device only when
+     * `weatherFollowsDevice` is set); this one always tracks the live device fix, so the
+     * phone's block is right next to the car's when you're near it.
+     */
+    val phoneWeather: Weather? = null,
     val licensePlates: Map<String, String> = emptyMap(),
     val lastServiceMiles: Map<String, Int> = emptyMap(),
     val serviceIntervalMiles: Map<String, Int> = emptyMap(),
