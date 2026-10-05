@@ -66,7 +66,7 @@ internal fun DebugCardContent(logs: List<String>, vm: AppViewModel, clipboardSco
             }
             SettingsGroup("Activity log") {
                 BodySmallText("${logs.size} lines, newest last.")
-                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
+                ActionRow {
                     SafeMorphTextButton("Copy", onClick = { copy("bloo logs", logs.joinToString("\n")) })
                     SafeMorphTextButton("Clear", onClick = { vm.clearLogs() }, emphasis = ButtonEmphasis.Destructive)
                 }

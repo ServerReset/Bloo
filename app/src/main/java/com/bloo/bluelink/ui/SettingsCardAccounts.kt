@@ -74,7 +74,7 @@ private fun AccountPanel(creds: Credentials, vm: AppViewModel, addAnother: Boole
         if (creds.brand.requiresPin) {
             PinField(pin, { pin = it }, label = "Service PIN", digitsOnly = false, colors = OutlinedTextFieldDefaults.colors())
         }
-        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
+        ActionRow {
             if (creds.brand.requiresPin && pin.isNotBlank() && pin != creds.pin) {
                 SafeMorphTextButton("Update PIN", onClick = { vm.updatePin(creds.brand, pin) })
             }

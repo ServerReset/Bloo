@@ -292,7 +292,7 @@ internal fun LoginScreen(
                         )
 
                         // Secondary actions share one row, the app's standard button group.
-                        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
+                        ActionRow {
                             SafeMorphTextButton(
                                 text = "Forgot password?",
                                 onClick = {

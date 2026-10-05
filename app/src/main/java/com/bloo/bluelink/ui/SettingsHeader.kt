@@ -238,7 +238,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     Spacer(Modifier.height(GapGroup))
                     // Both update sources share one row: the in-app checker (primary) and the GitHub
                     // Releases page (works when the checker says up-to-date or GitHub's API is flaky).
-                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
+                    ActionRow {
                         SafeMorphTextButton(
                             "Check",
                             onClick = { vm.checkForUpdateManually() },

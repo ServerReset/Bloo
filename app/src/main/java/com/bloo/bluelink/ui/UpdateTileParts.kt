@@ -127,7 +127,7 @@ internal fun UpdateReleaseNotes(
             val looksLong =
                 notes.count { it == '\n' } >= collapsedLines || notes.length > collapsedLines * 48
             val showToggle = looksLong || expanded
-            ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
+            ActionRow {
                 if (showToggle) {
                     SafeMorphTextButton(
                         if (expanded) "Show less" else "Show more",

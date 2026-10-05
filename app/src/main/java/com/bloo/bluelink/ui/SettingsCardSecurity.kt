@@ -9,10 +9,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import com.bloo.bluelink.data.SettingsStore
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.runtime.key
 import android.content.Context
@@ -52,7 +50,7 @@ internal fun SecurityCardContent(
                     if (canBio) "A 4-8 digit PIN that works as a backup when biometrics aren't available."
                     else "This device has no biometrics, so the app unlocks with this PIN.",
                 )
-                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
+                ActionRow {
                     MorphActionButton(
                         label = if (pinSet) "Change PIN" else "Set up PIN",
                         icon = if (pinSet) Icons.Filled.LockReset else AppIcons.Lock,

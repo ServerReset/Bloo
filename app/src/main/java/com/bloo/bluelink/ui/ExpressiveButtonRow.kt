@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -43,3 +44,9 @@ fun ExpressiveButtonRow(
         content()
     }
 }
+
+
+/** The standard full-width row of action buttons under a card's or group's content: wraps, shares the line, rests at [GapRow]. */
+@Composable
+fun ActionRow(content: @Composable () -> Unit) =
+    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow, content = content)

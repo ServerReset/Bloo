@@ -53,7 +53,7 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             )
-            ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
+            ActionRow {
                 MorphActionButton(
                     label = "Set place",
                     icon = Icons.Filled.Place,
