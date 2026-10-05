@@ -1,13 +1,10 @@
 package com.bloo.bluelink.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Arrangement
@@ -29,10 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -51,7 +45,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
 import dev.chrisbanes.haze.HazeState
@@ -153,7 +146,6 @@ internal fun SearchLayer(
         // Resting corner for the bubble and drag bounds that keep it on screen.
         val minX = edge
         val maxX = (maxWidth - bubble - edge).coerceAtLeast(edge)
-        val minY = edge
         val maxY = (maxHeight - bubble - edge - bottomInset).coerceAtLeast(edge)
         val restX = maxX
         val restY = maxY

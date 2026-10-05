@@ -108,23 +108,6 @@ internal fun glassTint(blurred: Boolean): Color {
     }
 }
 
-/**
- * Glass effect: blur (if possible) plus tint in one modifier, for surfaces that can't use
- * [GlassSurface]. [progressive] fades the blur across the shape; only full-height scrims use it,
- * since on a small chip it leaves half the shape barely blurred.
- */
-@Composable
-internal fun Modifier.glassEffect(
-    hazeState: HazeState?,
-    progressive: Boolean = false,
-): Modifier {
-    val canBlur = hazeState != null && canBlurBackdrops()
-    val tint = glassTint(canBlur)
-    return this
-        .hazeWhenAble(hazeState, progressive)
-        .background(tint)
-}
-
  internal fun Modifier.appHazeEffect(state: HazeState, progressive: Boolean = false, cheap: Boolean = false): Modifier =
     this.hazeBlur(
         input = HazeInput.Sources(state),

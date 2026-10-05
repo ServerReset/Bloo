@@ -166,20 +166,6 @@ fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
 
 // These hit EV-only endpoints, so route through electric(v) (forces isEv for user-marked PHEVs).
 
-/**
- * One-tap climate for surfaces with no room for the Climate pebble (the flip cover's action bar).
- */
-fun AppViewModel.toggleClimate(v: Vehicle) {
-    if (_state.value.statusFor(v)?.airCtrlOn == true) {
-        stopClimate(v)
-        return
-    }
-    viewModelScope.launch {
-        val saved = runCatching { loadSavedClimate(v) }.getOrNull()
-        startClimate(v, saved ?: ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
-    }
-}
-
 /** Begin charging; optimistically sets [VehicleStatus.evStatus]'s batteryCharge to true. */
 fun AppViewModel.startCharge(v: Vehicle) =
     runCommand(v.vin, "charge", "Charging", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = true)) }) {

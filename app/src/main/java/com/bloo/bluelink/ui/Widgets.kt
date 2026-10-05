@@ -4,10 +4,8 @@ import dev.chrisbanes.haze.HazeState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.only
@@ -47,7 +45,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.bloo.bluelink.data.SettingsStore
-import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.SegmentOption
 
 /**
@@ -161,12 +158,6 @@ internal val HeaderCornerGap = 12.dp
  * centre.
  */
 internal val HeaderButtonSize = 48.dp
-
-/**
- * Extra room reserved below a header button's footprint, since its ambient/drop shadow extends past
- * the logical box.
- */
-internal val HeaderContentClearance = 12.dp
 
 /**
  * A small translucent circular icon button used as a floating overlay control. [outerPadding] is

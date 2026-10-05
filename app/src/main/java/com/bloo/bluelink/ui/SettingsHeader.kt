@@ -46,7 +46,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -97,11 +96,6 @@ internal fun rememberGridItemVisibility(visible: Boolean): MutableTransitionStat
     }
     return transition
 }
-
-/** An [AnimatedVisibility] state that starts hidden and animates in on first composition. */
-@Composable
-internal fun rememberAppearedState(): MutableTransitionState<Boolean> =
-    remember { MutableTransitionState(false) }.apply { targetState = true }
 
 @Composable
 internal fun staggeredAdvancedVisible(advanced: Boolean, index: Int): Boolean {
