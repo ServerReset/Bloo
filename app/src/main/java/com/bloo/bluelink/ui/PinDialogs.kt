@@ -145,7 +145,7 @@ internal fun PinDialogs(
                     spacing = GapRow,
                     equalWidths = true,
                 ) {
-                    MorphTextButton("Cancel", onDismiss)
+                    MorphTextButton("Cancel", onDismiss, emphasis = ButtonEmphasis.Deny)
                     // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text had no
                     // `style`, so it rendered at a different size than "Cancel" right beside it in
                     // this same row, confirmed by audit.
@@ -156,6 +156,7 @@ internal fun PinDialogs(
                             vm.verifyAppPin(currentPin)
                         },
                         enabled = currentPin.length >= 4,
+                        emphasis = ButtonEmphasis.Confirm,
                     )
                 }
                 "finish" -> {
@@ -170,7 +171,7 @@ internal fun PinDialogs(
                             spacing = GapRow,
                             equalWidths = true,
                         ) {
-                            MorphTextButton("Keep PIN", onDismiss)
+                            MorphTextButton("Keep PIN", onDismiss, emphasis = ButtonEmphasis.Confirm)
                             // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- same
                             // missing-style issue as "Continue" above.
                             MorphTextButton(
@@ -185,6 +186,7 @@ internal fun PinDialogs(
                         "Done",
                         onClick = { haptics?.click(); onDismiss() },
                         modifier = Modifier.fillMaxWidth(),
+                        emphasis = ButtonEmphasis.Confirm,
                     )
                 }
             }

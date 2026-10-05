@@ -154,6 +154,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                 SafeMorphTextButton(
                     "Cancel",
                     onClick = onCancel,
+                    emphasis = ButtonEmphasis.Deny,
                 )
                 val confirmSource = remember { MutableInteractionSource() }
                 MorphButton(

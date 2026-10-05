@@ -459,7 +459,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                             icon = if (isLast) AppIcons.CheckCircle else AppIcons.Check,
                             onClick = { goNext() },
                             enabled = blockedHere == null,
-                            active = true,
+                            emphasis = ButtonEmphasis.Confirm,
                         )
                     }
                     blockedHere?.let { BodySmallText(it) }

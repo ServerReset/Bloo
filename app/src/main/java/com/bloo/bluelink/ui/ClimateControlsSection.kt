@@ -188,6 +188,7 @@ internal fun ClimateControlsSection(
             text = "Save as preset",
             onClick = onSaveAsPreset,
             modifier = Modifier.fillMaxWidth(),
+            emphasis = ButtonEmphasis.Confirm,
         )
     }
 }

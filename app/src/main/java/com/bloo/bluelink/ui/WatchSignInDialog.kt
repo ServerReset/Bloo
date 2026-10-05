@@ -44,12 +44,13 @@ internal fun WatchSignInDialog() {
         },
         buttons = {
             if (current is WatchSignIn.State.Confirm) {
-                MorphActionButton("They match", Icons.Filled.Watch, { WatchSignIn.confirm(context) }, Modifier.fillMaxWidth())
+                MorphActionButton("They match", Icons.Filled.Watch, { WatchSignIn.confirm(context) }, Modifier.fillMaxWidth(), emphasis = ButtonEmphasis.Confirm)
             }
             MorphTextButton(
                 if (current == WatchSignIn.State.Done) "Done" else "Cancel",
                 onClick = WatchSignIn::dismiss,
                 modifier = Modifier.fillMaxWidth(),
+                emphasis = if (current == WatchSignIn.State.Done) ButtonEmphasis.Confirm else ButtonEmphasis.Deny,
             )
         },
     )

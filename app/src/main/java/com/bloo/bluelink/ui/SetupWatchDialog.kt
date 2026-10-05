@@ -132,6 +132,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                             onDismiss()
                         },
                         modifier = Modifier.fillMaxWidth(),
+                        emphasis = ButtonEmphasis.Confirm,
                     )
                 } else if (watch == null) {
                     MorphActionButton("Wireless debugging is on", Icons.Filled.Watch, { step = WatchSetupStep.Pair }, Modifier.fillMaxWidth())
@@ -151,6 +152,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    emphasis = ButtonEmphasis.Confirm,
                 )
                 WatchSetupStep.Install -> MorphActionButton(
                     label = "Install Bloo",
@@ -173,6 +175,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    emphasis = ButtonEmphasis.Confirm,
                 )
                 WatchSetupStep.Done -> Unit
             }

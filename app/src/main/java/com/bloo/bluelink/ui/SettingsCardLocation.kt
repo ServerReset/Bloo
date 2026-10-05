@@ -42,7 +42,7 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
                     tint = MaterialTheme.colorScheme.primary,
                     title = place,
                     subtitle = "Weather and the map use this place",
-                    trailing = { SafeMorphTextButton("Clear", onClick = { vm.clearWeatherLocation() }, fillOnPress = false) },
+                    trailing = { SafeMorphTextButton("Clear", onClick = { vm.clearWeatherLocation() }, fillOnPress = false, emphasis = ButtonEmphasis.Deny) },
                 )
             }
             BlooTextField(
@@ -59,6 +59,7 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
                     icon = Icons.Filled.Place,
                     enabled = query.isNotBlank(),
                     onClick = { vm.setWeatherPlace(query); query = "" },
+                    emphasis = ButtonEmphasis.Confirm,
                 )
                 MorphActionButton(
                     label = "My location",

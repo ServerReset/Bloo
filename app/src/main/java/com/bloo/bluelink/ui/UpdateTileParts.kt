@@ -160,11 +160,13 @@ internal fun UpdateDismissRow(
             "Remind me",
             onClick = { vm.snoozeUpdate() },
             enabled = !busy,
+            emphasis = ButtonEmphasis.Confirm,
         )
         SafeMorphTextButton(
             "Not now",
             onClick = vm::dismissUpdate,
             enabled = !busy,
+            emphasis = ButtonEmphasis.Deny,
         )
     }
 }

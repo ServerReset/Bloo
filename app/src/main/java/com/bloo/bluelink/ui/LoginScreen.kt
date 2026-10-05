@@ -319,7 +319,7 @@ internal fun LoginScreen(
                                 },
                             )
                             if (onCancel != null) {
-                                SafeMorphTextButton(text = "Cancel", onClick = onCancel)
+                                SafeMorphTextButton(text = "Cancel", onClick = onCancel, emphasis = ButtonEmphasis.Deny)
                             }
                         }
 
@@ -425,13 +425,15 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !loading && code.isNotBlank(),
                     pending = loading,
+                    emphasis = ButtonEmphasis.Confirm,
                 )
             }
             SafeMorphTextButton(
                 "Cancel",
                 vm::kiaCancelOtp,
                 enabled = !loading,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                emphasis = ButtonEmphasis.Deny,
             )
         },
     )
@@ -462,12 +464,14 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !loading && code.isNotBlank(),
                 pending = loading,
+                emphasis = ButtonEmphasis.Confirm,
             )
             SafeMorphTextButton(
                 "Cancel",
                 vm::canadaCancelOtp,
                 enabled = !loading,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                emphasis = ButtonEmphasis.Deny,
             )
         },
     )

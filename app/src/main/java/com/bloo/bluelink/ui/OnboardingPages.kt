@@ -170,6 +170,7 @@ internal fun OnboardingSetupPage(
             icon = Icons.Filled.Cloud,
             onClick = { showDriveDialog = true },
             modifier = Modifier.fillMaxWidth(),
+            emphasis = ButtonEmphasis.Confirm,
         )
     }
 }
@@ -381,7 +382,7 @@ internal fun OnboardingAlertsPage(notif: SettingsStore.NotificationPrefs, vm: Ap
 internal fun OnboardingWatchPage(state: UiState) {
     var show by remember { mutableStateOf(false) }
     BodySmallText("Got a Wear OS watch? Bloo has a watch app with quick actions, a Tile and its own notifications. It installs straight from this phone, no Play Store needed.")
-    SafeMorphTextButton("Set up my watch", onClick = { show = true }, icon = Icons.Filled.Watch)
+    SafeMorphTextButton("Set up my watch", onClick = { show = true }, icon = Icons.Filled.Watch, emphasis = ButtonEmphasis.Confirm)
     BodySmallText("No watch? Swipe on. You can set one up later from Settings → Backup & sync.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     if (show) SetupWatchDialog(phoneName = "this phone", onDismiss = { show = false })
 }

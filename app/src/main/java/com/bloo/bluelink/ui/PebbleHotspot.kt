@@ -119,7 +119,7 @@ internal fun HotspotSlot(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    MorphTextButton("Remove", onClick = { vm.setHotspot(v, secondaryPebble) })
+                    MorphTextButton("Remove", onClick = { vm.setHotspot(v, secondaryPebble) }, emphasis = ButtonEmphasis.Deny)
                 }
                 CompositionLocalProvider(LocalForceExpanded provides true) {
                     Box(

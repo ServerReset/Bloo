@@ -74,7 +74,7 @@ private fun AccountPanel(creds: Credentials, vm: AppViewModel, addAnother: Boole
         }
         ActionRow {
             if (creds.brand.requiresPin && pin.isNotBlank() && pin != creds.pin) {
-                SafeMorphTextButton("Update PIN", onClick = { vm.updatePin(creds.brand, pin) })
+                SafeMorphTextButton("Update PIN", onClick = { vm.updatePin(creds.brand, pin) }, emphasis = ButtonEmphasis.Confirm)
             }
             SafeMorphTextButton(
                 text = if (signOut.armed) "Tap again to confirm" else "Sign out",

@@ -138,13 +138,14 @@ internal fun PaletteEditorDialog(
                     )
                     onDismiss()
                 },
-    modifier = Modifier.fillMaxWidth(),
-    active = true,
-)
+                modifier = Modifier.fillMaxWidth(),
+                emphasis = ButtonEmphasis.Confirm,
+            )
             SafeMorphTextButton(
                 "Cancel",
                 onDismiss,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                emphasis = ButtonEmphasis.Deny,
             )
         },
     )

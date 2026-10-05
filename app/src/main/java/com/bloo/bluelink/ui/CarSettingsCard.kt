@@ -96,7 +96,7 @@ internal fun CarSettingsCard(
             // other.
             ExpressiveButtonRow(spacing = GapRow) {
                 MorphTextButton(if (hasPhoto) "Change photo" else "Choose photo", onClick = onPickPhoto)
-                if (hasPhoto) MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") })
+                if (hasPhoto) MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") }, emphasis = ButtonEmphasis.Deny)
             }
         }
 

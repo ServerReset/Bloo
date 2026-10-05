@@ -351,6 +351,7 @@ internal fun ClimatePebble(
                         "Cancel",
                         onClick = { showAddPreset = false },
                         modifier = Modifier.fillMaxWidth(),
+                        emphasis = ButtonEmphasis.Deny,
                     )
                 },
             )

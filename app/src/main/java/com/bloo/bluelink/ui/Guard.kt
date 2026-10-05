@@ -331,6 +331,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                                 "Use biometrics",
                                 onClick = { haptics?.click(); usePinMode = false; authenticateBiometric() },
                                 modifier = Modifier.fillMaxWidth(),
+                                emphasis = ButtonEmphasis.Confirm,
                             )
                         }
                     }

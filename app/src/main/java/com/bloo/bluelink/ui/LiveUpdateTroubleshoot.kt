@@ -71,6 +71,7 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
                 "Allow background activity",
                 onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
                 modifier = Modifier.fillMaxWidth(),
+                emphasis = ButtonEmphasis.Confirm,
             )
             if (isSamsung) {
                 SafeMorphTextButton(

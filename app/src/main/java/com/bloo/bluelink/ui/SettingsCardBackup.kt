@@ -188,7 +188,7 @@ private fun ManualBackup(vm: AppViewModel, context: Context) {
         BodySmallText("A one-time snapshot file. Credentials are never included.")
         ActionRow {
             SafeMorphTextButton("Export", onClick = { vm.exportSettings(context) })
-            SafeMorphTextButton("Restore", onClick = { importLauncher.launch("application/json") })
+            SafeMorphTextButton("Restore", onClick = { importLauncher.launch("application/json") }, emphasis = ButtonEmphasis.Confirm)
         }
     }
 }

@@ -217,7 +217,8 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                 SafeMorphTextButton(
                     "Cancel",
                     onClick = { renaming = false },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    emphasis = ButtonEmphasis.Deny,
                 )
             },
         )
