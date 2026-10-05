@@ -128,7 +128,7 @@ class PhoneWatchSyncService : WearableListenerService() {
             val app = context.applicationContext
             CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                 runCatching {
-                    val bytes = okhttp3.OkHttpClient().newCall(
+                    val bytes = com.bloo.bluelink.data.ApiHttp.client.newCall(
                         okhttp3.Request.Builder().url(url).get().build(),
                     ).execute().use { resp ->
                         if (!resp.isSuccessful) error("HTTP ${resp.code}")
