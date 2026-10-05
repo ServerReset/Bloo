@@ -1,10 +1,8 @@
 package com.bloo.bluelink.data
 
 /**
- * One signed-in brand's vehicle operations, however that brand's backend works
- * underneath (Hyundai/Genesis telematics, or Kia Connect via [KiaRepository]).
- * Sign-in is brand-specific (Kia needs an OTP round-trip) so it lives on the
- * concrete types, not here.
+ * One signed-in brand's vehicle operations, however that brand's backend works underneath
+ * (Hyundai/Genesis telematics, or Kia Connect via [KiaRepository]).
  */
 interface VehicleRepository {
     suspend fun logout()
@@ -22,22 +20,24 @@ interface VehicleRepository {
     suspend fun startCharge(v: Vehicle)
     suspend fun stopCharge(v: Vehicle)
 
-    /** True where the backend actually supports [flashLights]/[hornAndLights]
-     *  (Hyundai/Genesis US telematics only -- Kia's US API has no equivalent). */
+    /**
+     * True where the backend actually supports [flashLights]/[hornAndLights] (Hyundai/Genesis US
+     * telematics only -- Kia's US API has no equivalent).
+     */
     val supportsHornLights: Boolean get() = false
     suspend fun flashLights(v: Vehicle) {}
     suspend fun hornAndLights(v: Vehicle) {}
 }
 
 /**
- * Build the right repository for a brand. Kia US rides a different backend
- * ([KiaRepository]); the three Canada brands share [CanadaApi]; Europe (CCS2)
- * rides [EuApi]; Hyundai/Genesis US share the Hyundai-shaped [BlueLinkApi].
+ * Build the right repository for a brand. Kia US rides a different backend ([KiaRepository]); the
+ * three Canada brands share [CanadaApi]; Europe (CCS2) rides [EuApi]; Hyundai/Genesis US share the
+ * Hyundai-shaped [BlueLinkApi].
  */
 fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStore): VehicleRepository {
-    // Timed as a whole: constructing an Api builds an OkHttpClient (dispatcher, thread
-    // pools, interceptors), which is real work and, for the cold-start path, lands on
-    // whichever thread first calls a repository -- the main thread for a cold auto-login.
+    // Timed as a whole: constructing an Api builds an OkHttpClient (dispatcher, thread pools,
+    // interceptors), which is real work and, for the cold-start path, lands on whichever thread
+    // first calls a repository -- the main thread for a cold auto-login.
     val started = StartupTrace.begin()
     val repo = when {
         brand == Brand.KIA -> KiaRepository(KiaUsaApi(), store, credentials)
@@ -50,8 +50,8 @@ fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStor
 }
 
 /**
- * Coordinates one brand's API client with its persisted session, retrying once
- * on an auth failure by refreshing the access token. All data is live.
+ * Coordinates one brand's API client with its persisted session, retrying once on an auth failure
+ * by refreshing the access token. All data is live.
  */
 class BlueLinkRepository(
     private val api: BlueLinkApi,
@@ -61,33 +61,18 @@ class BlueLinkRepository(
 
     /**
      * In-memory copy of the last [SessionStore.Session] loaded for this brand, alongside
-     * [withSession]'s own timing showing store.load() itself taking 1-3 SECONDS -- not the
-     * usual "instant, already-warm DataStore read" this class's own comments assumed -- and
-     * a single cold-start burst calling it three separate times back to back (once each for
-     * the current car's status, another car's status, and trips), paying that cost fully
-     * every time for data that cannot have changed between them. Caching here doesn't
-     * explain why any ONE read is that slow -- still an open question -- but it cuts
-     * three paid reads down to one regardless of the underlying cause, which is worth
-     * doing on its own merits.
-     *
-     * Invalidated (never served stale) on anything that can actually change the session:
-     * [login] writes a fresh one directly below, a 401 retry in [withSession] re-loads after
-     * [SessionStore.updateAccessToken], and [logout] clears it. Not invalidated by an
-     * EXTERNAL writer (a background worker refreshing the token in its own process) --
-     * that was already a possible race before this cache existed (two readers, one writer,
-     * no coordination beyond the account-wide statusMutex serializing the NETWORK calls, not
-     * the session read itself), and this doesn't make that scenario any more likely to
-     * matter: a stale token here still fails with 401 and retries via the exact same
-     * refresh path as before, just after one wasted round trip instead of zero.
+     * [withSession]'s own timing showing store.load() itself taking 1-3 SECONDS -- not the usual
+     * "instant, already-warm DataStore read" this class's own comments assumed -- and a single
+     * cold-start burst calling it three separate times back to back (once each for the current
+     * car's status, another car's status, and trips), paying that cost fully every time for data
+     * that cannot have changed between them.
      */
     @Volatile
     private var cachedSession: SessionStore.Session? = null
 
     /**
-     * Authenticates against the brand's API and persists the resulting tokens plus
-     * the caller-supplied [pin]/[username] as a new [SessionStore.Session] for this
-     * brand. Note the PIN itself is never sent to or validated by the login call —
-     * it's only remembered here so it can be attached as a header on later commands.
+     * Authenticates against the brand's API and persists the resulting tokens plus the
+     * caller-supplied [pin]/[username] as a new [SessionStore.Session] for this brand.
      */
     suspend fun login(username: String, password: String, pin: String) {
         val token = api.login(username, password)
@@ -108,9 +93,9 @@ class BlueLinkRepository(
         cachedSession = null
     }
 
-    // Stamps each vehicle returned by the API with this repository's brand code,
-    // since the raw API response doesn't distinguish brand and the UI/other layers
-    // need it to route subsequent calls (and to disambiguate vehicles across brands).
+    // Stamps each vehicle returned by the API with this repository's brand code, since the raw API
+    // response doesn't distinguish brand and the UI/other layers need it to route subsequent calls
+    // (and to disambiguate vehicles across brands).
     override suspend fun vehicles(): List<Vehicle> = withSession { s ->
         api.vehicles(s.accessToken, s.username).map { it.copy(brandIndicator = brand.code) }
     }
@@ -166,26 +151,14 @@ class BlueLinkRepository(
     }
 
     /**
-     * Runs [block] with this brand's session, refreshing the token once on 401/403.
-     *
-     * Mechanism: loads the persisted [SessionStore.Session] for this brand (throwing
-     * if there is none, i.e. not logged in) and invokes [block] with it. If that call
-     * throws a [BlueLinkException] whose HTTP code is 401 or 403 (token expired/
-     * rejected) AND a refresh token is available, it calls [BlueLinkApi.refresh] to
-     * obtain a new access/refresh token pair, persists it via
-     * [SessionStore.updateAccessToken], reloads the now-updated session from the
-     * store, and retries [block] exactly once with the fresh session. Any other
-     * exception, or a second failure after the refreshed retry, propagates to the
-     * caller unchanged — there is no further retry loop, so a persistent auth
-     * failure surfaces immediately rather than looping.
+     * Runs [block] with this brand's session, refreshing the token once on 401/403. Mechanism:
+     * loads the persisted [SessionStore.Session] for this brand (throwing if there is none, i.e.
+     * not logged in) and invokes [block] with it.
      */
     private suspend fun <T> withSession(block: suspend (SessionStore.Session) -> T): T {
-        // cachedSession first -- see that property's own doc for why (three of these paid
-        // the full store.load() cost back to back in one cold-start burst, for data that
-        // hadn't changed between them). Logged only past a threshold on an actual disk read:
-        // store.load() is a plain (unencrypted) Preferences DataStore read that should
-        // already be warm by the time any repo call runs, but real reports showed it taking
-        // 1-3 SECONDS on its own, so that number still needs to be visible when it happens.
+        // cachedSession first -- see that property's own doc for why (three of these paid the full
+        // store.load() cost back to back in one cold-start burst, for data that hadn't changed
+        // between them).
         val session = cachedSession ?: run {
             val loadStartedAt = System.currentTimeMillis()
             val loaded = store.load(brand) ?: throw BlueLinkException("Not logged in")

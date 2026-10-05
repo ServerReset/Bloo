@@ -3,22 +3,13 @@ package com.bloo.bluelink.data
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * Data models for the Hyundai Blue Link US telematics API.
- *
- * Endpoint paths, header names and field names are derived from the
- * community reverse-engineering work in:
- *  - Hacksore/bluelinky
- *  - schmidtwmark/BetterBlueKit
- *  - andyfase/egmp-bluelink-scriptable
- *
- * Nothing here is simulated: every request hits the real
- * api.telematics.hyundaiusa.com servers.
- */
+/** Data models for the Hyundai Blue Link US telematics API. */
 
-/** Response body from the Blue Link oauth token endpoint (login and refresh
- *  share this same shape). [refreshToken] can be null on a refresh response
- *  that reuses the existing refresh token rather than issuing a new one. */
+/**
+ * Response body from the Blue Link oauth token endpoint (login and refresh share this same shape).
+ * [refreshToken] can be null on a refresh response that reuses the existing refresh token rather
+ * than issuing a new one.
+ */
 @Serializable
 data class TokenResponse(
     @SerialName("access_token") val accessToken: String,
@@ -27,25 +18,26 @@ data class TokenResponse(
     @SerialName("token_type") val tokenType: String? = null,
 )
 
-
 // --- Enrollment / vehicle list -------------------------------------------
 
-/** Response body from the enrollment/details endpoint: every car the signed-in
- *  account has registered with Blue Link. */
+/**
+ * Response body from the enrollment/details endpoint: every car the signed-in account has
+ * registered with Blue Link.
+ */
 @Serializable
 data class EnrollmentResponse(
     val enrolledVehicleDetails: List<EnrolledVehicle> = emptyList(),
 )
 
-
-/** One wrapper layer the API adds around each vehicle's details for no
- *  apparent reason beyond matching the real response shape; unwrapped by
- *  [toVehicle] into the flatter [Vehicle] the rest of the app uses. */
+/**
+ * One wrapper layer the API adds around each vehicle's details for no apparent reason beyond
+ * matching the real response shape; unwrapped by [toVehicle] into the flatter [Vehicle] the rest of
+ * the app uses.
+ */
 @Serializable
 data class EnrolledVehicle(
     val vehicleDetails: VehicleDetails,
 )
-
 
 @Serializable
 data class VehicleDetails(
@@ -60,7 +52,6 @@ data class VehicleDetails(
     val odometer: String? = null,
 )
 
-
 /** Flattened, UI-friendly representation of a single enrolled car. */
 data class Vehicle(
     val vin: String,
@@ -73,16 +64,12 @@ data class Vehicle(
     val odometer: String? = null,
 )
 
-
 // --- Vehicle status -------------------------------------------------------
 
-/** Thin wrapper the vehicleStatus endpoint puts around the actual payload;
- *  null when the car hasn't reported a status at all yet. */
 @Serializable
 data class VehicleStatusResponse(
     val vehicleStatus: VehicleStatus? = null,
 )
-
 
 @Serializable
 data class VehicleStatus(
@@ -101,8 +88,8 @@ data class VehicleStatus(
     val battery: Battery12V? = null,
     val evStatus: EvStatus? = null,
     val dateTime: String? = null,
-    // Last-known GPS, included free with the status payload (no rate-limited
-    // findMyCar call needed). This is how the official app shows location.
+    // Last-known GPS, included free with the status payload (no rate-limited findMyCar call
+    // needed). This is how the official app shows location.
     val vehicleLocation: VehicleLocation? = null,
     // Comfort / climate sub-features
     val steerWheelHeat: Int? = null,
@@ -117,14 +104,9 @@ data class VehicleStatus(
     val fuelLevel: Int? = null,
     val tirePressure: TirePressure? = null,
 ) {
-    /** True when the embedded location's last-known speed says the car is
-     *  moving. The main phone UI's AppViewModel.isDriving() layers a live GPS
-     *  reading on top of this same check; this bare version is what the
-     *  snapshot-based command runners use to apply the same "car rejects
-     *  climate commands while driving" gate before starting climate. */
+    /** True when the embedded location's last-known speed says the car is moving. */
     val isDriving: Boolean get() = (vehicleLocation?.speed?.value ?: 0.0) > 0.0
 }
-
 
 /** Per-window open state (0 closed, 1 open), like [DoorOpen]. */
 @Serializable
@@ -138,8 +120,6 @@ data class WindowOpen(
         get() = listOf(frontLeft, frontRight, backLeft, backRight).any { it == 1 }
 }
 
-
-/** Current per-seat heater/vent state, used to infer which seats the car has. */
 @Serializable
 data class SeatHeaterVentState(
     val flSeatHeatState: Int? = null,
@@ -148,14 +128,14 @@ data class SeatHeaterVentState(
     val rrSeatHeatState: Int? = null,
 )
 
-
-/** Coarse tire-pressure reading; [all] is a single combined status (not
- *  broken out per wheel — that's [TirePressureLamp] instead). */
+/**
+ * Coarse tire-pressure reading; [all] is a single combined status (not broken out per wheel —
+ * that's [TirePressureLamp] instead).
+ */
 @Serializable
 data class TirePressure(
     val all: Int? = null,
 )
-
 
 /** Per-door open state. The API encodes each door as 0 (closed) or 1 (open). */
 @Serializable
@@ -169,10 +149,9 @@ data class DoorOpen(
         get() = listOf(frontLeft, frontRight, backLeft, backRight).any { it == 1 }
 }
 
-
 /**
- * Tire-pressure warning lamp. Different vehicle generations use different key
- * names for the same data, so both variants are captured and merged.
+ * Tire-pressure warning lamp. Different vehicle generations use different key names for the same
+ * data, so both variants are captured and merged.
  */
 @Serializable
 data class TirePressureLamp(
@@ -198,41 +177,36 @@ data class TirePressureLamp(
         get() = listOf(all, frontLeft, frontRight, rearLeft, rearRight).any { it != null && it != 0 }
 }
 
-
-/** Distance-to-empty: a numeric [value] plus a [unit] code (the API's own
- *  unit enum, not resolved here — callers that care about miles vs km read
- *  this in conjunction with the user's own unit preference). */
+/**
+ * Distance-to-empty: a numeric [value] plus a [unit] code (the API's own unit enum, not resolved
+ * here — callers that care about miles vs km read this in conjunction with the user's own unit
+ * preference).
+ */
 @Serializable
 data class Dte(
     val value: Double? = null,
     val unit: Int? = null,
 )
 
-
-/** A climate setpoint as the API reports it: [value] is a numeric string
- *  (not a Double) because the API itself sends it quoted; [unit] again is
- *  the API's own unit code. */
+/**
+ * A climate setpoint as the API reports it: [value] is a numeric string (not a Double) because the
+ * API itself sends it quoted; [unit] again is the API's own unit code.
+ */
 @Serializable
 data class TempValue(
     val value: String? = null,
     val unit: Int? = null,
 )
 
-
 @Serializable
 data class Battery12V(
     val batSoc: Int? = null,
     val batState: Int? = null,
-    // NB: batSignalReferenceValue is intentionally omitted — some vehicles
-    // (e.g. newer CCNC head units) return it as an object like
-    // {"batWarning":65} rather than a number, which would break parsing. It's
-    // unused, so we let ignoreUnknownKeys skip it whatever its shape.
+    // NB: batSignalReferenceValue is intentionally omitted — some vehicles (e.g. newer CCNC head
+    // units) return it as an object like {"batWarning":65} rather than a number, which would break
+    // parsing.
 ) {
-    /**
-     * The state of charge, or null when the car reported something that isn't a percentage. Some cars
-     * send a sentinel (255, -1) for "no reading" after a 12V reset or an ICCU fault; showing that as
-     * "255%" read as a real value, and calling it "Good" was worse. Every display goes through this.
-     */
+    /** Every display goes through this. */
     val level: Int?
         get() = batSoc?.takeIf { it in 0..100 }
 
@@ -247,23 +221,12 @@ data class Battery12V(
         }
 
     /**
-     * Whether this 12V reading is one the user should act on -- i.e. exactly the
-     * readings [health] already calls "Low" or "Needs attention".
-     *
-     * Defined in terms of [health] rather than repeating a number, because the number
-     * was the bug. The watch hardcoded `batSoc < 20` twice on one card: once to decide
-     * whether the 12V counted toward "N to check", and once to decide whether to tint
-     * the row red. Both sat directly beside the row's own [health] label. So a 12V at
-     * 35% rendered "35% · Low", in the ordinary text colour, and was not counted --
-     * the same line calling itself Low and treating itself as fine.
-     *
-     * Unknown is not an issue: a car that reports no 12V state of charge yields null
-     * from [health] and false here, rather than being counted as a problem.
+     * Whether this 12V reading is one the user should act on -- i.e. exactly the readings [health]
+     * already calls "Low" or "Needs attention".
      */
     val needsAttention: Boolean
         get() = health == "Low" || health == "Needs attention"
 }
-
 
 @Serializable
 data class EvStatus(
@@ -284,40 +247,13 @@ data class EvStatus(
         }
 
     /**
-     * Minutes until the battery is full, or null when the car isn't reporting a
-     * usable estimate.
-     *
-     * Non-positive means "no estimate", not "zero minutes". Cars report 0 here
-     * routinely -- not plugged in, just plugged in and still working it out, or
-     * simply not reporting -- and "0 min to full" is a worse answer than no row at
-     * all. Every consumer already knew that and re-applied `takeIf { it > 0 }`
-     * itself: the notification builder, and three separate places on the watch.
-     * Three of the eight producers applied it too. The phone's diagnostics pebble
-     * was the one path that applied it nowhere, and it was the one path that could
-     * print "Time to full: 0 min".
-     *
-     * So the rule lives here once instead of in nine places and missing from a
-     * tenth. The downstream guards are now redundant but harmless, and left alone.
-     *
-     * The unit question is deliberately NOT answered here. [RemainTime2] documents
-     * these as being "in whatever unit TimeValue.unit encodes (typically minutes)",
-     * and nothing in this codebase has ever read that field -- CanadaApi and
-     * KiaUsaApi both hardcode `TimeValue(value, 1)` when they build one, and
-     * BlueLinkApi deserializes whatever the OEM sends. Treating the value as minutes
-     * is therefore exactly what every call site already did; inventing a mapping for
-     * other unit codes without knowing what they mean would risk hiding estimates
-     * that currently display correctly. If the encoding is ever established, this is
-     * now the single place that has to change.
+     * Minutes until the battery is full, or null when the car isn't reporting a usable estimate.
+     * Non-positive means "no estimate", not "zero minutes".
      */
     val minutesToFull: Int?
         get() = remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
 }
 
-
-/** Remaining-charge-time estimates, in whatever unit [TimeValue.unit] encodes
- *  (typically minutes). [atc] is the estimate for whichever charger is
- *  currently connected; [etc1]/[etc3] are separate AC/DC estimates reported
- *  regardless of what's plugged in. */
 @Serializable
 data class RemainTime2(
     val atc: TimeValue? = null,
@@ -325,60 +261,58 @@ data class RemainTime2(
     val etc3: TimeValue? = null,
 )
 
-
-/** A {value, unit} pair for time-based fields (charge time estimates), same
- *  shape convention as [Dte]/[TempValue]/[Speed]. */
+/**
+ * A {value, unit} pair for time-based fields (charge time estimates), same shape convention as
+ * [Dte]/[TempValue]/[Speed].
+ */
 @Serializable
 data class TimeValue(
     val value: Double? = null,
     val unit: Int? = null,
 )
 
-
 /** Charge-limit targets for both charger types on this car. */
 @Serializable
 data class ReservChargeInfos(
     val targetSOClist: List<TargetSOC> = emptyList(),
 ) {
-    /** Look up the target for a specific [plugType] (0 = DC fast, 1 = AC) by
-     *  scanning the flat list the API returns — there's no guaranteed order
-     *  or fixed index, so this is a linear search by the plug-type key rather
-     *  than direct indexing. Returns null if that plug type wasn't reported. */
     fun level(plugType: Int): Int? =
         targetSOClist.firstOrNull { it.plugType == plugType }?.targetSOClevel
 }
 
-
-/** One entry in the charge-limit list: which plug ([plugType], 0 = DC fast,
- *  1 = AC — matching the same encoding used elsewhere for battery plug type)
- *  and its configured target state-of-charge percentage. */
+/**
+ * One entry in the charge-limit list: which plug ([plugType], 0 = DC fast, 1 = AC — matching the
+ * same encoding used elsewhere for battery plug type) and its configured target state-of-charge
+ * percentage.
+ */
 @Serializable
 data class TargetSOC(
     val plugType: Int? = null,
     val targetSOClevel: Int? = null,
 )
 
-
-/** Wraps the range figure for one fuel/energy source; the API models this as
- *  a list (see [EvStatus.drvDistance]) even though in practice only the first
- *  entry (the car's primary energy source) is ever read. */
+/**
+ * Wraps the range figure for one fuel/energy source; the API models this as a list (see
+ * [EvStatus.drvDistance]) even though in practice only the first entry (the car's primary energy
+ * source) is ever read.
+ */
 @Serializable
 data class DrvDistance(
     val rangeByFuel: RangeByFuel? = null,
 )
 
-
-/** The actual range value, one level deeper than [DrvDistance] — the API
- *  nests it this way to allow (unused here) per-fuel-type breakdowns. */
+/**
+ * The actual range value, one level deeper than [DrvDistance] — the API nests it this way to allow
+ * (unused here) per-fuel-type breakdowns.
+ */
 @Serializable
 data class RangeByFuel(
     val totalAvailableRange: Dte? = null,
 )
 
-
 /**
- * Seat heater/ventilation levels for the US Blue Link climate command.
- * Values follow the community-documented encoding.
+ * Seat heater/ventilation levels for the US Blue Link climate command. Values follow the
+ * community-documented encoding.
  */
 @Serializable
 enum class SeatLevel(val apiValue: Int, val label: String) {
@@ -405,17 +339,7 @@ enum class SeatLevel(val apiValue: Int, val label: String) {
     }
 }
 
-
-/**
- * Steering wheel heat level. Unlike [SeatLevel], most brands' APIs here only ever
- * modelled this as a plain on/off -- Kia's US request body is the one exception found
- * with a real second field (`steeringWheelStep`) beyond the on/off one, mirroring the
- * shape of its seat-heat step. [apiValue] is this app's own flat wire encoding (used
- * by the command layer, [ClimateSync]/[CarCommand]) and is NOT the literal value
- * any vendor API expects -- each brand's request-builder maps a level to whatever its
- * own protocol wants (see [KiaUsaApi.startClimate]'s `steeringWheelStep`, and every
- * other brand's plain [isOn] fallback).
- */
+/** Steering wheel heat level. */
 @Serializable
 enum class WheelHeatLevel(val apiValue: Int, val label: String) {
     OFF(0, "Off"),
@@ -429,7 +353,6 @@ enum class WheelHeatLevel(val apiValue: Int, val label: String) {
     }
 }
 
-
 /** A full climate-start request assembled by the UI. */
 @Serializable
 data class ClimateRequest(
@@ -442,7 +365,6 @@ data class ClimateRequest(
     val seatRearLeft: SeatLevel = SeatLevel.OFF,
     val seatRearRight: SeatLevel = SeatLevel.OFF,
 )
-
 
 /** A user-named, saved climate configuration for one car. */
 @Serializable

@@ -8,11 +8,7 @@ sealed interface LockDecision {
     data class Skip(val reason: String) : LockDecision
 }
 
-/**
- * Pure policy: should AutoLock attempt to lock, given this status? Ported from
- * i5-AutoLock's `LockPolicy`, onto Bloo's own [VehicleStatus] shape (`doorLock == true`
- * means locked here, matching [com.bloo.bluelink.ui.AppViewModel.lock]'s own convention).
- */
+/** Pure policy: should AutoLock attempt to lock, given this status? */
 object LockPolicy {
     fun decide(status: VehicleStatus): LockDecision = when {
         status.doorLock == true -> LockDecision.Skip("Already locked")

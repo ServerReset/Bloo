@@ -51,110 +51,41 @@ import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.SegmentOption
 
 /**
- * True while the Activity is in Android's multi-window/split-screen/freeform
- * presentation ("floating" -- the app no longer owns the whole display).
- * Driven entirely from [com.bloo.bluelink.MainActivity]: seeded from
- * `Activity.isInMultiWindowMode()` at `onCreate`, kept live via its
- * `onMultiWindowModeChanged` override. A plain top-level `mutableStateOf`,
- * not a CompositionLocal -- there is exactly one Activity for this whole
- * process, so there is nothing to scope it to, and every composable that
- * cares (today, just [StatusBarScrim]) can read it directly.
- *
- * Why [StatusBarScrim] needs this at all: in multi-window mode the OS draws
- * its own real, opaque status/task bar and this app's own window does NOT
- * extend edge-to-edge behind it the way [enableEdgeToEdge][androidx.activity.enableEdgeToEdge]
- * makes it do full-screen -- so "the area behind the status bar" is no
- * longer transparent app content the scrim is free to blur, it is empty
- * space outside this app's own window. Blurring it there would do nothing
- * useful and cost a RenderEffect for no visible effect.
+ * True while the Activity is in multi-window/split-screen/freeform mode.
+ * Set from [com.bloo.bluelink.MainActivity]. A top-level state (one Activity per process); read by [StatusBarScrim],
+ * which skips its blur because the OS draws an opaque bar and the window doesn't extend behind it.
  */
 internal var inMultiWindowMode by mutableStateOf(false)
 
 
 /**
- * A soft blurred scrim behind the status bar so scrolling content underneath
- * (a car photo, Aurora, dense text) doesn't fight the system clock/battery
- * icons drawn on top of it -- everywhere except [inMultiWindowMode]
- * ("floating"), where this app doesn't draw behind the status bar at all (see
- * that flag's own doc). That check lives HERE instead of being repeated at
- * each call site, because it is a single process-wide flag every caller
- * should honour identically.
- *
- * The blur is always active when [hazeState] and hardware capability
- * ([canBlurBackdrops]) allow it -- there used to be an `active: Boolean`
- * escape hatch here (meant for pausing the blur during a pager fling to save
- * a per-frame RenderEffect recomposite), but every real call site already
- * passed `true` unconditionally, so the flag was dead flexibility that only
- * risked a future caller accidentally turning the blur off. Removed rather
- * than left unused -- reported directly as wanting this scrim's blur to
- * always be on, with no path to disable it by mistake.
+ * A soft blurred scrim behind the status bar so content underneath doesn't fight the system icons.
+ * Skipped in [inMultiWindowMode]; the blur is always on when [hazeState] and [canBlurBackdrops] allow it.
  */
 @Composable
 internal fun StatusBarScrim(
     /**
-     * The [HazeState] whose matching [dev.chrisbanes.haze.hazeSource] marks the
-     * content actually behind this scrim (the car photo, Aurora, scrolling list --
-     * one per screen, applied where that screen already draws its own background).
-     * Non-null makes this a REAL backdrop blur of that content; null (every screen
-     * not yet wired to a HazeState) falls back to the old self-blur behaviour
-     * unchanged, so adopting Haze screen-by-screen carries no regression for the
-     * ones that haven't yet.
-     *
-     * Plain `Modifier.blur` was always a no-op here regardless of API level: it only
-     * ever blurred what THIS composable's own modifier chain draws, which is a flat
-     * vertical gradient with no detail in it for a blur convolution to soften --
-     * reported directly as "still not working" even after gating it to real API 31+
-     * hardware. A gradient blurred is the same gradient. What legibility under the
-     * status bar icons actually needs is the CONTENT drawn behind this scrim to look
-     * soft, which requires capturing that content into its own layer first -- Haze's
-     * whole job, and not something `Modifier.blur` alone can do without it.
+     * The [HazeState] whose [dev.chrisbanes.haze.hazeSource] marks the content behind this scrim.
+     * Null falls back to a self-blur, which only softens the flat gradient (so it's nearly a no-op).
      */
     hazeState: HazeState? = null,
 ) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    // Modifier.blur (the hazeState == null fallback path below) is backed by
-    // RenderEffect, which the Android framework only implements from API 31 (S)
-    // onward -- Compose has no software fallback for it, and neither does Haze's own
-    // blur. minSdk here is 26, so on any API 26-30 device both paths are a visual
-    // no-op: the gradient alone -- with no blur softening it -- is the only thing
-    // anyone on those devices ever actually sees. Gating on the real capability
-    // rather than leaving a dead modifier attached, and giving pre-S devices a
-    // stronger gradient (blur's whole job, legibility under the status bar icons,
-    // otherwise falls entirely on a fairly light 0.55 alpha fade) instead of
-    // silently doing less than intended.
+    // RenderEffect blur needs API 31+ (minSdk is 26); pre-S devices see only the gradient.
     val canBlur = canBlurBackdrops()
-    // glassTint, not this scrim's own separately-tuned alpha pair or scheme.surface --
-    // the exact same fill (colour AND alpha) every other glass surface in the app
-    // resolves to for this canBlur state. There is now exactly one function in the
-    // whole app that decides what a "not blurred, fall back to solid" (or "blurred,
-    // go lighter") tint actually looks like.
+    // The same glassTint every other glass surface resolves to for this canBlur state.
     val tint = glassTint(canBlur)
     Box(
         Modifier
             .fillMaxWidth()
-            // The status bar's own real height, not that plus an extra margin --
-            // 20dp (and 28dp before that) was still reported as "too thick", reaching
-            // past the icons it exists to back into content below (a segmented
-            // toggle). Basing this directly on the actual inset means it
-            // covers exactly the status bar and nothing past it, on every device.
+            // Exactly the status bar's real inset, so it never reaches past the icons.
             .height(topInset)
             .then(
                 if (hazeState != null && canBlur) {
-                    // The actual fix: blurs whatever is really drawn behind this scrim, via
-                    // the matching Modifier.hazeSource(hazeState) on that screen's own
-                    // background -- not this Box's own gradient. That gradient (below,
-                    // applied identically either way) still does the same legibility
-                    // tinting job it always did, now over a genuinely blurred backdrop.
-                    //
-                    // appGlassEffect: the one shared Haze configuration (see its own doc)
-                    // every blurred surface in the app now goes through. fadeOut = true so the
-                    // blur is strong at the status bar and tapers to none by this Box's bottom
-                    // edge, and edgeWarp = false so it uses Haze's SURFACE refraction profile --
-                    // a full-width strip has no visible curved rim for the Edge profile to bend
-                    // at, so it warped only a hairline top and bottom and read as a plain blur.
-                    // Surface refracts across the whole bar, the pronounced warp behind the
-                    // status bar this wants.
+                    // Blurs what is drawn behind this scrim via the screen's hazeSource. fadeOut tapers the
+                    // blur toward the bottom; edgeWarp = false uses the Surface profile, since a full-width
+                    // strip has no curved rim for the Edge profile to bend.
                     Modifier.fadeOutBottom().appGlassEffect(hazeState, RoundedCornerShape(0.dp), fadeOut = true, edgeWarp = false)
                 } else {
                     Modifier
@@ -162,8 +93,7 @@ internal fun StatusBarScrim(
             )
             .background(
                 Brush.verticalGradient(
-                    // Weaker glass effect: reduce tint alpha by half for a lighter scrim
-                    // that still provides legibility without being too heavy.
+                    // Half-strength tint: legible without being heavy.
                     listOf(tint.copy(alpha = tint.alpha * 0.5f), Color.Transparent),
                 ),
             )
@@ -179,27 +109,9 @@ internal fun StatusBarScrim(
 
 
 /**
- * Settings mode (Simple/Advanced) toggle, flush against the status bar's own
- * bottom edge so it reads as one continuous piece of chrome hanging from it,
- * not a second, separately-bordered pill floating below it.
- *
- * Previously this nested a fully-rounded [MorphSegmented] pill (its own
- * background AND its own hairline border, from the app-level `MorphSegmented`
- * wrapper's hardcoded `borderColor`) inside an outer, flat-topped/round-
- * bottomed [GlassSurface] that ALSO carried its own border (glassEdge's
- * frostedRim) plus an [ambientRing] halo shadow drawn on all four sides --
- * including the top edge, right where it meets the status bar. Two
- * differently-shaped bordered surfaces stacked on each other, with a shadow
- * ring interrupting the seam between this tab and the status bar above it,
- * is what read as disjointed rather than as one element.
- *
- * Now there is exactly one bordered/shadowed/blurred surface -- this
- * [GlassSurface], using its normal edge treatment (a plain downward
- * dropShadow, which only ever darkens BELOW the shape, so it can't interrupt
- * the seam above) and no [ambientRing]. [MorphSegmented] is called directly
- * (bypassing the app wrapper's fixed border) with a transparent container and
- * no border of its own, so it draws only its segment labels and highlight
- * indicator on top of this surface's own fill.
+ * Settings mode (Simple/Advanced) toggle hanging flush from the status bar as one piece of chrome.
+ * A single [GlassSurface] with its normal downward shadow (so the seam above stays clean), no [ambientRing],
+ * and a border-free [MorphSegmented] on top.
  */
 @Composable
 internal fun SettingsModeTab(
@@ -210,13 +122,7 @@ internal fun SettingsModeTab(
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
 
-    // Sits BELOW the status bar, like every other piece of floating header
-    // chrome in the app (FloatingIcon, the refresh badge) -- reported
-    // directly as looking bad: extending the glass fill up under the status
-    // bar icons (a previous pass, chasing "make it feel like it comes out of
-    // the status bar") instead blurred together with the system clock/
-    // battery/signal glyphs and any notification pill drawn there, reading
-    // as visual clutter rather than a deliberate "tab" shape.
+    // Sits below the status bar like the other floating header chrome, so it doesn't blur into the system icons.
     Box(
         Modifier
             .fillMaxWidth()
@@ -250,46 +156,20 @@ internal fun SettingsModeTab(
 }
 
 
-/** The one shared "gap below the status bar" every free-floating header
- *  element -- [FloatingIcon]'s own default [FloatingIcon.outerPadding], the
- *  page-dot overlays -- lines up against, so they all sit on the same row
- *  instead of each surface
- *  reproducing its own close-but-not-quite value (this used to be `12.dp` in
- *  some places and `10.dp` in others, an inconsistency invisible on any one
- *  screen alone but obvious the moment two headers are compared side by
- *  side). */
+/** The shared gap below the status bar that free-floating header elements align to. */
 internal val HeaderCornerGap = 12.dp
 
 
-/** The one shared size every free-floating header BUTTON -- [FloatingIcon]'s
- *  circle, and anything meant to sit in the same row as one -- is drawn at,
- *  so two buttons on the same header always share a vertical centre. Used to
- *  be re-typed as a bare `48.dp` at each call site (and, in one place,
- *  [LockOverlay]'s own hand-rolled back button, mistyped as `46.dp` -- a
- *  silent 2dp size/alignment drift from every other header button in the
- *  app). */
+/** The shared size of every free-floating header button, so buttons in one row share a vertical centre. */
 internal val HeaderButtonSize = 48.dp
 
 
-/** Extra breathing room reserved *below* a header button's own footprint
- *  (`HeaderCornerGap + HeaderButtonSize`) before real content is allowed to
- *  start, on top of whatever `Arrangement.spacedBy` a column already adds.
- *  Needed because a button's true on-screen silhouette is bigger than its
- *  logical box: [FloatingIcon] draws `ambientRing()`/`dropShadow()` glow
- *  outside its 48dp circle, and content below it (e.g. a [Pebble] row) has
- *  its own card shadow -- so reserving exactly the button's geometric
- *  footprint (as ExpandedCar's dual-column header used to) leaves only the
- *  column's incidental 12dp `spacedBy` gap as buffer, which those two halos
- *  can visibly eat into. Mirrors the same "bare inset isn't enough, add a
- *  named clearance" pattern [PagerDotClearance] already uses below. */
+/** Extra room reserved below a header button's footprint, since its ambient/drop shadow extends past the logical box. */
 internal val HeaderContentClearance = 12.dp
 
 
 /** A small translucent circular icon button used as a floating overlay control.
- *  [outerPadding] is the breathing room around the [HeaderButtonSize] circle -
- *  the default ([HeaderCornerGap], a 72dp footprint) suits free-floating
- *  overlay corners; a tight row can pass a smaller value (2dp keeps the
- *  whole footprint down to 52dp). */
+ *  [outerPadding] is the breathing room around the [HeaderButtonSize] circle; tight rows can pass a smaller value. */
 @Composable
 internal fun FloatingIcon(
     icon: ImageVector,
@@ -297,26 +177,12 @@ internal fun FloatingIcon(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     outerPadding: Dp = HeaderCornerGap,
-    // Overrides for surfaces that float over something other than the app's
-    // content: the lock overlay's back arrow sits on a dark scrim, not a
-    // card, so it deliberately uses plain white instead of the glass fill
-    // (see LockOverlay's own note -- the old hand-rolled Surface there was
-    // this exact shape re-built by hand; it now passes these instead).
+    // Overrides for surfaces over a dark scrim (the lock overlay's back arrow uses plain white, not the glass fill).
     containerColor: Color? = null,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    /** The screen's own [HazeState] (its `hazeSource` marks the content actually
-     *  behind this button), giving this a REAL backdrop blur instead of just a
-     *  translucent tonal fill -- reported directly as wanting every floating
-     *  button's background to carry the same blur the status bar/map sheet
-     *  already do. Null (the default) keeps every existing call site exactly as
-     *  it was: a plain glass tint, no blur, opted into per screen as each one's
-     *  own hazeState becomes available here, the same gradual-adoption shape
-     *  [StatusBarScrim]'s own `hazeState` param already uses. */
+    /** The screen's [HazeState] for a real backdrop blur; null keeps a plain glass tint with no blur. */
     hazeState: HazeState? = null,
-    /** Swaps the static [icon] for a spinning [LoadingIndicator] and ignores taps --
-     *  the same "icon becomes its own busy state" pattern [PebbleHeaderAction.pending]
-     *  uses, for a floating button whose action is itself already in flight (the
-     *  global refresh button while [AppViewModel]'s own `refreshing` is true). */
+    /** Swaps [icon] for a spinning [LoadingIndicator] and ignores taps while the action is in flight. */
     busy: Boolean = false,
 ) {
     val haptics = LocalHaptics.current
@@ -327,17 +193,13 @@ internal fun FloatingIcon(
         animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "floatIconScale",
     )
-    // GlassSurface (GlassChrome.kt) is the shared layered fill/blur/rim/shadow
-    // every floating pill/circle/chip in the app now goes through -- see its own
-    // doc for why this used to be its own hand-rolled Box+Surface here.
+    // GlassSurface supplies the shared fill/blur/rim/shadow.
     GlassSurface(
         shape = CircleShape,
         modifier = modifier
             .padding(outerPadding)
             .size(HeaderButtonSize)
-            // Lambda form: the press spring is read at DRAW time, so the animation
-            // never recomposes this button (the arg-taking overload reads it in
-            // composition instead -- see ExpressiveButtons.kt for the same fix).
+            // Lambda form: the press spring is read at draw time, so it never recomposes this button.
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -365,30 +227,20 @@ internal fun FloatingIcon(
 
 
 /**
- * The current [SettingsStore.Appearance], provided once at the app root (see
- * BlooApp) so pebbles/tiles read it via LocalAppearance.current instead of each
- * opening its own vm.appearance.collectAsStateWithLifecycle() coroutine collector. ~20 hot
- * per-pebble/per-tile collectors collapse to one. Default is a fresh Appearance()
- * (all defaults) so a reader outside the provider degrades gracefully rather than
- * crashing — but every real screen is inside the provider.
+ * The current [SettingsStore.Appearance], provided once at the app root so pebbles read it
+ * instead of each collecting the flow. The default degrades gracefully outside the provider.
  */
 internal val LocalAppearance = staticCompositionLocalOf { SettingsStore.Appearance() }
 
 
 /**
- * When true (these days: the pinned pebbles and full-screen/car-glance contexts,
- * PebbleHotspot and PebbleShell), pebbles render permanently open with no
- * collapse chevron or drag handle -- collapsing a context that has nowhere to
- * collapse TO makes no sense.
+ * When true (pinned pebbles and full-screen/car-glance contexts), pebbles render permanently
+ * open with no collapse chevron or drag handle.
  */
 internal val LocalForceExpanded = staticCompositionLocalOf { false }
 
 
-/**
- * The live pull-to-refresh distance (0..1+), published by [Refreshable] so the
- * floating overlays in [GarageScreen] (settings/back/flip buttons)
- * can track the pull in real time instead of only animating once refresh starts.
- */
+/** The live pull-to-refresh distance (0..1+), published by [Refreshable] so [GarageScreen]'s overlays track the pull. */
 internal val LocalPullFraction =
 
     staticCompositionLocalOf<androidx.compose.runtime.MutableState<Float>> { mutableFloatStateOf(0f) }

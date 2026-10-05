@@ -19,84 +19,14 @@ import com.bloo.uicommon.frostedRim as sharedFrostedRim
 import com.bloo.uicommon.ambientRing as sharedAmbientRing
 
 /**
- * UNIFIED GLASS & BLUR SYSTEM — One Set of Numbers, Referenced Everywhere
- *
- * This file contains the COMPLETE, UNIFIED glass styling system for every
- * floating surface in the app: search results, dialogs, overlays, status bar,
- * drag handles, pills, chips. ONE place controls all glass/blur — change here,
- * everything changes together. NO scattered alpha values, NO per-site overrides.
- *
- * THE NUMBERS (All Floating Surfaces Share These):
- * ────────────────────────────────────────────────
- * [GlassTintAlpha] = 0.22f        // No blur fallback (pre-S, battery saver)
- * [GlassBlurredTintAlpha] = 0.05f // With real Haze blur (API 31+)
- *
- * These are the ONLY two alpha values the entire app uses for glass. Everything
- * else (dark/light theme, blurred/unblurred) is computed from these two numbers
- * and the device's actual capabilities. No separate overrides per-component.
- *
- * COMPONENT REFERENCE (Pick One):
- * ─────────────────────────────
- * 1. [GlassSurface] — Main floating surface (search pills, dialogs, chips)
- *    - Takes shape, modifier, hazeState, content
- *    - Handles blur, tint, rim, shadow automatically
- *    - Use this for: search results, dialogs, floating pills, alert dialogs
- *
- * 2. [ScrimBlur] — Full-screen dim + blur (map sheets, expandable overlays)
- *    - Takes hazeState, progress lambda, modifier
- *    - No shape, no content slot (full-screen only)
- *    - Use this for: dimming backdrop behind expanded sheets
- *
- * 3. [pebbleCardEdge] — Opaque card edges (pebbles, standard Material cards)
- *    - NOT glass (not translucent)
- *    - Takes shape, outline toggle
- *    - Use this for: pebble shells, standard cards, opaque containers
- *
- * CORE MODIFIERS (Combine into larger patterns or used directly):
- * ───────────────────────────────────────────────────────────
- * - [glassEdge(shape)] — Shadow + frosted rim (used by GlassSurface)
- * - [glassEffect(hazeState)] — Blur + tint combined (for manual styling)
- * - [glassTint(blurred)] — Just the tint color (compute or pass to background)
- * - [glassRim(shape)] — Just the frosted rim (rare specialized cases)
- * - [appHazeEffect(state)] — Just the blur (low-level, rarely needed)
- * - [ambientRing(shape)] — Glow ring effect (specialized cases only)
- *
- * WHY THIS STRUCTURE:
- * ──────────────────
- * Before: Five places with glass (FloatingIcon, MetaChip, pull-refresh circle,
- * map name pill, drag handle chip), each with slightly different alphas and
- * blur/rim/shadow — impossible to change all at once, easy to drift.
- *
- * After: One system everywhere. Change alpha here, ALL floating surfaces change.
- * Change blur strength here, entire app changes. One function call, one place
- * to check, one place to fix.
- *
- * The phone app's floating-chrome helpers are shared in :uicommon
- * (com.bloo.uicommon.GlassChrome). This file
- * re-supplies Material theme tint the shared module can't depend on.
+ * Unified glass system: every floating surface takes its tint, blur, rim and shadow from here.
+ * [GlassSurface] is the floating panel, [ScrimBlur] the full-screen dim, [pebbleCardEdge] the opaque card edge.
+ * Shared helpers live in :uicommon; this file adds the Material theme tint they can't depend on.
  */
 
 /**
- * Apply glass edge treatment: shadow + frosted rim. Used by all glass surfaces.
- * This is the ONLY glass edge styling in the app.
- *
- * [shadow] defaults to true (unchanged behaviour) for a surface genuinely
- * FLOATING over the screen -- search results, the status bar, a floating
- * icon button -- where a real drop shadow is what separates it from an
- * arbitrary, unpredictable backdrop (a car photo, scrolled content). Pass
- * false for a glass panel NESTED inside another already-elevated card (e.g.
- * a status callout inside a pebble): that card already carries its own edge
- * treatment, so stacking a second full-strength shadow (dropShadow's own
- * default is a fairly heavy 0.38 alpha, 14dp blur) on a small sub-panel a
- * few dp inside it read as a harsh, "baked-in" dark smudge rather than a
- * second, subtler layer of depth -- reported directly from a screenshot.
- * The frosted rim border still draws either way; only the shadow is optional.
- *
- * The shadow is also THEME-DEPENDENT now -- see [glassDropShadow]. That was the
- * remaining "black shadow behind floating elements" bug, reported about five times
- * and only partly addressed by the [pebbleCardEdge]/[glassTint] fixes: those two
- * were reading the WRONG dark-mode source, while this one never looked at the theme
- * at all.
+ * Glass edge treatment: shadow + frosted rim.
+ * Pass [shadow] = false for glass nested inside an already-elevated card, where a second full shadow reads as a smudge.
  */
 @Composable
 internal fun Modifier.glassEdge(shape: Shape, shadow: Boolean = true): Modifier =
@@ -104,38 +34,10 @@ internal fun Modifier.glassEdge(shape: Shape, shadow: Boolean = true): Modifier 
 
 
 /**
- * The floating-glass drop shadow, at the weight the CURRENT theme can carry.
+ * The floating-glass drop shadow, at the weight the current theme can carry.
  *
- * This is the third and last "black smudge behind floating chrome" root cause, and it
- * is a different one from the other two: [pebbleCardEdge] and [glassTint] were reading
- * dark mode from the wrong SOURCE (raw `isSystemInDarkTheme()` instead of the app's own
- * override -- now [appIsDarkTheme]); this drew `dropShadow(shape)` with its bare default
- * -- black at 0.38 alpha, 14dp blur, offset 5dp down -- with no light/dark gate of ANY
- * kind. Every [GlassSurface] in the app goes through here, so that one line put a heavy
- * black silhouette under every floating chip, pill, dialog, status bar, refresh circle
- * and [FloatingIcon] in both themes.
- *
- * Why that reads as a *smudge* specifically, rather than as depth, and why LIGHT mode is
- * where it was reported: the glass FILL is deliberately almost nothing. [glassTint] is
- * 0.10 alpha unblurred and 0.02 blurred (lowered five times, each time on a request for
- * more of the background to show through), and in light mode it is a pale
- * `surfaceContainer` at 0.08-0.12. On a device with no real backdrop blur -- pre-API-31,
- * or battery saver on, i.e. [canBlurBackdrops] false, which is also every screen that
- * still passes no `hazeState` -- there is then nothing solid on the shape at all, and the
- * single most opaque thing anywhere near a floating chip is this 0.38 black behind it.
- * The chip reads as its own shadow. Dark mode hid it because the shadow lands on an
- * already-dark backdrop; light mode is where 0.38 black on near-white is exactly the
- * "flat black smudge" in the screenshots.
- *
- * Not dropped entirely in light mode, and that is the one thing this does differently
- * from [pebbleCardEdge]. A pebble is an opaque themed card on the app's own background,
- * so it can rely on its outline; this floats over an ARBITRARY backdrop -- a car photo,
- * scrolled content -- and the shadow is what stops a translucent chip dissolving into a
- * bright patch of photo (the same fact `ambientRing` exists for). So light mode keeps a
- * shadow, as a soft contact shadow rather than a silhouette: a third of the alpha, a
- * tighter blur and a much shorter offset, which still separates the shape from what is
- * behind it without ever becoming the most solid thing on screen. Dark mode is unchanged
- * (`dropShadow`'s own defaults), because nothing was ever wrong there.
+ * Light mode keeps a soft contact shadow (a heavy black one under a near-transparent fill reads as a
+ * smudge) because the shape floats over an arbitrary backdrop. Dark mode uses `dropShadow` defaults.
  */
 @Composable
 private fun Modifier.glassDropShadow(shape: Shape): Modifier =
@@ -156,33 +58,10 @@ internal fun Modifier.glassRim(shape: Shape): Modifier =
 
 
 /**
- * The symmetric ambient halo, at the weight the CURRENT theme can carry --
- * see [com.bloo.uicommon.ambientRing] for what it draws and why it has no offset.
+ * The symmetric ambient halo, at the weight the current theme can carry; see [com.bloo.uicommon.ambientRing].
  *
- * Same root cause as [glassDropShadow], and the two STACK, which is why this is the
- * other half of the "black halo behind floating elements" report rather than a separate
- * issue: [FloatingIcon] (Widgets.kt) chains this ON a [GlassSurface], so a
- * 48dp floating button was
- * carrying 0.38-alpha black offset below it AND 0.30-alpha black on all four sides,
- * neither gated on the theme, under a fill of 0.02-0.12 alpha. In light mode that is two
- * black layers and no button. [HeaderContentClearance]'s own doc already describes the
- * result from the layout side -- "a button's true on-screen silhouette is bigger than its
- * logical box... those two halos can visibly eat into" the content below it.
- *
- * The shared :uicommon implementation stays exactly as it is, and is still what
- * [com.bloo.uicommon.PagerDots] calls: it can't see [LocalAppearance] (uicommon is
- * Material- and app-state-free by design, see its own file doc), and both draw over their
- * own always-dark backdrops anyway. This wrapper is the phone's theme-aware entry point,
- * which is what the wrapper existed for in the first place -- it just wasn't adding
- * anything yet.
- *
- * Light mode keeps a halo rather than dropping it (same reasoning as [glassDropShadow]:
- * the thing this defends against is a bright patch of car photo, which happens in either
- * theme) at a third of the alpha and a tighter radius, so it still darkens the backdrop
- * around the shape without being the shape's most visible feature.
- *
- * @Composable now, where the shared one is a plain function. Both current call sites
- * chain this inside a composable's modifier argument, so nothing had to move.
+ * Stacks with [glassDropShadow], so light mode uses a weaker halo. The shared :uicommon version stays
+ * theme-free because it can't see [LocalAppearance].
  */
 @Composable
 fun Modifier.ambientRing(shape: Shape): Modifier =
@@ -194,31 +73,12 @@ fun Modifier.ambientRing(shape: Shape): Modifier =
 
 
 /**
- * The standard opaque pebble/card edge: a drop shadow, plus -- only when the user
- * has turned on the "pebble outline" appearance setting -- a bolder solid border.
- * Shared by every pebble-shaped card in the app (PebbleShell's own card, the
- * single-column pull-to-refresh content in Pebbles.kt, the cover screen's hero
- * tile in Cover.kt), which used to each carry an identical, separately copy-pasted
- * three-line block -- literally the same code, typed three times.
- *
- * Distinct from [GlassSurface]: this is for opaque, themed card content (a pebble
- * IS its own content, not a translucent overlay on top of something else), so it
- * has no fill or blur of its own to standardize -- just the shadow/outline pairing
- * every pebble already shares.
- *
- * In light mode, skip the shadow entirely -- the outline provides sufficient visual
- * separation and shadows read as too heavy on light backgrounds.
+ * The standard opaque pebble/card edge: a drop shadow, plus a solid border when the "pebble outline" setting is on.
+ * Dark mode only draws the shadow; in light mode the outline provides the separation.
  */
 @Composable
 internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier {
-    // [appIsDarkTheme], NOT a raw isSystemInDarkTheme() read. That was the bug: a
-    // user who explicitly set the app to Light while their SYSTEM was in dark mode
-    // got a light-themed app that still drew this shadow, because raw
-    // isSystemInDarkTheme() only ever sees the phone's setting, not the app's own
-    // override. The four-line `when` that fixed it in place here has moved into
-    // appIsDarkTheme() (Theme.kt) -- it had been re-typed at five sites by then,
-    // and that file's doc lists all five; a call is what keeps the sixth from
-    // being typed by hand too.
+    // Uses the app's own dark override, not the system setting.
     val dark = appIsDarkTheme()
     return (if (dark) this.dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp) else this).then(
         if (outline) {
@@ -233,18 +93,8 @@ internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier {
 // ---- One floating-glass surface, everywhere -------------------------------
 
 /**
- * The two alphas every neutral glass fill in the app shares -- one number for "no
- * real blur behind this" (pre-S devices, or battery saver), a lighter second number
- * for "a real blur is already doing most of the legibility work underneath."
- *
- * Used to be four separate pairs (dark/light theme × blurred/unblurred), but splitting
- * by theme was redundant: the THEME only needs to change the base colour (black or white),
- * not how transparent it is. Literally one set of numbers now, referenced everywhere.
- *
- * History: lowered four times (0.65/0.3 → 0.4/0.12 → 0.28/0.06 → 0.16/0.02), raised
- * once to 0.22/0.05 to restore neutral cast, lowered again to 0.15/0.03, and now
- * lowered once more to 0.10/0.02 -- reported directly as still wanting more of the
- * background to show through the glass.
+ * The two alphas every neutral glass fill shares: one for "no real blur behind this" (pre-S, battery saver),
+ * a lighter one for when a real blur is doing the legibility work. Theme only changes the base colour.
  */
 internal const val GlassTintAlpha = 0.10f
 
@@ -252,44 +102,22 @@ internal const val GlassBlurredTintAlpha = 0.02f
 
 
 /**
- * Resolves [GlassSurface]'s own fill color -- also called directly by places that
- * can't host [GlassSurface] itself because they don't own their own layout, just a
- * `Color` parameter on a platform composable or a `Modifier.background()`.
+ * Resolves [GlassSurface]'s fill color; also used where [GlassSurface] can't be hosted.
  *
- * Plain black/white by theme, deliberately NOT a `MaterialTheme.colorScheme` tonal
- * role -- see [MetaChip]'s own doc for the reason: this app's dynamic/custom palette
- * feeds every tonal role, even the "neutral" ones, a slice of the seed colour, so a
- * technically-neutral token can still render as a flatly-tinted chip. [blurred]
- * defaults to whatever [GlassSurface] would itself decide (a real blur actually
- * playing behind this fill), so passing nothing here and passing nothing for
- * [GlassSurface]'s own `hazeState` agree automatically.
+ * Plain black/white by theme, not a tonal `colorScheme` role (see [MetaChip]): the dynamic palette tints
+ * even the neutral roles. [blurred] defaults to whether a real blur plays behind this fill.
  */
 @Composable
 internal fun glassTint(blurred: Boolean): Color {
-    // Same fix as pebbleCardEdge (GlassChrome.kt): resolve dark the way
-    // BlooTheme itself does (Theme.kt), not a raw isSystemInDarkTheme() read.
-    // That mismatch is what made floating glass (search results, the status
-    // bar, every GlassSurface) render as a near-solid black panel -- e.g. the
-    // app forced to Dark while the SYSTEM was in light mode read `dark` as
-    // false here, so this picked the "light mode" branch and tinted with
-    // colorScheme.surfaceContainer at low alpha -- but the actual color
-    // scheme in that case IS dark (the app is forced dark), so that low-alpha
-    // tint was a low-alpha DARK color layered over a blur that, without a
-    // real light backdrop to lighten it, read as flatly black.
-    // (The `when` block that lived here is now appIsDarkTheme() -- see Theme.kt.)
+    // Resolve dark via the app's override (Theme.kt), not the system setting.
     val dark = appIsDarkTheme()
     return if (dark) {
         val alpha = if (blurred) GlassBlurredTintAlpha else GlassTintAlpha
         Color.White.copy(alpha = alpha)
     } else {
-        // Light mode: use theme-aware surface color for better color matching.
-        // Use a semi-transparent overlay on top of the surface to maintain proper
-        // contrast while respecting the theme's palette. This ensures floating
-        // buttons don't appear as black overlays but instead blend with the theme.
+        // Theme-aware surface colour keeps floating buttons from reading as black overlays.
         val scheme = MaterialTheme.colorScheme
-        // Use surfaceContainer with adjusted alpha for proper glass effect
-        // When blurred: lighter alpha (blur provides softness)
-        // When not blurred: stronger alpha (need more visual weight)
+        // Blurred needs less alpha; unblurred needs more visual weight.
         val surfaceColor = scheme.surfaceContainer
         val alpha = if (blurred) 0.06f else 0.09f
         surfaceColor.copy(alpha = alpha)
@@ -298,32 +126,9 @@ internal fun glassTint(blurred: Boolean): Color {
 
 
 /**
- * The one Haze configuration every blurred surface in the app uses -- literally the
- * same function call, not a same-looking copy of one. Every hazeEffect call in the
- * app goes through this, so there is exactly one place that decides what "the app's
- * blur" looks like -- change it here and every surface in the app changes together.
- *
- * [progressive] defaults OFF: a flat, full-intensity blur across the whole shape,
- * the SAME strength as the strongest point of [StandardBlurProgressive]'s own
- * gradient. It used to be forced on unconditionally for every call site, including
- * small floating chips (the map's drag handle/name pill, the cover screen's camera
- * band) -- reported directly as looking visibly weaker than the status bar's own
- * blur, and for a real reason: [StandardBlurProgressive] fades from full intensity
- * to none across whatever height it's applied to, which reads as "strong right at
- * the edge it grows from, soft by the far edge" on a TALL scrim (the status bar, a
- * map sheet's full-screen dim) -- the shape that gradient was actually designed for
- * -- but on a chip only 20-48dp tall, that exact same fade means the bottom half of
- * the chip is barely blurred at all, next to the status bar's own uniformly-strong
- * blur at its own (comparably small) height. Only the two full-height scrims
- * ([ScrimBlur], `StatusBarScrim` in Widgets.kt) opt into the gradient now; every
- * chip-shaped surface gets the same flat, full-strength blur the status bar's own
- * TOP edge -- its most blurred point -- already has.
- */
-/**
- * Apply glass effect: combines blur (if possible) and tint in one modifier.
- * Used by specialized glass surfaces that can't use [GlassSurface] directly.
- * [progressive] controls whether the blur fades across the shape (full-screen scrims)
- * or stays uniform (small floating elements).
+ * Glass effect: blur (if possible) plus tint in one modifier, for surfaces that can't use [GlassSurface].
+ * [progressive] fades the blur across the shape; only full-height scrims use it, since on a small chip it
+ * leaves half the shape barely blurred.
  */
 @Composable
 internal fun Modifier.glassEffect(
@@ -359,18 +164,11 @@ internal fun Modifier.glassEffect(
 internal val LocalBackdropHaze = androidx.compose.runtime.staticCompositionLocalOf<HazeState?> { null }
 
 
-/** How much of its colour a glass card keeps over the blur: enough tint to read text on, little
- *  enough that the backdrop shows through as frosted glass. Lowered from 0.42 -- reported as
- *  carrying too much of its own colour, so the cards read as flat panels rather than glass; the
- *  backdrop blurs through much more clearly now. */
+/** Tint kept by a glass card over the blur: enough to read text on, little enough to look frosted. */
 private const val GlassCardTintAlpha = 0.26f
 
 
-/**
- * The sheen every glass surface in the app shares: light catching the pane from its top-left and
- * fading across, so it reads as a sheet of glass rather than a flat tint. Cards, floating chrome,
- * dialogs, toasts and the onboarding cards all take it from here.
- */
+/** The shared glass sheen: light from the top-left fading across, so a surface reads as glass rather than a flat tint. */
 internal fun Modifier.glassSheen(): Modifier = this.background(
     androidx.compose.ui.graphics.Brush.linearGradient(
         0f to Color.White.copy(alpha = 0.09f),
@@ -380,19 +178,14 @@ internal fun Modifier.glassSheen(): Modifier = this.background(
 )
 
 /**
- * The standard card fill: the card's bounding box is glass -- the backdrop blurred behind a veil of
- * [tint] -- while whatever sits inside the card keeps its own, opaque panels. Every card in the app
- * (pebbles, settings cards) takes its fill from here, so they all read as the same glass. Without a
- * backdrop to blur it falls back to the nearly opaque fill cards used to have.
+ * The standard card fill: the backdrop blurred behind a veil of [tint], while the card's contents keep
+ * their own opaque panels. Falls back to a nearly opaque fill without a backdrop.
  */
 @Composable
 internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
     val haze = LocalBackdropHaze.current
     val ultra = LocalAppearance.current.ultraGlass
-    // Ultra glass: even a card gets the real LIQUID glass (refraction + rim), the same material
-    // the floating chrome uses, instead of the flat blur-and-tint veil -- so "glass everywhere"
-    // is literal. It needs a backdrop to refract, so ultra without a haze source still falls
-    // back (there would be nothing behind the card to bend).
+    // Ultra glass uses the liquid-glass effect, which needs a backdrop to refract; otherwise it falls back.
     return if (ultra && haze != null && canBlurBackdrops()) {
         this.clip(shape)
             .appGlassEffect(haze, shape)
@@ -408,12 +201,10 @@ internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
 }
 
 
-/** The radius every glass surface blurs its backdrop by. One value, so a chip and the status
- *  bar scrim soften by the same amount. Haze 2.0 defaults blurRadius to 20dp; this matches the
- *  1.7 look the app was tuned against. */
+/** The radius every glass surface blurs its backdrop by (Haze 2.0 defaults to 20dp; this matches the tuned look). */
 private val StandardBlurRadius = 20.dp
 
-/** The softer, cheaper blur cards use -- see [appHazeEffect]'s `cheap`. */
+/** The blur radius cards use; see [appHazeEffect]'s `cheap`. */
 private val CardBlurRadius = 20.dp
 
 

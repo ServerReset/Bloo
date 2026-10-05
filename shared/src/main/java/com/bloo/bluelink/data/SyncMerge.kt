@@ -12,121 +12,65 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 /**
- * Pure, Context-free core of the Drive-sync backup format: build the export JSON,
- * and decode a backup JSON into the exact set of DataStore mutations a merge or
- * import should apply. This is the logic that used to live inline in
- * [com.bloo.bluelink.data] `SettingsStore.exportSettingsJson` /
- * `importSettingsJson` / `mergeSettingsJson`, lifted out so it can be unit-tested
- * on a plain JVM with no Android Context/DataStore/Bitmap.
+ * Pure, Context-free core of the Drive-sync backup format: builds the export JSON and decodes
+ * a backup into the DataStore mutations a merge or import applies. JVM-testable; the Android
+ * side (DataStore, photos, dirty keys) stays in SettingsStore.
  *
- * Everything here operates only on JSON strings and plain maps/sets. The Android
- * side (reading DataStore into a map, base64-encoding photos from Bitmaps,
- * applying a [MergePlan] to DataStore, dirty-key tracking) stays in SettingsStore.
+ * Two export shapes:
+ * - [buildExport]: the portable shape (`prefs`/`photos`/`_removed`, no device metadata). Used
+ *   for the shareable file and as the content [portableContentHash] covers.
+ * - [buildExportForMainToMain]: portable plus Drive-only keys (`_hash`, `_primaryDeviceId`,
+ *   `_writerDeviceId`, `devices`). Never shared, so device names/ids do not leak.
  *
- * ## Two export shapes
- * - [buildExport] — the **portable** shape (`prefs`/`photos`/`_removed` only). It is
- *   what the manual "export settings to a file" feature produces (a file the user
- *   may share/email), and it is also the exact byte-content the change-detection
- *   [portableContentHash] is computed over. It carries **no device metadata**.
- * - [buildExportForMainToMain] — the portable shape **plus** the Drive-sync-only keys
- *   (`_hash`, `_primaryDeviceId`, `_writerDeviceId`, `devices`). Used only for the
- *   Drive file, never for the shareable export, so device names/ids never leak.
- *
- * ## The `_hash` change gate (why not a timestamp / sequence counter)
- * The old import gate compared the Drive file's last-modified time against a
- * locally-stored wall-clock — fragile under cross-device clock skew (and useless
- * when a provider exposes no modified-time). A monotonic `_seq += 1` per upload
- * would instead ping-pong forever (each device re-uploads on every clean pass,
- * climbing the counter and re-importing the other's echo). A **content hash** of
- * the portable content is skew-immune AND self-detects a no-op sync: identical
- * content → identical hash → nothing to import and nothing new to write. All new
- * keys are additive top-level fields, so [BACKUP_VERSION] stays 1 and an older
- * client (which ignores them on read, and drops them when it rewrites the file)
- * still interoperates — the new client just falls back to the timestamp gate when
- * `_hash` is absent.
+ * Change gate: a content hash of the portable content is clock-skew-immune and makes a no-op
+ * sync self-detecting (a sequence counter would ping-pong). The extra keys are additive, so
+ * [BACKUP_VERSION] stays 1; without `_hash` callers fall back to the timestamp gate.
  */
 object SyncMerge {
 
-    /** The settings-backup format version. The format is a flat key-value bag, so
-     *  an older client reading a newer backup is normally fine (unknown keys are
-     *  ignored); bump this only if a future change stops being purely additive, so
-     *  old clients can detect and refuse a newer format instead of misreading it.
-     *  The `_hash`/`devices`/`_primaryDeviceId`/`_writerDeviceId` keys are additive
-     *  (ignored by old clients), so they do NOT warrant a version bump. */
+        /** Settings-backup format version. Bump only when a change stops being purely additive,
+         *  so old clients can refuse a newer format. */
     const val BACKUP_VERSION = 1
 
-    /** Preference keys that describe THIS device's own Drive-sync wiring (the
-     *  content:// URI it was granted, its last-sync bookkeeping, its Wi-Fi-only
-     *  preference, its local dirty set, and its sync-identity/registry bookkeeping)
-     *  — never portable, so never exported, imported, or merged. */
+        /** Preference keys describing THIS device's own sync wiring: never exported, imported or merged. */
     val DEVICE_LOCAL_KEYS = setOf(
         "sync_uri", "sync_last_ms", "sync_last_error", "sync_wifi", "sync_dirty_keys",
-        // Sync identity + hash-gate + registry bookkeeping (all per-device, never travel):
+                // Sync identity + hash-gate + registry bookkeeping (all per-device, never travel):
         "sync_device_id", "sync_device_name", "sync_last_hash", "sync_synced_ever",
         "sync_devices_cache", "sync_pull_primary", "sync_primary_cache", "sync_file_id",
-        // A primary designation made on THIS device and not yet uploaded. Emphatically
-        // device-local: it is a one-shot write intent, and letting it roam would hand every
-        // other device the same intent and restart the tug-of-war it exists to end.
+                // A primary designation made here and not yet uploaded: a one-shot write intent that
+                // must not roam.
         "sync_primary_pending",
-        // Whether THIS device installs updates silently via Shizuku — a device-local
-        // capability (Shizuku may not be present elsewhere), so it must not roam.
+                // Device-local capability (Shizuku may be absent elsewhere).
         "seamless_install_shizuku",
-        // Which car is on screen RIGHT NOW. Transient per-device view state, not a setting:
-        // it is written through editTracked on every car swipe, so it was dirty-tracked,
-        // auto-pushed to Drive, and then roamed -- changing the car on the phone yanked the
-        // tablet to the same car, and every swipe cost a sync round trip.
+                // Which car is on screen right now: transient view state, must not roam or cost a sync per swipe.
         "last_vehicle_vin",
         // Which version of the settings schema this install last migrated to (see [SyncSchema]).
         "settings_schema",
     )
 
-    /** Per-VIN keys whose NAMES carry a dynamic suffix (the VIN), so they can't be
-     *  listed exactly in [DEVICE_LOCAL_KEYS] but are just as device-local and must
-     *  never travel. All are transient per-device RUNTIME state, not settings:
-     *   - `alert_*`      : CarAlerts "already fired this episode" flags — importing a
-     *                      peer's true flag would suppress THIS device's own
-     *                      independent door/engine/service notification.
-     *   - `door_since_*` / `engine_since_*` / `unlocked_since_*` : the wall-clock
-     *                      timestamp an open/running/unlocked episode began — comparing
-     *                      it against another device's clock domain makes the
-     *                      elapsed-time threshold fire early/late.
-     *   - `tile_refreshed_*` : the per-car live-refresh throttle stamp left by the
-     *                      since-removed tiles — a peer's
-     *                      stamp would wrongly suppress this device's own refresh.
-     *  Excluding them also keeps the portable content hash stable across alert/refresh
-     *  ticks (otherwise every 30-min alert poll churned the hash and forced a re-upload). */
+        /** Per-VIN key prefixes (dynamic suffix) that are device-local runtime state and never travel:
+         *  - `alert_*`: "already fired" flags; a peer's flag would suppress this device's notification.
+         *  - `door_since_*` / `engine_since_*` / `unlocked_since_*`: wall-clock episode starts that are
+         *    meaningless in another device's clock domain.
+         *  - `tile_refreshed_*`: per-car refresh throttle stamps.
+         *  Excluding them also keeps the content hash stable across alert/refresh ticks. */
     private val DEVICE_LOCAL_PREFIXES = listOf(
-        // unlocked_since_* was missing here while all three of its siblings were
-        // listed. It is the same thing: Notifications sets it to
-        // System.currentTimeMillis() on first observing an unlocked car and then tests
-        // `now - since > unlockedMinutes * 60_000`, so a peer's clock-domain stamp
-        // makes the "unlocked for N minutes" alert fire early or late -- and it churns
-        // the content hash on every lock-state change, costing a Drive round trip per
-        // alert tick. The companion alert_unlocked_* WAS covered, by "alert_", which is
-        // probably why the gap went unnoticed. prefs.unlocked defaults on, so this is
-        // the common configuration rather than an edge case.
+                // Includes unlocked_since_* (same clock-domain reasoning as its siblings).
         "alert_", "door_since_", "engine_since_", "unlocked_since_", "tile_refreshed_",
-        // live_dismissed_* : "the user swiped THIS device's live charging bar away for
-        //                  the current charging session". Dismissing a notification on
-        //                  a phone says nothing about whether a tablet should show one,
-        //                  and roaming it would suppress the bar on a device the user
-        //                  never touched. Also cleared and re-set constantly during a
-        //                  charge, so exporting it would churn the content hash.
+                // live_dismissed_*: the user dismissed THIS device's live charging bar; also churns constantly during a charge.
         "live_dismissed_",
     )
 
-    /** Whether [name] is device-local (exact key or dynamic per-VIN prefix) and so must
-     *  never be exported, imported, merged, or folded into the content hash. */
+        /** Whether [name] is device-local (exact key or per-VIN prefix): never exported, imported, merged or hashed. */
     fun isDeviceLocal(name: String): Boolean =
         name in DEVICE_LOCAL_KEYS || DEVICE_LOCAL_PREFIXES.any { name.startsWith(it) } ||
-            // A retired setting never travels either: not exported, not imported, not in the hash.
+                        // A retired setting never travels either.
             SyncSchema.isDeprecated(name)
 
-    /** A device that syncs this Drive file, as recorded in the file's `devices`
-     *  registry. Purely informational (drives the phone's "your devices" list and
-     *  the "primary" designation); never affects the settings merge itself. All
-     *  fields default so a partial/older entry decodes leniently rather than
-     *  throwing — an entry with a blank [id] is dropped on merge. */
+        /** A device that syncs this Drive file, per the file's `devices` registry. Informational
+         *  (the "your devices" list and "primary" designation); never affects the merge. Defaults
+         *  keep partial entries decodable; a blank [id] is dropped on merge. */
     @Serializable
     data class SyncDevice(
         val id: String = "",
@@ -134,11 +78,8 @@ object SyncMerge {
         val model: String = "",
         val appVersion: String = "",
         val lastSeenMs: Long = 0L,
-        /** "watch" for a Wear OS companion, "phone" for everything else. Lets
-         *  Settings show a watch as a dependent companion rather than a peer
-         *  primary candidate -- a watch cannot be the source of truth. Serialized,
-         *  so it round-trips through the Drive registry like every other field;
-         *  absent (null) on entries written before this existed reads as "phone". */
+                /** "watch" for a Wear OS companion, "phone" otherwise; a watch cannot be the source
+                 *  of truth. Absent (null) entries read as "phone". */
         val kind: String = KIND_PHONE,
     ) {
         val isWatch: Boolean get() = kind == KIND_WATCH
@@ -148,52 +89,38 @@ object SyncMerge {
     const val KIND_WATCH = "watch"
 
 
-    /** Registry entries not seen for this long are pruned on merge, so a
-     *  factory-reset/retired device doesn't linger in the list forever. 90 days
-     *  is comfortably longer than any normal "I didn't open that device" gap. */
+        /** Registry entries unseen for this long are pruned on merge. */
     const val DEVICE_RETENTION_MS = 90L * 24 * 60 * 60 * 1000
 
-    /**
-     * The decoded set of mutations a merge/import should apply, with no DataStore
-     * involved. [stringPuts] are written under a string key, [boolPuts] under a
-     * boolean key, and every name in [removes] is deleted (under both key types on
-     * the Android side, since this app mixes string/boolean prefs under one name).
-     */
+        /**
+         * The decoded mutations a merge/import applies. [removes] are deleted under both key types
+         * (string and boolean prefs share names).
+         */
     data class MergePlan(
         val stringPuts: Map<String, String>,
         val boolPuts: Map<String, Boolean>,
         val removes: Set<String>,
     )
 
-    /** The Drive-sync-only metadata parsed out of a file's top-level keys, kept
-     *  separate from the [MergePlan] (which is only the portable prefs/tombstones).
-     *  [hash] is null when the file predates the hash gate (old client, or the
-     *  header/marker case) — the caller then falls back to the timestamp gate. */
+        /** Drive-only metadata from a file's top-level keys, separate from the [MergePlan].
+         *  [hash] is null when the file predates the hash gate (caller uses the timestamp gate). */
     data class SyncMeta(
         val hash: String?,
         val primaryDeviceId: String?,
         val writerDeviceId: String?,
         val devices: List<SyncDevice>,
-        /** A stable id for the FILE ITSELF, written into the content so every device
-         *  reads the SAME value — unlike a SAF content:// URI, which the OS assigns
-         *  differently per device for the same Drive file (the reason a URI hash
-         *  showed mismatched codes on two phones that ARE on one file). Minted once
-         *  by whichever device first writes it, then preserved by all. Null on a
-         *  file that predates this field. */
+                /** A stable id for the FILE ITSELF, written into the content so every device reads the
+                 *  same value (a SAF content:// URI differs per device). Null on files predating it. */
         val fileId: String?,
     )
 
-    // Same Json config SettingsStore's backupJson used: pretty-printed output so
-    // the exported file is human-readable, unknown keys ignored on decode.
+        // Pretty-printed so the exported file is human-readable; unknown keys ignored on decode.
     private val backupJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
     // --- Portable export (prefs/photos/_removed only — safe to share) ----------
 
-    /** The `prefs` object shared by [buildExport] and [buildExportForMainToMain]:
-     *  skips [DEVICE_LOCAL_KEYS] and local-file `img_` paths (a "/"-prefixed String
-     *  path is meaningless on another device — only the photos channel carries
-     *  local photos), and types each value as a JSON boolean/string (anything else
-     *  coerced via toString()). */
+        /** The `prefs` object shared by both exports: skips [DEVICE_LOCAL_KEYS] and local-file `img_`
+         *  paths (meaningless on another device), typing each value as JSON boolean or string. */
     private fun portablePrefsObject(prefs: Map<String, Any>): JsonObject = buildJsonObject {
         prefs.forEach { (name, value) ->
             if (isDeviceLocal(name)) return@forEach
@@ -206,16 +133,12 @@ object SyncMerge {
         }
     }
 
-    /** `_removed` tombstones: dirty keys that no longer exist in [prefs] and aren't
-     *  device-local, so other devices converge on the deletion instead of
-     *  resurrecting the key. */
+        /** `_removed` tombstones: dirty keys gone from [prefs] and not device-local, so other devices
+         *  converge on the deletion. */
     private fun tombstones(prefs: Map<String, Any>, dirtyKeys: Set<String>): Set<String> =
         (dirtyKeys - prefs.keys.toSet()).filterNotTo(LinkedHashSet()) { isDeviceLocal(it) }
 
-    /** Builds the base backup root (`_format`/`_version`/`prefs`/`photos`/`_removed`),
-     *  then lets [extra] add any additional top-level keys (the Drive-only metadata).
-     *  [buildExport] passes an empty [extra] so its output is exactly the historical
-     *  portable shape. */
+        /** Builds the base backup root, then lets [extra] add top-level keys (Drive-only metadata). */
     private inline fun buildRoot(
         prefs: Map<String, Any>,
         dirtyKeys: Set<String>,
@@ -224,25 +147,11 @@ object SyncMerge {
         extra: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit,
     ): JsonObject {
         val entries = portablePrefsObject(prefs)
-        // Local tombstones UNIONED with the ones already in the remote file.
-        //
-        // Without the union a tombstone lived for exactly ONE upload. `tombstones()` reads the
-        // current dirty set, and a successful upload clears it -- so the very next push, triggered
-        // by any unrelated edit, rebuilt the body from an empty dirty set and omitted `_removed`
-        // entirely. Any peer that had not synced inside that single window still held the key,
-        // re-uploaded it, and the deletion was undone on the device that made it. Plates, car
-        // photos, service history, weather location, climate presets: every setter that REMOVES a
-        // key rather than blanking it.
-        //
-        // Filtered so carrying forward cannot make a deletion permanent or smuggle a local key:
-        //  - a key PRESENT in prefs wins over its own stale tombstone, so re-adding a value works
-        //    (otherwise re-setting a plate would be undone on the next sync, forever);
-        //  - device-local keys can never travel, even via a hand-edited `_removed`.
-        //
-        // Known tradeoff, stated rather than hidden: the tombstone set grows with the number of
-        // keys ever deleted and has no TTL. Trimming it needs a per-tombstone timestamp, which
-        // this format has nowhere to put, and an unbounded-but-tiny list of dead key NAMES is a
-        // far better failure than resurrecting a user's deleted data.
+                // Local tombstones are unioned with those already in the remote file: the dirty set is
+                // cleared after each upload, so without the union a deletion would survive one push only
+                // and a lagging peer would resurrect the key. A key present in prefs wins over its stale
+                // tombstone, and device-local keys never travel. The set has no TTL (no per-tombstone
+                // timestamp in the format); a tiny list of dead key names beats resurrecting deleted data.
         val removed = (tombstones(prefs, dirtyKeys) + priorRemoved)
             .filterNotTo(LinkedHashSet()) { it in prefs.keys || isDeviceLocal(it) }
         return buildJsonObject {
@@ -257,16 +166,15 @@ object SyncMerge {
         }
     }
 
-    /**
-     * The **portable** export (identical output to the historical `buildExport`):
-     * `prefs`/`photos`/`_removed` only, no device metadata. Used by the manual
-     * share-to-file feature and as the content [portableContentHash] hashes.
-     */
+        /**
+         * The portable export: `prefs`/`photos`/`_removed` only, no device metadata. Used for the
+         * share-to-file feature and as the content [portableContentHash] hashes.
+         */
     fun buildExport(
         prefs: Map<String, Any>,
         dirtyKeys: Set<String>,
         photos: Map<String, String> = emptyMap(),
-        /** Tombstones already advertised by the file being replaced -- see [buildRoot]. */
+                /** Tombstones already advertised by the file being replaced -- see [buildRoot]. */
         priorRemoved: Set<String> = emptySet(),
     ): String =
         backupJson.encodeToString(
@@ -274,13 +182,11 @@ object SyncMerge {
             buildRoot(prefs, dirtyKeys, photos, priorRemoved) {},
         )
 
-    /**
-     * The **Drive** export: the portable content plus the Drive-sync-only metadata.
-     * [hash] should be [portableContentHash] of the same prefs/dirtyKeys/photos.
-     * The `devices` registry is [mergeDevices]`(knownDevices, selfDevice, nowMs)` so
-     * this device's own entry is upserted and stale peers pruned; peers are
-     * otherwise preserved. [primaryDeviceId] is omitted when null.
-     */
+        /**
+         * The Drive export: portable content plus Drive-only metadata. [hash] should be
+         * [portableContentHash] of the same inputs. `devices` is [mergeDevices] (self upserted, stale
+         * peers pruned). [primaryDeviceId] is omitted when null.
+         */
     fun buildExportForMainToMain(
         prefs: Map<String, Any>,
         dirtyKeys: Set<String>,
@@ -290,12 +196,9 @@ object SyncMerge {
         selfDevice: SyncDevice,
         knownDevices: List<SyncDevice>,
         nowMs: Long,
-        // The file's own stable id, written into the content so every device shows
-        // the SAME File ID for one Drive file (a per-device SAF URI can't). The
-        // caller passes the remote file's id if present, else a freshly-minted one.
+                // The file's own stable id; the caller passes the remote file's id if present, else a new one.
         fileId: String,
-        /** Tombstones already advertised by the remote file, carried forward so a deletion
-         *  survives longer than one upload -- see [buildRoot]. */
+                /** Tombstones advertised by the remote file, carried forward -- see [buildRoot]. */
         priorRemoved: Set<String> = emptySet(),
     ): String {
         val devices = mergeDevices(knownDevices, selfDevice, nowMs)
@@ -319,29 +222,20 @@ object SyncMerge {
         return backupJson.encodeToString(JsonObject.serializer(), root)
     }
 
-    /**
-     * A **canonical, order-independent** SHA-256 of the portable content
-     * (prefs + tombstones + photos), so two devices with identical logical settings
-     * produce the identical hash regardless of DataStore map iteration order (which
-     * is NOT guaranteed stable across devices). This is the change-detection signal:
-     * remote `_hash` != our last-seen hash ⇒ import; our new hash == remote ⇒ no-op
-     * (write only a registry heartbeat, don't churn the file).
-     *
-     * Entries are sorted by key and joined with ASCII control separators — a
-     * unit-separator (0x1F) between a key and its value, a record-separator (0x1E)
-     * between entries, and a group-separator (0x1D) between the prefs / tombstones /
-     * photos sections. None can appear in a key name or a stored value, so
-     * "a"->"bc" and "ab"->"c" can't collide.
-     */
+        /**
+         * A canonical, order-independent SHA-256 of the portable content (prefs + tombstones + photos),
+         * so identical logical settings hash identically regardless of map iteration order.
+         * Remote `_hash` != last-seen hash means import; equal means no-op.
+         *
+         * Entries are sorted and joined with ASCII control separators (0x1F key/value, 0x1E entry,
+         * 0x1D section) that cannot appear in keys or values, so "a"->"bc" and "ab"->"c" cannot collide.
+         */
     fun portableContentHash(
         prefs: Map<String, Any>,
         dirtyKeys: Set<String>,
         photos: Map<String, String> = emptyMap(),
-        /** Must be the SAME set passed to [buildExportForMainToMain]. The hash is documented as being
-         *  computed over the exact content uploaded, and `_removed` is part of that content -- so
-         *  once tombstones are carried forward, omitting them here would leave `_hash` describing
-         *  a file that no longer exists. Callers that pass one and not the other break the
-         *  invariant silently. */
+                /** Must be the SAME set passed to [buildExportForMainToMain]: `_removed` is part of the
+                 *  uploaded content, so omitting it would leave `_hash` describing a different file. */
         priorRemoved: Set<String> = emptySet(),
     ): String {
         val us = Char(31) // unit separator: between a key and its value
@@ -355,7 +249,7 @@ object SyncMerge {
             .sortedBy { it.key }
             .forEach { sb.append(it.key).append(us).append(it.value.toString()).append(rs) }
         sb.append(gs)
-        // Same union+filter as buildRoot, so the hash and the body agree by construction.
+                // Same union+filter as buildRoot, so the hash and the body agree.
         (tombstones(prefs, dirtyKeys) + priorRemoved)
             .filterNot { it in prefs.keys || isDeviceLocal(it) }
             .sorted()
@@ -372,10 +266,8 @@ object SyncMerge {
 
     // --- Device registry -------------------------------------------------------
 
-    /** Union [remote] with [self] by device id (self's entry replaces its own prior
-     *  copy; other devices are preserved), then prune entries whose [SyncDevice.lastSeenMs]
-     *  is older than [retentionMs] before [nowMs] — except [self], which is always
-     *  kept. Blank-id entries are dropped. */
+        /** Union [remote] with [self] by device id (self replaces its prior copy), then prune entries
+         *  older than [retentionMs] before [nowMs] (never [self]). Blank ids are dropped. */
     fun mergeDevices(
         remote: List<SyncDevice>,
         self: SyncDevice,
@@ -391,20 +283,14 @@ object SyncMerge {
 
     // --- Decode ----------------------------------------------------------------
 
-    /**
-     * Parse the Drive-only metadata out of a file's top-level keys. Returns null
-     * only when [json] isn't a valid JSON object at all; otherwise every field is
-     * best-effort ([hash] null when absent/blank so the caller uses the timestamp
-     * fallback; malformed `devices` entries dropped; a bad `_primaryDeviceId`/
-     * `_writerDeviceId` → null). Never throws on a hand-edited or version-skewed file.
-     */
+        /**
+         * Parse the Drive-only metadata from a file's top-level keys. Returns null only when [json]
+         * is not a JSON object; otherwise fields are best-effort (blank/malformed values become null
+         * or are dropped). Never throws on a hand-edited or version-skewed file.
+         */
     fun parseMeta(json: String): SyncMeta? {
         val root = runCatching { backupJson.parseToJsonElement(json) as? JsonObject }.getOrNull() ?: return null
-        // The hash (SHA-256 hex) and the device ids (UUID strings) are ALWAYS JSON
-        // strings when we write them. Require an actual JSON string primitive: a bare
-        // number like `123` is still a JsonPrimitive whose `content` is "123", so
-        // without the isString guard a hand-edited/foreign `"_writerDeviceId": 123`
-        // would be wrongly accepted as an id rather than treated as malformed → null.
+                // Require a real JSON string: a bare number like `123` is a JsonPrimitive too and must read as malformed.
         fun stringField(name: String): String? =
             (root[name] as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
         val hash = stringField("_hash")
@@ -418,14 +304,10 @@ object SyncMerge {
         return SyncMeta(hash = hash, primaryDeviceId = primary, writerDeviceId = writer, devices = devices, fileId = fileId)
     }
 
-    /**
-     * Just the `_removed` list from a backup, for carrying tombstones forward.
-     *
-     * Separate from [parseBackup] deliberately: performMainToMainSync needs this on the UPLOAD half,
-     * which runs even when the import half was skipped (nothing newer, or an unreadable prefs
-     * block). Going through parseBackup would tie the two together and lose the tombstones in
-     * exactly the passes that still have to republish them. Never throws.
-     */
+        /**
+         * Just the `_removed` list, for carrying tombstones forward. Separate from [parseBackup]
+         * because the upload half runs even when the import half was skipped. Never throws.
+         */
     fun parseRemoved(json: String): Set<String> = runCatching {
         val root = backupJson.parseToJsonElement(json) as? JsonObject ?: return emptySet()
         (root["_removed"] as? JsonArray)
@@ -435,16 +317,12 @@ object SyncMerge {
             ?: emptySet()
     }.getOrDefault(emptySet())
 
-    /**
-     * The shared decode used by both `importSettingsJson` and `mergeSettingsJson`:
-     * returns null on invalid JSON, a wrong/absent `_format`, a `_version` newer
-     * than [BACKUP_VERSION], or an absent `prefs` object (mirroring every guard in
-     * the original). Otherwise decodes `prefs` into [MergePlan.stringPuts] (real
-     * JSON strings, plus the numeric-fallback: a bare number is stored as a string
-     * pref in this app) versus [MergePlan.boolPuts] (bare JSON booleans), and
-     * `_removed` into [MergePlan.removes] — excluding [DEVICE_LOCAL_KEYS] from both
-     * puts and removes.
-     */
+        /**
+         * Shared decode for import and merge. Returns null on invalid JSON, a wrong `_format`, a
+         * newer `_version` than [BACKUP_VERSION], or no `prefs`. JSON strings and bare numbers (stored
+         * as string prefs) go to [MergePlan.stringPuts], bare booleans to [MergePlan.boolPuts],
+         * `_removed` to [MergePlan.removes]; [DEVICE_LOCAL_KEYS] are excluded everywhere.
+         */
     fun parseBackup(json: String): MergePlan? {
         val root = runCatching { backupJson.parseToJsonElement(json) as? JsonObject }.getOrNull() ?: return null
         if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") return null
@@ -460,33 +338,26 @@ object SyncMerge {
             if (isDeviceLocal(name)) return@forEach
             val prim = element as? JsonPrimitive ?: return@forEach
             when {
-                // A real JSON string (e.g. "DARK", "true") → keep as a string pref.
+                                // A real JSON string -> a string pref.
                 prim.isString -> stringPuts[name] = prim.content
-                // A bare JSON boolean → a boolean pref (notifications, alerts, …).
+                                // A bare JSON boolean -> a boolean pref.
                 prim.booleanOrNull != null -> boolPuts[name] = prim.booleanOrNull!!
-                // Anything else (a bare number) — every numeric pref is stored as a
-                // string, so coerce it back to one.
+                                // Anything else (a bare number): numeric prefs are stored as strings.
                 else -> stringPuts[name] = prim.content
             }
         }
-        // A key present in prefs wins over its own tombstone -- the SAME rule buildRoot applies
-        // when writing (`it in prefs.keys` is filtered out of `_removed`), enforced here on the
-        // read side too. Bloo's own exports never list a key in both, but the format is
-        // hand-editable, and without this filter a key in both `prefs` and `_removed` would be
-        // DELETED: every applier runs the puts THEN the removes, so the remove would undo the
-        // put -- the exact opposite of buildRoot's "a present value wins" guarantee.
+                // A key present in prefs wins over its own tombstone (as in buildRoot): appliers run
+                // puts then removes, so the remove would otherwise undo the put.
         val removes = removed.filterNotTo(LinkedHashSet()) {
             isDeviceLocal(it) || it in stringPuts || it in boolPuts
         }
         return MergePlan(stringPuts, boolPuts, removes)
     }
 
-    /**
-     * Like [parseBackup], but additionally drops every key in [guarded] from the
-     * puts and the removes — the protect + live-dirty logic in the automatic merge:
-     * a key changed locally since our last sync (and not yet uploaded) must keep
-     * its current local value and must not be tombstoned by the incoming file.
-     */
+        /**
+         * Like [parseBackup], but also drops every [guarded] key from puts and removes, so a key
+         * changed locally since the last sync keeps its value and is not tombstoned by the file.
+         */
     fun mergePlan(json: String, guarded: Set<String>): MergePlan? {
         val base = parseBackup(json) ?: return null
         if (guarded.isEmpty()) return base

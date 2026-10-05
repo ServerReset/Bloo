@@ -14,8 +14,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
- * Maps a WMO weather interpretation code + day/night flag to the appropriate
- * Material icon, so icon choices are consistent across the phone UI.
+ * Maps a WMO weather interpretation code + day/night flag to the appropriate Material icon, so icon
+ * choices are consistent across the phone UI.
  */
 fun weatherIcon(code: Int, isDay: Boolean): ImageVector = when (code) {
     0 -> if (isDay) Icons.Filled.WbSunny else Icons.Filled.Nightlight
@@ -30,9 +30,9 @@ fun weatherIcon(code: Int, isDay: Boolean): ImageVector = when (code) {
 }
 
 /**
- * Condition-appropriate accent colour for a weather icon. Mostly static ARGB
- * constants; callers pass [neutralColor] (typically `onSurfaceVariant` from
- * their Material theme) for overcast/fog/unknown conditions.
+ * Condition-appropriate accent colour for a weather icon. Mostly static ARGB constants; callers
+ * pass [neutralColor] (typically `onSurfaceVariant` from their Material theme) for
+ * overcast/fog/unknown conditions.
  */
 fun weatherTint(code: Int, isDay: Boolean, neutralColor: Color): Color = when (code) {
     0 -> if (isDay) Color(com.bloo.bluelink.data.BlooColors.warn) else Color(0xFFB0BEC5)

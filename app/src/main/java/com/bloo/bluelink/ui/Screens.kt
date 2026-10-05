@@ -63,29 +63,12 @@ import com.bloo.bluelink.data.platform
 
 
 /**
- * Root composable for the whole phone app. Owns nothing itself beyond a
- * snackbar host and a haptics engine -- all real state lives in [vm] and is
- * collected here as Compose state so this function (and everything below it)
- * recomposes whenever [AppViewModel.state] or [AppViewModel.appearance] emits.
- *
- * Structure, outside-in:
- *  - A [CompositionLocalProvider] makes the shared [Haptics] instance
- *    available to every descendant via [LocalHaptics].
- *  - A full-bleed vertical gradient paints behind the transparent system
- *    bars (edge-to-edge), inside a [Box] that can be blurred as a unit.
- *  - A [Scaffold] hosts the snackbar and, via [AnimatedContent] keyed on the
- *    current [Screen], cross-fades/slides between the Login, Empty,
- *    Onboarding, CarSetup, Garage, and Settings top-level screens.
- *  - A biometric lock overlay ([LockOverlay]) is drawn last, on top of
- *    everything, and blurs+dims the content behind it while [state.locked]
- *    is true.
+ * Root composable for the phone app: a gradient backdrop, a [Scaffold] that switches top-level screens
+ * via [AnimatedContent], and a biometric [LockOverlay] drawn last. State lives in [vm].
  */
 @Composable
 fun BlooApp(vm: AppViewModel) {
-    // Cold-start instrumentation: "first composition" is the moment Compose starts
-    // running this root, and the withFrameNanos below is the moment a frame is actually
-    // produced -- the pair separates "compose is slow" from "the frame clock is late",
-    // which the frame monitor's own numbers alone cannot distinguish.
+    // Marks the first composition and first frame, to tell a slow compose from a late frame clock.
     com.bloo.bluelink.data.StartupTrace.once("compose-root", "BlooApp: first composition")
     LaunchedEffect(Unit) {
         withFrameNanos { }
@@ -94,26 +77,12 @@ fun BlooApp(vm: AppViewModel) {
     val stateHolder = vm.state.collectAsStateWithLifecycle()
     val state by stateHolder
     val appearance by vm.appearance.collectAsStateWithLifecycle()
-    // Narrow derived reads of the collected state.
-    //
-    // Reading these fields straight off `state` in this body subscribed the WHOLE app root --
-    // the Scaffold, the screen dispatch, every child -- to every UiState emission: a status
-    // poll for one car, a location tick, an AI probe, a weather refresh. Each of these values
-    // changes far less often than the state object does, and a derived state only invalidates
-    // its reader when the value really changed, so an unrelated emission no longer recomposes
-    // the root (and, through it, the screen it is showing).
+    // Narrow derived reads, so unrelated UiState emissions don't recompose the whole root.
     val screen by remember { derivedStateOf { state.screen } }
     val locked by remember { derivedStateOf { state.locked } }
-    // Latches true the first time the app is NOT locked -- i.e. the user has unlocked at least
-    // once this session (or had no lock configured, which reads as unlocked immediately). Only
-    // the COLD-START lock defers composing the garage (see the Screen.Garage branch); once this
-    // has latched, a later re-lock (backgrounding, timing) composes the garage behind the lock
-    // as before, since its content is already built and just needs the blur.
+    // Latches once the app has been unlocked; only the cold-start lock defers composing the garage.
     var unlockedThisSession by remember { mutableStateOf(false) }
-    // SideEffect, not a bare body write: this codebase's own convention (see BlooApp's haptics
-    // write) -- mutating state during composition can be discarded or re-ordered, so it runs
-    // after a successful (re)composition instead. Latching the instant a non-locked frame is
-    // composed is what lets the garage start building on that very frame.
+    // SideEffect, not a body write: composition-time state writes can be discarded.
     SideEffect { if (!locked) unlockedThisSession = true }
     val loading by remember { derivedStateOf { state.loading } }
     val refreshing by remember { derivedStateOf { state.refreshing } }
@@ -125,42 +94,24 @@ fun BlooApp(vm: AppViewModel) {
     val canadaOtp by remember { derivedStateOf { state.canadaOtp } }
     val onSettingsPageSlot by remember { derivedStateOf { state.onSettingsPageSlot } }
     val mapExpanded by remember { derivedStateOf { state.mapExpanded } }
-    // Shared by GarageScreen, SettingsScreen and SearchLayer below -- see either
-    // screen's own `hazeState` parameter doc for why: SearchLayer floats above
-    // whichever of the two is actually showing, so its own glass fill needs ONE
-    // real blur source that works no matter which screen that turns out to be,
-    // instead of each screen's own previously-private, unshared HazeState leaving
-    // search with nothing to blur regardless of which one was on screen.
+    // One blur source shared by GarageScreen, SettingsScreen and SearchLayer, which floats over either.
     val searchHazeState = remember { HazeState() }
     val backdropHaze = remember { HazeState() }
     val toasts = remember { ToastState() }
-    // The ONE pull-to-refresh indicator for the whole app -- every Refreshable feeds it,
-    // PullRefreshIndicatorHost (mounted below, above the content) draws it.
+    // The one pull-to-refresh indicator; every Refreshable feeds it.
     val refreshIndicator = remember { RefreshIndicatorState() }
     val scope = rememberCoroutineScope()
-    // LocalClipboard (the non-deprecated spelling): its set API is SUSPEND, so
-    // the copy call below hops through this screen's existing `scope` rather
-    // than the old manager's synchronous setText.
+    // LocalClipboard's set is suspend, so copies hop through `scope`.
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
 
-    // One haptics engine for the whole app; its enabled flag tracks the setting.
-    // Written in a SideEffect{} rather than inline: mutating shared state during
-    // composition is a Compose anti-pattern (the write can be discarded if the
-    // composition is abandoned, and it isn't ordered relative to effects) --
-    // SideEffect runs it after every successful (re)composition.
+    // One haptics engine; written in a SideEffect because composition-time writes can be discarded.
     val haptics = remember { Haptics(context.applicationContext) }
     SideEffect { haptics.enabled = appearance.hapticsEnabled }
 
-    // While a command is in flight (or the garage is loading), loop a soft
-    // left-to-right sweep so progress is felt until it completes. The effect is
-    // keyed on `busy`, so it cancels as soon as work finishes. Gated on the
-    // STARTED lifecycle state: a backgrounded Activity keeps its composition
-    // (and its LaunchedEffects) alive, so without the gate a slow command kept
-    // vibrating the phone in the user's pocket after they switched apps.
+    // Loops a soft sweep while work is in flight; gated on STARTED so a backgrounded app stays quiet.
     val busy by remember { derivedStateOf { state.loading || state.pending.isNotEmpty() } }
-    // androidx.lifecycle.compose.LocalLifecycleOwner -- the compose-ui platform
-    // spelling is deprecated and slated for removal.
+    // The compose-ui LocalLifecycleOwner is deprecated.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     LaunchedEffect(busy) {
         if (!busy) return@LaunchedEffect
@@ -172,9 +123,7 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
-    // Every message the ViewModels raise lands in the toast stack, carrying its own type so a
-    // later message can never repaint an earlier one. clearMessage() right after keeps the single
-    // UiState slot free for the next one, which stacks below instead of queueing behind.
+    // Each ViewModel message becomes a typed toast; clearMessage() frees the single UiState slot.
     LaunchedEffect(message) {
         message?.let { msg ->
             toasts.show(msg, messageType)
@@ -182,22 +131,12 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
-    // One floating registry for the whole app: every floating element (corner chrome, search,
-    // the refresh indicator) publishes its bounds here and asks here who else is in the way,
-    // instead of screens hand-threading each other's positions around. See FloatingSystem.kt.
+    // One registry where every floating element publishes its bounds; see FloatingSystem.kt.
     val floatingRegistry = remember { FloatingRegistry() }
     val dialogHost = remember { DialogHost(searchHazeState) }
     CompositionLocalProvider(
-        // Kills Android's default ripple app-wide -- see NoTapHighlight for why this app
-        // answers a press with its own motion instead of a borrowed grey fill.
-        //
-        // Both halves are needed. LocalIndication covers everything that resolves indication
-        // the ordinary way: every plain Modifier.clickable, and MorphButtonCore (the component
-        // behind essentially every button here), which takes indication = LocalIndication.current.
-        // Material 3's own components do NOT read it -- Surface(onClick), IconButton, Switch and
-        // Card each construct their own ripple internally -- and LocalRippleConfiguration set to
-        // null is the supported way to turn those off, without rewriting each component and
-        // inheriting its layout quirks.
+        // Removes the default ripple app-wide (see NoTapHighlight). Material 3 components ignore
+        // LocalIndication, so LocalRippleConfiguration = null turns off theirs.
         LocalIndication provides NoTapHighlight,
         LocalRippleConfiguration provides null,
         LocalFloatingRegistry provides floatingRegistry,
@@ -206,40 +145,19 @@ fun BlooApp(vm: AppViewModel) {
         LocalRefreshIndicator provides refreshIndicator,
         LocalBackdropHaze provides backdropHaze,
         LocalHaptics provides haptics,
-        // Provided once here (the app root already collects `appearance` above) so
-        // every pebble/tile reads LocalAppearance.current instead of opening its own
-        // collectAsStateWithLifecycle() collector — see LocalAppearance.
+        // Provided once so pebbles read LocalAppearance.current instead of each collecting.
         LocalAppearance provides appearance,
     ) {
-    // Edge-to-edge: a soft full-bleed gradient paints behind the transparent
-    // status/navigation bars; screen content draws on top of it.
+    // A soft full-bleed gradient behind the transparent system bars.
     val scheme = MaterialTheme.colorScheme
-    // Biometric lock overlay: blur the whole app behind it and fade the blur
-    // away once unlocked. Both animated values used to be read directly here
-    // in BlooApp's own body (`by animateDpAsState`/`animateFloatAsState`),
-    // which subscribed BlooApp's entire recompose scope -- the Scaffold, the
-    // whole NavHost of every screen, the SearchLayer -- to every one of the
-    // ~27 frames of each 450ms lock/unlock transition. Hoisted into their own
-    // small composables below so only those tiny scopes recompose per frame;
-    // everything else just gets redrawn under the blurred/faded layer.
+    // Biometric lock overlay: the blur and fade animate in their own composables so only those scopes recompose per frame.
     Box(Modifier.fillMaxSize()) {
-    // "Content settled": true once the screen has actually become the garage AND its first
-    // composition has had a moment to finish. Two full-screen blurs are gated on it, because
-    // both re-rasterize the whole view tree and both were measured as the dominant cost of
-    // the cold-start frames on the API 34 emulator:
-    //   - the lock screen's 22dp blur over the entire app (2.3s frame with it, 1.33s
-    //     without), and
-    //   - Aurora's own 44dp backdrop blur, which the drift redraws every 80ms.
-    // Neither is visible as a change: the lock screen paints its own scrim, and a frozen
-    // backdrop is indistinguishable for the ~1s this window lasts on hardware (~0 on a fast
-    // device, where the garage's first frame is a few ms).
+    // "Content settled": the garage's first composition has finished. Gates two full-screen blurs
+    // (lock blur, Aurora backdrop blur) that dominate cold-start frame cost.
     var contentSettled by remember { mutableStateOf(screen == Screen.Garage) }
     LaunchedEffect(screen) {
         if (screen == Screen.Garage) {
-            // Two frames, not a wall-clock delay: on hardware the garage's first frame is a
-            // few milliseconds, so the blur is back essentially immediately, while a device
-            // that needs 2.5s for that frame (the software-rendered emulator) keeps the
-            // cheaper opaque backdrop for exactly as long as it is struggling.
+            // Frame-based, not a delay: the blur returns at once on fast devices and waits on slow ones.
             withFrameNanos { }
             withFrameNanos { }
             contentSettled = true
@@ -247,8 +165,7 @@ fun BlooApp(vm: AppViewModel) {
     }
     LockBlurLayer(locked = locked && contentSettled) {
     Box(Modifier.fillMaxSize()) {
-    // The app's backdrop: a Haze source every glass card blurs. A sibling UNDER everything, not
-    // the root's own background, because a card cannot blur a source it is a child of.
+    // The app's backdrop: a Haze source every glass card blurs. A sibling under everything, since a card can't blur its own parent.
     Box(
         Modifier
             .matchParentSize()
@@ -283,56 +200,26 @@ fun BlooApp(vm: AppViewModel) {
     )
     Scaffold(
         containerColor = Color.Transparent,
-        // Toasts are NOT the Scaffold's snackbar any more -- see the ToastHost call
-        // below the screen switch for why (they belong ABOVE search, and a
-        // snackbarHost is drawn under everything the Scaffold's content draws).
+        // Toasts render in ToastHost below, above search, not in the Scaffold's snackbar.
         snackbarHost = {},
     ) { padding ->
-        // Adding an account shows the login form even while already signed in.
+        // Adding an account shows the login form even while signed in.
         val target = if (addingAccount) Screen.Login else screen
-        // Shared with the search layer and the garage aurora: while the search
-        // panel is open the blurred aurora beneath it pauses (see
-        // AuroraBackground's `paused`), so typing/panel frames don't contend
-        // with a full-screen blur redraw. Hoisted here, above the screen
-        // switch, because BOTH the per-screen background and the search layer
-        // (which sits above every screen) read it.
+        // Hoisted above the screen switch: the aurora pauses while search is open.
         var searchOpen by remember { mutableStateOf(false) }
         AnimatedContent(
             targetState = target,
             transitionSpec = {
-                // A real spring (this app's own SoftDamping/StiffnessMediumLow, the
-                // same feel the garage's own expand/collapse AnimatedContent uses a
-                // few screens down) rather than AnimatedContent's bare default -- the
-                // default spec is tuned for a small content swap settling quickly,
-                // and on a screen-sized slide that read as slightly clipped/mechanical
-                // next to every other full-screen motion in the app. fadeIn/fadeOut
-                // keep their own (fast, linear-feeling) defaults on purpose: only the
-                // SLIDE -- the part that actually travels screen-sized distance --
-                // needed the softer landing. Settings used to be one of these targets
-                // (reached only from the no-vehicles screen) with its own slide
-                // direction; it's a page in the garage's own pager now, for every
-                // vehicle count, so there's nothing left here to give a special sign.
+                // A spring for the screen-sized slide; fade keeps its defaults.
                 val slideSpec = spring<IntOffset>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
                 (slideInHorizontally(slideSpec) { w -> -w } + fadeIn()) togetherWith
                     (slideOutHorizontally(slideSpec) { w -> w } + fadeOut())
             },
             label = "screen",
         ) { screen ->
-            // The garage draws full-bleed (content scrolls behind the bars and
-            // handles its own insets); other screens stay inset by the Scaffold.
+            // The garage draws full-bleed; other screens are inset by the Scaffold.
             when (screen) {
-                // Bootstrapping only -- see Screen.Loading's own doc
-                // (AppViewModel.kt) for why this exists at all. The SAME
-                // AuroraBackground + wordmark LoginScreen opens with (so
-                // there's nothing to visually reconcile if this resolves to
-                // Login next -- same background, same brand mark, already
-                // mid-fade), but with no form, no fields, nothing interactive
-                // -- this is a "we haven't decided what screen you need yet"
-                // placeholder, not a real destination, and it has to stay
-                // cheap: AuroraBackground is already exactly what the FIRST
-                // frame of a cold start painted before this screen existed
-                // (LoginScreen used it too), so this is strictly less work
-                // than before, not more.
+                // Bootstrapping placeholder (see Screen.Loading): same aurora + wordmark as Login, nothing interactive.
                 Screen.Loading -> {
                     com.bloo.bluelink.data.StartupTrace.once("screen-loading", "screen: Loading composed")
                     LoadingScreen(Modifier.padding(padding))
@@ -345,9 +232,7 @@ fun BlooApp(vm: AppViewModel) {
                         loading = loading,
                         onLogin = vm::login,
                         onCancel = if (accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
-                        // A logged-out user has no Settings to reach the update surface, so the
-                        // login screen offers its own: force a check (bypassing the background
-                        // debounce) and surface the result.
+                        // Logged-out users have no Settings, so Login offers its own forced update check.
                         onCheckForUpdates = { vm.checkForUpdate(force = true, surfaceResult = true) },
                         updateChecking = loginUpdateChecking,
                         updateAvailableUrl = loginUpdateAvailable?.run?.htmlUrl,
@@ -361,27 +246,12 @@ fun BlooApp(vm: AppViewModel) {
                 is Screen.CarSetup -> OnboardingScreen(vm, OnboardingMode.NewCars(screen.vins))
                 Screen.Garage -> {
                     com.bloo.bluelink.data.StartupTrace.once("screen-garage", "screen: Garage composed (first garage frame next)")
-                    // Reuses the outer `appearance` (already collected once above
-                    // for the CompositionLocalProvider) instead of re-subscribing
-                    // to the same StateFlow a second time here.
+                    // Reuses the outer `appearance`.
                     Box(Modifier.fillMaxSize()) {
-                        // `paused = searchOpen`: the search panel sits ABOVE this
-                        // background, and while it's up (typing frames, panel
-                        // scrolling) the ambient drift would otherwise keep
-                        // redrawing the blurred backdrop underneath at ~12fps --
-                        // real contention on exactly the frames search is using.
+                        // Paused while search is open so the aurora drift doesn't contend with search frames.
                         if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize().hazeSource(backdropHaze), appearance, refreshing = refreshing, paused = searchOpen)
-                        // COLD-START LOCK DEFERRAL: while a returning user's lock screen is up
-                        // before they've unlocked, do NOT compose the full garage -- it is a
-                        // pager of complete car pages, each with a hero photo decode and a
-                        // first-map tile fetch. Composing and then BLURRING all of that behind a
-                        // screen the user hasn't unlocked yet was the biggest cold-start frame
-                        // cost in a real trace (dozens of 33-50ms frames, heap 26->46MB). The
-                        // lock overlay already covers the screen, and the aurora above is the
-                        // backdrop it blurs, so nothing needs the garage yet. The instant the
-                        // user unlocks, `locked` flips and the garage composes for real --
-                        // the two-frame `contentSettled` gate the lock blur already uses keeps
-                        // that first real frame from being the one that flashes.
+                        // Cold-start lock: don't compose (and blur) the full garage behind a lock the user
+                        // hasn't passed; it composes once `locked` flips.
                         if (!(locked && !unlockedThisSession)) {
                             GarageScreen(stateHolder, vm, hazeState = searchHazeState)
                         }
@@ -389,44 +259,15 @@ fun BlooApp(vm: AppViewModel) {
                 }
             }
         }
-        // Search lives HERE, above the screen-switching AnimatedContent and
-        // outside it, which is the whole point: one element that survives the
-        // transition, so garage -> Settings genuinely morphs a corner bubble
-        // into the bottom bar instead of cross-fading two different objects
-        // that happen to look alike. Only the one screen that has anything to
-        // search; login, onboarding and the setup wizard don't. Settings is
-        // always a page inside THIS screen's own pager now (no standalone
-        // route any more, for any vehicle count), so it doesn't need a
-        // separate entry here.
+        // Search lives above the AnimatedContent so one element survives the transition (corner bubble
+        // morphing into the settings pill). Only the garage is searchable.
         val searchable = target == Screen.Garage
         val notifPrefs by vm.notifications.collectAsStateWithLifecycle()
-        // On the garage (and the cover) it is the user's switch. On the Settings
-        // PAGE of that same pager it is always there -- that is how you find a
-        // setting. state.onSettingsPageSlot (kept in sync by the pager's own
-        // settle effect) is the one signal for that now: without it, swiping to
-        // the Settings page fell back to the ordinary garage-screen showSearch
-        // preference (search could disappear entirely there for anyone with
-        // that off) and the search element itself stayed shaped like a garage
-        // "bubble" instead of morphing into the settings "pill".
+        // On the Settings pager page search is always shown (how you find a setting); onSettingsPageSlot tracks it.
         val effectivelyInSettings = onSettingsPageSlot
-        // !mapExpanded: a car's full-screen map overlay has its own bottom action row
-        // (Recentre/Open in Maps) sitting in the same corner the floating search bubble
-        // does -- the two overlapped and clipped into each other, reported directly from
-        // a screenshot. See UiState.mapExpanded's own doc.
+        // Hidden while the map overlay is expanded: its bottom action row occupies the same corner.
         if (searchable && !locked && !mapExpanded) {
-            // fillMaxSize() alone, no `.padding(padding)` -- SearchLayer already
-            // reads WindowInsets itself for every edge it cares about (its own
-            // `bottomInset`, `insetTopDp` for the compact docked band), the same
-            // "edge-to-edge, self-managed insets" pattern the Garage/Settings
-            // screens right above already use with no `.padding(padding)` of
-            // their own either. Applying the Scaffold's own default
-            // `contentWindowInsets` (WindowInsets.systemBars) HERE as well meant
-            // this Box's own measured height was already shrunk by the
-            // navigation bar before SearchLayer's BoxWithConstraints ever saw
-            // it, and SearchLayer's own `bottomInset` then subtracted that same
-            // navigation-bar height a SECOND time computing where "the bottom"
-            // is -- reported directly as the search bubble sitting noticeably
-            // higher than its own bottom-anchored formula should ever place it.
+            // No `.padding(padding)`: SearchLayer reads WindowInsets itself, and padding here would subtract the nav bar twice.
             Box(Modifier.fillMaxSize()) {
                 SearchLayer(
                     vm = vm,
@@ -440,18 +281,8 @@ fun BlooApp(vm: AppViewModel) {
             }
         }
     }
-    // Toasts live HERE -- inside the app's outer Box, after the screen switch and
-    // after SearchLayer (both drawn inside the Scaffold above), so they stack ABOVE
-    // search. They used to be the Scaffold's `snackbarHost`, which is drawn UNDER
-    // all of the Scaffold's content including that SearchLayer sibling -- so a toast
-    // that blobbed out of the search bubble then slid behind the very panel it came
-    // from. Still above them sits the lock overlay and the dialogs (drawn below,
-    // outside this Box): a toast is informational, a dialog is modal.
-    // The one universal pull-to-refresh indicator: a liquid-glass disc floating above all
-    // app content (it is drawn here, at the root, after the Scaffold/SearchLayer), below the
-    // toasts and dialogs. One instance for the entire app, fed by whichever Refreshable is on
-    // screen. hazeState = searchHazeState: the same backdrop source the app's other floating
-    // glass uses, so the disc refracts what is really behind it, not a flat tint.
+    // Toasts sit inside the outer Box after SearchLayer so they stack above search; the lock overlay and dialogs sit above them.
+    // The app-wide pull-to-refresh disc, drawn above content and below toasts/dialogs; refracts searchHazeState.
     PullRefreshIndicatorHost(
         state = refreshIndicator,
         hazeState = searchHazeState,

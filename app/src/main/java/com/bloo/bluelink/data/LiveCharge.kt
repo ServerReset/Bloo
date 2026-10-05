@@ -13,103 +13,27 @@ import androidx.core.net.toUri
 import com.bloo.bluelink.R
 
 /**
- * Android 16's "Live Update" notification for an actively-charging car -- the
- * ongoing progress bar Google documents at developer.android.com under
- * "Create live update notifications" and "Progress-centric notifications"
- * (the Android 16 feature page). Every API call below is checked against
- * those two pages plus the androidx.core 1.17.0-alpha01 release notes, which
- * is the release that added [NotificationCompat.ProgressStyle],
- * `setRequestPromotedOngoing`, and `canPostPromotedNotifications` together --
- * this app depends on core-ktx 1.19.0, well past that floor.
- *
- * ## Two different things, one notification
- *
- * 1. **An ordinary ongoing notification with a progress bar.** Works on
- *    every OS version this app supports (minSdk 26): [update] reposts under
- *    the same id as the percentage climbs, and Android always treats a
- *    repost with the same id as "replace", not "post a new one".
- * 2. **The same notification promoted into a status-bar / lock-screen
- *    chip.** Android 16 (API 36) and up only, and made ENTIRELY by the
- *    system at post time -- this code can ask, never force it. Below API 36
- *    the exact same builder just renders as (1), which is correct behaviour,
- *    not a failure.
- *
- * ## The promotion checklist
- *
- * `Notification#hasPromotableCharacteristics()` is Google's own gate for
- * (2), and its documented requirements are ALL of:
- *
- *  1. A promotable style (Standard, `BigTextStyle`, `CallStyle`,
- *     `ProgressStyle`, or `MetricStyle`) -- [update] always builds a
- *     `ProgressStyle`.
- *  2. The `POST_PROMOTED_NOTIFICATIONS` manifest permission -- install-time,
- *     never a runtime prompt, nothing to request from this code.
- *  3. `setRequestPromotedOngoing(true)` -- [update].
- *  4. `setOngoing(true)` -- [update].
- *  5. A non-blank `contentTitle` -- [update], always `"$carName is charging"`.
- *  6. No custom `RemoteViews` -- never set here.
- *  7. Not a group summary -- never set here.
- *  8. Not `setColorized(true)` -- never set here.
- *  9. Channel importance above `IMPORTANCE_MIN` -- [ensureChannel] uses
- *     `IMPORTANCE_LOW`, one full step above the floor.
- *
- * ## The 10th condition -- and the part that's new
- *
- * All nine rows above are checkable from code. There is also a per-app OS
- * "Live Updates" toggle that `hasPromotableCharacteristics()` does NOT
- * cover -- a notification satisfying every row above can still render as an
- * ordinary notification if the user has that switch off, with nothing
- * queryable to explain why. Earlier androidx.core releases had no API for
- * this at all. As of 1.17 there is one:
- * `NotificationManagerCompat.canPostPromotedNotifications()` (API 36+ only;
- * unconditionally `false` below that, since the underlying platform method
- * doesn't exist there either) -- wrapped here as [isPromotable]. When it's
- * false, [openLiveUpdateSettings] sends the user straight to the OS page for
- * it via `Settings.ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS`.
- *
- * ## How to tell it's actually promoting, on a real Android 16+ device
- *
- * Start a charge and watch for a CHIP in the status bar / lock screen, not
- * just a notification in the shade. If the shade notification looks right
- * (title, moving bar, Stop button) but no chip appears: check, in order,
- * (a) `Build.VERSION.SDK_INT >= 36` on the device, (b) [isPromotable] --
- * if false, [openLiveUpdateSettings] is the fix, not a code change --
- * (c) only then re-check the nine-row table above against whatever changed.
- *
- * Sources: https://developer.android.com/develop/ui/views/notifications/live-update ,
- * https://developer.android.com/about/versions/16/features/progress-centric-notifications ,
- * androidx.core 1.17.0-alpha01 release notes.
+ * Android 16's "Live Update" notification for an actively-charging car -- the ongoing progress bar
+ * Google documents at developer.android.com under "Create live update notifications" and
+ * "Progress-centric notifications" (the Android 16 feature page).
  */
 object LiveCharge {
-    // Own channel, never shared with the alert channel above: this reposts
-    // on every poll (as often as every 5 minutes while charging), which
-    // would be intolerable noise mixed into a channel meant for occasional
-    // door/service alerts. IMPORTANCE_LOW keeps it silent (no sound, no
-    // heads-up peek) while still clearing promotion condition 9 above with a
-    // full step to spare.
+    // Own channel, never shared with the alert channel above: this reposts on every poll (as often
+    // as every 5 minutes while charging), which would be intolerable noise mixed into a channel
+    // meant for occasional door/service alerts.
     private const val CHANNEL = "bloo_live_charge"
     private const val ACCENT = BlooColors.brandAccent
 
     // The one shared charge green (BlooColors.chargeGreen), used by every charge readout on the
-    // phone. This used to be its own 0xFF34C759 -- a brighter,
-    // Apple-style green that had drifted from the canonical token, so the live-charge bar (the
-    // one charge surface that actively interrupts the user) showed a different green from every
-    // other charge surface. Consolidated so a future palette change moves all of them together.
+    // phone. Consolidated so a future palette change moves all of them together.
     private const val CHARGE_GREEN = BlooColors.chargeGreen
 
-    // The bar's "topped up" fill, once the pack is at (or past) its own configured
-    // limit -- the same shared token every other surface that draws this bar now uses.
     private const val CHARGE_BLUE = BlooColors.chargeBlue
 
     private const val TRACK = 0x40FFFFFF
 
-    // The "won't fill past here" segment, past either the limit or (once the charge
-    // is already there) the current charge itself. Well under half TRACK's alpha,
-    // not just half -- half turned out too close to TRACK to read as a second, dimmer
-    // zone once actually rendered on a real device (see the phone's ChargeSegmentBar
-    // for the same finding there); NotificationCompat.ProgressStyle has no explicit
-    // inter-segment gap to fall back on the way the phone bars do, so the
-    // colour step here has to carry the whole distinction on its own.
+    // The "won't fill past here" segment, past either the limit or (once the charge is already
+    // there) the current charge itself.
     private const val TRACK_DIM = 0x14FFFFFF
 
     internal fun idFor(vin: String) = ("live_charge_$vin").hashCode()
@@ -126,39 +50,24 @@ object LiveCharge {
         )
     }
 
-    /** Clears every car's live-charge notification at once -- used when the
-     *  user turns the feature off, so nothing is left pinned in the shade
-     *  until the next poll happens to notice. */
+    /**
+     * Clears every car's live-charge notification at once -- used when the user turns the feature
+     * off, so nothing is left pinned in the shade until the next poll happens to notice.
+     */
     fun cancelAll(context: Context, vins: List<String>) {
         val mgr = NotificationManagerCompat.from(context)
         vins.forEach { vin -> runCatching { mgr.cancel(idFor(vin)) } }
     }
 
     /**
-     * Whether the SYSTEM will currently let this app show a promoted chip --
-     * the per-app Live Updates toggle, live-queried rather than guessed.
-     * `false` below API 36 unconditionally: `canPostPromotedNotifications()`
-     * itself doesn't exist on the platform there, so there's nothing to ask.
+     * Whether the SYSTEM will currently let this app show a promoted chip -- the per-app Live
+     * Updates toggle, live-queried rather than guessed.
      */
     fun isPromotable(context: Context): Boolean =
         Build.VERSION.SDK_INT >= 36 &&
             NotificationManagerCompat.from(context).canPostPromotedNotifications()
 
-    /**
-     * Convenience overload: derive the five charge fields from an [EvStatus] and delegate.
-     *
-     * The three callers named below -- AppViewModel's post-refresh hook, AlertWorker, and
-     * LiveChargePollWorker -- each held an `ev: EvStatus?` and mapped it to these five fields
-     * with the identical five lines. That mapping is exactly the kind of thing the KDoc on the
-     * full-parameter [sync] below warns about: a rule ("charging means batteryCharge == true",
-     * "the limit is targetForCurrentPlug") that has to agree across three sites. It now lives
-     * here, next to the policy it belongs with.
-     *
-     * `charging = ev?.batteryCharge == true` -- verified identical at all three old call sites,
-     * including LiveChargePollWorker whose local `charging` val was that exact expression. The
-     * "only call this for a car you actually heard back from" contract on [sync] is unchanged:
-     * these callers already guard on a non-null status before reaching here.
-     */
+    /** Convenience overload: derive the five charge fields from an [EvStatus] and delegate. */
     suspend fun sync(
         context: Context,
         settings: SettingsStore,
@@ -174,20 +83,16 @@ object LiveCharge {
         percent = ev?.batteryStatus,
         minutesToFull = ev?.minutesToFull,
         pluggedInLabel = ev?.pluggedInLabel,
-        // displayChargeLimit, not targetForCurrentPlug directly, for the same reason
-        // every other display of this value now does -- see that function's own doc.
-        // This bar only ever exists while charging = true, which normally implies a
-        // plug is connected, but the fallback costs nothing and covers the rare case
-        // of a status inconsistency between the two fields.
+        // This bar only ever exists while charging = true, which normally implies a plug is
+        // connected, but the fallback costs nothing and covers the rare case of a status
+        // inconsistency between the two fields.
         chargeLimit = ev?.displayChargeLimit(),
     )
 
     /**
      * [sync] for a caller holding a [Vehicle] and its current [EvStatus], which is how both
-     * background workers reach it: each wrote out
-     * `sync(context = applicationContext, settings = settings, vin = v.vin, carName = v.name, ev = ev)`
-     * verbatim. The vehicle's own vin/name are the arguments here, so those two call sites
-     * shrink to one call and can't drift on which field goes where.
+     * background workers reach it: each wrote out `sync(context = applicationContext, settings =
+     * settings, vin = v.vin, carName = v.name, ev = ev)` verbatim.
      */
     suspend fun sync(
         context: Context,
@@ -203,27 +108,8 @@ object LiveCharge {
     )
 
     /**
-     * The one entry point callers should use: applies the dismissal rule, then delegates
-     * to [update].
-     *
-     * There are three callers -- the 5-minute poll worker, the 30-minute alert worker, and
-     * the app's own post-refresh hook -- and every rule about WHEN this notification should
-     * exist has to hold in all three. It previously didn't: each called [update] directly
-     * and each independently got the "I couldn't fetch a status" case wrong, cancelling the
-     * bar because the network blipped. Putting the policy here means the next rule added
-     * lands once.
-     *
-     * Two rules live here:
-     *
-     * Charging ended -> clear the bar and FORGET any dismissal, so the next charging
-     * session shows it again instead of being permanently suppressed by one old swipe.
-     *
-     * Still charging but dismissed -> do nothing at all. Not a cancel: the notification is
-     * already gone, the user removed it, and re-cancelling would be a pointless call.
-     *
-     * Callers must still only call this for a car they actually have a status for --
-     * `charging = false` here genuinely means "the car told us it stopped", never "we
-     * don't know".
+     * The one entry point callers should use: applies the dismissal rule, then delegates to
+     * [update].
      */
     suspend fun sync(
         context: Context,
@@ -270,15 +156,8 @@ object LiveCharge {
     }
 
     /**
-     * Shows, updates, or cancels [vin]'s live-charge notification to
-     * match its current charge state. Reposting under the same [idFor] id is
-     * exactly what makes this "live" below API 36 -- see the class doc.
-     *
-     * [percent] absent means the car hasn't reported a state of charge yet;
-     * an indeterminate `ProgressStyle` is used rather than skipping the
-     * style entirely, since a promotable style is promotion condition 1 and
-     * skipping it on the very first poll would silently cost promotion for
-     * however long the percent stays unknown.
+     * Shows, updates, or cancels [vin]'s live-charge notification to match its current charge
+     * state.
      */
     fun update(
         context: Context,
@@ -289,18 +168,17 @@ object LiveCharge {
         minutesToFull: Int? = null,
         pluggedInLabel: String? = null,
         enabled: Boolean = true,
-        /** The charge limit for whichever plug is connected, if reported -- drawn as
-         *  a split in the bar (and turns its fill blue once reached). */
         chargeLimit: Int? = null,
-        /** The car's own photo, already decoded (see [sync]) -- shown as the notification's
-         *  large icon so the bar reads as THIS car, the same way the hero card's photo does.
-         *  Null falls back to the plain small icon with nothing extra, never an error. */
+        /**
+         * The car's own photo, already decoded (see [sync]) -- shown as the notification's large
+         * icon so the bar reads as THIS car, the same way the hero card's photo does.
+         */
         carPhoto: Bitmap? = null,
     ) {
         val id = idFor(vin)
         // Check THIS feature's own channel, not the alerts channel: the charging bar posts to
-        // bloo_live_charge (CHANNEL here is LiveCharge's own const), so a per-channel block on
-        // the alerts channel must not cancel it, and a block on this one must stop it.
+        // bloo_live_charge (CHANNEL here is LiveCharge's own const), so a per-channel block on the
+        // alerts channel must not cancel it, and a block on this one must stop it.
         if (!enabled || !charging || !Notifications.hasPermission(context, CHANNEL)) {
             runCatching { NotificationManagerCompat.from(context).cancel(id) }
             return
@@ -311,22 +189,10 @@ object LiveCharge {
         val limit = chargeLimit?.takeIf { it in 1..99 }
         if (percent != null) {
             val pct = percent.coerceIn(0, 100)
-            // Independent of `charging` -- a car reported charged to its own limit
-            // reads blue even hours later, unplugged, same as every other surface
-            // that draws this bar (see the phone's ChargeReadout.stuckAtLimit).
             val stuck = limit != null && pct >= limit
-            // Up to three segments -- filled to the current charge, track to the
-            // limit, dim track past it -- or two once the charge is already at (or
-            // past) its own limit, since there's no "still filling toward it" zone
-            // left to show separately at that point. Replaces the old two-segment
-            // fill/remainder split plus a Point marker at the limit: that pairing
-            // read as a cluttered tracker glyph riding the bar on a real device, and
-            // collapsing the split-not-marker case down to ONE segment whenever the
-            // charge sits exactly at its limit sidesteps the reason a marker was
-            // used there in the first place (two devices landing on the same pixel).
-            // Zero-length segments are skipped throughout, same reasoning as
-            // before: the API contract for one isn't documented, and an empty
-            // segment says nothing a shorter list doesn't already say.
+            // Up to three segments -- filled to the current charge, track to the limit, dim track
+            // past it -- or two once the charge is already at (or past) its own limit, since
+            // there's no "still filling toward it" zone left to show separately at that point.
             val segments = buildList {
                 if (pct > 0) add(NotificationCompat.ProgressStyle.Segment(pct).setColor(if (stuck) CHARGE_BLUE else CHARGE_GREEN))
                 when {
@@ -338,11 +204,8 @@ object LiveCharge {
                     }
                 }
             }
-            // setStyledByProgress(FALSE), which is what the version confirmed working on
-            // a real device used. True lets the platform style the bar from the progress
-            // VALUE, which overrides the segment colours built right above -- so the
-            // green/track split this code goes to the trouble of computing was being
-            // thrown away. The rebuild flipped it to true with no reason recorded.
+            // setStyledByProgress(FALSE), which is what the version confirmed working on a real
+            // device used. The rebuild flipped it to true with no reason recorded.
             style.setStyledByProgress(false)
                 .setProgressSegments(segments)
                 .setProgress(pct)
@@ -350,9 +213,6 @@ object LiveCharge {
             style.setProgressIndeterminate(true)
         }
 
-        // "82% · to 80% · 1h 20m left · Plugged in (AC)" -- only the pieces
-        // the car actually reported, joined with no stray separator for a
-        // missing one.
         val detail = listOfNotNull(
             percent?.let { "$it%" },
             limit?.takeIf { percent == null || percent < it }?.let { "to $it%" },
@@ -373,11 +233,7 @@ object LiveCharge {
             putExtra(AlertActionReceiver.EXTRA_VIN, vin)
             putExtra(AlertActionReceiver.EXTRA_ACTION, CarAction.CHARGE_OFF)
             putExtra(AlertActionReceiver.EXTRA_NOTIF_ID, id)
-            // The confirmation must NOT land on `id`. That is this bar's own id, and
-            // LiveCharge.sync posts, updates and cancels it on every 5-minute poll -- so a
-            // confirmation posted there gets cancelled by the next poll, or replaced by a
-            // reposted bar, and in the meantime LiveCharge believes its bar is showing when what
-            // is actually showing is a "Stop charging sent" message.
+            // The confirmation must NOT land on `id`.
             putExtra(AlertActionReceiver.EXTRA_CONFIRM_ID, ("live_charge_confirm_$vin").hashCode())
             putExtra(AlertActionReceiver.EXTRA_LABEL, "Stop charging")
         }
@@ -385,12 +241,7 @@ object LiveCharge {
             context, id, stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        // deleteIntent: the only way to learn the user swiped this away. Without it the
-        // next poll silently reposted a bar they had just dismissed, every five minutes
-        // for the length of the charge -- which the Live Updates guidance calls out
-        // specifically. Distinct request code from stopPi so the two PendingIntents don't
-        // collide (same id, same class, different action -> FLAG_UPDATE_CURRENT would
-        // otherwise have one overwrite the other's extras).
+        // deleteIntent: the only way to learn the user swiped this away.
         val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
             action = AlertActionReceiver.ACTION_LIVE_CHARGE_DISMISSED
             data = "bloo://live_charge_dismissed/$vin".toUri()
@@ -409,18 +260,9 @@ object LiveCharge {
             .setContentTitle("$carName is charging")
             .setContentText(detail.ifBlank { "Charging" })
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-            // The hero card's own photo, when there is one -- see [sync]. Large icon, not a
-            // background: a promoted notification can never have a custom background image,
-            // because that means customContentView (RemoteViews), and RemoteViews is promotion
-            // condition 6's explicit disqualifier. This is the closest a promoted notification
-            // can get to "looks like the hero card" without giving up promotion to get there.
+            // The hero card's own photo, when there is one -- see [sync].
             .apply { carPhoto?.let { setLargeIcon(it) } }
-            // VISIBILITY_PUBLIC, restored from the working version. Without it the
-            // default is VISIBILITY_PRIVATE, and a secured lock screen hides a private
-            // notification's content -- on the lock screen and the always-on display,
-            // which are two of the three places a Live Update is supposed to appear.
-            // The alert builder in this same file sets it; LiveCharge lost it in the
-            // rebuild.
+            // VISIBILITY_PUBLIC, restored from the working version.
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -430,22 +272,8 @@ object LiveCharge {
             .addAction(0, "Stop charging", stopPi)
             .setDeleteIntent(dismissPi)
             .apply { contentPi?.let { setContentIntent(it) } }
-            // The STATUS BAR CHIP's text, and the piece the rebuild dropped.
-            //
-            // I previously left this out on the grounds that setShortCriticalText is
-            // documented on the platform Notification.Builder and I couldn't confirm it
-            // on NotificationCompat.Builder. That was wrong, and this repo's own history
-            // is the proof: the version that was confirmed promoting on a real device
-            // called exactly this, and that commit built. Reasoning from documentation I
-            // couldn't fully fetch, when a working answer was sitting in git log, is the
-            // mistake -- not the API.
-            //
-            // Deliberately paired with setShowWhen(false), matching that version. The
-            // guide offers setShortCriticalText OR setWhen for chip state; the one known
-            // to have worked here used the former and suppressed the timestamp. A
-            // countdown chronometer is a nicer idea and I had added one, but it is an
-            // unverified change to the exact surface that is broken, so it goes until the
-            // chip is confirmed back.
+            // The STATUS BAR CHIP's text, and the piece the rebuild dropped. Deliberately paired
+            // with setShowWhen(false), matching that version.
         .setShowWhen(false)
         .apply { percent?.let { setShortCriticalText("${it.coerceIn(0, 100)}%") } }
 

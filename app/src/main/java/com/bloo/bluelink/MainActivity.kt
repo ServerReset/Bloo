@@ -38,21 +38,18 @@ import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.StartupTrace
 
 /**
- * The app's single Activity: hosts the Compose UI tree ([BlooApp]) and owns the
- * process-wide setup that only needs to happen once per launch -- scheduling the
- * background workers and routing shortcut intents into the ViewModel.
- * All actual screen/business logic lives in [AppViewModel] and the Compose tree; this
- * class is deliberately thin plumbing around the Android Activity lifecycle.
+ * The app's single Activity: hosts the Compose UI tree ([BlooApp]) and owns the process-wide setup
+ * that only needs to happen once per launch -- scheduling the background workers and routing
+ * shortcut intents into the ViewModel.
  */
 class MainActivity : FragmentActivity() {
 
     companion object {
         /**
-         * The most recently created MainActivity, for system-level integrations that have
-         * no view of their own -- currently only [StartupFrameMonitor] calling the
-         * platform's own `reportFullyDrawn()` once the first frame lands, which turns the
-         * app's internal timing into the same "fully drawn" number `adb shell am start -W`
-         * prints. Weak, so it never keeps an Activity alive past its own lifecycle.
+         * The most recently created MainActivity, for system-level integrations that have no view
+         * of their own -- currently only [StartupFrameMonitor] calling the platform's own
+         * `reportFullyDrawn()` once the first frame lands, which turns the app's internal timing
+         * into the same "fully drawn" number `adb shell am start -W` prints.
          */
         @Volatile
         var current: MainActivity? = null
@@ -61,15 +58,12 @@ class MainActivity : FragmentActivity() {
 
     private val viewModel: AppViewModel by viewModels()
 
-    // App-lock bookkeeping: when we last left the foreground, and whether this is the
-    // very first foreground (cold start, where the ViewModel already decides the lock).
+    // App-lock bookkeeping: when we last left the foreground, and whether this is the very first
+    // foreground (cold start, where the ViewModel already decides the lock).
     private var backgroundedAt = 0L
     private var firstStart = true
 
-    // Wall-clock time the screen last turned off, for LockTiming.SCREEN_OFF. The re-lock
-    // predicate only counts a screen-off that happened AFTER the app was backgrounded
-    // (screenOffAt > backgroundedAt), so a screen timeout while the user is actively using
-    // the app never re-locks it.
+    // Wall-clock time the screen last turned off, for LockTiming.SCREEN_OFF.
     @Volatile
     private var screenOffAt = 0L
 
@@ -79,21 +73,15 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    // Shizuku runtime-permission result → forward to the ViewModel so the update flow
-    // can proceed once the user grants it. Registered only while Shizuku is present.
+    // Shizuku runtime-permission result → forward to the ViewModel so the update flow can proceed
+    // once the user grants it. Registered only while Shizuku is present.
     private val shizukuPermissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
         viewModel.onShizukuPermissionResult(requestCode, grantResult)
     }
 
     /**
-     * Runs once when the Activity's process/window is created (not on every foreground --
-     * see [onStart]/[onStop] for that). Order of operations: configure edge-to-edge system
-     * bars, schedule all of the app's background WorkManager jobs (each `schedule()` call is
-     * itself idempotent/unique-work-keyed, so calling this on every cold start doesn't create
-     * duplicate schedules), route
-     * in any shortcut intent that launched this instance, then finally hand off to Compose via
-     * [setContent] -- which reads the current [AppViewModel.appearance] as Compose state so the
-     * whole UI recomposes live if theme/appearance settings change while it's open.
+     * Runs once when the Activity's process/window is created (not on every foreground -- see
+     * [onStart]/[onStop] for that).
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         StartupTrace.mark("MainActivity.onCreate: begin")
@@ -101,14 +89,12 @@ class MainActivity : FragmentActivity() {
         current = this
         StartupTrace.mark("MainActivity.super.onCreate done")
         // ACTION_SCREEN_OFF is a protected broadcast (a manifest receiver never sees it) but a
-        // runtime-registered one does. Exported so the SYSTEM can deliver it. Registered here
-        // for the Activity's whole life and removed in onDestroy -- it only stamps a timestamp,
-        // so it is cheaper to leave on than to juggle around the app-lock timing check.
+        // runtime-registered one does. Exported so the SYSTEM can deliver it.
         ContextCompat.registerReceiver(
             this, screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_EXPORTED,
         )
-        // Fully transparent system bars so the app's gradient shows through and
-        // content can draw edge-to-edge behind the status & navigation bars.
+        // Fully transparent system bars so the app's gradient shows through and content can draw
+        // edge-to-edge behind the status & navigation bars.
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
@@ -116,40 +102,23 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }
-        // Seed com.bloo.bluelink.ui.inMultiWindowMode from the Activity's actual
-        // starting state -- onMultiWindowModeChanged (below) only fires on a
-        // TRANSITION, so a cold start directly INTO split-screen/freeform would
-        // otherwise never set this at all and StatusBarScrim would blur empty
-        // space outside this window from the very first frame.
+        // Seed com.bloo.bluelink.ui.inMultiWindowMode from the Activity's actual starting state --
+        // onMultiWindowModeChanged (below) only fires on a TRANSITION, so a cold start directly
+        // INTO split-screen/freeform would otherwise never set this at all and StatusBarScrim would
+        // blur empty space outside this window from the very first frame.
         com.bloo.bluelink.ui.inMultiWindowMode = isInMultiWindowMode
         // Each schedule() call does a synchronous Room round-trip inside WorkManager's
-        // enqueueUniquePeriodicWork (regardless of the ExistingPeriodicWorkPolicy), so
-        // running these on the main thread ahead of setContent() delays the first
-        // Compose frame on every cold start. Dispatched off-thread instead; the
-        // schedules are idempotent/unique-work-keyed so ordering relative to the UI
-        // doesn't matter.
+        // enqueueUniquePeriodicWork (regardless of the ExistingPeriodicWorkPolicy), so running
+        // these on the main thread ahead of setContent() delays the first Compose frame on every
+        // cold start.
         lifecycleScope.launch(Dispatchers.Default) {
             AlertWorker.schedule(applicationContext)
-            // Drive settings sync used to only run while the app was foregrounded and
-            // a refresh settled — a no-op periodic worker when sync isn't configured.
             MainToMainSyncWorker.schedule(applicationContext)
-            // Bloo isn't on the Play Store, so it checks its own GitHub Actions builds
-            // for updates; this is that check running even when the app is closed,
-            // presenting a newer build via notification instead of the in-app tile.
             UpdateCheckWorker.schedule(applicationContext)
         }
-        // Shizuku (optional silent-install path): lift the runtime non-SDK block once so
-        // the reflected PackageInstaller/IntentSender constructors are callable, and listen
-        // for the permission-grant result. Both are guarded — no-ops (and no Shizuku classes
-        // touched beyond a cheap ping) when Shizuku isn't installed.
-        //
-        // ON IO, not here: HiddenApiBypass's class initializer builds a CoreOjClassLoader,
-        // which reads the APK's dex entries off disk. StrictMode measured that as
-        // 86-169ms x5 of MAIN-THREAD disk I/O on every cold start (measured at this very
-        // line), all of it before setContent, for a capability that is only needed when a
-        // user actually taps Install in the self-update flow. The listener registration
-        // below stays on main (it is a cheap binder-independent add), and the exemptions
-        // only have to be in place before an install, which is always user-initiated.
+        // Shizuku (optional silent-install path): lift the runtime non-SDK block once so the
+        // reflected PackageInstaller/IntentSender constructors are callable, and listen for the
+        // permission-grant result.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             lifecycleScope.launch(Dispatchers.Default) {
                 StartupTrace.trace("HiddenApiBypass.addHiddenApiExemptions") {
@@ -157,31 +126,20 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
-        // Register unconditionally (binder-independent, cheap): if Shizuku is started
-        // AFTER launch and the user later grants permission, the result still routes to
+        // Register unconditionally (binder-independent, cheap): if Shizuku is started AFTER launch
+        // and the user later grants permission, the result still routes to
         // onShizukuPermissionResult. Removed in onDestroy under runCatching.
         runCatching { Shizuku.addRequestPermissionResultListener(shizukuPermissionListener) }
-        // Notification permission is requested from the onboarding screen (on a
-        // button tap), not silently on first launch.
-        // Only route the shortcut on a genuine first creation, not on a
-        // config-change/process-death recreation: getIntent() still returns the
-        // original ACTION_SHORTCUT intent across recreation, so an unguarded call
-        // here would re-fire the car command (duplicating/inverting a lock/unlock).
-        // After handling, neutralize the stored intent so a later recreate can't
-        // replay it. (onNewIntent handles the already-running case and setIntents
-        // itself.)
+        // Notification permission is requested from the onboarding screen (on a button tap), not
+        // silently on first launch.
         if (savedInstanceState == null) {
             handleShortcutIntent(intent)
             setIntent(Intent())
         }
         StartupTrace.mark("MainActivity: pre-setContent work done")
-        // Touched HERE, before setContent, and deliberately not for its value. `by viewModels()`
-        // is lazy, and the first dereference used to be inside the composition lambda below --
-        // so AppViewModel's constructor and its whole init block ran synchronously in the middle
-        // of composing the first frame. Six stores, five DataStore collectors and the auto-login
-        // kick-off all landed on the first-frame critical path. Constructing it here does not
-        // make that work cheaper, but it stops it happening between "begin composition" and
-        // "first pixel", which is the part the user sees as a stutter.
+        // Touched HERE, before setContent, and deliberately not for its value. Six stores, five
+        // DataStore collectors and the auto-login kick-off all landed on the first-frame critical
+        // path.
         @Suppress("UNUSED_EXPRESSION")
         viewModel
         StartupTrace.mark("MainActivity: AppViewModel constructed (the `viewModel` deref)")
@@ -210,42 +168,32 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    /** Keeps [com.bloo.bluelink.ui.inMultiWindowMode] live across a drag into/out of
-     *  split-screen or freeform while this Activity is already running -- see that
-     *  flag's own doc for why [StatusBarScrim][com.bloo.bluelink.ui.StatusBarScrim]
-     *  needs to know. */
+    /**
+     * Keeps [com.bloo.bluelink.ui.inMultiWindowMode] live across a drag into/out of split-screen or
+     * freeform while this Activity is already running -- see that flag's own doc for why
+     * [StatusBarScrim][com.bloo.bluelink.ui.StatusBarScrim] needs to know.
+     */
     override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: Configuration) {
         super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
         com.bloo.bluelink.ui.inMultiWindowMode = isInMultiWindowMode
     }
 
-    /** Records the wall-clock time the Activity left the foreground, so the next
-     *  [onStart] can measure how long the app was backgrounded for the app-lock check. */
     override fun onStop() {
         super.onStop()
         backgroundedAt = System.currentTimeMillis()
     }
 
-    /**
-     * Fires every time the Activity returns to the foreground (including the very first
-     * launch). [firstStart] distinguishes that initial launch -- where [AppViewModel]'s own
-     * init logic already decides whether to show the lock screen -- from every subsequent
-     * warm resume, where [viewModel.maybeRelock] re-evaluates using how long the app was
-     * backgrounded ([backgroundedAt]).
-     */
     override fun onStart() {
         StartupTrace.mark("MainActivity.onStart")
         super.onStart()
-        // Reattach AutoLock's dynamic Bluetooth watcher for existing installs whose config was
-        // already enabled before the watcher existed. This is idempotent: starting the service
-        // again only refreshes its foreground notification and receiver, it does not start a
-        // car evaluation.
+        // This is idempotent: starting the service again only refreshes its foreground notification
+        // and receiver, it does not start a car evaluation.
         viewModel.ensureAutoLockWatcher()
         // Cold start is handled by the ViewModel; only re-evaluate on warm resumes.
         if (!firstStart) {
             viewModel.maybeRelock(backgroundedAt, screenOffAt > backgroundedAt)
-            // The user may have started Shizuku while away (its own app / ADB); re-probe
-            // so the "Updates" toggle appears without a cold restart. Off-main-thread.
+            // The user may have started Shizuku while away (its own app / ADB); re-probe so the
+            // "Updates" toggle appears without a cold restart. Off-main-thread.
             viewModel.refreshShizukuAvailable()
         }
         firstStart = false
@@ -265,10 +213,12 @@ class MainActivity : FragmentActivity() {
         super.onDestroy()
     }
 
-    /** Called instead of a fresh [onCreate] when this Activity is already running and
-     *  receives a new launch Intent (e.g. tapping another shortcut/notification while the
-     *  app is open) -- must replace the stored intent via [setIntent] so a later config
-     *  change/recreation doesn't re-process the stale original intent. */
+    /**
+     * Called instead of a fresh [onCreate] when this Activity is already running and receives a new
+     * launch Intent (e.g. tapping another shortcut/notification while the app is open) -- must
+     * replace the stored intent via [setIntent] so a later config change/recreation doesn't
+     * re-process the stale original intent.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -285,16 +235,8 @@ class MainActivity : FragmentActivity() {
     }
 
     /**
-     * Tell the launcher this shortcut was actually used, so its own ranking can
-     * promote the ones this user really taps over the ones that merely exist.
-     * The id must be the EXACT one [Shortcuts.refresh] registered: "cmd_vin" for a
-     * car shortcut, "bluelink_<brand>" for an "Open the <brand> app" shortcut.
-     *
-     * The brand for that second form is recovered from the CURRENT vehicle list --
-     * if the car list hasn't loaded yet (a cold launch straight from the shortcut),
-     * the id simply isn't reported for that one tap rather than guessing a brand
-     * that could name a different shortcut. Best-effort by design: this is an
-     * analytics nicety, never a reason for a shortcut tap to fail.
+     * The id must be the EXACT one [Shortcuts.refresh] registered: "cmd_vin" for a car shortcut,
+     * "bluelink_<brand>" for an "Open the <brand> app" shortcut.
      */
     private fun reportShortcutUsage(vin: String, cmd: String) {
         val id = if (cmd == "bluelink") {

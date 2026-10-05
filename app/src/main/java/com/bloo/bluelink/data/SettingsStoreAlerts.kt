@@ -8,9 +8,6 @@ import kotlinx.coroutines.flow.first
 
 // --- Notification prefs, alert bookkeeping, and search bubble (extracted from SettingsStore) --
 
-/** The single [SettingsStore.NotificationPrefs] decode, shared by both the one-shot
- *  [notificationPrefs] read and the reactive [notifications] Flow so the two
- *  can't drift apart (they previously inlined the identical block twice). */
 internal fun SettingsStore.decodeNotificationPrefs(p: Preferences): SettingsStore.NotificationPrefs =
     SettingsStore.NotificationPrefs(
         service = p[booleanPreferencesKey("notify_service")] ?: true,
@@ -27,15 +24,17 @@ internal fun SettingsStore.decodeNotificationPrefs(p: Preferences): SettingsStor
         watchLowBattery = p[booleanPreferencesKey("notify_watch_low")] ?: true,
     )
 
-/** One-shot read of [SettingsStore.NotificationPrefs] (vs. the [notifications] Flow below,
- *  which stays subscribed) — used where a caller just needs the current
- *  values once, e.g. deciding whether to schedule a check at all. */
+/**
+ * One-shot read of [SettingsStore.NotificationPrefs] (vs. the [notifications] Flow below, which
+ * stays subscribed) — used where a caller just needs the current values once, e.g. deciding whether
+ * to schedule a check at all.
+ */
 suspend fun SettingsStore.notificationPrefs(): SettingsStore.NotificationPrefs =
     decodeNotificationPrefs(context.settingsDataStore.data.first())
 
-// One setter per SettingsStore.NotificationPrefs field; `.let {}` just discards editTracked's
-// Unit return so these can stay one-expression functions (`=` body) rather
-// than needing an explicit block body.
+// One setter per SettingsStore.NotificationPrefs field; `.let {}` just discards editTracked's Unit
+// return so these can stay one-expression functions (`=` body) rather than needing an explicit
+// block body.
 suspend fun SettingsStore.setNotifyService(v: Boolean) =
     editTracked { it[booleanPreferencesKey("notify_service")] = v }.let {}
 
@@ -72,16 +71,9 @@ suspend fun SettingsStore.setNotifyChargeComplete(v: Boolean) =
 suspend fun SettingsStore.setNotifyWatchLowBattery(v: Boolean) =
     editTracked { it[booleanPreferencesKey("notify_watch_low")] = v }.let {}
 
-// Transient alert bookkeeping (per car), used to fire each alert only once.
-// Mechanism: when AlertWorker (see work/AlertWorker.kt) first observes a
-// door open (or engine running), it stamps "door_since_$vin"/"engine_since_$vin"
-// with the current time via the setters below. On each subsequent check it
-// reads that timestamp back and compares elapsed time against the configured
-// *Minutes threshold; once the threshold is crossed AND the per-condition
-// alertFired(key) flag isn't already set, it fires the notification and
-// flips alertFired to true so it won't repeat. The *Since value is cleared
-// (set to null, which removes the key) as soon as the condition stops being
-// true, so the next occurrence starts timing from zero again.
+// Mechanism: when AlertWorker (see work/AlertWorker.kt) first observes a door open (or engine
+// running), it stamps "door_since_$vin"/"engine_since_$vin" with the current time via the setters
+// below.
 suspend fun SettingsStore.doorOpenSince(vin: String): Long? =
     context.settingsDataStore.data.first()[stringPreferencesKey("door_since_$vin")]?.toLongOrNull()
 
@@ -93,12 +85,8 @@ suspend fun SettingsStore.setDoorOpenSince(vin: String, value: Long?) {
 }
 
 /**
- * Where the user last parked the floating search bubble, as
- * fractions (0f..1f) of its own drag range -- null until it has been dragged
- * at least once. A plain one-shot suspend read, not a collected Flow: the
- * bubble's own composable seeds itself from this once (see SearchLayer),
- * it does not need to react live to a value only that same composable ever
- * writes.
+ * Where the user last parked the floating search bubble, as fractions (0f..1f) of its own drag
+ * range -- null until it has been dragged at least once.
  */
 suspend fun SettingsStore.searchBubblePosition(): Pair<Float, Float>? {
     val prefs = context.settingsDataStore.data.first()
@@ -107,8 +95,10 @@ suspend fun SettingsStore.searchBubblePosition(): Pair<Float, Float>? {
     return x to y
 }
 
-/** Persists the bubble's resting fractions -- called once per drag gesture
- *  (on release), not per frame, from SearchLayer's onDragEnd. */
+/**
+ * Persists the bubble's resting fractions -- called once per drag gesture (on release), not per
+ * frame, from SearchLayer's onDragEnd.
+ */
 suspend fun SettingsStore.setSearchBubblePosition(xFrac: Float, yFrac: Float) {
     editTracked {
         it[SettingsStore.Keys.SEARCH_BUBBLE_X] = xFrac.toString()
@@ -136,10 +126,11 @@ suspend fun SettingsStore.setUnlockedSince(vin: String, value: Long?) {
     }
 }
 
-/** Whether a specific alert (identified by an arbitrary caller-defined
- *  [key], typically something like "door_$vin" or "running_$vin") has
- *  already fired for its current occurrence, so callers don't notify twice
- *  for the same continuous door-open/engine-running spell. */
+/**
+ * Whether a specific alert (identified by an arbitrary caller-defined [key], typically something
+ * like "door_$vin" or "running_$vin") has already fired for its current occurrence, so callers
+ * don't notify twice for the same continuous door-open/engine-running spell.
+ */
 suspend fun SettingsStore.alertFired(key: String): Boolean =
     context.settingsDataStore.data.first()[booleanPreferencesKey("alert_$key")] ?: false
 
@@ -147,20 +138,7 @@ suspend fun SettingsStore.setAlertFired(key: String, value: Boolean) {
     editTracked { it[booleanPreferencesKey("alert_$key")] = value }
 }
 
-/**
- * Whether the user swiped away [vin]'s live charging bar during the CURRENT charging
- * session. Google's Live Updates guidance is explicit that a dismissed Live Update
- * must not be reposted, and this notification is otherwise re-posted every five
- * minutes for as long as the charge lasts.
- *
- * Persisted rather than kept in memory because the poller is a WorkManager job: the
- * process is routinely killed between ticks, so an in-memory flag would be forgotten
- * and the bar would come straight back — which is the behaviour this exists to stop.
- *
- * Device-local (see SyncMerge's prefix list): dismissing a notification on a phone
- * says nothing about what a tablet should show. Cleared when charging ends, so the
- * next session starts fresh rather than being permanently suppressed by one swipe.
- */
+/** Whether the user swiped away [vin]'s live charging bar during the CURRENT charging session. */
 suspend fun SettingsStore.liveChargeDismissed(vin: String): Boolean =
     context.settingsDataStore.data.first()[booleanPreferencesKey("live_dismissed_$vin")] ?: false
 
@@ -204,11 +182,6 @@ suspend fun SettingsStore.setAuroraBackground(value: Boolean) {
     editTracked { it[SettingsStore.Keys.AURORA] = value.toString() }
 }
 
-// The setters below validate the incoming string against the fixed set of
-// legal values and silently fall back to the default if it's anything else
-// (e.g. a stale string from a future app version we don't recognize),
-// rather than storing garbage that the appearance Flow above would then
-// have to re-validate on every read.
 suspend fun SettingsStore.setAuroraMotion(value: String) {
     editTracked { it[SettingsStore.Keys.AURORA_MOTION] = value.takeIf { it in setOf("off", "static", "motion") } ?: "static" }
 }
@@ -225,8 +198,11 @@ suspend fun SettingsStore.setDistanceUnit(value: String) {
     editTracked { it[SettingsStore.Keys.DISTANCE_UNIT] = value.takeIf { it in setOf("auto", "mi", "km") } ?: "auto" }
 }
 
-/** True when distances are shown in km, honouring the distance override -- the one-shot read for
- *  non-Compose callers (CarAlerts building a notification string) that the [appearance] flow serves elsewhere. */
+/**
+ * True when distances are shown in km, honouring the distance override -- the one-shot read for
+ * non-Compose callers (CarAlerts building a notification string) that the [appearance] flow serves
+ * elsewhere.
+ */
 suspend fun SettingsStore.metricDistance(): Boolean {
     val p = context.settingsDataStore.data.first()
     // Overrides only count in Advanced mode (see the Appearance decode).
@@ -239,9 +215,10 @@ suspend fun SettingsStore.settingsMode(): String = settingsMode(context.settings
 
 fun SettingsStore.settingsMode(p: Preferences): String = p[SettingsStore.Keys.SETTINGS_MODE] ?: "simple"
 
-/** The chosen distance/temperature unit system ("imperial" default, or "metric"), for
- *  non-Compose callers that need it as a one-shot read rather than the [appearance] flow --
- *  e.g. CarAlerts building a notification string off the main thread. Mirrors [settingsMode]. */
+/**
+ * The chosen distance/temperature unit system ("imperial" default, or "metric"), for non-Compose
+ * callers that need it as a one-shot read rather than the [appearance] flow -- e.g.
+ */
 suspend fun SettingsStore.unitSystem(): String =
     context.settingsDataStore.data.first()[SettingsStore.Keys.UNIT_SYSTEM] ?: "imperial"
 

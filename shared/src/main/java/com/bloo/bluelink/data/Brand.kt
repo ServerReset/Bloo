@@ -1,16 +1,6 @@
 package com.bloo.bluelink.data
 
-/**
- * A supported US telematics brand. Genesis US runs on the same Hyundai-shaped
- * backend ("…telematics.hyundaiusa.com") with its own host + OAuth client, so
- * the entire request/path structure is shared — only these per-brand values
- * change.
- *
- * Values are taken from the community reverse-engineering projects referenced
- * in [Models]. They are real production endpoints (nothing simulated); the
- * Genesis credentials in particular are community-derived and can be corrected
- * here in one place if Genesis ever rotates them.
- */
+/** A supported US telematics brand. */
 enum class Brand(
     val code: String,
     val baseUrl: String,
@@ -37,10 +27,9 @@ enum class Brand(
     ),
 
     /**
-     * Kia US runs on a completely different backend (api.owners.kia.com, the
-     * "Kia Connect" API) served by [KiaUsaApi]/[KiaRepository] rather than the
-     * Hyundai-shaped [BlueLinkApi]; [KiaUsaApi] reads its endpoint and client
-     * credentials from this entry.
+     * Kia US runs on a completely different backend (api.owners.kia.com, the "Kia Connect" API)
+     * served by [KiaUsaApi]/[KiaRepository] rather than the Hyundai-shaped [BlueLinkApi];
+     * [KiaUsaApi] reads its endpoint and client credentials from this entry.
      */
     KIA(
         code = "K",
@@ -52,22 +41,18 @@ enum class Brand(
     ),
 
     /**
-     * Hyundai/Genesis/Kia Canada all run on one shared backend family (unrelated
-     * to both the US Hyundai/Genesis "HATA" API and Kia's separate US backend),
-     * served by [CanadaApi]/[CanadaRepository]: same client_id/client_secret and
-     * request shapes across all three, differing only by host. Ported from the
-     * community hyundai_kia_connect_api project's KiaUvoApiCA (see [CanadaApi]
-     * doc comment for the exact source). Sign-in always goes through an
-     * email one-time code.
+     * Hyundai/Genesis/Kia Canada all run on one shared backend family (unrelated to both the US
+     * Hyundai/Genesis "HATA" API and Kia's separate US backend), served by
+     * [CanadaApi]/[CanadaRepository]: same client_id/client_secret and request shapes across all
+     * three, differing only by host.
      */
     HYUNDAI_CA(
-        // Multi-letter, distinct from HYUNDAI's plain "H": brandIndicator is our
-        // own internal tag (repositoryFor/BlueLinkRepository/KiaRepository always
-        // overwrite whatever the wire sent with brand.code, never read it back
-        // out of the raw API response), so it's safe to make region-distinct
-        // here -- and it must be, since Brand.fromIndicator is how every command
-        // path (repoFor(v), TileCommandRunner, CarCommandRunner) re-derives
-        // which backend/host a saved Vehicle belongs to.
+        // Multi-letter, distinct from HYUNDAI's plain "H": brandIndicator is our own internal tag
+        // (repositoryFor/BlueLinkRepository/KiaRepository always overwrite whatever the wire sent
+        // with brand.code, never read it back out of the raw API response), so it's safe to make
+        // region-distinct here -- and it must be, since Brand.fromIndicator is how every command
+        // path (repoFor(v), TileCommandRunner, CarCommandRunner) re-derives which backend/host a
+        // saved Vehicle belongs to.
         code = "HCA",
         baseUrl = "https://mybluelink.ca/tods/api",
         host = "mybluelink.ca",
@@ -92,102 +77,53 @@ enum class Brand(
         label = "Kia (Canada)",
     ),
 
-    /**
-     * Hyundai Bluelink Europe on the CCAPI ("CCS2") platform, served by
-     * [EuApi]/[EuRepository]. Kia Connect EU and Genesis EU ride the SAME
-     * backend family (different host + client only) — exactly like the three
-     * Canada brands share [CanadaApi] — so they can later be added as sibling
-     * entries here with no new API code. Only Hyundai EU is shipped/verified now.
-     *
-     * clientSecret (and the stamp CFB seed in [EuStamp]) are community-derived
-     * and rotate with Hyundai's app; correct them here / in [EuStamp] in one
-     * place if EU sign-in starts failing. `baseUrl` keeps the non-standard :8080
-     * port the CCAPI is served on.
-     */
+    /** Hyundai Bluelink Europe on the CCAPI ("CCS2") platform, served by [EuApi]/[EuRepository]. */
     HYUNDAI_EU(
         code = "HEU",
         baseUrl = "https://prd.eu-ccapi.hyundai.com:8080",
         host = "prd.eu-ccapi.hyundai.com",
         clientId = "6d477c38-3ca4-4cf3-9557-2a1929a94654",
-        // From hyundai_kia_connect_api KiaUvoApiEU.py (Hyundai EU). base64("$clientId:$clientSecret")
-        // reproduces that project's hard-coded BASIC_AUTHORIZATION token (see EuApi.login).
+        // From hyundai_kia_connect_api KiaUvoApiEU.py (Hyundai EU).
+        // base64("$clientId:$clientSecret") reproduces that project's hard-coded
+        // BASIC_AUTHORIZATION token (see EuApi.login).
         clientSecret = "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV",
         label = "Hyundai (Europe)",
     );
 
-    /** False only for Kia US, whose commands aren't PIN-gated at all; every
-     *  other brand (including Canada, gated behind CanadaApi.pinAuth) needs
-     *  the login form's PIN field filled in. */
+    /**
+     * False only for Kia US, whose commands aren't PIN-gated at all; every other brand (including
+     * Canada, gated behind CanadaApi.pinAuth) needs the login form's PIN field filled in.
+     */
     val requiresPin: Boolean get() = this != KIA
 
-    /** Whether sign-in itself is blocked without a PIN. Europe signs in with just email and password
-     *  (the PIN is only used to authorise remote commands, and many EU owners have never set one), so
-     *  the field is optional there; everywhere else it is needed up front. */
+    /** Whether sign-in itself is blocked without a PIN. */
     val pinRequiredToSignIn: Boolean get() = requiresPin && !isEurope
 
-    /** True for the three Canada brands, which share [CanadaApi]/[CanadaRepository]
-     *  rather than [BlueLinkApi]/[KiaUsaApi]. */
+    /**
+     * True for the three Canada brands, which share [CanadaApi]/[CanadaRepository] rather than
+     * [BlueLinkApi]/[KiaUsaApi].
+     */
     val isCanada: Boolean get() = this == HYUNDAI_CA || this == GENESIS_CA || this == KIA_CA
 
     /**
-     * Whether this brand can report AC/DC charge-limit targets, and therefore
-     * whether the editable charge-limit controls are worth showing.
-     *
-     * False for Canada: [CanadaApi] has no verified read endpoint for the targets,
-     * so `EvStatus.reservChargeInfos` is always null on those cars (see the KNOWN-GAP
-     * comment in CanadaApi.parseStatus). Every *reading* surface already self-hides on
-     * that null -- the hero marker, the "Charge limit" status row -- but
-     * the *editable* controls (the phone's ChargePebble pills)
-     * render regardless and seed themselves from the 80/90 display defaults, so their
-     * "Set/Apply" could push a value the user never chose and the car never had. Hiding
-     * them for Canada is the honest state: we can neither show the real limit nor safely
-     * set one. If a real CA charge-target endpoint is ever wired up, flip this one line.
+     * Whether this brand can report AC/DC charge-limit targets, and therefore whether the editable
+     * charge-limit controls are worth showing.
      */
     val supportsChargeLimits: Boolean get() = !isCanada
 
-    /** True for the Europe (CCAPI/CCS2) brands, served by [EuApi]/[EuRepository].
-     *  Only Hyundai EU today; Kia/Genesis EU would join this check. */
+    /**
+     * True for the Europe (CCAPI/CCS2) brands, served by [EuApi]/[EuRepository]. Only Hyundai EU
+     * today; Kia/Genesis EU would join this check.
+     */
     val isEurope: Boolean get() = this == HYUNDAI_EU
 
     /**
      * Whether a status refresh can tell us if remote climate is actually RUNNING
      * (`VehicleStatus.airCtrlOn`).
-     *
-     * False for Europe: [EuApi] maps the CCS2 payload's Green/Cabin/Body/
-     * Drivetrain/Chassis/Electronics objects and none of them is wired to a
-     * climate-state field, so airCtrlOn is always null there.
-     *
-     * It matters because the command paths write an OPTIMISTIC climateOn the
-     * moment a start succeeds, and every other brand has that corrected by the
-     * next refresh. With nothing to correct it -- and SnapshotStore's merge
-     * deliberately keeping the old value when a status field is null, so a
-     * missing field never wipes a known one -- the optimistic `true` would
-     * survive forever: a climate button lit permanently, and a toggle
-     * that sends STOP because it believes climate is still on long after the
-     * car's own timer ended it.
-     *
-     * So the honest state for those brands is UNKNOWN, not a guess that cannot
-     * be checked. If a CCS2 climate field is ever identified, parse it in EuApi
-     * and delete this.
      */
     val reportsClimateState: Boolean get() = !isEurope
 
-    /**
-     * Whether this brand's backend can return trip history at all.
-     *
-     * Only the Hyundai/Genesis US telematics API has an evTripDetails feed, and
-     * [BlueLinkRepository] is the only repository that overrides `trips()` --
-     * Kia US, all three Canada brands and Europe inherit the interface's
-     * `emptyList()`, and their API clients have no trips endpoint to call.
-     *
-     * The Trips pebble already hides itself for Gen5W head units, on the stated
-     * reasoning that a feed which reports nothing should not sit there
-     * permanently empty. That reasoning applies identically here and was simply
-     * never extended to the brands whose BACKEND cannot serve it -- so Kia US
-     * and Canada have been showing an empty Trips pebble, and Europe was about
-     * to join them, precisely because EU cars are modern enough that the Gen5W
-     * check correctly does not catch them.
-     */
+    /** Whether this brand's backend can return trip history at all. */
     val supportsTrips: Boolean get() = this == HYUNDAI || this == GENESIS
 
     companion object {
@@ -197,44 +133,35 @@ enum class Brand(
         const val REGION_EU = "EU"
 
         /**
-         * The brands offered for a sign-in region, in display order.
-         *
-         * Shared so a second hand-written copy doesn't creep in: the watch used to
-         * ask this question too, and its own copy offered only the
-         * three US brands long after Canada shipped: a Canadian owner signing in
-         * on the watch could only pick a US brand, and their credentials failed
-         * against the wrong backend with nothing explaining why. Europe would
-         * have inherited the same gap.
+         * The brands offered for a sign-in region, in display order. Europe would have inherited
+         * the same gap.
          */
         fun brandsForRegion(region: String): List<Brand> = when (region) {
             REGION_CA -> listOf(HYUNDAI_CA, GENESIS_CA, KIA_CA)
-            // Europe ships Hyundai only for now; Kia/Genesis EU ride the same
-            // backend and join this list once they can be verified.
             REGION_EU -> listOf(HYUNDAI_EU)
             else -> listOf(HYUNDAI, GENESIS, KIA)
         }
 
-        /** The region a brand belongs to -- the inverse of [brandsForRegion], so a
-         *  picker can open on the region of whatever brand it was handed. */
         fun regionOf(brand: Brand): String = when {
             brand.isCanada -> REGION_CA
             brand.isEurope -> REGION_EU
             else -> REGION_US
         }
 
-        /** The brand's label without its region suffix, for a picker that already
-         *  says which region you are in. "Hyundai (Canada)" -> "Hyundai". */
+        /**
+         * The brand's label without its region suffix, for a picker that already says which region
+         * you are in. "Hyundai (Canada)" -> "Hyundai".
+         */
         fun shortLabel(brand: Brand): String =
             brand.label.removeSuffix(" (Canada)").removeSuffix(" (Europe)")
 
-        /** Map a vehicle's brand indicator back to a [Brand] -- the exact reverse
-         *  of the `code` each brand stamps onto its own vehicles (see
-         *  BlueLinkRepository.vehicles / KiaRepository.toVehicle / this file's CA
-         *  entries), so this is also how every command path (repoFor(v),
-         *  TileCommandRunner, CarCommandRunner) re-derives which backend/host a
-         *  saved [Vehicle] belongs to. Checks the 3-letter Canada codes first
-         *  since they'd otherwise be swallowed by the single-letter US checks
-         *  below (e.g. "KCA" contains no exact match to "K"). */
+        /**
+         * Map a vehicle's brand indicator back to a [Brand] -- the exact reverse of the `code` each
+         * brand stamps onto its own vehicles (see BlueLinkRepository.vehicles /
+         * KiaRepository.toVehicle / this file's CA entries), so this is also how every command path
+         * (repoFor(v), TileCommandRunner, CarCommandRunner) re-derives which backend/host a saved
+         * [Vehicle] belongs to.
+         */
         fun fromIndicator(indicator: String?): Brand = when {
             indicator == HYUNDAI_CA.code -> HYUNDAI_CA
             indicator == GENESIS_CA.code -> GENESIS_CA
@@ -250,13 +177,7 @@ enum class Brand(
 /** The telematics brand a vehicle belongs to. */
 val Vehicle.brand: Brand get() = Brand.fromIndicator(brandIndicator)
 
-/**
- * Brand-specific apps, sites and phone numbers — the single source of truth.
- * Everything that opens an OEM app, owner page or assistance line reads from
- * here (owner links, the OEM-app launcher, app shortcuts), so a rotated URL or
- * package name is a one-line fix. All URLs are the brands' real US owner-portal
- * pages (verified June 2026).
- */
+/** Brand-specific apps, sites and phone numbers — the single source of truth. */
 data class BrandLinks(
     /** Play Store package of the official companion app. */
     val appPackage: String,
@@ -273,8 +194,8 @@ data class BrandLinks(
     /** Connected-car content store (Features on Demand: themes, lighting…). */
     val storeUrl: String,
 ) {
-    // Builds the Play Store listing URL on the fly from appPackage rather than
-    // storing it as its own field, since it's always the same template per package id.
+    // Builds the Play Store listing URL on the fly from appPackage rather than storing it as its
+    // own field, since it's always the same template per package id.
     val playStoreUrl: String get() = "https://play.google.com/store/apps/details?id=$appPackage"
 }
 
@@ -313,14 +234,9 @@ val Brand.links: BrandLinks
             roadsidePhone = "8003334542",
             storeUrl = "https://owners.kia.com/us/en/kiaConnectStore/themes.html",
         )
-        // Canada owner portals ARE the API host itself (mybluelink.ca etc. serve
-        // both the web owner portal and this app's REST API), unlike the US
-        // brands above where the API host is a separate api.* subdomain from the
-        // consumer-facing owners.* site. Roadside numbers verified against each
-        // brand's public Canada support page (July 2026); no Play Store
-        // companion-app package or Features-on-Demand store confirmed for
-        // Canada, so those reuse the US package/store as a best-effort fallback
-        // rather than pointing at something unverified.
+        // Canada owner portals ARE the API host itself (mybluelink.ca etc. serve both the web owner
+        // portal and this app's REST API), unlike the US brands above where the API host is a
+        // separate api.* subdomain from the consumer-facing owners.* site.
         Brand.HYUNDAI_CA -> BrandLinks(
             appPackage = "com.stationdm.bluelink",
             appName = "Bluelink",
@@ -354,10 +270,9 @@ val Brand.links: BrandLinks
             roadsidePhone = "8664445421",
             storeUrl = "https://owners.kia.com/us/en/kiaConnectStore/themes.html",
         )
-        // Europe: pan-European owner portal (country is chosen on the site). No
-        // single EU roadside number (it's per-country), so it's left blank —
-        // callers already guard empty phone strings. The Play Store package is
-        // the European Bluelink app, distinct from the US "com.stationdm.bluelink".
+        // Europe: pan-European owner portal (country is chosen on the site). No single EU roadside
+        // number (it's per-country), so it's left blank — callers already guard empty phone
+        // strings.
         Brand.HYUNDAI_EU -> BrandLinks(
             appPackage = "com.hyundai.bluelink.eu",
             appName = "Bluelink",
@@ -372,56 +287,34 @@ val Brand.links: BrandLinks
     }
 
 /**
- * Whether this car's head unit supports the connected-car content store
- * (Features on Demand: display themes, ambient-lighting patterns…). That's a
- * ccNC-era feature: Hyundai/Genesis US report head-unit generation 3+ for
- * ccNC, while older Gen5W cars report 2. Kia US doesn't expose a generation,
- * so Kia stays eligible and the store page itself gates by VIN.
+ * Whether this car's head unit supports the connected-car content store (Features on Demand:
+ * display themes, ambient-lighting patterns…).
  */
 val Vehicle.supportsConnectedStore: Boolean
     get() = brand == Brand.KIA || (!brand.isCanada && !brand.isEurope && (generation.trim().toIntOrNull() ?: 0) >= 3)
 
 /**
- * Whether this car is an older Gen5W (pre-ccNC) Hyundai/Genesis head unit —
- * a non-Kia car that reports head-unit generation below 3. Unlike
- * [supportsConnectedStore], the generation fallback here is 3 (assume modern
- * ccNC, i.e. NOT Gen5W) when the value is missing/unparseable.
+ * Whether this car is an older Gen5W (pre-ccNC) Hyundai/Genesis head unit — a non-Kia car that
+ * reports head-unit generation below 3. Unlike [supportsConnectedStore], the generation fallback
+ * here is 3 (assume modern ccNC, i.e.
  */
 val Vehicle.isGen5W: Boolean
     get() = brand != Brand.KIA && !brand.isCanada && !brand.isEurope && (generation.trim().toIntOrNull() ?: 3) < 3
 
 /**
- * True for exactly the population where [isGen5W] varies at all: a
- * Hyundai/Genesis US car, the only brand/region combination whose API
- * reports a real head-unit generation number. Kia US never exposes one,
- * and Canada/Europe are excluded from [isGen5W]/[supportsConnectedStore]
- * outright -- so a user-facing "which generation is this" choice only has
- * anything to confirm, and only actually changes anything, for a vehicle
- * where this is true.
+ * True for exactly the population where [isGen5W] varies at all: a Hyundai/Genesis US car, the only
+ * brand/region combination whose API reports a real head-unit generation number.
  */
 val Vehicle.platformOverridable: Boolean
     get() = brand != Brand.KIA && !brand.isCanada && !brand.isEurope
 
-/**
- * Horn & Lights / Flash Lights (rcs/rhl/light, rcs/rhl/hnl) exist on the
- * Hyundai/Genesis US telematics API this app already uses for lock/unlock;
- * Kia's US API (Kia Connect) has no equivalent endpoint, and no equivalent was
- * found in the Canada backend ([CanadaApi] only exposes lock/unlock/climate/
- * charge) or the Europe one ([EuApi], same four).
- *
- * On [Brand] rather than [Vehicle], because not every caller has a Vehicle. The
- * widget used to hold only a VehicleSnapshot and its brand indicator and re-derived
- * this rule by hand -- and a hand copy of a rule is a rule that gets updated in
- * one place. That is not hypothetical here: the WATCH had the same copy, it
- * missed the `isCanada` half, and every Canadian user had Flash and Horn
- * buttons that silently did nothing on every tap. The watch was fixed by
- * routing to the shared accessor; the widget's copy survived, and adding
- * Europe would have reproduced the bug exactly for EU users.
- */
+/** On [Brand] rather than [Vehicle], because not every caller has a Vehicle. */
 val Brand.supportsHornLights: Boolean
     get() = this != Brand.KIA && !isCanada && !isEurope
 
-/** [Brand.supportsHornLights] for a [Vehicle], which is what the phone screens
- *  have to hand. One rule, two spellings of the same question. */
+/**
+ * [Brand.supportsHornLights] for a [Vehicle], which is what the phone screens have to hand. One
+ * rule, two spellings of the same question.
+ */
 val Vehicle.supportsHornLights: Boolean
     get() = brand.supportsHornLights

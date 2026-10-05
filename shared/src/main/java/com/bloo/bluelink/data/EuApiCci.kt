@@ -12,17 +12,7 @@ import okhttp3.HttpUrl
 import java.time.OffsetDateTime
 import java.time.ZoneId
 
-/**
- * Hyundai EU's OneApp/CCI sign-in, the flow that replaces the legacy IDPConnect one.
- *
- * Hyundai's WAF now blocks the legacy `/auth/api/v2/user/oauth2/authorize` by `client_id`
- * (a server-side block, not a credentials problem), so every EU sign-in was failing with
- * **HTTP 403**. The OneApp client_id is not on the block list; its authorize succeeds, and
- * the resulting code is exchanged at `cci-api-eu.hyundai.com` for a CCI token set, which is
- * then token-exchanged for a CCS token the legacy `ccapi:8080` vehicle endpoints still accept.
- *
- * Ported from hyundai_kia_connect_api `KiaUvoApiEU._login_with_password_cci` (#1273).
- */
+/** Hyundai EU's OneApp/CCI sign-in, the flow that replaces the legacy IDPConnect one. */
 private const val MOZILLA_UA =
     "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 " +
         "(KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
@@ -142,8 +132,10 @@ internal suspend fun EuApi.loginCci(
     )
 }
 
-/** CCS exchange: CCI access token -> CCS token the legacy endpoints accept
- *  (`token-exchange?serviceType=CCS`). Returns the bare CCS token string. */
+/**
+ * CCS exchange: CCI access token -> CCS token the legacy endpoints accept
+ * (`token-exchange?serviceType=CCS`). Returns the bare CCS token string.
+ */
 internal suspend fun EuApi.ccsExchange(
     deviceId: String,
     cciAccessToken: String,
@@ -165,9 +157,9 @@ internal suspend fun EuApi.ccsExchange(
 }
 
 /**
- * Refresh the CCI token set and re-exchange the CCS token (`v2/auth/token-refresh`). The CCS
- * token can't be refreshed on its own; the full CCI set has to be replayed. Returns a new
- * [EuSession] with every token field updated.
+ * Refresh the CCI token set and re-exchange the CCS token (`v2/auth/token-refresh`). The CCS token
+ * can't be refreshed on its own; the full CCI set has to be replayed. Returns a new [EuSession]
+ * with every token field updated.
  */
 internal suspend fun EuApi.refreshCci(session: EuSession): EuSession {
     val deviceId = session.deviceId
@@ -208,11 +200,7 @@ internal suspend fun EuApi.refreshCci(session: EuSession): EuSession {
     )
 }
 
-/**
- * POST to the CCI API with the OneApp headers. [service] is the path under `/domain/api/`
- * (e.g. "v1/auth/token"). [query] is appended after '?'. [body] null sends an empty body;
- * [jsonBody] marks the body as JSON (the refresh call) rather than an empty form.
- */
+/** POST to the CCI API with the OneApp headers. [service] is the path under `/domain/api/` (e.g. */
 internal suspend fun EuApi.cciPost(
     service: String,
     body: String?,

@@ -41,14 +41,9 @@ import com.bloo.bluelink.data.WatchPinPolicy
 import kotlinx.coroutines.launch
 
 /**
- * The whole watch UI, built for a round face: swipe left/right between cars, scroll up/down a
- * car's pebbles. Each page leads with a centred HERO (the car's name + its at-a-glance state),
- * then compact pebble cards. Wear's `ScalingLazyColumn` centres the item under the crown and
- * shrinks the rest toward the bezel, so nothing runs off the round edge.
- *
- * The PIN gate wraps everything: if the policy says this open needs an unlock, [WearPinScreen]
- * is shown INSTEAD of the garage until the user proves the PIN. Commands are gated separately
- * via [requestCommand] -- see [WatchPinPolicy] for the exact rules.
+ * The whole watch UI, built for a round face: swipe left/right between cars, scroll up/down a car's
+ * pebbles. Each page leads with a centred HERO (the car's name + its at-a-glance state), then
+ * compact pebble cards.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -66,7 +61,6 @@ fun WearGarageScreen(
     var sessionUnlocked by remember { mutableStateOf(false) }
     // A command requested while the PIN gate is pending, replayed after a successful unlock.
     var pendingCommand by remember { mutableStateOf<(() -> Unit)?>(null) }
-    // Whether the PIN screen is up right now.
     var pinPromptVisible by remember { mutableStateOf(false) }
 
     val needsOpenUnlock = pinStore.hasPin &&
@@ -252,7 +246,9 @@ private fun WearCarPage(
 private fun VehicleSnapshot.heroValue(): String =
     percent?.let { "$it%" } ?: locked?.let { if (it) "Locked" else "Unlocked" } ?: "—"
 
-/** The supporting line under the hero: lock state, charging, and range, whichever the car reports. */
+/**
+ * The supporting line under the hero: lock state, charging, and range, whichever the car reports.
+ */
 private fun VehicleSnapshot.stateLine(): String? = listOfNotNull(
     locked?.let { if (it) "Locked" else "Unlocked" }.takeIf { percent != null },
     if (charging == true) "Charging" else null,

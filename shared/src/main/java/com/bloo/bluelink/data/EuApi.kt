@@ -21,11 +21,10 @@ import java.util.UUID
 import javax.crypto.Cipher
 
 /**
- * A signed-in Hyundai Bluelink Europe (CCAPI / "CCS2") session. [deviceId] is the
- * `ccsp-device-id` from device registration and must stay stable across refreshes;
- * [pin] is the account service PIN, required to mint the short-lived control token
- * every command needs (the EU analogue of Canada's `pAuth`). [accessToken] is the
- * bare token — headers prepend "Bearer ".
+ * A signed-in Hyundai Bluelink Europe (CCAPI / "CCS2") session. [deviceId] is the `ccsp-device-id`
+ * from device registration and must stay stable across refreshes; [pin] is the account service PIN,
+ * required to mint the short-lived control token every command needs (the EU analogue of Canada's
+ * `pAuth`). [accessToken] is the bare token — headers prepend "Bearer ".
  */
 data class EuSession(
     val accessToken: String,
@@ -46,9 +45,6 @@ data class EuSession(
     val idToken: String? = null,
 )
 
-/** A Europe-account vehicle summary. [id] is the CCAPI `vehicleId`; [ccs2] is the
- *  car's `ccuCCS2ProtocolSupport` flag, echoed back in the `Ccuccs2protocolsupport`
- *  header and used to pick the v2/ccs2 endpoints (non-zero for E-GMP cars). */
 data class EuVehicleSummary(
     val id: String,
     val name: String,
@@ -58,19 +54,7 @@ data class EuVehicleSummary(
     val ccs2: Int,
 )
 
-/**
- * Client for Hyundai Bluelink Europe on the CCAPI platform ("CCS2" — E-GMP /
- * 2023+ cars). One shared API shape that Kia Connect EU and Genesis EU also ride
- * (different host/client/login-form host only), like the three Canada brands
- * share [CanadaApi]; only Hyundai EU is wired today via [Brand.isEurope].
- *
- * Ported from the Apache-2.0 hyundai_kia_connect_api (KiaUvoApiEU + the CCS2
- * ApiImplType1). The current EU sign-in is the "IDPConnect" OAuth2 flow: it
- * fetches an RSA public key, encrypts the password with it, posts the sign-in
- * form to the identity host (idpconnect-eu.hyundai.com), reads the authorization
- * code from the 302 redirect, then exchanges it for tokens. Opaque constants
- * ([EuStamp], [Brand.clientSecret]) are the Hyundai EU values from that source.
- */
+/** Client for Hyundai Bluelink Europe on the CCAPI platform ("CCS2" — E-GMP / 2023+ cars). */
 class EuApi(private val brand: Brand) {
     init {
         require(brand.isEurope) { "EuApi requires a Europe brand, got $brand" }
@@ -85,9 +69,9 @@ class EuApi(private val brand: Brand) {
 
     internal val clientSecret get() = brand.clientSecret
 
-    // Hyundai EU sign-in form / identity host and OAuth redirect target. When
-    // Kia/Genesis EU are added these become brand-keyed (idpconnect-eu.kia.com,
-    // redirect_uri .../oauth2/redirect for Kia).
+    // Hyundai EU sign-in form / identity host and OAuth redirect target. When Kia/Genesis EU are
+    // added these become brand-keyed (idpconnect-eu.kia.com, redirect_uri .../oauth2/redirect for
+    // Kia).
     internal val loginFormHost get() = "https://idpconnect-eu.hyundai.com"
 
     // --- OneApp/CCI login (Hyundai EU) --------------------------------------
@@ -115,9 +99,9 @@ class EuApi(private val brand: Brand) {
         /** A fresh device id (persisted; the ccsp-device-id is derived per login). */
         fun newDeviceId(): String = UUID.randomUUID().toString()
 
-        // Force-refresh polling: the car reports asynchronously (~20s live), so
-        // poll /latest this many times at this interval (≈20s cap) waiting for the
-        // snapshot timestamp to advance. Kept small for EU's strict rate limits.
+        // Force-refresh polling: the car reports asynchronously (~20s live), so poll /latest this
+        // many times at this interval (≈20s cap) waiting for the snapshot timestamp to advance.
+        // Kept small for EU's strict rate limits.
         private const val REFRESH_POLLS = 5
         private const val REFRESH_POLL_INTERVAL_MS = 4000L
 
@@ -156,9 +140,11 @@ class EuApi(private val brand: Brand) {
             .header("ccsp-device-id", session.deviceId)
             .header("Ccuccs2protocolsupport", ccs2.toString())
 
-    /** [authHeaders] with the PIN-derived control token in both Authorization and
-     *  AuthorizationCCSP — CCS2 control endpoints authenticate on the control
-     *  token, not the plain access token. [controlToken] already carries "Bearer ". */
+    /**
+     * [authHeaders] with the PIN-derived control token in both Authorization and AuthorizationCCSP
+     * — CCS2 control endpoints authenticate on the control token, not the plain access token.
+     * [controlToken] already carries "Bearer ".
+     */
     internal fun Request.Builder.commandHeaders(session: EuSession, ccs2: Int, controlToken: String): Request.Builder =
         authHeaders(session, ccs2)
             .header("Authorization", controlToken)
@@ -167,10 +153,8 @@ class EuApi(private val brand: Brand) {
     // --- Auth ----------------------------------------------------------------
 
     /**
-     * Registers this device with the CCAPI push channel and returns the
-     * `ccsp-device-id` all authenticated calls carry. Bloo doesn't use CCAPI push
-     * — it only needs the device id the register call mints from a generated push
-     * registration id. Ported from KiaUvoApiEU._get_device_id (no auth token).
+     * Registers this device with the CCAPI push channel and returns the `ccsp-device-id` all
+     * authenticated calls carry.
      */
     suspend fun register(): String = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
@@ -207,10 +191,9 @@ class EuApi(private val brand: Brand) {
     }
 
     /**
-     * Mint the short-lived control token every command needs by verifying the PIN
-     * (PUT user/pin). Not cached here — [EuRepository] caches it and refetches on a
-     * 401, like [CanadaRepository] does with `pAuth`. Returns the value already
-     * prefixed "Bearer " for the Authorization header.
+     * Mint the short-lived control token every command needs by verifying the PIN (PUT user/pin).
+     * Not cached here — [EuRepository] caches it and refetches on a 401, like [CanadaRepository]
+     * does with `pAuth`.
      */
     suspend fun controlToken(session: EuSession, pin: String): String = withContext(Dispatchers.IO) {
         val body = buildJsonObject { put("deviceId", session.deviceId); put("pin", pin) }
@@ -230,19 +213,8 @@ class EuApi(private val brand: Brand) {
     // --- Status / location ---------------------------------------------------
 
     /**
-     * Latest CCS2 vehicle state (carstatus is on the v1 SPA API; only the ccs2
-     * control commands are on v2).
-     *
-     * When [refresh] is false this just reads the cached `/latest` snapshot — fast,
-     * but it lags the car (right after a command it still shows the old state).
-     *
-     * When [refresh] is true it does a genuine force-refresh: GET the no-`/latest`
-     * "wake" endpoint, then poll `/latest` until its snapshot timestamp (`Date`)
-     * advances past the pre-wake value — the car reports asynchronously (~20s
-     * live), so this is the only way to see a post-command state. It returns as
-     * soon as fresh data arrives and is capped at ~20s so the spinner can't hang;
-     * if the car stays silent it falls back to the last snapshot. Kept to a
-     * handful of requests to respect EU's strict rate limits.
+     * Latest CCS2 vehicle state (carstatus is on the v1 SPA API; only the ccs2 control commands are
+     * on v2).
      */
     suspend fun status(session: EuSession, v: EuVehicleSummary, refresh: Boolean): VehicleStatus? =
         withContext(Dispatchers.IO) {
@@ -265,9 +237,11 @@ class EuApi(private val brand: Brand) {
             (before ?: readLatest())?.let { parseStatus(it) }
         }
 
-    /** Last-known parked GPS via the dedicated `/location/park` endpoint (returns
-     *  `resMsg.coord.lat/lon`) — the CCS2 carstatus snapshot doesn't reliably
-     *  carry a position. Non-rate-limited (parked position), access-token auth. */
+    /**
+     * Last-known parked GPS via the dedicated `/location/park` endpoint (returns
+     * `resMsg.coord.lat/lon`) — the CCS2 carstatus snapshot doesn't reliably carry a position.
+     * Non-rate-limited (parked position), access-token auth.
+     */
     suspend fun location(session: EuSession, v: EuVehicleSummary): GeoLocation? = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(spa + "vehicles/${v.id}/location/park")
             .get().authHeaders(session, v.ccs2).build()
@@ -305,9 +279,11 @@ class EuApi(private val brand: Brand) {
 
     // --- Plumbing ------------------------------------------------------------
 
-    /** RSA-PKCS1v1.5-encrypt [password] with the JWK public key ([nB64Url]/[eB64Url]
-     *  are base64url modulus/exponent), returning lowercase hex — matching the
-     *  reference's `cipher.encrypt(pw).hex()`. */
+    /**
+     * RSA-PKCS1v1.5-encrypt [password] with the JWK public key ([nB64Url]/[eB64Url] are base64url
+     * modulus/exponent), returning lowercase hex — matching the reference's
+     * `cipher.encrypt(pw).hex()`.
+     */
     internal fun rsaEncryptHex(password: String, nB64Url: String, eB64Url: String): String {
         fun decodeUrl(s: String): ByteArray {
             val padded = s + "=".repeat((4 - s.length % 4) % 4)
@@ -321,9 +297,11 @@ class EuApi(private val brand: Brand) {
         return cipher.doFinal(password.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
     }
 
-    /** Runs [request] on [httpClient] and returns the parsed JSON body. Throws on
-     *  non-2xx (401 -> [EuRepository] refreshes + retries) and on an in-band
-     *  `retCode == "F"` error. The failing method+path is included in the message. */
+    /**
+     * Runs [request] on [httpClient] and returns the parsed JSON body. Throws on non-2xx (401 ->
+     * [EuRepository] refreshes + retries) and on an in-band `retCode == "F"` error. The failing
+     * method+path is included in the message.
+     */
     /** See [ResponseFraming]: GET-only retry on a fresh connection for an unframable body. */
     internal fun call(request: Request, httpClient: OkHttpClient = this.client): JsonElement =
         ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it, httpClient) }
@@ -334,26 +312,22 @@ class EuApi(private val brand: Brand) {
             val root = if (text.isBlank()) JsonObject(emptyMap())
             else runCatching { json.parseToJsonElement(text) }.getOrNull() ?: JsonObject(emptyMap())
             val where = "${request.method} ${request.url.encodedPath}"
-            // In-band CCAPI status (resCode/resMsg) can accompany EITHER a 2xx or a
-            // 4xx HTTP status. Codes from the reference's _check_response_for_errors.
+            // In-band CCAPI status (resCode/resMsg) can accompany EITHER a 2xx or a 4xx HTTP
+            // status. Codes from the reference's _check_response_for_errors.
             val resCode = root.path("resCode").str()
             val resMsg = root.path("resMsg").str()
 
-            // 4004 "Duplicate request": an identical command is already being
-            // processed server-side (e.g. a command fired right after a refresh, or
-            // a double-tap) — the request DID land, so treat it as an accepted
-            // no-op whatever the HTTP status, and never retry (that just duplicates
-            // again). This is what makes the spurious "Duplicate request" error and
-            // the retry-driven refresh-on-error go away.
+            // 4004 "Duplicate request": an identical command is already being processed server-side
+            // (e.g. a command fired right after a refresh, or a double-tap) — the request DID land,
+            // so treat it as an accepted no-op whatever the HTTP status, and never retry (that just
+            // duplicates again).
             if (resCode == "4004") {
                 AppLog.log("$where: duplicate request — already accepted, ignoring")
                 return@use root
             }
 
-            // Only genuine token/device expiry retries (mapped to 401). 7501 = auth,
-            // 4002 = bad deviceId, or an explicit "token expired" message. A plain
-            // HTTP 401 counts too. Everything else is a terminal error (no retry) —
-            // notably we do NOT treat a bare 403 as retryable.
+            // Only genuine token/device expiry retries (mapped to 401). 7501 = auth, 4002 = bad
+            // deviceId, or an explicit "token expired" message. A plain HTTP 401 counts too.
             val expired = resp.code == 401 || resCode == "7501" || resCode == "4002" ||
                 (resMsg?.contains("token", true) == true && resMsg.contains("expired", true))
 
@@ -374,14 +348,11 @@ class EuApi(private val brand: Brand) {
 
     /**
      * Filters the 12V auxiliary battery reading the way the reference project's own
-     * `normalize_battery_soc` does, which this file's raw `.intLoose()` read skipped
-     * entirely: `Electronics.Battery.SensorReliability == 1` means the CCS2 stack is
-     * flagging the reading itself as unreliable (an expected state after a 12V reset
-     * or during an ICCU fault on IONIQ 5 / Kia EV, not an error to surface), and a raw
-     * value outside 0..100 is a sentinel (255/0xFF, -1) rather than a real percentage.
-     * Either case has to become "unknown" (null), not a number -- [Battery12V.health]
-     * reads `batSoc >= 75 -> "Good"` with no floor check of its own, so an unfiltered
-     * 255 would have rendered "255% . Good".
+     * `normalize_battery_soc` does, which this file's raw `.intLoose()` read skipped entirely:
+     * `Electronics.Battery.SensorReliability == 1` means the CCS2 stack is flagging the reading
+     * itself as unreliable (an expected state after a 12V reset or during an ICCU fault on IONIQ 5
+     * / Kia EV, not an error to surface), and a raw value outside 0..100 is a sentinel (255/0xFF,
+     * -1) rather than a real percentage.
      */
     internal fun normalizeBattery12V(level: Int?, sensorReliability: Int?): Int? {
         if (sensorReliability == 1) return null

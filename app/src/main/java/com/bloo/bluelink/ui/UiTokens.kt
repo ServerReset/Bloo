@@ -23,16 +23,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Text
-// No `motionScheme` import: it is a member of the MaterialTheme object (verified as
-// MaterialTheme.getMotionScheme in the resolved material3 AAR), as are defaultEffectsSpec
-// and defaultSpatialSpec on MotionScheme. Screens.kt imports none of them either.
+// `motionScheme` is a MaterialTheme member; no import needed.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-// State<T>'s `by` delegate isn't a member -- it resolves to this file-scope operator
-// extension, which the compiler will not find without an explicit import (unlike most of
-// this file's other extension functions, which show up as unresolved-reference errors
-// instead of this one's more oblique "has no method getValue... cannot serve as a delegate").
+// The `by` State delegate is a file-scope operator extension and needs this explicit import.
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -41,49 +36,23 @@ import com.bloo.bluelink.data.platform
 
 /**
  * The phone UI's shared design vocabulary: the sizes, colours and motion that more than one
- * screen has to agree on.
- *
- * Extracted from Screens.kt, which is 14.6k lines and 28% of this codebase. That extraction
- * is worth being honest about: the empirical literature does NOT support splitting a large
- * file to reduce defects (every study that controls for size either reverses the effect or
- * dissolves it, and none performs a refactoring intervention at all), and the build-speed
- * argument does not survive verification either. What a split does buy is navigability, and
- * it is the prerequisite for any further split of that file, because Kotlin's top-level
- * `private` is FILE-scoped -- so shared helpers have to become `internal` and live somewhere
- * common BEFORE any screen can move out from under them.
- *
- * This file is therefore deliberately the least interesting one: no logic, no layout, just
- * the values that would silently diverge if each screen kept its own copy. That is not
- * hypothetical here -- `AdvancedModeStiffness` below already drifted from the shared collapse
- * spec while it was buried at line ~10,700 of the monolith.
- *
- * `internal`, not `public`: it is the narrowest visibility that survives a file boundary.
+ * screen must agree on. `internal` because Kotlin's top-level `private` is file-scoped.
  */
 
 // ---- Colour -------------------------------------------------------------------
 
-// Was a phone-only re-declaration of the same hex values shared/BlooColors.kt already
-// centralizes (bit-identical today, one edit away from silently diverging like
-// chargerLabel's text had).
+// Mirrors shared/BlooColors.kt hex values.
 internal val ChargeGreen = Color(com.bloo.bluelink.data.BlooColors.chargeGreen)
 internal val ChargeGreenDark = Color(com.bloo.bluelink.data.BlooColors.chargeGreenDark)
 
-/** Climate seat/wheel tints, on the canonical semantic tokens rather than the
- *  cluster of one-off reds and blues (a bright pastel, a deep pastel, a mid
- *  blue) this file used to carry -- those had drifted from the shared
- *  heat/cool values and from each other. */
+/** Climate seat/wheel tints, on the canonical semantic heat/cool tokens. */
 internal val Heat = Color(com.bloo.bluelink.data.BlooColors.heat)
 internal val Cool = Color(com.bloo.bluelink.data.BlooColors.cool)
 
-/** The one "there's something new" colour -- the small notification dot on an update
- *  card's corner when a build is available. The canonical warning amber rather than its
- *  own 0xFFFF9800: that and BlooColors.warn's 0xFFF5A623 were two ambers a few degrees
- *  apart doing the same "look here" job, which is exactly the near-duplicate this palette
- *  is meant not to carry. */
+/** The "something new" notification dot colour (the canonical warning amber). */
 internal val UpdateAvailableAmber = Color(com.bloo.bluelink.data.BlooColors.warn)
 
-/** The charge bar's "topped up" state: the pack has reached its own configured limit,
- *  so the fill reads as done rather than still climbing. See ChargeSegmentBar. */
+/** The charge bar's "topped up" state: the pack has reached its configured limit. See ChargeSegmentBar. */
 internal val ChargeBlue = Color(com.bloo.bluelink.data.BlooColors.chargeBlue)
 internal val ChargeBlueDark = Color(com.bloo.bluelink.data.BlooColors.chargeBlueDark)
 
@@ -96,20 +65,10 @@ internal fun mutedContentColor(): androidx.compose.ui.graphics.Color =
     androidx.compose.material3.LocalContentColor.current.copy(alpha = MutedContentAlpha)
 
 /**
- * Text and icons drawn ON the hero's car photo.
- *
- * INVERTED against the theme on purpose. A car photo is a contrasty, unpredictable
- * backdrop, so the reliable pairing is the opposite of the surface's own: the app's
- * LIGHT theme draws near-black body text on pale surfaces, which over a photo would
- * vanish, so the hero uses near-white there; the app's DARK theme draws near-white
- * text, which over a photo would glare, so the hero uses near-black there. Before this
- * it was a single fixed near-white, which read fine on a dark photo but was the wrong
- * answer half the time -- reported directly as wanting it inverted.
- *
- * Resolved through [appIsDarkTheme] (the app's own Light/Dark override), NOT
- * `isSystemInDarkTheme()` -- see that function's own doc for the five bugs that
- * distinction already fixed. Off pure white/near-black for the same reason every other
- * on-photo surface in the app is: full white reads harsher than the photo behind it.
+ * Text and icons drawn on the hero's car photo.
+ * Inverted against the theme on purpose (near-white in light, near-black in dark) because a photo
+ * backdrop is the opposite of the surface's own pairing. Uses [appIsDarkTheme], not
+ * `isSystemInDarkTheme()`; off pure white/black to avoid harshness.
  */
 @Composable
 internal fun heroOnPhoto(): Color =
@@ -125,68 +84,39 @@ internal val PebbleHeaderHeight = ControlHeight
 internal val PebbleCornerCollapsed = 38.dp
 internal val PebbleCornerExpanded = 20.dp
 
-/** The charge bar's height, shared by every surface that draws this bar so the
- *  proportions read as one component rather than five near-misses. */
+/** The charge bar's height, shared by every surface that draws it. */
 internal val ChargeBarHeight = 18.dp
 
-/** The gap reserved on both sides of every internal boundary in the charge bar, so
- *  each segment (fill, track-to-limit, dim-track-past-it) is its own visibly
- *  separate, independently-rounded piece rather than any two reading as one shape. */
+/** Gap on both sides of every internal charge-bar boundary so each segment is its own rounded piece. */
 internal val ChargeSegmentGap = 5.dp
 
 /**
- * Gap between the hero's collapsed readout and the bottom edge of its card.
- *
- * Named because it is needed in TWO places that must agree: the readout's own bottom padding,
- * and the height the header reserves so its title does not sit on top of the readout. When it
- * was a bare `6.dp` at the padding site only, the reservation accounted for the readout's
- * content but not for this inset, so the reserved space was one gap short of what the node
- * actually occupies. Two copies of a spatial constant is how this slot has gone wrong every
- * previous time; one name means the reservation cannot drift from the thing it reserves for.
+ * Gap between the hero's collapsed readout and its card's bottom edge.
+ * Shared by the readout's bottom padding and the header's reserved height, which must agree.
  */
 internal val HeroReadoutBottomInset = 14.dp
 
-/** Gap between settings cards. Lives inside SettingsCard as bottom padding rather than in
- *  the parent's arrangement, so a card collapsing to zero height takes its gap with it --
- *  see the comment at that padding for what went wrong when the parent owned it. */
 /**
- * The horizontal inset every pebble's own content sits at -- the header icon, the summary line,
- * and anything a pebble reveals inside itself. Named because it is a shared alignment, not a
- * local choice: the lock pebble reaches it as 4 + 12 through a nested Box, and its revealed
- * remote-action history has to land on the same line or it reads as misaligned against the row
- * directly above it.
+ * The horizontal inset every pebble's content sits at (header icon, summary, revealed content);
+ * the lock pebble reaches it as 4 + 12 through a nested Box.
  */
 internal val PebbleContentInset = 16.dp
 
 /**
- * The one horizontal gutter a full page's content sits inside -- the single-column
- * car page, the dual-column car page, and the Settings page all reserve this before
- * their content starts. They each typed a bare `16.dp` before; it is named now so a
- * page added later lines up with them instead of picking its own close-but-not-quite
- * edge (the exact class of drift [HeaderCornerGap]'s own doc describes).
+ * The horizontal gutter a full page's content sits inside (car pages and Settings).
  */
 internal val ScreenGutter = 16.dp
 
 /**
- * The app's vertical rhythm: ONE base unit ([SpaceUnit]) that every gap, inset and arrangement
- * is a multiple of, so the whole layout is tuned from a single place.
- *
- * It scales with the app's own display scale (the "make everything bigger" setting), but only
- * about half as much, so a bigger font gets more air without the layout ballooning -- see
- * [spaceScaleFor]. Provided by [BlooTheme]; read through [LocalSpaceScale].
- *
- * Material 3's spacing system is built on 8 with 4dp sub-steps; ad-hoc gaps are invisible on
- * their own and obvious in aggregate, which is why these replaced the many raw values that had
- * accumulated (4, 6, 8, 10, 12, 14, 16dp and odder strays).
+ * The app's vertical rhythm: one base unit ([SpaceUnit]) that every gap and inset is a multiple of.
+ * Scales at half the display scale (see [spaceScaleFor]); provided by [BlooTheme], read via [LocalSpaceScale].
  */
 internal val LocalSpaceScale = androidx.compose.runtime.compositionLocalOf { 1f }
 
 /** Display scale → gap scale: gaps breathe with the app's display scale at half its swing. */
 internal fun spaceScaleFor(scale: Float): Float = 1f + (scale - 1f) * 0.5f
 
-/** The most the app will scale text: past this, the device's font setting is clamped.
- *  Big enough for "huge" accessibility sizes to read as huge, small enough that the fixed
- *  floating overlays (which track a pixel spot, not reflowing text) still fit their bounds. */
+/** The most the app will scale text; keeps fixed floating overlays within their bounds. */
 internal const val MaxFontScale = 1.8f
 
 /** The one spacing unit (4dp at 1.0 scale). Everything below is a multiple of it. */
@@ -201,8 +131,7 @@ internal val SettingsCardGap: Dp @Composable get() = SpaceUnit * 2.5f
 
 // ---- Shapes ---------------------------------------------------------------------
 //
-// Common corner radius values used throughout the app, extracted for consistency.
-// When a shape needs updating, only change it here instead of across 12+ files.
+// Common corner radii; change a shape here, not per file.
 internal val TinyShape = RoundedCornerShape(8.dp)    // Inline tap targets, swatches
 internal val SmallShape = RoundedCornerShape(12.dp)   // Smaller components, chips
 internal val StandardShape = RoundedCornerShape(16.dp) // Buttons, most cards
@@ -210,19 +139,10 @@ internal val ExtraLargeShape = RoundedCornerShape(28.dp) // Modal dialogs
 
 // ---- Icons ----------------------------------------------------------------------
 //
-// Commonly-used icons imported in 16+ files are centralized here to reduce
-// duplicate imports across the codebase. Use AppIcons.Settings instead of
-// importing Icons.Filled.Settings in 16 different files.
+// Commonly used icons centralized to avoid duplicate imports.
 object AppIcons {
-  // Icons.Filled.X (not a bare `X`): each of these is an extension property on
-  // `Icons.Filled`, not a plain top-level symbol, so a bare `val Settings = Settings`
-  // here doesn't resolve to the imported icon at all -- with no other `Settings` in
-  // scope to supply the `Icons.Filled` receiver, Kotlin resolves the right-hand side
-  // back to this very property, a property whose initializer referenced itself. That
-  // shipped for a while unnoticed (nothing here could be verified against a real
-  // Kotlin compiler until CI actually ran it) and was the true cause of the
-  // "recursive type checking" errors CI reported across every file that touched
-  // AppIcons -- not the IconBadge overload an earlier pass blamed and fixed first.
+  // Icons.Filled.X, not a bare `X`: these are extension properties, and a bare name would resolve
+  // to this very property (self-referencing initializer).
   val Settings = Icons.Filled.Settings
   val Lock = Icons.Filled.Lock
   val Bolt = Icons.Filled.Bolt
@@ -239,27 +159,11 @@ object AppIcons {
 
 // ---- Blur -----------------------------------------------------------------------
 //
-// Every real Haze backdrop-blur site in the app (StatusBarScrim, the map sheet's
-// scrim, FloatingIcon, the map's drag-handle chip) had drifted into its own
-// hand-copied `Build.VERSION.SDK_INT >= Build.VERSION_CODES.S` gate and, for the
-// two full-height scrims, its own literal `HazeProgressive.verticalGradient(
-// startIntensity = 1f, endIntensity = 0f)` call -- three copies of the exact same
-// expression. Reported directly as wanting the blur "standardized" across the
-// app: pulled here so every site shares the same instances instead of four
-// separately-typed, easy-to-drift copies.
+// Shared Haze backdrop-blur gate and progressive-blur instances used by every blur site.
 
 /**
- * Single, app-wide source of truth for [android.os.PowerManager.isPowerSaveMode],
- * kept live via exactly ONE [android.content.BroadcastReceiver] for the whole
- * process -- [BlooApplication] calls [ensureInitialized] once, at startup, the
- * same place it installs its own uncaught-exception handler.
- *
- * [isBatterySaverOn] used to register its OWN receiver inline, every time it was
- * called -- fine when [canBlurBackdrops] had a couple of call sites, but between
- * every [GlassSurface] in the app and every [lowPowerAwareSpring], that function
- * is now read from dozens of places on a single screen. Each one registering its
- * own receiver for the exact same system broadcast, each keeping its own separate
- * copy of the same boolean, is pure waste this object collapses to one.
+ * App-wide source of truth for [android.os.PowerManager.isPowerSaveMode], kept live by one
+ * [android.content.BroadcastReceiver] for the whole process; [BlooApplication] calls [ensureInitialized] at startup.
  */
 internal object BatterySaverState {
     private fun current(context: android.content.Context) =
@@ -283,13 +187,8 @@ internal object BatterySaverState {
                     _isOn.value = current(appContext)
                 }
             }
-            // ContextCompat, not Context.registerReceiver directly: this app's targetSdk (36)
-            // is well past the API 33 cutover where a context-registered receiver MUST say
-            // whether other apps can send it broadcasts, and the plain 2-arg platform call
-            // throws SecurityException at runtime on 34+ once targetSdk requires that flag
-            // instead of just warning about its absence. NOT_EXPORTED is correct here
-            // specifically -- this only ever needs the system's OWN battery-saver broadcast,
-            // never one from another app.
+            // ContextCompat with NOT_EXPORTED: at targetSdk 34+ the plain 2-arg registerReceiver throws SecurityException,
+            // and only the system's own battery-saver broadcast is needed.
             androidx.core.content.ContextCompat.registerReceiver(
                 appContext, receiver,
                 android.content.IntentFilter(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
@@ -300,50 +199,23 @@ internal object BatterySaverState {
     }
 }
 
-/** Live, reactive battery-saver state, read from the one shared [BatterySaverState]
- *  -- so toggling it while the app is already open (Quick Settings, the battery-
- *  saver notification) takes effect immediately everywhere at once, rather than
- *  only on the next cold start. [canBlurBackdrops] is this value's biggest
- *  consumer today, but it's a plain top-level composable precisely so anything
- *  else wanting to drop expensive visual effects under battery saver -- not just
- *  blur -- can read it the same way. */
+/** Live battery-saver state from the shared [BatterySaverState]; updates immediately everywhere. */
 @Composable
 internal fun isBatterySaverOn(): Boolean {
     val active by BatterySaverState.isOn.collectAsState()
     return active
 }
 
-/** True on API 31+ (where Haze's real RenderEffect-backed blur exists at all --
- *  below that it silently no-ops) AND battery saver is off. Call sites gate on
- *  this to fall back to a plain darkened/tinted layer instead of asking for a
- *  blur that either can't render, or that shouldn't be spending the GPU/battery
- *  cost it has even when it can. Reported directly: "when it's on battery saver,
- *  all of [the blur] should get disabled or turned into solid colors" -- since
- *  every real blur site in the app already gates on this ONE flag (see this
- *  section's own doc for why), turning it off here turns every one of them into
- *  their own already-existing solid-colour fallback, with nothing further to
- *  change at each individual site. */
+/** True on API 31+ (Haze's RenderEffect blur; no-op below) and battery saver off.
+ *  Call sites fall back to a solid tinted layer otherwise. */
 @Composable
 internal fun canBlurBackdrops(): Boolean =
     android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !isBatterySaverOn()
 
 /**
- * Battery-saver-aware replacement for a bouncy [spring]: the real spring when battery saver
- * is off, a short, critically-damped [tween] (no overshoot, no settle-jitter) when it's on.
- *
- * Reported directly alongside the blur ask, in the same message: "standardize all the low
- * power controls to reduce animations." [collapseEnter]/[collapseExit]/[PopVisible] below are
- * the single shared spring behind the app's pebble expand/collapse motion -- their own doc
- * describes 14 call sites that used to each hand-roll a slightly different spring/tween before
- * being migrated onto these two functions -- so gating THIS one spot under battery saver is
- * what turns every one of those sites calm without touching any of them individually, the
- * same leverage [canBlurBackdrops] already gets from every blur site sharing it.
- *
- * A spring isn't just slower under low power, it is MORE work per frame than a tween for the
- * same visual distance: an underdamped spring overshoots and keeps re-evaluating position/
- * velocity for several extra frames settling back to rest, where a critically-damped tween
- * arrives once and stops. 140ms is short enough to still read as a deliberate transition
- * rather than a hard cut, without the bounce's extra settle tail.
+ * Battery-saver-aware replacement for a bouncy [spring]: the real spring normally, a short
+ * critically-damped [tween] (no overshoot, fewer frames) under battery saver.
+ * Gating here calms every [collapseEnter]/[collapseExit]/[PopVisible] site at once.
  */
 @Composable
 internal fun <T> lowPowerAwareSpring(dampingRatio: Float, stiffness: Float) =
@@ -353,15 +225,10 @@ internal fun <T> lowPowerAwareSpring(dampingRatio: Float, stiffness: Float) =
         spring<T>(dampingRatio = dampingRatio, stiffness = stiffness)
     }
 
-/** The one shape every full-height scrim's blur uses: strong right at the edge
- *  it grows from, tapering to none by its own far edge -- "like a gradient of
- *  blur", not a flat smear with a hard cutoff. Shared by StatusBarScrim and the
- *  map sheet's own scrim; anything single-value/flat (FloatingIcon, the drag-
- *  handle chip) has no shape to standardize and doesn't use this. */
+/** The shape every full-height scrim's blur uses: strong at its edge, tapering to none by the far edge. */
 internal val StandardBlurProgressive
     get() = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
-        // Progressive blur: strong at top (status bar icons need legibility),
-        // fading to none at bottom (content below needs normal clarity)
+        // Strong at top (status bar legibility), none at bottom.
         startIntensity = 1f,
         endIntensity = 0f
     )

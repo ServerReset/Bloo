@@ -14,16 +14,16 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
 /**
- * The watch's only Activity. Hosts [WearGarageScreen]; everything else lives in the
- * repository + shared modules.
+ * The watch's only Activity. Hosts [WearGarageScreen]; everything else lives in the repository +
+ * shared modules.
  */
 class WearMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val repo = WearSnapshotRepository(this)
         val pinStore = WatchPinStore(this)
-        // Begin listening for the phone's pushes (real-time sync; the watch never hits the
-        // network for CAR data -- see WearDataLayerSync).
+        // Begin listening for the phone's pushes (real-time sync; the watch never hits the network
+        // for CAR data -- see WearDataLayerSync).
         WearDataLayerSync.start(this)
         // Notifications need a one-time grant on Android 13+.
         if (!WearNotifier.canPost(this)) {
@@ -43,11 +43,7 @@ class WearMainActivity : ComponentActivity() {
     }
 }
 
-/**
- * The watch theme: a dark, high-contrast scheme for a small AMOLED watch face. The
- * phone's dynamic-colour machinery does not exist on a watch the same way, so this is a
- * fixed palette -- deliberately tiny, just enough for the one screen.
- */
+/** The watch theme: a dark, high-contrast scheme for a small AMOLED watch face. */
 @Composable
 private fun WearTheme(content: @Composable () -> Unit) {
     MaterialTheme(

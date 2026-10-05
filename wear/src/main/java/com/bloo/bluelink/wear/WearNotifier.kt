@@ -56,22 +56,20 @@ class WearNotificationPrefs(context: Context) {
 }
 
 /**
- * The watch's own notifications, raised whenever a car's state changes on the watch -- whether
- * the change came from the phone's push or from the watch's own refresh -- so they appear even
- * with the phone out of range.
- *
- *  - an ongoing "Charging" card with a progress bar and a Stop action, while a car charges;
- *  - "Charged" when a charge finishes near full;
- *  - "Low battery" when a car drops under [WEAR_LOW_PERCENT] and isn't charging.
- *
- * Each notification's actions run through [WearActionReceiver], so a tap on the notification is
- * the same thing as the button in the app.
+ * The watch's own notifications, raised whenever a car's state changes on the watch -- whether the
+ * change came from the phone's push or from the watch's own refresh -- so they appear even with the
+ * phone out of range. - an ongoing "Charging" card with a progress bar and a Stop action, while a
+ * car charges; - "Charged" when a charge finishes near full; - "Low battery" when a car drops under
+ * [WEAR_LOW_PERCENT] and isn't charging.
  */
 object WearNotifier {
     private const val CHANNEL_CHARGING = "watch_charging"
     private const val CHANNEL_ALERTS = "watch_alerts"
 
-    /** Compare [old] with [new] and raise/clear whatever changed. [old] empty means first sight: no alerts. */
+    /**
+     * Compare [old] with [new] and raise/clear whatever changed. [old] empty means first sight: no
+     * alerts.
+     */
     fun onVehicles(context: Context, old: List<VehicleSnapshot>, new: List<VehicleSnapshot>) {
         val app = context.applicationContext
         // The Tile shows the same cars, so it refreshes whenever they change.
@@ -141,7 +139,10 @@ object WearNotifier {
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 }
 
-/** Runs a car action chosen from a watch notification, then lets the normal update path refresh the card. */
+/**
+ * Runs a car action chosen from a watch notification, then lets the normal update path refresh the
+ * card.
+ */
 class WearActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val vin = intent.getStringExtra(EXTRA_VIN) ?: return

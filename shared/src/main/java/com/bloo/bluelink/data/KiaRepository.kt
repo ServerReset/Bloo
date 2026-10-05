@@ -1,14 +1,9 @@
 package com.bloo.bluelink.data
 
 /**
- * [VehicleRepository] for Kia US (Kia Connect). Differences from the
- * Hyundai-shaped [BlueLinkRepository] it mirrors:
- *  - Sign-in may require a one-time code (email/SMS); see [startLogin] /
- *    [sendOtp] / [verifyOtp]. A successful login stores the session id plus an
- *    "rmtoken" bound to a stable device id, which lets us re-authenticate
- *    silently when the session expires.
- *  - Commands are keyed by a per-session "vinkey" rather than a service PIN,
- *    so vinkeys are re-fetched after every re-authentication.
+ * [VehicleRepository] for Kia US (Kia Connect). Differences from the Hyundai-shaped
+ * [BlueLinkRepository] it mirrors: - Sign-in may require a one-time code (email/SMS); see
+ * [startLogin] / [sendOtp] / [verifyOtp].
  */
 class KiaRepository(
     private val api: KiaUsaApi,
@@ -16,12 +11,7 @@ class KiaRepository(
     private val credentialStore: CredentialStore,
 ) : VehicleRepository {
 
-    /** Session-specific vinkeys + EV flags, keyed by vehicle id (our [Vehicle.vin]).
-     *  This one repository instance is cached and reused across the app's
-     *  lifetime (see AppViewModel's `repos` map), and not every
-     *  call path that reads/mutates it runs under the same lock (e.g. a
-     *  background garage load can race a user-triggered command) -- a plain
-     *  HashMap risked a ConcurrentModificationException under that race. */
+    /** Session-specific vinkeys + EV flags, keyed by vehicle id (our [Vehicle.vin]). */
     private val summaries = java.util.concurrent.ConcurrentHashMap<String, KiaVehicleSummary>()
 
     /** Device id carried between the password step and the OTP steps. */
@@ -30,12 +20,10 @@ class KiaRepository(
     // --- Sign-in (OTP) -----------------------------------------------------
 
     /**
-     * Step 1: authenticate with username/password. Returns [KiaAuth.LoggedIn]
-     * (session saved, done) or [KiaAuth.OtpRequired] (caller must pick a
-     * destination, then [sendOtp] and [verifyOtp]).
+     * Step 1: authenticate with username/password. Returns [KiaAuth.LoggedIn] (session saved, done)
+     * or [KiaAuth.OtpRequired] (caller must pick a destination, then [sendOtp] and [verifyOtp]).
      */
     suspend fun startLogin(username: String, password: String, pin: String): KiaAuth {
-        // Reuse the stored device id so a previously-issued rmtoken stays valid.
         val deviceId = store.load(Brand.KIA)?.deviceId ?: KiaUsaApi.newDeviceId()
         pendingDeviceId = deviceId
         val rmtoken = store.load(Brand.KIA)?.refreshToken
@@ -60,10 +48,9 @@ class KiaRepository(
         pendingDeviceId = null
     }
 
-    // Persists a freshly-obtained Kia session (sid + rmtoken + deviceId) as a
-    // generic SessionStore.Session tagged with Brand.KIA, so it round-trips through
-    // the same store used by every other brand; toKia() below does the reverse
-    // conversion when reading it back out.
+    // Persists a freshly-obtained Kia session (sid + rmtoken + deviceId) as a generic
+    // SessionStore.Session tagged with Brand.KIA, so it round-trips through the same store used by
+    // every other brand; toKia() below does the reverse conversion when reading it back out.
     private suspend fun save(session: KiaSession, username: String, pin: String) {
         store.save(
             SessionStore.Session.of(
@@ -77,8 +64,8 @@ class KiaRepository(
         )
     }
 
-    // Drops the in-memory vinkey cache (it's meaningless without a session) before
-    // clearing the persisted session, so a subsequent login starts with a clean slate.
+    // Drops the in-memory vinkey cache (it's meaningless without a session) before clearing the
+    // persisted session, so a subsequent login starts with a clean slate.
     override suspend fun logout() {
         summaries.clear()
         store.clear(Brand.KIA)
@@ -86,17 +73,17 @@ class KiaRepository(
 
     // --- Vehicles / status ---------------------------------------------------
 
-    // Every vehicles() call re-fetches summaries from the API (via fetchSummaries,
-    // which also repopulates the `summaries` cache) rather than reading the cache,
-    // so the returned list always reflects the account's current garage.
+    // Every vehicles() call re-fetches summaries from the API (via fetchSummaries, which also
+    // repopulates the `summaries` cache) rather than reading the cache, so the returned list always
+    // reflects the account's current garage.
     override suspend fun vehicles(): List<Vehicle> = withSession { s ->
         fetchSummaries(s).map { it.toVehicle() }
     }
 
-    // When `refresh` is requested, wakes the car with forceRefresh() first (a
-    // separate API call that tells the car to phone home with live data) and only
-    // then reads status(); without `refresh`, just reads whatever the server last
-    // cached, avoiding the extra wake call for lightweight/background polls.
+    // When `refresh` is requested, wakes the car with forceRefresh() first (a separate API call
+    // that tells the car to phone home with live data) and only then reads status(); without
+    // `refresh`, just reads whatever the server last cached, avoiding the extra wake call for
+    // lightweight/background polls.
     override suspend fun status(v: Vehicle, refresh: Boolean): VehicleStatus? = withSession { s ->
         val summary = summaryFor(s, v)
         if (refresh) api.forceRefresh(s, summary)
@@ -104,9 +91,8 @@ class KiaRepository(
     }
 
     override suspend fun location(v: Vehicle): GeoLocation? = withSession { s ->
-        // Kia has no separate location endpoint; GPS rides along with the same
-        // cmm/gvi fetch as status(), but api.location() skips the EV
-        // charge-targets round-trip that status() adds.
+        // Kia has no separate location endpoint; GPS rides along with the same cmm/gvi fetch as
+        // status(), but api.location() skips the EV charge-targets round-trip that status() adds.
         val coord = api.location(s, summaryFor(s, v))?.coord
         val lat = coord?.lat
         val lon = coord?.lon
@@ -134,10 +120,10 @@ class KiaRepository(
 
     // --- Plumbing --------------------------------------------------------
 
-    // Maps a Kia-specific vehicle summary onto the shared cross-brand Vehicle model;
-    // `generation` is left blank since Kia's API doesn't expose a head-unit
-    // generation (see Vehicle.supportsConnectedStore in Brand.kt, which treats a
-    // blank generation for Kia as always-eligible rather than "unknown/old").
+    // Maps a Kia-specific vehicle summary onto the shared cross-brand Vehicle model; `generation`
+    // is left blank since Kia's API doesn't expose a head-unit generation (see
+    // Vehicle.supportsConnectedStore in Brand.kt, which treats a blank generation for Kia as
+    // always-eligible rather than "unknown/old").
     private fun KiaVehicleSummary.toVehicle() = Vehicle(
         vin = id,
         regId = key,
@@ -148,10 +134,10 @@ class KiaRepository(
         isEv = isEv,
     )
 
-    // Fetches the account's full vehicle-summary list from the API and replaces the
-    // entire `summaries` cache with it (clear, then repopulate keyed by vehicle id),
-    // rather than merging — so a car removed from the account also disappears from
-    // the cache instead of lingering with stale data.
+    // Fetches the account's full vehicle-summary list from the API and replaces the entire
+    // `summaries` cache with it (clear, then repopulate keyed by vehicle id), rather than merging —
+    // so a car removed from the account also disappears from the cache instead of lingering with
+    // stale data.
     private suspend fun fetchSummaries(s: KiaSession): List<KiaVehicleSummary> =
         api.vehicles(s).also { list ->
             summaries.clear()
@@ -168,9 +154,9 @@ class KiaRepository(
         KiaSession(sid = accessToken, rmtoken = refreshToken, deviceId = deviceId ?: KiaUsaApi.newDeviceId(), pin = pin)
 
     /**
-     * Runs [block] with the saved Kia session. On an expired session (401/403),
-     * re-authenticates once with the stored rmtoken — silently, no OTP — then
-     * refreshes the session-specific vinkeys and retries.
+     * Runs [block] with the saved Kia session. On an expired session (401/403), re-authenticates
+     * once with the stored rmtoken — silently, no OTP — then refreshes the session-specific vinkeys
+     * and retries.
      */
     private suspend fun <T> withSession(block: suspend (KiaSession) -> T): T {
         val stored = store.load(Brand.KIA) ?: throw BlueLinkException("Not logged in")

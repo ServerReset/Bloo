@@ -20,10 +20,9 @@ import java.util.Locale
 import java.util.UUID
 
 /**
- * A signed-in Hyundai/Genesis/Kia Canada session. [pin] is the account's
- * service PIN (needed to obtain [CanadaApi.pinAuth] before any command);
- * [deviceId] must stay stable across logins — the 90-day "remembered device"
- * (mfaYn) is bound to it, and re-sending a fresh one forces a new OTP.
+ * A signed-in Hyundai/Genesis/Kia Canada session. [pin] is the account's service PIN (needed to
+ * obtain [CanadaApi.pinAuth] before any command); [deviceId] must stay stable across logins — the
+ * 90-day "remembered device" (mfaYn) is bound to it, and re-sending a fresh one forces a new OTP.
  */
 data class CanadaSession(
     val accessToken: String,
@@ -32,11 +31,12 @@ data class CanadaSession(
     val pin: String?,
 )
 
-/** A Canada-account vehicle summary. [id] is the API's own `vehicleId`, sent
- *  back as the `vehicleId` header on every vehicle-scoped call — unlike Kia
- *  US there is no separate session-scoped "vinkey" to refresh. [year] drives
- *  which of the two temperature lookup tables [CanadaApi] hex-encodes against
- *  (see [CanadaApi.tempToHex]). */
+/**
+ * A Canada-account vehicle summary. [id] is the API's own `vehicleId`, sent back as the `vehicleId`
+ * header on every vehicle-scoped call — unlike Kia US there is no separate session-scoped "vinkey"
+ * to refresh. [year] drives which of the two temperature lookup tables [CanadaApi] hex-encodes
+ * against (see [CanadaApi.tempToHex]).
+ */
 data class CanadaVehicleSummary(
     val id: String,
     val name: String,
@@ -46,35 +46,21 @@ data class CanadaVehicleSummary(
     val isEv: Boolean,
 )
 
-/** Outcome of step 1 of Canada sign-in: a ready session (device already
- *  remembered from a prior 90-day mfaYn grant), or an MFA challenge that must
- *  be completed with [CanadaApi.sendOtp] + [CanadaApi.verifyOtpAndComplete].
- *  Canada only offers email delivery (no SMS option, unlike Kia US). */
+/**
+ * Outcome of step 1 of Canada sign-in: a ready session (device already remembered from a prior
+ * 90-day mfaYn grant), or an MFA challenge that must be completed with [CanadaApi.sendOtp] +
+ * [CanadaApi.verifyOtpAndComplete].
+ */
 sealed interface CanadaAuth {
     data class LoggedIn(val session: CanadaSession) : CanadaAuth
     data class OtpRequired(val userInfoUuid: String, val email: String?) : CanadaAuth
 }
 
 /**
- * Client for the Hyundai/Genesis/Kia Canada telematics backend — one shared
- * API shape across all three brands (same client_id/client_secret, same
- * endpoints, differing only by host), and a completely different backend
- * from both the US Hyundai/Genesis "HATA" API ([BlueLinkApi]) and Kia's
- * separate US backend ([KiaUsaApi]).
- *
- * Ported from the community hyundai_kia_connect_api project's KiaUvoApiCA
- * (github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api,
- * hyundai_kia_connect_api/KiaUvoApiCA.py) and its temperature-hex helpers in
- * utils.py (get_index_into_hex_temp/get_hex_temp_into_index). Two things
- * that project's own code leaves brand-specific and unconfirmed by this
- * port:
- *  - The EV9-specific "remoteControl"-wrapped climate body (other EVs use
- *    "hvacInfo") isn't special-cased here; all EVs use the "hvacInfo" shape.
- *  - The per-seat heat/vent command encoding (`drvSeatOptCmd` et al) is not
- *    documented anywhere in the reference project at the time of this port,
- *    so seat commands are sent as a best-effort 0(off)/1(low)/2(med)/3(high)
- *    heat-only scale and may not work correctly — leaving every seat at Off
- *    avoids the field being sent at all.
+ * Client for the Hyundai/Genesis/Kia Canada telematics backend — one shared API shape across all
+ * three brands (same client_id/client_secret, same endpoints, differing only by host), and a
+ * completely different backend from both the US Hyundai/Genesis "HATA" API ([BlueLinkApi]) and
+ * Kia's separate US backend ([KiaUsaApi]).
  */
 class CanadaApi(private val brand: Brand) {
     init {
@@ -97,13 +83,13 @@ class CanadaApi(private val brand: Brand) {
         /** A fresh, stable device id (persist it; the 90-day mfaYn grant is bound to it). */
         fun newDeviceId(): String = UUID.randomUUID().toString().uppercase(Locale.US)
 
-        // The one shared OkHttp/Json stack -- see [ApiHttp]. This class is
-        // constructed per call on hot command paths, so a per-call client would
-        // cost a fresh TCP + TLS handshake every time.
+        // The one shared OkHttp/Json stack -- see [ApiHttp]. This class is constructed per call on
+        // hot command paths, so a per-call client would cost a fresh TCP + TLS handshake every
+        // time.
 
-        // Celsius half-degree lookup tables the hex-encoded setpoint indexes
-        // into — pre-2020 model-year vehicles report a narrower range. Mirrors
-        // KiaUvoApiCA's temperature_range_c_old/temperature_range_c_new exactly.
+        // Celsius half-degree lookup tables the hex-encoded setpoint indexes into — pre-2020
+        // model-year vehicles report a narrower range. Mirrors KiaUvoApiCA's
+        // temperature_range_c_old/temperature_range_c_new exactly.
         internal val TEMP_RANGE_OLD: List<Double> = (32..63).map { it * 0.5 }
         internal val TEMP_RANGE_NEW: List<Double> = (28..63).map { it * 0.5 }
         internal const val TEMP_RANGE_MODEL_YEAR = 2020
@@ -146,8 +132,10 @@ class CanadaApi(private val brand: Brand) {
 
     // --- Auth ----------------------------------------------------------------
 
-    /** Step 1: username/password. Returns a session directly if this device is
-     *  still within its 90-day mfaYn grant, otherwise an MFA challenge. */
+    /**
+     * Step 1: username/password. Returns a session directly if this device is still within its
+     * 90-day mfaYn grant, otherwise an MFA challenge.
+     */
     suspend fun authUser(username: String, password: String, deviceId: String, pin: String?): CanadaAuth =
         withContext(Dispatchers.IO) {
             val body = buildJsonObject { put("loginId", username); put("password", password) }
@@ -230,22 +218,9 @@ class CanadaApi(private val brand: Brand) {
                 model = listOfNotNull(o["modelYear"]?.str(), o["modelName"]?.str()).joinToString(" ").ifBlank { "Car" },
                 vin = o["vin"]?.str() ?: id,
                 year = o["modelYear"]?.str()?.toIntOrNull(),
-                // fuelKindCode's exact enumeration still isn't documented in the reference
-                // project. 4 matches the "pure EV" code Kia US's own fuelType field uses
+                // fuelKindCode's exact enumeration still isn't documented in the reference project.
+                // 4 matches the "pure EV" code Kia US's own fuelType field uses
                 // (KiaUsaApi.toVehicle), which is where that guess came from.
-                //
-                // Now accepts a LETTER code too, because the numeric-only test had a silent,
-                // total failure mode: if Canada reports this field as a string -- and Hyundai's
-                // own US endpoint does exactly that for the same question
-                // (`isEv = evStatus.equals("E", ignoreCase = true)` in BlueLinkApi) -- then
-                // `.int()` returns null (it is `intOrNull`), the comparison is false, and EVERY
-                // Canadian car including a pure EV parses as a petrol car. That hides the whole
-                // charging half of the app for those users, with no error anywhere.
-                //
-                // Deliberately ADDITIVE rather than a swap: I could not verify Canada's actual
-                // field type, and replacing one unverified guess with another would just move
-                // the failure. A numeric 4 still matches; a JSON number also stringifies to "4",
-                // which no letter code equals, so the two tests cannot collide.
                 isEv = o["fuelKindCode"].let { fk ->
                     fk?.int() == 4 || fk?.str()?.trim()?.uppercase() in setOf("E", "EV")
                 },
@@ -253,10 +228,10 @@ class CanadaApi(private val brand: Brand) {
         }
     }
 
-    /** Get the PIN-derived auth token every command (lock/unlock/climate/charge/
-     *  location) needs, by re-verifying the account's service PIN against this
-     *  specific vehicle. Not cached here -- callers (CanadaRepository) cache it
-     *  per vehicle and re-fetch on a 401. */
+    /**
+     * Get the PIN-derived auth token every command (lock/unlock/climate/charge/ location) needs, by
+     * re-verifying the account's service PIN against this specific vehicle.
+     */
     suspend fun pinAuth(session: CanadaSession, vehicleId: String, pin: String): String = withContext(Dispatchers.IO) {
         val body = buildJsonObject { put("pin", pin) }.toString().toRequestBody(jsonMedia)
         val req = Request.Builder().url(apiUrl + "vrfypin").post(body).vehicleHeaders(session, vehicleId).build()
@@ -276,8 +251,10 @@ class CanadaApi(private val brand: Brand) {
             parseStatus(statusObj, v.year)
         }
 
-    /** Last-known GPS fix, gated behind the account's service PIN like every
-     *  other vehicle-scoped Canada command. */
+    /**
+     * Last-known GPS fix, gated behind the account's service PIN like every other vehicle-scoped
+     * Canada command.
+     */
     suspend fun location(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String): GeoLocation? =
         withContext(Dispatchers.IO) {
             val body = buildJsonObject { put("pin", session.pin.orEmpty()) }.toString().toRequestBody(jsonMedia)
@@ -322,10 +299,11 @@ class CanadaApi(private val brand: Brand) {
         Unit
     }
 
-    /** Shared shape for the no-extra-body PIN-gated commands (lock/unlock/
-     *  stop-climate/start-stop-charge): every one of these still needs the
-     *  account's PIN in the body per the reference project, just with no
-     *  other fields alongside it. */
+    /**
+     * Shared shape for the no-extra-body PIN-gated commands (lock/unlock/
+     * stop-climate/start-stop-charge): every one of these still needs the account's PIN in the body
+     * per the reference project, just with no other fields alongside it.
+     */
     internal suspend fun pinCommand(path: String, session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
         withContext(Dispatchers.IO) {
             val body = buildJsonObject { put("pin", session.pin.orEmpty()) }.toString().toRequestBody(jsonMedia)
@@ -336,10 +314,14 @@ class CanadaApi(private val brand: Brand) {
 
     // --- Plumbing ----------------------------------------------------------
 
-    /** Runs [request] and returns the parsed JSON body. Throws on non-2xx and
-     *  on an expired session (surfaced as 401 so the repository re-authenticates). */
-    /** The retrying entry point: a GET whose body can't be framed is retried once on a fresh
-     *  connection (see [ResponseFraming]); POSTs are never retried here. */
+    /**
+     * Runs [request] and returns the parsed JSON body. Throws on non-2xx and on an expired session
+     * (surfaced as 401 so the repository re-authenticates).
+     */
+    /**
+     * The retrying entry point: a GET whose body can't be framed is retried once on a fresh
+     * connection (see [ResponseFraming]); POSTs are never retried here.
+     */
     internal fun call(request: Request): JsonElement =
         ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it) }
 
@@ -352,26 +334,21 @@ class CanadaApi(private val brand: Brand) {
             throw BlueLinkException(msg, code = resp.code)
         }
         val root = if (text.isBlank()) JsonObject(emptyMap()) else parseJson(text, resp.code)
-        // A successful HTTP status can still carry an in-band error. The CA (tods)
-        // backend nests the status under `responseHeader.responseCode` (0 = success,
-        // 1 = error) with details in a top-level `error` object — NOT the Kia-US
-        // shape (`status.statusCode`/top-level `responseCode`) this used to read,
-        // which doesn't exist in the CA envelope, so every in-band error slipped
-        // through as success (expired sessions never re-authed, real errors lost).
-        // Verified against the KiaUvoApiCA reference this client is ported from.
+        // A successful HTTP status can still carry an in-band error. Verified against the
+        // KiaUvoApiCA reference this client is ported from.
         val respCode = root.path("responseHeader", "responseCode").int()
         if (respCode != null && respCode != 0) {
             val errCode = root.path("error", "errorCode").str()
-            // 7110 = "device not remembered, OTP required" — NOT a failure: authUser
-            // relies on call() returning normally here so it can fall through to the
-            // MFA flow. Throwing on it would break Canadian sign-in entirely.
+            // 7110 = "device not remembered, OTP required" — NOT a failure: authUser relies on
+            // call() returning normally here so it can fall through to the MFA flow. Throwing on it
+            // would break Canadian sign-in entirely.
             if (errCode == "7110") return@use root
             val msg = root.path("error", "errorDesc").str()
                 ?: root.path("error", "errorMessage").str()
                 ?: "Canada request failed (${errCode ?: respCode})"
-            // These codes mean the session/token is dead (locked, expired, wrong
-            // creds, OTP failed, token deleted, IP-bound token rejected). Surface
-            // as 401 so CanadaRepository.withSession remaps + withCommandAuth retries.
+            // These codes mean the session/token is dead (locked, expired, wrong creds, OTP failed,
+            // token deleted, IP-bound token rejected). Surface as 401 so
+            // CanadaRepository.withSession remaps + withCommandAuth retries.
             val expired = errCode in setOf("7402", "7403", "7404", "7549", "7602", "7606")
             AppLog.log("ERROR ${request.method} ${request.url.encodedPath}: $msg (code $errCode)")
             throw BlueLinkException(msg, code = if (expired) 401 else resp.code)
@@ -383,8 +360,6 @@ class CanadaApi(private val brand: Brand) {
 
     internal fun friendly(code: Int, body: String): String {
         val msg = runCatching {
-            // CA envelope puts the human message at error.errorDesc; keep the old
-            // key paths as harmless fallbacks for any endpoint that differs.
             json.parseToJsonElement(body).obj()?.let {
                 it.path("error", "errorDesc") ?: it["responseDesc"] ?: it.path("status", "errorMessage")
             }?.str()

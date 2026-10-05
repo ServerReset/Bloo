@@ -27,12 +27,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
- * The watch's PIN entry. A 3x4 keypad, sized for a round watch face. On a correct PIN
- * [onUnlocked] fires; the caller owns the session state and the policy (see [WatchPinStore]
- * and the shared `WatchPinPolicy`).
- *
- * Deliberately simple and dependency-free (no text field, no keyboard): a watch PIN is digits
- * only, and a keypad is the one input that works reliably on a ~1-inch round screen.
+ * The watch's PIN entry. A 3x4 keypad, sized for a round watch face. On a correct PIN [onUnlocked]
+ * fires; the caller owns the session state and the policy (see [WatchPinStore] and the shared
+ * `WatchPinPolicy`).
  */
 @Composable
 fun WearPinScreen(

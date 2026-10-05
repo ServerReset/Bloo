@@ -32,14 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.MorphButtonCore
 
-/**
- * One watch "pebble": a small round-friendly card with a title row (icon + title) and a body.
- *
- * Sized and padded for a watch bezel: generous internal padding and a squircle radius, and the
- * whole thing is meant to sit centred in the round face rather than edge-to-edge (Wear's
- * `ScalingLazyColumn` does that centring for the item under the crown). Kept local to :wear --
- * the phone's PebbleShell lives in :app and pulls in the whole app theme.
- */
+/** One watch "pebble": a small round-friendly card with a title row (icon + title) and a body. */
 @Composable
 fun WearPebble(
     title: String,
@@ -72,8 +65,10 @@ fun WearPebble(
     }
 }
 
-/** The small tinted circle a pebble's leading glyph sits in -- the phone's own card-header
- *  language (a tonal icon badge) at watch scale, so a pebble reads the same on both surfaces. */
+/**
+ * The small tinted circle a pebble's leading glyph sits in -- the phone's own card-header language
+ * (a tonal icon badge) at watch scale, so a pebble reads the same on both surfaces.
+ */
 @Composable
 private fun IconBadge(icon: ImageVector, tint: Color = MaterialTheme.colorScheme.primary) {
     Surface(shape = CircleShape, color = tint.copy(alpha = 0.18f), modifier = Modifier.size(28.dp)) {
@@ -82,10 +77,8 @@ private fun IconBadge(icon: ImageVector, tint: Color = MaterialTheme.colorScheme
 }
 
 /**
- * A single action inside a [WearPebble] -- the shared phone [MorphButtonCore], so the watch's
- * tap target morphs and presses exactly like every other Bloo button. The foundation core takes
- * its colours as parameters (it cannot reach Material's LocalContentColor), so the watch theme
- * supplies them here.
+ * A single action inside a [WearPebble] -- the shared phone [MorphButtonCore], so the watch's tap
+ * target morphs and presses exactly like every other Bloo button.
  */
 @Composable
 fun WearActionRow(
@@ -148,11 +141,7 @@ fun WearCenteredText(
     )
 }
 
-/**
- * The car's at-a-glance state, used as the page's hero value. With a [progress] (0..1) the value
- * sits inside a ring that follows the round bezel's curve -- the charge level read at a glance --
- * and without one it is just the value over its caption.
- */
+/** The car's at-a-glance state, used as the page's hero value. */
 @Composable
 fun WearHero(
     value: String,
@@ -162,8 +151,8 @@ fun WearHero(
 ) {
     val text: @Composable () -> Unit = {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // The standard rolling value, entered through :uicommon's AnimatedValue
-            // so the watch's hero (battery %, lock state) rolls like the phone's.
+            // The standard rolling value, entered through :uicommon's AnimatedValue so the watch's
+            // hero (battery %, lock state) rolls like the phone's.
             com.bloo.uicommon.AnimatedValue(
                 value = value,
                 style = MaterialTheme.typography.displaySmall.merge(
@@ -219,7 +208,8 @@ data class WearQuickAction(
 
 /**
  * The car's everyday actions as a grid of big tap targets, two to a row so each stays thumb-sized
- * on a small round face, all the shared [MorphButtonCore] so they press like every other Bloo button.
+ * on a small round face, all the shared [MorphButtonCore] so they press like every other Bloo
+ * button.
  */
 @Composable
 fun WearQuickActions(actions: List<WearQuickAction>, modifier: Modifier = Modifier) {

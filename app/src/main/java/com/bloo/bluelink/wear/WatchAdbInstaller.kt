@@ -19,12 +19,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Installs the watch app from the phone without Google Play, over the watch's own Wireless
- * debugging. The watch app is not published anywhere, and Wear OS will not accept an APK from a
- * phone any other way on first install, so the phone acts as a one-shot ADB client: pair with the
- * code the watch shows, connect, stream the APK into `cmd package install`, launch it.
- *
- * The key pair is made fresh for each setup and never stored -- it is only ever trusted by the
- * watch that was just paired, and is gone when this object is.
+ * debugging.
  */
 internal class WatchAdbInstaller : AbsAdbConnectionManager() {
     private val privateKey: PrivateKey
@@ -47,10 +42,9 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
             .getCertificate(builder.build(JcaContentSignerBuilder("SHA256withRSA").build(pair.private)))
         // The daemon being talked to is the watch's (Wear OS 3 = API 30 and up), not this phone's.
         setApi(Build.VERSION_CODES.R)
-        // 60s, not 20: this timeout covers the socket read while STREAMING the APK into
-        // `cmd package install`, and a multi-MB watch APK over Wi-Fi can easily exceed 20s on
-        // a modest network -- the install then aborted mid-stream and looked like the watch
-        // "refusing" it. Pairing and connecting are both well under this.
+        // 60s, not 20: this timeout covers the socket read while STREAMING the APK into `cmd
+        // package install`, and a multi-MB watch APK over Wi-Fi can easily exceed 20s on a modest
+        // network -- the install then aborted mid-stream and looked like the watch "refusing" it.
         setTimeout(60, TimeUnit.SECONDS)
     }
 
@@ -58,19 +52,15 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
     override fun getCertificate(): Certificate = certificate
     override fun getDeviceName(): String = "Bloo"
 
-    /** Pair with the watch using the address, port and six-digit code on its "Pair new device" screen. */
+    /**
+     * Pair with the watch using the address, port and six-digit code on its "Pair new device"
+     * screen.
+     */
     suspend fun pairWith(host: String, port: Int, code: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching { check(pair(host.trim(), port, code.trim())) { "The watch refused the code" } }
     }
 
-    /**
-     * Connect to the watch's main Wireless debugging address, after [pairWith].
-     *
-     * Retries a few times with a short delay: right after pairing, the watch often needs a
-     * beat before its CONNECT port accepts a session, and a single immediate attempt failed
-     * with a generic socket error. Kept short (3 tries over ~3s) so a genuinely wrong port
-     * still reports quickly.
-     */
+    /** Connect to the watch's main Wireless debugging address, after [pairWith]. */
     suspend fun connectTo(host: String, port: Int): Result<Unit> = withContext(Dispatchers.IO) {
         var last: Throwable? = null
         repeat(3) { attempt ->
@@ -92,8 +82,8 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
 
     suspend fun download(url: String): Result<ByteArray> = withContext(Dispatchers.IO) {
         runCatching {
-            // The app's one shared OkHttp stack (ApiHttp), not a throwaway client per call --
-            // same connection pooling and timeouts every other network call uses.
+            // The app's one shared OkHttp stack (ApiHttp), not a throwaway client per call -- same
+            // connection pooling and timeouts every other network call uses.
             com.bloo.bluelink.data.ApiHttp.client.newCall(Request.Builder().url(url).get().build())
                 .execute().use { resp ->
                     check(resp.isSuccessful) { "Download failed (HTTP ${resp.code})" }

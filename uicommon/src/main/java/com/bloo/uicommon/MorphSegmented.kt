@@ -64,9 +64,9 @@ import kotlin.math.abs
 data class SegmentOption(val key: String, val label: String, val icon: ImageVector? = null)
 
 /**
- * Each segment's share of the track at highlight position [pos] (fractional while travelling): 1, plus
- * up to ([ratio] - 1) where the highlight sits, fading linearly to the neighbour as it moves, scaled
- * by [shown] (0 = nothing selected, all equal). The weights always hand off continuously.
+ * Each segment's share of the track at highlight position [pos] (fractional while travelling): 1,
+ * plus up to ([ratio] - 1) where the highlight sits, fading linearly to the neighbour as it moves,
+ * scaled by [shown] (0 = nothing selected, all equal).
  */
 fun segmentWeights(n: Int, pos: Float, shown: Float, ratio: Float): FloatArray = FloatArray(n) { i ->
     1f + (ratio - 1f) * shown * (1f - abs(pos - i)).coerceAtLeast(0f)
@@ -74,9 +74,7 @@ fun segmentWeights(n: Int, pos: Float, shown: Float, ratio: Float): FloatArray =
 
 /**
  * Pixel widths for the segments: [free] split by [weights], except no segment goes below its
- * [naturals] (the width its label needs), so a squashed neighbour never truncates its text. Segments
- * that would fall short are pinned at their natural width and the rest share what is left by weight.
- * When even the naturals don't fit, they are scaled down evenly.
+ * [naturals] (the width its label needs), so a squashed neighbour never truncates its text.
  */
 fun fitSegmentWidths(free: Float, weights: FloatArray, naturals: FloatArray): FloatArray {
     val n = weights.size
@@ -111,17 +109,7 @@ private fun stretchRatio(n: Int): Float = when {
 /**
  * Bloo's full-width segmented selector: a pick-one control where the chosen segment STRETCHES and
  * the rest SQUASH to make room, all riding one bouncy spring, so the choice reads as the control
- * physically leaning toward what you picked. The chosen segment carries the [indicatorColor] fill
- * and a slightly heavier label; the squashed ones shrink their label a touch.
- *
- * Tap a segment to jump there, or drag across the track: the stretch follows your finger, a tick
- * lands each time it crosses into a new segment, and letting go commits the one you are over.
- *
- * Every colour, type style and haptic is passed in, so this module stays neutral to the theme.
- *
- * @param onTick Called when the selection changes (and on each segment a drag crosses).
- * @param indicatorVisible When false no segment reads as selected (unless being dragged). Used to
- *   split ONE choice across two stacked rows, only one of which holds the selection.
+ * physically leaning toward what you picked.
  */
 @Composable
 fun MorphSegmented(
@@ -163,9 +151,8 @@ fun MorphSegmented(
     }
     val visualIndex = dragIndex ?: pendingIndex ?: if (indicatorVisible) selectedIndex else -1
 
-    // ONE spring drives everything: the highlight's position along the track (0..n-1, fractional while
-    // it travels). The segment widths and the highlight are both derived from it every frame, so the
-    // highlight is literally the stretched segment sliding to its neighbour, never two things animating.
+    // ONE spring drives everything: the highlight's position along the track (0..n-1, fractional
+    // while it travels).
     val ratio = stretchRatio(n)
     val pos = remember(n) { Animatable(selectedIndex.toFloat()) }
     val shown = remember(n) { Animatable(if (visualIndex >= 0) 1f else 0f) }
@@ -181,17 +168,16 @@ fun MorphSegmented(
     // (NaN = no drag) and [lag] is how far it still trails the finger after the initial resistance.
     var dragFrac by remember { mutableFloatStateOf(Float.NaN) }
     val lag = remember { Animatable(0f) }
-    // Equal widths while dragging, so the highlight is the same size under the finger all the way along;
-    // the stretch springs back in on release.
+    // Equal widths while dragging, so the highlight is the same size under the finger all the way
+    // along; the stretch springs back in on release.
     val stretch = remember { Animatable(1f) }
-    // The elastic budget at the first/last option, in option units: same fraction of the range
-    // the slider uses (see [EdgeOverscrollFraction]), so pulling past the end of either control
-    // stretches by the same proportion. Zero on a single-option track (nothing to overscroll to).
+    // The elastic budget at the first/last option, in option units: same fraction of the range the
+    // slider uses (see [EdgeOverscrollFraction]), so pulling past the end of either control
+    // stretches by the same proportion.
     val edgeOver = if (n > 1) (n - 1) * EdgeOverscrollFraction else 0f
     // Physics-driven edge bounce, not a hard clamp: past the first/last option the highlight keeps
     // moving under the finger but works for it (the shared asymptotic rubber band), and letting go
-    // hands it to the settle spring below, which carries it back with a little overshoot. This is
-    // the same "hit the edge" feel the slider's own ends have.
+    // hands it to the settle spring below, which carries it back with a little overshoot.
     fun posNow(): Float {
         val raw = if (dragFrac.isNaN()) pos.value else (dragFrac - lag.value)
         return when {
@@ -210,7 +196,6 @@ fun MorphSegmented(
         val gapPx = with(androidx.compose.ui.platform.LocalDensity.current) { gap.toPx() }
         // The segment widths of the last layout, written by the track and read by touch handling.
         val widths = remember(n) { FloatArray(n) }
-        /** Which segment sits under x right now, using the live (mid-spring) widths of the last layout. */
         fun indexAt(x: Float): Int {
             var left = 0f
             for (i in 0 until n) {
@@ -242,8 +227,8 @@ fun MorphSegmented(
                         var startFrac = 0f
                         var last = -1
                         val stepPx = widths.sum() / n + gapPx
-                        // The first few dp of a drag are held back (it resists), then it lets go and
-                        // catches up to the finger.
+                        // The first few dp of a drag are held back (it resists), then it lets go
+                        // and catches up to the finger.
                         val resistPx = 18.dp.toPx()
                         try {
                             while (true) {
@@ -305,8 +290,8 @@ fun MorphSegmented(
                             val land = Math.round(from).coerceIn(0, n - 1)
                             dragIndex = null
                             if (claimed) {
-                                // Hand the highlight back to its own spring from exactly where the finger left
-                                // it, and let it snap to the option it is over.
+                                // Hand the highlight back to its own spring from exactly where the
+                                // finger left it, and let it snap to the option it is over.
                                 scope.launch {
                                     pos.snapTo(from)
                                     dragFrac = Float.NaN
@@ -413,8 +398,9 @@ private fun SegmentTrack(
                 val f = p - i
                 val l = lefts[i] + (lefts[j] - lefts[i]) * f
                 val r = rights[i] + (rights[j] - rights[i]) * f
-                // A pane of tinted glass rather than a flat chip: the theme colour at ~three quarters so the
-                // track shows through, a bright sheen across the top, and a light-catching rim.
+                // A pane of tinted glass rather than a flat chip: the theme colour at ~three
+                // quarters so the track shows through, a bright sheen across the top, and a
+                // light-catching rim.
                 val topLeft = Offset(l, 0f)
                 val sz = Size((r - l).coerceAtLeast(0f), size.height)
                 val corner = CornerRadius(12.dp.toPx())

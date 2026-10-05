@@ -14,14 +14,10 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import com.bloo.bluelink.ui.hasPermission
 
-/** A single best-effort current-location read (the phone's own last-known position), and
- *  a continuous stream of the same for surfaces that want it live. Originally added for
- *  AutoLock's geofence trigger (ported down from i5-AutoLock's `LocationHelper`); that
- *  trigger is gone, but this fine, fused location fix (via play-services-location, already
- *  a dependency for Activity Recognition) is still what backs the car map's "you are here"
- *  dot, weather's distance-to-car, and [com.bloo.bluelink.ui.AppViewModel.refreshDeviceLocation] --
- *  Bloo's own weather "My location" feature is unrelated and uses a one-shot coarse fix via
- *  the platform `LocationManager` instead. */
+/**
+ * A single best-effort current-location read (the phone's own last-known position), and a
+ * continuous stream of the same for surfaces that want it live.
+ */
 object LocationHelper {
     private fun hasPermission(context: Context): Boolean =
         context.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -41,24 +37,11 @@ object LocationHelper {
     }
 
     /**
-     * A continuous stream of fused location fixes, for surfaces that want the
-     * device's own position to track in real time while they're on screen (the
-     * car map's "you are here" dot, weather's distance-to-car) instead of only
-     * the single point-in-time reads [currentLocation] gives on refresh/open.
-     *
-     * [intervalMs] is a balance, not a hard real-time guarantee -- fused
-     * location coalesces/batches updates on its own schedule regardless of what
-     * is requested. PRIORITY_BALANCED_POWER_ACCURACY (network+GPS, city-block
-     * accuracy) rather than HIGH_ACCURACY: this drives a map dot and a "how far
-     * is the car" readout, not turn-by-turn navigation, so the battery cost of
-     * raw GPS is not worth paying here.
-     *
-     * Emits nothing (an empty flow that never completes on its own) without
-     * fine-location permission -- collectors should stop collecting when the
-     * screen that wanted this goes away, same as any other flow; there's
-     * nothing here for a caller to poll for permission having been granted
-     * mid-collection since Android doesn't restart an in-flight collector for
-     * that anyway.
+     * A continuous stream of fused location fixes, for surfaces that want the device's own position
+     * to track in real time while they're on screen (the car map's "you are here" dot, weather's
+     * distance-to-car) instead of only the single point-in-time reads [currentLocation] gives on
+     * refresh/open. [intervalMs] is a balance, not a hard real-time guarantee -- fused location
+     * coalesces/batches updates on its own schedule regardless of what is requested.
      */
     fun liveUpdates(context: Context, intervalMs: Long = 90_000L): Flow<android.location.Location> = callbackFlow {
         if (!hasPermission(context)) {

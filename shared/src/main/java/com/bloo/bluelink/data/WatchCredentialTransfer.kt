@@ -18,8 +18,8 @@ import javax.crypto.spec.PSource
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * Everything the watch needs to run the car on its own: each signed-in account's credentials (so
- * it can sign back in when a token expires) and its current session.
+ * Everything the watch needs to run the car on its own: each signed-in account's credentials (so it
+ * can sign back in when a token expires) and its current session.
  */
 @Serializable
 data class WatchCredentialBundle(
@@ -40,17 +40,7 @@ data class WatchCredentialBundle(
     )
 }
 
-/**
- * The sealed envelope that carries a [WatchCredentialBundle] from phone to watch.
- *
- * Hybrid encryption: a fresh AES-256-GCM key encrypts the bundle, and that key is wrapped with
- * RSA-OAEP to a public key whose private half lives in the WATCH's Android Keystore and never
- * leaves it. So the secret is readable only on that one watch, however the bytes travel. The
- * wrapping key's hash is bound in as authenticated data, so an envelope cannot be replayed
- * against a different key.
- *
- * Layout: version(1) | wrappedKeyLength(2) | wrappedKey | iv(12) | ciphertext+tag.
- */
+/** The sealed envelope that carries a [WatchCredentialBundle] from phone to watch. */
 object WatchCredentialTransfer {
     private const val VERSION: Byte = 1
     private const val IV_BYTES = 12
@@ -93,7 +83,10 @@ object WatchCredentialTransfer {
             .put(VERSION).putShort(wrapped.size.toShort()).put(wrapped).put(iv).put(body).array()
     }
 
-    /** Open an envelope with the watch's private key; null if it is not a valid envelope for that key. */
+    /**
+     * Open an envelope with the watch's private key; null if it is not a valid envelope for that
+     * key.
+     */
     fun open(privateKey: PrivateKey, publicKeyBytes: ByteArray, envelope: ByteArray): WatchCredentialBundle? =
         runCatching {
             val buf = ByteBuffer.wrap(envelope)

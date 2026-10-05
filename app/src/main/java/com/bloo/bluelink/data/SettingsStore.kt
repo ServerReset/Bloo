@@ -22,24 +22,13 @@ import kotlinx.serialization.json.Json
 import androidx.core.graphics.scale
 
 /**
- * App appearance preferences, kept separate from the session so sign-out keeps them.
- *
- * A thin typed wrapper over one Jetpack DataStore<Preferences> ([Context.settingsDataStore]), a flat
- * key-value bag. Getters read the current value or a hardcoded default when the key was never set;
- * setters write through [editTracked], which also records which keys changed so Drive sync (see
- * [performMainToMainSync]) knows which values are "dirty" (changed locally, not yet uploaded).
- *
- * Only primitives are stored, so anything structured (climate presets, custom palettes, the full
- * backup) is JSON-encoded into one string under one key. Per-car keys interpolate the VIN into the
- * key name ("plate_$vin"), since the namespace is flat.
+ * App appearance preferences, kept separate from the session so sign-out keeps them. A thin typed
+ * wrapper over one Jetpack DataStore<Preferences> ([Context.settingsDataStore]), a flat key-value
+ * bag.
  */
 class SettingsStore(internal val context: Context) {
 
-    /** All strongly-typed, non-interpolated preference keys used directly by
-     *  name below. Per-car keys are instead built ad hoc with string
-     *  interpolation (see e.g. [seatConfig]) since Preferences DataStore has
-     *  no notion of a keyed sub-namespace — this object only holds the ones
-     *  that are the same for the whole app. */
+    /** All strongly-typed, non-interpolated preference keys used directly by name below. */
     internal object Keys {
         val THEME = stringPreferencesKey("theme_mode")
         val FONT = stringPreferencesKey("font_choice")
@@ -61,14 +50,9 @@ class SettingsStore(internal val context: Context) {
         val HAPTICS = stringPreferencesKey("haptics_enabled")
         val PEBBLE_OUTLINE = stringPreferencesKey("pebble_outline")
         val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey("seamless_install_shizuku")
-        // Fractions (0f..1f) of the search bubble's own drag range, not raw dp -- the
-        // display doesn't change size between sessions, but a fraction
-        // still degrades gracefully if it ever did, where a raw dp coordinate could
-        // clamp to a corner it wasn't actually dropped near. Kept OUT of the Appearance
-        // bundle deliberately: that flow is collected by most of the app's UI (theme,
-        // colors, ...), so writing to it on every drag delta -- which this needs to
-        // survive a killed process, not just a rotation -- would recompose far more
-        // than a floating circle's own position ever should.
+        // Fractions (0f..1f) of the search bubble's own drag range, not raw dp -- the display
+        // doesn't change size between sessions, but a fraction still degrades gracefully if it ever
+        // did, where a raw dp coordinate could clamp to a corner it wasn't actually dropped near.
         val SEARCH_BUBBLE_X = stringPreferencesKey("search_bubble_x")
         val SEARCH_BUBBLE_Y = stringPreferencesKey("search_bubble_y")
         val AURORA = stringPreferencesKey("aurora_background")
@@ -83,16 +67,14 @@ class SettingsStore(internal val context: Context) {
         const val DEFAULT_CLIMATE_PRESET_PREFIX = "default_climate_preset_"
     }
 
-    /** @Immutable for the same reason as UiState: this is threaded through
-     *  every screen, and while Compose infers it unstable (it holds Maps and
-     *  Lists) nothing taking it can ever skip. All fields are vals and every
-     *  collection in one is built fresh by the store, never edited in place. */
     @Immutable
     data class Appearance(
         val themeMode: ThemeMode = ThemeMode.SYSTEM,
         val fontChoice: FontChoice = FontChoice.SYSTEM,
         val dynamicColor: Boolean = true,
-        /** Which built-in palette to use when dynamic colour is off and no custom palette is active. */
+        /**
+         * Which built-in palette to use when dynamic colour is off and no custom palette is active.
+         */
         val colorPalette: ColorPalette = ColorPalette.BLUE,
         /** User-saved custom colour palettes. */
         val customPalettes: List<CustomPaletteData> = emptyList(),
@@ -102,17 +84,17 @@ class SettingsStore(internal val context: Context) {
         val weatherLat: Double? = null,
         val weatherLon: Double? = null,
         val weatherLabel: String? = null,
-        /** True when the weather location was last set via [setWeatherFromDeviceLocation]
-         *  (the "use device location" mode) rather than a typed place. Lets a refresh
-         *  re-sync it to wherever the device is NOW instead of it staying a one-time
-         *  snapshot from whenever that mode was turned on -- reported directly as the
-         *  location "not updating in settings when the app is refreshed if it's set to
-         *  location mode". False whenever a place is set explicitly, or the location is
-         *  cleared -- see [setWeatherLocation]. */
+        /**
+         * False whenever a place is set explicitly, or the location is cleared -- see
+         * [setWeatherLocation].
+         */
         val weatherFollowsDevice: Boolean = false,
         /** True for °F, false for °C. Derived from [unitSystem], unless [tempUnit] overrides it. */
         val useFahrenheit: Boolean = true,
-        /** True for km (and km/h), false for miles. Derived from [unitSystem], unless [distanceUnit] overrides it. */
+        /**
+         * True for km (and km/h), false for miles. Derived from [unitSystem], unless [distanceUnit]
+         * overrides it.
+         */
         val metricDistance: Boolean = false,
         /** "auto" (follow [unitSystem]), "f" or "c". */
         val tempUnit: String = "auto",
@@ -127,12 +109,16 @@ class SettingsStore(internal val context: Context) {
         val uiScale: Float = 1f,
         /** Colour vibrancy multiplier (0.5–1.6, 1 = default). */
         val vibrancy: Float = 1f,
-        /** How transparent the backing of floating glass is: 0 = solid, 1 = none (one of
-         *  [com.bloo.bluelink.ui.GlassStops]). Defaults to "Clear" (0.90) -- the second
-         *  clearest stop, so the glass reads as glass out of the box. Was "Misted" (0.70). */
+        /**
+         * How transparent the backing of floating glass is: 0 = solid, 1 = none (one of
+         * [com.bloo.bluelink.ui.GlassStops]). Defaults to "Clear" (0.90) -- the second clearest
+         * stop, so the glass reads as glass out of the box.
+         */
         val glassClarity: Float = 0.95f,
-        /** Ultra glass: glass on EVERY surface, not just the floating chrome -- cards and
-         *  panels included. See GlassChrome.glassCardFill. */
+        /**
+         * Ultra glass: glass on EVERY surface, not just the floating chrome -- cards and panels
+         * included. See GlassChrome.glassCardFill.
+         */
         val ultraGlass: Boolean = false,
         /** Show an aurora gradient as the app background instead of solid surface. */
         val auroraBackground: Boolean = false,
@@ -142,28 +128,26 @@ class SettingsStore(internal val context: Context) {
         val unitSystem: String = "imperial",
         /** Haptic feedback across the UI. */
         val hapticsEnabled: Boolean = true,
-        /** Hairline rim on pebbles/hero card. Off by default -- most of the app's
-         *  "floating chrome" (buttons, dialogs, the search bar) always has one,
-         *  but pebbles are the majority of on-screen surface area, and a rim on
-         *  every single one read as busier than most people want as the default. */
+        /** Hairline rim on pebbles/hero card. */
         val pebbleOutline: Boolean = false,
-        /** When on, this device installs downloaded updates silently via Shizuku
-         *  (local ADB) instead of the tap-through system installer. Off by default;
-         *  device-local capability (Shizuku may not be present on other devices), so
-         *  it never roams via Drive sync (see SyncMerge.DEVICE_LOCAL_KEYS). */
+        /**
+         * Off by default; device-local capability (Shizuku may not be present on other devices), so
+         * it never roams via Drive sync (see SyncMerge.DEVICE_LOCAL_KEYS).
+         */
         val seamlessInstallShizuku: Boolean = false,
-        /** Opt-in "liquid glass" appearance. Off by default = current look; when
-         *  on, floating chrome and cards use real backdrop refraction (API 31+)
-         *  or an enhanced-frosted fallback below that. */
+        /**
+         * Opt-in "liquid glass" appearance. Off by default = current look; when on, floating chrome
+         * and cards use real backdrop refraction (API 31+) or an enhanced-frosted fallback below
+         * that.
+         */
     )
 
-    // A reactive view of every appearance preference: re-emits a freshly decoded Appearance snapshot
-    // on any DataStore change (here, or via Drive sync). Each field falls back to its default when the
-    // key is absent or fails to parse, because this flow is collected at launch and must never crash.
+    // A reactive view of every appearance preference: re-emits a freshly decoded Appearance
+    // snapshot on any DataStore change (here, or via Drive sync).
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
         Appearance(
-            // "AMOLED"/"SYSTEM_AMOLED" are legacy values remapped to the nearest modern mode, so
-            // an install that had AMOLED selected keeps a dark theme instead of reverting to System.
+            // "AMOLED"/"SYSTEM_AMOLED" are legacy values remapped to the nearest modern mode, so an
+            // install that had AMOLED selected keeps a dark theme instead of reverting to System.
             themeMode = when (val raw = prefs[Keys.THEME]) {
                 "AMOLED" -> ThemeMode.DARK
                 "SYSTEM_AMOLED" -> ThemeMode.SYSTEM
@@ -187,9 +171,9 @@ class SettingsStore(internal val context: Context) {
             lockTiming = prefs[Keys.LOCK_TIMING]?.let { runCatching { LockTiming.valueOf(it) }.getOrNull() }
                 ?: LockTiming.IMMEDIATE,
             columnsFlipped = prefs[Keys.FLIPPED]?.toBooleanStrictOrNull() ?: false,
-            // Clamp on read: a corrupt/hand-edited/foreign backup with e.g.
-            // ui_scale="10" would otherwise scale the whole UI 10x and lock the
-            // user out of Settings, so a bad stored value can never take effect.
+            // Clamp on read: a corrupt/hand-edited/foreign backup with e.g. ui_scale="10" would
+            // otherwise scale the whole UI 10x and lock the user out of Settings, so a bad stored
+            // value can never take effect.
             uiScale = (prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f).coerceIn(0.85f, 1.3f),
             vibrancy = (prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f).coerceIn(0.5f, 1.6f),
             glassClarity = (prefs[Keys.GLASS_CLARITY]?.toFloatOrNull() ?: 0.95f).coerceIn(0f, 1f),
@@ -198,10 +182,8 @@ class SettingsStore(internal val context: Context) {
             auroraBackground = prefs[Keys.AURORA]?.toBooleanStrictOrNull() ?: false,
             auroraMotion = prefs[Keys.AURORA_MOTION] ?: "static",
             unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",
-            // Shared rule -- see FormatUtils.useFahrenheit for why this stopped being
-            // written out separately per surface.
-            // The per-measurement overrides only apply in Advanced mode, where they can be set;
-            // in Simple mode the one Units choice is global.
+            // Shared rule -- see FormatUtils.useFahrenheit for why this stopped being written out
+            // separately per surface.
             useFahrenheit = resolveFahrenheit(prefs[Keys.UNIT_SYSTEM], prefs[Keys.TEMP_UNIT].takeIf { prefs[Keys.SETTINGS_MODE] == "advanced" }),
             metricDistance = resolveMetricDistance(prefs[Keys.UNIT_SYSTEM], prefs[Keys.DISTANCE_UNIT].takeIf { prefs[Keys.SETTINGS_MODE] == "advanced" }),
             tempUnit = prefs[Keys.TEMP_UNIT] ?: "auto",
@@ -212,25 +194,22 @@ class SettingsStore(internal val context: Context) {
     }
         // Off the main thread. This is a ~40-field decode including two JSON parses (custom
         // palettes and per-car palette ids), and DataStore only guarantees the FILE read is off
-        // main -- a map{} transform runs in the collector's context. Three separate collectors
-        // subscribe to this on cold start, so it ran three times on the main thread while the
-        // first frame was trying to draw.
+        // main -- a map{} transform runs in the collector's context.
         .flowOn(Dispatchers.Default)
 
-    // Simple appearance setters: each writes one Keys.* string through editTracked() (persist + mark
-    // dirty for Drive sync). Booleans are stored as "true"/"false" strings (typed keys of different
-    // kinds with one name are different keys); the read side parses with toBooleanStrictOrNull().
+    // Simple appearance setters: each writes one Keys.* string through editTracked() (persist +
+    // mark dirty for Drive sync).
 
     // --- Notifications --------------------------------------------------
 
-    /** App-wide (not per-car) notification toggles and thresholds. [service]
-     *  gates the persistent foreground-service notification; [doorOpen],
-     *  [running] and [unlocked] gate the "door left open" / "engine left
-     *  running" / "left unlocked" alerts, each firing once the condition has
-     *  held continuously for its paired *Minutes threshold (see
-     *  [doorOpenSince]/[engineOnSince]/[unlockedSince] below, which track how
-     *  long the condition has been true per car). */
-    /** @Immutable -- same terms as [Appearance]. */
+    /**
+     * App-wide (not per-car) notification toggles and thresholds. [service] gates the persistent
+     * foreground-service notification; [doorOpen], [running] and [unlocked] gate the "door left
+     * open" / "engine left running" / "left unlocked" alerts, each firing once the condition has
+     * held continuously for its paired *Minutes threshold (see
+     * [doorOpenSince]/[engineOnSince]/[unlockedSince] below, which track how long the condition has
+     * been true per car).
+     */
     @Immutable
     data class NotificationPrefs(
         val service: Boolean = true,
@@ -240,12 +219,15 @@ class SettingsStore(internal val context: Context) {
         val runningMinutes: Int = 10,
         val unlocked: Boolean = true,
         val unlockedMinutes: Int = 10,
-        /** The Live Update charging notification -- see
-         *  [com.bloo.bluelink.data.LiveCharge]'s class doc for what that
-         *  means precisely and how to verify it's actually working. */
+        /**
+         * The Live Update charging notification -- see [com.bloo.bluelink.data.LiveCharge]'s class
+         * doc for what that means precisely and how to verify it's actually working.
+         */
         val charging: Boolean = true,
-        /** The "Locked" / "Would have locked" notification AutoLock posts when it acts. The lock
-         *  FAILED notification is deliberately not governed by this: it is always worth seeing. */
+        /**
+         * The "Locked" / "Would have locked" notification AutoLock posts when it acts. The lock
+         * FAILED notification is deliberately not governed by this: it is always worth seeing.
+         */
         val autoLockAlerts: Boolean = true,
         /** Notification when the car's engine is started. */
         val carStarted: Boolean = true,
@@ -255,8 +237,10 @@ class SettingsStore(internal val context: Context) {
         val watchLowBattery: Boolean = true,
     )
 
-    /** Reactive equivalent of [notificationPrefs] for UI that needs to update
-     *  live when the user changes a toggle in Settings while the screen is open. */
+    /**
+     * Reactive equivalent of [notificationPrefs] for UI that needs to update live when the user
+     * changes a toggle in Settings while the screen is open.
+     */
     val notifications: Flow<NotificationPrefs> = context.settingsDataStore.data.map { p ->
         decodeNotificationPrefs(p)
     }
@@ -296,29 +280,32 @@ class SettingsStore(internal val context: Context) {
 
     /** Outcome of one [performMainToMainSync] pass. */
     data class MainToMainSyncOutcome(
-        /** False when sync isn't configured, or was skipped (Wi-Fi-only, not on Wi-Fi). */
         val ran: Boolean,
-        /** True if a newer remote file was found and imported into this device. */
         val imported: Boolean,
-        /** True if this device's settings were successfully uploaded. */
         val uploaded: Boolean,
         /** The timestamp this pass recorded as the last-sync time (unchanged if !ran). */
         val syncedAtMs: Long,
-        /** A user-facing reason the pass didn't fully succeed, or null if it did
-         *  (or wasn't configured — that's not a failure). */
+        /**
+         * A user-facing reason the pass didn't fully succeed, or null if it did (or wasn't
+         * configured — that's not a failure).
+         */
         val error: String? = null,
         /** The merged device registry after this pass (for the ViewModel/Settings). */
         val devices: List<SyncMerge.SyncDevice> = emptyList(),
         /** The primary device id recorded in the file, or null if none. */
         val primaryDeviceId: String? = null,
-        /** This device's own sync id (so the UI can mark "this device" / hide "make
-         *  primary" on self without a second read). */
+        /**
+         * This device's own sync id (so the UI can mark "this device" / hide "make primary" on self
+         * without a second read).
+         */
         val selfDeviceId: String? = null,
     )
 
-    /** Result of [testSyncRoundTrip]: [ok] plus a human-readable [message]
-     *  describing exactly which step passed or failed, for a Settings "Test
-     *  sync" diagnostic the user can run on a real device. */
+    /**
+     * Result of [testSyncRoundTrip]: [ok] plus a human-readable [message] describing exactly which
+     * step passed or failed, for a Settings "Test sync" diagnostic the user can run on a real
+     * device.
+     */
     data class SyncTestResult(val ok: Boolean, val message: String)
 
     // --- Dual-column "hot spot" (pebbles pinned under the car-info column) -----
@@ -346,37 +333,21 @@ class SettingsStore(internal val context: Context) {
 
     internal val backupJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
-    /** The settings-backup format version. The format is a flat key-value bag,
-     *  so an older client reading a newer backup is normally fine (unrecognized
-     *  keys are simply ignored — ignoreUnknownKeys); bump this only if a future
-     *  change stops being purely additive (a renamed/restructured key an older
-     *  client would misinterpret rather than just skip), so old clients can
-     *  detect and refuse it instead of silently importing something wrong.
-     *  Single source of truth lives in [SyncMerge] (the pure, testable core);
-     *  this alias keeps the many in-class references reading by simple name. */
+    /** The settings-backup format version. */
     internal val BACKUP_VERSION = SyncMerge.BACKUP_VERSION
 
-    /** Preference keys that describe THIS device's own Drive-sync wiring (a
-     *  content:// URI this app instance was granted permission for, local
-     *  bookkeeping of when it last synced, its own Wi-Fi-only preference, and
-     *  which keys it's changed locally since its last sync) — never portable, so
-     *  never included in or restored from a settings backup. A tablet that's
-     *  Wi-Fi-only and a phone with unlimited data may reasonably want different
-     *  choices here, same as the Drive URI itself. Defined in [SyncMerge] so the
-     *  pure export/merge core and this Context-bound store can't drift apart. */
+    /**
+     * A tablet that's Wi-Fi-only and a phone with unlimited data may reasonably want different
+     * choices here, same as the Drive URI itself.
+     */
     internal val DEVICE_LOCAL_KEYS = SyncMerge.DEVICE_LOCAL_KEYS
 
     /**
-     * Wraps a settings mutation to record which preference keys it actually
-     * changed into the "dirty" set — the keys this device has touched locally
-     * since its own last successful Drive sync. [performMainToMainSync] protects
-     * these from being overwritten by an incoming remote file, so a local edit
-     * that hasn't been uploaded yet is never silently lost (field-level merge
+     * Wraps a settings mutation to record which preference keys it actually changed into the
+     * "dirty" set — the keys this device has touched locally since its own last successful Drive
+     * sync. [performMainToMainSync] protects these from being overwritten by an incoming remote
+     * file, so a local edit that hasn't been uploaded yet is never silently lost (field-level merge
      * instead of one whole-file last-write-wins).
-     *
-     * NOT used by [mergeSettingsJson] — accepting a value FROM the remote file
-     * must not re-mark that same key as a pending local change, or it would
-     * never propagate back out to a third device.
      */
     internal suspend fun editTracked(mutate: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.settingsDataStore.edit { prefs ->
@@ -385,19 +356,17 @@ class SettingsStore(internal val context: Context) {
             val after = prefs.asMap()
             val touched = mutableSetOf<String>()
             after.forEach { (k, v) -> if (before[k] != v) touched += k.name }
-            // Build the after-key-name set ONCE (was rebuilt via after.keys.map{}
-            // inside this loop → O(n²) + n list allocations on every settings write,
-            // which now fires the auto-push path). Value-identical.
+            // Value-identical.
             val afterNames = HashSet<String>(after.size)
             after.keys.forEach { afterNames += it.name }
             before.keys.forEach { k -> if (k.name !in afterNames) touched += k.name }
-            // Strip BOTH the exact device-local keys AND the per-VIN device-local
-            // prefixes (see SyncMerge.DEVICE_LOCAL_PREFIXES for the list -- naming them
-            // here just meant this comment fell behind it), matching what
-            // the export/hash already exclude via isDeviceLocal — otherwise those
-            // transient runtime stamps land in the dirty set and every alert/tile tick
-            // fires a redundant full Drive round-trip (the hash is unchanged, so no data
-            // corrupts, but it's needless background I/O the prefix design meant to stop).
+            // Strip BOTH the exact device-local keys AND the per-VIN device-local prefixes (see
+            // SyncMerge.DEVICE_LOCAL_PREFIXES for the list -- naming them here just meant this
+            // comment fell behind it), matching what the export/hash already exclude via
+            // isDeviceLocal — otherwise those transient runtime stamps land in the dirty set and
+            // every alert/tile tick fires a redundant full Drive round-trip (the hash is unchanged,
+            // so no data corrupts, but it's needless background I/O the prefix design meant to
+            // stop).
             touched.removeAll { com.bloo.bluelink.data.SyncMerge.isDeviceLocal(it) }
             if (touched.isNotEmpty()) {
                 val dirtyKey = stringPreferencesKey("sync_dirty_keys")
@@ -407,61 +376,37 @@ class SettingsStore(internal val context: Context) {
         }
     }
 
-    /** Decode the CSV-encoded "sync_dirty_keys" pref into a Set, dropping blanks
-     *  (an unset/empty value → empty set). Shared by every site that reads the
-     *  dirty set — the tracked-edit writer, [dirtyKeys], [clearDirtyKeys], and the
-     *  live-dirty re-read in [mergeSettingsJson] — so they can't split it
-     *  inconsistently. */
+    /**
+     * Decode the CSV-encoded "sync_dirty_keys" pref into a Set, dropping blanks (an unset/empty
+     * value → empty set).
+     */
     internal fun Preferences.dirtyKeySet(): Set<String> =
         this[stringPreferencesKey("sync_dirty_keys")]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
     internal suspend fun dirtyKeys(): Set<String> =
         context.settingsDataStore.data.first().dirtyKeySet()
 
-    /** Reactive view of the dirty set — emits whenever a tracked setting changes
-     *  (every [editTracked] that touches a portable key appends to it). The
-     *  ViewModel observes this to auto-push to Drive shortly after ANY change
-     *  (setting toggle, pebble/section reorder, per-car config…), so sync feels
-     *  automatic instead of only firing on a refresh or the periodic worker.
-     *  Emits the empty set once the last upload clears it.
-     *
-     *  Deduplicated HERE, on the key set *and a biometric of those keys' current values*,
-     *  rather than by a plain `distinctUntilChanged()` at the collector. That is the whole
-     *  point: the dirty set is a lossy projection of "something changed", so editing the
-     *  same key twice leaves it byte-identical. A collector deduplicating on the set alone
-     *  therefore saw no second change -- which is fine while the first push is still pending
-     *  (it uploads current values anyway), but not when that push FAILED: the set stayed
-     *  `{k}`, the re-edit of `k` produced `{k}` again, no emission, and the change sat
-     *  unsynced until a data refresh or the 2-hour worker. The value biometric restores
-     *  the promise the first sentence above makes.
-     *
-     *  Biometriced by hash, not by retaining the values: `distinctUntilChanged` holds its
-     *  last value for comparison, and dirty values include multi-kilobyte JSON blobs
-     *  (climate presets, custom palettes). A hash collision would suppress one emission --
-     *  a delayed sync, backstopped by the periodic worker -- not a wrong one. */
+    /**
+     * Reactive view of the dirty set — emits whenever a tracked setting changes (every
+     * [editTracked] that touches a portable key appends to it).
+     */
     val dirtyKeysFlow: Flow<Set<String>> = context.settingsDataStore.data
         .map { prefs ->
             val keys = prefs.dirtyKeySet()
-            // One name -> value map, not a scan per dirty key. Tombstoned keys are absent
-            // from prefs and biometric as null, so a delete and a later restore of the
-            // same key are correctly distinct.
+            // One name -> value map, not a scan per dirty key. Tombstoned keys are absent from
+            // prefs and biometric as null, so a delete and a later restore of the same key are
+            // correctly distinct.
             val byName = prefs.asMap().entries.associate { it.key.name to it.value }
-            // NUL separator below, and written as the ESCAPE rather than the character. A pref
-            // value can hold any printable text (names, JSON blobs, file paths), so a space or
-            // comma separator would let two different key/value sets biometric alike; NUL
-            // cannot occur in one. Kotlin also accepts the raw byte, which is the trap: it
-            // compiles, and then grep classifies this whole file as binary and prints no
-            // matching lines at all. tools/check-control-chars.py now fails on it.
+            // NUL separator below, and written as the ESCAPE rather than the character.
             keys to keys.sorted().joinToString("\u0000") { "$it=${byName[it]}" }.hashCode()
         }
         .distinctUntilChanged()
         .map { it.first }
 
-    /** Clear [keys] from the dirty set via set-difference, leaving any key
-     *  marked dirty after the calling upload's body was snapshotted still
-     *  pending. Done inside a single edit{} so a concurrent [editTracked] can't
-     *  race between our read and write; if nothing dirty remains the key is
-     *  removed entirely. */
+    /**
+     * Done inside a single edit{} so a concurrent [editTracked] can't race between our read and
+     * write; if nothing dirty remains the key is removed entirely.
+     */
     internal suspend fun clearDirtyKeys(keys: Set<String>) {
         context.settingsDataStore.edit { prefs ->
             val dirtyKey = stringPreferencesKey("sync_dirty_keys")
@@ -470,11 +415,9 @@ class SettingsStore(internal val context: Context) {
         }
     }
 
-    /** How recently a file in `cars/` must have been written to be spared by
-     *  [pruneOrphanPhotos]. Only guards the crop screen's write-file-then-write-pref
-     *  window, which is sub-millisecond; ten minutes is absurdly generous on purpose,
-     *  because the cost of waiting is one stale file until the next launch and the cost
-     *  of being wrong is deleting the photo the user just chose. */
+    /**
+     * How recently a file in `cars/` must have been written to be spared by [pruneOrphanPhotos].
+     */
     internal val MIN_ORPHAN_AGE_MS = 10 * 60 * 1000L
 
     // --- Chargers ----------------------------------------------------------

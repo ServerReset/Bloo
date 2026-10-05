@@ -2,18 +2,10 @@ package com.bloo.bluelink.data
 
 import kotlinx.serialization.Serializable
 
-/** Stable command verbs understood by every command source (natural-language
- *  search, quick actions, notification action buttons, AutoLock). These are
- *  plain string constants (not a Kotlin enum) so a serialized [CarCommand]
- *  never needs matching enum ordinals/names across independently-updated call
- *  sites; an unrecognized action string is just ignored by whichever consumer
- *  receives it instead of failing to decode entirely. TOGGLE_* actions ask the
- *  receiver to flip whatever the current state is; the explicit _ON / _OFF /
- *  LOCK / UNLOCK variants force a specific state regardless of the current one.
- *
- *  Formerly named "Wear*" because this vocabulary doubled as the wire protocol
- *  to a now-removed Wear OS companion app; it is purely the phone's own
- *  internal command layer -- see [CarCommandRunner]. */
+/**
+ * Stable command verbs understood by every command source (natural-language search, quick actions,
+ * notification action buttons, AutoLock).
+ */
 object CarAction {
     const val TOGGLE_LOCK = "toggle_lock"
     const val LOCK = "lock"
@@ -25,8 +17,10 @@ object CarAction {
     const val CHARGE_ON = "charge_on"
     const val CHARGE_OFF = "charge_off"
 
-    /** Flash the hazard lights, or flash + sound the horn. Hyundai/Genesis
-     *  only (see Vehicle.supportsHornLights) -- Kia's US API has neither. */
+    /**
+     * Flash the hazard lights, or flash + sound the horn. Hyundai/Genesis only (see
+     * Vehicle.supportsHornLights) -- Kia's US API has neither.
+     */
     const val FLASH_LIGHTS = "flash_lights"
     const val HORN_AND_LIGHTS = "horn_and_lights"
 
@@ -42,9 +36,11 @@ object CarAction {
 data class CarCommand(
     val vin: String,
     val action: String,
-    /** Climate settings to use for [CarAction.CLIMATE_ON]/[CarAction.TOGGLE_CLIMATE].
-     *  Seats are [SeatLevel.apiValue] ints (0 = off) so the format stays flat.
-     *  [steeringWheelHeat] is likewise [WheelHeatLevel.apiValue]. */
+    /**
+     * Climate settings to use for [CarAction.CLIMATE_ON]/[CarAction.TOGGLE_CLIMATE]. Seats are
+     * [SeatLevel.apiValue] ints (0 = off) so the format stays flat. [steeringWheelHeat] is likewise
+     * [WheelHeatLevel.apiValue].
+     */
     val tempF: Int = DEFAULT_CLIMATE_TEMP_F,
     val durationMinutes: Int = DEFAULT_CLIMATE_DURATION_MIN,
     val defrost: Boolean = false,

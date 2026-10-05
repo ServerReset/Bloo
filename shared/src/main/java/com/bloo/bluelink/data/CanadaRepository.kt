@@ -1,16 +1,6 @@
 package com.bloo.bluelink.data
 
-/**
- * [VehicleRepository] for Hyundai/Genesis/Kia Canada. Differences from
- * [KiaRepository] it mirrors:
- *  - Sign-in always requires an email one-time code (no "just retry with the
- *    password" fast path) unless this device is still within a prior login's
- *    90-day remembered-device grant.
- *  - Every command (lock/unlock/climate/charge/location) needs a PIN-derived
- *    `pAuth` token obtained per-vehicle via [CanadaApi.pinAuth] -- cached here
- *    keyed by VIN and refreshed on a 401, the same shape [summaries] already
- *    uses for vehicle-id caching.
- */
+/** [VehicleRepository] for Hyundai/Genesis/Kia Canada. */
 class CanadaRepository(
     private val api: CanadaApi,
     private val store: SessionStore,
@@ -21,8 +11,10 @@ class CanadaRepository(
     private val summaries = java.util.concurrent.ConcurrentHashMap<String, CanadaVehicleSummary>()
     private val pAuths = java.util.concurrent.ConcurrentHashMap<String, String>()
 
-    /** Device id + pending OTP state carried between the password step and the
-     *  OTP steps (mirrors KiaRepository's pendingDeviceId). */
+    /**
+     * Device id + pending OTP state carried between the password step and the OTP steps (mirrors
+     * KiaRepository's pendingDeviceId).
+     */
     private var pendingDeviceId: String? = null
     private var pendingOtpKey: String? = null
 
@@ -132,11 +124,12 @@ class CanadaRepository(
     private fun SessionStore.Session.toCanada() =
         CanadaSession(accessToken, refreshToken, deviceId ?: CanadaApi.newDeviceId(), pin)
 
-    /** Runs [block] with a fresh PIN-derived `pAuth` for [v], fetching it via
-     *  [CanadaApi.pinAuth] if not already cached, and retrying once with a
-     *  freshly-fetched pAuth if the command itself 401s (an expired/rotated
-     *  pAuth, distinct from an expired session -- [withSession] handles that
-     *  case one layer down). */
+    /**
+     * Runs [block] with a fresh PIN-derived `pAuth` for [v], fetching it via [CanadaApi.pinAuth] if
+     * not already cached, and retrying once with a freshly-fetched pAuth if the command itself 401s
+     * (an expired/rotated pAuth, distinct from an expired session -- [withSession] handles that
+     * case one layer down).
+     */
     private suspend fun <T> withCommandAuth(
         v: Vehicle, block: suspend (CanadaSession, CanadaVehicleSummary, String) -> T,
     ): T = withSession { s ->
@@ -154,20 +147,7 @@ class CanadaRepository(
         }
     }
 
-    /**
-     * Runs [block] with the saved Canada session. The Canada backend has no
-     * lightweight refresh-token exchange (confirmed against the reference
-     * project this port is based on) -- but re-running the exact same
-     * password login this device already completed once succeeds silently,
-     * with no OTP, as long as this device's 90-day "remembered device" grant
-     * (mfaYn, see [CanadaApi]) from that original login hasn't expired yet.
-     * A real Bloo session can easily outlive one API access-token's shorter
-     * lifetime while staying well within that 90-day window, so most 401s
-     * here should be invisible to the user -- only a re-login that itself
-     * comes back demanding a fresh OTP (the device grant has genuinely
-     * lapsed) surfaces the "sign in again" error, mirroring [KiaRepository]'s
-     * own silent-reauth shape.
-     */
+    /** Runs [block] with the saved Canada session. */
     private suspend fun <T> withSession(block: suspend (CanadaSession) -> T): T {
         val stored = store.load(brand) ?: throw BlueLinkException("Not logged in")
         return try {
@@ -185,8 +165,6 @@ class CanadaRepository(
             }
             save(auth.session, creds.email, stored.pin)
             val fresh = store.load(brand) ?: throw e
-            // pAuth tokens are bound to the now-invalidated session; drop the
-            // cache so the next command re-derives them against the new one.
             pAuths.clear()
             block(fresh.toCanada())
         }

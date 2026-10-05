@@ -23,8 +23,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The watch's Tile: one car at a glance in the carousel -- name, charge, lock state -- and a tap
- * anywhere opens the app for the quick actions. It reads the same on-watch store the app mirrors,
- * so it is right with or without the phone.
+ * anywhere opens the app for the quick actions.
  */
 class BlooTileService : TileService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

@@ -8,20 +8,19 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
 
-// A corruption handler so a file damaged by an interrupted write/power loss
-// resets to empty prefs (signed out) instead of rethrowing an uncaught
-// exception out of every read — every surface (the app UI, the background
-// workers, the command runners) reads this at some point, and a crash loop is
-// worse than a forced re-login.
+// A corruption handler so a file damaged by an interrupted write/power loss resets to empty prefs
+// (signed out) instead of rethrowing an uncaught exception out of every read — every surface (the
+// app UI, the background workers, the command runners) reads this at some point, and a crash loop
+// is worse than a forced re-login.
 private val Context.dataStore by preferencesDataStore(
     name = "bloo_session",
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
 
 /**
- * Persists Blue Link sessions — one per brand, so a Hyundai and a Genesis
- * account can be signed in at the same time. The service PIN is required as a
- * header on every remote command, so it is stored locally on-device only.
+ * Persists Blue Link sessions — one per brand, so a Hyundai and a Genesis account can be signed in
+ * at the same time. The service PIN is required as a header on every remote command, so it is
+ * stored locally on-device only.
  */
 class SessionStore(private val context: Context) {
 
@@ -45,13 +44,8 @@ class SessionStore(private val context: Context) {
     ) {
         companion object {
             /**
-             * Build a [Session] from a brand API's own logged-in session.
-             *
-             * Every brand API (Blue Link, Canada, Europe, Kia US) exposes a session type
-             * carrying the same access/refresh/device fields, and each repository used to
-             * hand-build this six-field [Session] inline -- byte-identical copies, one per
-             * brand's `save(...)`. Taking those fields plus the login `username`/`pin`/`brand`
-             * here keeps the mapping in one place.
+             * Build a [Session] from a brand API's own logged-in session. Taking those fields plus
+             * the login `username`/`pin`/`brand` here keeps the mapping in one place.
              */
             fun of(
                 accessToken: String,
@@ -71,21 +65,18 @@ class SessionStore(private val context: Context) {
         }
     }
 
-    // Namespaces every stored field by brand, e.g. key(KIA, "access") -> "KIA_access",
-    // so each brand's session fields live under distinct DataStore keys in the same file.
+    // Namespaces every stored field by brand, e.g. key(KIA, "access") -> "KIA_access", so each
+    // brand's session fields live under distinct DataStore keys in the same file.
     private fun key(brand: Brand, field: String) = stringPreferencesKey("${brand.name}_$field")
-    // Comma-joined list of brand names that currently have a saved session; DataStore
-    // Preferences has no native Set<String> support here so it's hand-rolled as CSV
-    // (contrast with CredentialStore, which uses putStringSet on plain SharedPreferences).
+    // Comma-joined list of brand names that currently have a saved session; DataStore Preferences
+    // has no native Set<String> support here so it's hand-rolled as CSV (contrast with
+    // CredentialStore, which uses putStringSet on plain SharedPreferences).
     private val brandsKey = stringPreferencesKey("brands")
 
     /**
-     * Writes all of [session]'s fields under that brand's namespaced keys in one
-     * DataStore transaction. Optional fields (refreshToken, deviceId) are only written
-     * if non-null, so an update that doesn't carry a new refresh token/device id leaves
-     * the previously-stored value untouched rather than clobbering it with null. Also
-     * adds the brand to the CSV [brandsKey] set (via a Set to dedupe) so this brand
-     * shows up in [loggedInBrands].
+     * Writes all of [session]'s fields under that brand's namespaced keys in one DataStore
+     * transaction. Also adds the brand to the CSV [brandsKey] set (via a Set to dedupe) so this
+     * brand shows up in [loggedInBrands].
      */
     suspend fun save(session: Session) {
         context.dataStore.edit { p ->
@@ -109,10 +100,9 @@ class SessionStore(private val context: Context) {
     }
 
     /**
-     * Reads back one brand's session. Returns
-     * null (meaning "not logged in for this brand") if any of the three required
-     * fields — access token, username, pin — is missing, rather than returning a
-     * half-populated [Session].
+     * Reads back one brand's session. Returns null (meaning "not logged in for this brand") if any
+     * of the three required fields — access token, username, pin — is missing, rather than
+     * returning a half-populated [Session].
      */
     suspend fun load(brand: Brand): Session? {
         StartupTrace.markIfStarting("SessionStore.load(${brand.name}): begin")
@@ -131,21 +121,10 @@ class SessionStore(private val context: Context) {
         )
     }
 
-    /**
-     * Force this store's first DataStore read now -- same file-open + protobuf-parse cost as
-     * [SettingsStore.warmUp], moved onto the startup warm-up thread. [load] is the first thing
-     * the cold-start auto-login does after the cached garage, so paying the file-open here takes
-     * that disk read out of the garage path entirely.
-     */
     suspend fun warmUp() {
         runCatching { context.dataStore.data.first() }
     }
 
-    /**
-     * Parses the CSV [brandsKey] value back into [Brand] enum values, dropping (via
-     * `mapNotNull` + `runCatching`) any stored name that no longer maps to a known
-     * [Brand] constant instead of throwing.
-     */
     suspend fun loggedInBrands(): List<Brand> {
         return context.dataStore.data.first()[brandsKey]
             ?.split(",")?.mapNotNull { runCatching { Brand.valueOf(it) }.getOrNull() } ?: emptyList()
@@ -165,9 +144,8 @@ class SessionStore(private val context: Context) {
     }
 
     /**
-     * Removes every namespaced field for [brand] and drops it from the CSV
-     * [brandsKey] set; if that leaves the set empty, removes the key entirely rather
-     * than storing an empty string.
+     * Removes every namespaced field for [brand] and drops it from the CSV [brandsKey] set; if that
+     * leaves the set empty, removes the key entirely rather than storing an empty string.
      */
     suspend fun clear(brand: Brand) {
         context.dataStore.edit { p ->

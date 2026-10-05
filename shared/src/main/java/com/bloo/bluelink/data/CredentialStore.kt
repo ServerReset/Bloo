@@ -14,47 +14,27 @@ data class Credentials(
 )
 
 /**
- * Stores credentials at rest using AES-256 via Jetpack Security
- * (EncryptedSharedPreferences) — one set per brand, so multiple accounts can be
- * remembered and re-authenticated after a token expires.
+ * Stores credentials at rest using AES-256 via Jetpack Security (EncryptedSharedPreferences) — one
+ * set per brand, so multiple accounts can be remembered and re-authenticated after a token expires.
  */
 class CredentialStore(context: Context) {
 
     private val appContext: Context = context.applicationContext
 
     // ONE EncryptedSharedPreferences per process, shared by every CredentialStore instance.
-    //
-    // This used to be a plain per-instance `by lazy`. That meant BlooApplication's startup
-    // warm-up thread built its OWN instance -- a second MasterKey lookup + keyset parse --
-    // and the store the cold-start auto-login actually reads still paid the full setup on
-    // the critical path, so warming it from another thread warmed nothing that mattered.
-    // Sharing the instance is what makes the warm-up mean something.
     private val prefs: SharedPreferences get() = sharedPrefs(appContext)
 
     /**
-     * Force the lazy [prefs] (MasterKey generation/lookup + EncryptedSharedPreferences +
-     * Tink keyset parse) to initialize now, and cache the decrypted account list.
-     *
-     * Called from the startup warm-up thread in BlooApplication, which starts well over a
-     * second before the cold-start auto-login first touches credentials. That first real
-     * access otherwise pays this setup on the critical path -- directly ahead of the app-lock
-     * check and the garage load -- and it measures ~470ms on the API 34 emulator. Warming it
-     * on the background thread moves that cost off the path to the first screen. A failure
-     * here is harmless: the lazy simply retries on the next real access.
-     *
-     * It also caches the DECRYPTED account list, because EncryptedSharedPreferences re-decrypts
-     * every value on every read (there is no plaintext cache inside it): the ~500ms this warm-up
-     * spends decrypting was otherwise thrown away and loadAll() re-paid it on the garage path.
+     * Called from the startup warm-up thread in BlooApplication, which starts well over a second
+     * before the cold-start auto-login first touches credentials.
      */
     fun warmUp() {
         runCatching { cachedAccounts = loadAllUncached() }
     }
 
     /**
-     * Persists [credentials] under brand-prefixed keys (e.g. "HYUNDAI_email") so
-     * multiple brands' accounts coexist in the same prefs file. Adds the brand's name to the [KEY_BRANDS] set (used
-     * by [loadAll]/[brandSet] to know which brands have stored credentials) and writes
-     * everything in one `apply()` batch.
+     * Persists [credentials] under brand-prefixed keys (e.g. "HYUNDAI_email") so multiple brands'
+     * accounts coexist in the same prefs file.
      */
     fun save(credentials: Credentials) {
         val b = credentials.brand.name
@@ -68,12 +48,7 @@ class CredentialStore(context: Context) {
         cachedAccounts = null
     }
 
-    /**
-     * Loads the stored credentials for one [brand]. Returns null if any of the three
-     * required fields (email/password/pin) is missing, treating a partially-written
-     * or never-saved account as "not logged in" rather than returning a broken
-     * [Credentials] with blank fields.
-     */
+    /** Loads the stored credentials for one [brand]. */
     fun load(brand: Brand): Credentials? {
         val b = brand.name
         val email = prefs.getString("${b}_email", null) ?: return null
@@ -83,14 +58,8 @@ class CredentialStore(context: Context) {
     }
 
     /**
-     * Loads every brand that has an entry in [KEY_BRANDS], mapping each stored brand
-     * name back to a [Brand] enum value and then to its [Credentials] via [load].
-     * Uses `runCatching { Brand.valueOf(name) }.getOrNull()` so a stale/unknown brand
-     * name left over from a removed enum constant is silently skipped instead of
-     * throwing and losing every other account.
-     *
-     * Returns the warm-up's cached result when one exists (see [warmUp]); any write
-     * invalidates it, so this is only ever a cache hit on the read-only cold-start path.
+     * Loads every brand that has an entry in [KEY_BRANDS], mapping each stored brand name back to a
+     * [Brand] enum value and then to its [Credentials] via [load].
      */
     fun loadAll(): List<Credentials> = cachedAccounts ?: loadAllUncached().also { cachedAccounts = it }
 
@@ -128,8 +97,10 @@ class CredentialStore(context: Context) {
     /** The encoded [PinRecord] (or null when no PIN is set). */
     fun getPinRecord(): String? = prefs.getString(KEY_PIN_RECORD, null)
 
-    /** Sets (or, with null, clears) the stored PIN record. Clearing also
-     *  wipes the failure counter -- there is nothing left to protect. */
+    /**
+     * Sets (or, with null, clears) the stored PIN record. Clearing also wipes the failure counter
+     * -- there is nothing left to protect.
+     */
     fun setPinRecord(record: String?) {
         if (record == null) {
             prefs.edit()
@@ -146,12 +117,12 @@ class CredentialStore(context: Context) {
     /** Consecutive PIN failures since the last successful unlock. */
     fun getPinFailures(): Int = prefs.getInt(KEY_PIN_FAILURES, 0)
 
-    /** Whether the PIN is currently in its rejection window, and for how
-     *  long -- wall-clock epoch ms until the next attempt may proceed. */
+    /**
+     * Whether the PIN is currently in its rejection window, and for how long -- wall-clock epoch ms
+     * until the next attempt may proceed.
+     */
     fun getPinLockedUntil(): Long = prefs.getLong(KEY_PIN_LOCKED_UNTIL, 0L)
 
-    /** The same deadline on the monotonic clock -- see [PinLockout.lockedUntilElapsedMs].
-     *  0 for state written before this existed, which reads as "no anchor". */
     fun getPinLockedUntilElapsed(): Long = prefs.getLong(KEY_PIN_LOCKED_UNTIL_ELAPSED, 0L)
 
     /** Persists the whole [PinLockout] state atomically. */
@@ -169,14 +140,11 @@ class CredentialStore(context: Context) {
         cachedAccounts = null
     }
 
-    // The set of brand names that currently have credentials stored, used to drive
-    // loadAll()/save()/clear() bookkeeping. Falls back to emptySet() because
-    // getStringSet can return null if the key was never written.
     private fun brandSet(): Set<String> = prefs.getStringSet(KEY_BRANDS, emptySet()) ?: emptySet()
 
     private companion object {
-        // Prefs key holding the Set<String> of brand names ("HYUNDAI", "KIA", ...)
-        // that currently have credentials saved.
+        // Prefs key holding the Set<String> of brand names ("HYUNDAI", "KIA", ...) that currently
+        // have credentials saved.
         const val KEY_BRANDS = "brands"
         const val KEY_PIN_RECORD = "app_pin_record"
         const val KEY_PIN_FAILURES = "app_pin_failures"
@@ -186,8 +154,10 @@ class CredentialStore(context: Context) {
         @Volatile
         private var cachedPrefs: SharedPreferences? = null
 
-        /** Process-wide cache of the decrypted account list, populated by [warmUp] and
-         *  invalidated by every write, so the read-only cold-start load is a plain cache hit. */
+        /**
+         * Process-wide cache of the decrypted account list, populated by [warmUp] and invalidated
+         * by every write, so the read-only cold-start load is a plain cache hit.
+         */
         @Volatile
         private var cachedAccounts: List<Credentials>? = null
 

@@ -52,28 +52,10 @@ import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /**
- * A small slippy map centred on the car, assembled from key-free OpenStreetMap raw
- * tiles. We compute the tiles needed to fill the box with the car at the centre,
- * draw each at its pixel offset, then drop a pin. This avoids the flaky static-map
- * render services that painted blank.
- *
- * Interactive: one- or two-finger drag pans, pinch zooms -- standard slippy-map
- * gestures, deliberately with no on-screen +/- buttons alongside them (tried once;
- * reported directly as unwanted -- pinch alone is the expected way to zoom a map,
- * and a button pair was one more thing sitting on top of the tiles). [state] is
- * pixel/tile-level view state for one CarMap instance; the default
- * `rememberCarMapState()` keeps it private to this call site, so panning one
- * Location pebble's map never affects another's, and a fresh `location` update
- * does not yank the view back to centre out from under a hand mid-pan/zoom --
- * only the ORIGIN each tile/the pin is drawn from moves with a new fix, same as
- * it always did.
- *
- * Also shows a second, smaller marker for the DEVICE's own last-known position
- * ([deviceLocation], owned by [UiState]/[AppViewModel] -- not fetched here) -- so
- * the map answers "how far away is the car from me" at a glance instead of only
- * ever showing where the car is with nothing to measure that against. Reported
- * directly. It is a reference point, not the map's subject: it never moves the
- * camera, which stays centred on the car exactly as before.
+ * A small slippy map centred on the car, built from key-free OpenStreetMap raw tiles.
+ * One/two-finger drag pans, pinch zooms; no on-screen +/- buttons by design.
+ * [state] is private per call site by default; a new `location` moves only the tile/pin origin, never the view.
+ * [deviceLocation] adds a secondary marker as a reference point; it never moves the camera.
  */
 @Composable
 internal fun CarMap(
@@ -81,61 +63,31 @@ internal fun CarMap(
     modifier: Modifier = Modifier,
     state: CarMapState = rememberCarMapState(),
     /**
-     * The DEVICE's own last-known position (not the car's) -- [UiState.deviceLocation],
-     * refreshed on app open/refresh and by "Locate", NOT fetched by CarMap itself. This
-     * used to be a one-shot `LocationHelper.currentLocation()` call fired the moment any
-     * CarMap composed, which meant it only ever reflected wherever the phone was the
-     * FIRST time a Location pebble happened to render, never anything more current --
-     * reported directly as wanting it to stay in step with the rest of the app's own
-     * refresh cycle instead. Null (never fetched yet, or no permission/fix) simply
-     * omits the marker.
+     * The device's own last-known position ([UiState.deviceLocation]), not fetched here.
+     * Null (no fix/permission) omits the marker.
      */
     deviceLocation: GeoLocation? = null,
 ) {
     val context = LocalContext.current
-    // Cold-start diagnostic -- see HeroVisual's matching mark for why. If the map is
-    // expanded by default, its tile fetches (real network + decode work, if slower than
-    // expected) are another candidate for the "black screen for a second or two" report.
+    // Cold-start diagnostic; see HeroVisual's matching mark.
     com.bloo.bluelink.data.StartupTrace.once("carmap-composing", "CarMap composing (first one)")
 
-    // The car's own pin uses the app's actual dynamic/custom-palette primary --
-    // not a fixed semantic role like `error` -- so a car with its own custom
-    // palette shows ITS colour on the map, the same
-    // way that colour already drives everything else on that car's screen.
-    // Reported directly as wanting map colours "pulled from the dynamic color
-    // of the app" rather than a hardcoded red.
+    // The car's pin uses the dynamic/custom-palette primary so it matches the car's screen.
     val pinColor = MaterialTheme.colorScheme.primary
-    // The device's own position gets a second, DIFFERENT dynamic role
-    // (secondary) rather than a hardcoded blue -- still theme-driven, just
-    // visually distinct from the car's own primary-coloured pin.
+    // The device marker uses the secondary role to stay distinct from the car pin.
     val deviceLocationColor = MaterialTheme.colorScheme.secondary
-    // Same fix as pebbleCardEdge/glassTint (GlassChrome.kt): resolve dark from
-    // the app's own ThemeMode override, not a raw isSystemInDarkTheme() read --
-    // otherwise a user who forced Light/Dark against a differently-set system
-    // theme got a map whose colour filter didn't match the rest of the app.
-    // The `when` block this used to spell out in place is appIsDarkTheme() now
-    // (Theme.kt), so all five sites that need this answer share one.
+    // Resolve dark from the app's ThemeMode override, not isSystemInDarkTheme().
     val isDarkMode = appIsDarkTheme()
 
-    // Adaptive map background: light map needs bright pins, dark needs adjustment
-    // The map tiles themselves provide the visual theme, so minimal background needed
+    // Tiles carry the map theme; background stays minimal.
     val mapBackground = if (isDarkMode) {
         MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
     } else {
         MaterialTheme.colorScheme.surfaceContainerLowest
     }
 
-    // Client-side dark filter over these SAME OSM tiles, not a second tile source.
-    // CARTO's Dark Matter basemap used to fill this role -- reverted after its
-    // endpoint started serving an "API KEY REQUIRED" watermark over the whole tile
-    // with no key configured, reported directly as a broken map. invert() +
-    // hue-rotate(180deg) is the standard trick several map SDKs' own "quick dark
-    // mode" use for turning a light raster map into a passable dark one without a
-    // second tile source: inverting alone flips every hue to its raw RGB complement
-    // (parks read magenta, water reads orange); the hue rotation brings each colour
-    // back close to its original hue with the lightness still inverted. See
-    // MapTiles.tileUrl's own doc for why this replaced a second tile provider
-    // entirely rather than just swapping in a different (also key-gated) one.
+    // Client-side dark filter over the same OSM tiles: invert() + hue-rotate(180deg) turns a light raster
+    // into a passable dark one (inversion alone flips hues to their RGB complement).
     val darkMapFilter = remember(isDarkMode) {
         if (!isDarkMode) return@remember null
         val invert = android.graphics.ColorMatrix(
@@ -146,10 +98,7 @@ internal fun CarMap(
                 0f, 0f, 0f, 1f, 0f,
             ),
         )
-        // The W3C hue-rotate(180deg) filter matrix, applied to the ALREADY-inverted
-        // colour rather than the original -- postConcat runs `invert` first, then
-        // this, exactly matching the CSS `filter: invert(1) hue-rotate(180deg)`
-        // order the whole trick is borrowed from.
+        // W3C hue-rotate(180deg) matrix, applied after `invert` to match CSS `invert(1) hue-rotate(180deg)`.
         val hueRotate180 = android.graphics.ColorMatrix(
             floatArrayOf(
                 -0.574f, 1.430f, 0.144f, 0f, 0f,
@@ -162,14 +111,8 @@ internal fun CarMap(
         ColorFilter.colorMatrix(ColorMatrix(invert.array))
     }
 
-    // The box's own real, measured size -- onSizeChanged, not BoxWithConstraints. Both
-    // report the same numbers, but BoxWithConstraints is a SubcomposeLayout: its content
-    // composes in a SEPARATE, deferred pass, which is avoidable overhead on a composable
-    // that recomposes on every `location` update, i.e. continuously while the car/phone
-    // is moving -- the exact frequency the rest of this app's onSizeChanged conversions
-    // (PebbleShell.kt, Pebbles.kt) were made for. Zero-sized for the one frame before the
-    // real size lands is safe here (unlike a width CAP elsewhere in the app, a wrong-low
-    // default just means one frame with no tiles drawn yet, not a false layout decision).
+    // Measured with onSizeChanged, not BoxWithConstraints (a SubcomposeLayout defers composition,
+    // costly while `location` updates continuously). Zero for the first frame just draws no tiles.
     var boxSizePx by remember { mutableStateOf(IntSize.Zero) }
     Box(
         modifier
@@ -177,9 +120,8 @@ internal fun CarMap(
             .onSizeChanged { boxSizePx = it }
             .pointerInput(state) {
                 detectTransformGestures { _, gesturePan, gestureZoom, _ ->
-                    // The tiles sit in a layer scaled by state.scale (0.5..2 inside one zoom
-                    // level), so a drag of d px moves them d * scale on screen. Dividing by the
-                    // scale first makes the map track the finger 1:1 at every zoom.
+                    // Tiles sit in a layer scaled by state.scale (0.5..2), so a drag of d px moves them d * scale;
+                    // divide by scale to track the finger 1:1.
                     val s = state.scale
                     state.pan(gesturePan.x / s, gesturePan.y / s)
                     state.pinch(gestureZoom)
@@ -196,12 +138,8 @@ internal fun CarMap(
         val yTileF = MapTiles.tileY(location.latitude, zoom)
         val tileDp = with(density) { tilePx.toDp() }
 
-        // Brings the device's own location into view (zooming out, never in) the
-        // first time both fixes are known and the map is still at rest -- see
-        // CarMapState.fitBothLocations's own doc for why: at the default
-        // street-level zoom the device sits, more often than not, many SCREENS of
-        // pixels outside the box, not just near an edge, so the blue dot below
-        // was reported as simply never appearing "alongside" the car at all.
+        // Zooms out (never in) to bring the device into view the first time both fixes are known and the
+        // map is at rest; see CarMapState.fitBothLocations.
         LaunchedEffect(location.latitude, location.longitude, deviceLocation?.latitude, deviceLocation?.longitude, wPx, hPx) {
             val dev = deviceLocation
             if (dev != null) {
@@ -209,27 +147,9 @@ internal fun CarMap(
             }
         }
 
-        // Which tiles are actually needed -- recomputed only when this genuinely
-        // changes (a new zoom level, a resize, or the pan/scale crossing into a
-        // different integer tile range), NOT on every single pixel of a live pan
-        // or pinch. Reading state.panX/panY/scale directly as plain vals here
-        // (the previous shape of this code) subscribed this whole composable --
-        // and the per-tile AsyncImage/Modifier chain it drives, one full rebuild
-        // PER VISIBLE TILE -- to recompose on every one of those pixels, reported
-        // directly as poor map performance while panning. derivedStateOf reads
-        // them the same way but only actually invalidates readers when the
-        // DERIVED tile range changes, which for a drag is roughly once per whole
-        // 256px tile crossed rather than every frame.
-        //
-        // fetchScaleCoverage over-fetches by 1/scale so this range still covers
-        // the box even while a live pinch has shrunk the tile grid below scale 1
-        // (see CarMapState.pinch's own clamp/doc): without it, the fetched range
-        // matched the box's own unscaled size exactly, so the moment a pinch-out
-        // shrank the content below that, blank/tile-less margins appeared around
-        // the edges -- worst, and permanently, once pinched past CarMapMinZoom,
-        // where scale can never recover via a further zoom-level snap. Reported
-        // directly: "if you zoom out all the way, you don't see stuff anymore,
-        // it cuts off the edges."
+        // Needed tile range, derived so a live pan/pinch only recomposes when it crosses a tile boundary.
+        // fetchScaleCoverage over-fetches by 1/scale so a pinched-out grid (even past CarMapMinZoom)
+        // never shows blank margins.
         val range by remember(zoom, xTileF, yTileF, wPx, hPx) {
             derivedStateOf {
                 val fetchScaleCoverage = 1f / state.scale.coerceAtLeast(0.5f)
@@ -246,32 +166,9 @@ internal fun CarMap(
             }
         }
 
-        // Warms Coil's cache for the NEXT whole zoom level in either direction, once
-        // this one has been settled on for a moment -- reported directly as pinching
-        // in/out being "pretty slow" because it "has to refresh all the tiles".
-        // Crossing an octave boundary (see CarMapState.pinch) always needs genuinely
-        // different tiles; the tiles AREN'T cached yet is the actual latency, not
-        // anything about how they're requested.
-        //
-        // Two things this got wrong the first time, both reported directly as making
-        // rapid pinching feel SLOWER than before this existed at all:
-        //  1. loader.enqueue() starts its network fetch immediately and doesn't tie
-        //     its own lifecycle to the calling coroutine -- cancelling this
-        //     LaunchedEffect (which a fast zoom change does constantly, since it's
-        //     keyed on `zoom`) stopped the FOR LOOP from enqueueing further tiles,
-        //     but every request already handed to Coil kept running regardless.
-        //     Someone "poking in or out really quickly" crosses several octaves in
-        //     under a second, and each one fired off a fresh batch that never
-        //     actually got cancelled -- competing with the VISIBLE tiles' own
-        //     requests for the same small pool of OkHttp connections. `delay(300)`
-        //     up front fixes this the same way any other debounce does: a rapid
-        //     sequence of zoom changes just keeps restarting this delay, and only
-        //     the level the gesture actually settles on ever reaches the code below.
-        //  2. Even the delayed batch could still outlive its own usefulness if the
-        //     user moves on before it finishes -- now explicitly disposed in a
-        //     `finally` the moment a newer zoom supersedes it, so a superseded
-        //     prefetch stops actively competing for bandwidth instead of finishing
-        //     as though it still mattered.
+        // Warms Coil's cache for the next zoom level in each direction once zoom settles.
+        // delay(300) debounces rapid zoom changes (enqueue() outlives this coroutine); the batch is
+        // disposed in `finally` once superseded so it stops competing with visible tiles.
         LaunchedEffect(zoom, xTileF, yTileF, wPx, hPx) {
             if (wPx <= 0f || hPx <= 0f) return@LaunchedEffect
             delay(300)
@@ -291,12 +188,7 @@ internal fun CarMap(
                     val lastY = floor(cy + halfTilesY).toInt().coerceAtMost(span - 1)
                     for (tx in firstX..lastX) {
                         for (ty in firstY..lastY) {
-                            // A plain enqueue() call has no suspension point of its own
-                            // for cancellation to interrupt -- without this explicit
-                            // check, a whole tight loop of them runs to completion
-                            // regardless of a newer zoom superseding this effect the
-                            // instant it starts, defeating the debounce above for
-                            // anything already past its `delay(300)`.
+                            // enqueue() has no suspension point; check cancellation explicitly so a superseded batch stops.
                             currentCoroutineContext().ensureActive()
                             val wrappedX = MapTiles.wrapX(tx, targetZoom)
                             disposables += loader.enqueue(
@@ -313,29 +205,14 @@ internal fun CarMap(
             }
         }
 
-        // Everything below (tiles, pin, device dot) sits inside its own scaled layer --
-        // NOT the outer Box, which also hosts the expand button (CarMap's own doc) and
-        // must stay at 1x regardless of how far a pinch has scaled the map itself.
-        // state.scale is the CONTINUOUS part of a pinch (see its own doc): applying it
-        // here, every frame of the gesture, is what makes zooming feel fluid instead of
-        // jumping between the whole levels a fresh tile fetch actually needs.
+        // Tiles, pin and device dot sit in their own scaled layer, not the outer Box (which hosts the
+        // 1x expand button). state.scale is the continuous pinch part, applied every frame for fluid zoom.
         Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    // PAN as one layer translation, not N per-tile/per-pin offsets: every child
-                    // below is placed at its PAN-INDEPENDENT position, and pan moves the whole
-                    // layer in one shot. Before this, every visible tile AND both pins carried
-                    // their own `offset { ... state.panX ... }` lambda, so a drag re-ran a dozen
-                    // layout lambdas per frame for a single rigid translation -- the exact shape
-                    // of "laggy to scroll around". One layer transform, read in the draw phase,
-                    // is the whole cost now.
-                    // * scale, not the raw pan: the layer scales each child's position by
-                    // `scale`, so the pan (which lives in TILE space, pre-scale) has to be
-                    // brought into the same parent space to keep the 1:1 finger tracking the
-                    // gesture divides by `scale` for. Previously each tile's own offset did
-                    // this implicitly (its pan term sat INSIDE the scaled child), so the net
-                    // screen motion was scale*pan; this reproduces exactly that.
+                    // Pan is one layer translation; children are placed at pan-independent positions.
+                    // Divide by `scale` to bring tile-space pan into parent space (keeps 1:1 finger tracking).
                     translationX = state.panX * state.scale
                     translationY = state.panY * state.scale
                     scaleX = state.scale
@@ -346,47 +223,17 @@ internal fun CarMap(
             for (ty in range.firstY..range.lastY) {
                 if (ty < 0 || ty >= span) continue
                 val wrappedX = MapTiles.wrapX(tx, zoom)
-                // key(), not a bare loop body: gives each tile a stable slot
-                // keyed by its own tile coordinate, so the remember() just
-                // below is safe to use inside a plain for-loop (whose visible
-                // tile SET changes as the car/box moves) without its state
-                // silently reattaching to the wrong tile between compositions.
+                // key() gives each tile a stable slot so remember() below is safe in a loop.
                 key(wrappedX, ty) {
-                    // Remembered, not rebuilt on every recomposition of this
-                    // composable (which happens on every `location` update,
-                    // i.e. while the car/phone is moving): Coil's ImageRequest
-                    // has no equals()/hashCode() override, so a fresh .build()
-                    // every time is a reference-distinct object even when the
-                    // URL/headers are identical -- AsyncImage keys its load
-                    // launch on that identity, so an unremembered request
-                    // restarted the whole load pipeline (a blank frame while
-                    // it "reloads") for every visible tile on every location
-                    // update, even for tiles already sitting in Coil's memory
-                    // cache -- visible flicker across the whole map.
+                    // Remembered: ImageRequest has no equals(), so a fresh build() would restart AsyncImage's load
+                    // (flicker) on every location update.
                     val request = remember(wrappedX, ty, zoom) {
                         ImageRequest.Builder(context)
                             .data(MapTiles.tileUrl(zoom, wrappedX, ty))
-                            // OSM returns a "blocked" placeholder tile to clients whose
-                            // User-Agent doesn't identify the app. This one used to read
-                            // "Bloo Bluelink companion app" -- no version, no contact URL,
-                            // i.e. still shaped like the string that gets blocked, while
-                            // the widget and watch had already been fixed.
+                            // OSM blocks clients whose User-Agent does not identify the app.
                             .setHeader("User-Agent", MapTiles.userAgent("Android"))
-                            // No crossfade. Coil only skips its own crossfade animation
-                            // for an exact MEMORY cache hit -- a DISK cache hit (or a
-                            // genuinely fresh fetch) still fades in. That mattered a lot
-                            // here specifically: the pebble's compact map and the full-
-                            // screen sheet are two SEPARATE CarMap composables (see
-                            // ExpandedMapState's own doc), so expanding mounts a second,
-                            // brand-new grid of AsyncImage tiles requesting the exact
-                            // same URLs the pebble was already showing -- reported
-                            // directly as pinch-zoom and the expand/collapse transition
-                            // both feeling like the map "has to refresh" rather than
-                            // being instant/seamless. A flat, no-fade appearance means a
-                            // cache hit (memory OR disk -- the overwhelmingly common case
-                            // here) is visually indistinguishable from "was already
-                            // there", and a genuine new fetch just pops in the moment
-                            // it's ready instead of visibly announcing itself.
+                            // No crossfade: Coil skips it only for memory hits, and the pebble map and full-screen sheet are
+                            // separate CarMaps requesting the same URLs, so fading would look like a refresh.
                             .crossfade(false)
                             .build()
                     }
@@ -396,14 +243,8 @@ internal fun CarMap(
                         colorFilter = darkMapFilter,
                         modifier = Modifier
                             .size(tileDp)
-                            // Layout-phase placement, not a composition-time Dp
-                            // offset(x=,y=): reads the live pan fresh every frame
-                            // without ever recomposing this AsyncImage -- see
-                            // `range`'s own doc above for why that matters.
-                            // Pan-INDEPENDENT placement: the container's own graphicsLayer
-                            // applies panX/panY, so this only ever encodes where the tile sits
-                            // in tile space relative to the car-centred origin. No state read,
-                            // so a drag never re-runs it.
+                            // Layout-phase placement: no recomposition per pan frame.
+                            // Pan-independent placement; the container's graphicsLayer applies pan.
                             .offset {
                                 val originX = xTileF * tilePx - wPx / 2f
                                 val originY = yTileF * tilePx - hPx / 2f
@@ -416,38 +257,22 @@ internal fun CarMap(
                 }
             }
         }
-        // Screen-space (not real-world) distance between the car pin and the device
-        // dot, in tile pixels -- panX/panY cancel out of this difference (both pins
-        // ride along with pan identically), so this is purely "how far apart do
-        // they actually look right now," which is exactly what should decide
-        // whether to merge them: at a zoomed-out view a mile apart can overlap on
-        // screen, and at a close zoom a genuinely close pair can still read as
-        // two distinct pins. Recomputed from tile coordinates directly rather than
-        // real-world lat/lon distance for that reason -- it already accounts for
-        // the current zoom level the same way the pins' own on-screen positions do.
+        // On-screen distance between car pin and device dot in tile pixels (pan cancels out);
+        // decides whether to merge them, accounting for zoom.
         val devTileOffsetPx = deviceLocation?.let { dev ->
             val dx = (MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx
             val dy = (MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx
             dx to dy
         }
-        // Under this many screen px apart, the two pins would visually overlap
-        // (each pin is ~40dp/16dp wide) -- merge them into one instead of drawing
-        // two pins stacked on top of each other.
+        // Under this many px apart the pins overlap; merge them.
         val mergeThresholdPx = with(density) { 36.dp.toPx() }
-        // Non-null only when the two pins would visually collide. Carrying the
-        // offset itself (rather than a boolean plus a second null check on the
-        // same value) is what lets the merged branch destructure it directly --
-        // and it is what the compiler was already proving: "isMerged" could only
-        // be true when the offset existed, so the old `&& devTileOffsetPx != null`
-        // was dead weight.
+        // Non-null only when the pins collide; carries the offset so the merged branch can use it directly.
         val mergedOffsetPx = devTileOffsetPx?.takeIf { (dx, dy) ->
             kotlin.math.hypot(dx, dy) < mergeThresholdPx
         }
         if (mergedOffsetPx != null) {
             val (dx, dy) = mergedOffsetPx
-            // One pin at the midpoint between the two, tinted with an even mix of
-            // the car's own colour and the device's -- "a combined pin that has
-            // the mix of the two colors" rather than picking one or stacking both.
+            // One pin at the midpoint, tinted with an even mix of the car and device colours.
             Icon(
                 Icons.Filled.LocationOn,
                 contentDescription = "Car and your location",
@@ -459,33 +284,20 @@ internal fun CarMap(
                     .offset(y = (-20).dp),
             )
         } else {
-            // The pin's screen offset from the box's own centre: zero (i.e. dead-centre) at
-            // rest, and it rides along with panX/panY exactly like the tiles do -- so panning
-            // away from the car slides the pin off toward wherever the car actually is
-            // relative to the new view, instead of it staying glued to the middle of the box.
+            // Pin offset from the box centre; rides along with pan like the tiles.
             Icon(
                 Icons.Filled.LocationOn,
                 contentDescription = "Car location",
                 tint = pinColor,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    // The car is the map's pan origin, so the container's own translation
-                    // already puts it dead-centre -- no per-frame offset here any more.
+                    // The car is the pan origin, so the layer translation already centres it.
                     .size(40.dp)
                     .offset(y = (-20).dp),
             )
         }
-        // The device's own position, drawn ALWAYS when a fix exists -- deliberately OUTSIDE
-        // the merged/not-merged branch above. It used to be drawn only in the not-merged
-        // case, so whenever the phone was close enough to the car for the two to collide
-        // (i.e. standing next to it, the common case) the "you are here" dot silently
-        // vanished into the combined pin and the map looked like it had no device location
-        // at all. Reported directly: "make the user's location show on the expanded map".
-        // Offset from the box's centre the same way the tiles/pin are, but derived from ITS
-        // OWN tile coordinate rather than riding along with panX/panY: the pin's offset
-        // (panX, panY) is a shortcut that only works because the pin IS what the view is
-        // centred on. Everything else goes through the full conversion: its tile position
-        // minus the car's, in pixels, plus however far the user has panned.
+        // Device position, drawn whenever a fix exists, outside the merged branch so it never vanishes.
+        // Its offset comes from its own tile coordinate (tile delta in px plus pan), since it is not the view centre.
         devTileOffsetPx?.let { (dx, dy) ->
             Box(
                 Modifier
@@ -497,11 +309,7 @@ internal fun CarMap(
                     .background(deviceLocationColor, CircleShape),
             )
         }
-        } // close the scaled tiles/pin/dot layer
-        // No buttons drawn over the map any more -- reported directly from a
-        // screenshot as unwanted ("no buttons floating on the map, they should
-        // be underneath it as normal buttons"). Expand/Open-in-Maps now render
-        // as a real MapFeatureRow in the caller, right after this composable,
-        // the same shape the full-screen map's own bottom toolbar already uses.
+        } // close the scaled layer
+        // Expand/Open-in-Maps render as a MapFeatureRow in the caller, not over the map.
     }
 }
