@@ -51,6 +51,11 @@ fun WiggleText(
     maxLines: Int = 1,
     reduceMotion: Boolean,
 ) {
+    // BasicText has no LocalContentColor fallback, so an unspecified colour paints black: resolve it here.
+    @Suppress("NAME_SHADOWING")
+    val style = if (style.color == androidx.compose.ui.graphics.Color.Unspecified) {
+        style.copy(color = androidx.compose.material3.LocalContentColor.current)
+    } else style
     // Fires only when the trimmed text is exactly one of WIGGLE_NUMBERS, optionally
     // followed by a single trailing unit character ("67", "67°", "67F", "42mi").
     // Matching the whole string this way -- rather than filtering digits out and

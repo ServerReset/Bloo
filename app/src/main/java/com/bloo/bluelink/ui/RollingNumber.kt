@@ -26,11 +26,16 @@ internal fun RollingNumber(
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
 ) {
+    // The rolling digits are drawn by uicommon (no Text, so no LocalContentColor lookup there): an
+    // unspecified colour has to be resolved HERE or it paints black on dark surfaces.
+    val resolved = when {
+        color != Color.Unspecified -> color
+        style.color != Color.Unspecified -> style.color
+        else -> androidx.compose.material3.LocalContentColor.current
+    }
     AnimatedValue(
         value = text,
-        style = style.merge(TextStyle(fontWeight = fontWeight)).takeIf { color == Color.Unspecified } ?: style.merge(
-            TextStyle(fontWeight = fontWeight, color = color),
-        ),
+        style = style.merge(TextStyle(fontWeight = fontWeight, color = resolved)),
         maxLines = 1,
         reduceMotion = LocalReduceMotion.current,
         modifier = modifier,
