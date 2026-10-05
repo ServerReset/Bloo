@@ -1,24 +1,17 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,7 +22,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.CircleShape
-import kotlinx.coroutines.flow.first
 
 /**
  * The morph family's icon-only member: [IconButton]'s containerless chrome and 40dp target, plus
@@ -122,62 +114,11 @@ fun MorphChip(
     }
 }
 
-/**
- * Right-side expand control for pebbles with no action button: a pill that morphs to a rounded
- * square when the section is open.
- */
+/** The expand control for pebbles with no action button: the chevron on its own, a single fully round button. */
 @Composable
 internal fun MorphExpandButton(
     expanded: Boolean,
     onToggle: () -> Unit,
-    /**
-     * Reports this button's own pressed (held-down) state to the caller, live -- so the pebble card
-     * this chevron belongs to can square its own outer shape off together with the chevron's,
-     * instead of only the small chevron itself reacting to the hold. Null (the default) for every
-     * caller that doesn't care.
-     */
+    /** Reports the chevron's held-down state, so the pebble card can square its own shape with it. */
     onPressChange: ((Boolean) -> Unit)? = null,
-) {
-    val haptics = LocalHaptics.current
-    // Shared with SplitExpandButton's chevron; see [rememberChevronSpin].
-    val chevron = rememberChevronSpin(expanded, label = "morphChevron")
-    // With expansion animation.
-    val chevronSource = remember { MutableInteractionSource() }
-    if (onPressChange != null) {
-        val pressed by chevronSource.collectIsPressedAsState()
-        LaunchedEffect(pressed) { onPressChange(pressed) }
-        // Whatever was true when this leaves the composition (a collapse that unmounts this button
-        // mid-press, say) shouldn't leave the pebble permanently squared -- the effect above only
-        // reacts to CHANGES, not to being torn down.
-        DisposableEffect(Unit) { onDispose { onPressChange(false) } }
-    }
-    SafeExpansiveButton(
-        interactionSource = chevronSource,
-        enabled = true,
-    ) {
-        MorphButton(
-            onClick = { onToggle() },
-            onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
-            onLongClick = {
-                // Easter egg: hold the chevron to spin it + vibrate.
-                chevron.spin()
-                haptics?.heavy()
-            },
-            // Expanded highlight = the same active state as lock/unlock (MorphButton defaults).
-            active = expanded,
-            interactionSource = chevronSource,
-            contentPadding = PaddingValues(0.dp),
-            pillCornerPercent = 50f,
-            morphedCornerPercent = 20f,
-            minHeight = 0.dp,
-            // As SplitExpandButton's chevron: contentDescription is the next action, this is the
-            // current state. Tap toggles; holding spins the chevron without toggling.
-            // ButtonTargetHeight like everything tappable.
-            modifier = Modifier
-                .size(ButtonTargetHeight)
-                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
-        ) {
-            ExpandChevronIcon(expanded, chevron)
-        }
-    }
-}
+) = SplitExpandButton(action = null, expanded = expanded, onToggle = onToggle, onChevronPressChange = onPressChange)

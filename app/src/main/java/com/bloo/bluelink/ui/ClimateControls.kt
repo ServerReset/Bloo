@@ -16,14 +16,11 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -48,7 +45,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.lerp
@@ -61,7 +57,6 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.degValue
-import com.bloo.uicommon.splitPillShapes
 import com.bloo.uicommon.rememberConfirmArm
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -247,87 +242,49 @@ internal fun PresetPill(
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHaptics.current
-    // Delete needs a second tap to confirm (same 4s auto-reset as Sign out); a mis-aimed tap beside
-    // Apply dropped a preset irreversibly.
+    // Delete needs a second tap to confirm (auto-resets, like Sign out): a mis-aimed tap beside Apply dropped a preset
+    // for good.
     val confirm = rememberConfirmArm()
-    // Corners use CornerSize(Dp) directly, with no measured row height. Remembered because this is
-    // one item body per preset in a ReorderColumn and splitPillShapes is a pure function.
-    val leftShapeForCorner: (Float, Int) -> Shape = remember {
-        { morph, cp -> splitPillShapes(morph, cp).first }
-    }
-    val rightShapeForCorner: (Float, Int) -> Shape = remember {
-        { morph, cp -> splitPillShapes(morph, cp).second }
-    }
-
-    // The drag handle wraps the whole pill so long-press anywhere reorders.
-    ExpressiveButtonRow(
-        modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min),
-        spacing = SplitSeam,
-        verticalAlignment = Alignment.CenterVertically,
-        // One split pill, not two adjacent buttons (see `wrap`).
-        wrap = false,
-    ) {
-        // Apply half: snowflake icon plus preset name; MorphButton, primary fill when applied.
-        val applySource = remember { MutableInteractionSource() }
-        MorphButton(
-            onClick = { onStart() },
-            onClickHaptic = { haptics?.click() },
-            active = active,
-            interactionSource = applySource,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
-            shapeForCorner = leftShapeForCorner,
-            pillCornerPercent = 50f,
-            morphedCornerPercent = MorphedCornerPercent,
-            minHeight = 0.dp,
-            groupWeight = 1f,
-            modifier = Modifier.fillMaxHeight(),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-                Spacer(Modifier.width(ButtonIconGap))
-                Column {
-                    Text(
-                        name,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                    )
-                    if (detail.isNotBlank()) {
-                        Text(
-                            detail,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = mutedContentColor(),
-                            maxLines = 1,
-                        )
+    ButtonCluster(
+        listOf(
+            // Apply: snowflake plus the preset's name, primary fill when applied.
+            ClusterButton(
+                onClick = onStart,
+                onClickHaptic = { haptics?.click() },
+                active = active,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+                weight = 1f,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+                    Spacer(Modifier.width(ButtonIconGap))
+                    Column {
+                        Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        if (detail.isNotBlank()) {
+                            Text(detail, style = MaterialTheme.typography.labelSmall, color = mutedContentColor(), maxLines = 1)
+                        }
                     }
                 }
-            }
-        }
-        // Delete nub: inner (left) corners match the gap, outer (right) are pill-rounded; error
-        // colours while armed.
-        val deleteSource = remember { MutableInteractionSource() }
-        MorphButton(
-            onClick = {
-                haptics?.tick()
-                if (confirm.armed) onDelete() else confirm.arm()
             },
-            interactionSource = deleteSource,
-            containerColor = if (confirm.armed) denyTone().container else buttonContainer(),
-            contentColor = if (confirm.armed) denyTone().content else MaterialTheme.colorScheme.onSurface,
-            contentPadding = PaddingValues(horizontal = 14.dp),
-            shapeForCorner = rightShapeForCorner,
-            pillCornerPercent = 50f,
-            morphedCornerPercent = MorphedCornerPercent,
-            minHeight = 0.dp,
-            modifier = Modifier.fillMaxHeight(),
-        ) {
-            Icon(
-                AppIcons.Close,
-                contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
-                modifier = Modifier.size(15.dp),
-            )
-        }
-    }
+            // Delete: the deny red while armed.
+            ClusterButton(
+                onClick = {
+                    haptics?.tick()
+                    if (confirm.armed) onDelete() else confirm.arm()
+                },
+                containerColor = if (confirm.armed) denyTone().container else buttonContainer(),
+                contentColor = if (confirm.armed) denyTone().content else MaterialTheme.colorScheme.onSurface,
+                contentPadding = PaddingValues(horizontal = 14.dp),
+            ) {
+                Icon(
+                    AppIcons.Close,
+                    contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
+                    modifier = Modifier.size(15.dp),
+                )
+            },
+        ),
+        modifier.fillMaxWidth(),
+    )
 }
 
 // --- Charge limits --------------------------------------------------------
@@ -348,89 +305,46 @@ internal fun ChargeLimitPill(
     onApply: () -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    // Same split-pill geometry as the preset pill. Remembered because this pill recomposes on every
-    // slider-drag tick.
-    val leftShapeForCorner: (Float, Int) -> Shape = remember {
-        { morph, cp -> splitPillShapes(morph, cp).first }
-    }
-    val rightShapeForCorner: (Float, Int) -> Shape = remember {
-        { morph, cp -> splitPillShapes(morph, cp).second }
-    }
-
+    val step = { onValueChange(if (limit >= 100) 50 else limit + 10) }
     Column(Modifier.fillMaxWidth()) {
-        // Same group conversion as PresetPill.
-        ExpressiveButtonRow(
-            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-            spacing = SplitSeam,
-            wrap = false,
-        ) {
-            // Left half: label. Tapping bumps the limit one step, wrapping to 50% after 100%.
-            val incrementSource = remember { MutableInteractionSource() }
-            MorphButton(
-                onClick = { onValueChange(if (limit >= 100) 50 else limit + 10) },
-                onClickHaptic = { haptics?.tick() },
-                enabled = enabled,
-                interactionSource = incrementSource,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
-                shapeForCorner = leftShapeForCorner,
-                pillCornerPercent = 50f,
-                morphedCornerPercent = MorphedCornerPercent,
-                minHeight = 0.dp,
-                // Both the current value and what tapping actually does (bump by 10%, wrapping at
-                // 100%) were purely visual -- TalkBack announced only the label text with no
-                // indication this half was itself a stepper, distinct from "Set" on the right.
-                groupWeight = 1f,
-                modifier = Modifier.fillMaxHeight()
-                    .semantics(mergeDescendants = true) {
+        ButtonCluster(
+            listOf(
+                // The value half: tapping bumps the limit one step, wrapping to 50% after 100%.
+                ClusterButton(
+                    onClick = step,
+                    onClickHaptic = { haptics?.tick() },
+                    enabled = enabled,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+                    weight = 1f,
+                    // TalkBack hears both the value and that this half is itself a stepper, distinct from "Set".
+                    modifier = Modifier.semantics(mergeDescendants = true) {
                         contentDescription = "$label, $limit percent"
-                        onClick(label = "Increase by 10 percent") {
-                            onValueChange(if (limit >= 100) 50 else limit + 10)
-                            true
-                        }
+                        onClick(label = "Increase by 10 percent") { step(); true }
                     },
-            ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-                    Spacer(Modifier.width(ButtonIconGap))
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    RollingNumber(
-                        text = "$limit%",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
+                ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+                        Spacer(Modifier.width(ButtonIconGap))
+                        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        RollingNumber(text = "$limit%", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    }
+                },
+                // "Set": sends the command; active while it is in flight.
+                ClusterButton(
+                    onClick = onApply,
+                    onClickHaptic = { haptics?.heavy() },
+                    enabled = enabled && !pending,
+                    active = pending,
+                    contentPadding = PaddingValues(horizontal = 18.dp),
+                    // The spinner must not fade with the disabled content.
+                    disabledContentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    if (pending) LoadingIndicator(Modifier.size(18.dp))
+                    else Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
                 }
-            }
-            // Right half: "Set" nub. Inner (left) corners match the gap, outer are pill-rounded;
-            // active while the command is in flight.
-            val applySource = remember { MutableInteractionSource() }
-            MorphButton(
-                onClick = { onApply() },
-                onClickHaptic = { haptics?.heavy() },
-                enabled = enabled && !pending,
-                active = pending,
-                interactionSource = applySource,
-                contentPadding = PaddingValues(horizontal = 18.dp),
-                shapeForCorner = rightShapeForCorner,
-                pillCornerPercent = 50f,
-                morphedCornerPercent = MorphedCornerPercent,
-                minHeight = 0.dp,
-                // The pending spinner must not fade with the disabled content, so pin the full
-                // tone.
-                disabledContentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.fillMaxHeight(),
-            ) {
-                if (pending) {
-                    LoadingIndicator(Modifier.size(18.dp))
-                } else {
-                    Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
-                }
-            }
-        }
+            ),
+            Modifier.fillMaxWidth(),
+        )
         Spacer(Modifier.height(GapRow))
         AnimatedSlider(
             value = limit.toFloat(),

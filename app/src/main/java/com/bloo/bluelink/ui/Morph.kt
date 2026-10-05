@@ -51,9 +51,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.bloo.uicommon.MorphButtonCore
-import com.bloo.uicommon.connectedGroupShape
 
-/** One icon-only segment in a connected button group (see [connectedGroupShape]). */
+/** One icon-only segment in a connected button group (see [ButtonCluster]). */
 internal data class GroupIconAction(
     val icon: ImageVector,
     val contentDescription: String,

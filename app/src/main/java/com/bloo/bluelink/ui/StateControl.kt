@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,13 +40,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.connectedGroupShape
 import kotlinx.coroutines.flow.first
 
 /**
@@ -189,7 +186,6 @@ internal fun StateControl(
         val haptics = LocalHaptics.current
         // Extra icon actions plus the lock/unlock button form one connected button group (a single
         // child of the outer Row, so the outer spacing isn't piled on top).
-        val segmentCount = groupActions.size + 1
         // Bigger, thumb-friendly hit targets on the cover screen (operated by a thumb on a ~1-inch
         // square) than on the phone (mouse-precise finger taps in a full pebble). Only the cover
         // provides LocalPebbleFillHeight (see its doc in Widgets.kt), so that is the one that
@@ -209,57 +205,44 @@ internal fun StateControl(
                 }
             }
         }
-        // The lock/unlock button itself: alone it keeps the pill<->rounded-square morph; as the
-        // last segment of a connected group the group's static silhouette ([shapeForCorner]) takes
-        // over.
-        val mainButton: @Composable (((Float, Int) -> androidx.compose.ui.graphics.Shape)?) -> Unit = { shapeForCorner ->
+        val onMainClick = { if (isOn == true) onDeactivate() else onActivate() }
+        if (groupActions.isEmpty()) {
+            // Alone it keeps the standard pill <-> rounded-square morph. (A lone member in an ExpressiveButtonGroup
+            // would grow to fill the row on press, which a grid cell must not.)
             MorphButton(
-                onClick = { if (isOn == true) onDeactivate() else onActivate() },
-                onClickHaptic = { haptics?.heavy() },
+                onClick = { haptics?.heavy(); onMainClick() },
                 enabled = enabled && !pending,
                 interactionSource = mainSource,
                 active = highlighted,
                 activeContainerColor = highlightColor,
                 activeContentColor = highlightContentColor,
-                shapeForCorner = shapeForCorner,
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
                 modifier = Modifier.heightIn(min = groupBtnSize),
                 expressive = true,
-            ) {
-                lockContent()
-            }
-        }
-        if (groupActions.isEmpty()) {
-            // A lone member has no neighbour to take width from, so wrapping it in the group gave
-            // it a press fraction that was faithfully computed and just as faithfully multiplied by
-            // a reserve of zero -- not a bug in the animation itself, a design that only works with
-            // two or more real segments, silently applied to the one-segment case too.
-            mainButton(null)
+            ) { lockContent() }
         } else {
-            ExpressiveButtonRow(
-                // Caps the group's room at groupMaxWidth (see above).
-                modifier = Modifier.widthIn(max = groupMaxWidth),
-                spacing = SplitSeam,
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalAlignment = Alignment.CenterHorizontally,
-                wrap = false,
-            ) {
-                groupActions.forEachIndexed { i, action ->
-                    val actionSource = remember { MutableInteractionSource() }
-                    MorphButton(
+            ButtonCluster(
+                groupActions.map { action ->
+                    ClusterButton(
                         onClick = action.onClick,
                         enabled = action.enabled,
-                        interactionSource = actionSource,
                         contentPadding = PaddingValues(0.dp),
-                        shapeForCorner = { morph, cp -> connectedGroupShape(i, segmentCount, cp, morph) },
                         modifier = Modifier.size(groupBtnSize),
-                        expressive = true,
                     ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
-                }
-                // Pill when off, rounded rectangle + highlight when on; in a group the static
-                // connected shape takes over.
-                mainButton { morph, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp, morph) }
-            }
+                } + ClusterButton(
+                    onClick = onMainClick,
+                    onClickHaptic = { haptics?.heavy() },
+                    enabled = enabled && !pending,
+                    active = highlighted,
+                    activeContainerColor = highlightColor,
+                    activeContentColor = highlightContentColor,
+                    interactionSource = mainSource,
+                    modifier = Modifier.heightIn(min = groupBtnSize),
+                ) { lockContent() },
+                // Caps the group's room at groupMaxWidth (see above).
+                Modifier.widthIn(max = groupMaxWidth),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            )
         }
     }
 }

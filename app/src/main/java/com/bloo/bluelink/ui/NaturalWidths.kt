@@ -1,10 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.interaction.InteractionSource
-import androidx.compose.foundation.layout.Box
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -62,33 +57,6 @@ internal const val GroupWeightProportional = -1f
 /** Receiver for [ExpressiveButtonGroup]'s children. */
 @Stable
 object ExpressiveButtonGroupScope {
-    /**
-     * One button in the group. Its press grows it and squeezes its neighbours, so buttons read as
-     * pushing each other.
-     */
-    @Composable
-    fun GroupButton(
-        interactionSource: InteractionSource,
-        modifier: Modifier = Modifier,
-        enabled: Boolean = true,
-        /** See [ExpressiveGroupData.weight]. */
-        groupWeight: Float = 0f,
-        content: @Composable () -> Unit,
-    ) {
-        val press by expressivePressFraction(interactionSource, enabled)
-        Box(
-            modifier
-                // propagateMinConstraints (below) so the button itself fills the width the group
-                // hands it -- otherwise it would sit at its own natural width inside a slot growing
-                // and shrinking around it, and nothing would appear to move.
-                .then(ExpressiveGroupData({ press }, groupWeight)),
-            propagateMinConstraints = true,
-        ) {
-            // FALSE inside, as SafeExpansiveButton's group branch does: this slot already joined
-            // the group, so the MorphButton must not join a second time.
-            CompositionLocalProvider(LocalExpressiveGroup provides false) { content() }
-        }
-    }
 }
 
 /**
