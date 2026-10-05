@@ -143,7 +143,7 @@ internal fun buildSettingsSearchEntries(
         // Deferred-commit, same as the main Appearance card's slider — see there.
         UiScaleSlider(appearance, vm, label = "Scale")
     }
-    add("Glass clarity", "liquid glass transparency frosted clear refraction blur backing") {
+    add("Glass clarity", "liquid glass transparency frosted misted crystal ultra warp refraction blur backing everywhere") {
         GlassClaritySlider(appearance, vm)
     }
     add("Colour vibrancy", "color saturation vivid material you monochrome best buy tv") {
