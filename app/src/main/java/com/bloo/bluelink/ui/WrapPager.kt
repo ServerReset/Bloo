@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -9,12 +8,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
 import kotlin.math.floor
-import kotlin.math.abs
 
 // Pages are keyed by raw virtual index (see [WrapPagerState]) because real-index keying crashed
 // ("Key already used") twice.
@@ -24,8 +18,7 @@ private const val WRAP_MULTIPLIER = 80
  * range -- see [WRAP_MULTIPLIER]'s own doc.
  */
 private const val RECENTER_MARGIN_CYCLES = 10
-/** Max per-page scale shrink at full off-screen offset (floor 0.94). */
-private const val PAGER_SHRINK = 0.06f
+
 
 /** Pure wrap arithmetic: the real item index a virtual page maps to. */
 internal fun wrapRealIndex(page: Int, realCount: Int): Int =
@@ -94,15 +87,3 @@ internal fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0): WrapP
     return remember(pager, realCount) { WrapPagerState(pager, realCount) }
 }
 
-/**
- * Per-page depth transform for the horizontal car pagers: a subtle scale shrink proportional to how
- * far [page] is from the settled one, read only in the draw phase (graphicsLayer) so a drag never
- * recomposes page content.
- */
-internal fun Modifier.pagerDepth(pager: PagerState, page: Int): Modifier = graphicsLayer {
-    // Offset formula matches the Compose Pager docs' sample: (currentPage - page) + offsetFraction.
-    val off = abs((pager.currentPage - page).toFloat() + pager.currentPageOffsetFraction)
-        .coerceIn(0f, 1f)
-    scaleX = 1f - off * PAGER_SHRINK
-    scaleY = 1f - off * PAGER_SHRINK
-}

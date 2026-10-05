@@ -1,20 +1,11 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.foundation.layout.offset
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -22,14 +13,12 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 
 /**
  * Registry of where every floating element (corner buttons, search bubble, refresh indicator)
@@ -53,32 +42,6 @@ class FloatingRegistry {
     // Snapshot-backed so a dodger recomposes/redraws when a neighbour moves. Writes come from
     // onGloballyPositioned (layout phase is finished by then, so this is a safe place to write).
     private val bounds = mutableStateMapOf<FloatingId, Rect>()
-
-    /**
-     * Pull-to-refresh progress, 0..1, as a lambda so the drag is read in the layout phase
-     * ([Modifier.floatingOverlay]'s offset lambda) and never recomposes the screen per frame.
-     */
-    var chromePull: () -> Float = { 0f }
-
-    /**
-     * A refresh is in flight and the shift holds open; narrower than [chromeHidden], which is also
-     * true during the pull.
-     */
-    var chromeHolding by mutableStateOf(false)
-
-    /** Chrome should fade: true through the pull AND the refresh, unlike [chromeHolding]. */
-    var chromeHidden by mutableStateOf(false)
-
-    /**
-     * Back to rest. A screen that publishes these must call this when it leaves, or the last thing
-     * it asserted outlives it -- and "hidden, shifted down 96dp" is a state no screen should be
-     * able to leave behind for the next one.
-     */
-    fun resetChrome() {
-        chromePull = { 0f }
-        chromeHolding = false
-        chromeHidden = false
-    }
 
     /** Who last published each id, so a withdrawal can be checked against it. */
     private val owners = mutableStateMapOf<FloatingId, Any>()
@@ -107,82 +70,6 @@ class FloatingRegistry {
      * LEFT/RIGHT "beside it".
      */
     internal var searchDock by mutableStateOf<SearchDock?>(null)
-
-    /**
-     * Does anything else registered overlap [rect]? [marginPx] pads the other element so near
-     * misses count.
-     */
-    fun collidesWithOthers(
-        self: FloatingId,
-        rect: Rect?,
-        marginPx: Float,
-        /**
-         * Ids worth yielding to; null means every other floater. Name them so a new floater can't
-         * hide an existing one (e.g. a user-parked search bubble).
-         */
-        avoid: Set<FloatingId>? = null,
-    ): Boolean {
-        if (rect == null) return false
-        bounds.forEach { (id, other) ->
-            if (id == self) return@forEach
-            if (avoid != null && id !in avoid) return@forEach
-            if (overlaps(rect, other, marginPx)) return true
-        }
-        return false
-    }
-
-    internal companion object {
-        /**
-         * Delegates to uicommon's [com.bloo.uicommon.floatersOverlap] -- one pure check, kept over
-         * there because that is where the JVM tests pinning its boundary behaviour live.
-         */
-        fun overlaps(a: Rect, b: Rect, marginPx: Float): Boolean =
-            com.bloo.uicommon.floatersOverlap(a, b, marginPx)
-    }
-}
-
-/**
- * Everything a floating element needs, in one modifier: it publishes its bounds so others can avoid
- * it, rides the pull-to-refresh shift, and fades while a refresh runs. [fade] is off for chrome
- * that is *about* the refresh (the loading indicator, which must stay visible precisely when
- * everything else goes) and for persistent navigation that should not blink. [shift] is off for
- * anything anchored to the screen rather than to the page beneath it -- the Settings cog is a nav
- * target, not page chrome, so it stays put while the page slides.
- */
-fun Modifier.floatingOverlay(
-    id: FloatingId,
-    active: Boolean = true,
-    fade: Boolean = true,
-    shift: Boolean = true,
-): Modifier = composed {
-    val registry = LocalFloatingRegistry.current
-    // The HOLD is animated (a refresh starting or ending is a state change worth easing); the DRAG
-    // is not, because a pull should track the finger exactly rather than lag a spring behind it.
-    // Both are read inside the offset lambda below, so neither recomposes anything.
-    val holdState = animateFloatAsState(
-        targetValue = if (registry.chromeHolding) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
-        label = "floatingShiftHold",
-    )
-    val alphaState = animateFloatAsState(
-        targetValue = if (fade && registry.chromeHidden) 0f else 1f,
-        animationSpec = tween(MotionShort),
-        label = "floatingFade",
-    )
-    this
-        // Layout phase and draw phase respectively -- neither re-runs composition per frame, which
-        // is the whole reason these are read inside lambdas.
-        .offset {
-            if (!shift) return@offset IntOffset.Zero
-            // Whichever is further along: the finger, or the settled refresh hold.
-            val f = maxOf(registry.chromePull().coerceIn(0f, 1f), holdState.value)
-            IntOffset(0, (RefreshPullShift.toPx() * f).roundToInt())
-        }
-        .graphicsLayer { this.alpha = alphaState.value }
-        .floatingElement(id, active)
 }
 
 /** Provided once in `BlooApp` (Screens.kt); the default lets previews work without a host. */
@@ -207,34 +94,6 @@ fun Modifier.floatingElement(id: FloatingId, active: Boolean = true): Modifier =
         onDispose { }
     }
     onGloballyPositioned { if (active) registry.report(id, it.boundsInRoot(), owner) }
-}
-
-/**
- * Fades this element out while another registered floater overlaps it, and back in when clear.
- * Draw-phase only; the animation is keyed on the collision boolean, not the bounds, which would
- * restart it every frame.
- */
-fun Modifier.dodgeFloating(
-    self: FloatingId,
-    /** Which floaters to yield to; null means all. See [FloatingRegistry.collidesWithOthers]. */
-    avoid: Set<FloatingId>? = null,
-    margin: Dp = 8.dp,
-    dampingRatio: Float = 0.6f,
-    stiffness: Float = Spring.StiffnessMedium,
-): Modifier = composed {
-    val registry = LocalFloatingRegistry.current
-    val marginPx = with(LocalDensity.current) { margin.toPx() }
-    val alpha = remember { Animatable(1f) }
-    val colliding by remember(registry, self, marginPx, avoid) {
-        derivedStateOf { registry.collidesWithOthers(self, registry.boundsOf(self), marginPx, avoid) }
-    }
-    LaunchedEffect(colliding) {
-        alpha.animateTo(
-            targetValue = if (colliding) 0f else 1f,
-            animationSpec = spring(dampingRatio = dampingRatio, stiffness = stiffness),
-        )
-    }
-    graphicsLayer { this.alpha = alpha.value }
 }
 
 @Composable

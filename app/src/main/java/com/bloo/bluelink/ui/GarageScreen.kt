@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -12,9 +11,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -27,17 +24,14 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Top-level garage screen: picks between two fundamentally different layouts based on screen size
@@ -101,19 +95,6 @@ internal fun GarageScreen(
     // Drives the expanded pager's programmatic car-switch (the hero card's own swipe -- see
     // ExpandedCar's onSwipeCar).
     val garageScope = rememberCoroutineScope()
-    // Hide the floating chrome as soon as the pull begins (and through the refresh), so the
-    // squiggly indicator has the stage to itself; fade it back in when done.
-    val pulling by remember { derivedStateOf { pullFractionState.floatValue > 0.01f } }
-    // Published to the floating registry instead of animated here. The fade and the pull shift are
-    // behaviours of floating CHROME, not of the dots or the corner buttons individually -- holding
-    // them per-site is what let them disagree (dots faded but never shifted; the corner icons
-    // shifted but never faded).
-    val floatingRegistry = LocalFloatingRegistry.current
-    // Slide the floating overlays (dots, settings, back/flip) down: in real time as the user pulls,
-    // then settle/spring back up once the refresh completes. overlayShiftTarget genuinely needs the
-    // continuous fraction (the shift is proportional to how far the user has pulled, not just
-    // on/off), so this read can't be narrowed the same way -- it recomposes GarageScreen during an
-    // active pull, same as before.
     val count = vehicles.size
     // At least one non-Settings page even with zero cars: the "no connection"/ "not signed in"/"no
     // vehicles" status card (GarageStatusCard, Guard.kt) takes that one slot instead of a car, so
@@ -123,23 +104,6 @@ internal fun GarageScreen(
     val windowInfo = LocalWindowInfo.current
     val widthDp = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
     val large = widthDp >= TWO_COLUMN_MIN_DP.dp
-    val chromeHidden = refreshing || pulling
-    // SideEffect, not a bare assignment: these are snapshot writes, and writing state during
-    // composition invalidates the composition that is running. The pull is published as a LAMBDA
-    // over the State, never as a value.
-    SideEffect {
-        floatingRegistry.chromePull = { pullFractionState.floatValue }
-        // Two separate flags on purpose -- see chromeHolding's own doc. The HOLD is only while a
-        // refresh is in flight; the FADE covers the pull as well.
-        floatingRegistry.chromeHolding = refreshing
-        floatingRegistry.chromeHidden = chromeHidden
-    }
-    // Cleared when this screen goes away. The outgoing screen's own overlays are still composed
-    // during the crossfade, so they held that offset and alpha 0 all the way through the
-    // transition.
-    DisposableEffect(floatingRegistry) {
-        onDispose { floatingRegistry.resetChrome() }
-    }
     // See StatusBarScrim's doc for why plain Modifier.blur never worked here.
     val expandedMap = remember { ExpandedMapState() }
     // Mirrors expandedMap.vin into shared UiState -- see UiState.mapExpanded's own doc -- so

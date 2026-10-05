@@ -85,17 +85,6 @@ internal fun BodyMediumText(text: String, modifier: Modifier = Modifier, color: 
     )
 }
 
-/** Label text (labelSmall) -- compact labels and captions. */
-@Composable
-internal fun LabelSmallText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
-    Text(
-        text,
-        modifier = modifier,
-        style = MaterialTheme.typography.labelSmall,
-        color = color,
-    )
-}
-
 /** Label text (labelLarge) -- prominent labels and tags. */
 @Composable
 internal fun LabelLargeText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {

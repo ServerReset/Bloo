@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
@@ -252,9 +251,6 @@ fun AnimatedSlider(
             val th = trackThickness.toPx()
             val top = cy - th / 2f
             val radius = CornerRadius(th / 2f)
-            // Half-gap kept clear around the thumb.
-            val cut = halfThumb + gapPx
-
             // Inactive track: from just past the thumb's right edge (thumbX + cut) to the far right
             // end of the control. Only drawn if there's room left -- i.e. the thumb isn't already
             // sitting at (or past) the far right edge.

@@ -11,10 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.Vehicle
-
-/** How far the floating chrome slides down during a pull-to-refresh. */
-internal val RefreshPullShift = 96.dp
 
 /** Wraps content with the pull-to-refresh gesture -- no visual indicator at all, app-wide. */
 @Composable
