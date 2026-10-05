@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.draw.clipToBounds
 import dev.chrisbanes.haze.HazeState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -55,25 +57,36 @@ internal var inMultiWindowMode by mutableStateOf(false)
 
 private val StatusGlassCorner = 24.dp
 
+/** How far the status bar's glass pane reaches past the visible strip on the sides and below, out of sight. */
+private val StatusGlassOverscan = 64.dp
+
 /**
- * The status bar as a thin pane of bare liquid glass: just the strip behind the system icons, clear in the middle,
- * bending the content scrolling under it along its rounded lower edge like every other glass chip in the app.
- * [hazeState] marks the content behind it; without one (or without blur support) it is a soft tinted fade.
- * Skipped in [inMultiWindowMode].
+ * The status bar as a thin pane of bare liquid glass that bends light along its TOP edge only. The pane is drawn
+ * larger than the strip you see (past both sides and below it, clipped away), so its other edges never reach the
+ * screen: what is left is a clear strip behind the system icons whose top edge refracts the content scrolling
+ * under it. [hazeState] marks the content behind it; without one (or without blur support) it is a soft tinted
+ * fade. Skipped in [inMultiWindowMode].
  */
 @Composable
 internal fun StatusBarScrim(hazeState: HazeState? = null) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val shape = RoundedCornerShape(bottomStart = StatusGlassCorner, bottomEnd = StatusGlassCorner)
+    val shape = RoundedCornerShape(StatusGlassCorner)
     val glass = hazeState != null && canBlurBackdrops()
+    val overscan = with(androidx.compose.ui.platform.LocalDensity.current) { StatusGlassOverscan.roundToPx() }
     Box(
         Modifier
             .fillMaxWidth()
             .height(topInset)
+            .clipToBounds()
             .then(
                 if (glass) {
-                    Modifier.clip(shape).appGlassEffect(hazeState!!, shape, clear = true)
+                    Modifier.layout { measurable, constraints ->
+                        val w = constraints.maxWidth + 2 * overscan
+                        val h = constraints.maxHeight + overscan
+                        val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(w, h))
+                        layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-overscan, 0) }
+                    }.clip(shape).appGlassEffect(hazeState!!, shape, clear = true)
                 } else {
                     val tint = glassTint(false)
                     Modifier.background(Brush.verticalGradient(listOf(tint.copy(alpha = tint.alpha * 0.5f), Color.Transparent)))
