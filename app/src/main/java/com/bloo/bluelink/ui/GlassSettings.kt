@@ -14,10 +14,13 @@ import kotlin.math.roundToInt
  */
 @Composable
 internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
-    // Five fixed stops, never a free value: how TRANSPARENT the glass is.
-    var index by remember(appearance.glassClarity) { mutableFloatStateOf(nearestGlassStop(appearance.glassClarity).toFloat()) }
+    // Six fixed stops, never a free value. The last, Ultra, is crystal-clear glass on EVERY surface with
+    // the whole app warping behind it; the rest set how transparent the floating glass is.
+    var index by remember(appearance.glassClarity, appearance.ultraGlass) {
+        mutableFloatStateOf((if (appearance.ultraGlass) GlassStops.lastIndex else nearestGlassStop(appearance.glassClarity)).toFloat())
+    }
     val stop = GlassStops[index.roundToInt().coerceIn(0, GlassStops.lastIndex)]
-    StepRow("Glass", "${stop.name} · ${(stop.transparency * 100).roundToInt()}% transparent")
+    StepRow("Glass", if (stop.ultra) "Ultra · glass everywhere, everything warps" else "${stop.name} · ${(stop.transparency * 100).roundToInt()}% transparent")
     AnimatedSlider(
         value = index,
         onValueChange = { index = it },
@@ -26,22 +29,16 @@ internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppVie
         onValueSettled = {
             val i = it.roundToInt().coerceIn(0, GlassStops.lastIndex)
             index = i.toFloat()
-            vm.setGlassClaritySoon(GlassStops[i].transparency)
+            val picked = GlassStops[i]
+            vm.setGlassClaritySoon(picked.transparency)
+            vm.setUltraGlass(picked.ultra)
         },
     )
-    BodySmallText("How see-through the backing of floating glass is, from solid to nothing but the bending edge.")
-    // Ultra glass: glass on EVERY surface, not just the floating chrome -- cards and panels
-    // become the same refracting material too. Off by default because it costs a real blur per
-    // card, but it is the "make it glass everywhere" switch.
-    ToggleRow(
-        "Ultra glass",
-        appearance.ultraGlass,
-        description = "Glass on every card and panel, not just the floating chrome. Heavy on older devices.",
-    ) { vm.setUltraGlass(it) }
+    BodySmallText("How see-through floating glass is, from solid to nothing but the bending edge. Ultra puts glass on every card and warps the whole app, aurora included. Heavy on older devices.")
 }
 
 /** One fixed stop on the glass slider: its name and how transparent the backing is (0 = solid, 1 = none). */
-internal class GlassStop(val name: String, val transparency: Float)
+internal class GlassStop(val name: String, val transparency: Float, val ultra: Boolean = false)
 
 internal val GlassStops = listOf(
     GlassStop("Solid", 0f),
@@ -49,8 +46,9 @@ internal val GlassStops = listOf(
     GlassStop("Misted", 0.72f),
     GlassStop("Clear", 0.95f),
     GlassStop("Crystal", 1f),
+    GlassStop("Ultra", 1f, ultra = true),
 )
 
 /** The stop closest to a stored [transparency] (older versions stored free values). */
 internal fun nearestGlassStop(transparency: Float): Int =
-    GlassStops.indices.minByOrNull { kotlin.math.abs(GlassStops[it].transparency - transparency) } ?: 2
+    GlassStops.indices.filter { !GlassStops[it].ultra }.minByOrNull { kotlin.math.abs(GlassStops[it].transparency - transparency) } ?: 2
