@@ -121,10 +121,6 @@ fun MorphButton(
 ) {
     val haptics = LocalHaptics.current
     val clickHaptic = onClickHaptic ?: { haptics?.click() }
-    // In a connected group the group decides the silhouette (its place in the line), unless the caller drew its own.
-    val slotOf = LocalClusterSlot.current
-    val groupShape: ((Float, Int) -> Shape)? = shapeForCorner
-        ?: slotOf?.let { slot -> { morph, cornerPercent -> slot()?.let { slotShape(it, morph, cornerPercent) } ?: RoundedCornerShape(percent = cornerPercent) } }
     // The content tone content lambdas inherit, provided the way M3's Button provides it internally
     // (the shared core is foundation-only and cannot reach material3's LocalContentColor).
     val resolvedContent = if (active) activeContentColor else contentColor
@@ -202,7 +198,7 @@ fun MorphButton(
                 onLongClick = onLongClick,
                 pillCornerPercent = pillCornerPercent,
                 morphedCornerPercent = morphedCornerPercent,
-                shapeForCorner = groupShape,
+                shapeForCorner = shapeForCorner,
                 content = {
                     content()
                     if (withLayer) {

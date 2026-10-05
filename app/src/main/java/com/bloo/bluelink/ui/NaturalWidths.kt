@@ -36,21 +36,6 @@ internal class NaturalWidths {
  * Carries a child's live press fraction to the group's measure policy; a lambda so the group reads
  * it during layout without the child recomposing.
  */
-/** A member's place in a connected line: [index] of [count]. */
-internal data class ClusterSlot(val index: Int, val count: Int)
-
-/** Holds a member's [ClusterSlot]. Written by the group's layout, read when the button's shape is drawn. */
-@Stable
-internal class ClusterSlotState {
-    var slot by androidx.compose.runtime.mutableStateOf<ClusterSlot?>(null)
-}
-
-/** Whether the surrounding [ExpressiveButtonGroup] draws its members as one connected silhouette. */
-internal val LocalClusterConnected = androidx.compose.runtime.staticCompositionLocalOf { false }
-
-/** The current button's place in its connected line, or null outside one. */
-internal val LocalClusterSlot = androidx.compose.runtime.staticCompositionLocalOf<(() -> ClusterSlot?)?> { null }
-
 internal data class ExpressiveGroupData(
     val pressFraction: () -> Float,
     /**
@@ -59,8 +44,6 @@ internal data class ExpressiveGroupData(
      * measure policy, and a child of this group is not a child of a Row.
      */
     val weight: Float,
-    /** Where the group puts this member in its line, written during layout; null when the group is not connected. */
-    val slotState: ClusterSlotState? = null,
 ) : ParentDataModifier {
     override fun Density.modifyParentData(parentData: Any?): Any = this@ExpressiveGroupData
 }

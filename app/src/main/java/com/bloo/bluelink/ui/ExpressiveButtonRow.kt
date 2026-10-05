@@ -26,8 +26,6 @@ fun ExpressiveButtonRow(
     wrap: Boolean = true,
     /** See [ExpressiveButtonGroup]'s own `stretchCompact`. */
     stretchCompact: Boolean = false,
-    /** See [ExpressiveButtonGroup]'s own `connected`. */
-    connected: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     ExpressiveButtonGroup(
@@ -39,17 +37,16 @@ fun ExpressiveButtonRow(
         lineSpacing = lineSpacing,
         wrap = wrap,
         stretchCompact = stretchCompact,
-        connected = connected,
     ) {
         content()
     }
 }
 
 /**
- * The standard full-width row of action buttons under a card's or group's content, a connected [ButtonCluster]:
- * the buttons of a line share one silhouette (a lone one is fully round), and when they do not fit on one line
- * they wrap, each line its own cluster.
+ * The standard full-width row of action buttons under a card's or group's content: each button is its own fully
+ * round pill, split from its neighbours by [GapRow]; they share a line in proportion to their labels and wrap
+ * to the next when they do not fit. (Connected clusters are for pebble header controls: see [ButtonCluster].)
  */
 @Composable
 fun ActionRow(content: @Composable () -> Unit) =
-    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = SplitSeam, lineSpacing = GapRow, connected = true, content = content)
+    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow, content = content)

@@ -76,23 +76,19 @@ internal fun rememberShowMyLocation(
     }
 }
 
-/**
- * The buttons under a map: one connected [ButtonCluster] with a button per [MapFeature], sharing the row in
- * proportion to their labels (and compacting to symbols when the row is narrow).
- */
+/** The buttons under a map: one action button per [MapFeature], each its own pill, in the standard [ActionRow]. */
 @Composable
 internal fun MapFeatureRow(
     features: List<MapFeature>,
     modifier: Modifier = Modifier,
 ) {
-    ButtonCluster(
-        features.map { feature ->
-            ClusterButton(onClick = feature.onClick, enabled = feature.enabled, weight = GroupWeightProportional) {
-                MorphButtonLabel(feature.icon, feature.label, pending = false)
+    Box(modifier.padding(horizontal = 12.dp, vertical = GapRow)) {
+        ActionRow {
+            features.forEach { feature ->
+                MorphActionButton(label = feature.label, icon = feature.icon, onClick = feature.onClick, enabled = feature.enabled)
             }
-        },
-        modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = GapRow),
-    )
+        }
+    }
 }
 
 /**

@@ -43,11 +43,6 @@ fun ExpressiveButtonGroup(
      * of capping each member at its glyph width, so the row still spans its full width.
      */
     stretchCompact: Boolean = false,
-    /**
-     * Draw the members of each line as one connected silhouette: fully round at the line's ends, a soft seam
-     * between neighbours (see [ButtonCluster]). Pair with a [SplitSeam] spacing.
-     */
-    connected: Boolean = false,
     content: @Composable ExpressiveButtonGroupScope.() -> Unit,
 ) {
     // Natural (unpressed) child widths from the last resting pass. Deliberately not snapshot state:
@@ -63,7 +58,7 @@ fun ExpressiveButtonGroup(
     }
     Layout(
         content = {
-            CompositionLocalProvider(LocalExpressiveGroup provides true, LocalClusterConnected provides connected) {
+            CompositionLocalProvider(LocalExpressiveGroup provides true) {
                 ExpressiveButtonGroupScope.content()
             }
         },
@@ -159,11 +154,6 @@ fun ExpressiveButtonGroup(
                 // A lone button on its line has nobody to share with: it rests at its own width
                 // (aligned to the start) and only fills the line while pressed -- see below.
                 if (memberIdx.size == 1) weight[memberIdx[0]] = 0f
-                if (connected) {
-                    memberIdx.forEachIndexed { k, i ->
-                        (measurables[i].parentData as? ExpressiveGroupData)?.slotState?.slot = ClusterSlot(k, memberIdx.size)
-                    }
-                }
                 if (memberIdx.isEmpty()) {
                     lineWidth[li] = nonMemberWidth + gapsHere
                     lineHeight[li] = idx.maxOf { out[it]?.height ?: 0 }

@@ -123,10 +123,6 @@ internal fun connectedShape(first: Boolean, last: Boolean, outerPercent: Int, st
     return RoundedCornerShape(topStart = start, bottomStart = start, topEnd = end, bottomEnd = end)
 }
 
-/** The shape for a member the group has placed at [slot] (see [LocalClusterSlot]). */
-internal fun slotShape(slot: ClusterSlot, morph: Float, cornerPercent: Int): RoundedCornerShape =
-    connectedShape(slot.index == 0, slot.index == slot.count - 1, cornerPercent, morph, morph)
-
 /** The silhouette of button [index] in a cluster: round at the cluster's ends, a seam corner wherever it meets a neighbour. */
 internal fun clusterShape(buttons: List<ClusterButton>, index: Int, morph: Float, cornerPercent: Int): Shape =
     connectedShape(index == 0, index == buttons.lastIndex, cornerPercent, morph, morph)
