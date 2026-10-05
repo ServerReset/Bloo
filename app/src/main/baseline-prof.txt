@@ -1,0 +1,22 @@
+# Hand-written baseline profile: AOT-compile the startup and first-frame path (composition, layout,
+# draw, the app's own UI package) instead of interpreting it on first launch. Wildcards per the
+# baseline profile rule format (H = hot, S = startup, P = post-startup).
+HSPLandroidx/compose/runtime/**->**(**)**
+HSPLandroidx/compose/ui/**->**(**)**
+HSPLandroidx/compose/foundation/**->**(**)**
+HSPLandroidx/compose/animation/**->**(**)**
+HSPLandroidx/compose/material3/**->**(**)**
+HSPLandroidx/lifecycle/**->**(**)**
+HSPLandroidx/datastore/**->**(**)**
+HSPLdev/chrisbanes/haze/**->**(**)**
+HSPLcom/bloo/bluelink/ui/**->**(**)**
+HSPLcom/bloo/bluelink/data/**->**(**)**
+HSPLcom/bloo/uicommon/**->**(**)**
+Landroidx/compose/runtime/**;
+Landroidx/compose/ui/**;
+Landroidx/compose/foundation/**;
+Landroidx/compose/animation/**;
+Landroidx/compose/material3/**;
+Ldev/chrisbanes/haze/**;
+Lcom/bloo/bluelink/**;
+Lcom/bloo/uicommon/**;
