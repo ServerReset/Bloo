@@ -37,6 +37,10 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
             else -> "Not summarized yet"
         },
         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        // The one pebble whose subject is not a part of the car, so it is the one that earns a
+        // different surface: a gradient marks "this was generated" rather than measured, the same
+        // way the Summarize action is the only header action that makes something rather than
+        // sending a command.
         background = {
             val scheme = MaterialTheme.colorScheme
             val brush = remember(scheme.tertiaryContainer, scheme.primaryContainer, scheme.secondaryContainer) {

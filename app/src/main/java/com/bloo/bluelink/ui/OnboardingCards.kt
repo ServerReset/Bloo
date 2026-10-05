@@ -146,7 +146,8 @@ internal fun onboardingAccent(kind: OnboardingStepKind): Color {
 @Composable
 internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean, onTap: () -> Unit = {}) {
     // Only the card in view breathes and floats; the neighbours the pager keeps ready stay still,
-    // so a deck of seven runs one animation, not seven.
+    // so a deck of seven runs one animation, not seven. States, read only inside the draw and layer
+    // lambdas below, so a frame of the animation redraws the glyph without recomposing it.
     val glow: androidx.compose.runtime.State<Float>
     val bob: androidx.compose.runtime.State<Float>
     if (current) {

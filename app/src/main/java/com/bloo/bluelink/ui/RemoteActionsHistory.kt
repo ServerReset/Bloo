@@ -67,7 +67,8 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
-        // Details share the line, muted, and give up space first.
+        // Details ride on the SAME line, muted, and give up their space first -- a failure reason
+        // is worth showing but never worth a row of its own here.
         if (action.details != null) {
             Spacer(Modifier.width(6.dp))
             Text(
@@ -97,8 +98,12 @@ private fun shortTime(iso: String, use24Hour: Boolean): String = runCatching {
     // Clock style follows the device's 12/24h setting.
     val clock = if (use24Hour) "HH:mm" else "h:mm a"
     val fmt = if (at.toLocalDate() == today) clock else "d MMM $clock"
-    // Not hoisted to file scope: ofPattern() captures Locale.getDefault() at construction, so a
-    // file-scope formatter would keep a stale locale after a device language change.
+    // NOT hoisted to four file-scope DateTimeFormatters the way SettingsIndex.kt's Rx* patterns
+    // are, even though ofPattern() does parse its pattern on every construction. ofPattern() with
+    // no explicit Locale captures Locale.getDefault() AT CONSTRUCTION, so a file-scope formatter
+    // would freeze this row's month name and AM/PM marker to whatever locale the process started in
+    // -- a device language change recreates activities but not the process, so the stale text would
+    // survive until the app was killed.
     at.format(java.time.format.DateTimeFormatter.ofPattern(fmt))
 }.getOrDefault(iso)
 
@@ -119,8 +124,10 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
         // A hairline separating the controls from the history.
         SectionDivider(alpha = 0.35f, modifier = Modifier.padding(bottom = 6.dp))
         if (actions.isEmpty()) {
-            // Not nothing: the press that reveals this panel has no chrome, so the empty state is
-            // its only feedback.
+            // NOT nothing. This panel is revealed by pressing the pebble's background -- a gesture
+            // with no chrome to announce it -- so drawing nothing for a car that has not been
+            // commanded yet made a working gesture indistinguishable from a missing one. The empty
+            // state is the only feedback that the press did something.
             Text(
                 text = "No remote actions yet",
                 style = MaterialTheme.typography.labelSmall,
@@ -129,7 +136,8 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
             )
             return@Column
         }
-        // Resolved once, not per row: is24HourFormat reads a system setting.
+        // Resolved once here, not per row: is24HourFormat reads a system setting, and every row in
+        // the list would otherwise ask the same question again.
         val use24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
         actions.take(max).forEach { RemoteActionItem(it, use24Hour) }
         if (actions.size > max) {

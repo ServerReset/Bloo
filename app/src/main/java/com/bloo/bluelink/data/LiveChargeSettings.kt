@@ -15,8 +15,11 @@ import androidx.core.net.toUri
  */
 
 /**
- * Confirmed against the AOSP `Settings.java` source directly rather than trusting a doc summary,
- * since the wrong extra means the intent resolves to nothing useful.
+ * Deep-links to the OS page for this app's Live Updates permission --
+ * `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS`
+ * (`"android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS"`), which takes the target package via
+ * `EXTRA_APP_PACKAGE` (an extra, NOT a `package:` URI -- that's the older per-app-settings
+ * convention this action doesn't use).
  */
 fun LiveCharge.openLiveUpdateSettings(context: Context) {
     if (Build.VERSION.SDK_INT >= 36) {

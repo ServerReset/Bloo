@@ -20,7 +20,11 @@ import androidx.compose.ui.unit.dp
 
 /** One place, so every surface that uses them moves the same way. */
 
-/** Text that fades in when [text] changes, instead of swapping in a frame. */
+/**
+ * Text that fades in when [text] changes, instead of swapping in a frame. One plain Text and one
+ * alpha (no cross-fade, which composes both strings at once): this sits inside every button label,
+ * so it has to be close to free when nothing is changing.
+ */
 @Composable
 internal fun AnimatedText(
     text: String,
@@ -68,7 +72,8 @@ private val enteredThisSession = mutableSetOf<String>()
 
 /**
  * Fades and lifts a surface in the first time it appears (once per [key] per session), so cards
- * arrive instead of being there.
+ * arrive instead of being there. Read in the draw phase, so it costs no recomposition, and a card
+ * scrolled away and back does not replay it.
  */
 @Composable
 internal fun Modifier.entrance(key: String): Modifier {

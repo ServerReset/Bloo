@@ -111,8 +111,9 @@ private fun MorphButtonGlyph(
         LoadingIndicator(Modifier.size(iconSize))
     } else {
         val angle = rememberSpinAngle(spinning)
-        // The glyph cross-fades on change; the spin is applied in the draw phase so `angle` never
-        // recomposes the Icon per frame.
+        // The glyph cross-fades when it changes (lock to unlock, play to stop); the spin is on the
+        // wrapper, in the draw phase: `angle` loops `while (true)` while pending, so reading it
+        // through Modifier.rotate() recomposed the Icon on EVERY FRAME for as long as it ran.
         androidx.compose.animation.Crossfade(
             targetState = icon,
             modifier = Modifier.size(iconSize).graphicsLayer { rotationZ = angle.value },
@@ -122,8 +123,9 @@ private fun MorphButtonGlyph(
             Icon(
                 glyph,
                 contentDescription = null,
-                // Unspecified falls back to the content colour; Icon would otherwise draw the
-                // vector's own colours.
+                // Unspecified means "whatever the content colour is", which is Icon's own default.
+                // It cannot simply be passed through: Icon treats Unspecified as "draw the vector's
+                // own colours", which is a different thing entirely.
                 tint = if (tint.isSpecified) tint else LocalContentColor.current,
                 modifier = Modifier.size(iconSize),
             )
@@ -188,8 +190,9 @@ fun MorphButtonLabel(
                     // caches its layout; maxIntrinsicWidth() re-laid it out every frame of a
                     // button-group press.
                     val text = measurables[1].measure(free)
-                    // Whole label or no label; a symbol-only button shows its name on long press
-                    // (see LabelHint).
+                    // Whole label or no label -- anything in between is a truncated word. (Holding
+                    // a symbol-only button shows its name in a bubble above it instead, see
+                    // LabelHint.)
                     if (constraints.maxWidth < glyph.width + gapPx + text.width) {
                         val w = glyph.width.coerceAtMost(constraints.maxWidth)
                         // Height still accounts for the undrawn label.

@@ -90,7 +90,8 @@ internal fun SettingsScreen(
     val logs = remember(logsVersion) { vm.logSnapshot() }
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
-    // LocalClipboard's set is suspend; one scope for both copy buttons.
+    // LocalClipboard's set API is suspend; one scope for the two copy buttons below (Logs card's
+    // Copy, Debug panel's report copy).
     val clipboardScope = rememberCoroutineScope()
     val canBio = remember { vm.canUseBiometrics() }
     // LazyColumn: many heavy collapsible sections, unlike a car page's pebble list.
@@ -110,8 +111,11 @@ internal fun SettingsScreen(
   // Search is an app-root element (SearchLayer) that handles its own back. This is the last pager
   // page, so system back exits the app; no BackHandler needed.
   BackdropHost {
-        // Single column like a car page; the pager pins every page to one car-column width.
-        // LazyColumn so only visible sections compose.
+        // LazyColumn instead of a plain Column for the same reason a car page could get away with a
+        // plain one and this can't: Settings holds many more, and heavier,
+        // independently-collapsible sections than a single car's pebble list, so composing every
+        // one of them unconditionally (a plain Column's only option) would be real, avoidable work
+        // paid on every visit regardless of which sections are actually open.
         Box(
             Modifier
                 .fillMaxSize(),
@@ -137,7 +141,8 @@ internal fun SettingsScreen(
         ) {
             // Leading spacer, not a card.
             item {
-                // Clears the Simple/Advanced tab hanging below the status bar.
+                // Clears the Simple/Advanced tab that hangs below the status bar (its corner gap +
+                // its height) with a breath to spare, so the first card never sits under it.
                 Spacer(Modifier.height(topInset + HeaderCornerGap + HeaderButtonSize + 14.dp))
             }
             // Page hero: app identity, version and build.
@@ -190,7 +195,8 @@ internal fun SettingsScreen(
             }
             if (advTransition1.targetState || !advTransition1.isIdle) item {
 
-            // Debug -- device info and activity log; Advanced mode only.
+            // Debug -- device info and the activity log together, for support troubleshooting. A
+            // power-user card, so it only exists in Advanced mode.
             AnimatedVisibility(visibleState = advTransition1, enter = expandEnterSized(), exit = expandExitSized()) {
             DebugCardContent(logs, vm, clipboardScope, clipboard)
             }
@@ -202,8 +208,12 @@ internal fun SettingsScreen(
             }
             item {
 
-            // Location: "My location" sets Appearance.weatherFollowsDevice and feeds both weather
-            // and the map (see WeatherController.refreshDeviceLocationForWeather).
+            // Location -- was titled "Weather" and talked only about weather, even though choosing
+            // "My location" here does more than that: it sets Appearance.weatherFollowsDevice, and
+            // AppViewModel.refreshDeviceLocation() (the same place that keeps the map's own "you
+            // are here" dot and the Location pebble's distance-to-car current) re-syncs this
+            // location to that live fix on every refresh -- see
+            // WeatherController.refreshDeviceLocationForWeather's own doc.
             LocationCardContent(appearance, vm)
             }
             item {

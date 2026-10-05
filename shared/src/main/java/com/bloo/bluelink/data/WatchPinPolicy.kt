@@ -31,7 +31,8 @@ object WatchPinPolicy {
     /**
      * The one gate the UI actually consults before revealing content or running a command.
      * [alreadyUnlockedThisSession] is the watch's in-memory "the user proved the PIN since the app
-     * opened" flag.
+     * opened" flag. It only ever satisfies the OPEN gate -- "opening the app" is a per-session
+     * gate, so an open-unlock unlocks the session.
      */
     fun requiresUnlock(
         timing: WatchLockTiming,

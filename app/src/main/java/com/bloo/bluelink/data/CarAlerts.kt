@@ -47,7 +47,11 @@ object CarAlerts {
             val odo = parseOdometerMiles(v.odometer)
             val last = settings.lastServiceMiles(v.vin)
             val interval = settings.serviceIntervalMiles(v.vin)
-            // "Due" needs both last-serviced mileage and interval; missing either means not judgeable (not "not due").
+            // "Due" mileage only exists once both the last-serviced mileage and the chosen interval
+            // are known; either missing means we can't judge due-ness at all (rather than treating
+            // it as "not due"). nextServiceMiles is the shared formula -- this was a third inline
+            // `last + interval`, the exact re-inlining that helper's KDoc warns against, and the
+            // one the phone pebble already routes through.
             val due = if (last != null && interval != null) nextServiceMiles(last, interval) else null
             // Raw signed miles remaining; `remaining <= 0` fires the moment odo reaches the interval.
             val remaining = serviceDue(odo, last, interval)
@@ -56,7 +60,10 @@ object CarAlerts {
                 if (canDeliver && !settings.alertFired(key)) {
                     // formatDistance so metric users see km.
                     val metric = settings.metricDistance()
-                    // Both non-null here; `?.let ?: ""` avoids a not-null assertion.
+                    // odo and due are both non-null in this branch (remaining != null requires all
+                    // three inputs), but the compiler can't carry that through serviceDue's
+                    // signature -- odo is Int? from parseOdometerMiles. `?.let ?: ""` keeps it
+                    // total without a not-null assertion; the empty fallback is unreachable here.
                     val odoStr = odo?.let { formatDistance(it, metric) } ?: ""
                     val dueStr = due?.let { formatDistance(it, metric) } ?: ""
                     out += Alert(
@@ -78,7 +85,9 @@ object CarAlerts {
             val key = "door_${v.vin}"
             val now = System.currentTimeMillis()
             if (open) {
-                // Set on the first "open" observation only, so it marks when the episode began.
+                // Timestamp is set the first time we observe "open" and left alone on every
+                // subsequent open observation, so it always reflects when the open state *began*,
+                // not when we last checked.
                 val since = settings.doorOpenSince(v.vin)
                 if (since == null) {
                     settings.setDoorOpenSince(v.vin, now)
@@ -157,7 +166,11 @@ object CarAlerts {
                     out += Alert(
                         runningId(v),
                         "${v.name} is running",
-                        // A pure EV has no engine to mention; other powertrains keep "engine/climate" (airCtrlOn can come from either).
+                        // A pure EV has no engine at all to reference -- "engine/climate" read as a
+                        // hedge that didn't apply to it. Every other powertrain (gas, hybrid, PHEV)
+                        // keeps the hedge: airCtrlOn can be true from either the engine or, on some
+                        // of them, a battery-only remote climate run, so "engine/climate" is the
+                        // accurate answer there.
                         if (powertrain == Powertrain.EV) {
                             "The climate has been running for over ${prefs.runningMinutes} min."
                         } else {
@@ -178,8 +191,11 @@ object CarAlerts {
         if (prefs.carStarted && status != null) {
             val engineOn = status.engine == true
             if (engineOn && !settings.engineStartNotificationSent(v.vin)) {
-                // Not while driving: a late "started" notice is noise. The sent flag is set anyway to close this
-                // ON-episode, unlike the canDeliver branch below, where an undelivered alert leaves it unset to retry.
+                // Unlike the unlocked/running-too-long alerts above, this one does NOT fire late
+                // once driving stops either: it is a one-time "just turned on" notice, and one that
+                // shows up only after the drive already happened would be equally useless -- so the
+                // sent flag is set here even though nothing was posted, closing out this ON-episode
+                // for good.
                 if (status.isDriving) {
                     settings.setEngineStartNotificationSent(v.vin, true)
                 } else if (canDeliver) {
@@ -226,7 +242,9 @@ object CarAlerts {
         return out
     }
 
-    // Stable per-VIN ids, one per alert kind so alerts for the same car never overwrite each other.
+    // Stable per-VIN notification ids, one distinct id per alert *kind* so the three alert types
+    // for the same car never overwrite each other's notification (each hashes a kind-prefixed
+    // string unique to that VIN).
     private fun serviceId(v: Vehicle) = ("svc" + v.vin).hashCode()
     private fun doorId(v: Vehicle) = ("door" + v.vin).hashCode()
     private fun runningId(v: Vehicle) = ("run" + v.vin).hashCode()

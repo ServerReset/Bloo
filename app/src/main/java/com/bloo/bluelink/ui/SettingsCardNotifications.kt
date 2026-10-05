@@ -31,7 +31,9 @@ import com.bloo.bluelink.data.requestBackgroundUnrestricted
 
 /**
  * Simple mode is the handful of switches most people want. Advanced adds the timing thresholds, the
- * charging notification's look, the less common alerts and the troubleshooting tools.
+ * charging notification's look, the less common alerts and the troubleshooting tools. The "Needs
+ * attention" block is neither: it shows only when something is genuinely stopping an enabled alert
+ * from arriving, in either mode.
  */
 @Composable
 internal fun NotificationsCardContent(

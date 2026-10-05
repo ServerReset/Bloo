@@ -26,8 +26,12 @@ data class VehicleSnapshot(
     val name: String,
     val model: String,
     val isEv: Boolean,
-    /** Whether this car has a chargeable battery, per the user's manual powertrain override
-     *  (a PHEV the API reports as gas). Defaults to [isEv]. */
+    /**
+     * Whether this car has a chargeable battery, per the user's manual powertrain override on the
+     * phone (a PHEV the API misreports as gas still needs its charge readouts). Defaults to [isEv]
+     * so snapshots built without an override (e.g. from the account's vehicle list) behave exactly
+     * as before.
+     */
     val hasBattery: Boolean = isEv,
     val regId: String = "",
     val generation: String = "2",
@@ -45,15 +49,23 @@ data class VehicleSnapshot(
      *  unit (and rename) before displaying it. */
     val speedMph: Double? = null,
     val updated: String? = null,
-    /** Wall-clock (ms) of the last fresh data from the car; 0 = unknown. Lets surfaces flag stale data. */
+    /**
+     * Wall-clock (ms) when this snapshot last got fresh data from the car; 0 = unknown. Lets
+     * glanceable surfaces flag stale data instead of showing an hours-old lock/charge state as if
+     * it were live.
+     */
     val fetchedAt: Long = 0L,
     val odometer: String? = null,
     /** User-entered license plate and service-due tracking, mirrored for other snapshot readers. */
     val licensePlate: String? = null,
     val lastServiceMiles: Int? = null,
     val serviceIntervalMiles: Int? = null,
-    /** The car's charge limit for the plug it is on (see [EvStatus.targetForCurrentPlug]), 1..100,
-     *  or null when unplugged or unreported. */
+    /**
+     * The car's charge limit for the plug it's currently on (see [EvStatus.targetForCurrentPlug]),
+     * 1..100, or null when it isn't plugged in or didn't report one. Mirrored so the out-of-process
+     * surfaces can draw the same "will charge / won't" split the phone hero and the live charging
+     * notification both show.
+     */
     val chargeLimitPct: Int? = null,
 ) {
     /** Rebuild the command-capable Vehicle. */
@@ -69,7 +81,11 @@ data class VehicleSnapshot(
     )
 }
 
-/** True when the last known speed reading says the car is moving (snapshot-based AppViewModel.isDriving()). */
+/**
+ * True when the last known speed reading says the car is moving -- the snapshot-based equivalent of
+ * AppViewModel.isDriving(), for the out-of-process command runners that only ever see a
+ * [VehicleSnapshot].
+ */
 val VehicleSnapshot.isDriving: Boolean get() = (speedMph ?: 0.0) > 0.0
 
 /**
@@ -79,10 +95,15 @@ val VehicleSnapshot.isDriving: Boolean get() = (speedMph ?: 0.0) > 0.0
  * none. The status wins when it has a coordinate.
  */
 fun VehicleSnapshot.merged(status: VehicleStatus, location: GeoLocation? = null): VehicleSnapshot {
-    // hasBattery (the user's powertrain override), not isEv: a misreported PHEV must not get fuel data in percent/range.
+    // Use hasBattery (the user's manual powertrain override), not the raw isEv flag -- this
+    // reimplemented percentFor/rangeMiFor's own logic with the wrong flag, so a PHEV the API
+    // misreports as gas would have every refresh through this path (CarCommandRunner.refresh)
+    // clobber percent/rangeMi with fuel data instead of battery data.
     val pct = status.percentFor(hasBattery)
     val range = status.rangeMiFor(hasBattery)
-    // Local so the nullable property smart-casts.
+    // Hoisted to a local: a nullable property of another class is only smart-castable under
+    // conditions this file has already been bitten by once (see rangeMi's note in AppViewModel). A
+    // local is free and removes the question.
     val ev = status.evStatus
     return copy(
         percent = pct ?: percent,
@@ -125,15 +146,21 @@ internal fun VehicleSnapshot.keepingStatusOf(old: VehicleSnapshot): VehicleSnaps
     fetchedAt = if (fetchedAt > 0L) fetchedAt else old.fetchedAt,
 )
 
-/** The payload persisted as a single JSON string under one DataStore key, so reads and writes
- *  are atomic over the whole vehicle list and selection. */
+/**
+ * The exact shape persisted to disk as a single JSON string under one DataStore key — kept as one
+ * blob (rather than one DataStore entry per field) so a read or write is always a single atomic
+ * operation over the whole vehicle list + selection together.
+ */
 @Serializable
 private data class SnapshotPayload(
     val vehicles: List<VehicleSnapshot> = emptyList(),
     val selectedVin: String? = null,
 )
 
-// Corruption resets to empty prefs instead of crashing every background reader.
+// A corruption handler so a file damaged by an interrupted write/power loss resets to empty prefs
+// instead of rethrowing an uncaught exception out of every read — this store is read from
+// background workers and command runners, every one of which would otherwise crash on a corrupt
+// file.
 private val Context.snapshotDataStore by preferencesDataStore(
     name = "bloo_snapshots",
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
@@ -169,13 +196,17 @@ class SnapshotStore(private val context: Context) {
     val payload: Flow<SnapshotData> = context.snapshotDataStore.data.map { prefs ->
         decode(prefs[Keys.PAYLOAD])
     }
-        // decode() parses every vehicle; keep it off the collector's (often main) thread.
+        // decode() is a full Json parse of every vehicle, and DataStore only guarantees the FILE
+        // read is off the main thread -- a map{} transform runs in the collector's context, so
+        // without this the whole blob would be parsed on whatever thread collects (and a command
+        // tap deliberately emits twice, optimistic then settled).
         .flowOn(Dispatchers.IO)
 
     /** One-shot read of the current snapshot data. */
     suspend fun current(): SnapshotData = withContext(Dispatchers.IO) {
         StartupTrace.markIfStarting("SnapshotStore.current(): begin (disk read)")
-        // .first() resumes on the caller's dispatcher, often main.
+        // withContext for the same reason as `payload` above: .first() resumes on the CALLER's
+        // dispatcher, and the caller is often the main thread.
         decode(context.snapshotDataStore.data.first()[Keys.PAYLOAD])
     }
 

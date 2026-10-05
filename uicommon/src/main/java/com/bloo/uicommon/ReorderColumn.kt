@@ -139,7 +139,9 @@ fun <T> ReorderColumn(
                 ) {
                     val handleCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
                     // REMEMBERED, so this is ONE instance for the item's lifetime. Every pebble
-                    // takes this as a `dragHandle: Modifier`.
+                    // takes this as a `dragHandle: Modifier`. Built inline, the chain below is
+                    // rebuilt on every recomposition, and a child can only skip if its arguments
+                    // compare equal -- so a fresh chain means a changed argument.
                     val handle = remember(k) {
                         Modifier
                         .onGloballyPositioned { handleCoords.value = it }

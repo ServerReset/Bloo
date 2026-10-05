@@ -108,8 +108,9 @@ fun MorphButton(
      */
     groupWeight: Float = 0f,
     /**
-     * Wraps the button in [SafeExpansiveButton] for press-grow feedback; always on inside an
-     * [ExpressiveButtonGroup].
+     * Wraps the button in [SafeExpansiveButton] itself -- the press-grow feedback -- so a call site
+     * sets a flag instead of hand-wiring a wrapper around a shared interaction source. Always on
+     * inside an [ExpressiveButtonGroup], where the button joins on its own.
      */
     expressive: Boolean = false,
     /**
@@ -121,8 +122,8 @@ fun MorphButton(
 ) {
     val haptics = LocalHaptics.current
     val clickHaptic = onClickHaptic ?: { haptics?.click() }
-    // The content tone content lambdas inherit (the shared core cannot reach material3's
-    // LocalContentColor).
+    // The content tone content lambdas inherit, provided the way M3's Button provides it internally
+    // (the shared core is foundation-only and cannot reach material3's LocalContentColor).
     val resolvedContent = if (active) activeContentColor else contentColor
     // What this button's label reports, for the long-press name hint.
     val hint = remember { LabelHintState() }
@@ -175,8 +176,9 @@ fun MorphButton(
     val providedContent = if (enabled) {
         resolvedContent
     } else {
-        // Keep the full background when disabled (only the label fades); M3's onSurface@12% is
-        // invisible on light cards.
+        // Keep the button's full background when disabled (only the label fades) instead of M3's
+        // default onSurface@12%, which is invisible against light cards and made disabled buttons
+        // look backgroundless.
         disabledContentColor ?: resolvedContent
     }
     val body: @Composable () -> Unit = {
@@ -184,16 +186,23 @@ fun MorphButton(
             MorphButtonCore(
                 onClick = { clickHaptic(); onClick() },
                 modifier = modifier
-                    // Makes every MorphButton announce its state to TalkBack, not only a colour
-                    // change.
+                    // `active` is otherwise a colour-only change -- most call sites also swap their
+                    // label text (Lock/Unlock, Start/Stop), which is why this mostly "worked" for
+                    // TalkBack by accident, but that's caller discipline, not something the shared
+                    // button guarantees.
                     .semantics { selected = active }
                     .onSizeChanged { hint.sizePx = it }
                     // While its lifted copy is up, the original steps aside.
                     .graphicsLayer { rotationZ = hint.shakeDegrees; alpha = if (hint.present) 0f else 1f }
                     // Inert: the app's one disabled look (see [frosted]).
                     .then(frost)
-                    // Skipped while SafeExpansiveButton already drives the width on press
-                    // (LocalExpressiveGrowth); a second spring would make the button wobble.
+                    // Skipped while SafeExpansiveButton is already smoothly driving this button's
+                    // width on press (LocalExpressiveGrowth -- see its own doc): animateContentSize
+                    // exists for a genuine content change (a label swapping to a longer one), but
+                    // left unconditional it ALSO re-smoothed a width the wrapper was already
+                    // animating frame by frame with its own, deliberately non-bouncy spring -- two
+                    // springs chasing the same width at once, which is what made a growing button
+                    // wobble on press instead of just growing.
                     .then(
                         if (LocalExpressiveGrowth.current) {
                             Modifier
@@ -210,8 +219,10 @@ fun MorphButton(
                 activeContainerColor = activeContainerColor,
                 contentPadding = contentPadding,
                 border = if (active) null else border,
-                // Disabled = frosted glass (translucent shared tint with a matching rim), not a
-                // washed-out pill.
+                // Disabled = the app's standard frosted glass, not a washed-out tonal pill: the
+                // shared glass tint (translucent, blur-aware) with a matching frosted rim, so a
+                // dimmed button reads as an inert pane of glass sitting in the layout rather than a
+                // broken button.
                 disabledContainerColor = glassTint(canBlurBackdrops()),
                 disabledBorder = BorderStroke(1.dp, hairlineColor()),
                 interactionSource = interactionSource,
@@ -339,8 +350,9 @@ fun SafeMorphTextButton(
     SafeExpansiveButton(
         interactionSource = source,
         enabled = enabled,
-        // The group reads the wrapper, so the weight must be declared here, not only on the inner
-        // button.
+        // The wrapper is what the group reads, so the weight has to be declared HERE -- passed only
+        // to the inner button it was silently dropped and every labelled button sat at width zero
+        // weight, never filling its line.
         groupWeight = groupWeight,
         fillOnPress = fillOnPress,
     ) {

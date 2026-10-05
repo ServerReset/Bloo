@@ -67,7 +67,10 @@ import com.bloo.bluelink.data.platform
  */
 @Composable
 fun BlooApp(vm: AppViewModel) {
-    // Marks the first composition and first frame, to tell a slow compose from a late frame clock.
+    // Cold-start instrumentation: "first composition" is the moment Compose starts running this
+    // root, and the withFrameNanos below is the moment a frame is actually produced -- the pair
+    // separates "compose is slow" from "the frame clock is late", which the frame monitor's own
+    // numbers alone cannot distinguish.
     com.bloo.bluelink.data.StartupTrace.once("compose-root", "BlooApp: first composition")
     LaunchedEffect(Unit) {
         withFrameNanos { }
@@ -81,7 +84,10 @@ fun BlooApp(vm: AppViewModel) {
     val locked by remember { derivedStateOf { state.locked } }
     // Latches once the app has been unlocked; only the cold-start lock defers composing the garage.
     var unlockedThisSession by remember { mutableStateOf(false) }
-    // SideEffect, not a body write: composition-time state writes can be discarded.
+    // SideEffect, not a bare body write: this codebase's own convention (see BlooApp's haptics
+    // write) -- mutating state during composition can be discarded or re-ordered, so it runs after
+    // a successful (re)composition instead. Latching the instant a non-locked frame is composed is
+    // what lets the garage start building on that very frame.
     SideEffect { if (!locked) unlockedThisSession = true }
     val loading by remember { derivedStateOf { state.loading } }
     val refreshing by remember { derivedStateOf { state.refreshing } }
@@ -124,7 +130,9 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
-    // Each ViewModel message becomes a typed toast; clearMessage() frees the single UiState slot.
+    // Every message the ViewModels raise lands in the toast stack, carrying its own type so a later
+    // message can never repaint an earlier one. clearMessage() right after keeps the single UiState
+    // slot free for the next one, which stacks below instead of queueing behind.
     LaunchedEffect(message) {
         message?.let { msg ->
             toasts.show(msg, messageType)
@@ -151,16 +159,19 @@ fun BlooApp(vm: AppViewModel) {
     ) {
     // A soft full-bleed gradient behind the transparent system bars.
     val scheme = MaterialTheme.colorScheme
-    // Biometric lock overlay: the blur and fade animate in their own composables so only those
-    // scopes recompose per frame.
+    // Biometric lock overlay: blur the whole app behind it and fade the blur away once unlocked.
+    // Hoisted into their own small composables below so only those tiny scopes recompose per frame;
+    // everything else just gets redrawn under the blurred/faded layer.
     Box(Modifier.fillMaxSize()) {
     // "Content settled": the garage's first composition has finished. Gates two full-screen blurs
     // (lock blur, Aurora backdrop blur) that dominate cold-start frame cost.
     var contentSettled by remember { mutableStateOf(screen == Screen.Garage) }
     LaunchedEffect(screen) {
         if (screen == Screen.Garage) {
-            // Frame-based, not a delay: the blur returns at once on fast devices and waits on slow
-            // ones.
+            // Two frames, not a wall-clock delay: on hardware the garage's first frame is a few
+            // milliseconds, so the blur is back essentially immediately, while a device that needs
+            // 2.5s for that frame (the software-rendered emulator) keeps the cheaper opaque
+            // backdrop for exactly as long as it is struggling.
             withFrameNanos { }
             withFrameNanos { }
             contentSettled = true
@@ -214,7 +225,14 @@ fun BlooApp(vm: AppViewModel) {
         AnimatedContent(
             targetState = target,
             transitionSpec = {
-                // A spring for the screen-sized slide; fade keeps its defaults.
+                // A real spring (this app's own SoftDamping/StiffnessMediumLow, the same feel the
+                // garage's own expand/collapse AnimatedContent uses a few screens down) rather than
+                // AnimatedContent's bare default -- the default spec is tuned for a small content
+                // swap settling quickly, and on a screen-sized slide that read as slightly
+                // clipped/mechanical next to every other full-screen motion in the app.
+                // fadeIn/fadeOut keep their own (fast, linear-feeling) defaults on purpose: only
+                // the SLIDE -- the part that actually travels screen-sized distance -- needed the
+                // softer landing.
                 val slideSpec = spring<IntOffset>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
                 (slideInHorizontally(slideSpec) { w -> -w } + fadeIn()) togetherWith
                     (slideOutHorizontally(slideSpec) { w -> w } + fadeOut())
@@ -254,8 +272,10 @@ fun BlooApp(vm: AppViewModel) {
                     com.bloo.bluelink.data.StartupTrace.once("screen-garage", "screen: Garage composed (first garage frame next)")
                     // Reuses the outer `appearance`.
                     Box(Modifier.fillMaxSize()) {
-                        // Paused while search is open so the aurora drift doesn't contend with
-                        // search frames.
+                        // `paused = searchOpen`: the search panel sits ABOVE this background, and
+                        // while it's up (typing frames, panel scrolling) the ambient drift would
+                        // otherwise keep redrawing the blurred backdrop underneath at ~12fps --
+                        // real contention on exactly the frames search is using.
                         if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize().hazeSource(backdropHaze), appearance, refreshing = refreshing, paused = searchOpen)
                         // Cold-start lock: don't compose (and blur) the full garage behind a lock
                         // the user hasn't passed; it composes once `locked` flips.

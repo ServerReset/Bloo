@@ -51,15 +51,20 @@ import kotlinx.coroutines.isActive
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
-/** A small slippy map centred on the car, built from key-free OpenStreetMap raw tiles. */
+/**
+ * A small slippy map centred on the car, assembled from key-free OpenStreetMap raw tiles. We
+ * compute the tiles needed to fill the box with the car at the centre, draw each at its pixel
+ * offset, then drop a pin. This avoids the flaky static-map render services that painted blank.
+ */
 @Composable
 internal fun CarMap(
     location: GeoLocation,
     modifier: Modifier = Modifier,
     state: CarMapState = rememberCarMapState(),
     /**
-     * The device's own last-known position ([UiState.deviceLocation]), not fetched here. Null (no
-     * fix/permission) omits the marker.
+     * The DEVICE's own last-known position (not the car's) -- [UiState.deviceLocation], refreshed
+     * on app open/refresh and by "Locate", NOT fetched by CarMap itself. Null (never fetched yet,
+     * or no permission/fix) simply omits the marker.
      */
     deviceLocation: GeoLocation? = null,
 ) {
@@ -71,7 +76,10 @@ internal fun CarMap(
     val pinColor = MaterialTheme.colorScheme.primary
     // The device marker uses the secondary role to stay distinct from the car pin.
     val deviceLocationColor = MaterialTheme.colorScheme.secondary
-    // Resolve dark from the app's ThemeMode override, not isSystemInDarkTheme().
+    // Same fix as pebbleCardEdge/glassTint (GlassChrome.kt): resolve dark from the app's own
+    // ThemeMode override, not a raw isSystemInDarkTheme() read -- otherwise a user who forced
+    // Light/Dark against a differently-set system theme got a map whose colour filter didn't match
+    // the rest of the app.
     val isDarkMode = appIsDarkTheme()
 
     // Tiles carry the map theme; background stays minimal.
@@ -93,8 +101,9 @@ internal fun CarMap(
                 0f, 0f, 0f, 1f, 0f,
             ),
         )
-        // W3C hue-rotate(180deg) matrix, applied after `invert` to match CSS `invert(1)
-        // hue-rotate(180deg)`.
+        // The W3C hue-rotate(180deg) filter matrix, applied to the ALREADY-inverted colour rather
+        // than the original -- postConcat runs `invert` first, then this, exactly matching the CSS
+        // `filter: invert(1) hue-rotate(180deg)` order the whole trick is borrowed from.
         val hueRotate180 = android.graphics.ColorMatrix(
             floatArrayOf(
                 -0.574f, 1.430f, 0.144f, 0f, 0f,
@@ -202,9 +211,12 @@ internal fun CarMap(
             }
         }
 
-        // Tiles, pin and device dot sit in their own scaled layer, not the outer Box (which hosts
-        // the 1x expand button). state.scale is the continuous pinch part, applied every frame for
-        // fluid zoom.
+        // Everything below (tiles, pin, device dot) sits inside its own scaled layer -- NOT the
+        // outer Box, which also hosts the expand button (CarMap's own doc) and must stay at 1x
+        // regardless of how far a pinch has scaled the map itself. state.scale is the CONTINUOUS
+        // part of a pinch (see its own doc): applying it here, every frame of the gesture, is what
+        // makes zooming feel fluid instead of jumping between the whole levels a fresh tile fetch
+        // actually needs.
         Box(
             Modifier
                 .fillMaxSize()
@@ -222,10 +234,20 @@ internal fun CarMap(
             for (ty in range.firstY..range.lastY) {
                 if (ty < 0 || ty >= span) continue
                 val wrappedX = MapTiles.wrapX(tx, zoom)
-                // key() gives each tile a stable slot so remember() below is safe in a loop.
+                // key(), not a bare loop body: gives each tile a stable slot keyed by its own tile
+                // coordinate, so the remember() just below is safe to use inside a plain for-loop
+                // (whose visible tile SET changes as the car/box moves) without its state silently
+                // reattaching to the wrong tile between compositions.
                 key(wrappedX, ty) {
-                    // Remembered: ImageRequest has no equals(), so a fresh build() would restart
-                    // AsyncImage's load (flicker) on every location update.
+                    // Remembered, not rebuilt on every recomposition of this composable (which
+                    // happens on every `location` update, i.e. while the car/phone is moving):
+                    // Coil's ImageRequest has no equals()/hashCode() override, so a fresh .build()
+                    // every time is a reference-distinct object even when the URL/headers are
+                    // identical -- AsyncImage keys its load launch on that identity, so an
+                    // unremembered request restarted the whole load pipeline (a blank frame while
+                    // it "reloads") for every visible tile on every location update, even for tiles
+                    // already sitting in Coil's memory cache -- visible flicker across the whole
+                    // map.
                     val request = remember(wrappedX, ty, zoom) {
                         ImageRequest.Builder(context)
                             .data(MapTiles.tileUrl(zoom, wrappedX, ty))
@@ -292,7 +314,8 @@ internal fun CarMap(
                 tint = pinColor,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    // The car is the pan origin, so the layer translation already centres it.
+                    // The car is the map's pan origin, so the container's own translation already
+                    // puts it dead-centre -- no per-frame offset here any more.
                     .size(40.dp)
                     .offset(y = (-20).dp),
             )

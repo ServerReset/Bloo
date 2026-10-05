@@ -93,13 +93,18 @@ internal fun GlassSurface(
 }
 
 /**
- * The full-screen dim+blur scrim behind an expanded map sheet, shared by [ExpandableMapLayer] and
- * [CarMapSheetBody].
+ * A plain `Float` parameter would still type-check, but passing one computed from
+ * `someAnimatable.value` at the CALL SITE reads that value at composition time to build the
+ * argument -- which is exactly the mistake both original copies of this code were once fixed for
+ * (see either call site's own history): it recomposed the entire sheet -- the map's tile loop,
+ * every button -- on every single frame of the open/close spring.
  */
 @Composable
 internal fun ScrimBlur(hazeState: HazeState?, progress: () -> Float, modifier: Modifier = Modifier) {
-    // canBlurBackdrops() is the real gate (the HazeState is always non-null), as at every blur
-    // site.
+    // Both call sites always pass a real, non-null HazeState (each screen builds one
+    // unconditionally via `remember { HazeState() }`), so `hazeState != null` alone was never
+    // actually gating anything -- the blur ran unconditionally, battery saver or not.
+    // canBlurBackdrops() is the real gate, same as every other blur site in the app.
     val canBlur = hazeState != null && canBlurBackdrops()
     // Full-screen scrim needs strong dimming in both themes: black with alpha.
     val tint = if (canBlur) Color.Black.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.22f)

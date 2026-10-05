@@ -1,6 +1,10 @@
 package com.bloo.bluelink.ui
 
-/** Where the search bubble lives on the normal (phone) layout. */
+/**
+ * Where the search bubble lives on the normal (phone) layout. Pick it up and fling it: a bottom
+ * corner keeps it a bubble that only opens out into the search pill on the Settings page, the
+ * bottom middle keeps it open as the pill everywhere.
+ */
 internal enum class SearchDock {
     LEFT, CENTER, RIGHT;
 

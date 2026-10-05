@@ -37,7 +37,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.first
 
-/** A Wear OS companion shown UNDER the phone it belongs to, not as a peer row. */
+/**
+ * A Wear OS companion shown UNDER the phone it belongs to, not as a peer row. Deliberately not a
+ * [SyncDeviceRow]: a watch has no drag handle and no star, because it depends on its phone.
+ * [onRemove] is null for a live Data Layer watch -- pairing is managed by Wear OS, not by Bloo.
+ */
 @Composable
 fun WearCompanionRow(
     name: String,

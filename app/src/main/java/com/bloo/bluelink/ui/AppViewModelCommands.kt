@@ -31,8 +31,12 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
     if (!restart && liveLocationJob?.isActive == true) return
     liveLocationJob?.cancel()
     liveLocationJob = viewModelScope.launch {
-        // See MIN_DEVICE_LOCATION_INTERVAL_MS/_MOVE_METERS: publishing every raw fix caused OOM
-        // from recompositions.
+        // See MIN_DEVICE_LOCATION_INTERVAL_MS/_MOVE_METERS' own doc -- a real device OOM crash
+        // traced back to this collector publishing every raw fused-location callback verbatim,
+        // which a burst of near-identical fixes (GPS jitter, or the provider "catching up" right
+        // after its first-ever fix) turned into hundreds of genuinely distinct GeoLocation values
+        // in under a second, each one recomposing LocationPebble (and, on a real report, its whole
+        // host page) via its own stateSlice.
         var lastPublished: android.location.Location? = null
         var lastPublishedAtMs = 0L
         com.bloo.bluelink.autolock.LocationHelper.liveUpdates(getApplication()).collect { loc ->
@@ -51,8 +55,9 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
 }
 
 fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
-    // "Locate" refreshes the device position alongside the car's; fire-and-forget so a slow device
-    // fix never delays the car locate.
+    // "Locate" is the one button whose entire job is refreshing a position -- the car's, below --
+    // so it refreshes the DEVICE's own right alongside it. Fire-and- forget: a slow/missing device
+    // fix must not delay or fail the car locate this command exists for.
     refreshDeviceLocation()
     // GPS rides along with a status refresh; prefer it over the rate-limited findMyCar.
     val s = repoFor(v).status(v, refresh = true)
@@ -65,8 +70,9 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location upda
         }
     }
     val statusLoc = s.toGeoLocation()
-    // Only call the rate-limited findMyCar if the status had no GPS; on failure keep the existing
-    // fix.
+    // Only hit the rate-limited findMyCar if the status carried no GPS. If it then fails (e.g. the
+    // daily locate limit) but we already have a fix, keep showing that rather than throwing a scary
+    // error.
     val hadCached = _state.value.locations[v.vin] != null
     val loc = statusLoc ?: try {
         repoFor(v).location(v)
@@ -86,8 +92,10 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location upda
             }
             loadCarWeather(v, force = true)
             persistCache()
-            // persistCache() updates only the phone's status cache, not SnapshotStore (read by
-            // snapshot surfaces), so publish here too.
+            // persistCache() writes the PHONE's own status cache (statusCache) so the next cold
+            // start shows this fix. It does not touch SnapshotStore, which is what the snapshot
+            // surfaces read -- so Locate updated the map on screen and nothing else, until the next
+            // status refresh happened to run persistSnapshots() for another reason.
             persistSnapshots()
         }
         hadCached -> _state.update {
@@ -106,12 +114,16 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location upda
  * as gas must use the EV climate/charge endpoints.
  */
 
-// Lock/unlock share the "doors" key so they cannot race; each optimistically flips
-// VehicleStatus.doorLock.
+// Lock/unlock share the "doors" action key, so a lock command in flight blocks a rapid-fire unlock
+// (and vice versa) rather than letting them race each other through the API. Each optimistically
+// flips VehicleStatus.doorLock the instant the command is accepted.
 fun AppViewModel.lock(v: Vehicle) = runCommand(v.vin, "doors", "Locked", { it.copy(doorLock = true) }) { repoFor(v).lock(v) }
 fun AppViewModel.unlock(v: Vehicle) = runCommand(v.vin, "doors", "Unlocked", { it.copy(doorLock = false) }) { repoFor(v).unlock(v) }
 
-// Share the "hornLights" key; momentary actions with no state to flip, so `optimistic` is null.
+// Both share the "hornLights" action key (only one can run at a time) and have no boolean toggle to
+// optimistically flip -- these are momentary actions (the car doesn't have a persistent "lights are
+// flashing" state worth reflecting), so `optimistic` is null and the UI only shows the pending
+// spinner until the command completes.
 fun AppViewModel.flashLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Lights flashing", null) { repoFor(v).flashLights(v) }
 fun AppViewModel.hornAndLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Horn & lights", null) { repoFor(v).hornAndLights(v) }
 
@@ -125,7 +137,10 @@ fun AppViewModel.stopClimate(v: Vehicle) =
         repoFor(v).stopClimate(v)
     }
 
-/** Start climate with [req]. Shares the "climate" key with [stopClimate] so they cannot race. */
+/**
+ * Start climate with the given [req] (temp/duration/defrost/seat heating/etc). Shares the "climate"
+ * action key with [stopClimate] so starting and stopping can't race each other on the same car.
+ */
 fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
     // degLabel converts and suffixes the °F value per the user's unit.
     runCommand(
@@ -138,7 +153,8 @@ fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
         { it.copy(airCtrlOn = true) },
     ) {
         val chunks = com.bloo.bluelink.data.climateChunks(req.durationMinutes)
-        // Within the single-command cap: chunks is just [req.durationMinutes].
+        // Unchanged behavior for every request already within the single- command cap: chunks is
+        // just [req.durationMinutes] and this is the same call it always was.
         repoFor(v).startClimate(v, req.copy(durationMinutes = chunks.first()))
         val remaining = chunks.drop(1).sum()
         val ctx = getApplication<android.app.Application>()

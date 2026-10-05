@@ -126,8 +126,10 @@ private fun UpdateAvailableDot(modifier: Modifier = Modifier) {
         modifier
             .size(12.dp)
             .background(UpdateAvailableAmber, CircleShape)
-            // A hairline ring in the card's container tone separates the dot from whatever is
-            // behind the corner.
+            // A hairline ring in the card's own container tone -- otherwise the dot's edge, sitting
+            // right at the card's rounded corner, has nothing separating it from whatever happens
+            // to be directly behind that corner (status bar icons, another card peeking from the
+            // next page over).
             .border(2.dp, MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
     )
 }

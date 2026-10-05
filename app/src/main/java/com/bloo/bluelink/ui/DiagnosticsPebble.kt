@@ -51,7 +51,10 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
     val metric = a.metricDistance
     val rows = remember(status, fahrenheit, metric) { buildList {
         status?.tirePressureLamp?.let { tp ->
-            // No psi suffix.
+            // No psi suffix. `TirePressure.all` was only ever populated FROM the warning lamp --
+            // Kia read `tirePressure.all` (a 0/1 indicator) and Canada read
+            // `tirePressureLamp.tirePressureLampAll` outright -- so this rendered "Warning · 1 psi"
+            // and "OK · 0 psi".
             add(DiagRow("Tire pressure", if (tp.hasWarning) "Warning" else "OK"))
             tp.frontLeft?.let { add(DiagRow("Front left", warn(it), indent = true)) }
             tp.frontRight?.let { add(DiagRow("Front right", warn(it), indent = true)) }

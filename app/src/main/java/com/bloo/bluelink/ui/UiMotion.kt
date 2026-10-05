@@ -52,7 +52,12 @@ internal val PillCornerPercent get() = com.bloo.uicommon.PillCornerPercent
 
 internal val MorphedCornerPercent get() = com.bloo.uicommon.MorphedCornerPercent
 
-/** The app's collapse/expand transition, supplied by the Material theme. */
+/**
+ * The app's collapse/expand transition, supplied by the Material theme. M3 Expressive delivers
+ * motion as a theme subsystem: MaterialTheme.motionScheme exposes six spec factories, a 2x3 matrix
+ * of SPATIAL (bounds, size, scale, shape -- allowed to overshoot) against EFFECTS (colour, alpha --
+ * must not) crossed with fast/default/slow.
+ */
 // internal: PebbleShell's corner-radius morph shares these springs so height and corners move as
 // one.
 internal val PebbleBounceDamping = 0.68f
@@ -149,8 +154,10 @@ fun pebbleRowOvershoot(t: Float, overshoot: Float = 1.15f): Float {
 const val PebbleStaggerSpan = 0.85f
 
 /**
- * The app's one "working" spin for icons that turn while something loads: accelerates from rest,
- * holds a fast spin, and when [spinning] ends decelerates to the next full turn and resets.
+ * The app's one "working" spin, for any icon that turns while something loads: the first turn
+ * accelerates from rest, then it holds a steady fast spin, and when [spinning] ends it decelerates
+ * to the next full turn and resets. The Animatable only runs while spinning, so idle icons hold no
+ * live animation.
  */
 @androidx.compose.runtime.Composable
 internal fun rememberSpinAngle(spinning: Boolean): androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D> {

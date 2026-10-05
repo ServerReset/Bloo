@@ -138,7 +138,11 @@ suspend fun SettingsStore.setAlertFired(key: String, value: Boolean) {
     editTracked { it[booleanPreferencesKey("alert_$key")] = value }
 }
 
-/** Whether the user swiped away [vin]'s live charging bar during the CURRENT charging session. */
+/**
+ * Whether the user swiped away [vin]'s live charging bar during the CURRENT charging session.
+ * Google's Live Updates guidance is explicit that a dismissed Live Update must not be reposted, and
+ * this notification is otherwise re-posted every five minutes for as long as the charge lasts.
+ */
 suspend fun SettingsStore.liveChargeDismissed(vin: String): Boolean =
     context.settingsDataStore.data.first()[booleanPreferencesKey("live_dismissed_$vin")] ?: false
 
@@ -182,6 +186,10 @@ suspend fun SettingsStore.setAuroraBackground(value: Boolean) {
     editTracked { it[SettingsStore.Keys.AURORA] = value.toString() }
 }
 
+// The setters below validate the incoming string against the fixed set of legal values and silently
+// fall back to the default if it's anything else (e.g. a stale string from a future app version we
+// don't recognize), rather than storing garbage that the appearance Flow above would then have to
+// re-validate on every read.
 suspend fun SettingsStore.setAuroraMotion(value: String) {
     editTracked { it[SettingsStore.Keys.AURORA_MOTION] = value.takeIf { it in setOf("off", "static", "motion") } ?: "static" }
 }

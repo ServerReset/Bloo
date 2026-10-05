@@ -360,6 +360,14 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      * on this class has one exception type callers need to handle.
      */
     internal suspend fun <T> execute(block: suspend () -> T): T {
+        // Logged only past a threshold, unconditionally (not just for the cold-start path -- see
+        // BlueLinkRepository/AppViewModel's own logStartupTiming for that): the mutex was proven
+        // instant and the actual HTTP request/response were both proven fast in a real report, yet
+        // several real seconds still elapsed somewhere between the two -- this
+        // withContext(Dispatchers.IO) hop is the next-most-likely place for that time to be hiding
+        // (a busy/starved IO dispatcher, or a slow one-time class-load the very first time this
+        // call shape runs), so it needs its own number rather than being assumed instant the way
+        // coroutine dispatch onto Main already was ruled out to be.
         val dispatchStartedAt = System.currentTimeMillis()
         return withContext(Dispatchers.IO) {
             val dispatchMs = System.currentTimeMillis() - dispatchStartedAt

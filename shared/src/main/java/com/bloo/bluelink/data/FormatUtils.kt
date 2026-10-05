@@ -21,7 +21,9 @@ fun formatPlaceName(a: android.location.Address): GeocodedPlace? {
     val locality = a.locality ?: a.subAdminArea
     val parts = if (street != null) listOfNotNull(street, locality) else listOfNotNull(locality, a.adminArea)
     val full = parts.distinct().joinToString(", ").ifBlank { a.getAddressLine(0) } ?: return null
-    // Street + ZIP when both exist; otherwise the long form.
+    // Street + ZIP when both exist; otherwise just reuse `full` -- a geocode result with no
+    // street-level detail or no postal code has nothing more compact to offer than the long form
+    // already is.
     val zip = a.postalCode?.takeIf { it.isNotBlank() }
     val compact = if (street != null && zip != null) "$street, $zip" else full
     return GeocodedPlace(full, compact)
@@ -61,7 +63,11 @@ fun smartClimateTargetF(ambientF: Int): Int {
 fun smartClimateIsCooling(ambientF: Int): Boolean = ambientF >= 70
 
 
-/** Valid minutes for a SINGLE remote-start climate command (the vendor API caps at 10). */
+/**
+ * The valid range (in minutes) for a SINGLE remote-start climate command's duration -- the vendor
+ * API itself rejects/clamps anything past 10 minutes per command. The default within this range
+ * stays its own constant, [DEFAULT_CLIMATE_DURATION_MIN].
+ */
 val CLIMATE_DURATION_RANGE: IntRange = 1..10
 
 
@@ -91,7 +97,11 @@ fun climateChunks(minutes: Int): List<Int> {
 val CHARGE_LIMIT_RANGE = 50..100
 
 
-/** How long a vehicle's cached status is trusted before it is treated as stale. */
+/**
+ * How long a vehicle's cached status is trusted before it's treated as stale (worth nudging the
+ * user to pull-to-refresh). Picked 15 minutes (the phone UI's existing value, the one actually
+ * user-facing as copy) as the one reasonable default for all three.
+ */
 val STALE_STATUS_MS = 15L * 60 * 1000L
 
 
@@ -176,7 +186,11 @@ fun maskEmail(email: String): String {
 }
 
 
-/** Current GMT offset in whole hours (-5 EST, -4 EDT), sent as an auth header by both brand clients. */
+/**
+ * Current GMT offset in whole hours (e.g. -5 EST, -4 EDT) -- both brand API clients send this as an
+ * auth header; kept in one place so a future fix (e.g. rounding for negative sub-hour offsets)
+ * can't apply to one and not the other.
+ */
 fun gmtOffsetHours(): String {
     // getOffset(now) includes DST; integer division truncates to whole hours.
     val offsetMs = TimeZone.getDefault().getOffset(System.currentTimeMillis())
@@ -189,7 +203,9 @@ fun relativeLabel(ms: Long?): String {
     // No timestamp recorded yet: blank rather than a nonsensical duration.
     if (ms == null || ms <= 0) return ""
     val d = System.currentTimeMillis() - ms
-    // Largest whole unit that fits; integer division truncates.
+    // Each branch's divisor converts the elapsed-ms delta into the largest whole unit that still
+    // fits (minutes under an hour, hours under a day, otherwise days); integer division truncates
+    // rather than rounds.
     return when {
         d < 60_000 -> "just now"
         d < 3_600_000 -> "${d / 60_000} min ago"
@@ -212,7 +228,9 @@ fun degLabel(valueF: String, fahrenheit: Boolean, sourceUnit: Int? = null): Stri
     val sourceIsCelsius = sourceUnit == 0
     val valueIsAlreadyTarget = sourceIsCelsius != fahrenheit
 
-    // Only Celsius keeps its fraction (Canada reports half degrees); Fahrenheit stays whole.
+    // A Celsius value shown in Celsius keeps its fraction, and ONLY that case does. Canada's
+    // setpoint table is in half degrees, so 22.5 is the common reading there and rounding it to
+    // "23" throws away precision the car actually sent.
     if (valueIsAlreadyTarget) {
         if (fahrenheit) return "${raw.roundToInt()}°F"
         return "${trimTrailingZero(raw)}°C"

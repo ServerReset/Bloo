@@ -36,8 +36,9 @@ fun BlooTheme(
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
 
-    // System bars follow the app's theme, not the phone's (SystemBarStyle.auto only sees the system
-    // setting).
+    // The system bars follow the APP's theme, not the phone's: SystemBarStyle.auto (MainActivity)
+    // only sees the system setting, so an app forced Dark on a light phone had dark status icons on
+    // a dark screen (and the reverse).
     val barsView = androidx.compose.ui.platform.LocalView.current
     if (!barsView.isInEditMode) {
         androidx.compose.runtime.SideEffect {
@@ -51,9 +52,10 @@ fun BlooTheme(
     }
 
     val context = LocalContext.current
-    // The cheap static scheme paints the first frame; the dynamic (Material You) scheme needs a
-    // slow synchronous binder call, so it is resolved off the main thread and swapped in when
-    // ready.
+    // The STATIC scheme is cheap and is what the FIRST frame paints. The dynamic (Material You)
+    // scheme extracts the user's wallpaper colours -- a synchronous binder call that can take well
+    // over a second on a cold start -- and was being computed in a `remember` on the main thread,
+    // i.e. ON the first frame.
     val staticScheme = remember(dark, colorPalette, customPalette, vibrancy) {
         blooColorScheme(
             context = context,
@@ -82,13 +84,18 @@ fun BlooTheme(
         }
     }
 
-    // Spacing follows the same scale (see spaceScaleFor).
+    // So: effective = clamp(deviceFontScale, 1..MaxFontScale) * uiScale gives "huge fonts actually
+    // get bigger" while capping the blow-up at a point the fixed overlays and the space scale were
+    // tuned to survive. Spacing follows the SAME effective scale (see spaceScaleFor), so a bigger
+    // font gets breathing room, not clipping.
     val density = LocalDensity.current
     val effectiveFontScale = density.fontScale.coerceIn(1f, MaxFontScale) * uiScale
     val scaledDensity = Density(density.density, effectiveFontScale)
 
-    // Read through a process-wide cache: a synchronous binder IPC on the first-frame path, and it
-    // cannot change without a configuration change.
+    // Keyed on the resolver rather than un-keyed, and read through a process-wide cache: this is a
+    // synchronous binder IPC to the settings provider, and it sat on the first-frame path inside
+    // composition. remember{} alone still pays it once per BlooTheme instance -- and the theme is
+    // applied on every screen -- so the answer is cached for the process instead.
     val reduceMotion = remember(context.contentResolver) { reduceMotionCached(context) }
     // Memoize typography and motion to avoid recomputing on every recomposition.
     val typography = remember(fontChoice) { expressiveTypography(fontChoice) }

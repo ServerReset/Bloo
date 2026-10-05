@@ -50,7 +50,8 @@ enum class ColorPalette(val label: String, val swatch: Color, internal val hue: 
 
 /**
  * A user-authored colour palette. Each field stores a packed Android ARGB int (same encoding as
- * [android.graphics.Color]).
+ * [android.graphics.Color]). Only [primaryArgb] is required; secondary and tertiary default to the
+ * base scheme's relative offsets from primary.
  */
 @Serializable
 data class CustomPaletteData(
@@ -81,7 +82,9 @@ private fun Color.extractHue(): Float {
 
 /**
  * Recolour a scheme from a [CustomPaletteData]. Primary group rotates by however much the user's
- * primary hue differs from the base palette hue.
+ * primary hue differs from the base palette hue. Secondary and tertiary each rotate independently
+ * if the user provided an override; otherwise they follow the same delta as primary (preserving the
+ * expressive offset).
  */
 internal fun ColorScheme.applyCustomPalette(p: CustomPaletteData): ColorScheme {
     val dark = surface.luminance() < 0.5f

@@ -15,8 +15,10 @@ const val CHARGE_LOW_PCT = 30
 
 
 /**
- * Which band a charge/fuel level falls in. Charging outranks the level, and a null [percent] is
- * [ChargeTier.UNKNOWN]. Bands are inclusive ("15% or less"); each surface maps tiers to its own colours.
+ * Which band a charge/fuel level falls in. Charging outranks the level itself, and a null [percent]
+ * is [ChargeTier.UNKNOWN] rather than being folded into a band. The bands are inclusive here, which
+ * is the widget's reading and the safer one: "15% or less" flags at the number a user would expect
+ * it to. Only the bands are shared.
  */
 fun chargeTier(percent: Int?, charging: Boolean): ChargeTier = when {
     charging -> ChargeTier.CHARGING
@@ -63,12 +65,19 @@ fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
     if (fahrenheit) "${(tempC * 9 / 5 + 32).roundToInt()}°F" else "${tempC.roundToInt()}°C"
 
 
-/** The one exact mile/kilometre factor; dividing by it keeps both directions exact inverses. */
+/**
+ * The one mile/kilometre conversion factor, exact. Those are not reciprocals -- 1 / 0.621371 =
+ * 1.609344 -- so a Canadian metric user's value round-tripped lossily through the API boundary and
+ * back to the screen: 263 km arrived as 163.42 mi, rendered as 262 km.
+ */
 const val KM_PER_MI = 1.609344
 
 
-/** Format a distance in miles as "mi" or "km" per the unit system. API distances are always miles;
- *  metric multiplies by [KM_PER_MI] and rounds. */
+/**
+ * Format a distance in miles as "mi" or "km" based on the unit system. The API's distance figures
+ * are always miles, so metric users get a multiply by [KM_PER_MI] and a re-labelled unit; imperial
+ * users get the raw value. Metric ROUNDS rather than truncates.
+ */
 fun formatDistance(mi: Number, metric: Boolean): String =
 
     if (metric) "${(mi.toDouble() * KM_PER_MI).roundToInt()} km" else "${mi.toInt()} mi"
@@ -105,8 +114,10 @@ fun serviceDue(odometerMiles: Int?, lastServiceMiles: Int?, intervalMiles: Int?)
 
 
 /**
- * The ABSOLUTE odometer reading a service falls due at. [serviceDue] is defined as
- * `nextServiceMiles - odometer`, so the countdown and the absolute figure share one formula.
+ * The ABSOLUTE odometer reading a service falls due at. Trivial arithmetic, and shared anyway for
+ * one reason: [serviceDue] is defined as `nextServiceMiles - odometer`, so the relative countdown
+ * ("in N mi") and the absolute figure ("at N mi") are two views of ONE number and must never
+ * disagree.
  */
 fun nextServiceMiles(lastServiceMiles: Int, intervalMiles: Int): Int =
 

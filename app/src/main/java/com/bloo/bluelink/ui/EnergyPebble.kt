@@ -52,12 +52,19 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
     // Brand.supportsChargeLimits).
     var acSeeded by remember(v.vin) { mutableStateOf(false) }
     var dcSeeded by remember(v.vin) { mutableStateOf(false) }
+    // Keying on the VIN alone ran this exactly once, at first composition -- which is almost always
+    // before the car's status has arrived, since the pebble composes as soon as the garage does and
+    // the status fetch lands later.
     val acReported = ev?.reservChargeInfos?.level(1)
     val dcReported = ev?.reservChargeInfos?.level(0)
     LaunchedEffect(v.vin, acReported, dcReported) {
         if (!acSeeded) acReported?.let { acLimit = it; acSeeded = true }
         if (!dcSeeded) dcReported?.let { dcLimit = it; dcSeeded = true }
     }
+    // Collapsing throws away limits that were dragged but never applied: re-opening the pebble
+    // shows the targets the car actually has. (The latches above only ever seed once, so without
+    // this a half-edited slider would survive a close and open and look like the car's real
+    // setting.)
     val expanded = LocalForceExpanded.current || state.isPebbleExpanded(v.vin, "charge")
     LaunchedEffect(expanded) {
         if (!expanded) {
@@ -81,8 +88,10 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
             activeContent = denyTone().content,
         ),
     ) {
-        // ChargeFuelBar only renders in a forced-open context for brands that cannot report limits
-        // (Canada).
+        // Charge limits are EDITABLE here (see the AC/DC pills below, which replaced an earlier
+        // read-only ChargeFuelBar state). ChargeFuelBar itself only renders in a forced-open
+        // context for a brand that cannot report limits at all (Canada) -- there would otherwise be
+        // nothing to show.
         if (LocalForceExpanded.current && !v.brand.supportsChargeLimits) {
             ChargeFuelBar(
                 status,
@@ -92,12 +101,15 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
                 metric = LocalAppearance.current.metricDistance,
             )
         }
-        // Own PopVisible: plugging or unplugging changes this row live while the pebble is open.
+        // Its own PopVisible: this row arrives/leaves live while the pebble is open -- plugging or
+        // unplugging the car doesn't require re-expanding to see it change.
         PopVisible(visible = plugged) {
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
         }
-        // Only for brands that report the targets; elsewhere "Set" would push a value the user
-        // never chose.
+        // Shown only for brands that can actually report the targets. Canada can't
+        // (reservChargeInfos is always null), so the sliders would sit on the 80/90 display
+        // defaults and "Set" would push a value the user never chose to the car -- so we hide them
+        // entirely there. See Brand.supportsChargeLimits.
         if (v.brand.supportsChargeLimits) {
             ChargeLimitPill(
                 label = "AC (home) limit",
@@ -136,7 +148,10 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         range != null -> "${formatDistance(range, metric)}"
         else -> "--"
     }
-    // Not alwaysExpandedInSimpleMode: this pebble has two rows and must stay collapsible.
+    // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting that reads
+    // better inline without an expand/collapse control (see its own doc). This one renders both a
+    // fuel-level row and a range row, so forcing it always open in simple mode just removed the
+    // ability to collapse it.
     Pebble(
         v, "fuel", "Fuel", Icons.Filled.LocalGasStation, state, vm, modifier,
         summary = summary,
@@ -155,8 +170,10 @@ internal fun chargerLabel(plugin: Int?): String? = com.bloo.bluelink.data.charge
 internal fun fmtMinutes(min: Int) = com.bloo.bluelink.data.fmtMinutes(min)
 
 /**
- * A climate setpoint in the user's chosen unit; non-numeric values pass through with a bare degree
- * sign. [sourceUnit] is the API's unit code (0 Celsius, 1 Fahrenheit).
+ * A climate setpoint rendered in the user's chosen unit. Non-numeric values pass through with a
+ * bare degree sign. [sourceUnit] is the API's own unit code for this value -- 0 Celsius, 1
+ * Fahrenheit. That is exactly what happened -- the four setpoint call sites were updated to pass
+ * the unit and failed to compile against this wrapper.
  */
 internal fun degLabel(valueF: String, fahrenheit: Boolean, sourceUnit: Int? = null): String =
     com.bloo.bluelink.data.degLabel(valueF, fahrenheit, sourceUnit)

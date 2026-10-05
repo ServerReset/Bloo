@@ -52,7 +52,11 @@ internal fun ChargeSegmentBar(
     stuckAtLimit: Boolean,
     charging: Boolean,
     modifier: Modifier = Modifier,
-    /** True while the hero card is COLLAPSED (the small readout). */
+    /**
+     * True while the hero card is COLLAPSED (the small readout). The remaining/trailing track is
+     * drawn darker then, so the coloured fill reads clearly against it on the compact bar;
+     * expanded, the longer bar keeps the lighter track it always had.
+     */
     collapsed: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -132,7 +136,9 @@ internal fun ChargeSegmentBar(
                 cornerRadius = radius,
             )
             // The shimmer band: transparent everywhere except a soft white peak that travels with
-            // shimmerX.
+            // shimmerX. Drawn as a SECOND rounded rect the same size as the fill (rather than a
+            // separate clip) -- drawRoundRect only lights up the pixels its own shape covers, so
+            // this rides on top of the gradient above without needing to clip anything itself.
             if (shimmerX != null) {
                 val bandWidth = layout.fillWidth * 0.35f
                 val bandCenter = layout.fillWidth * shimmerX.value
@@ -220,7 +226,9 @@ internal fun chargeBarLayout(
 ): ChargeBarLayout {
     val clampedFrac = filledFrac.coerceIn(0f, 1f)
     // Floored at the bar's own height when there is ANY charge: below that the 50% corner radius
-    // eats the whole shape, so 3% and 0% would otherwise draw the same nothing.
+    // eats the whole shape, so 3% and 0% would otherwise draw the same nothing. This is the
+    // CONCEPTUAL current-charge boundary -- the fill segment's own width is derived from it below,
+    // shrunk by half the gap.
     val filledXRaw = if (clampedFrac <= 0f) 0f else minOf(totalWidth, maxOf(totalWidth * clampedFrac, barHeight))
     val halfGap = gap / 2f
     // Every segment's own bound is coerced against its neighbour's, the same pattern repeated at

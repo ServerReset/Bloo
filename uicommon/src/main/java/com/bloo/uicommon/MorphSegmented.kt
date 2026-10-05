@@ -152,7 +152,9 @@ fun MorphSegmented(
     val visualIndex = dragIndex ?: pendingIndex ?: if (indicatorVisible) selectedIndex else -1
 
     // ONE spring drives everything: the highlight's position along the track (0..n-1, fractional
-    // while it travels).
+    // while it travels). The segment widths and the highlight are both derived from it every frame,
+    // so the highlight is literally the stretched segment sliding to its neighbour, never two
+    // things animating.
     val ratio = stretchRatio(n)
     val pos = remember(n) { Animatable(selectedIndex.toFloat()) }
     val shown = remember(n) { Animatable(if (visualIndex >= 0) 1f else 0f) }

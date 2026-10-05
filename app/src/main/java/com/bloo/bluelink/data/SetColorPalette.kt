@@ -128,7 +128,8 @@ suspend fun SettingsStore.setWeatherFromDeviceLocation(preloaded: android.locati
     val loc = preloaded ?: run {
         // GetLastKnownLocation requires an active location grant; fail fast and explicitly instead
         // of relying on the SecurityException throw inside the runCatching below to do the same
-        // thing.
+        // thing. Keep the runCatching anyway -- TIME is revoked mid-call by the user sometimes, and
+        // a missed weather label must never crash a settings click.
         if (androidx.core.app.ActivityCompat.checkSelfPermission(
                 context, android.Manifest.permission.ACCESS_COARSE_LOCATION,
             ) != android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -155,6 +156,10 @@ suspend fun SettingsStore.setWeatherFromDeviceLocation(preloaded: android.locati
                 listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea).distinct()
                     .joinToString(", ")
                     // .ifBlank, because the `?: "My location"` below only catches a NULL geocode.
+                    // An Address whose locality, subAdminArea AND adminArea are all null --
+                    // offshore, or a sparse country -- makes joinToString return "", which is
+                    // non-null, so it sailed past the fallback and setWeatherLocation stored a
+                    // label of no label at all.
                     .ifBlank { "My location" }
             }
     }.getOrNull() ?: "My location"

@@ -87,7 +87,10 @@ internal object SyncPhotos {
      * locally since the last successful sync, same reasoning as the plain pref merge in
      * [mergeSettingsJson].
      */
-    // @OptIn: Coil's diskCache accessor is still @ExperimentalCoilApi.
+    // @OptIn: Coil's diskCache accessor is still @ExperimentalCoilApi. The call is a deliberate
+    // blanket clear() (see the comment at its call site), not an API we can avoid -- the annotation
+    // records that we knowingly depend on the experimental surface rather than suppressing it
+    // file-wide.
     @OptIn(coil.annotation.ExperimentalCoilApi::class)
     fun apply(context: Context, photos: JsonObject?, protect: Set<String> = emptySet()): Map<String, String> {
         if (photos == null) return emptyMap()
@@ -102,10 +105,12 @@ internal object SyncPhotos {
                 vin to file.absolutePath
             }.getOrNull()
         }.toMap()
-        // A hand-rolled BitmapFactory decode would hit the same "same path, new content" gap --
-        // this app's actual image loads go through Coil (rememberPhotoModel in Hero.kt) instead of
-        // a manual BitmapFactory decode, so the fix here is Coil's own cache, not a produceState
-        // key.
+        // Every synced photo lands at the SAME fixed path across imports (deliberately -- see this
+        // function's own doc on why a fixed name beats a fresh timestamped one), which is exactly
+        // the shape Coil's default File-model cache key can't tell apart: a second import that
+        // overwrites car_$vin_synced.jpg with genuinely different bytes still hits whatever Coil
+        // already decoded and cached for that identical path, in-process, without ever reading the
+        // new file.
         if (result.isNotEmpty()) {
             runCatching {
                 val loader = context.imageLoader
@@ -117,7 +122,12 @@ internal object SyncPhotos {
     }
 }
 
-/** `vin -> (file stamp, base64 JPEG)` memo for [SyncPhotos.encode]. */
+/**
+ * `vin -> (file stamp, base64 JPEG)` memo for [SyncPhotos.encode]. Top-level rather than a field,
+ * because [SettingsStore] is CONSTRUCTED AD HOC at a dozen call sites
+ * (`SettingsStore(context).appearance.first()` and friends) -- an instance field would be a fresh
+ * empty map on most of those calls and would cache nothing.
+ */
 private val syncPhotoCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, String>>()
 
 /**

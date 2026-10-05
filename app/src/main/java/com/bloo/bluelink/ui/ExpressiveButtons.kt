@@ -50,16 +50,19 @@ private const val PressDamping = 0.88f
 @Composable
 internal fun expressivePressFraction(interactionSource: InteractionSource, enabled: Boolean): State<Float> {
     val anim = remember { Animatable(0f) }
-    // Whether a press is currently held. A tap's onClick often disables the button while its
-    // Release is still in flight, so the collector must not be keyed on `enabled` (that would
-    // cancel the push leg).
+    // Tracks whether a press is CURRENTLY held, shared with the enabled-watching effect below.
+    // Needed because a tap's own onClick routinely disables the button as its direct side effect
+    // (Lock/Unlock -> pending, "Check for updates" -> updateChecking) -- so `enabled` flips false
+    // while the SAME gesture's Release is still in flight.
     val isPressed = remember { mutableStateOf(false) }
     // True from the start of the leg back to rest until it finishes, so a self-disabling click
     // cannot snap it.
     val isSettling = remember { mutableStateOf(false) }
     LaunchedEffect(interactionSource) {
-        // Barely bouncy and quick: this drives real width, and overshoot would wobble the
-        // neighbours.
+        // Barely-bouncy and quick, because this fraction drives real WIDTH. A bouncy, slow spring
+        // is the right feel for something that only paints -- it was the original graphicsLayer
+        // scale -- but on width every overshoot frame re-measures the row and drags the neighbours
+        // back and forth with it, which reads as wobble rather than as life.
         val spec = spring<Float>(dampingRatio = PressDamping, stiffness = Spring.StiffnessMedium)
         // Held by press identity, so a cancelled gesture cannot leave the button stuck pressed.
         val held = mutableSetOf<PressInteraction.Press>()
@@ -78,8 +81,10 @@ internal fun expressivePressFraction(interactionSource: InteractionSource, enabl
                     }
                     anim.animateTo(target, spec)
                 } finally {
-                    // Runs on completion and cancellation so a stale true never blocks the next
-                    // leg.
+                    // Runs on a clean finish AND on cancellation (a new press interrupting the
+                    // release, say) -- either way this leg is done owning the settle, and the NEXT
+                    // leg (or the enabled-effect) is free to act without a stale true blocking it
+                    // forever.
                     if (target == 0f) isSettling.value = false
                 }
             }
@@ -141,15 +146,17 @@ fun SafeExpansiveButton(
     content: @Composable () -> Unit,
 ) {
     val press by expressivePressFraction(interactionSource, enabled)
-    // Inside a group the button hands its press fraction to the group, which takes width from its
-    // neighbours.
+    // Inside an [ExpressiveButtonRow]/[ExpressiveButtonGroup] this button joins the group, which
+    // takes the extra width off its NEIGHBOURS so the row's own footprint never changes.
     if (LocalExpressiveGroup.current) {
         Box(
             modifier.then(ExpressiveGroupData({ press }, groupWeight)),
             propagateMinConstraints = true,
         ) {
-            // Providing false makes joining a group idempotent (no second wrapper or press spring).
-            // LocalExpressiveGrowth stays true so MorphButton's animateContentSize steps aside.
+            // Providing FALSE inside makes joining a group idempotent. LocalExpressiveGrowth TRUE,
+            // though (unlike the group flag) -- a member's own width is still being smoothly
+            // driven, by the group's seam-reserve layout instead of this file's standalone one, so
+            // MorphButton's animateContentSize still needs to step aside for the same reason.
             CompositionLocalProvider(LocalExpressiveGroup provides false, LocalExpressiveGrowth provides true) {
                 ExpressiveContent(enabled, content)
             }
@@ -190,7 +197,9 @@ fun SafeExpansiveButton(
                 val target = grown.coerceAtMost(room).coerceAtLeast(0)
                 measurables.map { it.measure(constraints.copy(minWidth = target, maxWidth = target)) }
             }
-            // Stacked at the origin: some call sites emit more than one root into this slot.
+            // Stacked at the origin, like the Box this replaced: a handful of call sites emit more
+            // than one root into this slot (a button with a label and an AnimatedVisibility beside
+            // it), and measuring only the first would make the rest silently vanish.
             val w = placeables.maxOf { it.width }.coerceIn(constraints.minWidth, constraints.maxWidth)
             val h = placeables.maxOf { it.height }.coerceIn(constraints.minHeight, constraints.maxHeight)
             // placeRelative: alone on a row the button rests on the start edge.
@@ -206,8 +215,14 @@ fun SafeExpansiveButton(
 internal val LocalExpressiveGroup = staticCompositionLocalOf { false }
 
 /**
- * True for content [SafeExpansiveButton] is already resizing on press (in a group or standalone),
- * so [MorphButton] skips its own `animateContentSize`.
+ * True for content that [SafeExpansiveButton] is already smoothly resizing on press -- either
+ * because it joined a group (the seam-reserve layout) or because it is growing for real on its own
+ * (this file's own `Layout` above). [MorphButton] reads this to skip its own `animateContentSize`:
+ * that modifier exists for a genuine content change (a label swapping to a longer one, say), and
+ * left unconditional it ALSO tried to re-smooth a width SafeExpansiveButton was already smoothly
+ * driving frame by frame with its own, deliberately non-bouncy spring (see
+ * `expressivePressFraction`'s own doc on why that spring specifically does not ring) -- two
+ * different springs chasing the same width at once, which read as the button wobbling on press.
  */
 internal val LocalExpressiveGrowth = staticCompositionLocalOf { false }
 

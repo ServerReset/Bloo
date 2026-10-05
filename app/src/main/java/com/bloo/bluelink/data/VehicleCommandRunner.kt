@@ -72,7 +72,9 @@ object VehicleCommandRunner {
                     "charge_limit" -> {
                         // Guarded centrally here, so EVERY dispatch route (the natural-language
                         // Settings-search command included) is covered, not just the rendered
-                        // sliders.
+                        // sliders. Canada can't read its charge targets, so it must not write one
+                        // either -- setChargeTargets would POST the unverified evc/setsoc "level"
+                        // field.
                         if (!brand.supportsChargeLimits) {
                             error("Charge limit isn't available on ${v.name}")
                         }
@@ -186,7 +188,9 @@ object VehicleCommandRunner {
         val req = when {
             target == "smart" -> smart ?: smartClimateInLock(snap)
             // "temp:64" -- an explicit temperature in Fahrenheit, which is what search produces for
-            // "start climate at the coldest temperature on X".
+            // "start climate at the coldest temperature on X". Additive to the existing string
+            // protocol rather than a new parameter: every other caller keeps passing what it always
+            // did, and a preset id can never collide with this because ids are UUIDs.
             target.startsWith(TEMP_PREFIX) -> {
                 // "temp:64" or "temp:82:defrost". Suffix rather than a second prefix so the two can
                 // be asked for together, which is what "defrost the windscreen" actually wants:

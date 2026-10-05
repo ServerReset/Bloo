@@ -156,8 +156,10 @@ internal fun MapTopBar(
                 .heightIn(min = 60.dp)
                 .padding(horizontal = 18.dp),
         ) {
-            // Car icon, name, and the charge/range line beneath. Reserves room at the end so the
-            // name never runs under the refresh circle.
+            // Reserves room on the end for the refresh icon (never under it) regardless of
+            // alignment, since both float independently in this Box rather than sharing a Row's own
+            // space-distribution. The car icon, its name, and under it the charge and range: the
+            // pill says which car this map is and how it is doing, not just what it is called.
             Row(
                 Modifier
                     .align(Alignment.CenterStart)
@@ -197,7 +199,9 @@ internal fun MapTopBar(
                 )
             }
             if (onRefreshLocation != null) {
-                // Icon-only; spins while the real pending flag is set.
+                // Icon-only: a refresh indicator that spins while it is actually working (the real
+                // pending flag), in the same ramp-up/steady-spin language as every in-progress
+                // icon.
                 val angle = rememberSpinAngle(refreshing)
                 // 40dp circle, centred in the bar like the handle and name; end padding keeps it
                 // off the edge.
@@ -250,7 +254,9 @@ internal fun Modifier.pullDownToDismiss(
 }
 
 /** "88% · 415 km": a car's charge and range for the map pill, or null when it has neither yet. */
-// @Composable because chargeReadoutOf resolves theme locals.
+// chargeReadoutOf is @Composable (it reads MaterialTheme/LocalContentColor for the state-colour
+// pair it derives), so this wrapper must be too -- not for composition itself, but because a plain
+// function cannot resolve those locals.
 @Composable
 internal fun mapStatusLine(state: UiState, v: com.bloo.bluelink.data.Vehicle, metric: Boolean): String? {
     val r = chargeReadoutOf(state.statusFor(v), state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric)

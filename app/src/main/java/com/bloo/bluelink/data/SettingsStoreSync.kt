@@ -107,6 +107,8 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
     val fullAdopt = pullPrimary || !syncedEver
     val shouldImport = remoteHasContent && (pullPrimary || !syncedEver || gatePassed)
     var imported = false
+    // No `&& remoteJson != null` here: remoteHasContent (folded into shouldImport above) already
+    // requires it, and K2 proves it -- the extra check was dead code.
     if (shouldImport) {
         imported = if (fullAdopt) {
             adoptSettingsJson(remoteJson)

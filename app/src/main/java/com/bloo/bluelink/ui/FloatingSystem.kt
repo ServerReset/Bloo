@@ -50,8 +50,8 @@ object FloatingIds {
 
 @Stable
 class FloatingRegistry {
-    // Snapshot-backed so a dodger recomposes when a neighbour moves; written from
-    // onGloballyPositioned (post-layout).
+    // Snapshot-backed so a dodger recomposes/redraws when a neighbour moves. Writes come from
+    // onGloballyPositioned (layout phase is finished by then, so this is a safe place to write).
     private val bounds = mutableStateMapOf<FloatingId, Rect>()
 
     /**
@@ -70,8 +70,9 @@ class FloatingRegistry {
     var chromeHidden by mutableStateOf(false)
 
     /**
-     * Back to rest. A publishing screen must call this when it leaves so its state doesn't outlive
-     * it.
+     * Back to rest. A screen that publishes these must call this when it leaves, or the last thing
+     * it asserted outlives it -- and "hidden, shifted down 96dp" is a state no screen should be
+     * able to leave behind for the next one.
      */
     fun resetChrome() {
         chromePull = { 0f }
@@ -82,7 +83,11 @@ class FloatingRegistry {
     /** Who last published each id, so a withdrawal can be checked against it. */
     private val owners = mutableStateMapOf<FloatingId, Any>()
 
-    /** Publish (or with null, withdraw) this element's live bounds under [id]. */
+    /**
+     * Publish (or with null, withdraw) this element's live bounds under [id]. [owner] identifies
+     * the publishing instance, and a withdrawal only takes effect if that instance is the one
+     * currently holding the id.
+     */
     fun report(id: FloatingId, rect: Rect?, owner: Any) {
         if (rect == null) {
             if (owners[id] === owner) {
@@ -128,7 +133,8 @@ class FloatingRegistry {
 
     internal companion object {
         /**
-         * Delegates to uicommon's [com.bloo.uicommon.floatersOverlap], where its JVM tests live.
+         * Delegates to uicommon's [com.bloo.uicommon.floatersOverlap] -- one pure check, kept over
+         * there because that is where the JVM tests pinning its boundary behaviour live.
          */
         fun overlaps(a: Rect, b: Rect, marginPx: Float): Boolean =
             com.bloo.uicommon.floatersOverlap(a, b, marginPx)
@@ -136,10 +142,12 @@ class FloatingRegistry {
 }
 
 /**
- * Everything a floating element needs in one modifier: publishes its bounds, rides the
- * pull-to-refresh shift, and fades during a refresh. [fade] is off for chrome about the refresh
- * itself and for persistent navigation; [shift] is off for anything anchored to the screen rather
- * than the page (the Settings cog).
+ * Everything a floating element needs, in one modifier: it publishes its bounds so others can avoid
+ * it, rides the pull-to-refresh shift, and fades while a refresh runs. [fade] is off for chrome
+ * that is *about* the refresh (the loading indicator, which must stay visible precisely when
+ * everything else goes) and for persistent navigation that should not blink. [shift] is off for
+ * anything anchored to the screen rather than to the page beneath it -- the Settings cog is a nav
+ * target, not page chrome, so it stays put while the page slides.
  */
 fun Modifier.floatingOverlay(
     id: FloatingId,
@@ -148,8 +156,9 @@ fun Modifier.floatingOverlay(
     shift: Boolean = true,
 ): Modifier = composed {
     val registry = LocalFloatingRegistry.current
-    // The hold is animated; the drag is not, so a pull tracks the finger. Both are read in the
-    // offset lambda.
+    // The HOLD is animated (a refresh starting or ending is a state change worth easing); the DRAG
+    // is not, because a pull should track the finger exactly rather than lag a spring behind it.
+    // Both are read inside the offset lambda below, so neither recomposes anything.
     val holdState = animateFloatAsState(
         targetValue = if (registry.chromeHolding) 1f else 0f,
         animationSpec = spring(
@@ -164,7 +173,8 @@ fun Modifier.floatingOverlay(
         label = "floatingFade",
     )
     this
-        // Layout and draw phase respectively, so neither recomposes per frame.
+        // Layout phase and draw phase respectively -- neither re-runs composition per frame, which
+        // is the whole reason these are read inside lambdas.
         .offset {
             if (!shift) return@offset IntOffset.Zero
             // Whichever is further along: the finger, or the settled refresh hold.
@@ -179,8 +189,9 @@ fun Modifier.floatingOverlay(
 val LocalFloatingRegistry = staticCompositionLocalOf { FloatingRegistry() }
 
 /**
- * Publishes this element's live bounds under [id] so other floaters can avoid it. [active] false
- * withdraws them (present but not currently floating).
+ * Publishes this element's live bounds to the registry under [id], so other floaters can avoid it.
+ * [active] false withdraws them (an element that is present but not currently floating -- a title
+ * still inline in the page, say -- should not push anything around).
  */
 fun Modifier.floatingElement(id: FloatingId, active: Boolean = true): Modifier = composed {
     val registry = LocalFloatingRegistry.current
@@ -189,7 +200,8 @@ fun Modifier.floatingElement(id: FloatingId, active: Boolean = true): Modifier =
     DisposableEffect(registry, id, owner) {
         onDispose { registry.report(id, null, owner) }
     }
-    // Withdraw immediately; onGloballyPositioned won't fire again if nothing moved.
+    // Withdraw immediately on going inactive rather than waiting for a layout pass that may never
+    // come (nothing moved, so onGloballyPositioned would not fire again).
     DisposableEffect(registry, id, active, owner) {
         if (!active) registry.report(id, null, owner)
         onDispose { }

@@ -25,8 +25,10 @@ import com.bloo.bluelink.data.setLiveChargeDismissed
 internal fun AppViewModel.ensureStatus(
     v: Vehicle,
     /**
-     * Every other caller leaves this false -- see [logStartup]'s own doc for why this isn't
-     * meaningful outside the cold-start path.
+     * Startup-only instrumentation: when true, logs how long THIS fetch actually took once it
+     * succeeds, so [loadGarageInner]'s own cold-start timeline can report when the CURRENT car's
+     * status (the one gating its first-visible pebbles) was actually ready, not just when the fetch
+     * was dispatched.
      */
     logStartupTiming: Boolean = false,
 ) {
@@ -118,7 +120,9 @@ internal fun AppViewModel.loadStatus(
         }
         try {
             // Only the network status() call needs the account-wide mutex (Blue Link 502s on
-            // overlapping requests).
+            // overlapping requests). Capture the result and EXIT the lock before running the slow,
+            // purely-local follow-up work (checkAlerts' DataStore read, the blocking Geocoder) so
+            // it doesn't stall every other car's fetch and the background poller behind it.
             val beforeLockAt = System.currentTimeMillis()
             val s = statusMutex.withLock {
                 if (logStartupTiming) {
@@ -188,8 +192,10 @@ internal fun AppViewModel.loadStatus(
 }
 
 /**
- * `LiveCharge.update` clears the bar on its own once a car isn't charging, so this also handles the
- * instant a refresh shows charging has finished.
+ * Brings the live-charge notification (see [LiveCharge]) in step with whatever the app itself just
+ * fetched -- otherwise only the background workers ever wrote it, and the one moment the user has
+ * the freshest data (having just pulled to refresh, standing in the app) was the one moment the bar
+ * in the shade didn't move.
  */
 internal suspend fun AppViewModel.refreshLiveChargeBar(vehicles: List<Vehicle>) {
     if (!settingsStore.notificationPrefs().charging) return
@@ -204,8 +210,10 @@ internal suspend fun AppViewModel.refreshLiveChargeBar(vehicles: List<Vehicle>) 
     val statuses = _state.value.statuses
     var anyCharging = false
     vehicles.forEach { v ->
-        // Only cars we actually hold a status for. Third instance of the same mistake; AlertWorker
-        // and the 5-minute poll worker had it too.
+        // Only cars we actually hold a status for. LiveCharge.update CANCELS the notification when
+        // told charging = false, and a missing status produced exactly that -- so opening the app
+        // before its own first fetch landed could delete a live bar a background worker had
+        // correctly posted, purely because this in-memory map was still empty.
         val status = statuses[v.vin] ?: return@forEach
         val ev = status.evStatus
         if (ev?.batteryCharge == true) anyCharging = true

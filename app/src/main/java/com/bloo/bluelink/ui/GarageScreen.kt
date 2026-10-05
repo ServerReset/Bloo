@@ -104,7 +104,10 @@ internal fun GarageScreen(
     // Hide the floating chrome as soon as the pull begins (and through the refresh), so the
     // squiggly indicator has the stage to itself; fade it back in when done.
     val pulling by remember { derivedStateOf { pullFractionState.floatValue > 0.01f } }
-    // Published to the floating registry instead of animated here.
+    // Published to the floating registry instead of animated here. The fade and the pull shift are
+    // behaviours of floating CHROME, not of the dots or the corner buttons individually -- holding
+    // them per-site is what let them disagree (dots faded but never shifted; the corner icons
+    // shifted but never faded).
     val floatingRegistry = LocalFloatingRegistry.current
     // Slide the floating overlays (dots, settings, back/flip) down: in real time as the user pulls,
     // then settle/spring back up once the refresh completes. overlayShiftTarget genuinely needs the
@@ -145,7 +148,10 @@ internal fun GarageScreen(
     // sheet covers the same corner its own bottom action row occupies.
     LaunchedEffect(expandedMap.vin) { vm.setMapExpanded(expandedMap.vin != null) }
     DisposableEffect(Unit) { onDispose { vm.setMapExpanded(false) } }
-    // How many full-height cards fit side by side; pages advance by this many.
+    // How many full-height cards fit side by side; pages advance by this many. `slots`, not
+    // `count`: coerceIn(1, 0) throws (min > max) with zero cars, and there is exactly one
+    // non-Settings page to show anyway in that case (the status card), so multi-column grid mode
+    // never applies to it.
     val perPage = carColumnsFor(widthDp.value).coerceIn(1, slots)
     // Expanding to the dual-column view only makes sense on a wide screen.
     val canExpand = large && count > 1

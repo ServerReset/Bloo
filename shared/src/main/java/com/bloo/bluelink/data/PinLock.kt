@@ -152,6 +152,8 @@ data class PinLockout(
             PinLockout(
                 nextFailures,
                 nowEpochMs + durationMs,
+                // Only anchored when a real monotonic reading was supplied; 0 stays 0 so a caller
+                // that has none does not manufacture a deadline at the epoch.
                 if (nowElapsedMs > 0L) nowElapsedMs + durationMs else 0L,
             )
         } else {
@@ -165,7 +167,11 @@ data class PinLockout(
         const val STRIKES_PER_BATCH = 5
         const val BASE_WINDOW_MS = 30_000L
 
-        /** The window length for batch number [batch] (1-based). */
+        /**
+         * The window length for batch number [batch] (1-based). The doubling is deliberate and
+         * unbounded in spirit -- PinLockBoundaryTest pins the 10th-strike window at 256 minutes
+         * precisely because the escalation is meant to become punishing -- so this does NOT cap it.
+         */
         fun windowMs(batch: Int): Long = BASE_WINDOW_MS * (1L shl (batch.coerceIn(1, 40) - 1))
     }
 }

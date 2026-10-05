@@ -301,7 +301,9 @@ fun ToggleRow(
     description: String? = null,
     onChange: (Boolean) -> Unit,
 ) {
-    // No wrapper when there is no caption, so existing call sites keep their layout.
+    // No wrapper at all when there is no caption, so every existing call site keeps exactly the
+    // layout it had -- a Column around a single fillMaxWidth Row measures the same, but "the same"
+    // is not worth asserting across ~25 call sites for a branch that costs nothing.
     if (description == null) {
         ToggleRowControl(label, checked, onChange)
     } else {
@@ -321,8 +323,9 @@ internal fun SettingsCaption(
     text: String,
     modifier: Modifier = Modifier,
     /**
-     * The gap below; defaults to the group gap. Pass a smaller one where the caption leads its
-     * control.
+     * The gap below. The default is the group gap, because a caption normally trails the control it
+     * explains and what matters is the distance to the NEXT one. Pass a smaller one where the
+     * caption instead LEADS its own control, so the two read as a pair.
      */
     bottomGap: Dp = GapGroup,
 ) {

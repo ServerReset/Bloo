@@ -62,7 +62,9 @@ internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
     LaunchedEffect(locked) {
         lockBlur.snapTo(if (locked) LOCK_BLUR_DP else 0f)
     }
-    // The blur modifier is applied only while there IS one.
+    // The blur modifier is applied only while there IS one. Modifier.blur(0.dp) installs no
+    // RenderEffect, but it still forces the whole app tree into its own graphicsLayer on every
+    // frame -- for the entire life of the process, to serve a lock screen that is almost never up.
     Box(
         Modifier
             .fillMaxSize()
@@ -111,7 +113,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     // loop.
     var nowTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
     // The monotonic reading is ticked alongside the wall clock, so the countdown this screen SHOWS
-    // agrees with the one verifyAppPin enforces.
+    // agrees with the one verifyAppPin enforces. Reading only the wall clock here would have the UI
+    // cheerfully offer a keypad while the attempt was still being rejected.
     var elapsedTick by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
     val lockout = appState.pinLockout
     val rejected = lockout.isLocked(nowTick, elapsedTick)

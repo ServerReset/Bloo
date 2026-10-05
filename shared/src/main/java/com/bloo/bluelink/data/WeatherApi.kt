@@ -43,7 +43,12 @@ data class Weather(
     fun highF(): Double? = highC?.let { it * 9 / 5 + 32 }
     fun lowF(): Double? = lowC?.let { it * 9 / 5 + 32 }
 
-    /** Temperature as a rounded, unit-suffixed string. */
+    /**
+     * Temperature as a rounded, unit-suffixed string. Delegates to the shared [weatherTemp] so the
+     * C-to-F-and-round rule lives in exactly one place; this was a byte-for-byte second copy of it,
+     * and weatherTemp's own KDoc had wrongly claimed the watch was "its only caller" while the
+     * phone reached this identical copy instead.
+     */
     fun tempLabel(fahrenheit: Boolean): String = weatherTemp(tempC, fahrenheit)
 
     // No unit suffix here (just the degree glyph) -- this is meant for compact UI spots that

@@ -62,15 +62,27 @@ fun AnimatedSlider(
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    // Set via onSizeChanged; needed to turn a touch x into a track fraction.
+    // Tracked via onSizeChanged below (Compose only knows this after the first layout pass), since
+    // every gesture-to-value conversion needs the control's actual pixel width to turn a touch
+    // x-coordinate into a fraction of the track.
     var widthPx by remember { mutableFloatStateOf(0f) }
 
-    // Source of truth for the thumb position: snapTo during a drag, animateTo when settling; the Canvas reads it in the draw phase only.
+    // The single source of truth for the thumb/track's rendered position. Driven either by a live
+    // drag (snapTo, 1:1 with the finger) or by a settle spring (animateTo) once the finger lifts;
+    // the Canvas below reads anim.value every frame to draw the thumb without needing a
+    // recomposition per frame.
     val anim = remember { Animatable(value) }
     var dragging by remember { mutableStateOf(false) }
     var prevStep by remember { mutableFloatStateOf(snapToStep(value, valueRange, steps)) }
-    // settleTo() calls onValueChange synchronously, which re-triggers this effect; `settling` (set before
-    // any suspension) stops its snapTo racing the just-launched bounce, as isRunning flips late.
+    // settleTo() below calls onValueChange(target) synchronously, which recomposes with the new
+    // `value` and re-triggers this effect, racing the scope.launch{} bounce animation settleTo just
+    // started: if this effect's snapTo(value) runs before that launched coroutine has actually
+    // started animating (a scheduling gap, not a guaranteed ordering), it jumps anim.value straight
+    // to the target and the just-started spring then animates from target to target -- a no-op that
+    // reads as the bounce snapping partway through instead of completing. isRunning alone can't
+    // detect this window reliably since it doesn't flip true until the launched coroutine actually
+    // starts; an explicit flag set synchronously inside settleTo (before any suspension point)
+    // closes it.
     var settling by remember { mutableStateOf(false) }
     var settleJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
@@ -153,8 +165,10 @@ fun AnimatedSlider(
             .height(thumbH)
             // No motion blur: a blurred render target reads as the slider going low-resolution.
             .onSizeChanged { widthPx = it.width.toFloat() }
-            // Tap-vs-drag as in MorphSegmented: `claimed` flips once horizontal movement passes slop and dominates;
-            // release while undecided is a tap; vertical movement cedes to an ancestor scrollable.
+            // Same tap-vs-drag disambiguation as MorphSegmented's gesture handler: `claimed` starts
+            // false (undecided) and only flips true once horizontal movement exceeds touch slop and
+            // dominates vertical movement, at which point this becomes a drag and every subsequent
+            // move updates the thumb live via trackTo().
             .pointerInput(valueRange, steps) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -184,7 +198,8 @@ fun AnimatedSlider(
                                 dy > slop -> break
                             }
                         } else if (change.positionChanged()) {
-                            // Dragging: track the finger.
+                            // Already dragging: keep the thumb tracking the finger every frame via
+                            // trackTo's free-flow + overshoot logic.
                             trackTo(change.position.x)
                             change.consume()
                         }
@@ -196,9 +211,16 @@ fun AnimatedSlider(
                     }
                 }
             }
-            // The LOGICAL value, not anim.value: reading the Animatable would recompose every frame; also what assistive tech announces.
+            // The LOGICAL value, not anim.value: reading the Animatable here invalidated
+            // composition on every frame of a drag or settle bounce just to keep semantics fresh
+            // (the Canvas below reads anim.value in its own draw scope, which redraws without
+            // recomposing). The stepped value is also what assistive tech should announce.
             .progressSemantics(value, valueRange, steps)
-            // progressSemantics is read-only; setProgress makes it adjustable for TalkBack (touch exploration intercepts the drag).
+            // progressSemantics alone only publishes the value for announcement (read-only, meant
+            // for plain progress indicators) -- this control is adjustable, so without setProgress
+            // a screen-reader user could hear the current value but had no supported way to change
+            // it (touch-exploration intercepts the raw drag gesture the pointerInput above depends
+            // on).
             .semantics {
                 setProgress { target ->
                     settleTo(snapToStep(target, valueRange, steps))
@@ -206,7 +228,11 @@ fun AnimatedSlider(
                 }
             },
     ) {
-        // Hand-drawn each frame from one `frac` of anim.value, read in the draw scope so dragging does not recompose.
+        // Everything the slider looks like is hand-drawn here each frame: an inactive (remaining)
+        // track segment, an active (traveled) track segment, optional step dots, and the thumb
+        // itself -- all positioned from a single `frac` derived from anim.value, so reading
+        // anim.value in this draw scope (rather than in a @Composable read further up) means
+        // dragging/settling repaints without triggering a recomposition of this whole function.
         Canvas(
             Modifier
                 .fillMaxWidth()
@@ -229,7 +255,9 @@ fun AnimatedSlider(
             // Half-gap kept clear around the thumb.
             val cut = halfThumb + gapPx
 
-            // One continuous track behind the handle: the whole pill inactive, then the accent drawn over it, clipped left of the handle.
+            // Inactive track: from just past the thumb's right edge (thumbX + cut) to the far right
+            // end of the control. Only drawn if there's room left -- i.e. the thumb isn't already
+            // sitting at (or past) the far right edge.
             drawRoundRect(inactiveColor, topLeft = Offset(0f, top), size = Size(size.width, th), cornerRadius = radius)
             if (thumbX > 0f) {
                 clipRect(left = 0f, top = 0f, right = thumbX, bottom = size.height) {
@@ -248,7 +276,8 @@ fun AnimatedSlider(
             if (steps > 0) {
                 val n = steps + 2
                 val rPx = dotR.toPx()
-                // A crowded slider draws every k-th dot.
+                // A crowded slider draws every k-th dot so the track never turns into a dotted
+                // line.
                 val every = ((n * (dotR.toPx() * 5f)) / size.width.coerceAtLeast(1f)).toInt().coerceAtLeast(1)
                 for (i in 0 until n) {
                     if (i % every != 0 && i != n - 1) continue
@@ -284,8 +313,10 @@ fun AnimatedSlider(
 }
 
 /**
- * Quantizes [v] to the nearest of [steps] evenly-spaced intermediate stops across [range]
- * (`steps + 1` equal increments); 0 steps is a plain clamp.
+ * Quantizes [v] to the nearest of [steps] evenly-spaced increments across [range]. With `steps`
+ * intermediate stops, the range is divided into `steps + 1` equal-sized increments (so a slider
+ * with 1 step has 3 valid positions: start, midpoint and end; 0 steps means no quantization at all,
+ * just a plain clamp to the range).
  */
 fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: Int): Float {
     if (steps <= 0) return v.coerceIn(range.start, range.endInclusive)

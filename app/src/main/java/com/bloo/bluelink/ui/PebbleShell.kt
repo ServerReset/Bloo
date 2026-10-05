@@ -53,8 +53,9 @@ import kotlinx.coroutines.flow.first
 import com.bloo.bluelink.data.settingsMode
 
 /**
- * A collapsible titled section that springs open/closed. Open state lives in the ViewModel (per car
- * + section).
+ * A collapsible "pebble" - a titled section that springs open/closed with a playful bounce.
+ * Open/closed state lives in the ViewModel (per car + section), and the section order is
+ * user-configurable in Settings.
  */
 @Composable
 internal fun Pebble(
@@ -70,7 +71,10 @@ internal fun Pebble(
     headerAction: PebbleHeaderAction? = null,
     /** Drawn behind the header and body, clipped to the pebble's shape. */
     background: (@Composable BoxScope.() -> Unit)? = null,
-    /** If true and in simple mode, the pebble is always expanded and cannot be collapsed. */
+    /**
+     * If true and in simple mode, the pebble is always expanded and cannot be collapsed. Use for
+     * pebbles with a single setting that benefit from inline display without expand/collapse.
+     */
     alwaysExpandedInSimpleMode: Boolean = false,
     /**
      * For a pebble whose body is a single setting: in simple mode, render that control on the title
@@ -83,7 +87,9 @@ internal fun Pebble(
     val simpleMode = state.settingsMode != "advanced"
     val forceAlwaysExpanded = alwaysExpandedInSimpleMode && simpleMode
     val inlineSimple = inlineSettingInSimpleMode != null && simpleMode
-    // The stored toggle only applies when neither special mode is active.
+    // Body only ever opens via the user's own stored toggle when neither special mode is active --
+    // forceAlwaysExpanded already shows the body unconditionally, and inlineSimple has nothing left
+    // to disclose (the one setting it holds is already on the title row).
     val expanded = forceExpanded || forceAlwaysExpanded ||
         (!inlineSimple && state.isPebbleExpanded(v.vin, section))
     val canToggle = !forceAlwaysExpanded && !inlineSimple
@@ -118,8 +124,9 @@ internal fun PebbleShell(
     modifier: Modifier = Modifier,
     summary: String? = null,
     /**
-     * Trailing content on the title row (e.g. the hero's [ChargeStatsLine]). Null for other
-     * pebbles. It owns its leading gap so an absent stat costs nothing.
+     * Trailing content on the TITLE row -- a headline stat that would otherwise need a third row of
+     * its own. Null for every other pebble. A composable slot rather than a string: the hero puts a
+     * styled, derived readout here ([ChargeStatsLine]), not a caption.
      */
     titleTrailing: (@Composable () -> Unit)? = null,
     /**
@@ -138,8 +145,10 @@ internal fun PebbleShell(
      */
     headerContent: (@Composable () -> Unit)? = null,
     /**
-     * Whether the title grows on expand. Hero only: the growth lerps a real font size, so every
-     * frame misses the ParagraphLayoutCache and re-lays the text out.
+     * Whether the TITLE grows when this pebble expands. False for every pebble but the hero, and
+     * that is the point. Also the only one where the cost is justified: the growth lerps a real
+     * font size, so every frame misses the SINGLE-SLOT ParagraphLayoutCache and re-lays the text
+     * out.
      */
     growTitleOnExpand: Boolean = false,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
@@ -148,8 +157,10 @@ internal fun PebbleShell(
     /** If false, the chevron is hidden and onToggle is not called. */
     canToggle: Boolean = true,
     /**
-     * Drawn behind the header and collapsing body, inside the card's clip (the hero's photo). Must
-     * handle its own text legibility (scrim). Null for other pebbles.
+     * Drawn BEHIND the header and the collapsing body, inside the card's clip. A pebble is
+     * otherwise a plain vertical stack with no z-order, so nothing could sit under the header. The
+     * hero needs that: its photo runs up behind the header row so the title and the chevron overlay
+     * the top of the image.
      */
     background: (@Composable BoxScope.() -> Unit)? = null,
     /**
@@ -195,7 +206,9 @@ internal fun PebbleShell(
         label = "pebbleCorner",
     )
     val pebbleShape = RoundedCornerShape(corner)
-    // Off by default; see Appearance.pebbleOutline.
+    // Off by default -- see Appearance.pebbleOutline's doc comment. Most floating chrome always has
+    // a rim, but pebbles are the majority of on-screen surface area, so a rim on every single one
+    // is a much bigger visual commitment than one more floating button.
     val pebbleAppearance = LocalAppearance.current
     val pebbleOutline = pebbleAppearance.pebbleOutline
     Box(Modifier.fillMaxWidth()) {
@@ -206,8 +219,10 @@ internal fun PebbleShell(
                 // The card's bounding box is glass; its own panels stay solid.
                 .glassCardFill(pebbleShape, containerColor),
             shape = pebbleShape,
-            // No shadow elevation: the card is scaled by the drag lift/intro layer, and a default
-            // spot shadow would re-rasterize every frame. The border carries the depth.
+            // No shadow elevation: the whole card is scaled by ReorderColumn's drag lift and the
+            // cold-start intro (a graphicsLayer on the pebble's own Box above), and the default 1dp
+            // shadow is a spot shadow baked into that layer -- so it re-rasterized on every frame
+            // of the lift, which is exactly the drag/float chug.
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             colors = CardDefaults.cardColors(
                 // Slightly translucent so the aurora reads faintly through; 0.9 keeps text
@@ -253,8 +268,10 @@ internal fun PebbleShell(
                         // rows do.
                         StaggeredRevealColumn(
                             transition = transition,
-                            // Animates height changes while expanded (install steps, loading
-                            // notes).
+                            // AnimatedVisibility only animates the whole block appearing and
+                            // disappearing; content that changes WHILE expanded (an install step
+                            // arriving, notes loading) still jumped the card's height. This
+                            // animates those in place too.
                             modifier = Modifier.animateContentSize(
                                 lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                             ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),

@@ -34,7 +34,9 @@ import kotlinx.coroutines.flow.map
         }
         val percent = status?.percentFor(hasBattery)
         val range = status?.rangeMiFor(hasBattery)
-        // A fix that did NOT ride along on the status.
+        // `locate()` prefers the GPS carried by a status refresh, but falls back to
+        // `repoFor(v).location(v)` (findMyCar) and stores that in `_state.locations` only -- and
+        // Canada's repo has no GPS on its status at all, so that fallback is its ONLY source.
         val fix = status.toGeoLocation() ?: state.locations[v.vin]
         return VehicleSnapshot(
             vin = v.vin,

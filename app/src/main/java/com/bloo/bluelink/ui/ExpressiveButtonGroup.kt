@@ -49,7 +49,10 @@ fun ExpressiveButtonGroup(
     // Natural (unpressed) child widths from the last resting pass. Deliberately not snapshot state:
     // writing state during measure invalidates the running pass.
     val naturals = remember { NaturalWidths() }
-    // Invalidate the natural-width cache whenever the composed content re-runs.
+    // Invalidate the natural-width cache whenever the CONTENT this group composes re-runs. So every
+    // measure of every group in the app re-walked each member's intrinsic width, and a button's
+    // intrinsic width runs a real text layout for its label (that is what
+    // `MorphButtonLabel.maxIntrinsicWidth` is).
     SideEffect {
         naturals.content = null
         naturals.compact = null
@@ -82,9 +85,10 @@ fun ExpressiveButtonGroup(
             val weight = FloatArray(n) { i ->
                 (measurables[i].parentData as? ExpressiveGroupData)?.weight ?: 0f
             }
-            // Natural widths come from maxIntrinsicWidth, not a trial measure: a child can be
-            // measured once per pass, and a trial inside a width-forcing parent would record the
-            // forced width.
+            // Natural widths come from maxIntrinsicWidth rather than from a trial measure. That is
+            // not a micro-optimisation, it is what makes filling possible at all: a child may only
+            // be measured once per pass, so measuring to learn the natural width leaves nothing
+            // with which to place the child at a different one.
             val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
             // Re-read whenever at rest, cached only while a press animates: labels can change and
             // stale widths would mis-size neighbours.
@@ -97,7 +101,8 @@ fun ExpressiveButtonGroup(
                     naturals.compact = null
                 }
             }
-            // What each child's content actually asked for.
+            // What each child's content actually asked for -- the only intrinsic width this group
+            // pays for by default.
             val full = naturals.content!!
             // Proportional members take spare room in proportion to their natural width. A lone
             // member rests at its natural width (see SafeExpansiveButton's fillOnPress).
@@ -123,8 +128,9 @@ fun ExpressiveButtonGroup(
                 return (0 until n).all { c[it] < full[it] } && c.sum() + gapPx * (n - 1) <= maxW
             }
             if (!wrap || collapsesInsteadOfWrapping()) {
-                // A row whose buttons all have a symbol never wraps: it compacts to symbols
-                // instead.
+                // A row whose buttons all have a symbol never breaks into lines: when the labels do
+                // not fit, every button drops to its symbol (the fit rule below) and the one line
+                // fills the width. Wrapping is for buttons that have nothing to collapse to.
                 lines.add(IntArray(n) { it })
             } else {
                 val broken = balancedLineBreaks(full, gapPx, maxW)
@@ -146,8 +152,8 @@ fun ExpressiveButtonGroup(
                     nonMemberWidth += p.width
                 }
                 val memberIdx = idx.filter { member[it] }
-                // A lone button rests at its own width (start-aligned) and only fills the line
-                // while pressed.
+                // A lone button on its line has nobody to share with: it rests at its own width
+                // (aligned to the start) and only fills the line while pressed -- see below.
                 if (memberIdx.size == 1) weight[memberIdx[0]] = 0f
                 if (memberIdx.isEmpty()) {
                     lineWidth[li] = nonMemberWidth + gapsHere
@@ -211,8 +217,11 @@ fun ExpressiveButtonGroup(
                     // split pill spans its row and still redistributes on press.
                     val wSum = memberIdx.sumOf { weight[it].toDouble() }
                     for (i in memberIdx) base[i] = natLine[i].toDouble()
-                    // Stretch only when the group is GIVEN its width (min == max); a loose bounded
-                    // width is only a maximum and stretching would starve a weighted sibling.
+                    // Stretching to fill is only for a group GIVEN its width (fillMaxWidth: min ==
+                    // max). A group in a Row beside a weighted label is handed a loose, bounded
+                    // width as the most it may take -- stretching to that claimed the whole row and
+                    // starved the label to nothing (the Logs header: one letter per line, buttons
+                    // on top of it).
                     val handedItsWidth = constraints.hasBoundedWidth && constraints.minWidth == constraints.maxWidth
                     val spareRaw = room - naturalTotal
                     val spare = if (!handedItsWidth && spareRaw > 0) 0 else spareRaw
@@ -224,8 +233,9 @@ fun ExpressiveButtonGroup(
                             }
                             naturalTotal + spare
                         }
-                        // Too tight for resting widths: give up reserve first, proportionally,
-                        // never the basis.
+                        // Not enough room even for the resting widths. Give up the RESERVE first,
+                        // proportionally, and never a pixel of the basis -- so a tight line loses
+                        // its squash allowance before it loses anything you can see.
                         spare < 0 -> {
                             val reserve = memberIdx.sumOf { (natLine[it] - basis[it]).toDouble() }
                             if (reserve > 0.0) {
@@ -249,7 +259,9 @@ fun ExpressiveButtonGroup(
                 for (i in memberIdx) exact[i] = base[i]
                 for (k in 0 until memberIdx.size - 1) {
                     val a = memberIdx[k]; val b = memberIdx[k + 1]
-                    // Bilateral: each side can only give its own half of the seam's reserve.
+                    // Bilateral, not a shared pooled seam: each side can only ever GIVE what it
+                    // holds as its OWN half of this seam's reserve (see seamReserve's own doc for
+                    // why that half is sized off its own content, not its neighbour's).
                     val bHalf = (ExpressivePressGrowth * basis[b]) / 2.0
                     val aHalf = (ExpressivePressGrowth * basis[a]) / 2.0
                     // Each side's gain is capped by the smaller of the two halves, so a small
@@ -263,13 +275,17 @@ fun ExpressiveButtonGroup(
                     exact[a] += delta
                     exact[b] -= delta
                 }
-                // Defensive floor: content never shrinks below what it needs.
+                // Defensive floor only -- content itself never shrinks below what it needs, even in
+                // the two-sided-press edge case above. Left uncorrected on the other side of that
+                // same rare case; a pixel of slack in the line's own total there is a far smaller
+                // cost than a truncated label.
                 for (i in memberIdx) {
                     exact[i] = exact[i].coerceAtLeast(basis[i].toDouble())
                 }
-                // FINAL GUARANTEE: placed width never exceeds the budget; claw back from members
-                // with slack first, then proportionally, so the last member is never pushed
-                // off-screen.
+                // FINAL GUARANTEE: the line's placed width never exceeds its budget, whatever the
+                // equal-share or the floor above produced. Claw any excess back from the members
+                // with slack first, then proportionally, so the last member can never be pushed
+                // past the edge of the row and off-screen.
                 val exactSum = memberIdx.sumOf { exact[it] }
                 if (exactSum > total && total > 0) {
                     var excess = exactSum - total
@@ -289,9 +305,10 @@ fun ExpressiveButtonGroup(
                     }
                 }
 
-                // A lone button has no neighbour to take from, so it expands to the line's budget
-                // while pressed (start-aligned at rest). Runs after the budget clamp, which must
-                // not undo it.
+                // A LONE button on a line has no neighbour to take press width from, so the seam
+                // redistribution above left it unchanged and its press would be a corner-only
+                // change with NO growth. Instead it EXPANDS to fill the line's budget: laid out
+                // left-aligned at rest, full-width while pressed.
                 if (memberIdx.size == 1) {
                     val i = memberIdx[0]
                     if (press[i] > 0f) {
@@ -307,7 +324,10 @@ fun ExpressiveButtonGroup(
                 var remainder = total - memberIdx.sumOf { target[it] }
                 if (remainder > 0) {
                     val order = memberIdx.sortedByDescending { exact[it] - exact[it].toInt() }
-                    // Bounded by construction: a spinning measure pass would freeze the app.
+                    // Bounded by construction, not by trusting the arithmetic: truncation can only
+                    // leave a remainder >= 0 smaller than the member count. But this runs inside a
+                    // measure pass, and a measure pass that can spin is a frozen app rather than a
+                    // wrong pixel.
                     var k = 0
                     while (remainder > 0 && k < order.size) {
                         target[order[k]]++; remainder--; k++

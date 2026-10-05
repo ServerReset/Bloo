@@ -47,7 +47,12 @@ data class WatchNotifyPrefs(
 object WatchSyncProtocol {
     /** Phone → watch: the snapshot + lock config. Written by the phone, read by the watch. */
     const val PATH_SNAPSHOT = "/bloo/snapshot"
-    /** Phone → watch: the full WATCH APK bytes for a seamless in-watch update. */
+    /**
+     * Phone → watch: the full WATCH APK bytes for a seamless in-watch update. The phone downloads
+     * the watch APK (it has the network; the watch does not) and streams it here as an asset; the
+     * watch writes it to a cache file and hands it to the system package installer, so the user
+     * never leaves the watch or opens a browser.
+     */
     const val PATH_WATCH_APK = "/bloo/watch_apk"
     /** Phone → watch: a command the watch wants run (see [WatchCommandRequest]). */
     const val PATH_COMMAND = "/bloo/command"

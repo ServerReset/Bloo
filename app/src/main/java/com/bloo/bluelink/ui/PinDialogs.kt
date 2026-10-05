@@ -50,6 +50,8 @@ internal fun PinDialogs(
     }
     var currentPin by remember { mutableStateOf("") }
     var rejected by remember { mutableStateOf(false) }
+    // Baselines, so the effects below react to CHANGES only -- the initial composition must not
+    // treat a stale flag (left by an earlier lock screen session, say) as a fresh event.
     var seenRejected by remember(mode) { mutableStateOf(state.pinAttemptRejected) }
     var seenTick by remember(mode) { mutableIntStateOf(state.pinAcceptedTick) }
     // Watch the verify outcome: a wrong PIN flags pinAttemptRejected (shown as an inline error
@@ -159,6 +161,10 @@ internal fun PinDialogs(
                 "finish" -> {
                     if (mode == "remove") {
                         // equalWidths on the group, NOT Modifier.weight on each child.
+                        // RowScope.weight is parent data read by a Row's own measure policy; inside
+                        // this group's policy it is not read at all, so it would have silently done
+                        // nothing while the two halves went back to hugging their labels. See
+                        // ExpressiveButtons.kt.
                         ExpressiveButtonRow(
                             modifier = Modifier.fillMaxWidth(),
                             spacing = GapRow,

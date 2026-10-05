@@ -142,7 +142,8 @@ internal fun ToastHost(
 
     // The search's live rect, read ONLY while a toast is up (null otherwise, so the common no-toast
     // case never subscribes to the registry's bounds map -- which the search bubble writes on every
-    // drag frame).
+    // drag frame). LIVE, not snapshotted: the pill can register or move AFTER a toast mounts, and a
+    // frozen rect left the clearance stuck at "none".
     val searchRect = if (bottomId == null) null else registry.boundsOf(FloatingIds.Search)
     // The one piece of search-negotiation geometry, kept pure and unit-tested (see
     // ToastClearanceTest): given the search's rect and the window, it says where the BOTTOM toast's

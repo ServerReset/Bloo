@@ -110,6 +110,8 @@ internal fun <T : Enum<T>> EnumSegmented(
     onSelect: (T) -> Unit,
     icon: (T) -> ImageVector? = { null },
 ) {
+    // An icon per option (Gas/Hybrid/PHEV/EV) instead of text-only segments -- a quick visual
+    // "shape" for each choice, not just a label to read.
     MorphSegmented(
         options = entries.map { SegmentOption(it.name, label(it), icon(it)) },
         selectedKey = selected.name,
@@ -204,8 +206,10 @@ internal fun SettingsCard(
      */
     inlineSetting: (@Composable () -> Unit)? = null,
     /**
-     * A short state string for the title row ("2 accounts", "On · auto"). Ignored when the card has
-     * an [inlineSetting], whose control already says it.
+     * A short piece of state for the title row -- "2 accounts", "On · auto", "Atkinson". This is
+     * the pebble treatment brought across: a car pebble tells you what it knows while collapsed,
+     * and a Settings card had no way to, so the only method of finding out what a setting was
+     * currently set to was to open the card and read the control.
      */
     status: String? = null,
     content: @Composable () -> Unit,
@@ -237,8 +241,9 @@ internal fun SettingsCard(
             },
             // Hard right like every other settings control (titleTrailingAtEnd).
             titleTrailingAtEnd = true,
-            // Cards space their own rows with explicit Spacers, so the shell must not add its row
-            // gap.
+            // Settings cards space their own rows with explicit Spacers (the gap tokens), so the
+            // shell must not ALSO insert its default row gap -- that double-spaced every card and
+            // is what made the gaps read as uneven.
             contentGap = 0.dp,
             content = { content() },
         )

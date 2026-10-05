@@ -59,8 +59,10 @@ internal fun UpdateAvailableTile(
     ) {
         if (info == null) return@AnimatedVisibility
         val context = LocalContext.current
-        // Progress is collected from its own StateFlow so per-chunk ticks invalidate only this
-        // tile; state.updateDownloading stays on UiState since it changes rarely.
+        // Download progress is collected from its own StateFlow rather than read off UiState, so a
+        // per-chunk tick invalidates only this tile's bar/percent, not every pebble on the live
+        // pager pages. state.updateDownloading (the boolean that gates the display below) stays on
+        // UiState -- it changes twice per download, not hundreds of times.
         val downloadProgress by vm.updateDownloadProgress.collectAsStateWithLifecycle()
         val hasDirectDownload = info.run.phoneApkUrl != null
         val current = vm.currentBuildNumber
@@ -75,8 +77,10 @@ internal fun UpdateAvailableTile(
         val seamless = LocalAppearance.current.seamlessInstallShizuku && state.shizukuAvailable
         // Keyed on the build number so a different build starts collapsed.
         var expanded by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
-        // Always visible: this composable only renders when an update exists (matches
-        // SettingsHeroCard's dot).
+        // Always visible=true: this whole composable only ever renders once an update actually
+        // exists (the AnimatedVisibility above gates that), so the badge and the card's own
+        // existence say the same thing -- consistent with SettingsHeroCard wearing the identical
+        // dot, rather than this being the one update surface without it.
         UpdateBadgedCard(visible = true, modifier = Modifier.fillMaxWidth()) {
         PebbleShell(
             expanded = expanded,
@@ -108,7 +112,9 @@ internal fun UpdateAvailableTile(
                         state.updateApkReady -> vm.installDownloadedUpdate()
                         hasDirectDownload -> vm.downloadUpdateInBackground()
                         else -> {
-                            // Dismiss only if the page really opened.
+                            // Dismiss ONLY if the page really opened. Swallowing an
+                            // ActivityNotFoundException and dismissing anyway meant a tap did
+                            // visibly nothing AND cost the user the tile.
                             val opened = context.tryStart(
                                 Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri()),
                             )
@@ -144,7 +150,9 @@ internal fun UpdateAvailableTile(
             PopVisible(visible = info.run.releaseNotes != null) {
                 UpdateReleaseNotes(info, collapsedLines = 5, hazeState = hazeState)
             }
-            // Install help only in the tap-through (non-seamless) path, as an opt-in disclosure.
+            // Progressive install help: only in the tap-through (non-seamless) path, and only as an
+            // opt-in disclosure — the Play-Protect steps are scaffolding, not something to shout
+            // before the user has even tapped Update.
             if (!seamless) {
                 var showHelp by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
                 SafeMorphTextButton(
@@ -160,8 +168,11 @@ internal fun UpdateAvailableTile(
                         shadow = false,
                     ) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-                            // Without Shizuku the OS installer interferes and the Play Protect
-                            // sheet is collapsed by default, so say so up front.
+                            // Without Shizuku the OS installer gets in the way EVERY time, and the
+                            // player-protect sheet is folded shut by default, so an update looks
+                            // like it failed when the real answer is "expand it, then tap Install
+                            // anyway". Spell that out up front rather than only after someone
+                            // reports it as broken.
                             if (!state.shizukuAvailable || !LocalAppearance.current.seamlessInstallShizuku) {
                                 Text(
                                     "Shizuku is off, so Android asks you to confirm each update. On the next screen tap \"More details\" to expand it, then \"Install anyway\".",
@@ -193,8 +204,9 @@ internal fun UpdateAvailableTile(
 }
 
 /**
- * What the update's primary action says and does; shared by the pebble header action and the
- * Settings button so the label, glyph and branch never differ.
+ * What the update's primary action says and does, in one place. The pebble surfaces it as its
+ * header action and the Settings card as a full-width button, so the CHROME differs -- but the
+ * label, the glyph and the branch it takes must not, and they had a copy each.
  */
 internal data class UpdateAction(val label: String, val icon: ImageVector, val ready: Boolean)
 

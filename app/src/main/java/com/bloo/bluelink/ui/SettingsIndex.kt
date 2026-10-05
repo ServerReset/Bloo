@@ -175,7 +175,11 @@ internal class SearchEntry(val title: String, val haystack: String, val content:
 internal class ToggleSpec(
     val title: String,
     val keywords: String,
-    /** Shown on the row itself; defaults to [title]. */
+    /**
+     * Shown on the row itself; defaults to [title] since most toggles read identically in both
+     * places. Only a few (e.g. "Dynamic color (Material You)") spell the row out more fully than
+     * the search title.
+     */
     val label: String = title,
     /** How a person would ask for it in a sentence; matched like keywords. */
     val phrases: String = "",
@@ -184,7 +188,11 @@ internal class ToggleSpec(
     val onToggle: (AppViewModel, Boolean) -> Unit,
 )
 
-/** Every plain app-wide toggle, in the order it should appear when searched. */
+/**
+ * Every plain app-wide toggle, in the order it should appear when searched. Add a new one here --
+ * not a new `add(...)` call in [SettingsSearchResults] -- and it is searchable with no other
+ * change.
+ */
 internal val ToggleSettings = listOf(
     ToggleSpec(
         title = "Haptic feedback", keywords = "vibration vibrate buzz sound",
@@ -242,7 +250,9 @@ internal val ToggleSettings = listOf(
         title = "Pebble outline", keywords = "border rim card theme appearance",
         checked = { a, _, _ -> a.pebbleOutline }, onToggle = { vm, v -> vm.setPebbleOutline(v) },
     ),
-    // Gated like the AI card itself: only meaningful where Gemini Nano is supported.
+    // Same top-level gate the AI card itself uses -- these two only mean anything on a device
+    // Gemini Nano actually supports, same reason the card is hidden entirely rather than shown
+    // disabled.
     ToggleSpec(
         title = "On-device AI", label = "On-device AI (Gemini Nano)", keywords = "gemini nano ai summary assistant privacy on-device",
         visible = { it.aiSupported }, checked = { _, _, s -> s.aiEnabled }, onToggle = { vm, v -> vm.setAiEnabled(v) },
@@ -388,8 +398,10 @@ internal fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): 
 internal class ParsedVehicleCommand(val cmd: String, val climateTarget: String = "default", val label: String)
 
 /**
- * Recognises a small, conservative set of command phrasings (lock/unlock, start/stop/smart climate,
- * start/stop charging). "unlock" is checked before "lock".
+ * Recognises a small, deliberately-conservative set of command phrasings -- lock/unlock,
+ * start/stop/smart climate, start/stop charging -- rather than attempting general natural-language
+ * command parsing. Order matters: "unlock" is checked before the bare "lock" pattern so "unlock"
+ * doesn't also match as "lock".
  */
 /**
  * The temperature asked for, in Fahrenheit, or null if the query names none. Superlatives resolve

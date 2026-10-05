@@ -32,7 +32,11 @@ import com.bloo.uicommon.ambientRing as sharedAmbientRing
 internal fun Modifier.glassEdge(shape: Shape, shadow: Boolean = true): Modifier =
     (if (shadow) this.glassDropShadow(shape) else this).glassRim(shape)
 
-/** The floating-glass drop shadow, at the weight the current theme can carry. */
+/**
+ * The floating-glass drop shadow, at the weight the CURRENT theme can carry. Every [GlassSurface]
+ * in the app goes through here, so that one line put a heavy black silhouette under every floating
+ * chip, pill, dialog, status bar, refresh circle and [FloatingIcon] in both themes.
+ */
 @Composable
 private fun Modifier.glassDropShadow(shape: Shape): Modifier =
     if (appIsDarkTheme()) {
@@ -68,7 +72,10 @@ fun Modifier.ambientRing(shape: Shape): Modifier =
  */
 @Composable
 internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier {
-    // Uses the app's own dark override, not the system setting.
+    // [appIsDarkTheme], NOT a raw isSystemInDarkTheme() read. That was the bug: a user who
+    // explicitly set the app to Light while their SYSTEM was in dark mode got a light-themed app
+    // that still drew this shadow, because raw isSystemInDarkTheme() only ever sees the phone's
+    // setting, not the app's own override.
     val dark = appIsDarkTheme()
     return (if (dark) this.dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp) else this).then(
         if (outline) {
@@ -90,7 +97,11 @@ internal const val GlassTintAlpha = 0.10f
 
 internal const val GlassBlurredTintAlpha = 0.02f
 
-/** Resolves [GlassSurface]'s fill color; also used where [GlassSurface] can't be hosted. */
+/**
+ * Resolves [GlassSurface]'s own fill color -- also called directly by places that can't host
+ * [GlassSurface] itself because they don't own their own layout, just a `Color` parameter on a
+ * platform composable or a `Modifier.background()`.
+ */
 @Composable
 internal fun glassTint(blurred: Boolean): Color {
     // Resolve dark via the app's override (Theme.kt), not the system setting.

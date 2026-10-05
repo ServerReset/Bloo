@@ -28,11 +28,19 @@ import kotlinx.serialization.json.put
  */
 object SyncMerge {
 
-    /** Settings-backup format version. Bump only when a change stops being purely additive,
-     *  so old clients can refuse a newer format. */
+    /**
+     * The settings-backup format version. The format is a flat key-value bag, so an older client
+     * reading a newer backup is normally fine (unknown keys are ignored); bump this only if a
+     * future change stops being purely additive, so old clients can detect and refuse a newer
+     * format instead of misreading it.
+     */
     const val BACKUP_VERSION = 1
 
-    /** Preference keys describing THIS device's own sync wiring: never exported, imported or merged. */
+    /**
+     * Preference keys that describe THIS device's own Drive-sync wiring (the content:// URI it was
+     * granted, its last-sync bookkeeping, its Wi-Fi-only preference, its local dirty set, and its
+     * sync-identity/registry bookkeeping) — never portable, so never exported, imported, or merged.
+     */
     val DEVICE_LOCAL_KEYS = setOf(
         "sync_uri", "sync_last_ms", "sync_last_error", "sync_wifi", "sync_dirty_keys",
         // Sync identity + hash-gate + registry bookkeeping (all per-device, never travel):
@@ -41,7 +49,8 @@ object SyncMerge {
         // A primary designation made here and not yet uploaded: a one-shot write intent that
         // must not roam.
         "sync_primary_pending",
-        // Device-local capability (Shizuku may be absent elsewhere).
+        // Whether THIS device installs updates silently via Shizuku — a device-local capability
+        // (Shizuku may not be present elsewhere), so it must not roam.
         "seamless_install_shizuku",
         // Which car is on screen right now: transient view state, must not roam or cost a sync per swipe.
         "last_vehicle_vin",
@@ -58,14 +67,17 @@ object SyncMerge {
     private val DEVICE_LOCAL_PREFIXES = listOf(
         // Includes unlocked_since_* (same clock-domain reasoning as its siblings).
         "alert_", "door_since_", "engine_since_", "unlocked_since_", "tile_refreshed_",
-        // live_dismissed_*: the user dismissed THIS device's live charging bar; also churns constantly during a charge.
+        // live_dismissed_* : "the user swiped THIS device's live charging bar away for the current
+        // charging session". Dismissing a notification on a phone says nothing about whether a
+        // tablet should show one, and roaming it would suppress the bar on a device the user never
+        // touched.
         "live_dismissed_",
     )
 
     /** Whether [name] is device-local (exact key or per-VIN prefix): never exported, imported, merged or hashed. */
     fun isDeviceLocal(name: String): Boolean =
         name in DEVICE_LOCAL_KEYS || DEVICE_LOCAL_PREFIXES.any { name.startsWith(it) } ||
-            // A retired setting never travels either.
+            // A retired setting never travels either: not exported, not imported, not in the hash.
             SyncSchema.isDeprecated(name)
 
     /** A device that syncs this Drive file, per the file's `devices` registry. Informational
@@ -93,8 +105,10 @@ object SyncMerge {
     const val DEVICE_RETENTION_MS = 90L * 24 * 60 * 60 * 1000
 
     /**
-     * The decoded mutations a merge/import applies. [removes] are deleted under both key types
-     * (string and boolean prefs share names).
+     * The decoded set of mutations a merge/import should apply, with no DataStore involved.
+     * [stringPuts] are written under a string key, [boolPuts] under a boolean key, and every name
+     * in [removes] is deleted (under both key types on the Android side, since this app mixes
+     * string/boolean prefs under one name).
      */
     data class MergePlan(
         val stringPuts: Map<String, String>,
@@ -102,8 +116,12 @@ object SyncMerge {
         val removes: Set<String>,
     )
 
-    /** Drive-only metadata from a file's top-level keys, separate from the [MergePlan].
-     *  [hash] is null when the file predates the hash gate (caller uses the timestamp gate). */
+    /**
+     * The Drive-sync-only metadata parsed out of a file's top-level keys, kept separate from the
+     * [MergePlan] (which is only the portable prefs/tombstones). [hash] is null when the file
+     * predates the hash gate (old client, or the header/marker case) — the caller then falls back
+     * to the timestamp gate.
+     */
     data class SyncMeta(
         val hash: String?,
         val primaryDeviceId: String?,
@@ -119,8 +137,12 @@ object SyncMerge {
 
     // --- Portable export (prefs/photos/_removed only — safe to share) ----------
 
-    /** The `prefs` object shared by both exports: skips [DEVICE_LOCAL_KEYS] and local-file `img_`
-     *  paths (meaningless on another device), typing each value as JSON boolean or string. */
+    /**
+     * The `prefs` object shared by [buildExport] and [buildExportForMainToMain]: skips
+     * [DEVICE_LOCAL_KEYS] and local-file `img_` paths (a "/"-prefixed String path is meaningless on
+     * another device — only the photos channel carries local photos), and types each value as a
+     * JSON boolean/string (anything else coerced via toString()).
+     */
     private fun portablePrefsObject(prefs: Map<String, Any>): JsonObject = buildJsonObject {
         prefs.forEach { (name, value) ->
             if (isDeviceLocal(name)) return@forEach
@@ -138,7 +160,11 @@ object SyncMerge {
     private fun tombstones(prefs: Map<String, Any>, dirtyKeys: Set<String>): Set<String> =
         (dirtyKeys - prefs.keys.toSet()).filterNotTo(LinkedHashSet()) { isDeviceLocal(it) }
 
-    /** Builds the base backup root, then lets [extra] add top-level keys (Drive-only metadata). */
+    /**
+     * Builds the base backup root (`_format`/`_version`/`prefs`/`photos`/`_removed`), then lets
+     * [extra] add any additional top-level keys (the Drive-only metadata). [buildExport] passes an
+     * empty [extra] so its output is exactly the historical portable shape.
+     */
     private inline fun buildRoot(
         prefs: Map<String, Any>,
         dirtyKeys: Set<String>,
@@ -266,8 +292,12 @@ object SyncMerge {
 
     // --- Device registry -------------------------------------------------------
 
-    /** Union [remote] with [self] by device id (self replaces its prior copy), then prune entries
-     *  older than [retentionMs] before [nowMs] (never [self]). Blank ids are dropped. */
+    /**
+     * Union [remote] with [self] by device id (self's entry replaces its own prior copy; other
+     * devices are preserved), then prune entries whose [SyncDevice.lastSeenMs] is older than
+     * [retentionMs] before [nowMs] — except [self], which is always kept. Blank-id entries are
+     * dropped.
+     */
     fun mergeDevices(
         remote: List<SyncDevice>,
         self: SyncDevice,
@@ -355,8 +385,10 @@ object SyncMerge {
     }
 
     /**
-     * Like [parseBackup], but also drops every [guarded] key from puts and removes, so a key
-     * changed locally since the last sync keeps its value and is not tombstoned by the file.
+     * Like [parseBackup], but additionally drops every key in [guarded] from the puts and the
+     * removes — the protect + live-dirty logic in the automatic merge: a key changed locally since
+     * our last sync (and not yet uploaded) must keep its current local value and must not be
+     * tombstoned by the incoming file.
      */
     fun mergePlan(json: String, guarded: Set<String>): MergePlan? {
         val base = parseBackup(json) ?: return null

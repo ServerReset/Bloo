@@ -25,7 +25,11 @@ fun AppViewModel.snoozeUpdate() {
     }
 }
 
-/** Always the same filename, so a later download simply overwrites a stale one. */
+/**
+ * Fixed on-disk location for the downloaded update APK, inside the app's cache dir (so the system
+ * can reclaim it under storage pressure, and it's automatically cleaned up on uninstall). Always
+ * the same filename, so a later download simply overwrites a stale one.
+ */
 private fun AppViewModel.apkCacheFile(): java.io.File {
     val ctx = getApplication<Application>()
     return java.io.File(java.io.File(ctx.cacheDir, "apk"), "Bloo.apk")
@@ -49,7 +53,10 @@ fun AppViewModel.downloadUpdateInBackground() {
     _state.update { it.copy(updateDownloading = true, updateTileDismissed = false) }
     viewModelScope.launch {
         val dest = apkCacheFile()
-        // Throttled to whole percents.
+        // Throttled to whole percents. UpdateApi calls back once per 64KB buffer, which on a fast
+        // connection is hundreds of emissions a second for a multi-MB APK -- and every one of them
+        // recomposed the whole update tile, on the main thread, while the user may well be
+        // scrolling.
         var lastPercent = -1
         val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
             val percent = (progress * 100f).toInt()
@@ -68,7 +75,9 @@ fun AppViewModel.downloadUpdateInBackground() {
 
 /**
  * The update tile's second tap, once [downloadUpdateInBackground] has finished: the APK is already
- * sitting in cache.
+ * sitting in cache. If the user opted into seamless install AND Shizuku is running, install
+ * silently via ADB; otherwise (or on any Shizuku failure) hand it to the system installer as
+ * before.
  */
 fun AppViewModel.installDownloadedUpdate() {
     if (!_state.value.updateApkReady) return

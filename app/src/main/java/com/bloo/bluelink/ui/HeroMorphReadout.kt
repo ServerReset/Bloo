@@ -61,13 +61,17 @@ internal fun HeroMorphReadout(
     // Real type steps are lerped, not graphicsLayer-scaled: this Column's height must grow so the
     // state line below is pushed down (graphicsLayer does not change measured size).
     Column(
-        // No alpha ramp: this node is fully visible in both states; one bar and one pair of numbers
-        // change shape.
+        // NO alpha ramp. This node is present and fully visible in BOTH states, which is the whole
+        // point: one bar and one pair of numbers that move and change shape, rather than two copies
+        // crossfading. The `t * t` fade that was here existed only to hide this copy while a second
+        // one was drawn in the header.
         modifier,
         verticalArrangement = Arrangement.spacedBy(lerp(2.dp, 6.dp, t)),
     ) {
-        // Fades in on the back half only: the collapsed numbers are drawn by the header's title Row
-        // (see HeroCollapsedNumbers), so this copy must stay invisible until that one is gone.
+        // Fades IN on the back half only. The collapsed numbers are drawn by the header's own title
+        // Row (see HeroCollapsedNumbers), because that is the only way to guarantee they sit on the
+        // name's line -- so this copy must be invisible until that one has gone, or both are on
+        // screen at once and the morph reads as a double image.
         Row(
             Modifier
                 .padding(start = numbersStart)

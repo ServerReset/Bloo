@@ -61,7 +61,9 @@ object LiveCharge {
 
     /**
      * Whether the SYSTEM will currently let this app show a promoted chip -- the per-app Live
-     * Updates toggle, live-queried rather than guessed.
+     * Updates toggle, live-queried rather than guessed. `false` below API 36 unconditionally:
+     * `canPostPromotedNotifications()` itself doesn't exist on the platform there, so there's
+     * nothing to ask.
      */
     fun isPromotable(context: Context): Boolean =
         Build.VERSION.SDK_INT >= 36 &&
@@ -241,7 +243,9 @@ object LiveCharge {
             context, id, stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        // deleteIntent: the only way to learn the user swiped this away.
+        // deleteIntent: the only way to learn the user swiped this away. Without it the next poll
+        // silently reposted a bar they had just dismissed, every five minutes for the length of the
+        // charge -- which the Live Updates guidance calls out specifically.
         val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
             action = AlertActionReceiver.ACTION_LIVE_CHARGE_DISMISSED
             data = "bloo://live_charge_dismissed/$vin".toUri()
@@ -260,9 +264,15 @@ object LiveCharge {
             .setContentTitle("$carName is charging")
             .setContentText(detail.ifBlank { "Charging" })
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-            // The hero card's own photo, when there is one -- see [sync].
+            // The hero card's own photo, when there is one -- see [sync]. Large icon, not a
+            // background: a promoted notification can never have a custom background image, because
+            // that means customContentView (RemoteViews), and RemoteViews is promotion condition
+            // 6's explicit disqualifier.
             .apply { carPhoto?.let { setLargeIcon(it) } }
-            // VISIBILITY_PUBLIC, restored from the working version.
+            // VISIBILITY_PUBLIC, restored from the working version. Without it the default is
+            // VISIBILITY_PRIVATE, and a secured lock screen hides a private notification's content
+            // -- on the lock screen and the always-on display, which are two of the three places a
+            // Live Update is supposed to appear.
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -272,8 +282,10 @@ object LiveCharge {
             .addAction(0, "Stop charging", stopPi)
             .setDeleteIntent(dismissPi)
             .apply { contentPi?.let { setContentIntent(it) } }
-            // The STATUS BAR CHIP's text, and the piece the rebuild dropped. Deliberately paired
-            // with setShowWhen(false), matching that version.
+            // The STATUS BAR CHIP's text, and the piece the rebuild dropped. Reasoning from
+            // documentation I couldn't fully fetch, when a working answer was sitting in git log,
+            // is the mistake -- not the API. Deliberately paired with setShowWhen(false), matching
+            // that version.
         .setShowWhen(false)
         .apply { percent?.let { setShortCriticalText("${it.coerceIn(0, 100)}%") } }
 

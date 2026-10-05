@@ -15,7 +15,8 @@ import com.bloo.bluelink.wear.WatchSignIn
 
 /**
  * Signs the watch in so it works on its own. Shows whatever step [WatchSignIn] is on; renders
- * nothing while idle.
+ * nothing while idle. The confirm step is the security check: the code here must match the one the
+ * watch is showing before the accounts are sent to it.
  */
 @Composable
 internal fun WatchSignInDialog() {

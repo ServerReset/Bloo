@@ -206,7 +206,11 @@ internal fun OnboardingRestorePage(vm: AppViewModel) {
     BodySmallText("New here? Swipe on to set up fresh.", color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-/** How the app looks and reads: theme and units, the two choices everyone has an opinion on. */
+/**
+ * First-run only: bring this device's setup in from another one. Picking a sync file joins it and
+ * re-resolves where this device lands (straight to the app if the file already covered everything).
+ * Anyone starting fresh just swipes on.
+ */
 @Composable
 internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     ThemeModeSegmentedRow(appearance) { vm.setThemeMode(it) }

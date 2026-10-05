@@ -74,6 +74,10 @@ private fun SwatchDisc(color: Color, selected: Boolean, description: String, onC
     Box(
         Modifier
             .size(58.dp)
+            // The colour name was only ever rendered as a sibling Text below, outside this
+            // clickable's own semantics -- TalkBack announced an unlabelled "double tap to
+            // activate" with no colour name and no sense of which swatch is selected (the
+            // ring/check are purely visual).
             .semantics {
                 contentDescription = description
                 role = Role.RadioButton
@@ -167,8 +171,9 @@ internal fun ColorPickerCanvas(
     val hueGradient = remember(Unit) {
         (0..12).map { i -> Color(android.graphics.Color.HSVToColor(floatArrayOf(i * 30f, 1f, 1f))) }
     }
-    // Hoisted out of the draw scope to avoid per-frame List + Brush allocation: satValueBrush
-    // changes only with hue.
+    // Both brushes only depend on colours that change far less often than the Canvas redraws while
+    // dragging (sat/value redraw on every pointer move): satValueBrush only needs to change when
+    // the hue itself changes, and hueBrush's gradient stops never change at all.
     val satValueBrush = remember(pureHue) { Brush.horizontalGradient(listOf(Color.White, pureHue)) }
     val hueBrush = remember(hueGradient) { Brush.horizontalGradient(hueGradient) }
     fun hexOf(c: Color) = String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and c.toArgb())
@@ -277,7 +282,10 @@ internal fun ColorPickerCanvas(
             onValueChange = { hexInput = it; hexError = false },
             label = { Text("Hex colour") },
             singleLine = true,
-            // FieldShape like every other text field (matches the "Name" field above).
+            // FieldShape, like every other text field in the app -- this one was the single call
+            // site that never passed it, so it drew M3's default 4dp corners directly above the
+            // "Name" field of the very dialog it lives in (which does pass FieldShape). Same field,
+            // two corner radii, one dialog.
             isError = hexError,
             supportingText = if (hexError) { { Text("Not a valid colour") } } else null,
             keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
@@ -287,9 +295,16 @@ internal fun ColorPickerCanvas(
     }
 }
 
+/**
+ * Rounds [v] to the nearest multiple of [step]: the colour picker only offers fixed values, never
+ * free ones.
+ */
 private fun snapStep(v: Float, step: Float): Float = Math.round(v / step) * step
 
-/** The check mark a chosen swatch wears, shared by both swatch rows. */
+/**
+ * A swatch caption's colour: full-strength when its swatch is the chosen one, muted otherwise --
+ * the same pairing in both swatch rows.
+ */
 @Composable
 private fun SelectedCheck() {
     Icon(

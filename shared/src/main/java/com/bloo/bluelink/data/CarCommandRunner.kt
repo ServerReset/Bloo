@@ -16,6 +16,10 @@ object CarCommandRunner {
      */
     suspend fun execute(context: Context, command: CarCommand): CarCommandResult {
         val store = SnapshotStore(context)
+        // Same lock refresh() and the phone UI's own command path already use -- BlueLink 502s on
+        // overlapping requests for the same account, and this was the one command-executing path
+        // that skipped it, so a resent command could fire the same command twice concurrently, or
+        // race a phone-UI-driven command, with no protection.
         return BlueLinkGate.statusMutex.withLock {
             // Read the target vehicle's snapshot INSIDE the lock so the toggle direction is decided
             // from state serialized against every other command path.
@@ -194,7 +198,8 @@ object CarCommandRunner {
             store.updateVehicles(merged)
         }
         // Outside the lock: the callback is the caller's code and must not run holding the app-wide
-        // status mutex.
+        // status mutex. Only when something was actually fetched, so a total failure cannot be
+        // mistaken for "fetched nothing, so clear everything".
         if (fetched.isNotEmpty()) onStatuses?.invoke(fetched)
         return merged.isNotEmpty()
     }

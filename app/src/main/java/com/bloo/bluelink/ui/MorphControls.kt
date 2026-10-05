@@ -131,8 +131,10 @@ internal fun MorphExpandButton(
     expanded: Boolean,
     onToggle: () -> Unit,
     /**
-     * Reports this button's live pressed state so the pebble card can square its outer shape with
-     * the chevron's. Null for callers that don't care.
+     * Reports this button's own pressed (held-down) state to the caller, live -- so the pebble card
+     * this chevron belongs to can square its own outer shape off together with the chevron's,
+     * instead of only the small chevron itself reacting to the hold. Null (the default) for every
+     * caller that doesn't care.
      */
     onPressChange: ((Boolean) -> Unit)? = null,
 ) {
@@ -144,8 +146,9 @@ internal fun MorphExpandButton(
     if (onPressChange != null) {
         val pressed by chevronSource.collectIsPressedAsState()
         LaunchedEffect(pressed) { onPressChange(pressed) }
-        // Clear on leaving composition (e.g. a collapse unmounting mid-press); the effect above
-        // only reacts to changes.
+        // Whatever was true when this leaves the composition (a collapse that unmounts this button
+        // mid-press, say) shouldn't leave the pebble permanently squared -- the effect above only
+        // reacts to CHANGES, not to being torn down.
         DisposableEffect(Unit) { onDispose { onPressChange(false) } }
     }
     SafeExpansiveButton(

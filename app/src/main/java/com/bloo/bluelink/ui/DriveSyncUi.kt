@@ -60,7 +60,9 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     var renaming by remember { mutableStateOf(false) }
 
     // Order the list so the primary is on top (that's the invariant the drag gesture maintains);
-    // everyone else falls in by most-recently-seen.
+    // everyone else falls in by most-recently-seen. Dragging a device to the top sets it primary,
+    // after which this same sort keeps it there — so the visual order and the "primary" concept
+    // stay in lockstep.
     val ordered = remember(devices, state.syncPrimaryId) {
         devices.sortedWith(
             compareByDescending<com.bloo.bluelink.data.SyncMerge.SyncDevice> { it.id == state.syncPrimaryId }
@@ -189,6 +191,8 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                     "Shown in the devices list on all your synced devices.",
                     color = scheme.onSurfaceVariant,
                 )
+                // "Name this device" is an ordinary form field, and it was the only one of those
+                // wearing the credential look.
                 BlooTextField(
                     value = draft,
                     onValueChange = { draft = it },

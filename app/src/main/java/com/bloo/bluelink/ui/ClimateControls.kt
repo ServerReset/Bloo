@@ -100,7 +100,11 @@ internal fun WheelHeatControl(level: WheelHeatLevel, onChange: (WheelHeatLevel) 
     TintedLevelControl("Steering wheel heat", level.label, wheelHeatTint(level), "wheelHeatTint", range, range.indexOf(level).coerceAtLeast(0), onChange)
 }
 
-/** A labelled level slider whose value text and thumb share one animated tint. */
+/**
+ * Steering wheel heat tint by intensity -- the same light->dark red ramp [seatTint] uses for a
+ * seat's own heat half, both derived from the canonical heat red so the two never drift onto
+ * different pastels.
+ */
 @Composable
 private fun <T> TintedLevelControl(
     label: String,
@@ -372,7 +376,9 @@ internal fun ChargeLimitPill(
                 pillCornerPercent = 50f,
                 morphedCornerPercent = MorphedCornerPercent,
                 minHeight = 0.dp,
-                // Announce both the value and that this half is a stepper, distinct from "Set".
+                // Both the current value and what tapping actually does (bump by 10%, wrapping at
+                // 100%) were purely visual -- TalkBack announced only the label text with no
+                // indication this half was itself a stepper, distinct from "Set" on the right.
                 groupWeight = 1f,
                 modifier = Modifier.fillMaxHeight()
                     .semantics(mergeDescendants = true) {

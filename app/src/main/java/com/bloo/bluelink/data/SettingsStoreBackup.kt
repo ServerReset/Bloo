@@ -56,7 +56,10 @@ suspend fun SettingsStore.importSettingsJson(json: String): String? {
         plan.stringPuts.forEach { (name, value) -> mut[stringPreferencesKey(name)] = value }
         plan.boolPuts.forEach { (name, value) -> mut[booleanPreferencesKey(name)] = value }
         photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
-        // Propagate tombstones, removing both key types (names are shared); device-local keys are excluded by parseBackup.
+        // Propagate deletions: a key tombstoned on the source device is removed here too (both key
+        // types, since this file mixes string/boolean prefs under the same name) so a deletion
+        // converges instead of the key resurrecting from this device's stale copy.
+        // DEVICE_LOCAL_KEYS are already excluded by parseBackup.
         plan.removes.forEach { name ->
             mut.remove(stringPreferencesKey(name))
             mut.remove(booleanPreferencesKey(name))
@@ -133,7 +136,10 @@ internal suspend fun SettingsStore.mergeSettingsJson(json: String, protect: Set<
         photoPaths.forEach { (vin, path) ->
             if ("img_$vin" !in guarded) mut[stringPreferencesKey("img_$vin")] = path
         }
-        // Propagate remote deletions except protected/device-local keys (dropped by mergePlan); both key types are removed.
+        // Propagate deletions from the remote file, but never remove a key we're protecting
+        // (locally changed since our last sync, or live-dirty within this transaction) or a
+        // device-local key -- mergePlan already dropped both from removes; both key types removed
+        // since names are shared.
         plan.removes.forEach { name ->
             mut.remove(stringPreferencesKey(name))
             mut.remove(booleanPreferencesKey(name))
@@ -171,7 +177,9 @@ internal suspend fun SettingsStore.adoptSettingsJson(json: String): Boolean {
             mut.remove(stringPreferencesKey(name))
             mut.remove(booleanPreferencesKey(name))
         }
-        // Same transaction: adopted values are the file's, not pending local changes.
+        // Clear the dirty set in the SAME transaction: the adopted values are the file's, not
+        // pending local changes, so they must not be re-uploaded as edits (and must not protect
+        // themselves on the next merge).
         mut.remove(stringPreferencesKey("sync_dirty_keys"))
     }
     return true

@@ -4,7 +4,8 @@ import com.bloo.bluelink.data.settingsMode
 
 /**
  * Helpers to determine which settings are available in the current mode (simple vs. advanced) and
- * should appear in search results.
+ * should appear in search results. When in simple mode, advanced-only settings are completely
+ * hidden from search and cannot be accessed via any search/command interface.
  */
 
 /**

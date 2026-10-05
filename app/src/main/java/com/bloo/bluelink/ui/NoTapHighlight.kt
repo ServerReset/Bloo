@@ -5,7 +5,10 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.node.DelegatableNode
 
-/** The app's [androidx.compose.foundation.LocalIndication]: nothing at all. */
+/**
+ * The app's [androidx.compose.foundation.LocalIndication]: nothing at all. Android's default press
+ * indication is a ripple -- a grey fill that washes over whatever was tapped.
+ */
 internal object NoTapHighlight : IndicationNodeFactory {
     override fun create(interactionSource: InteractionSource): DelegatableNode = object : Modifier.Node() {}
 

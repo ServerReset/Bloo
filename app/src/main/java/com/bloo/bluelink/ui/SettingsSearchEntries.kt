@@ -40,7 +40,8 @@ import com.bloo.bluelink.data.settingsMode
 
 /**
  * Every searchable setting as a [SearchEntry]: its title, the words that find it, and the control
- * itself to draw in the result.
+ * itself to draw in the result. Built from the live state so each control shows its real value, and
+ * peeled out of [SettingsSearchResults] so that composable only deals with matching and showing.
  */
 internal fun buildSettingsSearchEntries(
     state: UiState,
@@ -139,7 +140,8 @@ internal fun buildSettingsSearchEntries(
                 vm.setLastServiceMiles(v.vin, it)
             }
         }
-        // The interval, which had no search entry while "Last service" above did.
+        // The interval, which had no search entry while "Last service" above did. Both fields sit
+        // side by side in the per-car section; only the index had one of them.
         add("Service interval · ${v.name}", "service interval maintenance mileage due ${v.name}") {
             MilesField(state.serviceIntervalMiles[v.vin], "Interval (mi)", Modifier.fillMaxWidth()) {
                 vm.setServiceIntervalMiles(v.vin, it)

@@ -82,8 +82,10 @@ internal fun HeroHeader(
      */
     expandAction: PebbleHeaderAction? = null,
 ) {
-    // Entrance plays once per car per session (coldStartIntroPlayed); replaying on re-composition
-    // adds frames to the page's compose burst mid-swipe.
+    // Play the fade/slide-up entrance only ONCE per car per session, gated on the same
+    // coldStartIntroPlayed set the pebble stagger uses. Replaying the fade on each enter added
+    // animation frames on top of the page's compose burst mid-swipe. Once-per-VIN means a page that
+    // re-enters snaps straight to rest instead of re-animating.
     val playIntro = remember(v.vin) { coldStartIntroPlayed.add("hero:${v.vin}") }
     val heroAlpha = remember { Animatable(if (playIntro) 0f else 1f) }
     val heroOffset = remember { Animatable(if (playIntro) 16f else 0f) }
@@ -104,8 +106,10 @@ internal fun HeroHeader(
         label = "heroMorph",
     )
 
-    // Delayed only going in (photoExpanded true); collapsing fades it out immediately. 350ms avoids
-    // reading as a snap.
+    // Delayed only going IN (photoExpanded true); collapsing fades it out immediately, so the card
+    // doesn't look like it's still finishing an entrance while it closes. This is a real wall-clock
+    // delay (tween + delayMillis), not a fraction of heroT, because heroT is spring-driven with no
+    // fixed duration to carve a fraction out of.
     val statusAlpha = run {
         val t = ((heroT - 0.15f) / 0.5f).coerceIn(0f, 1f)
         t * t * (3f - 2f * t)
@@ -148,7 +152,9 @@ internal fun HeroHeader(
         modifier = modifier,
         titleColor = heroTitleColorNow,
         headerAction = expandAction,
-        // The only pebble that grows its title: the name scaling up reads as the card taking over.
+        // The ONLY pebble that grows its title. Here the title is the car's NAME and the card
+        // becomes a photo of that car, so the name scaling up reads as the card taking over. On
+        // "Location" or "Diagnostics" it is a heading resizing for no reason.
         growTitleOnExpand = true,
         // No `summary`: the bar is the summary. The photo is the card's BACKGROUND, running behind
         // the header row, with the title and chevron overlaid.
@@ -178,14 +184,19 @@ internal fun HeroHeader(
             // the card is short. Derived from the readout's tokens (pct line + gap + bar), not a
             // constant.
             val collapsedReadoutHeight = 2.dp + ChargeBarHeight
-            // Plus the readout's bottom inset (HeroReadoutBottomInset above the card edge).
+            // + the readout's own bottom inset. The readout occupies collapsedReadoutHeight of
+            // CONTENT and then sits HeroReadoutBottomInset above the card's edge, so reserving only
+            // the content left the reservation one gap short and the readout's top edge crossed
+            // into the title's row.
             val h = lerp(collapsedReadoutHeight + HeroReadoutBottomInset, 0.dp, heroT)
-            // No graphicsLayer: an alpha on an empty Box is a per-frame layer allocation.
+            // No graphicsLayer: there is nothing here to fade any more. An alpha on an empty Box is
+            // a layer allocation per frame for no pixels.
             Spacer(Modifier.fillMaxWidth().height(h))
         },
     ) {
-        // Empty by design: the photo and readout live in `background`, positioned against the
-        // image.
+        // Empty by design. Everything the expanded state adds -- the photo and the readout over its
+        // lower edge -- is in `background`, because both need to be positioned against the IMAGE
+        // rather than stacked under the header.
         Spacer(Modifier.height(0.dp))
     }
 }

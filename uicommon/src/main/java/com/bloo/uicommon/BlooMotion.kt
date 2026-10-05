@@ -9,7 +9,8 @@ const val SoftDamping = 0.82f
 
 /**
  * The morph button's two corner states, as a percentage of the shorter side: a true pill at rest, a
- * rounded rectangle while active or pressed.
+ * rounded rectangle while active or pressed. Here rather than in the surface because this pair IS
+ * the shape half of the morph vocabulary. Note this shares only the two corner numbers.
  */
 const val PillCornerPercent = 50f
 const val MorphedCornerPercent = 28f

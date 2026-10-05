@@ -47,7 +47,11 @@ internal val NaturalFiller: Set<String> = setOf(
 private fun trimPlural(t: String): String =
     if (t.length > 3 && t.endsWith("s") && !t.endsWith("ss") && t !in SearchSynonyms) t.dropLast(1) else t
 
-/** The words of [query] worth matching, in order. */
+/**
+ * The words of [query] worth matching, in order. Falls back in two steps so a short query never
+ * matches nothing by being too polite: if scaffolding removal would leave no words, only stopwords
+ * go; and a query that is entirely stopwords keeps all.
+ */
 internal fun searchTokens(query: String): List<String> {
     var q = query.lowercase().replace("'", "")
     for ((rx, to) in NaturalPhrases) q = rx.replace(q, " $to ")

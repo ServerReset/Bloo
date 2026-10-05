@@ -54,8 +54,11 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
     val loading by remember { derivedStateOf { state.value.loading } }
     val scheme = MaterialTheme.colorScheme
 
-    // Each cause gets its own icon and headline. A connectivity failure gets plain "no connection"
-    // copy; an error while online keeps the specific message, which may help.
+    // A true connectivity failure (garageLoadOffline) gets its own plain "no connection" copy
+    // instead of a raw exception message -- there's nothing actionable in that message beyond
+    // "check your connection", which the dedicated copy already says -- and, gated the other way,
+    // an error that happens while the device IS online (an auth failure, Hyundai/Kia's own API
+    // returning a 500, etc.) keeps the more specific message since that one might actually help.
     val loadFailed = accounts.isNotEmpty() && garageLoadError != null
     val offline = loadFailed && garageLoadOffline
     val (icon, headline, body) = when {
@@ -89,8 +92,9 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
         launch { contentOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
 
-    // loadGarage() sets state.loading (not state.refreshing, which covers one car's fetch), so the
-    // pull gesture tracks that.
+    // loadGarage() sets state.loading (not state.refreshing, which only ever covers a single car's
+    // own status fetch) -- that's the flag this card's pull gesture needs to reflect for the
+    // indicator/release behaviour to track the request it actually triggers.
     Refreshable(refreshing = loading, onRefresh = { vm.loadGarage() }) {
         Box(
             Modifier

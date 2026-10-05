@@ -39,8 +39,10 @@ internal class PerCarConfig(val apply: (UiState) -> UiState, val shortcutSet: Se
 fun AppViewModel.loadGarage() = launchBusy { loadGarageInternal() }
 
 /**
- * Re-entrancy guard around [loadGarageInner]: only one garage load runs at a time. `@Volatile`
- * because it is read and written from different threads.
+ * Re-entrancy guard around [loadGarageInner]: the [loadingGarage] flag (checked/set here, not
+ * inside [loadGarageInner] itself so every caller goes through this one gate) makes sure only one
+ * garage load runs at a time -- e.g. a login finishing and a manual pull-to-refresh landing at the
+ * same moment shouldn't run two overlapping fetches of every brand's vehicle list.
  */
 internal suspend fun AppViewModel.loadGarageInternal() {
     if (loadingGarage) return
@@ -105,6 +107,10 @@ suspend fun AppViewModel.loadGarageInner() {
     // Started once per app open; no explicit stop, the subscription dies with the process.
     beginLiveDeviceLocation()
     com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: live device location started")
+    // That fetch is a network round trip and it was the gate on the garage being shown at all: the
+    // UI sat on Screen.Loading for its whole duration (measured 2.1s on the API 34 emulator, and
+    // that is before the garage's own first composition). The list is already on disk from the last
+    // session -- see publishCachedGarage's own doc.
     publishCachedGarage()
     // Merge vehicles from every signed-in brand; one brand failing must not hide the others.
     // Failures are tracked apart from "zero vehicles" so an API failure never reads as signed out.
@@ -125,7 +131,10 @@ suspend fun AppViewModel.loadGarageInner() {
                 r.vehicles()
             }
         }.getOrElse { e ->
-            // Wording for a malformed response that also failed the API layer's single retry.
+            // A malformed response (see ResponseFraming) would otherwise surface okio's parser text
+            // -- "Expected leading [0-9a-fA-F] character but was 0x7b" -- as the user-facing
+            // reason, which tells a person nothing. It is retried once inside the API layer; this
+            // is the wording for when the retry also fails.
             val msg = com.bloo.bluelink.data.ResponseFraming.userMessage(e)
                 ?: e.message
                 ?: "Couldn't load vehicles"
@@ -139,8 +148,9 @@ suspend fun AppViewModel.loadGarageInner() {
             "${System.currentTimeMillis() - vehiclesFetchStartedAt}ms: ${fetched.size} vehicle(s)",
     )
     if (fetched.isEmpty()) {
-        // Still bootstrap Drive sync on an empty/failed cold start; bootstrapDriveSync is
-        // idempotent.
+        // Still bootstrap Drive sync on an empty/failed cold start so the restore + persisted-grant
+        // check + auto-sync collector run once this session -- bootstrapDriveSync is idempotent
+        // (AtomicBoolean guard), so the non-empty path below calling it again is a no-op.
         bootstrapDriveSync()
         com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: publishing empty garage")
         _state.update {
@@ -187,8 +197,11 @@ suspend fun AppViewModel.loadGarageInner() {
             defaultClimatePresets = defaultPresets,
         )
     }
-    // Startup breadcrumb for CrashActivity's AppLog tail: shows whether the crash came before the
-    // garage appeared.
+    // Startup breadcrumb: if a crash follows shortly after, CrashActivity's own report includes the
+    // tail of AppLog, so this (and "App starting" in BlooApplication.onCreate) is what tells "did
+    // this even get as far as showing the garage" apart from "crashed during the very first frame"
+    // -- something the earlier per-brand/per-car error logs in this function don't cover on their
+    // own since they only fire on FAILURE.
     AppLog.log("✓ Garage loaded: ${vehicles.size} vehicle(s), screen=$screen")
     val shortcutSet = cfg.shortcutSet
     // Restores the last-selected car (currentIndex lives in its own flow, so it is set alongside
@@ -223,8 +236,9 @@ suspend fun AppViewModel.loadGarageInner() {
 }
 
 /**
- * Re-reads this device's local per-car config for the loaded vehicles and folds it into state, no
- * network call.
+ * Re-reads this device's local per-car config (seat capability, powertrain, photo, license plate,
+ * service intervals, pebble order) for the currently loaded vehicles and folds it straight into
+ * state -- the same local reads [loadGarageInner] already does once at startup, no network call.
  */
 /**
  * Decides which screen a signed-in session with [vehicles] already loaded lands on, from a fresh

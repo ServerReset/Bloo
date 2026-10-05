@@ -80,8 +80,8 @@ internal fun CriticalContent(
         modifier = modifier,
         drivingLabel = drivingLabel, metric = metric, photoExpanded = photoExpanded,
         expandAction = onCollapse?.let {
-            // Icon-only: the dual-column header is narrow, and a labelled pill would truncate the
-            // car name.
+            // Icon-only, deliberately: this is the dual-column view, where the header is already
+            // narrower (one column) AND carries the same collapse chevron every pebble has.
             PebbleHeaderAction(
                 label = "",
                 icon = Icons.AutoMirrored.Filled.ArrowBack,
@@ -146,9 +146,11 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
             // Surface, so the pebble keeps its resting silhouette; heightIn(min) lets it grow with
             // large accessibility fonts.
             Box(Modifier.fillMaxWidth().heightIn(min = ControlHeight).padding(start = 12.dp, end = 4.dp)) {
-                // Insets line the lock icon up with other pebbles' header icons (4 + 12 ==
-                // PebbleContentInset) and the trailing control with their chevrons (4 + 8 = 12dp
-                // from the edge).
+                // PrimaryActions' own default start padding (26.dp) plus this Box's 12.dp put the
+                // lock icon noticeably further right than every other pebble's header icon (Charge,
+                // Climate, ...), which only ever get Pebble's flat PebbleContentInset row padding.
+                // The 4.dp here lines the two icons up: 4 + this Box's own 12 ==
+                // PebbleContentInset.
                 PrimaryActions(
                     v, state, vm,
                     contentPadding = PaddingValues(start = PebbleContentInset - 12.dp, end = 8.dp),

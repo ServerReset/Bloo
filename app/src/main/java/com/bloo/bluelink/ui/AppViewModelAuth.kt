@@ -59,7 +59,11 @@ private fun AppViewModel.loginEurope(username: String, password: String, pin: St
     }
 }
 
-/** Step 1 of Kia login: attempt sign-in with just username/password/PIN. */
+/**
+ * Step 1 of Kia login: attempt sign-in with just username/password/PIN. Kia's API either logs
+ * straight in ([KiaAuth.LoggedIn]) or demands a one-time code ([KiaAuth.OtpRequired]) — which
+ * branch happens depends on the account and isn't knowable ahead of time.
+ */
 private fun AppViewModel.loginKia(username: String, password: String, pin: String) {
     launchBusy {
         when (val auth = kiaRepo().startLogin(username, password, pin)) {
@@ -102,6 +106,10 @@ fun AppViewModel.kiaVerifyOtp(code: String) {
     }
 }
 
+/**
+ * Back out of the Kia OTP challenge screen: drops the stashed credentials (they were never
+ * persisted) and clears the challenge UI.
+ */
 fun AppViewModel.kiaCancelOtp() {
     kiaPending = null
     _state.update { it.copy(kiaOtp = null) }
@@ -148,6 +156,10 @@ fun AppViewModel.canadaVerifyOtp(code: String) {
     }
 }
 
+/**
+ * Back out of the Canada OTP challenge screen: drops the stashed credentials (they were never
+ * persisted) and clears the challenge UI.
+ */
 fun AppViewModel.canadaCancelOtp() {
     canadaPending = null
     _state.update { it.copy(canadaOtp = null) }

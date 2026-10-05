@@ -44,9 +44,13 @@ internal fun StaggeredRevealColumn(
         label = "pebbleRowCascade",
         transitionSpec = {
             if (targetState == EnterExitState.Visible) {
-                // A short head start for the card, not the rows: the pop reads as arriving just
-                // after the pebble starts opening. LinearEasing: each row remaps a narrow slice of
-                // this value, and slicing an already-eased curve distorts the shape.
+                // A short head start for the CARD, not the rows -- asked for explicitly: the pop
+                // should read as arriving just after the pebble has started opening, not racing it
+                // from the same frame. collapseEnter's own bounce has no fixed duration (it's a
+                // spring, not a tween), so this can't be timed to "wait until the card is exactly
+                // this far open" -- a flat delay is what's available, short enough that the rows
+                // are still clearly popping in DURING the open rather than only once it's fully
+                // settled.
                 tween(durationMillis = 480, delayMillis = 90, easing = LinearEasing)
             } else {
                 tween(durationMillis = 400, easing = LinearEasing)

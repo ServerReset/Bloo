@@ -83,14 +83,19 @@ internal fun SearchLayer(
     var submitted by rememberSaveable { mutableStateOf("") }
     var focused by rememberSaveable { mutableStateOf(false) }
     val open = focused || query.isNotEmpty()
-    // Dragged bubble position in dp from the top-left (NaN = resting corner). Saved across
-    // rotation; mutableStateOf for rememberSaveable's guaranteed Saver path.
+    // Where the bubble was dragged, in dp from the top-left (NaN = never, so it rests in its
+    // corner). Saved so it survives rotation. mutableStateOf, not mutableFloatStateOf:
+    // rememberSaveable's guaranteed Saver path; this changes twice a gesture, so the boxing doesn't
+    // matter.
     @Suppress("AutoboxingStateCreation")
     var dragX by rememberSaveable { mutableStateOf(Float.NaN) }
+    // Normal (phone) layout only: which of three docks the bubble sits in, and how fast the last
+    // drag move was.
     var dockName by rememberSaveable { mutableStateOf(SearchDock.RIGHT.name) }
     val dock = SearchDock.valueOf(dockName)
     var lastDx by remember { mutableFloatStateOf(0f) }
-    // True only between finger-down and finger-up; position animation is bypassed meanwhile.
+    // True only between finger-down and finger-up on the bubble. The position animation is BYPASSED
+    // while it is true -- see the spec choice below.
     var dragging by remember { mutableStateOf(false) }
     // The app's own haptic vocabulary (Haptics.kt), not the platform LocalHapticFeedback.
     val haptics = LocalHaptics.current
@@ -108,7 +113,8 @@ internal fun SearchLayer(
         }
         hapticArmed = true
     }
-    // Clear the stale AI answer and last submission once the box is emptied.
+    // Drop any stale AI answer once the box is cleared, and forget the last submission with it --
+    // otherwise reopening search shows the previous question's answer under an empty field.
     LaunchedEffect(query.isBlank()) {
         if (query.isBlank()) { vm.clearAiReply(); submitted = "" }
     }
@@ -120,8 +126,10 @@ internal fun SearchLayer(
     val bottomInset = WindowInsets.navigationBars.union(WindowInsets.ime)
         .asPaddingValues().calculateBottomPadding()
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // With the keyboard up only a sliver is free; the panel gets what remains above the bar
-        // minus a margin. The blur cost is handled by AuroraBackground's `paused`.
+        // With the keyboard up, the panel and the bar together are competing for the sliver of
+        // screen that is left -- on a phone that is a couple of hundred dp, not the 360 the panel
+        // would otherwise take. Measure what is actually free rather than guessing: the panel gets
+        // what remains above the bar, minus a margin so it never looks wedged.
         val edge = 16.dp
         val bubble = 52.dp
         val barW = minOf(maxWidth - edge * 2, 640.dp)
@@ -207,7 +215,8 @@ internal fun SearchLayer(
             )
         }
 
-        // Results/suggestions anchored to the bottom, where the pill always sits while open.
+        // Results / suggestions, anchored to the bottom rather than to the pill: the pill is always
+        // at the bottom centre while open, so this never has to chase a bubble around the screen.
         AnimatedVisibility(
             visible = open,
             enter = expandEnter(Alignment.Bottom),
@@ -231,8 +240,10 @@ internal fun SearchLayer(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (query.isNotBlank()) {
-                        // Fewer results while the keyboard is up; a short list beats one you cannot
-                        // see the bottom of.
+                        // Fewer results while the keyboard is up. This is what the new ranking
+                        // buys: cutting to the top few is only honest when the top few really are
+                        // the best ones, and a scrollable list you cannot see the bottom of is
+                        // worse than a short list you can.
                         SettingsSearchResults(
                             query, submitted, vm, state.value, appearance, notif,
                             // Cover with keyboard up (~260dp square, mostly keyboard): two visible
@@ -262,8 +273,9 @@ internal fun SearchLayer(
             onQueryChange = { query = it },
             onFocusChange = { focused = it },
             onSubmit = { submitted = query },
-            // Dragging exists only for the bubble: a bar spans the screen, and a docked camera band
-            // has nowhere to go.
+            // Dragging only exists for the bubble. A bar spans the screen -- there is nowhere to
+            // move it to -- and while it is a text field a drag would fight the keyboard and the
+            // panel above it.
             onDrag = if (form != SearchForm.BAR) {
                 { dx, _ ->
                     dragX = ((if (dragX.isNaN()) x else dragX.dp) + dx).coerceIn(minX, maxX).value

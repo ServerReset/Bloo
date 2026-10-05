@@ -69,7 +69,11 @@ internal fun StatusBarScrim(
 ) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    // RenderEffect blur needs API 31+ (minSdk is 26); pre-S devices see only the gradient.
+    // Modifier.blur (the hazeState == null fallback path below) is backed by RenderEffect, which
+    // the Android framework only implements from API 31 (S) onward -- Compose has no software
+    // fallback for it, and neither does Haze's own blur. minSdk here is 26, so on any API 26-30
+    // device both paths are a visual no-op: the gradient alone -- with no blur softening it -- is
+    // the only thing anyone on those devices ever actually sees.
     val canBlur = canBlurBackdrops()
     // The same glassTint every other glass surface resolves to for this canBlur state.
     val tint = glassTint(canBlur)
@@ -154,8 +158,9 @@ internal fun SettingsModeTab(
 internal val HeaderCornerGap = 12.dp
 
 /**
- * The shared size of every free-floating header button, so buttons in one row share a vertical
- * centre.
+ * The one shared size every free-floating header BUTTON -- [FloatingIcon]'s circle, and anything
+ * meant to sit in the same row as one -- is drawn at, so two buttons on the same header always
+ * share a vertical centre.
  */
 internal val HeaderButtonSize = 48.dp
 
@@ -199,8 +204,9 @@ internal fun FloatingIcon(
         modifier = modifier
             .padding(outerPadding)
             .size(HeaderButtonSize)
-            // Lambda form: the press spring is read at draw time, so it never recomposes this
-            // button.
+            // Lambda form: the press spring is read at DRAW time, so the animation never recomposes
+            // this button (the arg-taking overload reads it in composition instead -- see
+            // ExpressiveButtons.kt for the same fix).
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -234,8 +240,9 @@ internal val LocalAppearance = staticCompositionLocalOf { SettingsStore.Appearan
 internal val LocalForceExpanded = staticCompositionLocalOf { false }
 
 /**
- * The live pull-to-refresh distance (0..1+), published by [Refreshable] so [GarageScreen]'s
- * overlays track the pull.
+ * The live pull-to-refresh distance (0..1+), published by [Refreshable] so the floating overlays in
+ * [GarageScreen] (settings/back/flip buttons) can track the pull in real time instead of only
+ * animating once refresh starts.
  */
 internal val LocalPullFraction =
 

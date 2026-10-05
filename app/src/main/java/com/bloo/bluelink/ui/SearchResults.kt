@@ -85,14 +85,18 @@ internal fun SettingsSearchResults(
     // Same source as the main Settings screen's Security card gate.
     val canBio = remember { vm.canUseBiometrics() }
 
-    // Remembered, not rebuilt per keystroke: no add(...) call reads `query`; only scoring does.
-    // settingsMode is a key so entries rebuild when simple/advanced mode changes.
+    // remember(state, appearance, notif, vm, canBio), not rebuilt inline: none of the ~50+ add(...)
+    // calls below read `query` at all -- only the scoring pass further down does -- so building
+    // this whole list (and every entry's own composable lambda) fresh on every keystroke was pure
+    // waste.
     val entries = remember(state, appearance, notif, vm, canBio, state.settingsMode) {
         buildSettingsSearchEntries(state, appearance, notif, vm, canBio)
     }
 
-    // Matches render first and the AI answer last; placed above the floating search bar, the stack
-    // reads [suggested results] [AI tile] [search bar] top to bottom. Ranked, not filtered.
+    // Matches render FIRST (top of this composable's output), the AI answer LAST -- this composable
+    // is placed above the floating search bar, so the resulting stack top-to-bottom is [suggested
+    // results] [AI tile] [search bar], matching the requested reading order bottom-up. Ranked, not
+    // filtered.
     val results = remember(entries, tokens, limit) {
         if (tokens.isEmpty()) {
             entries
@@ -129,7 +133,10 @@ internal fun SettingsSearchResults(
             )
         }
     } else {
-        // Restarts the stagger only when the SET of results changes, not on every keystroke.
+        // Restarts the stagger whenever the actual SET of results changes -- not on every
+        // keystroke, which would re-pop a list that hasn't actually moved just because the user is
+        // still typing the same word. Titles joined is cheap and exactly captures "did the ranked
+        // list change," which is the only thing that should trigger this.
         val resultsKey = results.joinToString("|") { it.title }
         results.forEachIndexed { i, e ->
             PopVisible(visible = staggeredResultVisible(resultsKey, i)) {
@@ -306,8 +313,9 @@ internal fun SettingsSearchResults(
                     )
                     if (ran == null && car != null) {
                         val scope = rememberCoroutineScope()
-                        // MorphTextButton for the press morph and click haptic. primary/onPrimary
-                        // are explicit because this is the card's primary action.
+                        // MorphTextButton, not a bare Button: this was the one plain Material
+                        // button left in the app, so it was the only standard button that neither
+                        // morphed on press nor fired the click haptic every other button gives.
                         SafeMorphTextButton(
                             text = if (running) "Working…" else "Run it",
                             onClick = {

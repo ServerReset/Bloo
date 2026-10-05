@@ -15,7 +15,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 
-/** The one expand/collapse chevron in the app. */
+/**
+ * The one expand/collapse chevron in the app. Both pebble header controls -- [MorphExpandButton]
+ * (the pebbles with no action button) and [SplitExpandButton] (the ones with a left action half) --
+ * carried a byte-identical copy of the chevron's two animations and its Icon. Only the spring LABEL
+ * differed.
+ */
 internal class ChevronSpin internal constructor(
     val rotation: Float,
     val easterEggSpin: Float,

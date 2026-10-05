@@ -11,8 +11,9 @@ import com.bloo.bluelink.data.setAiEnabled
 // --- On-device AI (Gemini Nano): summaries, free-form questions, command resolution (extracted from AppViewModel) --
 
 /**
- * The only actions [AppViewModel.aiResolveCommand] may return: exactly the ids VehicleCommandRunner
- * can execute.
+ * The only actions [AppViewModel.aiResolveCommand] may return -- exactly the ids
+ * VehicleCommandRunner has a case for. Deliberately NOT derived from a broader list: if the runner
+ * cannot execute it, the model must not be able to name it.
  */
 private val AI_COMMANDS = setOf(
     "lock", "unlock", "charge_on", "charge_off", "climate_on", "climate_off",
@@ -64,7 +65,7 @@ fun AppViewModel.summarizeCar(v: Vehicle) {
     }
     _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
     viewModelScope.launch {
-        // Prompt for this car only.
+        // Build the prompt for THIS car only, so the result reflects just it.
         val prompt = summaryPrompt(v, status, _state.value)
         val result = runCatching { ai.summarize(prompt) }
         _state.update { st ->

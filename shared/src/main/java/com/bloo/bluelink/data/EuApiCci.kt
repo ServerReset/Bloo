@@ -200,7 +200,11 @@ internal suspend fun EuApi.refreshCci(session: EuSession): EuSession {
     )
 }
 
-/** POST to the CCI API with the OneApp headers. [service] is the path under `/domain/api/` (e.g. */
+/**
+ * POST to the CCI API with the OneApp headers. [service] is the path under `/domain/api/` (e.g.
+ * "v1/auth/token"). [query] is appended after '?'. [body] null sends an empty body; [jsonBody]
+ * marks the body as JSON (the refresh call) rather than an empty form.
+ */
 internal suspend fun EuApi.cciPost(
     service: String,
     body: String?,

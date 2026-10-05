@@ -190,8 +190,10 @@ internal fun StateControl(
         // Extra icon actions plus the lock/unlock button form one connected button group (a single
         // child of the outer Row, so the outer spacing isn't piled on top).
         val segmentCount = groupActions.size + 1
-        // Phone-sized targets: ControlsPebble is the only caller and appears in the hot-spot column
-        // and single-column list, never on a cover tile.
+        // Bigger, thumb-friendly hit targets on the cover screen (operated by a thumb on a ~1-inch
+        // square) than on the phone (mouse-precise finger taps in a full pebble). Only the cover
+        // provides LocalPebbleFillHeight (see its doc in Widgets.kt), so that is the one that
+        // actually means "cover".
         val groupBtnSize = 50.dp
         val actionIconSize = 22.dp
         // Modifier.size on a segment is coerced to the width the group assigns.
@@ -228,8 +230,10 @@ internal fun StateControl(
             }
         }
         if (groupActions.isEmpty()) {
-            // No group for a lone button: a group redistributes width from neighbours, and a single
-            // member has none, so SafeExpansiveButton's standalone path (real growth) is used.
+            // A lone member has no neighbour to take width from, so wrapping it in the group gave
+            // it a press fraction that was faithfully computed and just as faithfully multiplied by
+            // a reserve of zero -- not a bug in the animation itself, a design that only works with
+            // two or more real segments, silently applied to the one-segment case too.
             mainButton(null)
         } else {
             ExpressiveButtonRow(

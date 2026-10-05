@@ -40,7 +40,8 @@ import androidx.compose.ui.unit.dp
 
 // ---- Colour -------------------------------------------------------------------
 
-// Mirrors shared/BlooColors.kt hex values.
+// Was a phone-only re-declaration of the same hex values shared/BlooColors.kt already centralizes
+// (bit-identical today, one edit away from silently diverging like chargerLabel's text had).
 internal val ChargeGreen = Color(com.bloo.bluelink.data.BlooColors.chargeGreen)
 internal val ChargeGreenDark = Color(com.bloo.bluelink.data.BlooColors.chargeGreenDark)
 
@@ -208,9 +209,11 @@ internal object BatterySaverState {
                     _isOn.value = current(appContext)
                 }
             }
-            // ContextCompat with NOT_EXPORTED: at targetSdk 34+ the plain 2-arg registerReceiver
-            // throws SecurityException, and only the system's own battery-saver broadcast is
-            // needed.
+            // ContextCompat, not Context.registerReceiver directly: this app's targetSdk (36) is
+            // well past the API 33 cutover where a context-registered receiver MUST say whether
+            // other apps can send it broadcasts, and the plain 2-arg platform call throws
+            // SecurityException at runtime on 34+ once targetSdk requires that flag instead of just
+            // warning about its absence.
             androidx.core.content.ContextCompat.registerReceiver(
                 appContext, receiver,
                 android.content.IntentFilter(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
@@ -221,7 +224,14 @@ internal object BatterySaverState {
     }
 }
 
-/** Live battery-saver state from the shared [BatterySaverState]; updates immediately everywhere. */
+/**
+ * Live, reactive battery-saver state, read from the one shared [BatterySaverState] -- so toggling
+ * it while the app is already open (Quick Settings, the battery- saver notification) takes effect
+ * immediately everywhere at once, rather than only on the next cold start. [canBlurBackdrops] is
+ * this value's biggest consumer today, but it's a plain top-level composable precisely so anything
+ * else wanting to drop expensive visual effects under battery saver -- not just blur -- can read it
+ * the same way.
+ */
 @Composable
 internal fun isBatterySaverOn(): Boolean {
     val active by BatterySaverState.isOn.collectAsState()

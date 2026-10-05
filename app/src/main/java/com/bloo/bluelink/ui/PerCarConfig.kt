@@ -29,8 +29,11 @@ import com.bloo.bluelink.data.snapshot
  * returns a UiState transform folding them in, plus the resolved shortcut set (needed outside the
  * copy to re-push launcher shortcuts).
  */
-// Runs on Dispatchers.Default: decoding each car's preset list must not run on the main thread
-// during the Loading -> Garage frame.
+// Dispatchers.Default, same reasoning as SettingsStore.appearance's own .flowOn(Default):
+// climatePresets(vin, prefs) below JSON-decodes each car's saved preset list, and this whole
+// function runs right on the Loading -> Garage transition frame (loadGarageInner) or a
+// settings-import refresh -- exactly the "decode ran on the main thread while the first frame was
+// trying to draw" cost that fix already called out elsewhere.
 internal suspend fun AppViewModel.perCarConfig(
     vehicles: List<Vehicle>,
     prefs: androidx.datastore.preferences.core.Preferences,
@@ -80,7 +83,9 @@ internal suspend fun AppViewModel.refreshLocalCarConfig() {
     val cfg = perCarConfig(vehicles, prefs)
     com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: perCarConfig done")
     _state.update { cfg.apply(it) }
-    // Also re-push launcher shortcuts so an imported shortcut-set change reaches the app-icon menu.
+    // Quick-tile / shortcut changes must also re-push the launcher shortcuts, exactly as
+    // loadGarageInner does, so an imported shortcut-set change is reflected in the app-icon
+    // long-press menu and not just in-app.
     com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, cfg.shortcutSet)
 }
 

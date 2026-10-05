@@ -23,8 +23,9 @@ internal class NaturalWidths {
     var compacted: Boolean = false
 
     /**
-     * The standalone button's single resting width from its last resting measure; only
-     * [SafeExpansiveButton]'s non-group path uses it.
+     * The standalone button's own single resting width, cached from its last resting measure. Only
+     * [SafeExpansiveButton]'s non-group path uses this; the group derives its widths from
+     * intrinsics instead ([content]/[compact]) and needs no measured cache at all.
      */
     var widths: IntArray? = null
 
@@ -42,8 +43,9 @@ internal class NaturalWidths {
 internal data class ExpressiveGroupData(
     val pressFraction: () -> Float,
     /**
-     * Share of the row's leftover space this member takes, 0 to opt out. The group's own
-     * Modifier.weight: RowScope weight cannot reach a child of this group.
+     * Share of the row's leftover space this member takes, 0 to opt out. The group's own answer to
+     * Modifier.weight, which cannot reach it: weight is RowScope parent data read by a Row's
+     * measure policy, and a child of this group is not a child of a Row.
      */
     val weight: Float,
 ) : ParentDataModifier {
@@ -76,7 +78,9 @@ object ExpressiveButtonGroupScope {
         val press by expressivePressFraction(interactionSource, enabled)
         Box(
             modifier
-                // propagateMinConstraints (below) so the button fills the width the group hands it.
+                // propagateMinConstraints (below) so the button itself fills the width the group
+                // hands it -- otherwise it would sit at its own natural width inside a slot growing
+                // and shrinking around it, and nothing would appear to move.
                 .then(ExpressiveGroupData({ press }, groupWeight)),
             propagateMinConstraints = true,
         ) {

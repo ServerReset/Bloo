@@ -288,7 +288,9 @@ private fun weekdayName(date: String): String {
 
 /**
  * How close (miles) the phone must be to the car for their two weather blocks to be merged into one
- * "Here & at the car" readout rather than shown as two.
+ * "Here & at the car" readout rather than shown as two. Roughly "same neighbourhood" -- close
+ * enough that the car's weather and yours are the same weather, so showing two copies would be
+ * redundant.
  */
 private const val WEATHER_MERGE_MILES = 7.0
 
@@ -341,13 +343,21 @@ internal fun WeatherLocations(
 
 // --- Service & links ------------------------------------------------------
 
-/** The one safe Activity launch. */
+/**
+ * The one safe Activity launch. True when something actually launched, so callers that need to know
+ * fell-back from served (the update tile's "you must dismiss it yourself" path) can tell the
+ * difference; silently ignoring a failed open is how an action button starts reading as dead.
+ */
 internal fun Context.tryStart(intent: Intent): Boolean = runCatching {
     if (this !is android.app.Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     startActivity(intent)
 }.isSuccess
 
-/** The one permission check. */
+/**
+ * The one permission check. Five objects kept a `fun hasPermission(context)` that differed only in
+ * the permission string and the OS level where the check stops being needed — and each had to be
+ * re-read (or, more often, forgotten) by every new caller.
+ */
 @Suppress("ObsoleteSdkInt") // minSdk is a caller-supplied OS level, not a literal
 internal fun Context.hasPermission(permission: String, minSdk: Int = 1): Boolean =
     android.os.Build.VERSION.SDK_INT < minSdk ||
@@ -356,7 +366,9 @@ internal fun Context.hasPermission(permission: String, minSdk: Int = 1): Boolean
 
 /**
  * Opens the car's location in the device's default Maps app -- a `geo:` intent rather than
- * hardcoding Google Maps, since the OS resolves it to whatever the user actually has set.
+ * hardcoding Google Maps, since the OS resolves it to whatever the user actually has set. Shared by
+ * [LocationPebble]'s own "Open in maps" button and [CarMapFullScreenDialog]'s [MapFeature] row so
+ * the two never drift on the URI format.
  */
 internal fun openInExternalMaps(context: Context, location: GeoLocation, label: String) {
     val uri = (

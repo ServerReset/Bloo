@@ -203,7 +203,8 @@ object UpdateApi {
 
 /**
  * Hand an already-downloaded APK to the system package installer, returning whether the installer
- * actually launched.
+ * actually launched. A content:// URI through FileProvider, never file://, which modern Android
+ * rejects outright with FileUriExposedException.
  */
 fun installDownloadedApk(context: Context, apk: File): Boolean = runCatching {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
@@ -222,7 +223,10 @@ fun installDownloadedApk(context: Context, apk: File): Boolean = runCatching {
     context.startActivity(intent)
 }.isSuccess
 
-/** The side-effect-free decisions used by the phone's UpdateChecker.checkPhone. */
+/**
+ * Only the pure predicates live here -- the caller keeps its own store reads/writes, its own
+ * debounce interval, `setLastCheckedAt` timing, and its own result mapping.
+ */
 object UpdateGate {
     /**
      * Whether an update check should short-circuit without hitting the network: an unstamped local

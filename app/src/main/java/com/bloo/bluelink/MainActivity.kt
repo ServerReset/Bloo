@@ -63,7 +63,10 @@ class MainActivity : FragmentActivity() {
     private var backgroundedAt = 0L
     private var firstStart = true
 
-    // Wall-clock time the screen last turned off, for LockTiming.SCREEN_OFF.
+    // Wall-clock time the screen last turned off, for LockTiming.SCREEN_OFF. The re-lock predicate
+    // only counts a screen-off that happened AFTER the app was backgrounded (screenOffAt >
+    // backgroundedAt), so a screen timeout while the user is actively using the app never re-locks
+    // it.
     @Volatile
     private var screenOffAt = 0L
 
@@ -178,6 +181,10 @@ class MainActivity : FragmentActivity() {
         com.bloo.bluelink.ui.inMultiWindowMode = isInMultiWindowMode
     }
 
+    /**
+     * Records the wall-clock time the Activity left the foreground, so the next [onStart] can
+     * measure how long the app was backgrounded for the app-lock check.
+     */
     override fun onStop() {
         super.onStop()
         backgroundedAt = System.currentTimeMillis()
@@ -186,8 +193,10 @@ class MainActivity : FragmentActivity() {
     override fun onStart() {
         StartupTrace.mark("MainActivity.onStart")
         super.onStart()
-        // This is idempotent: starting the service again only refreshes its foreground notification
-        // and receiver, it does not start a car evaluation.
+        // Reattach AutoLock's dynamic Bluetooth watcher for existing installs whose config was
+        // already enabled before the watcher existed. This is idempotent: starting the service
+        // again only refreshes its foreground notification and receiver, it does not start a car
+        // evaluation.
         viewModel.ensureAutoLockWatcher()
         // Cold start is handled by the ViewModel; only re-evaluate on warm resumes.
         if (!firstStart) {
@@ -236,7 +245,8 @@ class MainActivity : FragmentActivity() {
 
     /**
      * The id must be the EXACT one [Shortcuts.refresh] registered: "cmd_vin" for a car shortcut,
-     * "bluelink_<brand>" for an "Open the <brand> app" shortcut.
+     * "bluelink_<brand>" for an "Open the <brand> app" shortcut. Best-effort by design: this is an
+     * analytics nicety, never a reason for a shortcut tap to fail.
      */
     private fun reportShortcutUsage(vin: String, cmd: String) {
         val id = if (cmd == "bluelink") {

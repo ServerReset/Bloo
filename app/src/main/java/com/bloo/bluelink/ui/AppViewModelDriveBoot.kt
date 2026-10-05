@@ -38,6 +38,9 @@ internal fun AppViewModel.bootstrapDriveSync() {
         com.bloo.bluelink.data.StartupTrace.markIfStarting("bootstrapDriveSync: prefs snapshot read")
         val uri = settingsStore.syncUri(snap)
         val lastSync = settingsStore.lastSyncMs(snap)
+        // Restores a failure the background periodic worker hit while the app was closed, so it's
+        // visible in Settings on next launch instead of only ever surfacing if a foreground sync
+        // happens to fail too.
         var lastError = settingsStore.lastSyncError(snap)
         if (uri != null) {
             val stillGranted = runCatching {
@@ -110,7 +113,9 @@ internal fun AppViewModel.bootstrapDriveSync() {
     viewModelScope.launch {
         var pushJob: kotlinx.coroutines.Job? = null
         // No .distinctUntilChanged() here: dirtyKeysFlow already dedupes, on the key set AND a
-        // biometric of those keys' values.
+        // biometric of those keys' values. Deduping on the bare set a second time would
+        // re-introduce exactly what that fixes -- re-editing one key after a failed push yields an
+        // identical set, so the retry never got scheduled.
         settingsStore.dirtyKeysFlow
             .collect { dirty ->
                 // Empty = nothing pending (or a sync just cleared it) — cancel any scheduled push
@@ -130,7 +135,9 @@ internal fun AppViewModel.bootstrapDriveSync() {
             }
     }
 
-    // Sweep car photos no pref points at any more, once per launch.
+    // Sweep car photos no pref points at any more, once per launch. The crop screen writes a fresh
+    // timestamped file each time and only overwrites the img_$vin pref, so every re-crop stranded
+    // the previous full-resolution image on disk forever.
     viewModelScope.launch {
         kotlinx.coroutines.delay(PHOTO_SWEEP_DELAY_MS)
         runCatching { settingsStore.migrateSchema() }

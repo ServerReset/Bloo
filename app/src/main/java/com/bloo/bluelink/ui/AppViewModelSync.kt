@@ -25,8 +25,10 @@ import com.bloo.bluelink.data.syncUri
 // --- Settings export/import and Drive auto-sync (extracted from AppViewModel) --
 
 /**
- * Share a full settings backup (colours and palettes included) via the share sheet as a real file,
- * since most file-saving targets reject raw EXTRA_TEXT.
+ * Share a full settings backup (includes colours and palettes) via the share sheet, as a real file
+ * — not raw EXTRA_TEXT, which most file-saving targets (Drive, Files, email attachments) don't
+ * accept as a share destination at all, silently limiting "Export" to text-only apps and defeating
+ * the whole point of producing something "Restore" can later read back in.
  */
 fun AppViewModel.exportSettings(context: android.content.Context) = viewModelScope.launch {
     val json = settingsStore.exportSettingsJson()
@@ -113,7 +115,11 @@ fun AppViewModel.clearSyncUri() = viewModelScope.launch {
     AppLog.log("Drive auto-sync disabled")
 }
 
-/** Join an existing Drive sync file and set up auto-sync to it. */
+/**
+ * Join an existing Drive sync file and set up auto-sync to it. We only need to (1) confirm the file
+ * is readable, (2) take a persisted grant, (3) reset per-file gate state so join-adopt arms, then
+ * (4) run one pass.
+ */
 fun AppViewModel.importSettingsAndSync(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
     importSettingsAndSyncSuspend(context, uri)
 }
@@ -225,7 +231,11 @@ fun AppViewModel.removeSyncedDevice(id: String) {
     }
 }
 
-/** Writes the file's own bytes back verbatim. */
+/**
+ * Settings "Test sync" diagnostic: runs a non-destructive end-to-end round-trip against the real
+ * Drive file (permission → read → write → verify) and reports pass/fail as a snackbar, so the user
+ * can confirm sync actually works on their device/provider in one tap.
+ */
 fun AppViewModel.testSync() {
     viewModelScope.launch {
         val result = withContext(Dispatchers.IO) { settingsStore.testSyncRoundTrip() }

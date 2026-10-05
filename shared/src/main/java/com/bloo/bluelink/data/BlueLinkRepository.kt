@@ -72,7 +72,9 @@ class BlueLinkRepository(
 
     /**
      * Authenticates against the brand's API and persists the resulting tokens plus the
-     * caller-supplied [pin]/[username] as a new [SessionStore.Session] for this brand.
+     * caller-supplied [pin]/[username] as a new [SessionStore.Session] for this brand. Note the PIN
+     * itself is never sent to or validated by the login call — it's only remembered here so it can
+     * be attached as a header on later commands.
      */
     suspend fun login(username: String, password: String, pin: String) {
         val token = api.login(username, password)

@@ -13,11 +13,14 @@ import kotlin.math.max
 
 internal fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedVehicleCommand? {
     val q = query.lowercase()
-    // Only for a climate start, and not when smart climate is asked (it computes its own target).
+    // Only meaningful for a climate START, and only when the phrasing is not already asking for
+    // smart climate (which computes its own target from the weather -- naming a temperature and
+    // asking for smart at once is a contradiction, and smart is the more specific request).
     val temp = parseClimateTemperature(q, metric)
     // degLabel owns the F<->C-and-round rule; `temp` is an Int in °F and fahrenheit = !metric.
     val tempLabel = temp?.let { degLabel(it.toString(), fahrenheit = !metric) }
-    // Defrost implies climate at full heat unless the query also names a temperature.
+    // Defrost implies climate at full heat -- "clear the windscreen" is a request about ice, not
+    // about a number, so it picks its own temperature unless the query also named one.
     val wantsDefrost = RxDefrost.containsMatchIn(q)
     return when {
         // Checked first: "open Bluelink"/"open the app" launches the OEM companion app (dispatched
@@ -52,8 +55,9 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
             } else {
                 ParsedVehicleCommand("climate_on", "default", "Starting climate for")
             }
-        // Bare "heat <car> to 80": needs a real temperature, the same guard that stops "Ioniq 5"
-        // reading as one.
+        // Bare "heat <car> to 80" / "cool <car> to 65" / "warm <car> to 70" -- no start/turn-on
+        // prefix, no "up" -- the pattern above requires one of those, so a query that's just the
+        // verb plus a target temperature fell through to "not a command" entirely.
         temp != null && RxHeatCoolVerb.containsMatchIn(q) ->
             ParsedVehicleCommand("climate_on", VehicleCommandRunner.TEMP_PREFIX + temp, "Starting climate at $tempLabel for")
         // Charge limit before charge start/stop: "set the charge limit to 80" contains "charg".
@@ -111,7 +115,9 @@ internal val RxNegation = Regex("stop|turn off|cancel")
 
 internal val RxClimateOff = Regex("(stop|turn off|cancel|kill|end) (the )?(climate|ac|a/c|heat(er)?|aircon|air con|cooling|warming)")
 
-// Start-climate phrasings.
+// Was constructed fresh inline at its one call site, unlike every other pattern in this block --
+// missed when the rest were hoisted (see the doc above this block for why that hoist mattered: once
+// per submitted query, not once per frame, but still worth not re-parsing).
 internal val RxClimateStart = Regex(
     "(start|turn on|run|fire up|kick on) (the )?(climate|ac|a/c|heat(er)?|aircon|air con)" +
         "|pre.?(heat|cool|condition)|warm (it|the car|my car) up|cool (it|the car|my car) down" +

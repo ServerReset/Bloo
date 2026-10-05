@@ -57,7 +57,8 @@ class Haptics(context: Context) {
 
     /**
      * Central gate every effect funnels through: skips entirely if haptics are disabled, there's no
-     * effect to play, or the device genuinely has no vibrator motor.
+     * effect to play, or the device genuinely has no vibrator motor. Any platform exception from
+     * the actual vibrate() call is swallowed since a missed haptic is never worth crashing over.
      */
     private fun play(effect: VibrationEffect?) {
         if (!enabled || effect == null) return

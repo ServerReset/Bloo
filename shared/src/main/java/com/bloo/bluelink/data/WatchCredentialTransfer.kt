@@ -40,7 +40,11 @@ data class WatchCredentialBundle(
     )
 }
 
-/** The sealed envelope that carries a [WatchCredentialBundle] from phone to watch. */
+/**
+ * The sealed envelope that carries a [WatchCredentialBundle] from phone to watch. Hybrid
+ * encryption: a fresh AES-256-GCM key encrypts the bundle, and that key is wrapped with RSA-OAEP to
+ * a public key whose private half lives in the WATCH's Android Keystore and never leaves it.
+ */
 object WatchCredentialTransfer {
     private const val VERSION: Byte = 1
     private const val IV_BYTES = 12

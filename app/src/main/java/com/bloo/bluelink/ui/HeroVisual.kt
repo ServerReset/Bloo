@@ -127,7 +127,9 @@ private object HeroLoadStagger {
     private var burstSlot = 0
 
     /**
-     * Call once per load attempt (inside `remember(model) {}`), never from a plain composable body.
+     * Call once per actual load attempt (i.e. from inside a `remember(model) {}`), never from a
+     * plain composable body -- see the class doc for why this must not be charged against every
+     * recomposition.
      */
     fun claimDelayMs(): Long = synchronized(lock) {
         val now = android.os.SystemClock.uptimeMillis()
@@ -176,8 +178,10 @@ internal fun HeroVisual(
                 else -> entrance.animateTo(1f, tween(MotionLong, easing = FastOutSlowInEasing))
             }
         }
-        // See HeroLoadStagger: claimed once per model; delays only when another hero load just
-        // started.
+        // See HeroLoadStagger's own doc: claimed once per model (a fresh photo, not every
+        // recomposition), and only actually delays anything when another hero load just started
+        // within the same short burst window -- an isolated load (expanding one car well after cold
+        // start, say) claims 0ms and starts immediately.
         var staggerReady by remember(model) { mutableStateOf(false) }
         // Cold-start diagnostic: marks when AsyncImage starts so Success can log this photo's own
         // decode time.
@@ -201,8 +205,10 @@ internal fun HeroVisual(
                 .build()
         }
         if (!staggerReady) {
-            // Same tonal fallback as the no-photo branch, shown while the stagger holds the load
-            // back.
+            // Same tonal fallback the no-photo branch above shows -- a car whose hero load is being
+            // held back by the stagger looks exactly like one that simply hasn't loaded yet, for
+            // the brief window (a couple hundred ms, at most, and only when another hero just
+            // started loading) until its turn comes.
             val scheme = MaterialTheme.colorScheme
             Box(
                 sizeModifier

@@ -13,7 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 
-/** Plays a short celebratory sound for the first-run confetti moment. */
+/**
+ * Plays a short celebratory sound for the first-run confetti moment. If a bundled clip exists at
+ * `res/raw/celebrate` (drop in a royalty-free fireworks / party-popper file to use it), that's
+ * played; otherwise it falls back to the device's default notification sound. No audio is
+ * synthesized.
+ */
 object Fireworks {
 
     fun playSound(context: Context) {

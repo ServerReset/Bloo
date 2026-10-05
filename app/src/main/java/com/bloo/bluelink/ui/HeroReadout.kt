@@ -59,15 +59,20 @@ internal class ChargeReadout(
     /** Whether the state line is worth bolding: charging, or actually moving. */
     val emphasizeStatus: Boolean,
     /**
-     * Target fill, 0..1. The target, not an animated value, so this object isn't rebuilt every
-     * frame.
+     * Target fill, 0..1. Deliberately the TARGET and not an already-animated value: each site
+     * springs towards it through [animatedChargeFrac] with the same spec, so the two agree at rest
+     * — and at rest is when the pebble gets toggled. Holding an animating float in here instead
+     * would rebuild this object every frame.
      */
     val frac: Float,
     /** The AC/DC charge limit to mark, when plugged in and below full. */
     val limitPct: Int?,
     /** The pack reached its configured limit ("topped up"), independent of [charging]. */
     val stuckAtLimit: Boolean,
-    /** Plug-in hybrid only: the fuel tank alongside the pack; null when there is none. */
+    /**
+     * Plug-in hybrid only: the fuel tank alongside the pack. Null when there is no tank to show, so
+     * callers need no second `hasBattery && hasFuel` test.
+     */
     val fuelPct: Int?,
 )
 
@@ -166,8 +171,9 @@ internal fun HeroCollapsedNumbers(
      */
     hoisted: Boolean = false,
 ) {
-    // Gone by t = 0.35 where the expanded copy appears, unless hoisted (then it stays as an
-    // unpainted anchor).
+    // Gone by t = 0.35, where the expanded copy starts appearing -- unless the overlay has taken
+    // over, in which case this stays laid out for its whole life as the collapsed ANCHOR and simply
+    // never paints.
     val fade = (1f - t / 0.35f).coerceIn(0f, 1f)
     if (fade <= 0f && !hoisted) return
     // Name/numbers alignment lives on the name's side (see PebbleShell's `atRestScale`): at rest
@@ -204,7 +210,10 @@ internal fun HeroNumbers(
     // Stretches the inner Row to the width the parent already resolved; ignored when [width] is
     // set.
     fillWidth: Boolean = false,
-    // The status line's own fade; defaults to `t`.
+    // The status line's own fade -- see the top-level `statusAlpha` this defaults from for why it
+    // isn't just `t`. Defaults to `t` so the collapsed anchor (which calls this with t = 0f and
+    // never shows the line at all, see the `t > 0.01f` guard below) needs no changes at its call
+    // site.
     statusAlpha: Float = t,
     /**
      * Vertical alignment for the numbers. Expanded bottom-aligns; the collapsed copy centres beside

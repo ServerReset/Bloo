@@ -17,7 +17,12 @@ enum class DriveSide {
  */
 private val RIGHT_HAND_DRIVE_COUNTRIES = setOf("GB", "IE", "MT", "CY")
 
-/** The drive side implied by an ISO country code, defaulting to [DriveSide.LEFT]. */
+/**
+ * The drive side implied by an ISO country code, defaulting to [DriveSide.LEFT]. Defaulting left is
+ * the safe direction on two counts: it is the overwhelming majority of the region, and it is the
+ * value the payload already carried, so an unrecognised or absent country behaves exactly as it did
+ * before.
+ */
 fun driveSideFor(countryCode: String?): DriveSide =
     if (countryCode?.uppercase(Locale.US) in RIGHT_HAND_DRIVE_COUNTRIES) {
         DriveSide.RIGHT

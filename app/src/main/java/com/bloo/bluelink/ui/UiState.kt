@@ -29,8 +29,10 @@ import kotlinx.coroutines.launch
 
 sealed interface Screen {
     /**
-     * Bootstrapping state shown until the cold-start auto-login decides Login vs. the garage.
-     * Renders as just the app background (see its branch in Screens.kt).
+     * The bootstrapping state, and ONLY the bootstrapping state: shown for the brief window between
+     * process start and the cold-start auto-login coroutine (see AppViewModel's init block)
+     * determining whether this is a genuinely logged-out device (-> Login) or a returning signed-in
+     * one (-> whatever loadGarage resolves once its network call returns).
      */
     data object Loading : Screen
     data object Login : Screen
@@ -88,8 +90,9 @@ data class UiState(
      */
     val pinAttemptRejected: Boolean = false,
     /**
-     * Bumped on every successful PIN verify so settings dialogs can advance past the current-PIN
-     * stage.
+     * Bumped every time a PIN verify SUCCEEDS (the settings dialogs listen for the tick to advance
+     * past the "enter your current PIN" stage -- success itself is otherwise silent, since the app
+     * may already be unlocked when it happens in Settings).
      */
     val pinAcceptedTick: Int = 0,
     val loading: Boolean = false,
@@ -108,8 +111,9 @@ data class UiState(
      */
     val deviceLocation: GeoLocation? = null,
     /**
-     * Reverse-geocoded name for [deviceLocation]. Null until geocoded; geocode failure is not an
-     * error.
+     * A short human-readable name for [deviceLocation] (reverse-geocoded on refresh), shown as the
+     * phone-side location label in the Location & Weather pebble. Null until a fix has been
+     * geocoded -- geocoding fails routinely and is never treated as an error.
      */
     val devicePlace: String? = null,
     /** Recent EV trips by VIN (loaded lazily when the Trips pebble is shown). */
@@ -212,11 +216,15 @@ data class UiState(
     // Download progress is NOT here: it ticks per 64KB chunk and would recompose every live pebble.
     // It lives in AppViewModel.updateDownloadProgress and only the update tile collects it.
     /**
-     * The update APK is downloaded and ready to install; reset when a fresh check finds a
-     * different/no build.
+     * True once the update APK has finished downloading and is sitting in the cache ready to hand
+     * to the installer -- lets the update tile's button do "tap to download, tap again to install".
+     * Reset by a fresh update check finding a different/no build available.
      */
     val updateApkReady: Boolean = false,
-    /** A Shizuku seamless install is running; blocks a concurrent PackageInstaller session. */
+    /**
+     * True while a Shizuku seamless install is running, so a second Install tap (or a
+     * permission-grant retry) can't spawn a concurrent PackageInstaller session.
+     */
     val updateInstalling: Boolean = false,
     /**
      * A manual "Check for updates" is in flight (spinner + disabled button). Background checks
@@ -234,7 +242,10 @@ data class UiState(
     val syncWifiOnly: Boolean = true,
     /** Why the last Drive sync didn't fully succeed; null if it did or hasn't run. */
     val syncError: String? = null,
-    /** Devices sharing this sync file, from the last merged registry/cache. */
+    /**
+     * Devices sharing this sync file (name/model/last-seen), for the Settings "your devices" list.
+     * From the last sync's merged registry / cache.
+     */
     val syncDevices: List<com.bloo.bluelink.data.SyncMerge.SyncDevice> = emptyList(),
     /** The device id designated primary (source of truth), or null if none. */
     val syncPrimaryId: String? = null,
@@ -250,13 +261,16 @@ data class UiState(
      */
     val syncFileFingerprint: String? = null,
     /**
-     * The garage fetch came back empty because a request failed, not because the account has no
-     * vehicles. Cleared by the next successful load.
+     * Set when the garage fetch came back empty because a request actually failed (network/API
+     * error), not because the account genuinely has zero vehicles. Distinguishes a real failure
+     * from "not signed in" / "no vehicles" on the status card GarageScreen folds in as a page when
+     * there are no vehicles (see GarageStatusCard, Guard.kt).
      */
     val garageLoadError: String? = null,
     /**
-     * [garageLoadError] happened with no real connectivity (vs. an API/auth failure while online).
-     * Meaningless when [garageLoadError] is null.
+     * Whether [garageLoadError] happened while the device had no real internet connectivity, as
+     * opposed to a live network reporting an actual API/auth failure (Hyundai/Kia's own servers
+     * down for maintenance, an expired token, etc).
      */
     val garageLoadOffline: Boolean = false,
 ) {
@@ -268,7 +282,11 @@ data class UiState(
 
     fun isPebbleExpanded(vin: String, section: String): Boolean = "$vin:$section" !in collapsedPebbles
 
-    /** Pebbles pinned to the hotspot: ["controls"] or ["controls", userSelectedPebble]. */
+    /**
+     * Pebbles pinned to the hotspot as a list for rendering. Primary slot is always "controls"
+     * (lights/horn) - permanently pinned. Secondary slot is user-selectable from hotspotSections.
+     * Returns a list: ["controls"] or ["controls", userSelectedPebble]
+     */
     fun hotspotFor(vin: String): List<String> {
         val secondary = hotspotSections[vin]
         return if (secondary.isNullOrEmpty()) listOf("controls") else listOf("controls", secondary)
@@ -282,8 +300,10 @@ data class UiState(
     fun sectionsFor(v: Vehicle): List<String> = sectionOrders[v.vin] ?: DEFAULT_SECTIONS
 
     /**
-     * Effective powertrain: user override, else inferred from the API
-     * ([com.bloo.bluelink.data.resolvePowertrain], shared with CarAlerts).
+     * Effective powertrain: user override, else EV/gas inferred from the API. Delegates to
+     * [com.bloo.bluelink.data.resolvePowertrain], the one shared rule every powertrain-dependent
+     * surface in the app (this, and the background alert path in
+     * [com.bloo.bluelink.data.CarAlerts]) resolves through -- see that function's own doc.
      */
     fun powertrainOf(v: Vehicle): Powertrain =
         com.bloo.bluelink.data.resolvePowertrain(v, powertrains[v.vin])
@@ -305,8 +325,8 @@ data class UiState(
     fun isGen5WEffective(v: Vehicle): Boolean = platformOf(v) == VehiclePlatform.GEN5W
 
     /**
-     * [com.bloo.bluelink.data.supportsConnectedStore] honouring the override; Kia is always
-     * eligible.
+     * [com.bloo.bluelink.data.supportsConnectedStore], honouring the same override
+     * [isGen5WEffective] does -- mirrors that property's own Kia-is-always-eligible special case.
      */
     fun supportsConnectedStoreEffective(v: Vehicle): Boolean =
         v.brand == com.bloo.bluelink.data.Brand.KIA || (v.platformOverridable && platformOf(v) == VehiclePlatform.CCNC)
@@ -319,9 +339,10 @@ data class UiState(
     fun isSectionAvailable(v: Vehicle, section: String): Boolean {
         return when (section) {
             "ai" -> aiEnabled
-            // Trips: EV-only, not Gen5W, and only Hyundai/Genesis US has the endpoint
-            // (Brand.supportsTrips). An unavailable section would leave a phantom slot or a blank
-            // swipeable page.
+            // The trip-details feed is EV-only, Gen5W head units don't serve it at all, and only
+            // Hyundai/Genesis US actually has the endpoint (see Brand.supportsTrips) -- Kia US,
+            // every Canada brand and Europe all route to repositories with no trips() override, so
+            // they'd render nothing too.
             "trips" -> hasBattery(v) && !isGen5WEffective(v) && v.brand.supportsTrips
             // `!updateTileDismissed`: a dismissed tile renders nothing and would leave a phantom
             // slot.
@@ -331,7 +352,9 @@ data class UiState(
     }
 
     /**
-     * Whether the car is moving/on, for the header: speed first, else ignition. Null when unknown.
+     * Whether the car is moving/on, for the header. Speed (from a location fix) is the strongest
+     * signal; otherwise fall back to the ignition state. Null when we genuinely can't tell (e.g. an
+     * EV that's never been located).
      */
     fun drivingLabel(v: Vehicle): String? {
         val status = statusFor(v)

@@ -61,9 +61,11 @@ internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
     }
 
     /**
-     * This -- not a huge fake page count -- is what makes the wrap feel genuinely infinite while
-     * keeping the number of distinct virtual pages this pager can ever compose small and constant,
-     * instead of growing with how long or how far someone swipes.
+     * Call after every settle (never mid-drag -- see each call site's own `snapshotFlow {
+     * pager.settledPage }` collector): if the pager has drifted within [RECENTER_MARGIN_CYCLES]
+     * real-item-widths of either edge of the (small, fixed) virtual range, silently jump back to
+     * the page nearest the middle that maps to the SAME real index -- so nothing visibly changes,
+     * but the pager has room to keep going in either direction.
      */
     suspend fun recenterIfNearEdge() {
         if (realCount <= 1) return

@@ -1,6 +1,11 @@
 package com.bloo.bluelink.data
 
-/** A supported US telematics brand. */
+/**
+ * A supported US telematics brand. Genesis US runs on the same Hyundai-shaped backend
+ * ("…telematics.hyundaiusa.com") with its own host + OAuth client, so the entire request/path
+ * structure is shared — only these per-brand values change. Values are taken from the community
+ * reverse-engineering projects referenced in [Models].
+ */
 enum class Brand(
     val code: String,
     val baseUrl: String,
@@ -77,7 +82,12 @@ enum class Brand(
         label = "Kia (Canada)",
     ),
 
-    /** Hyundai Bluelink Europe on the CCAPI ("CCS2") platform, served by [EuApi]/[EuRepository]. */
+    /**
+     * Hyundai Bluelink Europe on the CCAPI ("CCS2") platform, served by [EuApi]/[EuRepository]. Kia
+     * Connect EU and Genesis EU ride the SAME backend family (different host + client only) —
+     * exactly like the three Canada brands share [CanadaApi] — so they can later be added as
+     * sibling entries here with no new API code.
+     */
     HYUNDAI_EU(
         code = "HEU",
         baseUrl = "https://prd.eu-ccapi.hyundai.com:8080",
@@ -107,7 +117,9 @@ enum class Brand(
 
     /**
      * Whether this brand can report AC/DC charge-limit targets, and therefore whether the editable
-     * charge-limit controls are worth showing.
+     * charge-limit controls are worth showing. False for Canada: [CanadaApi] has no verified read
+     * endpoint for the targets, so `EvStatus.reservChargeInfos` is always null on those cars (see
+     * the KNOWN-GAP comment in CanadaApi.parseStatus).
      */
     val supportsChargeLimits: Boolean get() = !isCanada
 
@@ -119,7 +131,9 @@ enum class Brand(
 
     /**
      * Whether a status refresh can tell us if remote climate is actually RUNNING
-     * (`VehicleStatus.airCtrlOn`).
+     * (`VehicleStatus.airCtrlOn`). False for Europe: [EuApi] maps the CCS2 payload's
+     * Green/Cabin/Body/ Drivetrain/Chassis/Electronics objects and none of them is wired to a
+     * climate-state field, so airCtrlOn is always null there.
      */
     val reportsClimateState: Boolean get() = !isEurope
 
@@ -308,7 +322,12 @@ val Vehicle.isGen5W: Boolean
 val Vehicle.platformOverridable: Boolean
     get() = brand != Brand.KIA && !brand.isCanada && !brand.isEurope
 
-/** On [Brand] rather than [Vehicle], because not every caller has a Vehicle. */
+/**
+ * Horn & Lights / Flash Lights (rcs/rhl/light, rcs/rhl/hnl) exist on the Hyundai/Genesis US
+ * telematics API this app already uses for lock/unlock; Kia's US API (Kia Connect) has no
+ * equivalent endpoint, and no equivalent was found in the Canada backend ([CanadaApi] only exposes
+ * lock/unlock/climate/ charge) or the Europe one ([EuApi], same four).
+ */
 val Brand.supportsHornLights: Boolean
     get() = this != Brand.KIA && !isCanada && !isEurope
 

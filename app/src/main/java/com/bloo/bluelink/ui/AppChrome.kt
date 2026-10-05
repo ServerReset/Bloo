@@ -185,8 +185,9 @@ internal fun AuroraBackground(
     }
     val motionMode = appearance?.auroraMotion ?: "static"
 
-    // Motion follows the phone's tilt; Static gets a slow ambient drift. A low smoothing alpha
-    // keeps tilt from jittering on hand tremor.
+    // "Motion" follows the phone's tilt (like a lock-screen wallpaper parallax); "Static" ignores
+    // tilt entirely and instead gets its own slow, small ambient drift (see p1/p2/p3 below) so it
+    // still reads as alive when the phone is sitting still, rather than a literally frozen frame.
     var tiltX by remember { mutableFloatStateOf(0f) }
     var tiltY by remember { mutableFloatStateOf(0f) }
     // Live pause flag: the sensor callback and coroutines start once and must see the newest value.
@@ -223,11 +224,15 @@ internal fun AuroraBackground(
             onDispose { mgr.unregisterListener(listener) }
         }
     } else {
-        // Reset so leaving Motion mode doesn't strand the blobs at a stale offset.
+        // Not tracking tilt in Static mode -- reset so a mode switch away from Motion doesn't leave
+        // the blobs stuck at a stale offset.
         LaunchedEffect(motionActive) { tiltX = 0f; tiltY = 0f }
     }
 
-    // Keyed on its inputs so the HSV round-trips don't re-run on every explosion frame.
+    // Remembered on the inputs the derivation actually reads, so the HSV round-trips don't re-run
+    // on every frame of the pull-to-refresh explosion animation (this composable recomposes each of
+    // those frames because it reads explosion.value below; the blob colours don't depend on the
+    // animation, so they shouldn't ride along with it).
     val (basePrimary, baseTertiary, baseSecondary) = remember(scheme.tertiary, scheme.secondary, scheme.surface) {
         val primary = run {
             val hsv = FloatArray(3)
@@ -238,8 +243,10 @@ internal fun AuroraBackground(
         Triple(primary, scheme.tertiary, scheme.secondary)
     }
 
-    // Guaranteed grow-then-shrink pulse with a brief hold at the peak, so a quick refresh still
-    // visibly animates.
+    // A guaranteed grow-then-shrink pulse rather than a value that just chases the raw refreshing
+    // boolean: a quick refresh (cache hit, or a refresh that resolves in well under a second)
+    // flipped refreshing back to false before the spring had visibly moved, which read as the
+    // background just snapping to its resting size instead of animating.
     val explosion = remember { Animatable(0f) }
     LaunchedEffect(refreshing) {
         if (refreshing) {
@@ -248,19 +255,25 @@ internal fun AuroraBackground(
         }
         explosion.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow))
     }
-    // Fade the blobs in so the heaviest draw (full-screen blur) isn't at full cost on the
-    // cold-start first frame. Alpha is read in drawBehind (draw phase only).
+    // Fades the blobs in from nothing instead of drawing this file's own most expensive draw (the
+    // full-screen blur) at full alpha on the very first frame this composable exists -- which, for
+    // a cold start, IS the very first frame the app paints at all (LoadingScreen/LoginScreen both
+    // use this).
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, tween(MotionMedium)) }
-    // Defer the blur one frame: the blobs are invisible at first, so blurring a flat surface is
-    // wasted GPU.
+    // Defer the blur itself past the first frame, not just the blob alpha (`appear` above). The
+    // blobs are at alpha 0 for the first ~320ms, so a full-screen 44dp blur of a flat surface on
+    // the very first frame is pure wasted GPU work -- and on a cold start that first frame is the
+    // one that decides "how long did the app take to open".
     var blurOn by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         withFrameNanos { }
         blurOn = true
     }
-    // Read inside drawBehind, not composition: reading it here would recompose and rebuild the
-    // full-screen RenderEffect every frame.
+    // Read inside drawBehind, not here. p1/p2/p3 and the tilt were already moved into draw scope;
+    // this one stayed in composition AND fed the blur radius argument, so every frame of the
+    // refresh spring recomposed AuroraBackground and rebuilt the full-screen RenderEffect -- the
+    // most expensive draw in the app, by this file's own account.
     val explodeAlpha = { 1f + explosion.value * 2.5f }
     val explodeSize = { 1f + explosion.value * 0.8f }
     val explodeSpread = { 1f + explosion.value * 0.3f }

@@ -222,7 +222,8 @@ data class Battery12V(
 
     /**
      * Whether this 12V reading is one the user should act on -- i.e. exactly the readings [health]
-     * already calls "Low" or "Needs attention".
+     * already calls "Low" or "Needs attention". Defined in terms of [health] rather than repeating
+     * a number, because the number was the bug.
      */
     val needsAttention: Boolean
         get() = health == "Low" || health == "Needs attention"
@@ -262,8 +263,9 @@ data class RemainTime2(
 )
 
 /**
- * A {value, unit} pair for time-based fields (charge time estimates), same shape convention as
- * [Dte]/[TempValue]/[Speed].
+ * Distance-to-empty: a numeric [value] plus a [unit] code (the API's own unit enum, not resolved
+ * here — callers that care about miles vs km read this in conjunction with the user's own unit
+ * preference).
  */
 @Serializable
 data class TimeValue(
@@ -271,11 +273,19 @@ data class TimeValue(
     val unit: Int? = null,
 )
 
-/** Charge-limit targets for both charger types on this car. */
+/**
+ * A climate setpoint as the API reports it: [value] is a numeric string (not a Double) because the
+ * API itself sends it quoted; [unit] again is the API's own unit code.
+ */
 @Serializable
 data class ReservChargeInfos(
     val targetSOClist: List<TargetSOC> = emptyList(),
 ) {
+    /**
+     * Look up the target for a specific [plugType] (0 = DC fast, 1 = AC) by scanning the flat list
+     * the API returns — there's no guaranteed order or fixed index, so this is a linear search by
+     * the plug-type key rather than direct indexing.
+     */
     fun level(plugType: Int): Int? =
         targetSOClist.firstOrNull { it.plugType == plugType }?.targetSOClevel
 }
@@ -339,7 +349,11 @@ enum class SeatLevel(val apiValue: Int, val label: String) {
     }
 }
 
-/** Steering wheel heat level. */
+/**
+ * Wraps the range figure for one fuel/energy source; the API models this as a list (see
+ * [EvStatus.drvDistance]) even though in practice only the first entry (the car's primary energy
+ * source) is ever read.
+ */
 @Serializable
 enum class WheelHeatLevel(val apiValue: Int, val label: String) {
     OFF(0, "Off"),
@@ -353,7 +367,10 @@ enum class WheelHeatLevel(val apiValue: Int, val label: String) {
     }
 }
 
-/** A full climate-start request assembled by the UI. */
+/**
+ * The actual range value, one level deeper than [DrvDistance] — the API nests it this way to allow
+ * (unused here) per-fuel-type breakdowns.
+ */
 @Serializable
 data class ClimateRequest(
     val tempF: Int,

@@ -31,8 +31,10 @@ fun AppViewModel.logout(brand: Brand) {
         AppLog.log("Signed out of ${brand.label}")
         val remaining = credentialStore.loadAll()
         if (remaining.isEmpty()) {
-            // Wipe account-derived telemetry (plaintext JSON: car GPS/lock/charge state, place
-            // names) so it cannot reload on the next cold start.
+            // Wipe account-derived telemetry from disk on full sign-out: the last-known car
+            // GPS/lock/charge state and reverse-geocoded place names persist as plaintext JSON and
+            // would otherwise re-load into the UI on the next cold start. Session tokens +
+            // credentials are already cleared above; this closes the derived-location leak.
             runCatching { statusCache.clear() }
             runCatching { snapshotStore.saveVehicles(emptyList()) }
             // AutoLock config is keyed by VIN; leaving it would make every Bluetooth event check a
@@ -42,8 +44,9 @@ fun AppViewModel.logout(brand: Brand) {
                 com.bloo.bluelink.autolock.AutoLockController.forgetAll(getApplication(), autoLockVins)
                 settingsStore.clearAllAutoLockConfigs()
             }
-            // `sessionFetched` is add-only and short-circuits ensureStatus; clear it so signing
-            // back in refetches statuses.
+            // `sessionFetched` is add-only and lives for the ViewModel's life, and [ensureStatus]
+            // returns immediately for any VIN in it. Belongs exactly here, beside the other two
+            // things being cleared because the account is gone.
             sessionFetched.clear()
             // Preserve everything that is not account state across the full reset: device
             // capability probes, Drive sync fields (the settings push gates on `syncUri`; the

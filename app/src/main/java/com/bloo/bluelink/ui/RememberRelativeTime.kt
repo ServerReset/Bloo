@@ -36,7 +36,11 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
-/** Holds the LABEL in state rather than a clock, which is the whole efficiency of it. */
+/**
+ * Holds the LABEL in state rather than a clock, which is the whole efficiency of it. Under a minute
+ * the text really does change every few seconds, so tick at 10s; under an hour it can only change
+ * once a minute; past that it cannot change more than every quarter of an hour.
+ */
 @Composable
 internal fun rememberRelativeTime(millis: Long?): String? {
     if (millis == null) return null
@@ -68,6 +72,7 @@ internal fun AnimatedSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
+    // No default and never zero: every slider in the app picks from fixed values, none are free.
     steps: Int,
     accent: Color = MaterialTheme.colorScheme.primary,
     // Fired once, with the final value, when the drag/tap settles — for callers whose real commit

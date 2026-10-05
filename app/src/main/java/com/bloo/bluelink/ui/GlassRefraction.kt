@@ -33,7 +33,9 @@ internal fun Modifier.appGlassEffect(
 ): Modifier {
     if (shape !is RoundedCornerShape) return this.appHazeEffect(state)
     // A theme-matched backing behind the refracted backdrop, so a floating element is never a black
-    // hole where the backdrop has nothing to show (light mode especially).
+    // hole where the backdrop has nothing to show (light mode especially). The user's clarity
+    // setting drives both the backing's opacity and how much it blurs: frosted is a thick soft
+    // pane, clear is a thin one with the refraction showing.
     val appearance = LocalAppearance.current
     // Ultra glass: no backing at all (pure refraction) and the clearest possible blur, so the
     // material reads as bare glass over whatever is behind it.

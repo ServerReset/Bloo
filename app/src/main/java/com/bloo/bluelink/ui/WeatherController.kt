@@ -40,7 +40,9 @@ internal class WeatherController(
     fun setWeatherPlace(query: String) = scope.launch {
         val q = query.trim()
         if (q.isBlank()) return@launch
-        // @Suppress("DEPRECATION"): the sync Geocoder is the only form below API 33.
+        // @Suppress("DEPRECATION"): see SettingsStore's identical note -- the sync Geocoder form is
+        // the only one that exists below API 33, where this app still runs; the async listener
+        // overload would need an API-level branch.
         @Suppress("DEPRECATION")
         val hit = withContext(Dispatchers.IO) {
             runCatching {

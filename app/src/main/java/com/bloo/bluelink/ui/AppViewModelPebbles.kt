@@ -40,8 +40,9 @@ internal suspend fun AppViewModel.checkAlerts(v: Vehicle, status: VehicleStatus)
 // --- Garage / vehicles ----------------------------------------------
 
 /**
- * Switch the visible car (swipe), lazily loading its status only if missing, so a car that failed
- * at startup gets another chance.
+ * Switch the visible car (swipe). Updates the index, and lazily loads this car's status only if we
+ * don't already have it — so already-loaded cars are never re-fetched on a swipe, but a car that
+ * failed to load at startup gets another chance when you view it.
  */
 fun AppViewModel.selectIndex(index: Int) {
     val v = _state.value.vehicles.getOrNull(index) ?: return
@@ -59,7 +60,10 @@ fun AppViewModel.selectIndex(index: Int) {
 /** Persist a new car display order (drag-and-drop in Settings). */
 fun AppViewModel.reorderVehicles(order: List<Vehicle>) {
     _state.update { s ->
-        // Keep the same car selected across a reorder, not the same position.
+        // Keep the same CAR selected across a reorder, not the same position -- selectIndex/expand
+        // always update currentIndex together with vehicles, but this was the one place that moved
+        // vehicles without it, so dragging a car above the currently selected one silently swapped
+        // which car the detail view showed.
         val selectedVin = s.vehicles.getOrNull(_currentIndex.value)?.vin
         val newIndex = order.indexOfFirst { it.vin == selectedVin }
         if (newIndex >= 0) _currentIndex.value = newIndex
@@ -105,8 +109,10 @@ fun AppViewModel.loadTrips(v: Vehicle) {
     if (v.vin in _state.value.trips || _state.value.isPending(v.vin, "trips")) return
     viewModelScope.launch {
         _state.update { it.copy(pending = it.pending + "${v.vin}:trips") }
-        // Cache only successful fetches: an empty list on failure would read as "no trips" and
-        // block re-fetching (the vin's presence gates it).
+        // Only cache the result on a successful fetch -- caching emptyList() on a transient failure
+        // looked identical to "genuinely no trips", and since the vin's presence in the map is what
+        // gates a re-fetch above, one bad network blip permanently stuck this car at "no trips" for
+        // the rest of the session with no way to retry.
         val fetched = runCatching { statusMutex.withLock { repoFor(v).trips(v) } }
             .onFailure { e -> AppLog.log("⚠ Trips for ${v.name}: ${e.message ?: "failed"}") }
             .getOrNull()
@@ -136,8 +142,9 @@ fun AppViewModel.setOnSettingsPageSlot(value: Boolean) {
  */
 fun AppViewModel.setDefaultClimatePreset(vin: String, id: String?) = viewModelScope.launch {
     settingsStore.setDefaultClimatePreset(vin, id)
-    // Also update state: defaultClimatePresets is populated once per process, so disk alone
-    // wouldn't take effect until restart.
+    // The STATE write, which was missing. UiState.defaultClimatePresets is populated exactly once
+    // per process, inside bootstrapDriveSync -- which is guarded by an AtomicBoolean and so never
+    // runs again.
     _state.update {
         it.copy(
             defaultClimatePresets = if (id == null) {

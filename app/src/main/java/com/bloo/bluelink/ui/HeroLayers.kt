@@ -141,8 +141,9 @@ internal fun BoxScope.HeroBackground(
                 onNumbersPositioned = reportNumbers,
                 numbersHoisted = hoisted,
                 statusAlpha = statusAlpha,
-                // Zero: this copy only shows expanded and owns the lower-left; the collapsed
-                // numbers are the header's.
+                // Collapsed, the numbers start after the name; expanded, they own the left edge.
+                // Only this Row shifts -- the bar underneath does not. Zero: this copy only ever
+                // shows EXPANDED, where it owns the card's lower-left.
                 numbersStart = 0.dp,
             )
         }

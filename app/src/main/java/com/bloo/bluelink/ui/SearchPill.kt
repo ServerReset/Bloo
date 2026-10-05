@@ -108,7 +108,9 @@ internal fun SearchPill(
         }
     }
     val interaction = remember { MutableInteractionSource() }
-    // Springs in on first appearance, including arriving from a different docked position.
+    // Springs in on first appearance; because SearchLayer keys the animations on the layout mode,
+    // "first appearance" includes arriving from a different docked position. The ball lands in its
+    // corner rather than sliding to it.
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { appeared = true }
     // Not DampingRatioMediumBouncy on both: entrance and press springs multiply into the same scale

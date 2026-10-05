@@ -132,7 +132,9 @@ internal fun LoginScreen(
 
     if (onCancel != null) BackHandler { onCancel() }
 
-    // Backs StatusBarScrim with a real backdrop blur of the Aurora background.
+    // Backs the StatusBarScrim call below with a REAL backdrop blur of the Aurora background --
+    // same pattern GarageScreen.kt uses for its own two pagers. See StatusBarScrim's own doc for
+    // why plain Modifier.blur never worked here.
     val hazeState = remember { HazeState() }
     Box(Modifier.fillMaxSize()) {
         // Same gate as LoadingScreen.
@@ -336,8 +338,9 @@ internal fun LoginScreen(
                             }
                         }
 
-                        // Update affordance without signing in: opens the release page once a build
-                        // is found, else checks on tap.
+                        // Update affordance, available WITHOUT signing in. Reads "Update available"
+                        // and opens the release page once a check finds a build; otherwise it
+                        // checks (or re-checks) on tap.
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             SafeMorphTextButton(
                                 text = when {
@@ -413,7 +416,8 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
             }
         },
         buttons = {
-            // Verify only once a code is sent; Cancel always. Stacked, primary on top.
+            // Verify shown only once a code's been sent; Cancel always. Stacked full-width (primary
+            // on top) per the shell's convention.
             if (otp.sentTo != null) {
                 SafeMorphTextButton(
                     text = "Verify",

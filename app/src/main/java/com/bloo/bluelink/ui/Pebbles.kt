@@ -45,8 +45,13 @@ internal fun sectionLabel(section: String): String = when (section) {
 }
 
 /**
- * The reorderable pebble stack for a car. [pinHotspot] true (wide/dual-column [ExpandedCar])
- * excludes "controls" and any secondary pin, which the caller renders via [HotspotSlot].
+ * The reorderable pebble stack for a car. [pinHotspot] defaults to true (exclude "controls" + any
+ * secondary pin, on the assumption the caller renders them separately via [HotspotSlot] -- true for
+ * the wide/dual-column [ExpandedCar]). [VehicleDetailContent]'s single-column layout has no
+ * separate hero-column slot to pin anything into, so it passes false: "controls" and any secondary
+ * pin then flow through this list like any other pebble, landing in their normal [DEFAULT_SECTIONS]
+ * position (right after "summary"/"update") instead of vanishing from the list with nothing
+ * rendering them in their place.
  */
 @Composable
 internal fun PebbleList(
@@ -66,8 +71,9 @@ internal fun PebbleList(
         derivedStateOf {
             val sel = state.value
             val hasBattery = sel.hasBattery(v)
-            // Exclude hotspot-pinned pebbles, but only when the caller renders them separately
-            // ([pinHotspot]).
+            // Exclude any pebbles pinned to the hotspot (both primary and secondary slots) -- but
+            // only when the caller is actually rendering them separately. See [pinHotspot]'s own
+            // doc.
             val pinnedPebbles = if (pinHotspot) sel.hotspotFor(v.vin) else emptyList()
             val allExclude = exclude + pinnedPebbles
             allSections.filter {
@@ -76,8 +82,10 @@ internal fun PebbleList(
         }
     }
     val hotDrag = LocalHotSeatDrag.current
-    // PERF: composing all pebbles eagerly on the fling-settle frame is the biggest car-swipe cost.
-    // Keyed on VIN so a recomposed page re-defers cheaply.
+    // PERF: each car-pager page composes this whole pebble stack. Composing all 8-10 pebbles
+    // eagerly (incl. ClimatePebble/ChargePebble's top-level effects, which run BEFORE their
+    // Pebble() call regardless of collapsed state) on the fling-settle frame is the biggest
+    // remaining car-swipe cost.
     val filledSections = remember(v.vin) { mutableStateSetOf<String>() }
     LaunchedEffect(v.vin, sections.size) {
         // One per frame, in list order, first-below-the-fold first.
@@ -91,8 +99,9 @@ internal fun PebbleList(
         items = sections,
         keyOf = { it },
         onReorder = { newVisible ->
-            // Merge reordered visible items back into the full order so excluded ones keep their
-            // slots.
+            // Merge the reordered visible items back into the full section order so excluded ones
+            // (the pinned hot-spot pebbles, summary, hidden) keep their slots instead of being
+            // dropped.
             val visibleSet = sections.toSet()
             val full = (allSections + com.bloo.bluelink.data.DEFAULT_SECTIONS).distinct()
             val queue = ArrayDeque(newVisible)
@@ -122,6 +131,10 @@ internal fun PebbleList(
         if (ready) {
             SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
         } else {
+            // Below the fold, so this transient state is never seen or interacted with.
+            // heightIn(min), not a fixed height: a pebble header carries a title plus an optional
+            // summary line, and at a large accessibility font that stacked text is taller than
+            // ControlHeight -- a hard 76dp clipped it.
             Box(Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).then(itemDragHandle))
         }
     }

@@ -112,7 +112,9 @@ internal fun ClimatePebble(
         }
         vm.startClimate(v, req)
     }
-    // The preset currently applied; cleared when the live settings drift from it.
+    // Which preset (if any) is currently applied: set when you start one, and cleared automatically
+    // once the live settings drift away from it (e.g. you nudge a slider) so the highlight only
+    // marks a true match.
     var activePresetId by remember(v.vin) { mutableStateOf<String?>(null) }
     // Start at [target] degrees F with defrost off, clearing any highlighted preset: the one-tap
     // "smart" start.
@@ -147,8 +149,9 @@ internal fun ClimatePebble(
     }
 
     val climateOn = status?.airCtrlOn == true
-    // The car rejects remote climate while moving, so the control is read-only when driving and
-    // shows the car's current values.
+    // The car rejects remote climate commands while it's moving, so the whole control goes
+    // read-only when driving - and if it's already on, we show what it's currently set to at the
+    // car instead of editable inputs.
     val driving = state.isDriving(v)
     val startClimate = { vm.startClimate(v, currentReq) }
     val weather = state.carWeather[v.vin] ?: state.homeWeather
@@ -156,8 +159,8 @@ internal fun ClimatePebble(
     // Mirrors Pebble()'s own expanded computation so this and the header Start button agree.
     val expanded = LocalForceExpanded.current || state.isPebbleExpanded(v.vin, "climate")
 
-    // While climate runs the controls are locked and show what the car reports, not the last slider
-    // values.
+    // While climate runs the controls are locked, so they should show what the CAR is doing, not
+    // whatever the sliders last held. Only the fields the car reports back are mirrored.
     val carTempF = status?.airTemp?.asFahrenheit()
     val carDefrost = status?.defrost
     val carWheelHeat = status?.steerWheelHeat
@@ -268,9 +271,10 @@ internal fun ClimatePebble(
             onReorder = { vm.reorderClimatePresets(v, it) },
         )
 
-        // Smart climate: a target from the weather at the car (falling back to home) via
-        // smartClimateTargetF. Its own PopVisible because weather can arrive after the pebble
-        // opens.
+        // Smart climate: read the weather where the car is (falling back to home) and pick a target
+        // -- see smartClimateTargetF, the same rule the tile command runner uses: ~10°F off ambient
+        // normally, or the car's most aggressive setting on a genuinely extreme day, always within
+        // what the car's own climate range actually accepts.
         PopVisible(visible = weather != null) {
             val w = weather
             if (w != null) {

@@ -27,7 +27,11 @@ import androidx.core.graphics.scale
  */
 class SettingsStore(internal val context: Context) {
 
-    /** All strongly-typed, non-interpolated preference keys used directly by name below. */
+    /**
+     * Per-car keys are instead built ad hoc with string interpolation (see e.g. [seatConfig]) since
+     * Preferences DataStore has no notion of a keyed sub-namespace — this object only holds the
+     * ones that are the same for the whole app.
+     */
     internal object Keys {
         val THEME = stringPreferencesKey("theme_mode")
         val FONT = stringPreferencesKey("font_choice")
@@ -127,11 +131,18 @@ class SettingsStore(internal val context: Context) {
         val unitSystem: String = "imperial",
         /** Haptic feedback across the UI. */
         val hapticsEnabled: Boolean = true,
-        /** Hairline rim on pebbles/hero card. */
+        /**
+         * Hairline rim on pebbles/hero card. Off by default -- most of the app's "floating chrome"
+         * (buttons, dialogs, the search bar) always has one, but pebbles are the majority of
+         * on-screen surface area, and a rim on every single one read as busier than most people
+         * want as the default.
+         */
         val pebbleOutline: Boolean = false,
         /**
-         * Off by default; device-local capability (Shizuku may not be present on other devices), so
-         * it never roams via Drive sync (see SyncMerge.DEVICE_LOCAL_KEYS).
+         * When on, this device installs downloaded updates silently via Shizuku (local ADB) instead
+         * of the tap-through system installer. Off by default; device-local capability (Shizuku may
+         * not be present on other devices), so it never roams via Drive sync (see
+         * SyncMerge.DEVICE_LOCAL_KEYS).
          */
         val seamlessInstallShizuku: Boolean = false,
         /**
@@ -142,7 +153,9 @@ class SettingsStore(internal val context: Context) {
     )
 
     // A reactive view of every appearance preference: re-emits a freshly decoded Appearance
-    // snapshot on any DataStore change (here, or via Drive sync).
+    // snapshot on any DataStore change (here, or via Drive sync). Each field falls back to its
+    // default when the key is absent or fails to parse, because this flow is collected at launch
+    // and must never crash.
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
         Appearance(
             // "AMOLED"/"SYSTEM_AMOLED" are legacy values remapped to the nearest modern mode, so an
@@ -182,7 +195,8 @@ class SettingsStore(internal val context: Context) {
             auroraMotion = prefs[Keys.AURORA_MOTION] ?: "static",
             unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",
             // Shared rule -- see FormatUtils.useFahrenheit for why this stopped being written out
-            // separately per surface.
+            // separately per surface. The per-measurement overrides only apply in Advanced mode,
+            // where they can be set; in Simple mode the one Units choice is global.
             useFahrenheit = resolveFahrenheit(prefs[Keys.UNIT_SYSTEM], prefs[Keys.TEMP_UNIT].takeIf { prefs[Keys.SETTINGS_MODE] == "advanced" }),
             metricDistance = resolveMetricDistance(prefs[Keys.UNIT_SYSTEM], prefs[Keys.DISTANCE_UNIT].takeIf { prefs[Keys.SETTINGS_MODE] == "advanced" }),
             tempUnit = prefs[Keys.TEMP_UNIT] ?: "auto",
@@ -279,6 +293,7 @@ class SettingsStore(internal val context: Context) {
 
     /** Outcome of one [performMainToMainSync] pass. */
     data class MainToMainSyncOutcome(
+        /** False when sync isn't configured, or was skipped (Wi-Fi-only, not on Wi-Fi). */
         val ran: Boolean,
         val imported: Boolean,
         val uploaded: Boolean,
@@ -336,8 +351,10 @@ class SettingsStore(internal val context: Context) {
     internal val BACKUP_VERSION = SyncMerge.BACKUP_VERSION
 
     /**
-     * A tablet that's Wi-Fi-only and a phone with unlimited data may reasonably want different
-     * choices here, same as the Drive URI itself.
+     * Preference keys that describe THIS device's own Drive-sync wiring (a content:// URI this app
+     * instance was granted permission for, local bookkeeping of when it last synced, its own
+     * Wi-Fi-only preference, and which keys it's changed locally since its last sync) — never
+     * portable, so never included in or restored from a settings backup.
      */
     internal val DEVICE_LOCAL_KEYS = SyncMerge.DEVICE_LOCAL_KEYS
 
@@ -403,8 +420,10 @@ class SettingsStore(internal val context: Context) {
         .map { it.first }
 
     /**
-     * Done inside a single edit{} so a concurrent [editTracked] can't race between our read and
-     * write; if nothing dirty remains the key is removed entirely.
+     * Clear [keys] from the dirty set via set-difference, leaving any key marked dirty after the
+     * calling upload's body was snapshotted still pending. Done inside a single edit{} so a
+     * concurrent [editTracked] can't race between our read and write; if nothing dirty remains the
+     * key is removed entirely.
      */
     internal suspend fun clearDirtyKeys(keys: Set<String>) {
         context.settingsDataStore.edit { prefs ->

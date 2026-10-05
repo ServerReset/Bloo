@@ -81,7 +81,8 @@ internal sealed interface OnboardingMode {
 
 /**
  * Whether notifications block leaving the [OnboardingStepKind.SETUP] card: required on API 33+
- * (POST_NOTIFICATIONS exists) until the permission is granted.
+ * (POST_NOTIFICATIONS exists) until the permission is granted. Pure so the gate can be pinned by a
+ * plain JVM test without a running Activity or a permission dialog.
  */
 internal fun notifRequiredOnSetup(
     onSetup: Boolean,
@@ -161,7 +162,8 @@ internal fun buildOnboardingSteps(
 
 /**
  * Every setup flow in the app: first run, newly detected cars, and the welcome cards summoned again
- * from Settings.
+ * from Settings. A deck of pebble cards swiped left and right like the garage's own; the cards
+ * differ by [mode], the chrome never does.
  */
 @Composable
 internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = OnboardingMode.FirstRun) {
@@ -173,8 +175,9 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     val appearance by vm.appearance.collectAsStateWithLifecycle()
     val notif by vm.notifications.collectAsStateWithLifecycle()
     val firstRun = mode == OnboardingMode.FirstRun
-    // Notifications are required on the setup card (API 33+), so the grant is visible to the Next
-    // gate; re-checked on resume.
+    // Notifications are REQUIRED on the setup card (API 33+), so the grant must be visible to the
+    // Next gate here, not only to the card's own button. Re-checked on resume so returning from the
+    // system permission screen updates it without a relaunch.
     var notifGranted by remember { mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context)) }
     val notifLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(notifLifecycle) {
@@ -328,7 +331,8 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     Box(
         Modifier
             .fillMaxSize()
-            // Opaque pointer target so touches never fall through to what the deck sits over.
+            // Opaque, and a pointer target of its own so touches never fall through to what the
+            // deck sits over; it takes none of them, so the cards and buttons above get every one.
             .graphicsLayer {
                 val e = exit
                 alpha = 1f - e
@@ -337,7 +341,9 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             .background(scheme.background)
             .pointerInput(Unit) {},
     ) {
-        // A cheap static backdrop: the surface plus a wash of the current card's accent.
+        // A cheap, static backdrop: the theme's own surface with a wash of the colour of the card
+        // you're on, easing from one accent to the next as you swipe. No aurora and no backdrop
+        // blur here: a full-screen blur plus a blur per card was the whole of this screen's lag.
         val accent by androidx.compose.animation.animateColorAsState(
             onboardingAccent(steps.getOrNull(pageIndex)?.kind ?: OnboardingStepKind.WELCOME),
             androidx.compose.animation.core.tween(MotionLong),
@@ -377,8 +383,10 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 beyondViewportPageCount = 0,
             ) { idx ->
                 val step = steps.getOrNull(idx) ?: return@HorizontalPager
-                // Distance from the centre card (0 on it, 1 a card away) drives shrink/fade/tilt.
-                // Read inside graphicsLayer, never here, or every page recomposes per drag frame.
+                // How far this card is from the centre: 0 on it, 1 a full card away. The cards
+                // shrink, fade and tilt away as they leave, so the deck has depth. Read INSIDE
+                // graphicsLayer, never here: a read in this scope recomposed every page's whole
+                // content on every drag frame, which is what made swiping lag.
                 Column(
                     Modifier
                         .fillMaxSize()

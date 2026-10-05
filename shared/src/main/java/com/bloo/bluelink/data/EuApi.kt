@@ -54,7 +54,12 @@ data class EuVehicleSummary(
     val ccs2: Int,
 )
 
-/** Client for Hyundai Bluelink Europe on the CCAPI platform ("CCS2" — E-GMP / 2023+ cars). */
+/**
+ * Client for Hyundai Bluelink Europe on the CCAPI platform ("CCS2" — E-GMP / 2023+ cars). One
+ * shared API shape that Kia Connect EU and Genesis EU also ride (different host/client/login-form
+ * host only), like the three Canada brands share [CanadaApi]; only Hyundai EU is wired today via
+ * [Brand.isEurope].
+ */
 class EuApi(private val brand: Brand) {
     init {
         require(brand.isEurope) { "EuApi requires a Europe brand, got $brand" }
@@ -154,7 +159,9 @@ class EuApi(private val brand: Brand) {
 
     /**
      * Registers this device with the CCAPI push channel and returns the `ccsp-device-id` all
-     * authenticated calls carry.
+     * authenticated calls carry. Bloo doesn't use CCAPI push — it only needs the device id the
+     * register call mints from a generated push registration id. Ported from
+     * KiaUvoApiEU._get_device_id (no auth token).
      */
     suspend fun register(): String = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
@@ -328,6 +335,8 @@ class EuApi(private val brand: Brand) {
 
             // Only genuine token/device expiry retries (mapped to 401). 7501 = auth, 4002 = bad
             // deviceId, or an explicit "token expired" message. A plain HTTP 401 counts too.
+            // Everything else is a terminal error (no retry) — notably we do NOT treat a bare 403
+            // as retryable.
             val expired = resp.code == 401 || resCode == "7501" || resCode == "4002" ||
                 (resMsg?.contains("token", true) == true && resMsg.contains("expired", true))
 

@@ -23,11 +23,16 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
                         it.copy(
                             updateAvailable = result.info,
                             updateApkReady = it.updateApkReady && sameBuild,
+                            // ("Remind me" is the one that stays hidden longer — it sets a snooze
+                            // so checkPhone short-circuits to UpToDate until the reminder worker
+                            // clears it, so we never reach this branch while snoozed.)
                             updateTileDismissed = false,
                         )
                     }
-                    // Advertise a newer watch build to a paired watch (it has no network); skipped
-                    // when no watch is paired.
+                    // Tell a paired watch about the newer WATCH build (if this release carries a
+                    // watch APK) so it can offer its own update -- the watch has no network of its
+                    // own. Advertised only when a watch is actually paired, so an unwatched phone
+                    // never does the extra Data Layer work.
                     com.bloo.bluelink.wear.WatchPresence.pushWatchUpdateAdvice(getApplication(), result.info.run)
                     // A manual check also confirms via snackbar, since the update tile isn't
                     // visible from Settings.
@@ -45,8 +50,9 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
                 }
                 is com.bloo.bluelink.update.UpdateCheckResult.UpToDate -> {
                     _state.update {
-                        // Never remove the tile from under in-flight work; a ready APK is kept so
-                        // Install stays available.
+                        // Never yank the tile out from under work already in flight. A
+                        // ready-to-install APK is kept for the same reason: the user still has an
+                        // Install button to press.
                         if (it.updateDownloading || it.updateInstalling || it.updateApkReady) it
                         else it.copy(updateAvailable = null, updateApkReady = false, updateTileDismissed = false)
                     }

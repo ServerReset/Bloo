@@ -118,7 +118,9 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     val appearance = LocalAppearance.current
     val fahrenheit = appearance.useFahrenheit
     val location = state.locations[v.vin]
-    // See rememberLocateAction: ties the permission request to a "Locate" action.
+    // See rememberLocateAction's own doc -- ACCESS_FINE_LOCATION is otherwise only ever requested
+    // from AutoLock's settings screen, so tying the request to a "Locate" action is what lets a
+    // user who's never touched AutoLock grant it at all.
     val locateWithPermission = rememberLocateAction(vm, v)
     val deviceRequest = rememberDeviceLocationRequest(vm)
     // On the cover this is the identity pill's headline; the compact street + ZIP form has no space
@@ -152,7 +154,8 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
         ) {
             Text("Tap Locate to query the car's current position.")
         }
-        // Mirror of the "not located yet" visibility above.
+        // Mirror of the "not located yet" AnimatedVisibility above -- same pebble, same boolean
+        // flip, only the empty side had the treatment.
         AnimatedVisibility(
             visible = location != null,
             enter = expandEnterSized(Alignment.Bottom),
@@ -212,8 +215,10 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 LaunchedEffect(state.deviceLocation?.latitude, state.deviceLocation?.longitude) {
                     if (state.deviceLocation != null && phoneWeather == null) vm.loadPhoneWeather()
                 }
-                // PopVisible: weather can arrive after the pebble opens. Shows the car's and
-                // phone's weather merged within ~7 miles, or as two labelled blocks.
+                // Its own PopVisible: weather can arrive AFTER this pebble is already open (it's a
+                // separate fetch triggered above), so this row pops in live rather than only ever
+                // being present from the first frame -- same idiom the Climate pebble's
+                // smart-climate section uses.
                 PopVisible(visible = carWeather != null) {
                     val cw = carWeather
                     if (cw != null) {

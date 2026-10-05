@@ -54,7 +54,12 @@ internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() ->
     }
 }
 
-/** A digits-only "minutes" field for the notification-delay settings, clamped to 1..120. */
+/**
+ * A digits-only "minutes" field for the notification-delay settings, clamped to 1..120. It owns the
+ * edit buffer: [initial] seeds it and re-seeds whenever the persisted value changes (via
+ * `remember(initial)`), while [onSet] fires only for an in-range number, so a half-typed or
+ * out-of-range value is shown but never persisted.
+ */
 @Composable
 internal fun MinutesField(initial: Int, label: String, onSet: (Int) -> Unit) {
     var text by remember(initial) { mutableStateOf(initial.toString()) }

@@ -52,8 +52,10 @@ import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
 /**
- * The pebble header's title line, with an optional trailing stat beside the name or pushed to the
- * far end.
+ * The pebble header's title line: the title itself (which can swell on expand for the hero) with an
+ * optional trailing stat, either beside the name or pushed to the far end. Split out of
+ * [PebbleShell], which only decides where this row goes; it needs nothing from the header's size or
+ * press state.
  */
 @Composable
 internal fun PebbleTitleRow(
@@ -97,8 +99,8 @@ internal fun PebbleTitleRow(
     // beside it.
     val atRestScale = !growTitleOnExpand || headerTState.value < 0.02f
     Row(
-        // Stretched only when the trailing slot is pushed to the end; otherwise stays
-        // shrink-wrapped.
+        // Only stretched when the trailing slot is being pushed to the end -- a row that merely
+        // holds a name and a stat must stay shrink-wrapped, or the stat drifts away from the name.
         modifier = if (titleTrailingAtEnd) Modifier.fillMaxWidth() else Modifier,
         verticalAlignment = Alignment.CenterVertically,
         // SpaceBetween (not a filled title) pushes the trailing slot to the far end without
@@ -170,7 +172,8 @@ internal fun PebbleTitleRow(
         }
         }
     } else {
-        // Common case: no grow/shrink, always native titleMedium.
+        // The common case: no grow/shrink, no rest-scale swap ever, so no Crossfade wrapper either
+        // -- always native titleMedium.
         Text(
             title,
             modifier = titleBaseModifier,

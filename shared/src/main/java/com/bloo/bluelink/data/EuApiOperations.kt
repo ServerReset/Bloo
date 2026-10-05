@@ -73,7 +73,9 @@ internal fun EuApi.parseStatus(vh: JsonObject): VehicleStatus {
 
     val evStatus = if (green == null) null else EvStatus(
         batteryStatus = soc,
-        // TRUE or unknown, never a definite false derived from a time estimate.
+        // TRUE or unknown, never a definite false derived from a time estimate. This was
+        // `chargeRemain?.let { it > 0.0 }`, which turns a missing or zero RemainTime into "the car
+        // told us it stopped charging".
         batteryCharge = if (chargeRemain != null && chargeRemain > 0.0) true else null,
         batteryPlugin = plug,
         drvDistance = rangeKm?.kmToMi()?.let { listOf(DrvDistance(RangeByFuel(Dte(it, 3)))) } ?: emptyList(),

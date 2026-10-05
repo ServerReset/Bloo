@@ -224,7 +224,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         logStartup("AppViewModel constructed")
-        // Probe on-device Gemini Nano once; the AI toggle only appears if present.
+        // Probe on-device Gemini Nano once; the AI toggle only appears if present. On
+        // Dispatchers.IO, like the probe below: ai.isSupported() builds an ML Kit client
+        // synchronously on first call, which on viewModelScope's Main.immediate landed on the main
+        // thread during cold start.
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val startedAt = System.currentTimeMillis()
             val supported = ai.isSupported()

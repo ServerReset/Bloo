@@ -58,12 +58,18 @@ fun MorphButtonCore(
     activeContainerColor: Color,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     border: BorderStroke? = null,
-    /** When null, the disabled container keeps the idle/active fill (only the label fades). */
+    /**
+     * When null, the disabled container keeps the (animated) idle/active fill instead of washing
+     * out -- matching the app's "only the label fades" disabled treatment everywhere.
+     */
     disabledContainerColor: Color? = null,
     /** Border used while disabled (overrides [border]). */
     disabledBorder: BorderStroke? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
-    /** Hold-to-act; null means click-only. */
+    /**
+     * Hold-to-act variety: the chevron easter egg, the cover screen's flash-lights. Null means
+     * plain click-only, exactly like M3 `Button`.
+     */
     onLongClick: (() -> Unit)? = null,
     pillCornerPercent: Float = PillCornerPercent,
     morphedCornerPercent: Float = MorphedCornerPercent,
@@ -149,7 +155,9 @@ private fun BoxScope.MorphChrome(
     )
     val fill = if (!enabled && disabledContainerColor != null) disabledContainerColor else bg
     val resolvedBorder = if (!enabled) (disabledBorder ?: border) else border
-    // The caller's BorderStroke is read here every morph frame (cheap).
+    // The BorderStroke passed in by the caller is the same mutable object in the parent scope;
+    // Modifier.border reads it here on every morph frame -- cheap, and it keeps the reference
+    // semantics identical to before.
     Box(
         Modifier
             // matchParentSize(), NOT fillMaxSize(): it is measured after the parent's real size and never

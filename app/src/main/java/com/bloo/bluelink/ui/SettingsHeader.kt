@@ -54,8 +54,13 @@ import com.bloo.bluelink.data.collapsedSections
 import com.bloo.bluelink.data.setSeamlessInstallShizuku
 
 /**
- * Delays an advanced-only card's entrance by `index * STAGGER_STEP_MS` once [advanced] flips true,
- * so Advanced mode cascades card by card instead of every card overshooting on one frame.
+ * Delays an advanced-only card's own entrance by `index * STAGGER_STEP_MS` once [advanced] flips
+ * true, so switching into Advanced mode cascades card by card instead of every advanced-only
+ * section overshooting on the exact same frame -- the same "one shared progress, remapped per item"
+ * idea [StaggeredRevealColumn] uses for a pebble's rows, adapted here for a handful of independent
+ * [AnimatedVisibility] instances rather than one Layout's worth of children (there's no single
+ * shared container to run a Layout-based cascade over: these are whole, separately-composed
+ * [SettingsCard]s scattered through one long screen, not rows of one component).
  */
 internal const val STAGGER_STEP_MS = 45L
 
@@ -77,7 +82,8 @@ internal fun rememberAdvancedVisibility(advanced: Boolean, count: Int): List<Boo
             // Cumulative delay equals the per-card index * STAGGER_STEP_MS.
             repeat(count) { i -> delay(STAGGER_STEP_MS); visible[i] = true }
         } else {
-            // Immediate, never staggered (see STAGGER_STEP_MS).
+            // Immediate, never staggered -- see STAGGER_STEP_MS' own doc on why hiding in sequence
+            // reads as a bug where revealing in sequence reads as deliberate.
             repeat(count) { i -> visible[i] = false }
         }
     }
@@ -85,8 +91,9 @@ internal fun rememberAdvancedVisibility(advanced: Boolean, count: Int): List<Boo
 }
 
 /**
- * Drives one advanced-only grid item's [AnimatedVisibility] and decides whether the caller's `if
- * (...) item { ... }` still emits that item.
+ * That was the bug behind "expanding/collapsing is entirely broken, the animations don't work":
+ * [rememberAppearedState] only ever goes false -> true, once, and nothing inside the card ever set
+ * it back to false -- its `exit` spec was dead code.
  */
 @Composable
 internal fun rememberGridItemVisibility(visible: Boolean): MutableTransitionState<Boolean> {
