@@ -58,6 +58,8 @@ fun buildLabel(runNumber: Int, branch: String = ""): String {
  */
 object UpdateApi {
 
+    private const val OWNER = "ServerReset"
+    private const val REPO = "Bloo"
     private const val PHONE_ASSET_NAME = "Bloo.apk"
     private const val WATCH_ASSET_NAME = "Bloo-watch.apk"
 
