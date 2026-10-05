@@ -140,26 +140,13 @@ internal fun SyncDeviceRow(
                 Icon(Icons.Filled.Edit, contentDescription = "Rename this device", modifier = Modifier.size(18.dp))
             }
         } else {
-            // Tap again to confirm, the app's usual destructive-action pattern (auto-resets).
-            val confirmRemove = rememberConfirmArm()
-            MorphIconButton(onClick = { if (confirmRemove.armed) onRemove() else confirmRemove.arm() }) {
-                Icon(
-                    AppIcons.Close,
-                    contentDescription = if (confirmRemove.armed) {
-                        "Tap again to remove ${device.name.ifBlank { "this device" }}"
-                    } else {
-                        "Remove ${device.name.ifBlank { "this device" }} from synced devices"
-                    },
-                    tint = if (confirmRemove.armed) scheme.error else scheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
+            ConfirmRemoveButton(device.name, "this device", onRemove)
         }
     }
 }
 
 @Composable
-private fun DeviceTag(text: String, color: Color) {
+internal fun DeviceTag(text: String, color: Color) {
     Text(
         text,
         style = MaterialTheme.typography.labelSmall,
@@ -167,4 +154,20 @@ private fun DeviceTag(text: String, color: Color) {
         maxLines = 1,
         modifier = Modifier.padding(start = 6.dp),
     )
+}
+
+
+/** The close button on a synced-device row: tap once to arm (it turns red), again to remove. Auto-resets. */
+@Composable
+internal fun ConfirmRemoveButton(name: String, fallbackNoun: String, onRemove: () -> Unit) {
+    val confirm = rememberConfirmArm()
+    val who = name.ifBlank { fallbackNoun }
+    MorphIconButton(onClick = { if (confirm.armed) onRemove() else confirm.arm() }) {
+        Icon(
+            AppIcons.Close,
+            contentDescription = if (confirm.armed) "Tap again to remove $who" else "Remove $who from synced devices",
+            tint = if (confirm.armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
 }

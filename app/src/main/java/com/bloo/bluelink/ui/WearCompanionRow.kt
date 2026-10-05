@@ -15,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.ui.semantics.contentDescription
@@ -36,7 +35,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.rememberConfirmArm
 import kotlinx.coroutines.flow.first
 
 /**
@@ -80,8 +78,7 @@ fun WearCompanionRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                Spacer(Modifier.width(6.dp))
-                Text("Companion", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                DeviceTag("Companion", MaterialTheme.colorScheme.primary)
             }
             if (detail.isNotBlank()) {
                 RollingNumber(
@@ -93,16 +90,7 @@ fun WearCompanionRow(
             }
         }
         if (onRemove != null) {
-            val confirmRemove = rememberConfirmArm()
-            MorphIconButton(onClick = { if (confirmRemove.armed) onRemove() else confirmRemove.arm() }) {
-                Icon(
-                    AppIcons.Close,
-                    contentDescription = if (confirmRemove.armed) "Tap again to remove ${name.ifBlank { "this watch" }}"
-                    else "Remove ${name.ifBlank { "this watch" }} from synced devices",
-                    tint = if (confirmRemove.armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
+            ConfirmRemoveButton(name, "this watch", onRemove)
         }
     }
 }
