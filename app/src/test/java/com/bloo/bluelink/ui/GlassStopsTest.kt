@@ -6,6 +6,11 @@ import kotlin.test.assertTrue
 
 class GlassStopsTest {
     @Test
+    fun stopsAreFrostedMediumClearVeryClearThenUltra() {
+        assertEquals(listOf("Frosted", "Medium", "Clear", "Very clear", "Ultra"), GlassStops.map { it.name })
+    }
+
+    @Test
     fun ultraIsTheLastStopAndTheOnlyUltraOne() {
         assertTrue(GlassStops.last().ultra)
         assertEquals(1, GlassStops.count { it.ultra })
@@ -13,15 +18,15 @@ class GlassStopsTest {
 
     @Test
     fun nearestStopNeverPicksUltra() {
-        // Ultra shares Crystal's transparency (1.0), so a stored 1.0 must resolve to Crystal.
-        val crystal = GlassStops.indexOfFirst { it.name == "Crystal" }
-        assertEquals(crystal, nearestGlassStop(1f))
-        assertTrue(!GlassStops[nearestGlassStop(0.9f)].ultra)
+        // Ultra shares Very clear's transparency (1.0), so a stored 1.0 must resolve to Very clear.
+        assertEquals(GlassStops.indexOfFirst { it.name == "Very clear" }, nearestGlassStop(1f))
+        assertTrue(!GlassStops[nearestGlassStop(0.95f)].ultra)
     }
 
     @Test
-    fun legacyFreeValuesSnapToTheClosestStop() {
-        assertEquals(0, nearestGlassStop(0.02f))
-        assertEquals(GlassStops.indexOfFirst { it.name == "Misted" }, nearestGlassStop(0.7f))
+    fun legacySolidAndFreeValuesSnapToTheClosestStop() {
+        // The old Solid (0%) stop is gone; a stored 0 lands on the most frosted one.
+        assertEquals(0, nearestGlassStop(0f))
+        assertEquals(GlassStops.indexOfFirst { it.name == "Medium" }, nearestGlassStop(0.7f))
     }
 }

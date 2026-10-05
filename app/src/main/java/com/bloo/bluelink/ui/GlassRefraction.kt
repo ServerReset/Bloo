@@ -91,21 +91,21 @@ private fun glassStyle(
             // ~status-bar-height strip a large fraction is what makes the warp read across the whole
             // bar instead of a faint ripple. Edge ignores it for refraction (lighting only).
             refractionHeightFraction = if (edgeWarp) 0.35f else 1f,
-            refractionDisplacement = if (ultra) (if (edgeWarp) 30.dp else 44.dp) else if (edgeWarp) 18.dp else 32.dp,
+            refractionDisplacement = if (ultra) (if (edgeWarp) 36.dp else 52.dp) else if (edgeWarp) 18.dp else 32.dp,
             depth = OpticalSizeValue.Fixed(1f),
             blurRadius = OpticalSizeValue.Fixed(blur),
             // Fold + detail to max on the surface warp so the bend is pronounced, not a gentle haze.
             refractionFoldStrength = if (edgeWarp) 0f else 0.6f,
             refractionDetailIntensity = if (edgeWarp) 0.7f else 1f,
-            refractionProfile = if (edgeWarp) RefractionProfile.Edge(if (ultra) 24.dp else 16.dp) else RefractionProfile.Surface,
+            refractionProfile = if (edgeWarp) RefractionProfile.Edge(if (ultra) 30.dp else 16.dp) else RefractionProfile.Surface,
             // The status-bar scrim: full strength at the top, thinning to nothing at its bottom edge.
             progressive = if (fadeOut) dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f) else null,
         ),
     )
     // A visible colour fringe along the edge, where the glass bends the light.
-    chromaticAberrationStrength(if (ultra) 0.7f else 0.4f)
+    chromaticAberrationStrength(if (ultra) 1f else 0.4f)
     chromaticAberrationMode(ChromaticAberrationMode.Simple)
-    specularIntensity(0.7f)
+    specularIntensity(if (ultra) 1f else 0.7f)
     ambientResponse(0.45f)
     whitePoint(0.05f)
     chromaMultiplier(1.1f)

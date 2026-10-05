@@ -246,7 +246,7 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
     LockBlurLayer(locked = locked && contentSettled) {
-    Box(Modifier.fillMaxSize().ultraWarp(appearance.ultraGlass)) {
+    Box(Modifier.fillMaxSize()) {
     // The app's backdrop: a Haze source every glass card blurs. A sibling UNDER everything, not
     // the root's own background, because a card cannot blur a source it is a child of.
     Box(
