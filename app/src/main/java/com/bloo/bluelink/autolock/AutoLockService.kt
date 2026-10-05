@@ -90,6 +90,13 @@ class AutoLockService : Service() {
             return START_STICKY
         }
         if (intent?.action == ACTION_STOP_WATCH) {
+            // Belt-and-suspenders alongside AutoLockController.cancel in setAutoLockConfig: if
+            // the watcher is being torn down, make sure no evaluation it may have kicked off is
+            // still counting down toward a lock. `forgetAll` needs the vins, which the service
+            // doesn't hold here, so cancel every VIN the controller currently tracks.
+            runCatching {
+                AutoLockController.state.value.keys.forEach { AutoLockController.cancel(this, it) }
+            }
             stopSelf()
             return START_NOT_STICKY
         }

@@ -100,11 +100,11 @@ class EuApi(private val brand: Brand) {
     internal val oneAppClientId get() = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
     internal val oneAppRedirectUri get() = "https://oneapp.hyundai.com/redirect"
     internal val cciApiUrl get() = "https://cci-api-eu.hyundai.com"
-    private val cciPackageId get() = "com.hyundai.oneapp.eu"
-    private val cciClientName get() = "hyundai"
-    private val cciClientVersion get() = "1.3.3"
-    private val cciClientOsVersion get() = "18.7"
-    private val cciNotificationProvider get() = "APNS"
+    internal val cciPackageId get() = "com.hyundai.oneapp.eu"
+    internal val cciClientName get() = "hyundai"
+    internal val cciClientVersion get() = "1.3.3"
+    internal val cciClientOsVersion get() = "18.7"
+    internal val cciNotificationProvider get() = "APNS"
 
     companion object {
         private const val USER_AGENT_OKHTTP = "okhttp/3.12.0"
@@ -186,6 +186,11 @@ class EuApi(private val brand: Brand) {
 
     /** Exchange the refresh token for a fresh access token (no re-login). */
     suspend fun refresh(session: EuSession): EuSession = withContext(Dispatchers.IO) {
+        // A OneApp/CCI session refreshes through the CCI token set, not the legacy OAuth
+        // refresh_token grant (the CCS token can't be refreshed on its own). See [refreshCci].
+        if (session.cciAccessToken != null || session.nonCcsToken != null) {
+            return@withContext refreshCci(session)
+        }
         val refresh = session.refreshToken
             ?: throw BlueLinkException("Session expired — please sign in again", code = 401)
         val form = FormBody.Builder()

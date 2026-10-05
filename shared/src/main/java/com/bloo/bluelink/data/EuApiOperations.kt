@@ -7,15 +7,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import okhttp3.Cookie
-import okhttp3.CookieJar
-import okhttp3.FormBody
-import okhttp3.HttpUrl
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.Locale
-import com.bloo.bluelink.data.EuApi.Companion.USER_AGENT_IDP
-import com.bloo.bluelink.data.EuApi.Companion.sharedClient
 
 /** The EU service's bigger operations -- sign-in, the vehicle list, climate and charge commands, and turning the CCS2 status tree into a [VehicleStatus] -- as extensions of [EuApi], kept out of the class so it stays readable. */
 
@@ -27,93 +21,10 @@ import com.bloo.bluelink.data.EuApi.Companion.sharedClient
  */
 suspend fun EuApi.login(username: String, password: String, deviceId: String, pin: String?): EuSession =
     withContext(Dispatchers.IO) {
-        // One cookie jar shared across the handshake; two clients over it that
-        // differ only in redirect-following (signin must NOT follow, so its 302
-        // Location — carrying the code — is readable).
-        val store = mutableListOf<Cookie>()
-        val jar = object : CookieJar {
-            override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-                store.removeAll { e -> cookies.any { it.name == e.name } }
-                store.addAll(cookies)
-            }
-            override fun loadForRequest(url: HttpUrl): List<Cookie> = store.toList()
-        }
-        val follow = sharedClient.newBuilder().cookieJar(jar).followRedirects(true).build()
-        val noFollow = sharedClient.newBuilder().cookieJar(jar).followRedirects(false).build()
-
-        fun idp(url: String) = Request.Builder().url(url).header("User-Agent", USER_AGENT_IDP)
-
-        // 1. authorize — seed IDP session cookies (follows redirect to login form).
-        //
-        // The country was pinned to "de" for every user, which is right for
-        // exactly one of the thirty-odd markets this region serves.
-        // euLoginCountry sends the device's own country instead, but only
-        // when it is one the region actually serves -- so a German owner
-        // with a US-English phone still sends "de" rather than a country
-        // this IDP has never heard of, and nobody who can sign in today
-        // stops being able to.
-        val authorizeUrl = "$loginFormHost/auth/api/v2/user/oauth2/authorize" +
-            "?response_type=code&client_id=$serviceId&redirect_uri=$redirectUri" +
-            "&lang=en&state=ccsp&country=${euLoginCountry()}"
-        follow.newCall(idp(authorizeUrl).get().build()).execute().close()
-
-        // 2. RSA public key (JWK) for password encryption.
-        val certRoot = call(idp("$loginFormHost/auth/api/v1/accounts/certs").get().build(), follow)
-        val jwk = certRoot.path("retValue") as? JsonObject
-            ?: throw BlueLinkException("Europe sign-in: could not fetch the login key")
-        val kid = jwk.path("kid").str().orEmpty()
-        val encryptedPw = rsaEncryptHex(
-            password,
-            jwk.path("n").str() ?: throw BlueLinkException("Europe sign-in: bad login key"),
-            jwk.path("e").str() ?: throw BlueLinkException("Europe sign-in: bad login key"),
-        )
-
-        // 3. signin — form POST, do NOT follow the redirect; pull code from Location.
-        val signinForm = FormBody.Builder()
-            .add("client_id", serviceId)
-            .add("encryptedPassword", "true")
-            .add("password", encryptedPw)
-            .add("redirect_uri", redirectUri)
-            .add("scope", "")
-            .add("nonce", "")
-            .add("state", "ccsp")
-            .add("username", username)
-            .add("connector_session_key", "")
-            .add("kid", kid)
-            .add("_csrf", "")
-            .build()
-        val location = noFollow.newCall(
-            idp("$loginFormHost/auth/account/signin").post(signinForm).build(),
-        ).execute().use { resp ->
-            if (resp.code != 302) {
-                throw BlueLinkException(
-                    "Europe sign-in failed (HTTP ${resp.code}) — check your Bluelink email and password",
-                    code = resp.code,
-                )
-            }
-            resp.header("location").orEmpty()
-        }
-        val code = Regex("[?&]code=([^&]+)").find(location)?.groupValues?.get(1)
-            ?: throw BlueLinkException(
-                if (location.contains("authorization", true))
-                    "Bluelink needs a one-time consent in the official app/website first, then try again."
-                else "Europe sign-in was rejected — check your Bluelink email and password.",
-            )
-
-        // 4. exchange code -> tokens (form; client_secret sent as a field).
-        val tokenForm = FormBody.Builder()
-            .add("grant_type", "authorization_code")
-            .add("code", code)
-            .add("redirect_uri", redirectUri)
-            .add("client_id", serviceId)
-            .add("client_secret", clientSecret)
-            .build()
-        val tokenRoot = call(
-            idp("$loginFormHost/auth/api/v2/user/oauth2/token").post(tokenForm).build(), follow,
-        )
-        val access = tokenRoot.path("access_token").str()
-            ?: throw BlueLinkException("Europe sign-in failed to obtain an access token")
-        EuSession(access, tokenRoot.path("refresh_token").str(), deviceId, pin)
+        // OneApp/CCI sign-in -- see [loginCci]. Hyundai's WAF now blocks the LEGACY
+        // IDPConnect authorize by client_id (a server-side block, not a credentials
+        // problem), which is why EU sign-in was returning HTTP 403 for everyone.
+        loginCci(username, password, deviceId, pin)
     }
 
 // --- Vehicles ------------------------------------------------------------

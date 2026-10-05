@@ -33,6 +33,15 @@ class SessionStore(private val context: Context) {
         val brand: Brand = Brand.HYUNDAI,
         /** Kia US only: the rmtoken is bound to this device id, so it must persist. */
         val deviceId: String? = null,
+        // --- Hyundai EU OneApp/CCI token set (nullable; only EU populates it) ---
+        // The CCI tokens are needed to REFRESH an EU session (the CCS access token can't be
+        // refreshed on its own), so they must persist alongside it. See EuApiCci.
+        val cciAccessToken: String? = null,
+        val exchangeableToken: String? = null,
+        val exchangeableRefreshToken: String? = null,
+        val nonCcsToken: String? = null,
+        val nonCcsRefreshToken: String? = null,
+        val idToken: String? = null,
     ) {
         companion object {
             /**
@@ -85,6 +94,14 @@ class SessionStore(private val context: Context) {
             p[key(session.brand, "username")] = session.username
             p[key(session.brand, "pin")] = session.pin
             session.deviceId?.let { p[key(session.brand, "device")] = it }
+            // CCI token set (EU only) -- written only when present, so a non-EU session never
+            // touches these keys and an EU refresh that clears one leaves the others intact.
+            session.cciAccessToken?.let { p[key(session.brand, "cciAccess")] = it }
+            session.exchangeableToken?.let { p[key(session.brand, "cciExchangeable")] = it }
+            session.exchangeableRefreshToken?.let { p[key(session.brand, "cciExchangeableRefresh")] = it }
+            session.nonCcsToken?.let { p[key(session.brand, "cciNonCcs")] = it }
+            session.nonCcsRefreshToken?.let { p[key(session.brand, "cciNonCcsRefresh")] = it }
+            session.idToken?.let { p[key(session.brand, "cciId")] = it }
             val set = (p[brandsKey]?.split(",")?.filter { it.isNotBlank() } ?: emptyList()).toMutableSet()
             set.add(session.brand.name)
             p[brandsKey] = set.joinToString(",")
@@ -103,7 +120,15 @@ class SessionStore(private val context: Context) {
         val access = p[key(brand, "access")] ?: return null
         val username = p[key(brand, "username")] ?: return null
         val pin = p[key(brand, "pin")] ?: return null
-        return Session(access, p[key(brand, "refresh")], username, pin, brand, p[key(brand, "device")])
+        return Session(
+            access, p[key(brand, "refresh")], username, pin, brand, p[key(brand, "device")],
+            cciAccessToken = p[key(brand, "cciAccess")],
+            exchangeableToken = p[key(brand, "cciExchangeable")],
+            exchangeableRefreshToken = p[key(brand, "cciExchangeableRefresh")],
+            nonCcsToken = p[key(brand, "cciNonCcs")],
+            nonCcsRefreshToken = p[key(brand, "cciNonCcsRefresh")],
+            idToken = p[key(brand, "cciId")],
+        )
     }
 
     /**
@@ -146,7 +171,11 @@ class SessionStore(private val context: Context) {
      */
     suspend fun clear(brand: Brand) {
         context.dataStore.edit { p ->
-            listOf("access", "refresh", "username", "pin", "device").forEach { p.remove(key(brand, it)) }
+            listOf(
+                "access", "refresh", "username", "pin", "device",
+                "cciAccess", "cciExchangeable", "cciExchangeableRefresh",
+                "cciNonCcs", "cciNonCcsRefresh", "cciId",
+            ).forEach { p.remove(key(brand, it)) }
             val set = p[brandsKey]?.split(",")?.filter { it.isNotBlank() && it != brand.name } ?: emptyList()
             if (set.isEmpty()) p.remove(brandsKey) else p[brandsKey] = set.joinToString(",")
         }

@@ -18,6 +18,15 @@ suspend fun AppViewModel.autoLockConfig(vin: String): com.bloo.bluelink.autolock
 fun AppViewModel.setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolock.AutoLockConfig) {
     viewModelScope.launch {
         settingsStore.setAutoLockConfig(vin, config)
+        // Turning AutoLock OFF must also CANCEL an evaluation already in flight for this car.
+        // Without this, an evaluation that had already passed its walk-away confirmation and
+        // was counting down its grace period kept running -- and locked the car -- after the
+        // user had switched AutoLock off, which is exactly the "no matter how I toggle it, the
+        // car continues to autolock" report. The config read at the START of an evaluation
+        // only guards NEW ones.
+        if (!config.enabled) {
+            runCatching { com.bloo.bluelink.autolock.AutoLockController.cancel(getApplication(), vin) }
+        }
         val anyEnabled = settingsStore.allAutoLockConfigs().values.any { it.enabled }
         val action = if (anyEnabled) {
             com.bloo.bluelink.autolock.AutoLockService.ACTION_START_WATCH
