@@ -58,6 +58,21 @@ internal val UpdateAvailableAmber = Color(com.bloo.bluelink.data.BlooColors.warn
 internal val ChargeBlue = Color(com.bloo.bluelink.data.BlooColors.chargeBlue)
 internal val ChargeBlueDark = Color(com.bloo.bluelink.data.BlooColors.chargeBlueDark)
 
+/**
+ * The app's two action colours: green confirms (go ahead, save, sign in, start), red denies (remove, sign out,
+ * stop, discard). One pair each, tuned per theme, used by every button that commits or reverses something.
+ */
+@androidx.compose.runtime.Immutable
+internal class ActionTone(val container: Color, val content: Color)
+
+@Composable
+internal fun confirmTone(): ActionTone =
+    if (appIsDarkTheme()) ActionTone(Color(0xFF7BD389), Color(0xFF06290E)) else ActionTone(Color(0xFF1E7B34), Color.White)
+
+@Composable
+internal fun denyTone(): ActionTone =
+    if (appIsDarkTheme()) ActionTone(Color(0xFFFF8A80), Color(0xFF4A0507)) else ActionTone(Color(0xFFC62828), Color.White)
+
 /** The app's muted/secondary-text alpha, applied over LocalContentColor. */
 internal const val MutedContentAlpha = 0.7f
 

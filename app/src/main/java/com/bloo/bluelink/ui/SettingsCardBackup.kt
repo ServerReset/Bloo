@@ -98,9 +98,9 @@ internal fun BackupSyncCardContent(
 
             if (!configured) {
                 BodySmallText("Keep your settings, layout and car setup the same on every device you use, through one file in your Google Drive.")
-                SafeMorphTextButton("Set up auto-sync", onClick = { showDriveDialog = true }, icon = Icons.Filled.CloudSync, emphasis = ButtonEmphasis.Primary)
+                SafeMorphTextButton("Set up auto-sync", onClick = { showDriveDialog = true }, icon = Icons.Filled.CloudSync, emphasis = ButtonEmphasis.Confirm)
             } else {
-                SafeMorphTextButton("Sync now", onClick = { vm.syncNow() }, icon = Icons.Filled.CloudSync, emphasis = ButtonEmphasis.Primary)
+                SafeMorphTextButton("Sync now", onClick = { vm.syncNow() }, icon = Icons.Filled.CloudSync, emphasis = ButtonEmphasis.Confirm)
                 state.syncError?.let { SyncErrorBanner(it) }
                 SyncDevicesSection(state = state, vm = vm)
                 SettingsGroup("Drive file") {
@@ -116,7 +116,7 @@ internal fun BackupSyncCardContent(
                         SafeMorphTextButton(
                             text = if (disable.armed) "Tap again to disable" else "Disable",
                             onClick = { if (disable.armed) vm.clearSyncUri() else disable.arm() },
-                            emphasis = ButtonEmphasis.Destructive,
+                            emphasis = ButtonEmphasis.Deny,
                         )
                     }
                 }

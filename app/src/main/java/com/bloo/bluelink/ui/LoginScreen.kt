@@ -296,7 +296,7 @@ internal fun LoginScreen(
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !loading,
                             pending = loading,
-                            emphasis = ButtonEmphasis.Primary,
+                            emphasis = ButtonEmphasis.Confirm,
                         )
 
                         // Secondary actions share one row, the app's standard button group.

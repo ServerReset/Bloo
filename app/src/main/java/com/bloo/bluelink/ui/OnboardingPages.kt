@@ -7,7 +7,6 @@ import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.SettingsStore
 import androidx.compose.material.icons.filled.Watch
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.only
@@ -26,7 +25,6 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.border
@@ -93,7 +91,7 @@ internal fun OnboardingSetupPage(
                 icon = Icons.Filled.Notifications,
                 onClick = { notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
                 modifier = Modifier.fillMaxWidth(),
-                emphasis = ButtonEmphasis.Primary,
+                emphasis = ButtonEmphasis.Confirm,
             )
         }
     }
@@ -123,7 +121,7 @@ internal fun OnboardingSetupPage(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                emphasis = ButtonEmphasis.Primary,
+                emphasis = ButtonEmphasis.Confirm,
             )
         }
     } else {

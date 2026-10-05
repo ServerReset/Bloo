@@ -168,7 +168,7 @@ internal fun DriveSyncSetupDialog(
                         text = "Create a new file anyway",
                         onClick = onSaveToDrive,
                         modifier = Modifier.fillMaxWidth(),
-                        emphasis = ButtonEmphasis.Destructive,
+                        emphasis = ButtonEmphasis.Deny,
                     )
                 }
             } else {

@@ -57,7 +57,7 @@ internal fun SecurityCardContent(
                         onClick = { pinDialog = "set" },
                     )
                     if (pinSet) {
-                        SafeMorphTextButton("Remove", onClick = { pinDialog = "remove" }, emphasis = ButtonEmphasis.Destructive)
+                        SafeMorphTextButton("Remove", onClick = { pinDialog = "remove" }, emphasis = ButtonEmphasis.Deny)
                     }
                 }
             }

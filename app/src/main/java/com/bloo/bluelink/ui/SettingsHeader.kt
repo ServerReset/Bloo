@@ -226,7 +226,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                             enabled = !state.updateChecking,
                             icon = Icons.Filled.Refresh,
                             pending = state.updateChecking,
-                            emphasis = ButtonEmphasis.Primary,
+                            emphasis = ButtonEmphasis.Confirm,
                         )
                         SafeMorphTextButton(
                             "GitHub",
@@ -281,8 +281,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                     onClick = { runUpdateAction(state, vm, updateInfo, context) },
                                     modifier = Modifier.fillMaxWidth(),
                                     active = act.ready,
-                                    activeContainerColor = ChargeGreen,
-                                    activeContentColor = Color.White,
+                                    activeContainerColor = confirmTone().container,
+                                    activeContentColor = confirmTone().content,
                                     enabled = !state.updateInstalling && !state.updateDownloading,
                                     expressive = true,
                                 ) {

@@ -17,7 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.DEFAULT_AC_CHARGE_LIMIT_PCT
@@ -26,7 +25,6 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.isPluggedOrCharging
-import kotlinx.coroutines.flow.first
 
 /**
  * Charge pebble: collapsed shows the charge start/stop control; expand to set the charge limits.
@@ -78,8 +76,9 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
             enabled = plugged,
             pending = pending,
             active = charging,
-            activeContainer = ChargeGreen,
-            activeContent = Color.White,
+            // Running means the button is Stop: the deny red.
+            activeContainer = denyTone().container,
+            activeContent = denyTone().content,
         ),
     ) {
         // ChargeFuelBar only renders in a forced-open context for brands that cannot report limits

@@ -42,7 +42,7 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                     text = "Sign in",
                     onClick = { vm.beginAddAccount() },
                     icon = Icons.Filled.PersonAdd,
-                    emphasis = ButtonEmphasis.Primary,
+                    emphasis = ButtonEmphasis.Confirm,
                 )
             }
             if (accounts.any { it.brand.requiresPin }) {
@@ -79,7 +79,7 @@ private fun AccountPanel(creds: Credentials, vm: AppViewModel, addAnother: Boole
             SafeMorphTextButton(
                 text = if (signOut.armed) "Tap again to confirm" else "Sign out",
                 onClick = { if (signOut.armed) vm.logout(creds.brand) else signOut.arm() },
-                emphasis = ButtonEmphasis.Destructive,
+                emphasis = ButtonEmphasis.Deny,
             )
             if (addAnother) {
                 SafeMorphTextButton(

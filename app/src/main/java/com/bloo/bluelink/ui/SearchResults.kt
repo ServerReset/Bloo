@@ -7,7 +7,6 @@ package com.bloo.bluelink.ui
 
 import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,7 +23,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -324,7 +322,7 @@ internal fun SettingsSearchResults(
                                 }
                             },
                             enabled = !running,
-                            emphasis = ButtonEmphasis.Primary,
+                            emphasis = ButtonEmphasis.Confirm,
                         )
                     }
                 }

@@ -308,8 +308,8 @@ internal fun PresetPill(
                 if (confirm.armed) onDelete() else confirm.arm()
             },
             interactionSource = deleteSource,
-            containerColor = if (confirm.armed) MaterialTheme.colorScheme.error else buttonContainer(),
-            contentColor = if (confirm.armed) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface,
+            containerColor = if (confirm.armed) denyTone().container else buttonContainer(),
+            contentColor = if (confirm.armed) denyTone().content else MaterialTheme.colorScheme.onSurface,
             contentPadding = PaddingValues(horizontal = 14.dp),
             shapeForCorner = rightShapeForCorner,
             pillCornerPercent = 50f,

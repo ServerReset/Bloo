@@ -23,7 +23,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
@@ -37,7 +36,6 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.smartClimateIsCooling
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 import com.bloo.bluelink.data.climatePresets
@@ -216,6 +214,9 @@ internal fun ClimatePebble(
             pending = pending,
             active = climateOn,
             spinning = climateOn,
+            // Running means the button is Stop: the deny red.
+            activeContainer = denyTone().container,
+            activeContent = denyTone().content,
         ),
     ) {
         // No hero: the summary is the same expression and already renders as the tile headline.
@@ -339,7 +340,7 @@ internal fun ClimatePebble(
                             }
                         },
                         enabled = presetName.isNotBlank(),
-                        emphasis = ButtonEmphasis.Primary,
+                        emphasis = ButtonEmphasis.Confirm,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     SafeMorphTextButton(

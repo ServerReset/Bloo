@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
@@ -20,7 +19,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -245,23 +243,23 @@ fun MorphButton(
 }
 
 /**
- * How loudly a button speaks, resolved to colours in one place. - [Tonal]: the standard button. -
- * [Primary]: the screen's or card's main action. - [Destructive]: removes or signs out.
+ * How a button speaks, resolved to colours in one place. [Tonal]: the standard button. [Confirm]: go ahead
+ * (green). [Deny]: remove, sign out, stop (red).
  */
-enum class ButtonEmphasis { Tonal, Primary, Destructive }
+enum class ButtonEmphasis { Tonal, Confirm, Deny }
 
 @Composable
 internal fun ButtonEmphasis.container(): Color = when (this) {
     ButtonEmphasis.Tonal -> buttonContainer()
-    ButtonEmphasis.Primary -> MaterialTheme.colorScheme.primary
-    ButtonEmphasis.Destructive -> MaterialTheme.colorScheme.errorContainer
+    ButtonEmphasis.Confirm -> confirmTone().container
+    ButtonEmphasis.Deny -> denyTone().container
 }
 
 @Composable
 internal fun ButtonEmphasis.content(): Color = when (this) {
     ButtonEmphasis.Tonal -> MaterialTheme.colorScheme.onSurface
-    ButtonEmphasis.Primary -> MaterialTheme.colorScheme.onPrimary
-    ButtonEmphasis.Destructive -> MaterialTheme.colorScheme.onErrorContainer
+    ButtonEmphasis.Confirm -> confirmTone().content
+    ButtonEmphasis.Deny -> denyTone().content
 }
 
 /**

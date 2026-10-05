@@ -32,7 +32,7 @@ private fun ConfirmButton(label: String, confirmed: Boolean, onConfirm: () -> Un
             icon = AppIcons.Check,
             onClick = onConfirm,
             modifier = Modifier.fillMaxWidth(),
-            emphasis = ButtonEmphasis.Primary,
+            emphasis = ButtonEmphasis.Confirm,
         )
     }
 }

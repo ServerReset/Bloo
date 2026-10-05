@@ -50,7 +50,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import com.bloo.bluelink.data.links
 import kotlin.math.max
 
 /**
@@ -71,7 +70,7 @@ internal fun DebugCardContent(logs: List<String>, vm: AppViewModel, clipboardSco
                 BodySmallText("${logs.size} lines, newest last.")
                 ActionRow {
                     SafeMorphTextButton("Copy", onClick = { copy("bloo logs", logs.joinToString("\n")) })
-                    SafeMorphTextButton("Clear", onClick = { vm.clearLogs() }, emphasis = ButtonEmphasis.Destructive)
+                    SafeMorphTextButton("Clear", onClick = { vm.clearLogs() }, emphasis = ButtonEmphasis.Deny)
                 }
                 val scroll = rememberScrollState()
                 SelectionContainer {

@@ -170,8 +170,7 @@ internal fun PinDialogs(
                             MorphTextButton(
                                 "Remove PIN",
                                 onClick = { haptics?.heavy(); vm.removeAppPin(); onDismiss() },
-                                containerColor = scheme.error,
-                                contentColor = scheme.onError,
+                                emphasis = ButtonEmphasis.Deny,
                             )
                         }
                     }

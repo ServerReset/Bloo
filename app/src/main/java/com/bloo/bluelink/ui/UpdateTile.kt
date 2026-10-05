@@ -7,23 +7,18 @@ package com.bloo.bluelink.ui
 
 import android.content.Intent
 import android.os.Build
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.MaterialTheme
@@ -36,7 +31,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -105,11 +99,10 @@ internal fun UpdateAvailableTile(
                 icon = if (state.updateApkReady) Icons.Filled.SystemUpdate else Icons.Filled.Download,
                 pending = state.updateDownloading || state.updateInstalling,
                 enabled = !state.updateInstalling,
-                // Same ChargeGreen/white pairing as ChargePebble's active headerAction, for the
-                // install-ready call to action.
+                // The confirm green: the install-ready call to action.
                 active = state.updateApkReady,
-                activeContainer = ChargeGreen,
-                activeContent = Color.White,
+                activeContainer = confirmTone().container,
+                activeContent = confirmTone().content,
                 onClick = {
                     when {
                         state.updateApkReady -> vm.installDownloadedUpdate()

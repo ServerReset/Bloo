@@ -26,7 +26,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.ReorderColumn
 import com.bloo.bluelink.data.removeSyncedDevice
 import com.bloo.bluelink.data.setPrimaryDevice
@@ -208,7 +207,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                         renaming = false
                     },
                     enabled = draft.isNotBlank(),
-                    emphasis = ButtonEmphasis.Primary,
+                    emphasis = ButtonEmphasis.Confirm,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 SafeMorphTextButton(
