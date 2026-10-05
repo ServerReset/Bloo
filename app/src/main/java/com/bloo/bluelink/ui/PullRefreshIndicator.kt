@@ -72,38 +72,37 @@ internal fun PullRefreshIndicatorHost(
     hazeState: HazeState?,
     modifier: Modifier = Modifier,
 ) {
-    // How far the disc is "shown": the pull while dragging, or fully once refreshing.
-    val shown = if (state.refreshing) 1f else state.pull.value.coerceIn(0f, 1f)
-    // Keep the endpoint drawn through a refresh even if a page resets its own pull to 0.
-    val emerge = remember { Animatable(0f) }
-    LaunchedEffect(shown, state.refreshing) {
-        emerge.animateTo(
-            targetValue = shown,
+    // The disc is driven DIRECTLY by the finger while pulling (1:1, no spring lag), and only
+    // springs for the refreshing endpoint -- a pull that trails the finger on a spring reads as
+    // disconnected. `refreshSpring` is the settled-open position for the in-flight refresh.
+    val refreshSpring = remember { Animatable(0f) }
+    LaunchedEffect(state.refreshing) {
+        refreshSpring.animateTo(
+            targetValue = if (state.refreshing) 1f else 0f,
             animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
         )
     }
-    val t = emerge.value
+    val raw = state.pull.value.coerceIn(0f, 1f)
+    // While refreshing, hold at the sprung-open endpoint; otherwise track the finger exactly.
+    val t = if (state.refreshing) refreshSpring.value else raw
     if (t <= 0.01f) return
 
     val density = LocalDensity.current
-    // How far below the top edge the disc comes to rest. Was 12dp, which left it hugging the
-    // very top edge; it now sits clear of the status bar so it reads as its own floating thing,
-    // and the drop travel from off-screen is correspondingly longer.
     val settlePx = with(density) { 30.dp.toPx() }
     val travelPx = with(density) { 84.dp.toPx() }
     Box(modifier.fillMaxSize()) {
-        // The one glass disc: floating chrome, so real liquid glass (refraction + a specular rim).
-        // 64dp (was 52) with a 36dp spinner (was 24): the shape read as a small dot at the top.
+        // The disc, sized to pair with the spinner inside it (48dp disc, 28dp spinner -- the
+        // earlier 64/36 read as a big empty circle with a tiny ring lost inside it).
         GlassSurface(
             shape = androidx.compose.foundation.shape.CircleShape,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .size(64.dp)
+                .size(48.dp)
                 .graphicsLayer {
                     // Drops from OFF the top edge as the pull grows, lands clear of the status bar.
                     translationY = (t - 1f) * travelPx + t * settlePx
                     alpha = t.coerceIn(0f, 1f)
-                    val k = 0.6f + 0.4f * t.coerceIn(0f, 1f)
+                    val k = 0.7f + 0.3f * t.coerceIn(0f, 1f)
                     scaleX = k
                     scaleY = k
                 },
@@ -111,13 +110,12 @@ internal fun PullRefreshIndicatorHost(
             shadow = true,
         ) {
             if (state.refreshing) {
-                LoadingIndicator(Modifier.size(36.dp))
+                LoadingIndicator(Modifier.size(28.dp))
             } else {
-                // While dragging, the spinner's own progress follows the pull, so the ring draws
-                // itself as you pull and is ready to spin the instant the gesture commits.
+                // While dragging, the spinner's own progress follows the pull exactly.
                 LoadingIndicator(
-                    progress = { state.pull.value.coerceIn(0f, 1f) },
-                    modifier = Modifier.size(36.dp),
+                    progress = { raw },
+                    modifier = Modifier.size(28.dp),
                 )
             }
         }

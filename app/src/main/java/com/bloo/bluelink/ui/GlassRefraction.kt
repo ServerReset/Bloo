@@ -55,7 +55,12 @@ internal fun Modifier.appGlassEffect(
     // the blur radius's lower bound in normal mode; ultra just pins it to its clearest end.
     val ultra = appearance.ultraGlass
     val clarity = if (ultra) 1f else appearance.glassClarity
-    val backing = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f * (1f - clarity))
+    // `surface`, not `surfaceContainer`: surfaceContainer is a DARKER tonal step in both themes,
+    // so using it as the backing cast a grey/dark tint over the app's light empty background
+    // (where the Aurora sits) -- the reported "liquid glass is darker over the empty background".
+    // `surface` matches the app's own base tone, so the backing only ever lifts or matches, never
+    // darkens. Its alpha still falls to ~0 at high clarity, so clear glass has no tint at all.
+    val backing = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f * (1f - clarity))
     val blur = (18f - 16.5f * clarity).dp
     val style = remember(shape, backing, blur, fadeOut, edgeWarp, ultra) {
         glassStyle(shape, backing, blur, fadeOut, edgeWarp, ultra)
