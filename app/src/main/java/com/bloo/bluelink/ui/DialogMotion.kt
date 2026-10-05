@@ -37,13 +37,6 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 
-/**
- * How a dialog rises from below the screen: bouncy, so it overshoots its resting place a little and
- * settles. The card's travel, its fade-in and its scale all ride the same progress value (1 =
- * resting, 0 = fully off the bottom).
- */
-internal val DialogEnterSpec = spring<Float>(dampingRatio = 0.6f, stiffness = 260f)
-
 /** How dark the page behind a dialog gets once the dialog is fully up. */
 internal const val DialogScrimAlpha = 0.42f
 
@@ -83,15 +76,7 @@ internal fun DialogLayer(host: DialogHost) {
 
 @Composable
 private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean) {
-    val progress = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { progress.animateTo(1f, DialogEnterSpec) }
-    LaunchedEffect(entry.leaving) {
-        if (!entry.leaving) return@LaunchedEffect
-        // A small anticipatory lift, then a quick accelerating drop off the bottom of the screen.
-        progress.animateTo(1.06f, tween(110))
-        progress.animateTo(0f, tween(300, easing = FastOutLinearInEasing))
-        host.entries.remove(entry)
-    }
+    val progress = rememberPop(entry.leaving) { host.entries.remove(entry) }
     BackHandler(enabled = isTop && !entry.leaving) { entry.onDismiss() }
 
     val scheme = MaterialTheme.colorScheme
@@ -130,13 +115,8 @@ private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean
                     .padding(horizontal = 24.dp)
                     .widthIn(max = 560.dp)
                     .fillMaxWidth()
-                    .graphicsLayer {
-                        val p = progress.value
-                        translationY = (1f - p) * screenHeightPx
-                        val s = 0.94f + 0.06f * p.coerceIn(0f, 1f)
-                        scaleX = s; scaleY = s
-                        alpha = (p * 4f).coerceIn(0f, 1f)
-                    }
+                    // Rises from below the screen.
+                    .popGraphics({ progress.value }, fromY = { screenHeightPx })
                     // Swallows taps on the card so they do not fall through to the scrim.
                     .pointerInput(Unit) { detectTapGestures { } },
             ) {
