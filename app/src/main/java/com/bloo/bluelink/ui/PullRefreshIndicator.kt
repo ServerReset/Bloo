@@ -1,5 +1,8 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -51,6 +54,12 @@ internal class RefreshIndicatorState {
 internal val LocalRefreshIndicator =
     staticCompositionLocalOf<RefreshIndicatorState?> { null }
 
+private val IndicatorSize = 64.dp
+private val SpinnerSize = 38.dp
+
+/** How far below the status bar's lower edge the indicator rests. */
+private val RestBelowStatusBar = 72.dp
+
 /** The single floating indicator. */
 @Composable
 internal fun PullRefreshIndicatorHost(
@@ -74,19 +83,21 @@ internal fun PullRefreshIndicatorHost(
     if (t <= 0.01f) return
 
     val density = LocalDensity.current
-    val settlePx = with(density) { 30.dp.toPx() }
-    val travelPx = with(density) { 84.dp.toPx() }
+    // Rests well clear of the status bar's glass, in the middle of the content it refreshes.
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val sizePx = with(density) { IndicatorSize.toPx() }
+    val restPx = with(density) { (topInset + RestBelowStatusBar).toPx() }
     Box(modifier.fillMaxSize()) {
         GlassSurface(
             shape = androidx.compose.foundation.shape.CircleShape,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .size(48.dp)
+                .size(IndicatorSize)
                 .graphicsLayer {
-                    // Drops from OFF the top edge as the pull grows, lands clear of the status bar.
-                    translationY = (t - 1f) * travelPx + t * settlePx
+                    // Drops from OFF the top edge as the pull grows and lands below the status bar.
+                    translationY = -sizePx + t * (sizePx + restPx)
                     alpha = t.coerceIn(0f, 1f)
-                    val k = 0.7f + 0.3f * t.coerceIn(0f, 1f)
+                    val k = 0.75f + 0.25f * t.coerceIn(0f, 1f)
                     scaleX = k
                     scaleY = k
                 },
@@ -94,12 +105,12 @@ internal fun PullRefreshIndicatorHost(
             shadow = true,
         ) {
             if (state.refreshing) {
-                LoadingIndicator(Modifier.size(28.dp))
+                LoadingIndicator(Modifier.size(SpinnerSize))
             } else {
                 // While dragging, the spinner's own progress follows the pull exactly.
                 LoadingIndicator(
                     progress = { raw },
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(SpinnerSize),
                 )
             }
         }
