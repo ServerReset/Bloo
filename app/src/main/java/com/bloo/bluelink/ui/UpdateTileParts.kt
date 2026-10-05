@@ -7,6 +7,7 @@ package com.bloo.bluelink.ui
  */
 
 import android.content.Intent
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -103,20 +104,30 @@ internal fun UpdateReleaseNotes(
         hazeState = hazeState,
         shadow = false,
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            // No "What's new" label any more -- reported as clutter. Just the two actions,
-            // right-aligned on ONE line, guaranteed never to overflow: "Show more" takes its
-            // natural width, and GitHub is given the LAST of the row's space via weight, so when
-            // the row is short IT is the one squeezed -- and the button framework's own fit rule
-            // then drops its label to the glyph alone. No magic width estimates to get wrong.
+        Column(
+            Modifier
+                .padding(12.dp)
+                // Animate the card's own height when "Show more" expands the notes (and back
+                // when it collapses), so the box grows/shrinks smoothly instead of jumping to
+                // the new size on one frame. Same spring the rest of the update card uses.
+                .animateContentSize(
+                    lowPowerAwareSpring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                ),
+            verticalArrangement = Arrangement.spacedBy(GapRow),
+        ) {
+            // No "What's new" label -- reported as clutter. The actions are a FULL-WIDTH button
+            // row, exactly like every other row of buttons in the app: each button takes half the
+            // width, so they read as proper, big, evenly-sized controls rather than small pills
+            // bunched on the right (the previous weighted-Row version was reported as "small and
+            // not full width"). The framework drops a label to its glyph only when a half is
+            // genuinely too narrow for it.
             val looksLong =
                 notes.count { it == '\n' } >= collapsedLines || notes.length > collapsedLines * 48
             val showToggle = looksLong || expanded
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(GapRow),
-            ) {
+            ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
                 if (showToggle) {
                     SafeMorphTextButton(
                         if (expanded) "Show less" else "Show more",
@@ -124,15 +135,11 @@ internal fun UpdateReleaseNotes(
                         fillOnPress = false,
                     )
                 }
-                Spacer(Modifier.weight(1f))
                 SafeMorphTextButton(
                     "GitHub",
                     onClick = { context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())) },
                     icon = Icons.AutoMirrored.Filled.OpenInNew,
                     fillOnPress = false,
-                    // The last of the row's space, so a tight row squeezes THIS button and the
-                    // framework drops its label to the glyph rather than overflowing.
-                    modifier = Modifier.weight(1f, fill = false),
                 )
             }
             Text(
@@ -172,37 +179,20 @@ internal fun UpdateDismissRow(
     modifier: Modifier = Modifier,
 ) {
     val busy = state.updateDownloading || state.updateInstalling
-    if (state.updatePendingDismiss) {
-        Row(
-            modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(GapRow),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "Dismissing…",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            MorphTextButton(
-                "Keep it",
-                onClick = { vm.undoDismissUpdate() },
-                emphasis = ButtonEmphasis.Primary,
-            )
-        }
-    } else {
-        ExpressiveButtonRow(modifier = modifier.fillMaxWidth(), spacing = GapRow) {
-            MorphTextButton(
-                "Remind me",
-                onClick = { vm.snoozeUpdate() },
-                enabled = !busy,
-            )
-            SafeMorphTextButton(
-                "Not now",
-                onClick = vm::dismissUpdate,
-                enabled = !busy,
-            )
-        }
+    // "Remind me" (deferral) and "Not now" (instant dismiss -- see dismissUpdate). The old
+    // undo window ("Dismissing…" + "Keep it") is gone: "Not now" now hides the update the
+    // instant it is tapped, so there is no pending state to render here.
+    ExpressiveButtonRow(modifier = modifier.fillMaxWidth(), spacing = GapRow) {
+        MorphTextButton(
+            "Remind me",
+            onClick = { vm.snoozeUpdate() },
+            enabled = !busy,
+        )
+        SafeMorphTextButton(
+            "Not now",
+            onClick = vm::dismissUpdate,
+            enabled = !busy,
+        )
     }
 }
 

@@ -19,11 +19,12 @@ import kotlinx.coroutines.launch
  *  again just restarts the window; [undoDismissUpdate] cancels it. */
 fun AppViewModel.dismissUpdate() {
     updateDismissJob?.cancel()
-    _state.update { it.copy(updatePendingDismiss = true) }
-    updateDismissJob = viewModelScope.launch {
-        kotlinx.coroutines.delay(UPDATE_DISMISS_UNDO_MS)
-        _state.update { it.copy(updateTileDismissed = true, updatePendingDismiss = false) }
-    }
+    updateDismissJob = null
+    // INSTANT dismiss: "Not now" hides the update the moment it is tapped. The previous
+    // undo-window ("Dismissing…" + "Keep it") was reported as janky and unwanted -- now it
+    // just goes. A later update check that still finds this build available re-surfaces it
+    // (see checkForUpdate), so nothing is lost by hiding immediately.
+    _state.update { it.copy(updateTileDismissed = true, updatePendingDismiss = false) }
 }
 
 /** "Undo" during the call-back window: cancel the pending dismiss so the tile
