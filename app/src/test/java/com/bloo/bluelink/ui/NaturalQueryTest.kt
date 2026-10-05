@@ -27,7 +27,9 @@ class NaturalQueryTest {
 
     @Test
     fun pluralsTrimButSynonymKeysStay() {
-        assertEquals(listOf("seat"), searchTokens("seats"))
+        assertEquals(listOf("window"), searchTokens("windows"))
+        // "seats" is itself a synonym key, so it keeps its form.
+        assertEquals(listOf("seats"), searchTokens("seats"))
         // "alerts" is itself a synonym key, so it keeps its form.
         assertEquals(listOf("alerts"), searchTokens("alerts"))
     }
