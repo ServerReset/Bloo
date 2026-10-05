@@ -349,36 +349,36 @@ internal fun LoginScreen(
                                 )
                             }
                         }
-                    }
 
-                    // Update affordance, available WITHOUT signing in. Reads "Update available"
-                    // and opens the release page once a check finds a build; otherwise it checks
-                    // (or re-checks) on tap. A logged-out user on an old build could not reach the
-                    // Settings update surface at all before this.
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        SafeMorphTextButton(
-                            text = when {
-                                updateChecking -> "Checking…"
-                                updateAvailableUrl != null -> "Update available"
-                                else -> "Check for updates"
-                            },
-                            onClick = {
-                                val url = updateAvailableUrl
-                                if (url != null) {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                        // Update affordance, available WITHOUT signing in. Reads "Update available"
+                        // and opens the release page once a check finds a build; otherwise it checks
+                        // (or re-checks) on tap. A logged-out user on an old build could not reach the
+                        // Settings update surface at all before this.
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            SafeMorphTextButton(
+                                text = when {
+                                    updateChecking -> "Checking…"
+                                    updateAvailableUrl != null -> "Update available"
+                                    else -> "Check for updates"
+                                },
+                                onClick = {
+                                    val url = updateAvailableUrl
+                                    if (url != null) {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                                    } else {
+                                        onCheckForUpdates()
+                                    }
+                                },
+                                icon = if (updateAvailableUrl != null) {
+                                    Icons.AutoMirrored.Filled.OpenInNew
                                 } else {
-                                    onCheckForUpdates()
-                                }
-                            },
-                            icon = if (updateAvailableUrl != null) {
-                                Icons.AutoMirrored.Filled.OpenInNew
-                            } else {
-                                Icons.Filled.SystemUpdate
-                            },
-                            enabled = !updateChecking,
-                            pending = updateChecking,
-                            contentColor = scheme.onSurfaceVariant,
-                        )
+                                    Icons.Filled.SystemUpdate
+                                },
+                                enabled = !updateChecking,
+                                pending = updateChecking,
+                                contentColor = scheme.onSurfaceVariant,
+                            )
+                    }
                     }
                 }
             }
