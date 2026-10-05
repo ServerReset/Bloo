@@ -25,13 +25,12 @@ data class VehicleLocation(
 )
 
 /**
- * Raw GPS coordinate; [alt] (altitude) is captured but not currently surfaced anywhere in the UI.
+ * Raw GPS coordinate.
  */
 @Serializable
 data class Coord(
     val lat: Double? = null,
     val lon: Double? = null,
-    val alt: Double? = null,
 )
 
 @Serializable
@@ -171,8 +170,6 @@ data class EvTrip(
     val totalused: Double? = null,
     val drivetrain: Double? = null,
     val climate: Double? = null,
-    val accessories: Double? = null,
-    val batterycare: Double? = null,
     val regen: Double? = null,
     val odometer: TripMeasure? = null,
     val mileagetime: TripMeasure? = null,
