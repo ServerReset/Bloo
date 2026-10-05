@@ -145,7 +145,7 @@ internal fun SplitExpandButton(
             .heightIn(min = rowHeightDp)
             // Real measured height, feeding the corner percent above.
             .onSizeChanged { rowHeightDp = with(density) { it.height.toDp() } },
-        spacing = 3.dp,
+        spacing = SplitSeam,
         verticalAlignment = Alignment.CenterVertically,
         // Action + chevron is one seamed control: never wrap, compact to glyphs instead.
         wrap = false,

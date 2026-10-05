@@ -121,6 +121,9 @@ internal val GapRow: Dp @Composable get() = SpaceUnit * 2
 internal val GapGroup: Dp @Composable get() = SpaceUnit * 3
 internal val GapSection: Dp @Composable get() = SpaceUnit * 4
 
+/** The seam between the two halves of a split button (action + chevron, preset + menu). */
+internal val SplitSeam = 3.dp
+
 /** Gap between settings cards: [GapRow] plus a hairline, on the same unit and scale. */
 internal val SettingsCardGap: Dp @Composable get() = SpaceUnit * 2.5f
 

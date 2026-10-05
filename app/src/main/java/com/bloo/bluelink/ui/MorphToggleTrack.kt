@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
@@ -65,9 +64,9 @@ internal fun MorphToggleTrack(checked: Boolean) {
     Box(
         Modifier
             .size(trackWidth, trackHeight)
-            .clip(RoundedCornerShape(50))
+            .clip(CircleShape)
             .background(trackColor)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)), RoundedCornerShape(50))
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)), CircleShape)
             .clearAndSetSemantics {},
         contentAlignment = Alignment.CenterStart,
     ) {

@@ -33,7 +33,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,119 +54,65 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.flow.first
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.toColorInt
 
-/**
- * A round colour swatch for the palette picker: the seed colour, with a ring + check when selected.
- */
+/** The round colour disc shared by every palette swatch: the colour, a ring + check and a small pop when selected. */
 @Composable
-internal fun PaletteSwatch(
-    palette: ColorPalette,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val haptics = LocalHaptics.current
-    val ring by animateDpAsState(
-        if (selected) 3.dp else 0.dp,
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "swatchRing",
+private fun SwatchDisc(color: Color, selected: Boolean, description: String, onClick: () -> Unit) {
+    val ring by animateDpAsState(if (selected) 3.dp else 0.dp, spring(stiffness = Spring.StiffnessMediumLow), label = "swatchRing")
+    val scale by animateFloatAsState(
+        if (selected) 1.12f else 1f,
+        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "swatchScale",
     )
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    // The 58dp slot leaves room for the 1.12x pop. Exposed as a RadioButton so TalkBack announces name and state.
+    Box(
+        Modifier
+            .size(58.dp)
+            .semantics {
+                contentDescription = description
+                role = Role.RadioButton
+                this.selected = selected
+            }
+            .hapticClickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
         Box(
-            modifier = Modifier
+            Modifier
                 .size(48.dp)
+                // Read at draw time, not in composition.
+                .graphicsLayer { scaleX = scale; scaleY = scale }
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.outline)
                 .padding(ring)
                 .clip(CircleShape)
-                .background(palette.swatch)
-                // Exposed as a RadioButton so TalkBack announces the colour name and selection state.
-                .semantics {
-                    contentDescription = palette.label
-                    role = Role.RadioButton
-                    this.selected = selected
-                }
-                .hapticClickable { onClick() },
+                .background(color),
             contentAlignment = Alignment.Center,
         ) {
-            if (selected) {
-                SelectedCheck()
-            }
+            if (selected) SelectedCheck()
         }
-        Spacer(Modifier.height(GapHairline))
-        Text(
-            palette.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = swatchLabelColor(selected),
-        )
     }
 }
 
-
-/** Like [PaletteSwatch] but for user-created [CustomPaletteData] entries. */
+/** A built-in palette in the picker: its seed colour and name. */
 @Composable
-internal fun CustomPaletteSwatch(
-    palette: CustomPaletteData,
-    selected: Boolean,
-    onClick: () -> Unit,
-    onEdit: () -> Unit,
-) {
-    val haptics = LocalHaptics.current
-    val ring by animateDpAsState(
-        if (selected) 3.dp else 0.dp,
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "customSwatchRing",
-    )
-    val scale by animateFloatAsState(
-        if (selected) 1.12f else 1f,
-        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "customSwatchScale",
-    )
-    val swatchColor = Color(palette.primaryArgb.toLong() and 0xFFFFFFFFL)
+internal fun PaletteSwatch(palette: ColorPalette, selected: Boolean, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Outer container fits the 1.12x scale without clipping.
-        Box(
-            modifier = Modifier
-                .size(58.dp)
-                .semantics {
-                    contentDescription = palette.name
-                    role = Role.RadioButton
-                    this.selected = selected
-                }
-                .hapticClickable { onClick() },
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    // Read at draw time, not in composition (see FloatingIcon in Widgets.kt).
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    }
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.outline)
-                    .padding(ring)
-                    .clip(CircleShape)
-                    .background(swatchColor),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (selected) {
-                    SelectedCheck()
-                }
-            }
-        }
-        Spacer(Modifier.height(2.dp))
-        // Standard gap between connected button elements (matches SplitExpandButton's 3dp).
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                palette.name,
-                style = MaterialTheme.typography.labelSmall,
-                color = swatchLabelColor(selected),
-            )
-            // IconButton gives a real touch target and the Button role. Haptics come from MorphIconButton.
+        SwatchDisc(palette.swatch, selected, palette.label, onClick)
+        Spacer(Modifier.height(GapHairline))
+        Text(palette.label, style = MaterialTheme.typography.labelSmall, color = swatchLabelColor(selected))
+    }
+}
+
+/** A user-made palette in the picker, with an edit button beside its name. */
+@Composable
+internal fun CustomPaletteSwatch(palette: CustomPaletteData, selected: Boolean, onClick: () -> Unit, onEdit: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        SwatchDisc(Color(palette.primaryArgb.toLong() and 0xFFFFFFFFL), selected, palette.name, onClick)
+        Spacer(Modifier.height(GapHairline))
+        Row(horizontalArrangement = Arrangement.spacedBy(SplitSeam), verticalAlignment = Alignment.CenterVertically) {
+            Text(palette.name, style = MaterialTheme.typography.labelSmall, color = swatchLabelColor(selected))
             // 32dp, not 48dp: it sits in a caption row inside a 58dp-wide swatch column in a tight grid.
             MorphIconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                 Icon(

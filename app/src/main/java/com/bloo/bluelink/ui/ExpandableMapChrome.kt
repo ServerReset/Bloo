@@ -27,7 +27,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,7 +39,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -181,7 +179,7 @@ internal fun MapTopBar(
             }
             // Frosted drag handle, centre-aligned. Purely visual: the pop and drag belong to the whole bar (`dragModifier`).
             GlassSurface(
-                shape = RoundedCornerShape(50),
+                shape = CircleShape,
                 modifier = Modifier.align(Alignment.Center).size(width = 44.dp, height = 18.dp),
                 hazeState = mapHazeState,
                 shadow = false,

@@ -248,7 +248,7 @@ internal fun PresetPill(
     // reach a member), and membership lets either half take width from the other on press.
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min),
-        spacing = 3.dp,
+        spacing = SplitSeam,
         verticalAlignment = Alignment.CenterVertically,
         // One split pill, not two adjacent buttons (see `wrap`).
         wrap = false,
@@ -346,7 +346,7 @@ internal fun ChargeLimitPill(
         // Same group conversion as PresetPill.
         ExpressiveButtonRow(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-            spacing = 3.dp,
+            spacing = SplitSeam,
             wrap = false,
         ) {
             // Left half: label. Tapping bumps the limit one step, wrapping to 50% after 100%.

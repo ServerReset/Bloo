@@ -232,7 +232,7 @@ internal fun StateControl(
             ExpressiveButtonRow(
                 // Caps the group's room at groupMaxWidth (see above).
                 modifier = Modifier.widthIn(max = groupMaxWidth),
-                spacing = 3.dp,
+                spacing = SplitSeam,
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalAlignment = Alignment.CenterHorizontally,
                 wrap = false,

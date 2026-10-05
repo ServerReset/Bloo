@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -23,7 +24,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -53,7 +53,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -136,7 +135,7 @@ internal fun SearchPill(
     ) {
         // canBlur/pillShape are hoisted so the fill and the blur layer agree; the blur needs its own
         // explicit clip because Surface's clip applies after the caller's modifier.
-        val pillShape = RoundedCornerShape(50)
+        val pillShape = CircleShape
         val canBlur = hazeState != null && canBlurBackdrops()
         Surface(
             onClick = { if (!expanded) onFocusChange(true) },
@@ -319,7 +318,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
                     minHeight = 0.dp,
                     // Theme-weighted, not a bare dropShadow() (0.38-alpha black is a halo on light themes);
                     // same split as glassDropShadow (GlassChrome.kt).
-                    modifier = Modifier.themedDropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
+                    modifier = Modifier.themedDropShadow(CircleShape, blurRadius = 8.dp, offsetY = 3.dp),
                     expressive = true,
                 ) {
                     Text(

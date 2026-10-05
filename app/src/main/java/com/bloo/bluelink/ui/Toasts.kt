@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.shape.CircleShape
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -8,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -274,7 +274,7 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
         // "it came out of search" read is unchanged; only the resting shape is.
         // A pill (fully rounded ends), not a fixed 24dp corner: the toasts read as smooth
         // rounded pills, the app's floating-chrome language.
-        shape = RoundedCornerShape(50),
+        shape = CircleShape,
         hazeState = hazeState,
         // Mostly clear: the glass does the work (refraction over a barely-there tint), but enough tint
         // that the words read the instant it lands.
