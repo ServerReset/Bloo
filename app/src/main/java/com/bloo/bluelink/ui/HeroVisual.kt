@@ -57,7 +57,8 @@ internal fun carTonalBrush(scheme: ColorScheme): Brush {
     // Deepened accent family (primary -> container -> tertiary -> secondary) so the hero's light
     // text always has contrast, in light and dark themes alike, and the card reads as one lit,
     // saturated surface.
-    val deepen = { c: Color -> lerp(c, Color.Black, if (appIsDarkTheme()) 0.25f else 0.38f) }
+    val amount = if (appIsDarkTheme()) 0.25f else 0.38f
+    val deepen = { c: Color -> lerp(c, Color.Black, amount) }
     return Brush.linearGradient(
         listOf(
             deepen(scheme.primary),
