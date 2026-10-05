@@ -12,7 +12,7 @@ import com.bloo.bluelink.data.setAiEnabled
 
 /** The "AI" card: one switch, and what it does. */
 @Composable
-internal fun AiCardContent(state: UiState, advanced: Boolean, vm: AppViewModel) {
+internal fun AiCardContent(state: UiState, vm: AppViewModel) {
     SettingsCard("AI", AppIcons.AutoAwesome, vm, status = if (state.aiEnabled) "On" else "Off") {
         ToggleRow(
             "On-device AI (Gemini Nano)",

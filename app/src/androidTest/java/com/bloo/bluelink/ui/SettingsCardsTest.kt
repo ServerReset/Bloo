@@ -87,7 +87,7 @@ class SettingsCardsTest {
 
     @Test fun ai() = checkCard("AI", "On-device AI (Gemini Nano)") { vm ->
         val state by vm.state.collectAsState()
-        AiCardContent(state, advanced = true, vm = vm)
+        AiCardContent(state, vm = vm)
     }
 
     @Test fun debugAndLogsAreOneCard() = checkCard("Debug", "Activity log") { vm ->

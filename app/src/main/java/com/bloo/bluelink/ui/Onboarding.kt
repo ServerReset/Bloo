@@ -418,7 +418,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                                 OnboardingStepKind.SETUP -> OnboardingSetupPage(vm, state, context, canBio, appearance.biometricLock, notifGranted) { notifGranted = it }
                                 OnboardingStepKind.LOOK -> OnboardingLookPage(appearance, vm)
                                 OnboardingStepKind.ALERTS -> OnboardingAlertsPage(notif, vm)
-                                OnboardingStepKind.WATCH -> OnboardingWatchPage(state)
+                                OnboardingStepKind.WATCH -> OnboardingWatchPage()
                                 OnboardingStepKind.CAR_POWERTRAIN -> vehicle?.let {
                                     OnboardingPowertrainPage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
                                 }

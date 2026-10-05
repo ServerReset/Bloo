@@ -95,7 +95,7 @@ class AutoLockService : Service() {
             // still counting down toward a lock. `forgetAll` needs the vins, which the service
             // doesn't hold here, so cancel every VIN the controller currently tracks.
             runCatching {
-                AutoLockController.state.value.keys.forEach { AutoLockController.cancel(this, it) }
+                AutoLockController.state.value.keys.forEach { AutoLockController.cancel(it) }
             }
             stopSelf()
             return START_NOT_STICKY
@@ -107,7 +107,7 @@ class AutoLockService : Service() {
 
         when (intent.action) {
             ACTION_CANCEL -> {
-                AutoLockController.cancel(this, vin)
+                AutoLockController.cancel(vin)
                 startForegroundCompat(vin, DetectionState.ABORTED, 0)
                 scope.launch { delay(3000); finishTracking(vin) }
                 return START_NOT_STICKY

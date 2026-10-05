@@ -21,7 +21,7 @@ fun AppViewModel.setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolo
         // Turning AutoLock OFF must also CANCEL an evaluation already in flight for this car. The
         // config read at the START of an evaluation only guards NEW ones.
         if (!config.enabled) {
-            runCatching { com.bloo.bluelink.autolock.AutoLockController.cancel(getApplication(), vin) }
+            runCatching { com.bloo.bluelink.autolock.AutoLockController.cancel(vin) }
         }
         val anyEnabled = settingsStore.allAutoLockConfigs().values.any { it.enabled }
         val action = if (anyEnabled) {

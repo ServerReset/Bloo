@@ -45,6 +45,6 @@ internal object AutoLockTrigger {
 
     /** The car reconnected (the user got back in): abort whatever is pending for it. */
     fun onCarConnected(context: Context, vin: String) {
-        AutoLockController.cancel(context.applicationContext, vin)
+        AutoLockController.cancel(vin)
     }
 }

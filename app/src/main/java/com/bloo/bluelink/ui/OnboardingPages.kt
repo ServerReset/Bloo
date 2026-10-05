@@ -379,7 +379,7 @@ internal fun OnboardingAlertsPage(notif: SettingsStore.NotificationPrefs, vm: Ap
  * uses.
  */
 @Composable
-internal fun OnboardingWatchPage(state: UiState) {
+internal fun OnboardingWatchPage() {
     var show by remember { mutableStateOf(false) }
     BodySmallText("Got a Wear OS watch? Bloo has a watch app with quick actions, a Tile and its own notifications. It installs straight from this phone, no Play Store needed.")
     SafeMorphTextButton("Set up my watch", onClick = { show = true }, icon = Icons.Filled.Watch, emphasis = ButtonEmphasis.Confirm)

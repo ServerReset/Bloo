@@ -103,7 +103,7 @@ object AutoLockController {
      * active so that ordinary case doesn't log a misleading "cancelled" for a car that was
      * never mid-evaluation, and doesn't push a spurious ABORTED entry into `state` (and
      * therefore into the Settings screen's live status line) for no reason. */
-    fun cancel(context: Context, vin: String) {
+    fun cancel(vin: String) {
         val job = jobs[vin] ?: return
         if (!job.isActive) return
         job.cancel()
@@ -116,7 +116,7 @@ object AutoLockController {
      *  [cancel]ling and leaving stale [DetectionState.ABORTED] entries and machines behind
      *  for VINs that no longer exist. Settings' own persisted config is cleared separately
      *  (see [com.bloo.bluelink.data.SettingsStore.clearAllAutoLockConfigs]). */
-    fun forgetAll(context: Context, vins: Collection<String>) {
+    fun forgetAll(vins: Collection<String>) {
         if (vins.isEmpty()) return
         vins.forEach { vin ->
             jobs.remove(vin)?.cancel()

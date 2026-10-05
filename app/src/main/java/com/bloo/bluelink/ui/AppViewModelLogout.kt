@@ -41,7 +41,7 @@ fun AppViewModel.logout(brand: Brand) {
             // car that can never be found.
             runCatching {
                 val autoLockVins = settingsStore.autoLockConfiguredVins()
-                com.bloo.bluelink.autolock.AutoLockController.forgetAll(getApplication(), autoLockVins)
+                com.bloo.bluelink.autolock.AutoLockController.forgetAll(autoLockVins)
                 settingsStore.clearAllAutoLockConfigs()
             }
             // `sessionFetched` is add-only and lives for the ViewModel's life, and [ensureStatus]

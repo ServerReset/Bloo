@@ -162,7 +162,7 @@ internal fun SettingsScreen(
 
             // Only when the device supports Gemini Nano; always shown, not advanced-only.
             run {
-                AiCardContent(state, advanced, vm)
+                AiCardContent(state, vm)
             }
             }
             if (advTransition0.targetState || !advTransition0.isIdle) item {
