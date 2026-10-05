@@ -11,6 +11,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -280,11 +281,13 @@ internal fun LoginScreen(
                             exit = expandExitSized(Alignment.Bottom),
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                                BlooTextField(
+                                PinField(
                                     value = pin,
                                     onValueChange = { pin = it },
-                                    label = { Text(if (brand.pinRequiredToSignIn) "Service PIN" else "Service PIN (optional)") },
-                                    singleLine = true,
+                                    label = if (brand.pinRequiredToSignIn) "Service PIN" else "Service PIN (optional)",
+                                    digitsOnly = false,
+                                    revealed = showPin,
+                                    colors = OutlinedTextFieldDefaults.colors(),
                                     trailingIcon = {
                                         MorphIconButton(onClick = { showPin = !showPin }) {
                                             Icon(
@@ -294,9 +297,6 @@ internal fun LoginScreen(
                                             )
                                         }
                                     },
-                                    visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                                    modifier = Modifier.fillMaxWidth(),
                                 )
                                 if (!brand.pinRequiredToSignIn) {
                                     BodySmallText("Only needed to run remote commands. Leave it blank if you never set one in the Hyundai app; you can add it later in Settings.")

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
@@ -41,8 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.PinCrypto
 import kotlinx.coroutines.launch
@@ -270,29 +267,18 @@ internal fun OnboardingPinForm(
     var attempted by remember { mutableStateOf(false) }
     val valid = pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS &&
         pin == confirm
-    val sanitize: (String) -> String = { it.take(PinCrypto.PIN_MAX_DIGITS).filter { ch -> ch.isDigit() } }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        BlooTextField(
+        PinField(
             value = pin,
-            onValueChange = { pin = sanitize(it); attempted = false },
-            placeholder = { Text("4–8 digit PIN") },
-            singleLine = true,
-            colors = borderlessFieldColors(),
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            onValueChange = { pin = it; attempted = false },
+            placeholder = "4–8 digit PIN",
             isError = attempted && pin.isNotEmpty() && pin.length < PinCrypto.PIN_MIN_DIGITS,
-            modifier = Modifier.fillMaxWidth(),
         )
-        BlooTextField(
+        PinField(
             value = confirm,
-            onValueChange = { confirm = sanitize(it); attempted = false },
-            placeholder = { Text("Confirm PIN") },
-            singleLine = true,
-            colors = borderlessFieldColors(),
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            onValueChange = { confirm = it; attempted = false },
+            placeholder = "Confirm PIN",
             isError = attempted && confirm.isNotEmpty() && pin != confirm,
-            modifier = Modifier.fillMaxWidth(),
         )
         if (attempted && (pin.length < PinCrypto.PIN_MIN_DIGITS || pin != confirm)) {
             Text(

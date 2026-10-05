@@ -1,22 +1,19 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Credentials
 import com.bloo.uicommon.rememberConfirmArm
@@ -75,15 +72,7 @@ private fun AccountPanel(creds: Credentials, vm: AppViewModel, addAnother: Boole
         // Kia US has no service PIN; its commands are session-keyed.
         var pin by remember(creds.brand, creds.pin) { mutableStateOf(creds.pin) }
         if (creds.brand.requiresPin) {
-            BlooTextField(
-                value = pin,
-                onValueChange = { pin = it },
-                label = { Text("Service PIN") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            PinField(pin, { pin = it }, label = "Service PIN", digitsOnly = false, colors = OutlinedTextFieldDefaults.colors())
         }
         ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
             if (creds.brand.requiresPin && pin.isNotBlank() && pin != creds.pin) {

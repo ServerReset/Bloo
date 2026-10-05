@@ -21,8 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fingerprint
@@ -49,9 +47,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.formatLockoutSeconds
 import com.bloo.bluelink.data.PinCrypto
@@ -340,18 +335,11 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                             }
                         }
                         Spacer(Modifier.height(GapSection))
-                        BlooTextField(
+                        PinField(
                             value = pin,
-                            onValueChange = { pin = it.take(PinCrypto.PIN_MAX_DIGITS).filter { ch -> ch.isDigit() } },
-                            placeholder = { Text("4–8 digit PIN") },
-                            singleLine = true,
-                            colors = borderlessFieldColors(),
-                            visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.NumberPassword,
-                                imeAction = ImeAction.Done,
-                            ),
-                            keyboardActions = KeyboardActions(onDone = { attemptPin() }),
+                            onValueChange = { pin = it },
+                            placeholder = "4–8 digit PIN",
+                            onDone = { attemptPin() },
                             supportingText = {
                                 when {
                                     rejected -> AnimatedText(

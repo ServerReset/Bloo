@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.ui.semantics.onClick
@@ -21,9 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 
 // --- App PIN dialogs ------------------------------------------------------
 
@@ -88,7 +83,6 @@ internal fun PinDialogs(
             if (stage == "current") stage = "finish"
         }
     }
-    val sanitize: (String) -> String = { it.take(8).filter { ch -> ch.isDigit() } }
 
     GlassAlertDialog(
         onDismissRequest = onDismiss,
@@ -103,27 +97,16 @@ internal fun PinDialogs(
                         color = scheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(GapGroup))
-                    BlooTextField(
+                    PinField(
                         value = currentPin,
-                        onValueChange = { currentPin = sanitize(it); rejected = false },
-                        placeholder = { Text("Current PIN") },
-                        singleLine = true,
-                        // borderlessFieldColors(), like every other PIN entry in the app (the
-                        // lock screen's field, onboarding's set-a-PIN pair -- and, one stage
-                        // later in THIS dialog, OnboardingPinForm itself). It used to pass
-                        // TextFieldDefaults.colors(), i.e. the FILLED TextField palette handed
-                        // to an OutlinedTextField: a tonal container plus indicator-derived
-                        // borders, a fourth field look found nowhere else, and visibly not the
-                        // field the next stage of the same dialog draws.
-                        colors = borderlessFieldColors(),
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = {
+                        onValueChange = { currentPin = it; rejected = false },
+                        placeholder = "Current PIN",
+                        onDone = {
                             if (currentPin.length >= 4) {
                                 haptics?.click()
                                 vm.verifyAppPin(currentPin)
                             }
-                        }),
+                        },
                         isError = rejected,
                         supportingText = if (rejected) {
                             {

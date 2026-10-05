@@ -53,3 +53,46 @@ internal fun BlooTextField(
         colors = colors,
     )
 }
+
+
+/**
+ * The app's one PIN field: masked, number keypad, and (for the app PIN) digits only and capped at
+ * [maxDigits]. The lock screen, the change-PIN dialog, onboarding's set-a-PIN pair, the account card and
+ * sign-in all enter a PIN, and each had hand-written the same six lines of masking and keyboard options.
+ * [revealed] unmasks it (sign-in's eye toggle); [onDone] makes the keypad's Done key act.
+ */
+@Composable
+internal fun PinField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    placeholder: String? = null,
+    label: String? = null,
+    digitsOnly: Boolean = true,
+    maxDigits: Int = com.bloo.bluelink.data.PinCrypto.PIN_MAX_DIGITS,
+    revealed: Boolean = false,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    isError: Boolean = false,
+    supportingText: @Composable (() -> Unit)? = null,
+    onDone: (() -> Unit)? = null,
+    colors: TextFieldColors = borderlessFieldColors(),
+) {
+    BlooTextField(
+        value = value,
+        onValueChange = { onValueChange(if (digitsOnly) it.take(maxDigits).filter(Char::isDigit) else it) },
+        modifier = modifier,
+        label = label?.let { { androidx.compose.material3.Text(it) } },
+        placeholder = placeholder?.let { { androidx.compose.material3.Text(it) } },
+        trailingIcon = trailingIcon,
+        supportingText = supportingText,
+        isError = isError,
+        singleLine = true,
+        colors = colors,
+        visualTransformation = if (revealed) VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword,
+            imeAction = if (onDone != null) androidx.compose.ui.text.input.ImeAction.Done else androidx.compose.ui.text.input.ImeAction.Default,
+        ),
+        keyboardActions = if (onDone != null) KeyboardActions(onDone = { onDone() }) else KeyboardActions.Default,
+    )
+}
