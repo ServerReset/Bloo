@@ -121,6 +121,10 @@ fun MorphButton(
 ) {
     val haptics = LocalHaptics.current
     val clickHaptic = onClickHaptic ?: { haptics?.click() }
+    // In a connected group the group decides the silhouette (its place in the line), unless the caller drew its own.
+    val slotOf = LocalClusterSlot.current
+    val groupShape: ((Float, Int) -> Shape)? = shapeForCorner
+        ?: slotOf?.let { slot -> { morph, cornerPercent -> slot()?.let { slotShape(it, morph, cornerPercent) } ?: RoundedCornerShape(percent = cornerPercent) } }
     // The content tone content lambdas inherit, provided the way M3's Button provides it internally
     // (the shared core is foundation-only and cannot reach material3's LocalContentColor).
     val resolvedContent = if (active) activeContentColor else contentColor
@@ -198,7 +202,7 @@ fun MorphButton(
                 onLongClick = onLongClick,
                 pillCornerPercent = pillCornerPercent,
                 morphedCornerPercent = morphedCornerPercent,
-                shapeForCorner = shapeForCorner,
+                shapeForCorner = groupShape,
                 content = {
                     content()
                     if (withLayer) {
@@ -272,14 +276,14 @@ enum class ButtonEmphasis { Tonal, Confirm, Deny }
 
 @Composable
 internal fun ButtonEmphasis.container(): Color = when (this) {
-    ButtonEmphasis.Tonal -> buttonContainer()
+    ButtonEmphasis.Tonal -> MaterialTheme.colorScheme.secondaryContainer
     ButtonEmphasis.Confirm -> confirmTone().container
     ButtonEmphasis.Deny -> denyTone().container
 }
 
 @Composable
 internal fun ButtonEmphasis.content(): Color = when (this) {
-    ButtonEmphasis.Tonal -> MaterialTheme.colorScheme.onSurface
+    ButtonEmphasis.Tonal -> MaterialTheme.colorScheme.onSecondaryContainer
     ButtonEmphasis.Confirm -> confirmTone().content
     ButtonEmphasis.Deny -> denyTone().content
 }
@@ -308,13 +312,22 @@ fun MorphTextButton(
     pending: Boolean = false,
     /** See [MorphButton]'s own `groupWeight`; labelled buttons default to proportional-to-label. */
     groupWeight: Float = GroupWeightProportional,
+    /** A toggle's "on" state: the primary fill. */
+    active: Boolean = false,
+    /** See [MorphButton]'s own `expressive`. */
+    expressive: Boolean = false,
+    /** See [MorphButton]'s own `fillOnPress`; false when the button shares its row. */
+    fillOnPress: Boolean = true,
 ) {
     MorphButton(
         onClick = onClick,
         modifier = modifier,
         // A pending action is inert and iced out.
         enabled = enabled && !pending,
+        active = active,
         groupWeight = groupWeight,
+        expressive = expressive,
+        fillOnPress = fillOnPress,
         interactionSource = interactionSource,
         containerColor = containerColor.takeOrElse { emphasis.container() },
         contentColor = contentColor.takeOrElse { emphasis.content() },
@@ -384,10 +397,7 @@ fun SafeMorphTextButton(
     }
 }
 
-/**
- * **The** standard action button: a glyph, a label, a tonal fill and a hairline rim. Padding is
- * 18dp/8dp on the shared [ButtonTargetHeight].
- */
+/** The standard action button: a glyph, a label and a tonal fill. [MorphTextButton] with the glyph required. */
 @Composable
 fun MorphActionButton(
     label: String,
@@ -395,40 +405,27 @@ fun MorphActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    /** Swaps the glyph for the shared in-flight spinner; pass a real flag, not `true`. */
     pending: Boolean = false,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
-    /** See [MorphButton]'s own `groupWeight`; labelled buttons default to proportional-to-label. */
     groupWeight: Float = GroupWeightProportional,
-    /** See [MorphButton]'s own `expressive`. */
     expressive: Boolean = false,
-    /** See [MorphButton]'s own `fillOnPress`; false when the button shares its row. */
     fillOnPress: Boolean = true,
-    /** The button's weight in the hierarchy, same as [MorphTextButton]'s. */
     emphasis: ButtonEmphasis = ButtonEmphasis.Tonal,
-    /** A toggle's "on" state: the primary fill, same as [MorphButton]'s own `active`. */
     active: Boolean = false,
-) {
-    MorphButton(
-        onClick = onClick,
-        modifier = modifier,
-        // A pending action is inert and iced out.
-        enabled = enabled && !pending,
-        active = active,
-        interactionSource = interactionSource,
-        groupWeight = groupWeight,
-        expressive = expressive,
-        fillOnPress = fillOnPress,
-        // Tonal keeps MorphButton's own default fill; the others take their emphasis colours.
-        containerColor = if (emphasis == ButtonEmphasis.Tonal) MaterialTheme.colorScheme.secondaryContainer else emphasis.container(),
-        contentColor = if (emphasis == ButtonEmphasis.Tonal) MaterialTheme.colorScheme.onSecondaryContainer else emphasis.content(),
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
-    ) {
-        // The shared label gives the glyph its standard gap and lets a cramped group know how small
-        // it can get.
-        MorphButtonLabel(icon, label, pending = pending)
-    }
-}
+) = MorphTextButton(
+    text = label,
+    onClick = onClick,
+    modifier = modifier,
+    enabled = enabled,
+    emphasis = emphasis,
+    interactionSource = interactionSource,
+    icon = icon,
+    pending = pending,
+    groupWeight = groupWeight,
+    active = active,
+    expressive = expressive,
+    fillOnPress = fillOnPress,
+)
 
 /** Every button in the app is this tall, so a row of them lines up whatever it contains. */
 val ButtonTargetHeight = 48.dp

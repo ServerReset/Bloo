@@ -151,15 +151,21 @@ fun SafeExpansiveButton(
     // Inside an [ExpressiveButtonRow]/[ExpressiveButtonGroup] this button joins the group, which
     // takes the extra width off its NEIGHBOURS so the row's own footprint never changes.
     if (LocalExpressiveGroup.current) {
+        val connected = LocalClusterConnected.current
+        val slotState = remember { ClusterSlotState() }
         Box(
-            modifier.then(ExpressiveGroupData(press, groupWeight)),
+            modifier.then(ExpressiveGroupData(press, groupWeight, if (connected) slotState else null)),
             propagateMinConstraints = true,
         ) {
             // Providing FALSE inside makes joining a group idempotent. LocalExpressiveGrowth TRUE,
             // though (unlike the group flag) -- a member's own width is still being smoothly
             // driven, by the group's seam-reserve layout instead of this file's standalone one, so
             // MorphButton's animateContentSize still needs to step aside for the same reason.
-            CompositionLocalProvider(LocalExpressiveGroup provides false, LocalExpressiveGrowth provides true) {
+            CompositionLocalProvider(
+                LocalExpressiveGroup provides false,
+                LocalExpressiveGrowth provides true,
+                LocalClusterSlot provides if (connected) remember(slotState) { { slotState.slot } } else null,
+            ) {
                 ExpressiveContent(enabled, content)
             }
         }

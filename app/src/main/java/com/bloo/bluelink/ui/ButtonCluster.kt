@@ -119,10 +119,21 @@ internal fun ButtonCluster(
     }
 }
 
+/** The silhouette of a connected button: round at the ends of its line, a seam corner wherever it meets a neighbour. */
+internal fun connectedShape(first: Boolean, last: Boolean, outerPercent: Int, startSeamMorph: Float, endSeamMorph: Float): RoundedCornerShape {
+    val outer = CornerSize(percent = outerPercent)
+    val start = if (first) outer else seamCorner(startSeamMorph)
+    val end = if (last) outer else seamCorner(endSeamMorph)
+    return RoundedCornerShape(topStart = start, bottomStart = start, topEnd = end, bottomEnd = end)
+}
+
+/** The shape for a member the group has placed at [slot] (see [LocalClusterSlot]). */
+internal fun slotShape(slot: ClusterSlot, morph: Float, cornerPercent: Int): RoundedCornerShape =
+    connectedShape(slot.index == 0, slot.index == slot.count - 1, cornerPercent, morph, morph)
+
 /**
- * The silhouette of button [index] in a cluster: fully round at the outer ends, a seam corner (soft at rest, opening
- * as it is pressed) wherever it meets a neighbour. A button with [ClusterButton.openness] morphs its outer corner
- * too, and the seams beside it open with it.
+ * The silhouette of button [index] in a cluster. A button with [ClusterButton.openness] morphs its outer corner too,
+ * and the seams beside it open with it.
  */
 internal fun clusterShape(buttons: List<ClusterButton>, index: Int, morph: Float, cornerPercent: Int): Shape {
     val button = buttons[index]
@@ -132,8 +143,11 @@ internal fun clusterShape(buttons: List<ClusterButton>, index: Int, morph: Float
     } else {
         cornerPercent
     }
-    val outer = CornerSize(percent = outerPercent)
-    val start = if (index == 0) outer else seamCorner(max(own, buttons[index - 1].openness))
-    val end = if (index == buttons.lastIndex) outer else seamCorner(max(own, buttons[index + 1].openness))
-    return RoundedCornerShape(topStart = start, bottomStart = start, topEnd = end, bottomEnd = end)
+    return connectedShape(
+        first = index == 0,
+        last = index == buttons.lastIndex,
+        outerPercent = outerPercent,
+        startSeamMorph = max(own, buttons.getOrNull(index - 1)?.openness ?: 0f),
+        endSeamMorph = max(own, buttons.getOrNull(index + 1)?.openness ?: 0f),
+    )
 }
