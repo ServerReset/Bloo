@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.layout.layout
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.positionInParent
@@ -174,11 +176,15 @@ private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
         val scroll = rememberScrollState()
         val viewportPx = remember { androidx.compose.runtime.mutableIntStateOf(0) }
         val blurOk = canBlurBackdrops()
+        // The strip runs to the pebble's own edges (the cards still start at its content inset), so cards melt
+        // out and in at the true edge of the card, not at the inset text column.
         Row(
             Modifier
                 .fillMaxWidth()
+                .bleedHorizontally(PebbleContentInset)
                 .onSizeChanged { viewportPx.intValue = it.width }
-                .horizontalScroll(scroll),
+                .horizontalScroll(scroll)
+                .padding(horizontal = PebbleContentInset),
             horizontalArrangement = Arrangement.spacedBy(GapRow),
         ) {
             hours.forEachIndexed { i, h ->
@@ -418,7 +424,7 @@ internal fun dial(context: Context, number: String) {
  * How wide the strip's soft edge is: cells blur and fade as they slide into it and sharpen as they
  * leave it.
  */
-private val ScrollEdgeFade = 72.dp
+private val ScrollEdgeFade = 40.dp
 
 /**
  * A cell of a horizontally scrolling strip that melts into blur as it nears an edge that has more
@@ -431,7 +437,7 @@ private fun Modifier.scrollEdgeBlur(scroll: ScrollState, viewportPx: androidx.co
     var w by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     val density = androidx.compose.ui.platform.LocalDensity.current
     val fadePx = with(density) { ScrollEdgeFade.toPx() }
-    val maxBlurPx = with(density) { 12.dp.toPx() }
+    val maxBlurPx = with(density) { 3.dp.toPx() }
     return this
         .onPlaced { x = it.positionInParent().x; w = it.size.width.toFloat() }
         .graphicsLayer {
@@ -444,11 +450,20 @@ private fun Modifier.scrollEdgeBlur(scroll: ScrollState, viewportPx: androidx.co
             val intoLeft = ((fadePx - left) / fadePx).coerceIn(0f, 1f) * leftGate
             val intoRight = ((right - (vp - fadePx)) / fadePx).coerceIn(0f, 1f) * rightGate
             val t = maxOf(intoLeft, intoRight)
-            alpha = 1f - 0.8f * t
+            alpha = 1f - 0.5f * t
             renderEffect = if (blur && t > 0.03f) {
                 androidx.compose.ui.graphics.BlurEffect(maxBlurPx * t, maxBlurPx * t, androidx.compose.ui.graphics.TileMode.Decal)
             } else {
                 null
             }
         }
+}
+
+
+/** Lets a child extend [inset] past both sides of the space its parent gives it, so it can reach the parent's own edges. */
+internal fun Modifier.bleedHorizontally(inset: androidx.compose.ui.unit.Dp): Modifier = layout { measurable, constraints ->
+    val extra = inset.roundToPx() * 2
+    val width = constraints.maxWidth + extra
+    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+    layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
 }
