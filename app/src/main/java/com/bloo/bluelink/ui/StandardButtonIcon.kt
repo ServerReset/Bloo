@@ -193,7 +193,7 @@ fun MorphButtonLabel(
                     // Whole label or no label -- anything in between is a truncated word. (Holding
                     // a symbol-only button shows its name in a bubble above it instead, see
                     // LabelHint.)
-                    if (constraints.maxWidth < glyph.width + gapPx + text.width) {
+                    if (hint?.glyphOnly == true || constraints.maxWidth < glyph.width + gapPx + text.width) {
                         val w = glyph.width.coerceAtMost(constraints.maxWidth)
                         // Height still accounts for the undrawn label.
                         val h = maxOf(glyph.height, text.height)

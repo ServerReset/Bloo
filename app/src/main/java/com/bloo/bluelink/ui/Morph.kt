@@ -27,7 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onPlaced
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -136,42 +136,38 @@ fun MorphButton(
     } else {
         Modifier
     }
-    // Press and hold a symbol-only button: haptic ticks build, then the button shakes, a heavy
-    // pulse lands and a bubble shows the symbol and name. The hold never touches the button's
-    // layout.
+    // Press and hold a symbol-only button: haptic ticks build, the button shakes, a heavy pulse lands, and then
+    // the button itself lifts out of its row above the finger and widens to show its name (see LabelHint).
+    // Letting go drops it back, and the hold never presses it.
     if (enabled && onLongClick == null) {
         LaunchedEffect(interactionSource) {
             interactionSource.interactions.collectLatest { interaction ->
                 when (interaction) {
                     is PressInteraction.Press -> {
+                        hint.suppressClick = false
                         if (!hint.collapsed) return@collectLatest
-                        val built = launch {
+                        val build = launch {
                             delay(120)
                             var gap = 70L
-                            repeat(3) { i ->
+                            repeat(3) {
                                 haptics?.tick()
                                 delay(gap)
                                 gap = (gap * 0.8f).toLong().coerceAtLeast(30L)
                             }
                         }
                         delay(HOLD_TO_EXPAND_MS)
-                        built.cancel()
+                        build.cancel()
                         haptics?.heavy()
-                        hint.onHoldStart()
-                        launch { hint.shake() }
+                        hint.shake()
+                        haptics?.heavy()
+                        hint.beginLift()
+                        hint.raise()
                         awaitCancellation()
                     }
-                    is PressInteraction.Release, is PressInteraction.Cancel -> hint.onHoldEnd()
+                    is PressInteraction.Release, is PressInteraction.Cancel -> hint.endLift()
                 }
             }
         }
-    }
-    // The lifted copy of this button (see LabelHint) draws from these.
-    SideEffect {
-        hint.containerColor = if (active) activeContainerColor else containerColor
-        hint.contentColor = resolvedContent
-        hint.borderColor = if (active) Color.Transparent else (border?.brush as? androidx.compose.ui.graphics.SolidColor)?.value ?: Color.Transparent
-        hint.cornerPercent = pillCornerPercent.toInt()
     }
     val providedContent = if (enabled) {
         resolvedContent
@@ -181,61 +177,76 @@ fun MorphButton(
         // look backgroundless.
         disabledContentColor ?: resolvedContent
     }
-    val body: @Composable () -> Unit = {
-        CompositionLocalProvider(LocalContentColor provides providedContent, LocalLabelHint provides hint) {
+    // The button itself, drawn once in its slot and once more, as the lifted copy, in the hold-to-explain layer.
+    @Composable
+    fun core(coreModifier: Modifier, onCoreClick: () -> Unit, source: MutableInteractionSource, state: LabelHintState, withLayer: Boolean) {
+        CompositionLocalProvider(LocalContentColor provides providedContent, LocalLabelHint provides state) {
             MorphButtonCore(
-                onClick = { clickHaptic(); onClick() },
-                modifier = modifier
-                    // `active` is otherwise a colour-only change -- most call sites also swap their
-                    // label text (Lock/Unlock, Start/Stop), which is why this mostly "worked" for
-                    // TalkBack by accident, but that's caller discipline, not something the shared
-                    // button guarantees.
-                    .semantics { selected = active }
-                    .onSizeChanged { hint.sizePx = it }
-                    // While its lifted copy is up, the original steps aside.
-                    .graphicsLayer { rotationZ = hint.shakeDegrees; alpha = if (hint.present) 0f else 1f }
-                    // Inert: the app's one disabled look (see [frosted]).
-                    .then(frost)
-                    // Skipped while SafeExpansiveButton is already smoothly driving this button's
-                    // width on press (LocalExpressiveGrowth -- see its own doc): animateContentSize
-                    // exists for a genuine content change (a label swapping to a longer one), but
-                    // left unconditional it ALSO re-smoothed a width the wrapper was already
-                    // animating frame by frame with its own, deliberately non-bouncy spring -- two
-                    // springs chasing the same width at once, which is what made a growing button
-                    // wobble on press instead of just growing.
-                    .then(
-                        if (LocalExpressiveGrowth.current) {
-                            Modifier
-                        } else {
-                            Modifier.animateContentSize(
-                                lowPowerAwareSpring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                            )
-                        },
-                    )
-                    .then(if (minHeight > 0.dp) Modifier.heightIn(min = minHeight) else Modifier),
+                onClick = onCoreClick,
+                modifier = coreModifier,
                 enabled = enabled,
                 active = active,
                 containerColor = containerColor,
                 activeContainerColor = activeContainerColor,
                 contentPadding = contentPadding,
                 border = if (active) null else border,
-                // Disabled = the app's standard frosted glass, not a washed-out tonal pill: the
-                // shared glass tint (translucent, blur-aware) with a matching frosted rim, so a
-                // dimmed button reads as an inert pane of glass sitting in the layout rather than a
-                // broken button.
+                // Disabled = the app's standard frosted glass, not a washed-out tonal pill: the shared glass
+                // tint (translucent, blur-aware) with a matching rim, so a dimmed button reads as an inert
+                // pane of glass in the layout rather than a broken button.
                 disabledContainerColor = glassTint(canBlurBackdrops()),
                 disabledBorder = BorderStroke(1.dp, hairlineColor()),
-                interactionSource = interactionSource,
+                interactionSource = source,
                 onLongClick = onLongClick,
                 pillCornerPercent = pillCornerPercent,
                 morphedCornerPercent = morphedCornerPercent,
                 shapeForCorner = shapeForCorner,
                 content = {
                     content()
-                    LabelHintPopup(hint)
+                    if (withLayer) {
+                        LabelHintLayer(state) { copy -> core(Modifier, {}, remember { MutableInteractionSource() }, copy, false) }
+                    }
                 },
             )
         }
+    }
+    val body: @Composable () -> Unit = {
+        core(
+            modifier
+                // `active` is otherwise a colour-only change -- most call sites also swap their label text
+                // (Lock/Unlock, Start/Stop), which is why this mostly "worked" for TalkBack by accident.
+                .semantics { selected = active }
+                .onPlaced { hint.coordinates = it }
+                // Out of the layout while its lifted copy is up, and out of sight.
+                .liftCollapse(hint)
+                .graphicsLayer { rotationZ = hint.shakeDegrees; alpha = if (hint.lifted) 0f else 1f }
+                // Inert: the app's one disabled look (see [frosted]).
+                .then(frost)
+                // Skipped while SafeExpansiveButton is already smoothly driving this button's width on press
+                // (LocalExpressiveGrowth): animateContentSize is for a genuine content change, and left on it
+                // re-smoothed a width the wrapper was already animating, so a growing button wobbled.
+                .then(
+                    if (LocalExpressiveGrowth.current) {
+                        Modifier
+                    } else {
+                        Modifier.animateContentSize(
+                            lowPowerAwareSpring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                        )
+                    },
+                )
+                .then(if (minHeight > 0.dp) Modifier.heightIn(min = minHeight) else Modifier),
+            // A hold that lifted the button is not a press: its click is swallowed.
+            {
+                if (hint.suppressClick) {
+                    hint.suppressClick = false
+                } else {
+                    clickHaptic()
+                    onClick()
+                }
+            },
+            interactionSource,
+            hint,
+            true,
+        )
     }
     // Join a group without the call site knowing: a button only takes part in the press
     // redistribution if it carries the group's parent data from SafeExpansiveButton. Wrapping is
@@ -247,6 +258,7 @@ fun MorphButton(
             enabled = enabled,
             groupWeight = groupWeight,
             fillOnPress = fillOnPress || standalone,
+            suppressPress = { hint.lifted },
         ) { body() }
     } else {
         body()

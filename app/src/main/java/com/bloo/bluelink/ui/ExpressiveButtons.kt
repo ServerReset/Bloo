@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -143,14 +142,17 @@ fun SafeExpansiveButton(
      * (left in LTR, right in RTL) and, pressed, widens to fill the row.
      */
     fillOnPress: Boolean = false,
+    /** True while the button is lifted out of its row: it takes no part in the press redistribution. */
+    suppressPress: () -> Boolean = { false },
     content: @Composable () -> Unit,
 ) {
-    val press by expressivePressFraction(interactionSource, enabled)
+    val rawPress by expressivePressFraction(interactionSource, enabled)
+    val press = { if (suppressPress()) 0f else rawPress }
     // Inside an [ExpressiveButtonRow]/[ExpressiveButtonGroup] this button joins the group, which
     // takes the extra width off its NEIGHBOURS so the row's own footprint never changes.
     if (LocalExpressiveGroup.current) {
         Box(
-            modifier.then(ExpressiveGroupData({ press }, groupWeight)),
+            modifier.then(ExpressiveGroupData(press, groupWeight)),
             propagateMinConstraints = true,
         ) {
             // Providing FALSE inside makes joining a group idempotent. LocalExpressiveGrowth TRUE,
@@ -176,7 +178,7 @@ fun SafeExpansiveButton(
         measurePolicy = { measurables, constraints ->
             if (measurables.isEmpty()) return@Layout layout(0, 0) {}
             // Read at layout time so a press invalidates layout only.
-            val p = press
+            val p = press()
             val cached = naturals.widths?.firstOrNull() ?: 0
             // One measure per child per pass (measuring twice throws), so the resting width is
             // cached. minWidth is zeroed for the resting measure so a parent that forces a width
