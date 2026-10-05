@@ -30,7 +30,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -138,10 +137,10 @@ internal fun StateControl(
                 else -> "Unknown"
             }
             val stateColorTarget = when {
-                !enabled -> LocalContentColor.current.copy(alpha = MutedContentAlpha)
+                !enabled -> mutedContentColor()
                 isOn == false && offTextColor != null -> offTextColor
                 highlighted -> highlightColor
-                else -> LocalContentColor.current.copy(alpha = MutedContentAlpha)
+                else -> mutedContentColor()
             }
             val stateColor by androidx.compose.animation.animateColorAsState(
                 stateColorTarget,

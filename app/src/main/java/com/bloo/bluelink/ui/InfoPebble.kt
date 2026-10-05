@@ -89,61 +89,57 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         // The old cover hero repeated the summary, already the tile headline: the lock
         // state used to appear THREE times on one tile -- summary, hero, and the "Doors"
         // row below.
-        when {
-            status == null && state.refreshing -> Text("Fetching live status…")
-            status == null -> Text("No status yet.")
-            else -> {
-                SectionLabel("Status")
-                status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
-                // Absent when the lock state is unknown, matching the engine row above --
-                // "Unlocked" was being shown for a car that simply hadn't reported it.
-                status.doorLock?.let { StatusRow("Doors", if (it) "Locked" else "Unlocked") }
-                status.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
-                    ?.let { StatusRow("Doors open", it.joinToString(", ")) }
-                status.windowOpen?.openLabels()?.takeIf { it.isNotEmpty() }
-                    ?.let { StatusRow("Windows open", it.joinToString(", ")) }
-                if (status.trunkOpen == true) StatusRow("Trunk", "Open")
-                if (status.hoodOpen == true) StatusRow("Hood", "Open")
-                if (status.acc == true) StatusRow("Accessory power", "On")
-                // Absent when climate state is unknown (airCtrlOn null), like the engine/doorLock
-                // rows above -- "Off" was being shown as fact for a car that never reported it.
-                status.airCtrlOn?.let { StatusRow("Climate", if (it) "On" else "Off") }
-                if (status.defrost == true) StatusRow("Defrost", "On")
-                status.airTemp?.let { t ->
-                    t.value?.let { StatusRow("Climate setpoint", degLabel(it, appearance.useFahrenheit, t.unit)) }
-                }
-                status.percentFor(state.hasBattery(v))?.let {
-                    StatusRow(if (state.hasBattery(v)) "Charge" else "Fuel", "$it%")
-                }
-                status.rangeMiFor(state.hasBattery(v))?.let { StatusRow("Range", formatDistance(it, metric)) }
-                status.battery?.level?.let { StatusRow("12V battery", "$it%") }
-                // Comfort heaters (read-only; mirror/rear-window heat track defrost).
-                status.steerWheelHeat?.takeIf { it != 0 }?.let { StatusRow("Steering wheel heat", "On") }
-                status.sideMirrorHeat?.takeIf { it != 0 }?.let { StatusRow("Mirror heat", "On") }
-                status.sideBackWindowHeat?.takeIf { it != 0 }?.let { StatusRow("Rear defroster", "On") }
-                // Resolved place name when geocoding's landed (same source the
-                // Location pebble and the AI summary both use); raw coordinates
-                // ONLY as the fallback until it does, never as the steady state --
-                // this row used to show coordString() unconditionally, the one
-                // place in the app that never even tried to resolve an address.
-                //
-                // On the cover, the COMPACT form (street + ZIP, not street + city) -- this
-                // row's own value column is narrow enough that the long form reliably wrapped
-                // onto two lines, a real reported "looks bad" bug. Phone keeps the long form,
-                // which has the room for it.
-                location?.let {
-                    val place = if (glance) state.placeZips[v.vin] ?: state.placeNames[v.vin] else state.placeNames[v.vin]
-                    StatusRow("Location", place ?: it.coordString())
-                }
-                rememberRelativeTime(state.fetchedAt(v))?.let { StatusRow("Last refreshed", it) }
+        PebbleStatusGate(status, state.refreshing) { status ->
+            SectionLabel("Status")
+            status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
+            // Absent when the lock state is unknown, matching the engine row above --
+            // "Unlocked" was being shown for a car that simply hadn't reported it.
+            status.doorLock?.let { StatusRow("Doors", if (it) "Locked" else "Unlocked") }
+            status.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
+                ?.let { StatusRow("Doors open", it.joinToString(", ")) }
+            status.windowOpen?.openLabels()?.takeIf { it.isNotEmpty() }
+                ?.let { StatusRow("Windows open", it.joinToString(", ")) }
+            if (status.trunkOpen == true) StatusRow("Trunk", "Open")
+            if (status.hoodOpen == true) StatusRow("Hood", "Open")
+            if (status.acc == true) StatusRow("Accessory power", "On")
+            // Absent when climate state is unknown (airCtrlOn null), like the engine/doorLock
+            // rows above -- "Off" was being shown as fact for a car that never reported it.
+            status.airCtrlOn?.let { StatusRow("Climate", if (it) "On" else "Off") }
+            if (status.defrost == true) StatusRow("Defrost", "On")
+            status.airTemp?.let { t ->
+                t.value?.let { StatusRow("Climate setpoint", degLabel(it, appearance.useFahrenheit, t.unit)) }
+            }
+            status.percentFor(state.hasBattery(v))?.let {
+                StatusRow(if (state.hasBattery(v)) "Charge" else "Fuel", "$it%")
+            }
+            status.rangeMiFor(state.hasBattery(v))?.let { StatusRow("Range", formatDistance(it, metric)) }
+            status.battery?.level?.let { StatusRow("12V battery", "$it%") }
+            // Comfort heaters (read-only; mirror/rear-window heat track defrost).
+            status.steerWheelHeat?.takeIf { it != 0 }?.let { StatusRow("Steering wheel heat", "On") }
+            status.sideMirrorHeat?.takeIf { it != 0 }?.let { StatusRow("Mirror heat", "On") }
+            status.sideBackWindowHeat?.takeIf { it != 0 }?.let { StatusRow("Rear defroster", "On") }
+            // Resolved place name when geocoding's landed (same source the
+            // Location pebble and the AI summary both use); raw coordinates
+            // ONLY as the fallback until it does, never as the steady state --
+            // this row used to show coordString() unconditionally, the one
+            // place in the app that never even tried to resolve an address.
+            //
+            // On the cover, the COMPACT form (street + ZIP, not street + city) -- this
+            // row's own value column is narrow enough that the long form reliably wrapped
+            // onto two lines, a real reported "looks bad" bug. Phone keeps the long form,
+            // which has the room for it.
+            location?.let {
+                val place = if (glance) state.placeZips[v.vin] ?: state.placeNames[v.vin] else state.placeNames[v.vin]
+                StatusRow("Location", place ?: it.coordString())
+            }
+            rememberRelativeTime(state.fetchedAt(v))?.let { StatusRow("Last refreshed", it) }
 
-                if (plugged) {
-                    SectionLabel("Charging")
-                    ev?.minutesToFull
-                        ?.let { StatusRow("Time to full", fmtMinutes(it)) }
-                    chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
-                    ev?.targetForCurrentPlug()?.let { StatusRow("Charge limit", "$it%") }
-                }
+            if (plugged) {
+                SectionLabel("Charging")
+                ev?.minutesToFull
+                    ?.let { StatusRow("Time to full", fmtMinutes(it)) }
+                chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
+                ev?.targetForCurrentPlug()?.let { StatusRow("Charge limit", "$it%") }
             }
         }
 

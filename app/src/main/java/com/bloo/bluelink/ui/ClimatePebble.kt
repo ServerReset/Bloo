@@ -13,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,7 +23,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
@@ -285,7 +283,7 @@ internal fun ClimatePebble(
                 Text(
                     "On at the car. Read-only while driving.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                    color = mutedContentColor(),
                 )
                 status?.airTemp?.let { t ->
                     t.value?.let { StatusRow("Set to", degLabel(it, fahrenheit, t.unit)) }
@@ -300,7 +298,7 @@ internal fun ClimatePebble(
                 Text(
                     "Climate can't be started while the car is driving.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                    color = mutedContentColor(),
                 )
             }
             return@Pebble
@@ -360,7 +358,7 @@ internal fun ClimatePebble(
                     Text(
                         "It's $ambientLabel by your car. Smart climate targets $targetLabel.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                        color = mutedContentColor(),
                     )
                 }
             }

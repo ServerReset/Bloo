@@ -349,3 +349,28 @@ fun pebbleRowOvershoot(t: Float, overshoot: Float = 1.15f): Float {
  *  row *i+1* even starts; past 5 they overlap only slightly, and the window is still narrow
  *  enough to read as its own quick step rather than blending into a wave. */
 const val PebbleStaggerSpan = 0.85f
+
+
+/**
+ * The app's one "working" spin, for any icon that turns while something loads: the first turn accelerates
+ * from rest, then it holds a steady fast spin, and when [spinning] ends it decelerates to the next full
+ * turn and resets. The Animatable only runs while spinning, so idle icons hold no live animation. Apply
+ * it in a layer (`graphicsLayer { rotationZ = angle.value }`) so the spin never recomposes.
+ */
+@androidx.compose.runtime.Composable
+internal fun rememberSpinAngle(spinning: Boolean): androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D> {
+    val angle = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(spinning) {
+        if (spinning) {
+            angle.animateTo(angle.value + 360f, androidx.compose.animation.core.tween(850, easing = androidx.compose.animation.core.FastOutLinearInEasing))
+            while (true) {
+                angle.animateTo(angle.value + 360f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.LinearEasing))
+            }
+        } else if (angle.value != 0f) {
+            val target = kotlin.math.ceil(angle.value / 360f) * 360f
+            angle.animateTo(target, androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+            angle.snapTo(0f)
+        }
+    }
+    return angle
+}

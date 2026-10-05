@@ -61,6 +61,16 @@ internal fun MutedText(text: String, modifier: Modifier = Modifier) {
     )
 }
 
+/** A pebble body that needs live status: shows [content] with it once there is one, else the loading or empty line. */
+@Composable
+internal fun <T : Any> PebbleStatusGate(status: T?, refreshing: Boolean, content: @Composable (T) -> Unit) {
+    when {
+        status != null -> content(status)
+        refreshing -> Text("Fetching live status…")
+        else -> Text("No status yet.")
+    }
+}
+
 /**
  * Label text styling (labelMedium) for subtle secondary text.
  * Consolidates another common text pattern.

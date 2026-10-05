@@ -1,9 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.height
@@ -44,7 +40,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,9 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.flow.first
 
 /**
  * The standard glyph for a button label.
@@ -134,31 +127,7 @@ private fun MorphButtonGlyph(
     if (pending) {
         LoadingIndicator(Modifier.size(iconSize))
     } else {
-        // Always-composed Animatable, but it only runs while spinning - so idle
-        // buttons don't each hold a live infinite animation, and we avoid calling
-        // remember conditionally.
-        val angle = remember { Animatable(0f) }
-        LaunchedEffect(spinning) {
-            if (spinning) {
-                // Ramp up: the first revolution accelerates from rest...
-                angle.animateTo(
-                    targetValue = angle.value + 360f,
-                    animationSpec = tween(durationMillis = 850, easing = FastOutLinearInEasing),
-                )
-                // ...then hold a steady, fast linear spin.
-                while (true) {
-                    angle.animateTo(
-                        targetValue = angle.value + 360f,
-                        animationSpec = tween(durationMillis = 600, easing = LinearEasing),
-                    )
-                }
-            } else if (angle.value != 0f) {
-                // Ramp down: decelerate to the next full turn, then reset.
-                val target = kotlin.math.ceil(angle.value / 360f) * 360f
-                angle.animateTo(target, tween(durationMillis = 700, easing = LinearOutSlowInEasing))
-                angle.snapTo(0f)
-            }
-        }
+        val angle = rememberSpinAngle(spinning)
         // The glyph cross-fades when it changes (lock to unlock, play to stop); the spin is on the
         // wrapper, in the draw phase: `angle` loops `while (true)` while pending, so reading it
         // through Modifier.rotate() recomposed the Icon on EVERY FRAME for as long as it ran.

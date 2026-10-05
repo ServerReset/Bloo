@@ -39,7 +39,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.takeOrElse
@@ -189,7 +188,7 @@ internal fun PebbleHeaderRow(
                     s,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
-                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                    color = mutedContentColor(),
                 ) }
             }
             headerContent?.invoke()

@@ -1,9 +1,6 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -37,7 +34,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -244,7 +240,7 @@ internal fun MapTopBar(
                             statusLine,
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Medium,
-                            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                            color = mutedContentColor(),
                         )
                     }
                 }
@@ -273,26 +269,9 @@ internal fun MapTopBar(
                 )
             }
             if (onRefreshLocation != null) {
-                // Icon-only (was a text chip: "Updated Xm ago" / "Refresh" beside a
-                // static icon) -- reported directly as wanting a refresh INDICATOR,
-                // not a label, that animates while it's actually working. Same
-                // ramp-up/steady-spin language MorphButtonGlyph (Morph.kt) already
-                // uses for every other in-progress icon in the app, driven by the
-                // real pending flag rather than a guessed duration -- see
-                // [refreshing]'s own doc.
-                val angle = remember { Animatable(0f) }
-                LaunchedEffect(refreshing) {
-                    if (refreshing) {
-                        angle.animateTo(angle.value + 360f, tween(850, easing = FastOutLinearInEasing))
-                        while (true) {
-                            angle.animateTo(angle.value + 360f, tween(600, easing = LinearEasing))
-                        }
-                    } else if (angle.value != 0f) {
-                        val target = kotlin.math.ceil(angle.value / 360f) * 360f
-                        angle.animateTo(target, tween(700, easing = LinearOutSlowInEasing))
-                        angle.snapTo(0f)
-                    }
-                }
+                // Icon-only: a refresh indicator that spins while it is actually working (the real
+                // pending flag), in the same ramp-up/steady-spin language as every in-progress icon.
+                val angle = rememberSpinAngle(refreshing)
                 // 40dp, matching the Text's own reserved end space above exactly --
                 // was 36dp against a 44dp reservation, a mismatched pair (see the
                 // Text's own comment). Centred in the 48dp-tall bar the same way the

@@ -10,7 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.contentColorFor
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -99,7 +98,7 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
                             Text(
                                 "•",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                                color = mutedContentColor(),
                             )
                         }
                         Text(
@@ -113,13 +112,13 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
             Text(
                 "Summarizes this car's latest status, on your device.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                color = mutedContentColor(),
             )
         }
         Text(
             "Reflects the last refresh. Tap Summarize to update.",
             style = MaterialTheme.typography.bodySmall,
-            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+            color = mutedContentColor(),
         )
     }
 }

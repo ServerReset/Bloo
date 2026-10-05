@@ -90,6 +90,11 @@ internal val ChargeBlueDark = Color(com.bloo.bluelink.data.BlooColors.chargeBlue
 /** The app's muted/secondary-text alpha, applied over LocalContentColor. */
 internal const val MutedContentAlpha = 0.7f
 
+/** The ambient content colour, muted: secondary text on any surface (tinted pebbles, glass, the map pill). */
+@androidx.compose.runtime.Composable
+internal fun mutedContentColor(): androidx.compose.ui.graphics.Color =
+    androidx.compose.material3.LocalContentColor.current.copy(alpha = MutedContentAlpha)
+
 /**
  * Text and icons drawn ON the hero's car photo.
  *

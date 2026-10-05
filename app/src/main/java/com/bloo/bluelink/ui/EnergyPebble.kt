@@ -191,14 +191,10 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         // The old cover hero repeated the pebble summary ("84% · 120 mi") that the
         // headline already carries, with the two StatusRows below carrying the detail --
         // the percentage used to appear three times on this tile.
-        when {
-            status == null && state.refreshing -> Text("Fetching live status…")
-            status == null -> Text("No status yet.")
-            else -> {
-                fuelPct?.let { StatusRow("Fuel level", "$it%") }
-                range?.let { StatusRow("Range (distance to empty)", formatDistance(it, metric)) }
-                if (fuelPct == null && range == null) Text("No fuel data reported.")
-            }
+        PebbleStatusGate(status, state.refreshing) { status ->
+            fuelPct?.let { StatusRow("Fuel level", "$it%") }
+            range?.let { StatusRow("Range (distance to empty)", formatDistance(it, metric)) }
+            if (fuelPct == null && range == null) Text("No fuel data reported.")
         }
     }
 }
