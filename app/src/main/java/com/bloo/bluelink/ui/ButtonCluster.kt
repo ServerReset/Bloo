@@ -43,7 +43,8 @@ internal class ClusterButton(
     val activeContainerColor: Color? = null,
     val activeContentColor: Color? = null,
     val disabledContentColor: Color? = null,
-    val contentPadding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = GapRow),
+    /** Null = the standard cluster padding. */
+    val contentPadding: PaddingValues? = null,
     /** Share of the row's leftover width this button takes; 0 keeps its natural width. */
     val weight: Float = 0f,
     /** Never narrower than the cluster is tall, so an icon-only button is a true circle (or a round nub in a cluster). */
@@ -76,6 +77,7 @@ internal fun ButtonCluster(
     val needsHeight = buttons.any { it.square }
     var rowHeight by remember { mutableStateOf(0.dp) }
     val scheme = MaterialTheme.colorScheme
+    val standardPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow)
     ExpressiveButtonGroup(
         modifier = modifier
             .height(IntrinsicSize.Min)
@@ -97,7 +99,7 @@ internal fun ButtonCluster(
                     activeContainerColor = b.activeContainerColor ?: scheme.primary,
                     activeContentColor = b.activeContentColor ?: scheme.onPrimary,
                     disabledContentColor = b.disabledContentColor,
-                    contentPadding = b.contentPadding,
+                    contentPadding = b.contentPadding ?: standardPadding,
                     interactionSource = b.interactionSource ?: remember { MutableInteractionSource() },
                     onClickHaptic = b.onClickHaptic,
                     onLongClick = b.onLongClick,
