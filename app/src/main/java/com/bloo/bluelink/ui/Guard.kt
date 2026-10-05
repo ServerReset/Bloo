@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -215,7 +216,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             // underneath has finished composing) this is fully opaque instead: a 45% scrim
             // over a sharp garage would show car names, plates and status through the lock
             // screen, which is the one thing it exists to prevent.
-            .background(lockBg.copy(alpha = backdropAlpha))
+            .drawBehind { drawRect(lockBg.copy(alpha = backdropAlpha)) }
             .noRippleClickable {},
     ) {
         // Floating back arrow -> login: the same FloatingIcon every other floating
