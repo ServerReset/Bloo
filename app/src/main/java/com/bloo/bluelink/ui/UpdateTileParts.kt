@@ -249,7 +249,7 @@ internal fun UpdateStatusLine(
         animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "updateStatusTint",
     )
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         // A tonal badge behind the icon, not a bare glyph -- the same "icon gets its
         // own coloured circle" weight every pebble's stat hero leads with.
         IconBadgeContainer(containerColor = animatedStatusTint.copy(alpha = 0.15f), size = 36.dp) {

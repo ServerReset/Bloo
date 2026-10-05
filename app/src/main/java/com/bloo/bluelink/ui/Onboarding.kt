@@ -369,7 +369,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             Spacer(Modifier.height(GapSection))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 GlassSurface(shape = CircleShape, liquid = false, tint = scheme.surfaceContainerHighest.copy(alpha = 0.7f)) {
-                    OnboardingDots(count = steps.size, current = pageIndex, modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp))
+                    OnboardingDots(count = steps.size, current = pageIndex, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
                 }
             }
 

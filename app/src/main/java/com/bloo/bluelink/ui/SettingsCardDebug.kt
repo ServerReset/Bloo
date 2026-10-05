@@ -178,7 +178,7 @@ private fun CreditRow(entry: CreditEntry) {
     val context = LocalContext.current
     Row(
         Modifier.fillMaxWidth().outlinedPanel(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         IconBadge(
             entry.icon,

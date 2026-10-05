@@ -82,7 +82,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
     ) {
         Row(
-            Modifier.padding(horizontal = 10.dp, vertical = GapHairline),
+            Modifier.padding(horizontal = 8.dp, vertical = GapHairline),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null) {

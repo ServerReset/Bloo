@@ -305,7 +305,7 @@ internal fun SearchLayer(
             enter = expandEnter(Alignment.Bottom),
             exit = expandExit(Alignment.Bottom),
             modifier = Modifier.align(Alignment.BottomCenter)
-                .padding(bottom = barH + edge + bottomInset + 10.dp),
+                .padding(bottom = barH + edge + bottomInset + 8.dp),
         ) {
             val panelShape = ExtraLargeShape
             // GlassSurface (GlassChrome.kt): the one shared fill/rim/shadow, replacing
@@ -322,8 +322,8 @@ internal fun SearchLayer(
                         .fillMaxWidth()
                         .heightIn(max = minOf(360.dp, freeAbovePill))
                         .verticalScroll(rememberScrollState())
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (query.isNotBlank()) {
                         // Fewer results while the keyboard is up. This is what

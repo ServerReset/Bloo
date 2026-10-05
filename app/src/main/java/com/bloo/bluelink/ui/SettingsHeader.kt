@@ -353,7 +353,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                     .fillMaxWidth()
                                     .clip(StandardShape)
                                     .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f))
-                                    .padding(14.dp),
+                                    .padding(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(GapRow),
                             ) {
                                 Text(

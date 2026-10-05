@@ -316,7 +316,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     hazeState = LocalBackdropHaze.current,
                 ) {
                     Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             IconBadge(
                                 icon = AppIcons.Lock,
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,

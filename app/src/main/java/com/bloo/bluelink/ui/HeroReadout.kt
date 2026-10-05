@@ -275,7 +275,7 @@ internal fun HeroCollapsedNumbers(
                 layout(w, p.height) { p.place(0, 0) }
             }
             .graphicsLayer { alpha = if (hoisted) 0f else fade }
-            .padding(start = 10.dp)
+            .padding(start = 8.dp)
             .onGloballyPositioned(onPositioned),
         verticalAlignment = Alignment.CenterVertically,
     ) {

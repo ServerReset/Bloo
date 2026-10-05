@@ -152,7 +152,7 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(start = PebbleContentInset, end = PebbleContentInset, bottom = 14.dp),
+            .padding(start = PebbleContentInset, end = PebbleContentInset, bottom = 16.dp),
     ) {
         // A hairline between the controls and the history, so the revealed panel reads as a
         // second section of the same pebble rather than loose text under the buttons.

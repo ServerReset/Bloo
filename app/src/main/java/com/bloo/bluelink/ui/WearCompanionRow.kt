@@ -183,7 +183,7 @@ internal fun DriveSyncSetupDialog(
                         .fillMaxWidth()
                         .clip(StandardShape)
                         .background(scheme.errorContainer.copy(alpha = 0.5f))
-                        .padding(14.dp),
+                        .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
                     Text(

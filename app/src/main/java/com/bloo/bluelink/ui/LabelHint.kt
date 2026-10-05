@@ -155,7 +155,7 @@ private fun LabelHintBubbleHost(state: LabelHintState) {
 @Composable
 private fun LabelHintBubble(label: String, icon: ImageVector, unfolded: Boolean, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
-    Box(modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+    Box(modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
         Row(
             Modifier
                 .dropShadow(CircleShape, color = scheme.primary.copy(alpha = 0.35f), blurRadius = 16.dp, offsetY = 5.dp)
