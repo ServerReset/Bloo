@@ -70,16 +70,27 @@ internal fun carTonalBrush(scheme: ColorScheme): Brush {
     // branch -- the two cases where the hero's fallback fill and everything drawn on it
     // disagreed about which theme they were in.
     val dark = appIsDarkTheme()
-    val colors = if (dark) {
-        // Dark mode: vivid primary/tertiary/secondary with light text over them
-        listOf(scheme.primary, scheme.tertiary, scheme.secondary)
-    } else {
-        // Light mode: the same family, softened. The hero's text is light-on-photo, so a near-white
-        // fallback made it unreadable (and needed a heavy dark scrim, which is what made a
-        // photo-less card's edges look dark); a soft vivid wash keeps white text readable.
-        listOf(scheme.primary.copy(alpha = 0.80f), scheme.tertiary.copy(alpha = 0.70f), scheme.secondary.copy(alpha = 0.75f))
-    }
-    return Brush.linearGradient(colors)
+    // A five-stop diagonal sweep through the theme's accent family (primary / tertiary /
+    // secondary, plus the two containers as mid-tones) at the scheme's own hue, rather than a
+    // flat 3-colour wash: primary -> primaryContainer -> tertiary -> secondaryContainer ->
+    // secondary, angled off the top-left so it reads as a lit surface with travel, not a band.
+    // Every colour comes from [scheme], so it tracks dynamic colour and the user's palette. The
+    // alphas keep the hero's light-on-photo text legible (soft in light mode, vivid in dark).
+    val a = if (dark) 1f else 0.82f
+    val colors = listOf(
+        scheme.primary.copy(alpha = a),
+        scheme.primaryContainer.copy(alpha = a * 0.9f),
+        scheme.tertiary.copy(alpha = a),
+        scheme.secondaryContainer.copy(alpha = a * 0.9f),
+        scheme.secondary.copy(alpha = a),
+    )
+    // A diagonal (top-left -> bottom-right) sweep reads livelier than a flat horizontal one and
+    // lets the two accent ends sit in opposite corners.
+    return Brush.linearGradient(
+        colors,
+        start = androidx.compose.ui.geometry.Offset.Zero,
+        end = androidx.compose.ui.geometry.Offset.Infinite,
+    )
 }
 
 /** The Coil model for a stored car photo: a [java.io.File] for a locally-cropped

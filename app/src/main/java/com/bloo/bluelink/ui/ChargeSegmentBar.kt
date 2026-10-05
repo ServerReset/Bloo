@@ -38,7 +38,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.composed
 
 /**
@@ -120,15 +119,16 @@ internal fun ChargeSegmentBar(
     // whatever the backdrop behind the segment actually is (the hero photo
     // scrim, a pebble card, the cover tile) because it inherits the reader's
     // own text colour rather than guessing a colour itself.
-    // Which tone the trailing zone is, decided HERE from the actual colour on top of the
-    // backdrop: LocalContentColor is what every surrounding element already resolved for
-    // whatever is behind the bar (heroOnPhoto -- white in light mode, near-black in dark
-    // mode -- over the hero photo, onSurface on a flat card), so a luminance test on it
-    // inverts the trailing zone the right way for ANY backdrop without the caller having to
-    // describe it. The old `darkBackdrop` override forced one answer for every theme state
-    // and had to be kept in sync by each call site with the theme-inverted scrim; reading
-    // the colour cannot drift from the colour it is reading.
-    val heavyScrim = LocalContentColor.current.luminance() < 0.5f
+    // The trailing (dimmed) segments FLIP between collapsed and expanded, on top of the
+    // theme's own inversion. In LIGHT mode the expanded card is a LIGHT surface while the
+    // collapsed card is the dark photo scrim; in DARK mode it is the reverse. A single fixed
+    // tone therefore matched one state and washed out in the other. Flipping on [collapsed]
+    // guarantees the dim segments are always the OPPOSITE tone of the card behind the bar.
+    //
+    // The theme already inverts the hero card (light mode = darker hero, dark mode = lighter
+    // hero), so the base is the theme's dark-mode flag; `collapsed` toggles it once more.
+    val darkCardBehind = appIsDarkTheme() == collapsed
+    val heavyScrim = darkCardBehind
     val farBackdropColor = if (heavyScrim) Color.White.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.24f)
     val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else scheme.onSurface.copy(alpha = 0.14f)
     // Sprung, not a plain `if`: this used to pick the two-item colour list outright,
