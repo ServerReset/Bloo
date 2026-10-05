@@ -180,7 +180,7 @@ data class UiState(
     val imageUrls: Map<String, String> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
     /** The COMPACT form of [placeNames] -- street + ZIP instead of street + city -- for the
-     *  cover screen's own space-constrained surfaces, where the long form (especially with a
+     *  glance surfaces' space-constrained layouts, where the long form (especially with a
      *  car-name suffix appended beside it) reliably wrapped onto two lines. See
      *  GeocodedPlace's own doc. In-memory only (not written to statusCache alongside
      *  placeNames): a cold start showing the long form until the next locate, rather than the
@@ -226,8 +226,7 @@ data class UiState(
     /** In-flight AI work: VINs being summarized, plus "search" for the query box. */
     val aiBusy: Set<String> = emptySet(),
     val aiSearchReply: String? = null,
-    /** Whether the garage's collapsed pager (or the compact cover screen's own
-     *  pager) is currently settled on its Settings slot -- Settings is always
+    /** Whether the garage's collapsed pager is currently settled on its Settings slot -- Settings is always
      *  the last page (right after the last car, or the one page there is when
      *  there are none), so this is simply "the pager is on that page". Kept in
      *  sync by those pagers' own settle effects; it's the ONLY "are we looking

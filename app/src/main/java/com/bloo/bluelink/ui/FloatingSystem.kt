@@ -59,7 +59,7 @@ value class FloatingId(val name: String)
  *  currently negotiate with each other. */
 object FloatingIds {
     /**
-     * The search bubble/bar. The one floater a PERSON positions: on a cover screen it can be
+     * The search bubble/bar. The one floater a PERSON positions: it can be
      * dragged and parked anywhere along an edge, and where the device reports a camera island it
      * docks into that band instead. Registering it publishes wherever it ended up, so the rest of
      * the chrome can avoid it -- which is the whole point of it being in here, and is why nothing
@@ -175,7 +175,7 @@ class FloatingRegistry {
          *
          * Naming them matters because "collides with anything registered" quietly grants every
          * new floater the power to hide an existing one. The search bubble is the sharp case:
-         * on a cover screen a person can drag it and park it anywhere along an edge, so parking
+         * a person can drag it and park it anywhere along an edge, so parking
          * it at the top permanently faded another floater, with nothing on screen to connect the
          * cause to the effect. Dodging is for chrome that arrives over you on its own --
          * not for something the user deliberately put there.
