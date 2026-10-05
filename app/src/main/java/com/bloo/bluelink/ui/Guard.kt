@@ -92,13 +92,15 @@ private const val LOCK_BLUR_DP = 22f
 
 @Composable
 internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel, opaqueBackdrop: Boolean = false) {
-    val lockAlpha by animateFloatAsState(
+    val lockAlpha = animateFloatAsState(
         targetValue = if (locked) 1f else 0f,
         animationSpec = tween(durationMillis = 450),
         label = "lockAlpha",
     )
-    if (lockAlpha > 0.01f) {
-        Box(Modifier.fillMaxSize().alpha(lockAlpha)) {
+    // Composition only sees the on/off threshold; the per-frame fade is read in the layer block.
+    val visible by remember { androidx.compose.runtime.derivedStateOf { lockAlpha.value > 0.01f } }
+    if (visible) {
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = lockAlpha.value }) {
             LockOverlay(vm, opaqueBackdrop)
         }
     }
