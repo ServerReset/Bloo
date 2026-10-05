@@ -12,16 +12,7 @@ import kotlinx.coroutines.flow.update
 
 // --- Sign-in: brand logins, one-time-code steps, add-account (extracted from AppViewModel) --
 
-/**
- * Sign in (or add another account). Multiple brands can be active at once.
- * Validates the fields locally first (PIN is skipped for brands that use a
- * one-time-code login instead of a PIN), then branches: Kia always goes
- * through [loginKia]'s two-step OTP dance, everything else does a normal
- * synchronous BlueLinkRepository login wrapped in [launchBusy] (so the
- * "loading" spinner shows and any thrown exception becomes a snackbar).
- * On success the credentials are persisted (so next cold start auto-logs-in)
- * and the garage is (re)loaded to pull in the newly-added account's cars.
- */
+/** Sign in (or add another account). Multiple brands can be active at once. */
 fun AppViewModel.login(username: String, password: String, pin: String, brand: Brand) {
     if (username.isBlank() || password.isBlank() || (pin.isBlank() && brand.pinRequiredToSignIn)) {
         _state.update {
@@ -54,10 +45,9 @@ fun AppViewModel.login(username: String, password: String, pin: String, brand: B
 }
 
 /**
- * Europe (Hyundai Bluelink EU) sign-in. Single-step like the Hyundai/Genesis
- * US branch — no OTP — just against [EuRepository] instead of
- * [BlueLinkRepository]; same post-login bookkeeping (persist credentials,
- * reload the garage).
+ * Europe (Hyundai Bluelink EU) sign-in. Single-step like the Hyundai/Genesis US branch — no OTP —
+ * just against [EuRepository] instead of [BlueLinkRepository]; same post-login bookkeeping (persist
+ * credentials, reload the garage).
  */
 private fun AppViewModel.loginEurope(username: String, password: String, pin: String, brand: Brand) {
     launchBusy {
@@ -69,14 +59,7 @@ private fun AppViewModel.loginEurope(username: String, password: String, pin: St
     }
 }
 
-/**
- * Step 1 of Kia login: attempt sign-in with just username/password/PIN. Kia's
- * API either logs straight in ([KiaAuth.LoggedIn]) or demands a one-time code
- * ([KiaAuth.OtpRequired]) — which branch happens depends on the account and
- * isn't knowable ahead of time. On the OTP branch the credentials are stashed
- * in [kiaPending] (NOT yet persisted to [credentialStore]) and the UI is told
- * to show the OTP challenge; [kiaSendOtp]/[kiaVerifyOtp] complete the flow.
- */
+/** Step 1 of Kia login: attempt sign-in with just username/password/PIN. */
 private fun AppViewModel.loginKia(username: String, password: String, pin: String) {
     launchBusy {
         when (val auth = kiaRepo().startLogin(username, password, pin)) {
@@ -119,17 +102,11 @@ fun AppViewModel.kiaVerifyOtp(code: String) {
     }
 }
 
-/** Back out of the Kia OTP challenge screen: drops the stashed
- *  credentials (they were never persisted) and clears the challenge UI. */
 fun AppViewModel.kiaCancelOtp() {
     kiaPending = null
     _state.update { it.copy(kiaOtp = null) }
 }
 
-/** Finish a fully-authenticated Kia login (reached from either the direct
- *  [KiaAuth.LoggedIn] branch or after [kiaVerifyOtp] succeeds): persist the
- *  credentials now that they're verified, refresh the account list, close
- *  the login form, and load the garage. */
 private suspend fun AppViewModel.finishKiaLogin(creds: Credentials) {
     credentialStore.save(creds)
     AppLog.log("Signed in as ${maskEmail(creds.email)} (Kia)")
@@ -137,14 +114,7 @@ private suspend fun AppViewModel.finishKiaLogin(creds: Credentials) {
     loadGarageInternal()
 }
 
-/**
- * Step 1 of Canada login: attempt sign-in with username/password. Returns
- * straight in ([CanadaAuth.LoggedIn]) if this device is still within a
- * prior login's 90-day remembered-device grant, otherwise an email code
- * challenge ([CanadaAuth.OtpRequired]) -- which is sent immediately (no
- * destination to pick, unlike Kia), so the UI goes straight to a
- * code-entry dialog; [canadaVerifyOtp] completes the flow.
- */
+/** Step 1 of Canada login: attempt sign-in with username/password. */
 private fun AppViewModel.loginCanada(username: String, password: String, pin: String, brand: Brand) {
     launchBusy {
         when (val auth = canadaRepo(brand).startLogin(username, password, pin)) {
@@ -178,16 +148,15 @@ fun AppViewModel.canadaVerifyOtp(code: String) {
     }
 }
 
-/** Back out of the Canada OTP challenge screen: drops the stashed
- *  credentials (they were never persisted) and clears the challenge UI. */
 fun AppViewModel.canadaCancelOtp() {
     canadaPending = null
     _state.update { it.copy(canadaOtp = null) }
 }
 
-/** Finish a fully-authenticated Canada login (reached from either the
- *  direct [CanadaAuth.LoggedIn] branch or after [canadaVerifyOtp]
- *  succeeds) -- same shape as [finishKiaLogin]. */
+/**
+ * Finish a fully-authenticated Canada login (reached from either the direct [CanadaAuth.LoggedIn]
+ * branch or after [canadaVerifyOtp] succeeds) -- same shape as [finishKiaLogin].
+ */
 private suspend fun AppViewModel.finishCanadaLogin(creds: Credentials) {
     credentialStore.save(creds)
     AppLog.log("Signed in as ${maskEmail(creds.email)} (${creds.brand.label})")
@@ -195,13 +164,15 @@ private suspend fun AppViewModel.finishCanadaLogin(creds: Credentials) {
     loadGarageInternal()
 }
 
-/** Show the login form again on top of an already-loaded garage, so the
- *  user can sign into a second (or third) brand without losing the first. */
+/**
+ * Show the login form again on top of an already-loaded garage, so the user can sign into a second
+ * (or third) brand without losing the first.
+ */
 fun AppViewModel.beginAddAccount() = _state.update { it.copy(addingAccount = true) }
 
 fun AppViewModel.cancelAddAccount() = _state.update { s ->
-    // If the user arrived here by backing out of the biometric prompt, "Cancel"
-    // must re-lock the app — not silently return them to the already-loaded garage.
+    // If the user arrived here by backing out of the biometric prompt, "Cancel" must re-lock the
+    // app — not silently return them to the already-loaded garage.
     if (s.lockedToLogin) s.copy(addingAccount = false, locked = true, lockedToLogin = false)
     else s.copy(addingAccount = false)
 }

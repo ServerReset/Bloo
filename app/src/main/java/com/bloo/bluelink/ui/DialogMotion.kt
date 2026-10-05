@@ -39,15 +39,18 @@ import dev.chrisbanes.haze.HazeState
 
 /**
  * How a dialog rises from below the screen: bouncy, so it overshoots its resting place a little and
- * settles. The card's travel, its fade-in and its scale all ride the same progress value
- * (1 = resting, 0 = fully off the bottom).
+ * settles. The card's travel, its fade-in and its scale all ride the same progress value (1 =
+ * resting, 0 = fully off the bottom).
  */
 internal val DialogEnterSpec = spring<Float>(dampingRatio = 0.6f, stiffness = 260f)
 
 /** How dark the page behind a dialog gets once the dialog is fully up. */
 internal const val DialogScrimAlpha = 0.42f
 
-/** One open dialog. Its content is handed up by [GlassAlertDialog] on every recomposition, so it stays live. */
+/**
+ * One open dialog. Its content is handed up by [GlassAlertDialog] on every recomposition, so it
+ * stays live.
+ */
 @Stable
 internal class DialogEntry {
     var content by mutableStateOf<@Composable () -> Unit>({})
@@ -59,9 +62,7 @@ internal class DialogEntry {
 
 /**
  * Where every dialog in the app is drawn: one layer inside the app's own window, above everything,
- * rather than a separate platform window per dialog. That is what lets the card be real glass -- it
- * blurs the actual app behind it through [hazeState] -- and lets the exit play on the dialog itself
- * instead of a recording of it.
+ * rather than a separate platform window per dialog.
  */
 @Stable
 internal class DialogHost(val hazeState: HazeState) {
@@ -122,8 +123,8 @@ private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean
             GlassSurface(
                 shape = ExtraLargeShape,
                 hazeState = host.hazeState,
-                // Frosted rather than clear: enough of the theme's surface over the blur that the text
-                // reads whatever is behind. Denser where the blur is unavailable.
+                // Frosted rather than clear: enough of the theme's surface over the blur that the
+                // text reads whatever is behind. Denser where the blur is unavailable.
                 tint = scheme.surfaceContainerHigh.copy(alpha = if (canBlurBackdrops()) 0.58f else 0.97f),
                 modifier = Modifier
                     .padding(horizontal = 24.dp)

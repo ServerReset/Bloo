@@ -44,11 +44,10 @@ internal fun sectionLabel(section: String): String = when (section) {
     else -> section.replaceFirstChar { it.uppercase() }
 }
 
-/** The reorderable pebble stack for a car.
- *
- * [pinHotspot] true (wide/dual-column [ExpandedCar]) excludes "controls" and any secondary pin,
- * which the caller renders via [HotspotSlot]. The single-column layout passes false so they
- * flow through this list in their [DEFAULT_SECTIONS] position. */
+/**
+ * The reorderable pebble stack for a car. [pinHotspot] true (wide/dual-column [ExpandedCar])
+ * excludes "controls" and any secondary pin, which the caller renders via [HotspotSlot].
+ */
 @Composable
 internal fun PebbleList(
     v: Vehicle,
@@ -60,14 +59,15 @@ internal fun PebbleList(
     onExpand: (() -> Unit)? = null,
 ) {
     // One derived computation, not `state.value` read in this body: that would subscribe the whole
-    // stack to every UiState emission. As derived state it only invalidates when the resulting
-    // LIST differs. The car's own section order is derived separately for the reorder handler.
+    // stack to every UiState emission. As derived state it only invalidates when the resulting LIST
+    // differs.
     val allSections by remember(v.vin) { derivedStateOf { state.value.sectionsFor(v) } }
     val sections by remember(v.vin, exclude, pinHotspot) {
         derivedStateOf {
             val sel = state.value
             val hasBattery = sel.hasBattery(v)
-            // Exclude hotspot-pinned pebbles, but only when the caller renders them separately ([pinHotspot]).
+            // Exclude hotspot-pinned pebbles, but only when the caller renders them separately
+            // ([pinHotspot]).
             val pinnedPebbles = if (pinHotspot) sel.hotspotFor(v.vin) else emptyList()
             val allExclude = exclude + pinnedPebbles
             allSections.filter {
@@ -77,13 +77,7 @@ internal fun PebbleList(
     }
     val hotDrag = LocalHotSeatDrag.current
     // PERF: composing all pebbles eagerly on the fling-settle frame is the biggest car-swipe cost.
-    // Compose the hero + first EAGER_PEBBLES sections now (above the fold), stub the rest with a
-    // collapsed-height placeholder, and fill them one per frame so several cars sharing a page
-    // (foldables) don't all fill in the same frame. Keyed on VIN so a recomposed page re-defers cheaply.
-    // `items` stays the FULL list so ReorderColumn's per-item machinery exists from frame one;
-    // only the body inside the content lambda is deferred.
-    // Snapshot SET of filled non-eager sections, read through a per-section derived boolean:
-    // a shared counter would invalidate and recompose every pebble on each tick.
+    // Keyed on VIN so a recomposed page re-defers cheaply.
     val filledSections = remember(v.vin) { mutableStateSetOf<String>() }
     LaunchedEffect(v.vin, sections.size) {
         // One per frame, in list order, first-below-the-fold first.
@@ -97,7 +91,8 @@ internal fun PebbleList(
         items = sections,
         keyOf = { it },
         onReorder = { newVisible ->
-            // Merge reordered visible items back into the full order so excluded ones keep their slots.
+            // Merge reordered visible items back into the full order so excluded ones keep their
+            // slots.
             val visibleSet = sections.toSet()
             val full = (allSections + com.bloo.bluelink.data.DEFAULT_SECTIONS).distinct()
             val queue = ArrayDeque(newVisible)
@@ -127,37 +122,33 @@ internal fun PebbleList(
         if (ready) {
             SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
         } else {
-            // Off-screen placeholder: reserves ~collapsed pebble height (no list jump) and carries the drag
-            // handle so ReorderColumn's item is fully formed. heightIn(min), not fixed: a header at large
-            // accessibility font is taller than ControlHeight and a hard 76dp clipped it.
             Box(Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).then(itemDragHandle))
         }
     }
 }
 
-/** How many pebbles from the top (incl. the hero summary) compose eagerly; the rest fill in
- *  later, off the swipe. 3 covers everything above the fold on a phone. */
+/**
+ * How many pebbles from the top (incl. the hero summary) compose eagerly; the rest fill in later,
+ * off the swipe. 3 covers everything above the fold on a phone.
+ */
 internal const val EAGER_PEBBLES = 3
 
+/** Renders one pebble by section name (used by the list and the hot spot). */
 /**
- * Renders one pebble by section name (used by the list and the hot spot).
- *
- * Pebbles take the WHOLE [UiState], whose equality fails on ANY field change, so each branch
- * hands its pebble a [KeyedSlice]/[stateSlice] keyed on exactly the fields it reads (including
- * what helpers like `statusFor`/`isPending` read). A missed key is a stale-UI bug.
+ * A UiState slice whose identity is the fields the row reads. Slices with equal [key] compare
+ * equal, so Compose skips a pebble when none of its fields moved.
  */
-/** A UiState slice whose identity is the fields the row reads. Slices with equal [key] compare
- *  equal, so Compose skips a pebble when none of its fields moved. */
 internal class KeyedSlice(val state: UiState, private val key: Any?) {
     override fun equals(other: Any?): Boolean = other is KeyedSlice && key == other.key
     override fun hashCode(): Int = key?.hashCode() ?: 0
 }
 
-/** Memoized slice of [state] keyed on exactly what the row reads (see [KeyedSlice]).
- *
- *  [keys] builds the key from the passed [UiState] so the read happens here, not in the caller's
- *  scope (which would subscribe it to every emission). [contextKey] covers anything else the
- *  lambda closes over (the car). */
+/**
+ * Memoized slice of [state] keyed on exactly what the row reads (see [KeyedSlice]). [keys] builds
+ * the key from the passed [UiState] so the read happens here, not in the caller's scope (which
+ * would subscribe it to every emission). [contextKey] covers anything else the lambda closes over
+ * (the car).
+ */
 @Composable
 internal fun stateSlice(state: State<UiState>, contextKey: Any?, keys: (UiState) -> Any?): UiState {
     val slice by remember(state, contextKey) {
@@ -171,8 +162,8 @@ internal fun stateSlice(state: State<UiState>, contextKey: Any?, keys: (UiState)
 
 @Composable
 internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm: AppViewModel, modifier: Modifier, onExpand: (() -> Unit)? = null) {
-    // Narrow derived read of this car's status; `state.value` here would subscribe every pebble
-    // to every UiState emission.
+    // Narrow derived read of this car's status; `state.value` here would subscribe every pebble to
+    // every UiState emission.
     val status by remember(v.vin) { derivedStateOf { state.value.statuses[v.vin] } }
     val metric = LocalAppearance.current.metricDistance
     when (section) {

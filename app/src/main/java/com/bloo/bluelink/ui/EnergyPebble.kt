@@ -28,7 +28,6 @@ import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.isPluggedOrCharging
 import kotlinx.coroutines.flow.first
 
-
 /**
  * Charge pebble: collapsed shows the charge start/stop control; expand to set the charge limits.
  */
@@ -45,24 +44,22 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
         else -> "Not plugged in"
     }
 
-    // Separate AC (level-2) and DC (fast) limit targets, seeded from the shared DEFAULT_*_CHARGE_LIMIT_PCT
-    // until the car's real targets load. "Set" sends both values as a pair, so a wrong seed would push a
-    // value the user never chose.
+    // Separate AC (level-2) and DC (fast) limit targets, seeded from the shared
+    // DEFAULT_*_CHARGE_LIMIT_PCT until the car's real targets load. "Set" sends both values as a
+    // pair, so a wrong seed would push a value the user never chose.
     var acLimit by remember(v.vin) { mutableIntStateOf(DEFAULT_AC_CHARGE_LIMIT_PCT) }
     var dcLimit by remember(v.vin) { mutableIntStateOf(DEFAULT_DC_CHARGE_LIMIT_PCT) }
-    // Seeded independently, one latch each, so a car that reports AC before DC still picks up the DC target.
-    // Canada never reports reservChargeInfos, so its pills are hidden (see Brand.supportsChargeLimits).
+    // Seeded independently, one latch each, so a car that reports AC before DC still picks up the
+    // DC target. Canada never reports reservChargeInfos, so its pills are hidden (see
+    // Brand.supportsChargeLimits).
     var acSeeded by remember(v.vin) { mutableStateOf(false) }
     var dcSeeded by remember(v.vin) { mutableStateOf(false) }
-    // Keyed on the reported numbers, not the VIN: status usually arrives after first composition. These
-    // restart only when a reported target changes value, then the latches no-op.
     val acReported = ev?.reservChargeInfos?.level(1)
     val dcReported = ev?.reservChargeInfos?.level(0)
     LaunchedEffect(v.vin, acReported, dcReported) {
         if (!acSeeded) acReported?.let { acLimit = it; acSeeded = true }
         if (!dcSeeded) dcReported?.let { dcLimit = it; dcSeeded = true }
     }
-    // Collapsing discards limits that were dragged but never applied, so reopening shows the car's real targets.
     val expanded = LocalForceExpanded.current || state.isPebbleExpanded(v.vin, "charge")
     LaunchedEffect(expanded) {
         if (!expanded) {
@@ -85,7 +82,8 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
             activeContent = Color.White,
         ),
     ) {
-        // ChargeFuelBar only renders in a forced-open context for brands that cannot report limits (Canada).
+        // ChargeFuelBar only renders in a forced-open context for brands that cannot report limits
+        // (Canada).
         if (LocalForceExpanded.current && !v.brand.supportsChargeLimits) {
             ChargeFuelBar(
                 status,
@@ -99,7 +97,8 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
         PopVisible(visible = plugged) {
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
         }
-        // Only for brands that report the targets; elsewhere "Set" would push a value the user never chose.
+        // Only for brands that report the targets; elsewhere "Set" would push a value the user
+        // never chose.
         if (v.brand.supportsChargeLimits) {
             ChargeLimitPill(
                 label = "AC (home) limit",
@@ -124,8 +123,8 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
 }
 
 /**
- * The energy pebble for a gas/hybrid car: fuel level + range, no charge UI. Uses the "charge" slot so
- * order/collapse state carry over.
+ * The energy pebble for a gas/hybrid car: fuel level + range, no charge UI. Uses the "charge" slot
+ * so order/collapse state carry over.
  */
 @Composable
 internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, modifier: Modifier) {
@@ -157,10 +156,8 @@ internal fun chargerLabel(plugin: Int?): String? = com.bloo.bluelink.data.charge
 internal fun fmtMinutes(min: Int) = com.bloo.bluelink.data.fmtMinutes(min)
 
 /**
- * A climate setpoint in the user's chosen unit; non-numeric values pass through with a bare degree sign.
- *
- * [sourceUnit] is the API's unit code (0 Celsius, 1 Fahrenheit). Forward it: this wrapper shadows the
- * shared function for every call site in this file.
+ * A climate setpoint in the user's chosen unit; non-numeric values pass through with a bare degree
+ * sign. [sourceUnit] is the API's unit code (0 Celsius, 1 Fahrenheit).
  */
 internal fun degLabel(valueF: String, fahrenheit: Boolean, sourceUnit: Int? = null): String =
     com.bloo.bluelink.data.degLabel(valueF, fahrenheit, sourceUnit)

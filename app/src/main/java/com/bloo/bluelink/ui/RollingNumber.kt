@@ -8,15 +8,10 @@ import androidx.compose.ui.text.font.FontWeight
 import com.bloo.uicommon.AnimatedValue
 
 /**
- * The big-headline alias of [com.bloo.uicommon.AnimatedValue], the app's one
- * rolling component: compact values roll digit runs vertically, directionally
- * (up when the number grew, down when it shrank) between static text that
- * crossfades; long or wrapping values fall back to a whole-string slide.
- *
- * Kept as its own name because the headline call sites ("84%", the charge
- * readouts, the build number) read as a different role from a status value and
- * want to grep separately -- but the behaviour is the SHARED one, so headline
- * and status values roll in the same language by construction.
+ * The big-headline alias of [com.bloo.uicommon.AnimatedValue], the app's one rolling component:
+ * compact values roll digit runs vertically, directionally (up when the number grew, down when it
+ * shrank) between static text that crossfades; long or wrapping values fall back to a whole-string
+ * slide.
  */
 @Composable
 internal fun RollingNumber(

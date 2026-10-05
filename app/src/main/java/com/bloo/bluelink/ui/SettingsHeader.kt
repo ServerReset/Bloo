@@ -1,6 +1,9 @@
 package com.bloo.bluelink.ui
 
-/** Settings' screen-header cluster: the mode-stagger helpers, the StatusHeaderRow badge and the SettingsHeaderRow title row. */
+/**
+ * Settings' screen-header cluster: the mode-stagger helpers, the StatusHeaderRow badge and the
+ * SettingsHeaderRow title row.
+ */
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedContent
@@ -52,24 +55,20 @@ import com.bloo.bluelink.data.collapsedSections
 import com.bloo.bluelink.data.setSeamlessInstallShizuku
 
 /**
- * Delays an advanced-only card's entrance by `index * STAGGER_STEP_MS` once [advanced] flips
- * true, so Advanced mode cascades card by card instead of every card overshooting on one frame.
- *
- * The flip back to Simple is immediate: staggering a hide leaves items visible and idle, then
- * vanishing abruptly, which reads as broken.
+ * Delays an advanced-only card's entrance by `index * STAGGER_STEP_MS` once [advanced] flips true,
+ * so Advanced mode cascades card by card instead of every card overshooting on one frame.
  */
 internal const val STAGGER_STEP_MS = 45L
 
-/** How many advanced-only cards Settings staggers in as whole grid items. Nested advanced blocks
- *  drive themselves through [staggeredAdvancedVisible] with their own index and are not counted. */
+/**
+ * How many advanced-only cards Settings staggers in as whole grid items. Nested advanced blocks
+ * drive themselves through [staggeredAdvancedVisible] with their own index and are not counted.
+ */
 internal const val ADVANCED_CARD_COUNT = 2
 
 /**
  * The same staggered reveal as [staggeredAdvancedVisible] for ALL advanced cards, hoisted out of
  * the lazy list's item content into the screen's composition.
- *
- * Returned as a plain list so the screen can skip emitting an item entirely; a hidden item
- * would still hold a slot and its list spacing open (a phantom gap).
  */
 @Composable
 internal fun rememberAdvancedVisibility(advanced: Boolean, count: Int): List<Boolean> {
@@ -87,12 +86,8 @@ internal fun rememberAdvancedVisibility(advanced: Boolean, count: Int): List<Boo
 }
 
 /**
- * Drives one advanced-only grid item's [AnimatedVisibility] and decides whether the caller's
- * `if (...) item { ... }` still emits that item.
- *
- * The returned transition is the [AnimatedVisibility]'s `visibleState`, so enter/exit play in both
- * directions. `transition.targetState || !transition.isIdle` keeps the item mounted until an
- * exit finishes; a plain boolean gate would tear it out on the next frame with no collapse.
+ * Drives one advanced-only grid item's [AnimatedVisibility] and decides whether the caller's `if
+ * (...) item { ... }` still emits that item.
  */
 @Composable
 internal fun rememberGridItemVisibility(visible: Boolean): MutableTransitionState<Boolean> {
@@ -103,12 +98,7 @@ internal fun rememberGridItemVisibility(visible: Boolean): MutableTransitionStat
     return transition
 }
 
-/**
- * An [AnimatedVisibility] state that starts hidden and animates in on first composition.
- *
- * For anything only composed once it should be visible (see [rememberAdvancedVisibility]), where
- * a plain `visible =` boolean has no false-to-true flip to animate.
- */
+/** An [AnimatedVisibility] state that starts hidden and animates in on first composition. */
 @Composable
 internal fun rememberAppearedState(): MutableTransitionState<Boolean> =
     remember { MutableTransitionState(false) }.apply { targetState = true }
@@ -128,10 +118,9 @@ internal fun staggeredAdvancedVisible(advanced: Boolean, index: Int): Boolean {
 }
 
 /**
- * The tonal icon badge, bold title and colour-coded status line at the top of several
- * SettingsCard bodies, giving an at-a-glance read of the card's state.
- *
- * [icon], [tint] and [status] animate on change, matching PebbleShell's header summary.
+ * The tonal icon badge, bold title and colour-coded status line at the top of several SettingsCard
+ * bodies, giving an at-a-glance read of the card's state. [icon], [tint] and [status] animate on
+ * change, matching PebbleShell's header summary.
  */
 @Composable
 internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, status: String) {
@@ -160,12 +149,8 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
 }
 
 /**
- * Settings' page-top hero card: the app's identity (name, version/build, update status) in the
- * same hero language as the garage's photo hero.
- *
- * Also the one home for updates. Collapsed it shows identity, car count, update chip and the big
- * build number; expanded (persisted via [AppViewModel.togglePebble] under the "Updates" key) it
- * reveals the Check/GitHub row, the Shizuku toggle and, when available, the download/install flow.
+ * Settings' page-top hero card: the app's identity (name, version/build, update status) in the same
+ * hero language as the garage's photo hero. Also the one home for updates.
  */
 @Composable
 internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
@@ -218,7 +203,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
             // the hero stat like a car's charge % or range, with the full label as caption.
             val headline = state.updateAvailable?.takeIf { !state.updateTileDismissed }
             if (headline != null) {
-                // Update waiting: the version jump IS the headline (2463 to 2464), not a second line below it.
+                // Update waiting: the version jump IS the headline (2463 to 2464), not a second
+                // line below it.
                 UpdateDeltaHero(vm.currentBuildNumber, headline.run.runNumber)
             } else Row(verticalAlignment = Alignment.Bottom) {
                 RollingNumber(
@@ -236,8 +222,9 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
             ) {
                 Column {
                     Spacer(Modifier.height(GapGroup))
-                    // Both update sources share one row: the in-app checker (primary) and the GitHub
-                    // Releases page (works when the checker says up-to-date or GitHub's API is flaky).
+                    // Both update sources share one row: the in-app checker (primary) and the
+                    // GitHub Releases page (works when the checker says up-to-date or GitHub's API
+                    // is flaky).
                     ActionRow {
                         SafeMorphTextButton(
                             "Check",
@@ -256,15 +243,16 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                             },
                         )
                     }
-                    // The Shizuku row is gated on Shizuku being present; the card and update controls are not.
+                    // The Shizuku row is gated on Shizuku being present; the card and update
+                    // controls are not.
                     if (state.shizukuAvailable) {
                         Spacer(Modifier.height(GapHairline))
                         ToggleRow("Install seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
                             vm.setSeamlessInstallShizuku(it)
                         }
                     }
-                    // The full download-install flow, driven by the same state machine as the update
-                    // pebble and rendered through the shared UpdateStatusLine.
+                    // The full download-install flow, driven by the same state machine as the
+                    // update pebble and rendered through the shared UpdateStatusLine.
                     val updateInfo = state.updateAvailable
                     PopVisible(visible = updateInfo != null && !state.updateTileDismissed, sizeAnimated = true) {
                         if (updateInfo != null) {
@@ -275,7 +263,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                 "${com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber)} → $newLabel"
                             } else newLabel
                             Spacer(Modifier.height(GapGroup))
-                            // One tinted panel, no second outline: the version jump is already the big number above.
+                            // One tinted panel, no second outline: the version jump is already the
+                            // big number above.
                             Column(
                                 Modifier
                                     .fillMaxWidth()
@@ -292,7 +281,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                 )
                                 // The status line carries the download's own progress bar.
                                 UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = false)
-                                // Both actions full width, stacked: side by side the download button collapsed to an icon.
+                                // Both actions full width, stacked: side by side the download
+                                // button collapsed to an icon.
                                 MorphButton(
                                     onClick = { runUpdateAction(state, vm, updateInfo, context) },
                                     modifier = Modifier.fillMaxWidth(),
@@ -304,7 +294,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                 ) {
                                     MorphButtonLabel(act.icon, act.label, pending = false)
                                 }
-                                // Shared dismissal row, giving the same undo window as the app tile.
+                                // Shared dismissal row, giving the same undo window as the app
+                                // tile.
                                 UpdateDismissRow(state, vm)
                                 UpdateReleaseNotes(updateInfo, collapsedLines = 3)
                             }

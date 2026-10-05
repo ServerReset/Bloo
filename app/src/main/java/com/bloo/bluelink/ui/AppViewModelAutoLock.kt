@@ -18,12 +18,8 @@ suspend fun AppViewModel.autoLockConfig(vin: String): com.bloo.bluelink.autolock
 fun AppViewModel.setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolock.AutoLockConfig) {
     viewModelScope.launch {
         settingsStore.setAutoLockConfig(vin, config)
-        // Turning AutoLock OFF must also CANCEL an evaluation already in flight for this car.
-        // Without this, an evaluation that had already passed its walk-away confirmation and
-        // was counting down its grace period kept running -- and locked the car -- after the
-        // user had switched AutoLock off, which is exactly the "no matter how I toggle it, the
-        // car continues to autolock" report. The config read at the START of an evaluation
-        // only guards NEW ones.
+        // Turning AutoLock OFF must also CANCEL an evaluation already in flight for this car. The
+        // config read at the START of an evaluation only guards NEW ones.
         if (!config.enabled) {
             runCatching { com.bloo.bluelink.autolock.AutoLockController.cancel(getApplication(), vin) }
         }
@@ -49,10 +45,7 @@ fun AppViewModel.setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolo
     }
 }
 
-/** Re-attaches the low-power Bluetooth watcher when the app returns to the foreground.
- *  This repairs installs upgraded from a build that had AutoLock enabled before the
- *  watcher was introduced: their persisted config is already ON, so they never visit the
- *  setting toggle again and would otherwise remain unwatched until the next reboot. */
+/** Re-attaches the low-power Bluetooth watcher when the app returns to the foreground. */
 fun AppViewModel.ensureAutoLockWatcher() {
     viewModelScope.launch {
         val entry = settingsStore.allAutoLockConfigs().entries.firstOrNull { it.value.enabled }
@@ -71,21 +64,17 @@ fun AppViewModel.ensureAutoLockWatcher() {
     }
 }
 
-/** Bonded (paired) Bluetooth devices, for the "which one is your car" picker. Empty
- *  without BLUETOOTH_CONNECT granted -- the Settings section prompts for it first. */
+/**
+ * Bonded (paired) Bluetooth devices, for the "which one is your car" picker. Empty without
+ * BLUETOOTH_CONNECT granted -- the Settings section prompts for it first.
+ */
 fun AppViewModel.pairedBluetoothDevices(): List<com.bloo.bluelink.autolock.PairedDevice> =
     com.bloo.bluelink.autolock.BluetoothDevices.bondedDevices(getApplication())
 
-/** "Simulate leaving" test button: runs the exact same evaluation a real Bluetooth
- *  disconnect would, without needing to actually drive off and walk away.
- *
- *  It must go through [AutoLockTrigger.onCarDisconnected] (or call the controller itself),
- *  NOT just [AutoLockService.start]: the service is only the progress-notification wrapper,
- *  and it deliberately does not start an evaluation (see its own "No onTriggerFired here any
- *  more" note). This used to call only `.start(...)`, so the Test button showed a brief
- *  "Confirming" notification and then nothing -- the evaluation had never been started, which
- *  is exactly the "AutoLock never fires" it was reported as. The trigger starts the evaluation
- *  AND the service, which is what a real disconnect does. */
+/**
+ * "Simulate leaving" test button: runs the exact same evaluation a real Bluetooth disconnect would,
+ * without needing to actually drive off and walk away.
+ */
 fun AppViewModel.simulateAutoLockLeaving(v: Vehicle) {
     viewModelScope.launch {
         val config = settingsStore.autoLockConfig(v.vin)

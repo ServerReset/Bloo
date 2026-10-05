@@ -44,9 +44,9 @@ private fun healthOf(lastSeenMs: Long, isSelf: Boolean, now: Long): DeviceHealth
 }
 
 /**
- * One phone in the drag-to-reorder devices list, in an outlined box of its own: drag handle, a
- * star for the primary, the name with "This device" / "Primary" tags, a health dot with the model
- * and last-seen line, and rename (this device) or tap-twice remove (any other).
+ * One phone in the drag-to-reorder devices list, in an outlined box of its own: drag handle, a star
+ * for the primary, the name with "This device" / "Primary" tags, a health dot with the model and
+ * last-seen line, and rename (this device) or tap-twice remove (any other).
  */
 @Composable
 internal fun SyncDeviceRow(
@@ -56,7 +56,10 @@ internal fun SyncDeviceRow(
     dragging: Boolean,
     modifier: Modifier,
     onRename: () -> Unit,
-    /** Never offered for [isSelf]: removal is a courtesy prune of a stale peer, not a way to leave sync. */
+    /**
+     * Never offered for [isSelf]: removal is a courtesy prune of a stale peer, not a way to leave
+     * sync.
+     */
     onRemove: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -156,8 +159,10 @@ internal fun DeviceTag(text: String, color: Color) {
     )
 }
 
-
-/** The close button on a synced-device row: tap once to arm (it turns red), again to remove. Auto-resets. */
+/**
+ * The close button on a synced-device row: tap once to arm (it turns red), again to remove.
+ * Auto-resets.
+ */
 @Composable
 internal fun ConfirmRemoveButton(name: String, fallbackNoun: String, onRemove: () -> Unit) {
     val confirm = rememberConfirmArm()

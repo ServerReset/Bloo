@@ -43,16 +43,14 @@ import com.bloo.uicommon.animatePlacement
  */
 
 /**
- * Small pill-shaped fact badge ([CarHeaderRow]'s model/powertrain and "updated x ago").
- *
  * Uses the floating-pill rim/shadow treatment, with a NEUTRAL fill (plain black/white by theme)
  * rather than a theme role like `surfaceContainerHighest`: dynamic palettes tint those with the
  * seed colour, and `surfaceContainerHigh` without a rim is invisible on the dark dual-car header.
  */
 @Composable
 internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, hazeState: HazeState? = null) {
-    // GlassSurface (GlassChrome.kt): hazeState comes from the hero header's screen-level
-    // HazeState for a real backdrop blur; callers without one fall back to the plain tint.
+    // GlassSurface (GlassChrome.kt): hazeState comes from the hero header's screen-level HazeState
+    // for a real backdrop blur; callers without one fall back to the plain tint.
     GlassSurface(
         shape = CircleShape,
         modifier = modifier,
@@ -78,12 +76,8 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
 }
 
 /**
- * The tinted sibling of [MetaChip]: a pill for a LIVE status readout whose colour carries
- * meaning (AutoLock's detection state, [SettingsHeroCard]'s update-check result).
- *
- * Separate from [MetaChip], which is hue-free glass with a rim over unpredictable content;
- * this one sits on a known settings card, has no rim, and is tinted on purpose. The 0.15-alpha
- * tint fill has a matching container tone for any tint a caller passes.
+ * The tinted sibling of [MetaChip]: a pill for a LIVE status readout whose colour carries meaning
+ * (AutoLock's detection state, [SettingsHeroCard]'s update-check result).
  */
 @Composable
 internal fun StatusChip(text: String, tint: Color, modifier: Modifier = Modifier, icon: ImageVector? = null) {
@@ -91,8 +85,8 @@ internal fun StatusChip(text: String, tint: Color, modifier: Modifier = Modifier
 }
 
 /**
- * [StatusChip] with the label as a slot, for callers that animate the text itself. Style and
- * tint are applied through LocalContentColor / LocalTextStyle so they match a static chip.
+ * [StatusChip] with the label as a slot, for callers that animate the text itself. Style and tint
+ * are applied through LocalContentColor / LocalTextStyle so they match a static chip.
  */
 @Composable
 internal fun StatusChip(
@@ -122,7 +116,6 @@ internal fun StatusChip(
     }
 }
 
-
 /**
  * The "there's something new" dot on the top-end corner of update cards ([SettingsHeroCard],
  * [UpdateAvailableTile]), applied via [Modifier.updateAvailableBadge]. A plain dot, not a count.
@@ -133,15 +126,15 @@ private fun UpdateAvailableDot(modifier: Modifier = Modifier) {
         modifier
             .size(12.dp)
             .background(UpdateAvailableAmber, CircleShape)
-            // A hairline ring in the card's container tone separates the dot from whatever is behind the corner.
+            // A hairline ring in the card's container tone separates the dot from whatever is
+            // behind the corner.
             .border(2.dp, MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
     )
 }
 
 /**
  * Wraps [content] in a [Box] and overlays [UpdateAvailableDot] on its top-end corner, scaling
- * in/out as [visible] flips. The dot sits slightly outside the corner (negative offset), since
- * flush against a rounded corner it would read as clipped.
+ * in/out as [visible] flips.
  */
 @Composable
 internal fun UpdateBadgedCard(visible: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
@@ -162,23 +155,13 @@ internal fun UpdateBadgedCard(visible: Boolean, modifier: Modifier = Modifier, c
     }
 }
 
-
-/** "Updated x ago" fact as a [MetaChip]; null (renders nothing) until a first fetch lands for [v]. */
 @Composable
 internal fun LastUpdatedLabel(fetchedAt: Long?, modifier: Modifier = Modifier, hazeState: HazeState? = null) {
     val rel = rememberRelativeTime(fetchedAt) ?: return
     MetaChip("Updated $rel", modifier, icon = Icons.Filled.Refresh, hazeState = hazeState)
 }
 
-
-
-
 /**
- * A vertical list whose items reorder by long-pressing the [dragHandle] and dragging; the
- * order is committed via [onReorder] on drop. A plain Column, meant for an existing scroll container.
- *
- * `order` is local state (re-synced from [items] when not dragging). The held item (`draggingKey`)
- * is translated by `offsetY`; past half a neighbour's measured height (`heights`) the two swap
- * and `offsetY` shrinks by that height so the item stays continuous. Others use [animatePlacement].
- * [staggerInOnColdStart]/[introKey] drive a one-time entrance stagger, see [coldStartIntroPlayed].
+ * A vertical list whose items reorder by long-pressing the [dragHandle] and dragging; the order is
+ * committed via [onReorder] on drop. A plain Column, meant for an existing scroll container.
  */

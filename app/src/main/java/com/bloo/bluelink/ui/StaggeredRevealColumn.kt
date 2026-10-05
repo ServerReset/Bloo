@@ -16,7 +16,8 @@ import androidx.compose.foundation.layout.size
 // No `motionScheme` import: it is a member of MaterialTheme.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-// State<T>'s `by` delegate resolves to this file-scope operator extension, which needs the explicit import.
+// State<T>'s `by` delegate resolves to this file-scope operator extension, which needs the explicit
+// import.
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
@@ -29,19 +30,6 @@ import androidx.compose.ui.unit.dp
  * Drop-in replacement for [PebbleShell]'s body `Column`: every DIRECT CHILD gets its own
  * pop-in/pop-out as the pebble opens and closes, cascading top to bottom, with no change to
  * callers' rows.
- *
- * One animated value drives every child (read in each child's `placeWithLayer` block and
- * remapped into its own window, see [PebbleStaggerSpan]) instead of one [AnimatedVisibility]
- * per row. On the way out every row reads the same un-windowed progress (see `closing`).
- *
- * Progress comes from [transition], the caller's own AnimatedVisibility `Transition`, not a
- * private [Animatable]: AnimatedVisibility only waits for animations in its own Transition
- * before removing content, so a private one would be torn out mid-fade.
- *
- * A custom [Layout] because the per-child transform must be applied at placement. It mirrors a
- * loose `Column` with `Arrangement.spacedBy(verticalGap)` (same width and wrap-content height).
- * Scale-and-fade per child, like [PopVisible]; no height change, since the outer
- * AnimatedVisibility already animates the container's height.
  */
 @Composable
 internal fun StaggeredRevealColumn(
@@ -56,22 +44,18 @@ internal fun StaggeredRevealColumn(
         label = "pebbleRowCascade",
         transitionSpec = {
             if (targetState == EnterExitState.Visible) {
-                // A short head start for the card, not the rows: the pop reads as arriving just after the
-                // pebble starts opening. A flat delay because collapseEnter's spring has no fixed duration.
-                // LinearEasing: each row remaps a narrow slice of this value, and slicing an already-eased
-                // curve distorts the shape. Linear gives every row the same smoothstep (below).
+                // A short head start for the card, not the rows: the pop reads as arriving just
+                // after the pebble starts opening. LinearEasing: each row remaps a narrow slice of
+                // this value, and slicing an already-eased curve distorts the shape.
                 tween(durationMillis = 480, delayMillis = 90, easing = LinearEasing)
             } else {
-                // No delay on the way out, and not a short duration: 400ms leaves each row a ~60ms window
-                // across PebbleStaggerSpan (220ms was too fast to read as a step); the open side's 480ms
-                // gives ~72ms.
                 tween(durationMillis = 400, easing = LinearEasing)
             }
         },
     ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
     // Windowing (see [PebbleStaggerSpan]) applies only on the way IN. Closing, late-window rows
-    // would stay opaque then cut out at the end, so closing maps every row to the same
-    // un-windowed `progress` and they fade together.
+    // would stay opaque then cut out at the end, so closing maps every row to the same un-windowed
+    // `progress` and they fade together.
     val closing = transition.targetState != EnterExitState.Visible
     val gapPx = with(LocalDensity.current) { verticalGap.roundToPx() }
     // `content` takes the ColumnScope receiver PebbleShell bodies use, via NoOpColumnScope.
@@ -87,8 +71,8 @@ internal fun StaggeredRevealColumn(
             var y = 0
             placeables.forEachIndexed { i, p ->
                 val start = if (n <= 1) 0f else (i.toFloat() / n) * PebbleStaggerSpan
-                // `progress` is read INSIDE the layerBlock (draw phase), not in the placement body, so
-                // transition ticks redraw instead of re-measuring every child.
+                // `progress` is read INSIDE the layerBlock (draw phase), not in the placement body,
+                // so transition ticks redraw instead of re-measuring every child.
                 p.placeWithLayer(0, y) {
                     // No windowing on the way out (see `closing`).
                     val raw = if (closing) {
@@ -100,7 +84,8 @@ internal fun StaggeredRevealColumn(
                     val local = raw * raw * (3f - 2f * raw)
                     alpha = local
                     // Scale uses [pebbleRowOvershoot] rather than `local`, so rows share the card's
-                    // overshoot-then-settle character (symmetric in `raw`, so closing pops slightly larger first).
+                    // overshoot-then-settle character (symmetric in `raw`, so closing pops slightly
+                    // larger first).
                     val scaleT = pebbleRowOvershoot(raw)
                     // 0.7 -> 1.0, not 0.85: a smaller change is lost next to the alpha fade.
                     scaleX = 0.7f + 0.3f * scaleT

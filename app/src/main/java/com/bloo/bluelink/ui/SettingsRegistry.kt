@@ -7,19 +7,15 @@ import com.bloo.bluelink.data.SettingsStore
 
 /**
  * The searchable settings that are not plain on/off switches -- the ranges (sliders and minute
- * fields) and the pickers (units, font, mode). With [ToggleSettings] and [VehicleToggleSettings] this
- * is the whole app-wide index: [buildSettingsSearchEntries] walks these lists and adds an entry for
- * every item with no per-setting code, so a new setting becomes searchable by being listed once here
- * and nowhere else.
- *
- * [phrases] is how a person would ask for it in a sentence ("make the text bigger", "stop it buzzing");
- * it is matched like keywords but is meant to be written in plain language, not the app's vocabulary.
+ * fields) and the pickers (units, font, mode).
  */
 internal class SettingSpec(
     val title: String,
     val keywords: String,
     val phrases: String = "",
-    /** The kind of control, so results can be grouped and a range is never mistaken for a switch. */
+    /**
+     * The kind of control, so results can be grouped and a range is never mistaken for a switch.
+     */
     val kind: SettingKind,
     val visible: (UiState) -> Boolean = { true },
     val content: @Composable (SettingsStore.Appearance, SettingsStore.NotificationPrefs, UiState, AppViewModel) -> Unit,
@@ -27,7 +23,6 @@ internal class SettingSpec(
 
 internal enum class SettingKind { Range, Choice }
 
-/** Every app-wide range: a slider with fixed stops, or a number of minutes. */
 internal val RangeSettings: List<SettingSpec> = listOf(
     SettingSpec(
         title = "Text & layout scale", kind = SettingKind.Range,

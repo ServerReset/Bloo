@@ -39,33 +39,40 @@ internal fun HeroMorphReadout(
     data: ChargeReadout,
     t: Float,
     modifier: Modifier = Modifier,
-    /** Start inset for the numbers row only, so it can sit after the car name while the bar spans the card. Zero for [ChargeFuelBar]. */
+    /**
+     * Start inset for the numbers row only, so it can sit after the car name while the bar spans
+     * the card. Zero for [ChargeFuelBar].
+     */
     numbersStart: Dp = 0.dp,
-    /** Reports where the numbers row landed, for the travelling overlay (see [HeroCollapsedNumbers.onPositioned]). */
+    /**
+     * Reports where the numbers row landed, for the travelling overlay (see
+     * [HeroCollapsedNumbers.onPositioned]).
+     */
     onNumbersPositioned: (LayoutCoordinates) -> Unit = {},
-    /** True once the overlay draws the real numbers; this row keeps measuring as an anchor but stops painting. */
+    /**
+     * True once the overlay draws the real numbers; this row keeps measuring as an anchor but stops
+     * painting.
+     */
     numbersHoisted: Boolean = false,
     /** The status line's own fade on its delayed clock (see the caller's `statusAlpha`). */
     statusAlpha: Float = t,
 ) {
     val type = MaterialTheme.typography
-    // Real type steps are lerped, not graphicsLayer-scaled: this Column's height must grow so the state line
-    // below is pushed down (graphicsLayer does not change measured size). The cost is a per-frame font size
-    // missing Text's single-slot ParagraphLayoutCache, bounded to two Text nodes in one layout pass.
-    // The type scale lives in [HeroNumbers] so the anchor and overlay cannot drift.
+    // Real type steps are lerped, not graphicsLayer-scaled: this Column's height must grow so the
+    // state line below is pushed down (graphicsLayer does not change measured size).
     Column(
-        // No alpha ramp: this node is fully visible in both states; one bar and one pair of numbers change shape.
+        // No alpha ramp: this node is fully visible in both states; one bar and one pair of numbers
+        // change shape.
         modifier,
         verticalArrangement = Arrangement.spacedBy(lerp(2.dp, 6.dp, t)),
     ) {
-        // Fades in on the back half only: the collapsed numbers are drawn by the header's title Row (see
-        // HeroCollapsedNumbers), so this copy must stay invisible until that one is gone.
-        // A plain Row with fillMaxWidth, not BoxWithConstraints: subcomposition on every frame of the heroT transition
-        // dropped frames. HeroNumbers gets fillWidth = true instead of a measured Dp.
+        // Fades in on the back half only: the collapsed numbers are drawn by the header's title Row
+        // (see HeroCollapsedNumbers), so this copy must stay invisible until that one is gone.
         Row(
             Modifier
                 .padding(start = numbersStart)
-                // fillMaxWidth so the anchor reports the readout's real span; the overlay lerps to that width (range at the right edge).
+                // fillMaxWidth so the anchor reports the readout's real span; the overlay lerps to
+                // that width (range at the right edge).
                 .fillMaxWidth()
                 .graphicsLayer {
                     alpha = if (numbersHoisted) 0f
@@ -74,15 +81,17 @@ internal fun HeroMorphReadout(
                 .onGloballyPositioned(onNumbersPositioned),
             verticalAlignment = Alignment.Bottom,
         ) {
-            // One definition of the numbers shared with the collapsed anchor and overlay (see [HeroNumbers]); this row only
-            // needs to be measured, and the overlay draws the visible copy. fillWidth = true matches the Row's width.
+            // One definition of the numbers shared with the collapsed anchor and overlay (see
+            // [HeroNumbers]); this row only needs to be measured, and the overlay draws the visible
+            // copy. fillWidth = true matches the Row's width.
             HeroNumbers(data, t, fillWidth = true, statusAlpha = statusAlpha)
         }
-        // Plug-in hybrid's fuel tank: expanded only; fades in over the back half of the morph. The pump icon
-        // distinguishes it from the battery figure.
+        // Plug-in hybrid's fuel tank: expanded only; fades in over the back half of the morph. The
+        // pump icon distinguishes it from the battery figure.
         data.fuelPct?.takeIf { statusAlpha > 0.01f }?.let { fuelPct ->
-            // LocalContentColor, not onSurfaceVariant: this row is always over the hero's photo + scrim, and a surface role
-            // would be near-black on a dark photo in light theme. MutedContentAlpha keeps it subordinate; statusAlpha fades it in.
+            // LocalContentColor, not onSurfaceVariant: this row is always over the hero's photo +
+            // scrim, and a surface role would be near-black on a dark photo in light theme.
+            // MutedContentAlpha keeps it subordinate; statusAlpha fades it in.
             val fuelColor = LocalContentColor.current
                 .copy(alpha = statusAlpha * MutedContentAlpha)
             Row(verticalAlignment = Alignment.CenterVertically) {

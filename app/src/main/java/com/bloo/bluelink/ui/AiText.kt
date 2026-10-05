@@ -1,13 +1,7 @@
 package com.bloo.bluelink.ui
 
 /**
- * The on-device AI prompt builders: plain-text descriptions of a car's
- * state, ordered by importance, and the charge-time phrasing -- the only
- * strings the model sees as facts, so they pin exactly: a sentence that
- * says the doors are unlocked when they were never reported was a real
- * false-fact bug (see carText's Priority 1 comment), and it is pinned
- * below the same way. Extractable from AppViewModel.kt because they are
- * pure functions of (Vehicle, status, UiState).
+ * Extractable from AppViewModel.kt because they are pure functions of (Vehicle, status, UiState).
  */
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.Vehicle
@@ -26,9 +20,6 @@ internal fun summaryPrompt(v: Vehicle, status: VehicleStatus?, state: UiState): 
             return parts.joinToString(" ")
         }
         // Priority 1 — doors.
-        // Only when the car has actually REPORTED it. `doorLock == true` collapsed null into
-        // "unlocked", so a car that has never reported its doors had "The doors are unlocked."
-        // fed to the AI as a fact -- and the summary then tells the user their car is unlocked.
         status.doorLock?.let { parts += "The doors are ${if (it) "locked" else "unlocked"}." }
         // Priority 2 — charging + time to full (EV/PHEV only).
         if (state.hasBattery(v)) {

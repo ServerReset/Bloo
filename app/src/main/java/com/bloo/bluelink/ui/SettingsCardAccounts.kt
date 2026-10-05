@@ -19,10 +19,8 @@ import com.bloo.bluelink.data.Credentials
 import com.bloo.uicommon.rememberConfirmArm
 
 /**
- * The "Accounts" card: one panel per signed-in account (each brand has its own sign-in, and
- * Hyundai and Genesis can both be signed in), then the way to add another. Each panel carries
- * exactly what you can do to that account -- see the password, fix the service PIN, sign out --
- * and nothing about the others.
+ * The "Accounts" card: one panel per signed-in account (each brand has its own sign-in, and Hyundai
+ * and Genesis can both be signed in), then the way to add another.
  */
 @Composable
 internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {

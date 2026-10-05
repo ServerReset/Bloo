@@ -13,10 +13,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import com.bloo.uicommon.blockPageSwipe
 
 /**
- * The app's one text field. Every field is [FieldShape] and keeps horizontal drags to itself (so
- * selecting text or moving the caret never pages the app), which used to be repeated at each of
- * twenty call sites. Anything else is the stock [OutlinedTextField]'s, and a caller that really
- * needs a different shape or colours can still pass them.
+ * The app's one text field. Anything else is the stock [OutlinedTextField]'s, and a caller that
+ * really needs a different shape or colours can still pass them.
  */
 @Composable
 internal fun BlooTextField(
@@ -55,12 +53,9 @@ internal fun BlooTextField(
     )
 }
 
-
 /**
  * The app's one PIN field: masked, number keypad, and (for the app PIN) digits only and capped at
- * [maxDigits]. The lock screen, the change-PIN dialog, onboarding's set-a-PIN pair, the account card and
- * sign-in all enter a PIN, and each had hand-written the same six lines of masking and keyboard options.
- * [revealed] unmasks it (sign-in's eye toggle); [onDone] makes the keypad's Done key act.
+ * [maxDigits].
  */
 @Composable
 internal fun PinField(

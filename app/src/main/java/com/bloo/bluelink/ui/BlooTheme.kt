@@ -36,7 +36,8 @@ fun BlooTheme(
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
 
-    // System bars follow the app's theme, not the phone's (SystemBarStyle.auto only sees the system setting).
+    // System bars follow the app's theme, not the phone's (SystemBarStyle.auto only sees the system
+    // setting).
     val barsView = androidx.compose.ui.platform.LocalView.current
     if (!barsView.isInEditMode) {
         androidx.compose.runtime.SideEffect {
@@ -50,8 +51,9 @@ fun BlooTheme(
     }
 
     val context = LocalContext.current
-    // The cheap static scheme paints the first frame; the dynamic (Material You) scheme needs a slow synchronous
-    // binder call, so it is resolved off the main thread and swapped in when ready.
+    // The cheap static scheme paints the first frame; the dynamic (Material You) scheme needs a
+    // slow synchronous binder call, so it is resolved off the main thread and swapped in when
+    // ready.
     val staticScheme = remember(dark, colorPalette, customPalette, vibrancy) {
         blooColorScheme(
             context = context,
@@ -80,15 +82,13 @@ fun BlooTheme(
         }
     }
 
-    // Honour the device font scale, clamped and combined with the app's uiScale:
-    //   effective = clamp(deviceFontScale, 1..MaxFontScale) * uiScale
-    // Unbounded scaling would overflow the fixed-size floating overlays. Spacing follows the same scale (see spaceScaleFor).
+    // Spacing follows the same scale (see spaceScaleFor).
     val density = LocalDensity.current
     val effectiveFontScale = density.fontScale.coerceIn(1f, MaxFontScale) * uiScale
     val scaledDensity = Density(density.density, effectiveFontScale)
 
-    // Read through a process-wide cache: a synchronous binder IPC on the first-frame path, and it cannot change
-    // without a configuration change.
+    // Read through a process-wide cache: a synchronous binder IPC on the first-frame path, and it
+    // cannot change without a configuration change.
     val reduceMotion = remember(context.contentResolver) { reduceMotionCached(context) }
     // Memoize typography and motion to avoid recomputing on every recomposition.
     val typography = remember(fontChoice) { expressiveTypography(fontChoice) }
@@ -99,8 +99,8 @@ fun BlooTheme(
         typography = typography,
         shapes = ExpressiveShapes,
     ) {
-        // The root Scaffold passes Color.Transparent, so contentColorFor yields Unspecified; set onBackground explicitly
-        // so bare Text() never falls back to an unthemed default.
+        // The root Scaffold passes Color.Transparent, so contentColorFor yields Unspecified; set
+        // onBackground explicitly so bare Text() never falls back to an unthemed default.
         CompositionLocalProvider(
             LocalDensity provides scaledDensity,
             LocalReduceMotion provides reduceMotion,
@@ -112,16 +112,12 @@ fun BlooTheme(
     }
 }
 
-
 /** True when the user has disabled animations in Accessibility settings. */
 val LocalReduceMotion = staticCompositionLocalOf { false }
 
-
 /**
- * Whether the app is dark right now, for any composable below [BlooTheme].
  * Honours the app's Light/Dark override; only SYSTEM falls through to the phone. Never read
  * `isSystemInDarkTheme()` directly. Matches how [BlooTheme] picks its colour scheme.
- * Not a composition local: [LocalAppearance] already carries `themeMode`.
  */
 @Composable
 internal fun appIsDarkTheme(): Boolean = when (LocalAppearance.current.themeMode) {

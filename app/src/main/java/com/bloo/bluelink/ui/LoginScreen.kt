@@ -72,20 +72,25 @@ import kotlin.math.max
 import androidx.core.net.toUri
 
 /**
- * Sign-in form for every brand (US, Canada, Europe) on one screen. Field state is local until [onLogin] fires,
- * so switching brands keeps typed values. Brand copy cross-fades via [AnimatedContent]. The PIN field shows for
- * brands with `requiresPin` (Canada's commands are PIN-gated though sign-in uses OTP); Kia and Canada get a
- * one-time-passcode dialog after submit ([KiaOtpDialog]/[CanadaOtpDialog]).
+ * Sign-in form for every brand (US, Canada, Europe) on one screen. Field state is local until
+ * [onLogin] fires, so switching brands keeps typed values. Brand copy cross-fades via
+ * [AnimatedContent].
  */
 @Composable
 internal fun LoginScreen(
     loading: Boolean,
     onLogin: (String, String, String, Brand) -> Unit,
     onCancel: (() -> Unit)? = null,
-    /** Offers the update flow on the logged-out screen too, since the normal surface lives in Settings behind sign-in. */
+    /**
+     * Offers the update flow on the logged-out screen too, since the normal surface lives in
+     * Settings behind sign-in.
+     */
     onCheckForUpdates: () -> Unit = {},
     updateChecking: Boolean = false,
-    /** Set once a check finds a newer build; the button then reads "Update available" and opens the release page. */
+    /**
+     * Set once a check finds a newer build; the button then reads "Update available" and opens the
+     * release page.
+     */
     updateAvailableUrl: String? = null,
 ) {
     var email by remember { mutableStateOf("") }
@@ -93,11 +98,13 @@ internal fun LoginScreen(
     var pin by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
     var showPin by remember { mutableStateOf(false) }
-    // Region picks which brands the picker offers (Canadian ones use a different backend, CanadaApi); switching resets `brand`.
+    // Region picks which brands the picker offers (Canadian ones use a different backend,
+    // CanadaApi); switching resets `brand`.
     var region by remember { mutableStateOf("US") }
     var brand by remember { mutableStateOf(Brand.HYUNDAI) }
     val scheme = MaterialTheme.colorScheme
-    // LocalWindowInfo, not LocalConfiguration: containerSize is the app's window, correct in multi-window.
+    // LocalWindowInfo, not LocalConfiguration: containerSize is the app's window, correct in
+    // multi-window.
     val shortScreen = with(LocalDensity.current) {
         LocalWindowInfo.current.containerSize.height.toDp() < 520.dp
     }
@@ -136,7 +143,8 @@ internal fun LoginScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Hero: the app tile and wordmark, with the brand line beneath crossfading as it changes.
+            // Hero: the app tile and wordmark, with the brand line beneath crossfading as it
+            // changes.
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -328,7 +336,8 @@ internal fun LoginScreen(
                             }
                         }
 
-                        // Update affordance without signing in: opens the release page once a build is found, else checks on tap.
+                        // Update affordance without signing in: opens the release page once a build
+                        // is found, else checks on tap.
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             SafeMorphTextButton(
                                 text = when {
@@ -358,15 +367,15 @@ internal fun LoginScreen(
                 }
             }
         }
-        // The hero wordmark has no top inset padding (deliberate), so it draws under the status bar:
-        // same scrim as every other call site.
+        // The hero wordmark has no top inset padding (deliberate), so it draws under the status
+        // bar: same scrim as every other call site.
         StatusBarScrim(hazeState = hazeState)
     }
 }
 
 /**
- * Kia sign-in verification: pick where the one-time code goes (email/text),
- * then enter it. Shown over the login form while a Kia OTP challenge is open.
+ * Kia sign-in verification: pick where the one-time code goes (email/text), then enter it. Shown
+ * over the login form while a Kia OTP challenge is open.
  */
 @Composable
 internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
@@ -425,8 +434,8 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
 }
 
 /**
- * Canada sign-in verification: unlike [KiaOtpDialog] there is no destination to pick, since the code is
- * already sent (see AppViewModel.loginCanada), so it goes straight to code entry.
+ * Canada sign-in verification: unlike [KiaOtpDialog] there is no destination to pick, since the
+ * code is already sent (see AppViewModel.loginCanada), so it goes straight to code entry.
  */
 @Composable
 internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewModel) {
@@ -460,7 +469,10 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
     )
 }
 
-/** The one-time-code field shared by [KiaOtpDialog] and [CanadaOtpDialog]; callers hoist `code` since Verify reads it. */
+/**
+ * The one-time-code field shared by [KiaOtpDialog] and [CanadaOtpDialog]; callers hoist `code`
+ * since Verify reads it.
+ */
 @Composable
 internal fun OtpCodeField(code: String, onCodeChange: (String) -> Unit) {
     BlooTextField(

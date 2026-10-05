@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,9 +18,10 @@ import com.bloo.bluelink.data.setPlatform
 import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setSeatFlag
 
-
-/** The "this is right" button every per-car card ends with: it confirms the answers on the card and
- *  lets the deck move on. Once confirmed it reads as done and stops being a button. */
+/**
+ * The "this is right" button every per-car card ends with: it confirms the answers on the card and
+ * lets the deck move on. Once confirmed it reads as done and stops being a button.
+ */
 @Composable
 private fun ConfirmButton(label: String, confirmed: Boolean, onConfirm: () -> Unit) {
     if (confirmed) {
@@ -37,7 +37,9 @@ private fun ConfirmButton(label: String, confirmed: Boolean, onConfirm: () -> Un
     }
 }
 
-/** Card 1 of a car: what powers it, which decides whether it shows a battery, a fuel gauge, or both. */
+/**
+ * Card 1 of a car: what powers it, which decides whether it shows a battery, a fuel gauge, or both.
+ */
 @Composable
 internal fun OnboardingPowertrainPage(
     vehicle: com.bloo.bluelink.data.Vehicle,
@@ -54,7 +56,9 @@ internal fun OnboardingPowertrainPage(
     ConfirmButton("Yes, that's my car", confirmed, onConfirm)
 }
 
-/** Card 2 of a Hyundai/Genesis US car: its head-unit generation, which the API can't always tell. */
+/**
+ * Card 2 of a Hyundai/Genesis US car: its head-unit generation, which the API can't always tell.
+ */
 @Composable
 internal fun OnboardingPlatformPage(
     vehicle: com.bloo.bluelink.data.Vehicle,
@@ -71,7 +75,10 @@ internal fun OnboardingPlatformPage(
     ConfirmButton("That's right", confirmed, onConfirm)
 }
 
-/** Card 3 of a car: which seats heat or cool, and whether the wheel heats, so the climate controls match. */
+/**
+ * Card 3 of a car: which seats heat or cool, and whether the wheel heats, so the climate controls
+ * match.
+ */
 @Composable
 internal fun OnboardingClimatePage(
     vehicle: com.bloo.bluelink.data.Vehicle,

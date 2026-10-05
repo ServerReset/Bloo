@@ -21,11 +21,8 @@ import com.bloo.bluelink.data.setUnlockedMinutes
 
 // --- Notification preference setters (extracted from AppViewModel) --
 
-// Simple notification-preference setters: each just fires a coroutine that
-// writes one field to SettingsStore's DataStore. They don't touch _state
-// directly because `notifications` above is already a StateFlow mirroring
-// settingsStore.notifications, so the UI picks up the change automatically
-// once the write completes and the underlying Flow re-emits.
+// Simple notification-preference setters: each just fires a coroutine that writes one field to
+// SettingsStore's DataStore.
 fun AppViewModel.setNotifyService(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyService(v) }
 
 fun AppViewModel.setNotifyDoor(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyDoor(v) }
@@ -40,9 +37,10 @@ fun AppViewModel.setNotifyUnlocked(v: Boolean) = viewModelScope.launch { setting
 
 fun AppViewModel.setUnlockedMinutes(m: Int) = viewModelScope.launch { settingsStore.setUnlockedMinutes(m) }
 
-/** Turning the live charging bar off clears anything already posted at
- *  once, and kills the poll chain, rather than leaving both to linger
- *  until they happen to notice the setting changed. */
+/**
+ * Turning the live charging bar off clears anything already posted at once, and kills the poll
+ * chain, rather than leaving both to linger until they happen to notice the setting changed.
+ */
 fun AppViewModel.setNotifyCharging(v: Boolean) = viewModelScope.launch {
     settingsStore.setNotifyCharging(v)
     com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())

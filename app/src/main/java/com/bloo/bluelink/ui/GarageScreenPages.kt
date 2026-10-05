@@ -28,12 +28,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 
 /*
- * The garage's two layouts, peeled out of GarageScreen: ExpandedGaragePage is one car full
- * screen, CollapsedGaragePager is the pager of cars (and Settings as one more page) that cycles
- * forever. GarageScreen keeps the state they both read and decides which one shows.
+ * The garage's two layouts, peeled out of GarageScreen: ExpandedGaragePage is one car full screen,
+ * CollapsedGaragePager is the pager of cars (and Settings as one more page) that cycles forever.
  */
 
-/** One car full screen, with the car pager that re-seeds on whichever car was expanded. */
 @Composable
 internal fun ExpandedGaragePage(
     vehicles: List<Vehicle>,
@@ -58,15 +56,17 @@ internal fun ExpandedGaragePage(
             HorizontalPager(
                 state = exPager,
                 modifier = Modifier.fillMaxSize().hazeSource(hazeState),
-                // One neighbour pre-warmed per side, never more pages than cars: two composed pages resolving to
-                // one car crash. count + wrap means pages composed = 1 + 2 * beyond <= count.
+                // One neighbour pre-warmed per side, never more pages than cars: two composed pages
+                // resolving to one car crash. count + wrap means pages composed = 1 + 2 * beyond <=
+                // count.
                 userScrollEnabled = true,
                 beyondViewportPageCount = ((count - 1) / 2).coerceIn(0, 1),
                 pageSize = androidx.compose.foundation.pager.PageSize.Fill,
                 key = { page -> page },
             ) { page ->
-                // Pager offset is read only in graphicsLayer{} (draw phase) so drags never recompose the page.
-                // Plain fade/scale only: no blur, tilt or secondary snap spring (they read worse and lagged the drag).
+                // Pager offset is read only in graphicsLayer{} (draw phase) so drags never
+                // recompose the page. Plain fade/scale only: no blur, tilt or secondary snap spring
+                // (they read worse and lagged the drag).
                 Box(Modifier.fillMaxSize()) {
                     val pv = vehicles[exWrap.real(page)]
                     ExpandedCar(
@@ -92,7 +92,10 @@ internal fun ExpandedGaragePage(
         }
 }
 
-/** The cycling pager of cars (a status card when there are none) with Settings as the page after the last. */
+/**
+ * The cycling pager of cars (a status card when there are none) with Settings as the page after the
+ * last.
+ */
 @Composable
 internal fun CollapsedGaragePager(
     vehicles: List<Vehicle>,
@@ -107,8 +110,6 @@ internal fun CollapsedGaragePager(
     hazeState: HazeState,
 ) {
         // Settings is one more item (index `slots`) in the cycling sequence, one car-column wide.
-        // One item per page; `perPage` pages sit side by side via PageSize.Fixed so each car keeps native drag/fling.
-        // slots + 1, not count + 1: coerceIn(0, -1) throws with zero cars; the status card fills the one car slot.
         val total = slots + 1
         // Opens on the car (or status card) already selected, never on Settings.
         val initialItem = currentIndex.coerceIn(0, slots - 1)
@@ -119,18 +120,20 @@ internal fun CollapsedGaragePager(
         LaunchedEffect(pager, total, perPage) {
             snapshotFlow { pager.settledPage }.collect { page ->
                 val real = realItem(page)
-                // Settings or the zero-car status slot is not a car selection; currentIndex keeps its car.
+                // Settings or the zero-car status slot is not a car selection; currentIndex keeps
+                // its car.
                 if (real < count) vm.selectIndex(real)
-                // Settings counts as "on screen" if it sits in ANY of the visible columns, not just the
-                // first: on a multi-column layout the search bar expands whenever Settings is showing.
+                // Settings counts as "on screen" if it sits in ANY of the visible columns, not just
+                // the first: on a multi-column layout the search bar expands whenever Settings is
+                // showing.
                 vm.setOnSettingsPageSlot((0 until perPage.coerceAtLeast(1)).any { realItem(page + it) == slots })
                 wrap.recenterIfNearEdge()
             }
         }
         // Clears the flag when the pager leaves composition so it can't go stale.
         DisposableEffect(Unit) { onDispose { vm.setOnSettingsPageSlot(false) } }
-        // Jump (no fly-through) when currentIndex changes externally, e.g. a shortcut tap.
-        // This and the `total` effect skip their first firing so they don't overwrite initialItem's seed.
+        // Jump (no fly-through) when currentIndex changes externally, e.g. a shortcut tap. This and
+        // the `total` effect skip their first firing so they don't overwrite initialItem's seed.
         val skipFirstIndexSnap = remember { mutableStateOf(true) }
         LaunchedEffect(currentIndex) {
             if (skipFirstIndexSnap.value) { skipFirstIndexSnap.value = false; return@LaunchedEffect }
@@ -138,8 +141,9 @@ internal fun CollapsedGaragePager(
             if (state.value.screen != Screen.Garage) return@LaunchedEffect
             wrap.snapToReal(currentIndex.coerceIn(0, slots - 1))
         }
-        // A car-count change shifts wrap's modulo divisor and could reshuffle the shown car; snap back to currentIndex.
-        // Skips its first firing and the exit transition, like the currentIndex effect.
+        // A car-count change shifts wrap's modulo divisor and could reshuffle the shown car; snap
+        // back to currentIndex. Skips its first firing and the exit transition, like the
+        // currentIndex effect.
         val skipFirstTotalSnap = remember { mutableStateOf(true) }
         LaunchedEffect(total) {
             if (skipFirstTotalSnap.value) { skipFirstTotalSnap.value = false; return@LaunchedEffect }
@@ -147,33 +151,30 @@ internal fun CollapsedGaragePager(
             wrap.snapToReal(currentIndex.coerceIn(0, slots - 1))
         }
         Box(Modifier.fillMaxSize()) {
-            // Pixel width of one item's page: viewport / perPage.
-            // onSizeChanged, not BoxWithConstraints (no extra subcomposition per drag frame).
-            // Seeded from windowWidthPx, never 0: a zero-width Fixed page makes HorizontalPager compose its whole virtual range (OOM).
+            // Pixel width of one item's page: viewport / perPage. onSizeChanged, not
+            // BoxWithConstraints (no extra subcomposition per drag frame).
             var boxWidthPx by remember { mutableIntStateOf(windowWidthPx) }
             val density = LocalDensity.current
-            // Ceiling division so perPage pages always cover boxWidthPx (a floored width leaves a gap needing an extra page).
-            // coerceAtLeast(1) keeps PageSize.Fixed(0.dp) unreachable.
             val pageWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).coerceAtLeast(1).toDp() }
             HorizontalPager(
                 state = pager,
                 modifier = Modifier.fillMaxSize().hazeSource(hazeState)
                     .onSizeChanged { boxWidthPx = it.width },
                 userScrollEnabled = true,
-                // One item per page at a fixed one-column width (same size as Fill on a phone).
                 pageSize = androidx.compose.foundation.pager.PageSize.Fixed(pageWidth),
-                // Never a flat 1: perPage + 2*beyond pages are composed at once, and if that exceeds `total` two virtual
-                // pages resolve to the same real item (e.g. Settings mounted twice) and corrupt its state, crashing.
-                // Largest safe beyond for `perPage + 2*beyond <= total`, capped at 1.
+                // Never a flat 1: perPage + 2*beyond pages are composed at once, and if that
+                // exceeds `total` two virtual pages resolve to the same real item (e.g. Settings
+                // mounted twice) and corrupt its state, crashing.
                 beyondViewportPageCount = ((total - perPage) / 2).coerceIn(0, 1),
-                // Raw page index as key, never the modulo item: duplicate keys crash ("Key already used").
+                // Raw page index as key, never the modulo item: duplicate keys crash ("Key already
+                // used").
                 key = { page -> page },
             ) { page ->
                 val real = realItem(page)
                 Box(Modifier.fillMaxSize()) {
                     if (real == slots) {
-                        // Folded-in Settings page, one car-column wide.
-                        // Always composed (pre-warmed as a neighbour) so a swipe onto it never shows an empty page.
+                        // Folded-in Settings page, one car-column wide. Always composed (pre-warmed
+                        // as a neighbour) so a swipe onto it never shows an empty page.
                         SettingsScreen(vm)
                     } else if (count == 0) {
                         // No cars: the status card takes the one other slot (Guard.kt).

@@ -1,8 +1,8 @@
 package com.bloo.bluelink.ui
 
 /**
- * Diagnostics pebble: DiagRow, DiagnosticsPebble, warn/yesNo/onOff --
- * extracted from Pebbles.kt to keep the UI file focused.
+ * Diagnostics pebble: DiagRow, DiagnosticsPebble, warn/yesNo/onOff -- extracted from Pebbles.kt to
+ * keep the UI file focused.
  */
 
 import androidx.compose.foundation.background
@@ -40,7 +40,6 @@ import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.formatDistance
 
-
 // --- Diagnostics ----------------------------------------------------------
 
 internal data class DiagRow(val label: String, val value: String, val indent: Boolean = false)
@@ -52,11 +51,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
     val metric = a.metricDistance
     val rows = remember(status, fahrenheit, metric) { buildList {
         status?.tirePressureLamp?.let { tp ->
-            // No psi suffix. `TirePressure.all` was only ever populated FROM the warning lamp --
-            // Kia read `tirePressure.all` (a 0/1 indicator) and Canada read
-            // `tirePressureLamp.tirePressureLampAll` outright -- so this rendered "Warning · 1
-            // psi" and "OK · 0 psi". No producer in this app has ever supplied a real
-            // pressure, and both assignments are now deleted, so there is nothing to suffix.
+            // No psi suffix.
             add(DiagRow("Tire pressure", if (tp.hasWarning) "Warning" else "OK"))
             tp.frontLeft?.let { add(DiagRow("Front left", warn(it), indent = true)) }
             tp.frontRight?.let { add(DiagRow("Front right", warn(it), indent = true)) }
@@ -91,9 +86,9 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
             if (seats.isNotEmpty()) add(DiagRow("Seat heat/vent active", seats.joinToString(", ")))
         }
         status?.evStatus?.pluggedInLabel?.let { add(DiagRow("Plug", it)) }
-        // fmtMinutes, not "$it min" -- the charge pebble's own "Time to full" row a
-        // few hundred lines up already used it, so a 95-minute estimate read
-        // "1h 35m" there and "95 min" here, in the same app on the same screen.
+        // fmtMinutes, not "$it min" -- the charge pebble's own "Time to full" row a few hundred
+        // lines up already used it, so a 95-minute estimate read "1h 35m" there and "95 min" here,
+        // in the same app on the same screen.
         status?.evStatus?.minutesToFull?.let { add(DiagRow("Time to full", fmtMinutes(it))) }
         status?.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
             ?.let { add(DiagRow("Doors open", it.joinToString(", "))) }
@@ -101,10 +96,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         if (status?.hoodOpen == true) add(DiagRow("Hood", "Open"))
         if (status?.doorLock == false && status.engine != true) add(DiagRow("Lock", "Car is unlocked while parked"))
     } }
-    // The count of actual problems. The warning affordance is then just "any problem at all"
-    // -- issueCount > 0 -- rather than a second hand-kept copy of these five predicates, which
-    // is what this used to be (a parallel `hasWarning` ||-chain that had to stay in sync with
-    // this list by hand). One source now; they can't drift.
+    // The count of actual problems.
     val issueCount = remember(status) {
         listOf(
             status?.tirePressureLamp?.hasWarning == true,
@@ -115,11 +107,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         ).count { it }
     }
     val hasWarning = issueCount > 0
-    // A VERDICT, not a tally. This used to read "12 checks", which is a count of rows rendered
-    // rather than anything about the car -- it cannot tell you whether to care, which is the
-    // only question a collapsed diagnostics pebble is asked. The cover's hero already computed
-    // the verdict and showed it one line below the tally; now the one line says it, on both
-    // surfaces, and the hero is gone.
+    // A VERDICT, not a tally.
     val diagSummary = remember(rows, hasWarning, issueCount) {
         when {
             rows.isEmpty() -> "No data"
@@ -139,14 +127,10 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
             isWarning = true,
             contentDescription = "Diagnostics warning",
         ) else null,
-        // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting
-        // that reads better inline without an expand/collapse control (see its own doc).
-        // This one renders ~12 diagnostic rows -- forcing it permanently open in simple
-        // mode, as an earlier pass did, just removed the ability to collapse a long list
-        // that most people only want to check occasionally.
+        // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting that reads
+        // better inline without an expand/collapse control (see its own doc).
     ) {
-        // The old cover hero's verdict is now the pebble's own summary, rendered as
-        // the tile headline. See diagSummary above.
+        // See diagSummary above.
         if (rows.isEmpty()) {
             Text(
                 "No diagnostics yet.",
@@ -156,14 +140,6 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         }
         rows.forEach { row ->
             if (row.indent) {
-                // The value used to be entirely unstyled (inheriting the pebble's
-                // own ambient onSurfaceVariant content color) rather than pinned to a
-                // legible tone the way StatusRow's own value already is -- an indented
-                // sub-row's VALUE is still the thing a user is actually checking.
-                // onSurfaceVariant is already full-alpha as a raw theme color -- its
-                // dimness is the ROLE itself (a lower-contrast RGB against the
-                // surface), not an alpha multiply, so unlike StatusRow this needed a
-                // color swap, not an alpha bump, to actually read stronger.
                 val indentLabelColor = if (LocalForceExpanded.current) {
                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
                 } else {

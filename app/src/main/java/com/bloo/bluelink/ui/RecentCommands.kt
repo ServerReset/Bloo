@@ -4,9 +4,8 @@ import android.content.Context
 import androidx.core.content.edit
 
 /**
- * Tracks recently used commands for quick access in the search interface.
- * Stores a list of command IDs so the search can suggest recently used commands
- * at the top of results.
+ * Tracks recently used commands for quick access in the search interface. Stores a list of command
+ * IDs so the search can suggest recently used commands at the top of results.
  */
 internal class RecentCommandsTracker(private val context: Context) {
 
@@ -20,9 +19,7 @@ internal class RecentCommandsTracker(private val context: Context) {
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
     }
 
-    /**
-     * Get recently used commands as a list of command IDs, most recent first.
-     */
+    /** Get recently used commands as a list of command IDs, most recent first. */
     fun recentCommands(): List<String> {
         val stored = prefs.getString(RECENT_COMMANDS_KEY, "") ?: ""
         if (stored.isEmpty()) return emptyList()
@@ -32,9 +29,6 @@ internal class RecentCommandsTracker(private val context: Context) {
             .take(RECENT_COMMANDS_LIMIT)
     }
 
-    /**
-     * Record that a command was just used.
-     */
     fun recordUsage(commandId: String) {
         val recent = recentCommands().toMutableList()
         // Remove if already exists and add to front
@@ -46,9 +40,7 @@ internal class RecentCommandsTracker(private val context: Context) {
         prefs.edit { putString(RECENT_COMMANDS_KEY, updated.joinToString("|")) }
     }
 
-    /**
-     * Clear all recent command history.
-     */
+    /** Clear all recent command history. */
     fun clear() {
         prefs.edit { clear() }
     }

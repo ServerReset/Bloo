@@ -40,9 +40,9 @@ fun AppViewModel.setLicensePlate(vin: String, plate: String) {
             else it.licensePlates + (vin to plate.trim()),
         )
     }
-    // Store write immediate (durability), cross-surface publish debounced -- see
-    // publishDebounced. Still republishes rather than waiting for the next status
-    // refresh to rebuild the snapshot; just not once per keypress.
+    // Store write immediate (durability), cross-surface publish debounced -- see publishDebounced.
+    // Still republishes rather than waiting for the next status refresh to rebuild the snapshot;
+    // just not once per keypress.
     viewModelScope.launch { settingsStore.setLicensePlate(vin, plate) }
     publishDebounced("plate:$vin")
 }
@@ -54,7 +54,6 @@ fun AppViewModel.setLastServiceMiles(vin: String, miles: Int?) {
             else it.lastServiceMiles + (vin to miles),
         )
     }
-    // See publishDebounced: write now, publish once the typing stops.
     viewModelScope.launch { settingsStore.setLastServiceMiles(vin, miles) }
     publishDebounced("lastService:$vin")
 }
@@ -66,19 +65,16 @@ fun AppViewModel.setServiceIntervalMiles(vin: String, miles: Int?) {
             else it.serviceIntervalMiles + (vin to miles),
         )
     }
-    // See publishDebounced: write now, publish once the typing stops.
     viewModelScope.launch { settingsStore.setServiceIntervalMiles(vin, miles) }
     publishDebounced("serviceInterval:$vin")
 }
 
-/** Toggle one seat-heater/cooler (or steering-wheel-heat) capability flag
- *  for a car. [field] is a short code ("dh" = driver heat, "dc" = driver
- *  cool, "ph"/"pc" = passenger, "rlh"/"rlc"/"rrh"/"rrc" = rear left/right,
- *  "sw" = steering wheel) mapped to the matching [SeatConfig] property;
- *  an unrecognized code is a no-op (`else -> current`). These flags don't
- *  come from the vehicle API -- they record which seat features the user
- *  says this specific trim actually has, so the climate UI only offers
- *  controls that will work. */
+/**
+ * Toggle one seat-heater/cooler (or steering-wheel-heat) capability flag for a car. [field] is a
+ * short code ("dh" = driver heat, "dc" = driver cool, "ph"/"pc" = passenger,
+ * "rlh"/"rlc"/"rrh"/"rrc" = rear left/right, "sw" = steering wheel) mapped to the matching
+ * [SeatConfig] property; an unrecognized code is a no-op (`else -> current`).
+ */
 fun AppViewModel.setSeatFlag(v: Vehicle, field: String, value: Boolean) {
     val current = _state.value.seatConfigs[v.vin] ?: SeatConfig()
     val updated = when (field) {
@@ -104,8 +100,8 @@ fun AppViewModel.setPowertrain(v: Vehicle, value: Powertrain) {
 
 fun AppViewModel.setPlatform(v: Vehicle, value: VehiclePlatform) {
     _state.update { it.copy(platforms = it.platforms + (v.vin to value)) }
-    // persistSnapshots writes the EFFECTIVE (override-applied) generation
-    // number into the synced VehicleSnapshot -- see snapshotOf.
+    // persistSnapshots writes the EFFECTIVE (override-applied) generation number into the synced
+    // VehicleSnapshot -- see snapshotOf.
     viewModelScope.launch { settingsStore.setPlatform(v.vin, value); persistSnapshots() }
 }
 

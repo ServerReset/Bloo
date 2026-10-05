@@ -19,11 +19,15 @@ import com.bloo.bluelink.data.setSectionCollapsed
 import com.bloo.bluelink.data.setVehicleOrder
 import com.bloo.bluelink.data.snapshot
 
-/** AppViewModel's car selection, pebble and trip actions, as extensions of [AppViewModel], kept out of the class so it stays readable. */
+/**
+ * AppViewModel's car selection, pebble and trip actions, as extensions of [AppViewModel], kept out
+ * of the class so it stays readable.
+ */
 
 /**
- * Evaluates [status] against the user's alert thresholds (see [CarAlerts]), posts a notification per alert,
- * and shows the first as an in-app message too. Called after every successful status load.
+ * Evaluates [status] against the user's alert thresholds (see [CarAlerts]), posts a notification
+ * per alert, and shows the first as an in-app message too. Called after every successful status
+ * load.
  */
 internal suspend fun AppViewModel.checkAlerts(v: Vehicle, status: VehicleStatus) {
     val alerts = CarAlerts.evaluate(settingsStore, v, status)
@@ -35,11 +39,14 @@ internal suspend fun AppViewModel.checkAlerts(v: Vehicle, status: VehicleStatus)
 
 // --- Garage / vehicles ----------------------------------------------
 
-/** Switch the visible car (swipe), lazily loading its status only if missing, so a car that failed at startup gets another chance. */
+/**
+ * Switch the visible car (swipe), lazily loading its status only if missing, so a car that failed
+ * at startup gets another chance.
+ */
 fun AppViewModel.selectIndex(index: Int) {
     val v = _state.value.vehicles.getOrNull(index) ?: return
-    // A no-op selection must not emit: UiState is unstable, so an emission recomposes every composed car page,
-    // and the pager's settledPage flow re-fires on re-settles of the same car.
+    // A no-op selection must not emit: UiState is unstable, so an emission recomposes every
+    // composed car page, and the pager's settledPage flow re-fires on re-settles of the same car.
     if (_currentIndex.value == index) {
         ensureStatus(v)
         return
@@ -65,12 +72,9 @@ fun AppViewModel.reorderVehicles(order: List<Vehicle>) {
 }
 
 /**
- * Publish after [textFieldPublishDebounceMs] of quiet on [key], superseding any pending publish for that key.
- *
- * Raw text fields would otherwise run the full [persistSnapshots] fan-out on every keystroke. Only the
- * cross-surface publish is debounced; the `_state` update and the SettingsStore write stay immediate so the
- * value is durable at once. [persistSnapshots] reads `_state`, so a debounced publish carries the latest value.
- * The map is main-dispatcher only with no suspension between read and write, so a plain map is safe.
+ * Publish after [textFieldPublishDebounceMs] of quiet on [key], superseding any pending publish for
+ * that key. Raw text fields would otherwise run the full [persistSnapshots] fan-out on every
+ * keystroke.
  */
 internal fun AppViewModel.publishDebounced(key: String) {
     pendingPublishes[key]?.cancel()
@@ -81,7 +85,10 @@ internal fun AppViewModel.publishDebounced(key: String) {
     }
 }
 
-/** Settings cards share this function via the placeholder [SettingsPseudoVehicle] (only its `vin` is read), so they persist exactly like a car's pebble. */
+/**
+ * Settings cards share this function via the placeholder [SettingsPseudoVehicle] (only its `vin` is
+ * read), so they persist exactly like a car's pebble.
+ */
 fun AppViewModel.togglePebble(v: Vehicle, section: String) {
     val key = "${v.vin}:$section"
     val collapsedNow = key !in _state.value.collapsedPebbles
@@ -98,9 +105,8 @@ fun AppViewModel.loadTrips(v: Vehicle) {
     if (v.vin in _state.value.trips || _state.value.isPending(v.vin, "trips")) return
     viewModelScope.launch {
         _state.update { it.copy(pending = it.pending + "${v.vin}:trips") }
-        // Cache only successful fetches: an empty list on failure would read as "no trips" and block re-fetching
-        // (the vin's presence gates it). Serialized with every other repo call via statusMutex (Blue Link rejects
-        // overlapping requests and a 401 refresh could race); only the network call is inside the lock.
+        // Cache only successful fetches: an empty list on failure would read as "no trips" and
+        // block re-fetching (the vin's presence gates it).
         val fetched = runCatching { statusMutex.withLock { repoFor(v).trips(v) } }
             .onFailure { e -> AppLog.log("⚠ Trips for ${v.name}: ${e.message ?: "failed"}") }
             .getOrNull()
@@ -116,15 +122,22 @@ fun AppViewModel.loadTrips(v: Vehicle) {
 
 // --- Settings / nav --------------------------------------------------
 
-/** Kept in sync by the pager settle effects (see [UiState.onSettingsPageSlot]); guarded so repeated settles don't emit. */
+/**
+ * Kept in sync by the pager settle effects (see [UiState.onSettingsPageSlot]); guarded so repeated
+ * settles don't emit.
+ */
 fun AppViewModel.setOnSettingsPageSlot(value: Boolean) {
     if (_state.value.onSettingsPageSlot != value) _state.update { it.copy(onSettingsPageSlot = value) }
 }
 
-/** Set (or clear, with null) the saved preset the one-tap climate Start button runs; restored in [bootstrapDriveSync] into [UiState.defaultClimatePresets]. */
+/**
+ * Set (or clear, with null) the saved preset the one-tap climate Start button runs; restored in
+ * [bootstrapDriveSync] into [UiState.defaultClimatePresets].
+ */
 fun AppViewModel.setDefaultClimatePreset(vin: String, id: String?) = viewModelScope.launch {
     settingsStore.setDefaultClimatePreset(vin, id)
-    // Also update state: defaultClimatePresets is populated once per process, so disk alone wouldn't take effect until restart.
+    // Also update state: defaultClimatePresets is populated once per process, so disk alone
+    // wouldn't take effect until restart.
     _state.update {
         it.copy(
             defaultClimatePresets = if (id == null) {
@@ -137,8 +150,9 @@ fun AppViewModel.setDefaultClimatePreset(vin: String, id: String?) = viewModelSc
 }
 
 /**
- * Runs [block] under the app-wide loading spinner ([UiState.loading]), clearing stale messages first and
- * always clearing loading afterwards. Exceptions are logged and surfaced as a snackbar message.
+ * Runs [block] under the app-wide loading spinner ([UiState.loading]), clearing stale messages
+ * first and always clearing loading afterwards. Exceptions are logged and surfaced as a snackbar
+ * message.
  */
 internal fun AppViewModel.launchBusy(block: suspend () -> Unit) {
     viewModelScope.launch {

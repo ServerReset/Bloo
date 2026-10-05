@@ -42,8 +42,9 @@ import com.bloo.bluelink.data.formatDistance
 import kotlinx.coroutines.launch
 
 /**
- * Asks for the phone's position so the map can draw "you are here". [ask] always asks; [askOnce] asks at
- * most once per app run (for a map opening with no fix). A grant starts the live subscription immediately.
+ * Asks for the phone's position so the map can draw "you are here". [ask] always asks; [askOnce]
+ * asks at most once per app run (for a map opening with no fix). A grant starts the live
+ * subscription immediately.
  */
 internal class DeviceLocationRequest(val ask: () -> Unit, val askOnce: () -> Unit)
 
@@ -82,9 +83,8 @@ internal fun rememberDeviceLocationRequest(vm: AppViewModel): DeviceLocationRequ
 }
 
 /**
- * A "Locate" action for [v] that requests ACCESS_FINE_LOCATION first if not granted (it backs the map's
- * device-location dot and is otherwise only requested from AutoLock settings). Shared by the compact
- * pebble map and the full-screen [ExpandableMapLayer].
+ * A "Locate" action for [v] that requests ACCESS_FINE_LOCATION first if not granted (it backs the
+ * map's device-location dot and is otherwise only requested from AutoLock settings).
  */
 @Composable
 internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
@@ -94,11 +94,13 @@ internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) {
-            // Fresh grant: restart the live subscription, which can't recover a job started permission-less.
+            // Fresh grant: restart the live subscription, which can't recover a job started
+            // permission-less.
             vm.beginLiveDeviceLocation(restart = true)
             vm.locate(v)
         } else {
-            // A permanent denial can only be undone from system app info, so the toast points there instead of re-asking.
+            // A permanent denial can only be undone from system app info, so the toast points there
+            // instead of re-asking.
             toasts?.show("Location permission denied. Enable it in Settings > Apps > Bloo to see your position.", "error")
         }
     }
@@ -119,7 +121,8 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     // See rememberLocateAction: ties the permission request to a "Locate" action.
     val locateWithPermission = rememberLocateAction(vm, v)
     val deviceRequest = rememberDeviceLocationRequest(vm)
-    // On the cover this is the identity pill's headline; the compact street + ZIP form has no space to wrap on.
+    // On the cover this is the identity pill's headline; the compact street + ZIP form has no space
+    // to wrap on.
     val place = if (LocalForceExpanded.current) {
         state.placeZips[v.vin] ?: state.placeNames[v.vin]
     } else {
@@ -138,7 +141,8 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
             pending = locating,
             bounceIcon = true,
         ),
-        // Not alwaysExpandedInSimpleMode: that flag removes the chevron, and this pebble must stay collapsible.
+        // Not alwaysExpandedInSimpleMode: that flag removes the chevron, and this pebble must stay
+        // collapsible.
     ) {
         val glance = LocalForceExpanded.current
         AnimatedVisibility(
@@ -156,13 +160,13 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
         ) {
             val loc = location
             if (loc != null) {
-                // Live device-location tracking runs app-wide (started in loadGarageInner), not per pebble.
+                // Live device-location tracking runs app-wide (started in loadGarageInner), not per
+                // pebble.
                 Column(
                     verticalArrangement = Arrangement.spacedBy(GapGroup)
                 ) {
-                // A live CarMap sharing expandedMap.mapStateFor(v.vin) with the full-screen overlay (same
-                // pan/zoom/tile cache). It is hidden with alpha 0 (not removed) while its vehicle is expanded
-                // so onGloballyPositioned keeps reporting a current originBounds.
+                // A live CarMap sharing expandedMap.mapStateFor(v.vin) with the full-screen overlay
+                // (same pan/zoom/tile cache).
                 val expandedMap = LocalExpandedMap.current
                 if (expandedMap != null) {
                     val isExpanded = expandedMap.vin == v.vin
@@ -180,7 +184,8 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         state = expandedMap.mapStateFor(v.vin),
                         deviceLocation = state.deviceLocation,
                     )
-                    // Real buttons under the map, same MapFeature shape as the full-screen map's toolbar.
+                    // Real buttons under the map, same MapFeature shape as the full-screen map's
+                    // toolbar.
                     MapFeatureRow(
                         features = listOf(
                             MapFeature(Icons.Filled.Fullscreen, "Expand") { expandedMap.vin = v.vin },
@@ -188,7 +193,8 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         ),
                     )
                 } else {
-                    // Not inside the garage's expandable map host: a plain map, with no expand to offer.
+                    // Not inside the garage's expandable map host: a plain map, with no expand to
+                    // offer.
                     CarMap(
                         loc,
                         Modifier
@@ -211,19 +217,21 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         StatusRow("Distance", formatDistance(device.distanceMilesTo(loc), appearance.metricDistance))
                     }
                 }
-                // Weather where the car is parked, fetched lazily once there is a fix and not already loading.
+                // Weather where the car is parked, fetched lazily once there is a fix and not
+                // already loading.
                 val carWeather = state.carWeather[v.vin]
                 val weatherLoading = state.isPending(v.vin, "carWeather")
                 LaunchedEffect(loc.latitude, loc.longitude) {
                     if (carWeather == null && !weatherLoading) vm.loadCarWeather(v)
                 }
-                // The phone's own weather; nudged here in case a fix landed without triggering a refresh.
+                // The phone's own weather; nudged here in case a fix landed without triggering a
+                // refresh.
                 val phoneWeather = state.phoneWeather
                 LaunchedEffect(state.deviceLocation?.latitude, state.deviceLocation?.longitude) {
                     if (state.deviceLocation != null && phoneWeather == null) vm.loadPhoneWeather()
                 }
-                // PopVisible: weather can arrive after the pebble opens. Shows the car's and phone's weather
-                // merged within ~7 miles, or as two labelled blocks.
+                // PopVisible: weather can arrive after the pebble opens. Shows the car's and
+                // phone's weather merged within ~7 miles, or as two labelled blocks.
                 PopVisible(visible = carWeather != null) {
                     val cw = carWeather
                     if (cw != null) {

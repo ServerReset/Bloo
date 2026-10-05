@@ -53,14 +53,7 @@ internal const val HOLD_TO_EXPAND_MS = 350L
 /** Pause between the bubble popping up and its label unfolding. */
 private const val LABEL_UNFOLD_DELAY_MS = 90L
 
-/**
- * What a button's label says about itself, so holding it can show what it does.
- *
- * Hold a button that has shrunk to its symbol: the phone builds a vibration and the button shakes,
- * then a copy of it pops up ABOVE the finger as a bubble and unfolds to show the symbol AND the name.
- * Lift and the bubble folds away. The bubble is a separate window, so it is never clipped by a tight
- * button group and never changes the layout under the finger.
- */
+/** What a button's label says about itself, so holding it can show what it does. */
 internal class LabelHintState {
     var label: String = ""
     var icon: ImageVector? = null
@@ -92,7 +85,6 @@ internal class LabelHintState {
 /** The button whose label is being composed, if any. Null outside a [MorphButton]. */
 internal val LocalLabelHint = androidx.compose.runtime.staticCompositionLocalOf<LabelHintState?> { null }
 
-/** A quick decaying side-to-side wobble, for the button that was just held long enough. */
 internal suspend fun LabelHintState.shake() {
     val amp = 7f
     val steps = floatArrayOf(1f, -1f, 0.7f, -0.7f, 0.4f, -0.4f, 0f)
@@ -107,8 +99,8 @@ internal suspend fun LabelHintState.shake() {
 }
 
 /**
- * The hold-to-explain bubble: pops up above the button (springing, from the button's own size), then
- * the name unfolds beside the symbol. Costs nothing until a button is actually held.
+ * The hold-to-explain bubble: pops up above the button (springing, from the button's own size),
+ * then the name unfolds beside the symbol. Costs nothing until a button is actually held.
  */
 @Composable
 internal fun LabelHintPopup(state: LabelHintState) {
@@ -149,8 +141,8 @@ private fun LabelHintBubbleHost(state: LabelHintState) {
             icon,
             unfolded,
             Modifier.graphicsLayer {
-                // The same button, lifting off its own spot to above the finger: it starts on top of
-                // where the original sits and rises by its own height plus a gap.
+                // The same button, lifting off its own spot to above the finger: it starts on top
+                // of where the original sits and rises by its own height plus a gap.
                 val p = pop.value
                 translationY = (1f - p) * (state.sizePx.height + gapPx)
             },
@@ -163,8 +155,8 @@ private fun LabelHintBubbleHost(state: LabelHintState) {
 private val LIFT_GAP = 14.dp
 
 /**
- * The lifted copy of the button: its own container colour, border, corner shape and content tone, at its
- * own size, then widening to put the name beside the symbol.
+ * The lifted copy of the button: its own container colour, border, corner shape and content tone,
+ * at its own size, then widening to put the name beside the symbol.
  */
 @Composable
 private fun LabelHintBubble(state: LabelHintState, icon: ImageVector, unfolded: Boolean, modifier: Modifier, lift: Float) {
@@ -214,7 +206,9 @@ private fun LabelHintBubble(state: LabelHintState, icon: ImageVector, unfolded: 
     }
 }
 
-/** Centred above the anchor, flipping below it when there is no room, and kept inside the window. */
+/**
+ * Centred above the anchor, flipping below it when there is no room, and kept inside the window.
+ */
 private object AboveAnchorPositionProvider : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,

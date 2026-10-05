@@ -1,7 +1,8 @@
 package com.bloo.bluelink.ui
 
 /**
- * The collapsible pebble shell family: [Pebble], [PebbleShell], [PebbleHeaderAction] and [SplitExpandButton].
+ * The collapsible pebble shell family: [Pebble], [PebbleShell], [PebbleHeaderAction] and
+ * [SplitExpandButton].
  */
 
 import androidx.compose.animation.AnimatedVisibility
@@ -52,7 +53,8 @@ import kotlinx.coroutines.flow.first
 import com.bloo.bluelink.data.settingsMode
 
 /**
- * A collapsible titled section that springs open/closed. Open state lives in the ViewModel (per car + section).
+ * A collapsible titled section that springs open/closed. Open state lives in the ViewModel (per car
+ * + section).
  */
 @Composable
 internal fun Pebble(
@@ -71,9 +73,8 @@ internal fun Pebble(
     /** If true and in simple mode, the pebble is always expanded and cannot be collapsed. */
     alwaysExpandedInSimpleMode: Boolean = false,
     /**
-     * For a pebble whose body is a single setting: in simple mode, render that control on the title row
-     * (via `titleTrailing`) and skip the body/disclosure. Null leaves normal expand/collapse.
-     * Unlike [alwaysExpandedInSimpleMode], which keeps the whole body visible.
+     * For a pebble whose body is a single setting: in simple mode, render that control on the title
+     * row (via `titleTrailing`) and skip the body/disclosure. Null leaves normal expand/collapse.
      */
     inlineSettingInSimpleMode: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
@@ -105,7 +106,8 @@ internal fun Pebble(
 }
 
 /**
- * The expand/collapse pebble shell; takes [expanded]/[onToggle] directly so non-section cards (the update tile) can reuse it.
+ * The expand/collapse pebble shell; takes [expanded]/[onToggle] directly so non-section cards (the
+ * update tile) can reuse it.
  */
 @Composable
 internal fun PebbleShell(
@@ -116,11 +118,14 @@ internal fun PebbleShell(
     modifier: Modifier = Modifier,
     summary: String? = null,
     /**
-     * Trailing content on the title row (e.g. the hero's [ChargeStatsLine]). Null for other pebbles.
-     * It owns its leading gap so an absent stat costs nothing.
+     * Trailing content on the title row (e.g. the hero's [ChargeStatsLine]). Null for other
+     * pebbles. It owns its leading gap so an absent stat costs nothing.
      */
     titleTrailing: (@Composable () -> Unit)? = null,
-    /** Pushes [titleTrailing] to the far end of the title row (for inline controls) instead of beside the name. */
+    /**
+     * Pushes [titleTrailing] to the far end of the title row (for inline controls) instead of
+     * beside the name.
+     */
     titleTrailingAtEnd: Boolean = false,
     /**
      * Overrides the colour of [title] and the leading [icon] together so they never mismatch.
@@ -133,8 +138,8 @@ internal fun PebbleShell(
      */
     headerContent: (@Composable () -> Unit)? = null,
     /**
-     * Whether the title grows on expand. Hero only: the growth lerps a real font size, so every frame
-     * misses the ParagraphLayoutCache and re-lays the text out.
+     * Whether the title grows on expand. Hero only: the growth lerps a real font size, so every
+     * frame misses the ParagraphLayoutCache and re-lays the text out.
      */
     growTitleOnExpand: Boolean = false,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
@@ -143,28 +148,29 @@ internal fun PebbleShell(
     /** If false, the chevron is hidden and onToggle is not called. */
     canToggle: Boolean = true,
     /**
-     * Drawn behind the header and collapsing body, inside the card's clip (the hero's photo).
-     * Must handle its own text legibility (scrim). Null for other pebbles.
+     * Drawn behind the header and collapsing body, inside the card's clip (the hero's photo). Must
+     * handle its own text legibility (scrim). Null for other pebbles.
      */
     background: (@Composable BoxScope.() -> Unit)? = null,
     /**
-     * Drawn on top of the header and body, in the same coordinate space as [background]
-     * (the hero's travelling charge numbers cross the header buttons). Null for other pebbles.
+     * Drawn on top of the header and body, in the same coordinate space as [background] (the hero's
+     * travelling charge numbers cross the header buttons). Null for other pebbles.
      */
     foreground: (@Composable BoxScope.() -> Unit)? = null,
-    /** Vertical gap between [content]'s top-level rows; pass 0.dp if the content spaces itself with [Spacer]s. */
+    /**
+     * Vertical gap between [content]'s top-level rows; pass 0.dp if the content spaces itself with
+     * [Spacer]s.
+     */
     contentGap: Dp = GapRow,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    // Collapsed = pill-soft corners; expanded = tighter rounded square. Direction picks the same springs
-    // collapseEnter/collapseExit use for height so corners and height read as one card.
-    // PebbleCornerCollapsed is only a fallback until the header row reports its real height;
-    // the corner targets half of that measured height so the card is a true capsule.
+    // Collapsed = pill-soft corners; expanded = tighter rounded square. Direction picks the same
+    // springs collapseEnter/collapseExit use for height so corners and height read as one card.
     var headerRowHeightPx by remember { mutableIntStateOf(0) }
-    // Row width from onSizeChanged (not BoxWithConstraints: a SubcomposeLayout's deferred pass is costly
-    // per pebble header). Default 1000.dp, not 0: it caps SplitExpandButton, so a low default would
-    // force compact on the first frame.
+    // Row width from onSizeChanged (not BoxWithConstraints: a SubcomposeLayout's deferred pass is
+    // costly per pebble header). Default 1000.dp, not 0: it caps SplitExpandButton, so a low
+    // default would force compact on the first frame.
     var headerRowWidthDp by remember { mutableStateOf(1000.dp) }
     val density = LocalDensity.current
     val collapsedCorner = if (headerRowHeightPx > 0) {
@@ -172,8 +178,8 @@ internal fun PebbleShell(
     } else {
         PebbleCornerCollapsed
     }
-    // True while the chevron is held; the whole card squares off with it, targeting PebbleCornerExpanded
-    // (the shape expanding lands on) so hold and expand agree.
+    // True while the chevron is held; the whole card squares off with it, targeting
+    // PebbleCornerExpanded (the shape expanding lands on) so hold and expand agree.
     var chevronPressed by remember { mutableStateOf(false) }
     val corner by animateDpAsState(
         targetValue = when {
@@ -196,17 +202,16 @@ internal fun PebbleShell(
         Card(
             Modifier
                 .fillMaxWidth()
-                // The dedicated pebble border (pebbleCardEdge), bolder than the floating-chrome rim:
-                // against a flat card the rim was nearly invisible, so toggling it read as doing nothing.
                 .pebbleCardEdge(pebbleShape, pebbleOutline)
                 // The card's bounding box is glass; its own panels stay solid.
                 .glassCardFill(pebbleShape, containerColor),
             shape = pebbleShape,
-            // No shadow elevation: the card is scaled by the drag lift/intro layer, and a default spot shadow
-            // would re-rasterize every frame. The border carries the depth.
+            // No shadow elevation: the card is scaled by the drag lift/intro layer, and a default
+            // spot shadow would re-rasterize every frame. The border carries the depth.
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             colors = CardDefaults.cardColors(
-                // Slightly translucent so the aurora reads faintly through; 0.9 keeps text contrast.
+                // Slightly translucent so the aurora reads faintly through; 0.9 keeps text
+                // contrast.
                 containerColor = Color.Transparent,
                 contentColor = contentColorFor(containerColor),
             ),
@@ -214,8 +219,8 @@ internal fun PebbleShell(
             // Box, so `background` can draw behind the header and body.
             Box(Modifier.fillMaxWidth()) {
                 background?.invoke(this)
-                // No animateContentSize: the body's AnimatedVisibility already animates the height, and a second
-                // spring compounds and rubber-bands.
+                // No animateContentSize: the body's AnimatedVisibility already animates the height,
+                // and a second spring compounds and rubber-bands.
                 Column {
                     PebbleHeaderRow(
                         icon = icon,
@@ -236,18 +241,20 @@ internal fun PebbleShell(
                         onMeasured = { h, w -> headerRowHeightPx = h; headerRowWidthDp = w },
                         onChevronPressChange = { chevronPressed = it },
                     )
-                    // Animate the body sliding open/closed; the exit fades the block so the shrinking bottom edge
-                    // doesn't visibly clip the content.
+                    // Animate the body sliding open/closed; the exit fades the block so the
+                    // shrinking bottom edge doesn't visibly clip the content.
                     AnimatedVisibility(
                         visible = expanded,
                         enter = expandEnterSized(),
                         exit = expandExitSized(fade = true),
                     ) {
-                        // StaggeredRevealColumn cascades rows; `transition` is this AnimatedVisibilityScope's, so the card
-                        // cannot finish closing before its rows do.
+                        // StaggeredRevealColumn cascades rows; `transition` is this
+                        // AnimatedVisibilityScope's, so the card cannot finish closing before its
+                        // rows do.
                         StaggeredRevealColumn(
                             transition = transition,
-                            // Animates height changes while expanded (install steps, loading notes).
+                            // Animates height changes while expanded (install steps, loading
+                            // notes).
                             modifier = Modifier.animateContentSize(
                                 lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                             ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
@@ -262,4 +269,3 @@ internal fun PebbleShell(
         }
     }
 }
-

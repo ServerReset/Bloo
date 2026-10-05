@@ -68,14 +68,12 @@ import com.bloo.uicommon.dropShadow
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
 
-/**
- * The search bar itself (SearchPill) and its suggestions list (SearchSuggestions).
- */
+/** The search bar itself (SearchPill) and its suggestions list (SearchSuggestions). */
 
 /**
  * The pill: one Surface at the [width]/[height] [SearchLayer] animates it to, with its content
- * chosen by [form]. Caller-sized (not a width fraction) so circle-in-corner and bottom bar are
- * the same element and can morph.
+ * chosen by [form]. Caller-sized (not a width fraction) so circle-in-corner and bottom bar are the
+ * same element and can morph.
  */
 @Composable
 internal fun SearchPill(
@@ -113,8 +111,8 @@ internal fun SearchPill(
     // Springs in on first appearance, including arriving from a different docked position.
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { appeared = true }
-    // Not DampingRatioMediumBouncy on both: entrance and press springs multiply into the same
-    // scale and read as too bouncy. The entrance uses the shared PebbleBounceDamping/Stiffness tokens.
+    // Not DampingRatioMediumBouncy on both: entrance and press springs multiply into the same scale
+    // and read as too bouncy. The entrance uses the shared PebbleBounceDamping/Stiffness tokens.
     val entrance by animateFloatAsState(
         targetValue = if (appeared) 1f else 0.55f,
         animationSpec = lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
@@ -129,12 +127,12 @@ internal fun SearchPill(
             scaleX = entrance
             scaleY = entrance
         }
-            // Publishes the pill's bounds (after .size) so other floating chrome can avoid it. Does not use
-            // floatingOverlay: this pill is placed by the user, not owned by the page.
+            // Publishes the pill's bounds (after .size) so other floating chrome can avoid it. Does
+            // not use floatingOverlay: this pill is placed by the user, not owned by the page.
             .floatingElement(FloatingIds.Search),
     ) {
-        // canBlur/pillShape are hoisted so the fill and the blur layer agree; the blur needs its own
-        // explicit clip because Surface's clip applies after the caller's modifier.
+        // canBlur/pillShape are hoisted so the fill and the blur layer agree; the blur needs its
+        // own explicit clip because Surface's clip applies after the caller's modifier.
         val pillShape = CircleShape
         val canBlur = hazeState != null && canBlurBackdrops()
         Surface(
@@ -148,8 +146,8 @@ internal fun SearchPill(
             tonalElevation = 0.dp,
             border = BorderStroke(
                 if (expanded) 1.5.dp else 1.dp,
-                // Static: this is composition scope, so multiplying in glowPulse would recompose the whole
-                // pill and text field on every tick.
+                // Static: this is composition scope, so multiplying in glowPulse would recompose
+                // the whole pill and text field on every tick.
                 Brush.verticalGradient(
                     listOf(
                         scheme.primary.copy(alpha = if (expanded) 0.65f else 0.4f),
@@ -160,19 +158,19 @@ internal fun SearchPill(
             interactionSource = interaction,
             modifier = Modifier
                 .fillMaxSize()
-                // The cover screen gets neither shadow nor glass rim: on a 40dp circle they read as a smudge.
-                // glassEdge (GlassChrome.kt) is the dropShadow + glassRim pair with the theme-aware
-                // shadow weight, so a change there reaches this pill too.
-                // shadow = !expanded: a full-width shadow on the expanded bar darkens the whole backdrop.
-                // The rim stays either way.
+                // The cover screen gets neither shadow nor glass rim: on a 40dp circle they read as
+                // a smudge. glassEdge (GlassChrome.kt) is the dropShadow + glassRim pair with the
+                // theme-aware shadow weight, so a change there reaches this pill too. shadow =
+                // !expanded: a full-width shadow on the expanded bar darkens the whole backdrop.
                 .glassEdge(pillShape, shadow = !expanded)
-                // appHazeEffect clipped to pillShape explicitly: this chain runs before Surface's own shape
-                // clip, so an unclipped blur would poke past the rounded outline.
+                // appHazeEffect clipped to pillShape explicitly: this chain runs before Surface's
+                // own shape clip, so an unclipped blur would poke past the rounded outline.
                 .then(if (canBlur && hazeState != null) Modifier.clip(pillShape).appGlassEffect(hazeState, pillShape) else Modifier)
                 .then(
                     if (onDrag != null) {
-                        // Callbacks read via rememberUpdatedState: pointerInput(key) keeps the installing
-                        // composition's lambda, so direct reads see stale dock, position and form.
+                        // Callbacks read via rememberUpdatedState: pointerInput(key) keeps the
+                        // installing composition's lambda, so direct reads see stale dock, position
+                        // and form.
                         Modifier.pointerInput(Unit) {
                             detectDragGestures(
                                 onDragStart = { latestDragStart.value() },
@@ -189,8 +187,8 @@ internal fun SearchPill(
             AnimatedContent(
                 targetState = form to expanded,
                 transitionSpec = {
-                    // Cross-fade only, fast, not delayed: the container's spring carries the motion, so a
-                    // second scale or delay on the content would fight it.
+                    // Cross-fade only, fast, not delayed: the container's spring carries the
+                    // motion, so a second scale or delay on the content would fight it.
                     fadeIn(tween(MotionFast)) togetherWith fadeOut(tween(90))
                 },
                 label = "searchContentMorph",
@@ -210,10 +208,12 @@ internal fun SearchPill(
                                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
                                 cursorBrush = SolidColor(scheme.primary),
                                 keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-                                // Submitting puts the keyboard away so the answer panel above the bar is visible.
+                                // Submitting puts the keyboard away so the answer panel above the
+                                // bar is visible.
                                 keyboardActions = KeyboardActions(onSearch = { onSubmit(); keyboard?.hide() }),
-                                // No auto-collapse on blur: onFocusChanged fires isFocused = false as the field composes,
-                                // before requestFocus lands, and would close the bar as it opens.
+                                // No auto-collapse on blur: onFocusChanged fires isFocused = false
+                                // as the field composes, before requestFocus lands, and would close
+                                // the bar as it opens.
                                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                                 decorationBox = { inner ->
                                     if (query.isEmpty()) {
@@ -246,7 +246,8 @@ internal fun SearchPill(
                         Spacer(Modifier.width(10.dp))
                         Text("Search", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
                     }
-                    // Closed BUBBLE: the glyph alone; contentDescription is on the icon since there is no label.
+                    // Closed BUBBLE: the glyph alone; contentDescription is on the icon since there
+                    // is no label.
                     else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Filled.Search,
@@ -262,8 +263,8 @@ internal fun SearchPill(
 }
 
 /**
- * Example queries shown while the search bar is focused but empty, to show that search answers
- * data questions and runs commands, not just finds settings.
+ * Example queries shown while the search bar is focused but empty, to show that search answers data
+ * questions and runs commands, not just finds settings.
  */
 @Composable
 internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: (String) -> Unit) {
@@ -299,7 +300,8 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
         "Try commands, settings, or ask about your car",
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.Bold,
-        // Floats over the aurora with nothing opaque behind it; full-strength onSurface for contrast.
+        // Floats over the aurora with nothing opaque behind it; full-strength onSurface for
+        // contrast.
         color = MaterialTheme.colorScheme.onSurface,
     )
     FlowRow(horizontalArrangement = Arrangement.spacedBy(GapRow), verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -316,8 +318,8 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
                     minHeight = 0.dp,
-                    // Theme-weighted, not a bare dropShadow() (0.38-alpha black is a halo on light themes);
-                    // same split as glassDropShadow (GlassChrome.kt).
+                    // Theme-weighted, not a bare dropShadow() (0.38-alpha black is a halo on light
+                    // themes); same split as glassDropShadow (GlassChrome.kt).
                     modifier = Modifier.themedDropShadow(CircleShape, blurRadius = 8.dp, offsetY = 3.dp),
                     expressive = true,
                 ) {

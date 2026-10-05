@@ -18,12 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 
 /**
- * A group of controls that can be locked out. While [locked] the controls dim and a frosted glass
- * layer sits over them, blurring what is underneath, with [message] on top -- so it reads as "this
- * is a live setting you can't change right now" rather than as controls that are merely broken.
- *
- * The glass swallows taps, so nothing underneath can be pressed, but leaves drags alone, so the page
- * still scrolls when a finger starts on it.
+ * A group of controls that can be locked out. The glass swallows taps, so nothing underneath can be
+ * pressed, but leaves drags alone, so the page still scrolls when a finger starts on it.
  */
 @Composable
 internal fun LockedControls(
@@ -44,7 +40,8 @@ internal fun LockedControls(
             enter = fadeIn() + scaleIn(initialScale = 0.9f),
             exit = fadeOut(),
         ) {
-            // Swallows taps (nothing underneath can be pressed) but not drags, so the page still scrolls.
+            // Swallows taps (nothing underneath can be pressed) but not drags, so the page still
+            // scrolls.
             Box(
                 Modifier
                     .fillMaxSize()

@@ -9,13 +9,14 @@ import com.bloo.bluelink.data.SettingsStore
 import kotlin.math.roundToInt
 
 /**
- * How clear the liquid glass is, from heavily frosted (an opaque, soft backing) to nearly clear (the
- * refraction shows almost undiluted). One slider shared by the Display card and Settings search.
+ * How clear the liquid glass is, from heavily frosted (an opaque, soft backing) to nearly clear
+ * (the refraction shows almost undiluted). One slider shared by the Display card and Settings
+ * search.
  */
 @Composable
 internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
-    // Six fixed stops, never a free value. The last, Ultra, turns every glass effect up past maximum on
-    // EVERY surface; the rest set how transparent the floating glass is.
+    // The last, Ultra, turns every glass effect up past maximum on EVERY surface; the rest set how
+    // transparent the floating glass is.
     var index by remember(appearance.glassClarity, appearance.ultraGlass) {
         mutableFloatStateOf((if (appearance.ultraGlass) GlassStops.lastIndex else nearestGlassStop(appearance.glassClarity)).toFloat())
     }
@@ -37,7 +38,6 @@ internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppVie
     BodySmallText("How see-through floating glass is, from solid to nothing but the bending edge. Ultra puts glass on every card and cranks the edge refraction, colour fringe and shine as far as they go. Heavy on older devices.")
 }
 
-/** One fixed stop on the glass slider: its name and how transparent the backing is (0 = solid, 1 = none). */
 internal class GlassStop(val name: String, val transparency: Float, val ultra: Boolean = false)
 
 internal val GlassStops = listOf(

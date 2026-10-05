@@ -56,15 +56,8 @@ internal fun PaletteEditorDialog(
     var tertiaryColor by remember(editing) {
         mutableStateOf(editing?.tertiaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: ColorPalette.TEAL.swatch)
     }
-    // Was a single un-confirmed tap that permanently deleted a saved custom
-    // palette -- same "tap again to confirm" + 4s auto-reset pattern as the
-    // climate preset delete nub, so this destructive action isn't one
-    // mis-tap away from losing work either.
     val confirmDeleteArm = rememberConfirmArm()
-    // Standardized on the shared GlassAlertDialog shell. No leading icon (the
-    // dialog is title-led); the delete affordance rides the shell's titleTrailing
-    // slot; the shell already scrolls its body (max 360dp), so the inner
-    // verticalScroll is dropped to avoid a nested-scroll conflict.
+    // Standardized on the shared GlassAlertDialog shell.
     GlassAlertDialog(
         onDismissRequest = onDismiss,
         title = if (editing == null) "New palette" else "Edit \"${editing.name}\"",
@@ -97,11 +90,10 @@ internal fun PaletteEditorDialog(
                 )
                 ColorPickerCanvas(primaryColor, { primaryColor = it })
 
-                // Secondary colour (optional)
-                // ToggleRow, not a hand-rolled label+Switch: identical layout and the
-                // same bodyMedium label, but it brings the morph pill track, the
-                // toggleOn/toggleOff haptics and the single-focus-stop TalkBack
-                // semantics that every other boolean setting in the app has.
+                // Secondary colour (optional) ToggleRow, not a hand-rolled label+Switch: identical
+                // layout and the same bodyMedium label, but it brings the morph pill track, the
+                // toggleOn/toggleOff haptics and the single-focus-stop TalkBack semantics that
+                // every other boolean setting in the app has.
                 ToggleRow("Custom secondary", useSecondary) { useSecondary = it }
                 AnimatedVisibility(useSecondary, enter = expandEnterSized(), exit = expandExitSized()) {
                     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -113,11 +105,10 @@ internal fun PaletteEditorDialog(
                     }
                 }
 
-                // Tertiary colour (optional)
-                // ToggleRow, not a hand-rolled label+Switch: identical layout and the
-                // same bodyMedium label, but it brings the morph pill track, the
-                // toggleOn/toggleOff haptics and the single-focus-stop TalkBack
-                // semantics that every other boolean setting in the app has.
+                // Tertiary colour (optional) ToggleRow, not a hand-rolled label+Switch: identical
+                // layout and the same bodyMedium label, but it brings the morph pill track, the
+                // toggleOn/toggleOff haptics and the single-focus-stop TalkBack semantics that
+                // every other boolean setting in the app has.
                 ToggleRow("Custom tertiary", useTertiary) { useTertiary = it }
                 AnimatedVisibility(useTertiary, enter = expandEnterSized(), exit = expandExitSized()) {
                     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -157,13 +148,6 @@ internal fun PaletteEditorDialog(
     )
 }
 
-
-// Three fixed stops instead of a free continuous 0-2 range with 20 snap points -- most
-// of those were indistinguishable by eye, and "what number is this" isn't a useful
-// question for a saturation slider. Bounded to match SettingsStore's own read-clamp
-// (0.5..1.6): this used to run 0f ("Monochrome") to 2.5f ("Best Buy TV"), but both
-// extremes silently got clamped back to 0.5/1.6 on the very next read, so picking
-// either one showed a value the persisted state could never actually hold.
 internal val VibrancySteps = floatArrayOf(0.5f, 1f, 1.6f)
 
 internal val VibrancyLabels = listOf("Muted", "Normal", "Vivid")
@@ -172,9 +156,10 @@ internal fun vibrancyIndexFor(v: Float): Int =
 
     VibrancySteps.indices.minByOrNull { kotlin.math.abs(VibrancySteps[it] - v) } ?: 1
 
-
-/** Shared by the main Appearance card and the settings-search quick-jump
- *  preview so the 3-stop mapping lives in exactly one place. */
+/**
+ * Shared by the main Appearance card and the settings-search quick-jump preview so the 3-stop
+ * mapping lives in exactly one place.
+ */
 @Composable
 internal fun VibrancySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     var indexDraft by remember(appearance.vibrancy) { mutableFloatStateOf(vibrancyIndexFor(appearance.vibrancy).toFloat()) }
@@ -192,10 +177,6 @@ internal fun VibrancySlider(appearance: SettingsStore.Appearance, vm: AppViewMod
     )
 }
 
-
-/** Shared by the main Appearance card and the settings-search quick-jump
- *  preview so this slider's range/step/rounding lives in exactly one place
- *  -- the two used to be hand-copied and could drift out of sync. */
 @Composable
 internal fun UiScaleSlider(appearance: SettingsStore.Appearance, vm: AppViewModel, label: String = "Text & layout scale") {
     var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }

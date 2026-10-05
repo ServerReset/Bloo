@@ -37,10 +37,10 @@ internal val SearchStopwords = setOf(
     "car", "cars", "my", "s", "setting", "settings", "get", "in",
 )
 
-
 /**
- * Words people use for things this app calls something else. Each query token expands to itself plus its
- * synonyms (token -> app vocabulary), and an entry matching any form counts as matching the token.
+ * Words people use for things this app calls something else. Each query token expands to itself
+ * plus its synonyms (token -> app vocabulary), and an entry matching any form counts as matching
+ * the token.
  */
 internal val SearchSynonyms: Map<String, List<String>> = mapOf(
     "vibrate" to listOf("haptic"),
@@ -147,13 +147,11 @@ internal val SearchSynonyms: Map<String, List<String>> = mapOf(
     "launcher" to listOf("shortcuts"),
 )
 
-
 /** A token and every form of it worth matching. */
 internal fun expandToken(t: String): List<String> {
     val extra = SearchSynonyms[t] ?: return listOf(t)
     return buildList { add(t); addAll(extra) }
 }
-
 
 /** A runner command id as a sentence fragment, for the confirm card. */
 internal fun aiCommandLabel(cmd: String): String = when (cmd) {
@@ -168,18 +166,12 @@ internal fun aiCommandLabel(cmd: String): String = when (cmd) {
     else -> "Run on"
 }
 
-
 internal class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit) {
     // Memoized lowercase title; avoids recomputing per score call.
     val titleLowercase: String = title.lowercase()
 }
 
-
-/**
- * Declarative description of one plain on/off setting: one entry here makes it searchable. Settings that
- * need more than a toggle (pickers, confirm-gated prompts, sliders, per-vehicle) declare themselves
- * explicitly so a search shortcut can't skip a step the real row enforces.
- */
+/** Declarative description of one plain on/off setting: one entry here makes it searchable. */
 internal class ToggleSpec(
     val title: String,
     val keywords: String,
@@ -191,7 +183,6 @@ internal class ToggleSpec(
     val checked: (SettingsStore.Appearance, SettingsStore.NotificationPrefs, UiState) -> Boolean,
     val onToggle: (AppViewModel, Boolean) -> Unit,
 )
-
 
 /** Every plain app-wide toggle, in the order it should appear when searched. */
 internal val ToggleSettings = listOf(
@@ -263,7 +254,6 @@ internal val ToggleSettings = listOf(
     ),
 )
 
-
 /**
  * The per-vehicle counterpart of [ToggleSpec]: a plain on/off setting that exists once per car.
  * [CarSettingsCard] is the source of truth; this list makes them searchable.
@@ -277,9 +267,10 @@ internal class VehicleToggleSpec(
     val onToggle: (AppViewModel, Vehicle, Boolean) -> Unit,
 )
 
-
-/** Every plain per-car toggle: each seat position's heat and cool flags plus the heated steering wheel.
- *  Built from [SeatPositions] (Screens.kt), the same list [CarSettingsCard] uses. */
+/**
+ * Every plain per-car toggle: each seat position's heat and cool flags plus the heated steering
+ * wheel. Built from [SeatPositions] (Screens.kt), the same list [CarSettingsCard] uses.
+ */
 internal val VehicleToggleSettings: List<VehicleToggleSpec> = buildList {
     SeatPositions.forEach { pos ->
         add(
@@ -312,9 +303,10 @@ internal val VehicleToggleSettings: List<VehicleToggleSpec> = buildList {
     )
 }
 
-
-/** True if any word in [hay] starts with [prefix] ("lim" hits "charge limit", not "unlimited"). Scans for the
- *  boundary instead of splitting, to avoid allocating per entry per keystroke. */
+/**
+ * True if any word in [hay] starts with [prefix] ("lim" hits "charge limit", not "unlimited").
+ * Scans for the boundary instead of splitting, to avoid allocating per entry per keystroke.
+ */
 internal fun hasWordStarting(hay: String, prefix: String): Boolean {
     var i = hay.indexOf(prefix)
     while (i >= 0) {
@@ -324,8 +316,10 @@ internal fun hasWordStarting(hay: String, prefix: String): Boolean {
     return false
 }
 
-
-/** Within one insertion, deletion or substitution. Not full Levenshtein: O(n), and keeps "haptic" from matching "static". */
+/**
+ * Within one insertion, deletion or substitution. Not full Levenshtein: O(n), and keeps "haptic"
+ * from matching "static".
+ */
 internal fun withinOneEdit(a: String, b: String): Boolean {
     if (a == b) return true
     val (short, long) = if (a.length <= b.length) a to b else b to a
@@ -342,7 +336,6 @@ internal fun withinOneEdit(a: String, b: String): Boolean {
     return true
 }
 
-
 /** True if any word of [hay] is within one edit of [token]. */
 internal fun hasFuzzyWord(hay: String, token: String): Boolean {
     var start = 0
@@ -355,18 +348,17 @@ internal fun hasFuzzyWord(hay: String, token: String): Boolean {
     return false
 }
 
-
 /**
- * How well one entry answers the query, or null for "not at all".
- *
- * Every token must match something ([tokens] are ANDed). Title outranks keywords, a word start outranks
- * the middle of one, and shorter titles win ties.
+ * How well one entry answers the query, or null for "not at all". Every token must match something
+ * ([tokens] are ANDed). Title outranks keywords, a word start outranks the middle of one, and
+ * shorter titles win ties.
  */
 internal fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): Int? {
     val title = e.titleLowercase
     var total = 0
     for (t in tokens) {
-        // Best hit across the token and its synonyms; a synonym is worth less than the literal word.
+        // Best hit across the token and its synonyms; a synonym is worth less than the literal
+        // word.
         var hit = 0
         for ((i, form) in expandToken(t).withIndex()) {
             val penalty = if (i == 0) 0 else 30
@@ -389,20 +381,19 @@ internal fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): 
     return total * 100 - title.length
 }
 
-
-/** A vehicle command recognised in a free-form search query. [cmd]/[climateTarget] use
- *  [com.bloo.bluelink.data.VehicleCommandRunner]'s command vocabulary. */
+/**
+ * A vehicle command recognised in a free-form search query. [cmd]/[climateTarget] use
+ * [com.bloo.bluelink.data.VehicleCommandRunner]'s command vocabulary.
+ */
 internal class ParsedVehicleCommand(val cmd: String, val climateTarget: String = "default", val label: String)
 
-
-/** Recognises a small, conservative set of command phrasings (lock/unlock, start/stop/smart climate,
- *  start/stop charging). "unlock" is checked before "lock". Direction is encoded in the command itself
- *  (`climate_on`/`climate_off`, `charge_on`/`charge_off`) so the runner never re-derives it from the snapshot. */
 /**
- * The temperature asked for, in Fahrenheit, or null if the query names none.
- *
- * Superlatives resolve to the ends of [CLIMATE_TEMP_RANGE_F]. A bare number is not a temperature
- * ("Ioniq 5"): it needs a preposition ("at 64") or a unit ("64 degrees", "64F").
+ * Recognises a small, conservative set of command phrasings (lock/unlock, start/stop/smart climate,
+ * start/stop charging). "unlock" is checked before "lock".
+ */
+/**
+ * The temperature asked for, in Fahrenheit, or null if the query names none. Superlatives resolve
+ * to the ends of [CLIMATE_TEMP_RANGE_F].
  */
 internal fun parseClimateTemperature(q: String, metric: Boolean): Int? {
     if (RxColdest.containsMatchIn(q)) {

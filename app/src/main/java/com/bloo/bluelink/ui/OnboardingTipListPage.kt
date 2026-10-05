@@ -19,20 +19,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.bloo.bluelink.data.Powertrain
 
 /**
- * The shared shape all three intro/closing pages ([OnboardingIntroPage],
- * [OnboardingCrashCoursePage], [OnboardingFeaturesPage]) turned out to want: an emoji, a big
- * title, a supporting line, then a list of tip cards. Extracted after finding it hand-written
- * three times over -- the pages differ only in their copy, [titleStyle] (the intro page's
- * welcome is a size up from the other two), and their tip list, never in shape, so a future
- * fourth page (or a copy edit to any existing one) has exactly one place to change.
- *
- * Deliberately no per-item entrance animation on the tip list, matching what
- * [OnboardingIntroPage] itself already settled on: [AnimatedContent]'s own slide/fade in
- * [OnboardingScreen] already animates the whole page in, and this exact page family already
- * tried layering a second per-card entrance on top of that once (see intro's own history) and
- * found it fought with the page slide, reading as jittery rather than smooth. The two closing
- * pages get the same plain, instant stack intro already uses -- not a separate animation
- * choice per page that happens to agree today.
+ * Extracted after finding it hand-written three times over -- the pages differ only in their copy,
+ * [titleStyle] (the intro page's welcome is a size up from the other two), and their tip list,
+ * never in shape, so a future fourth page (or a copy edit to any existing one) has exactly one
+ * place to change.
  */
 @Composable
 internal fun OnboardingTipListPage(tips: List<Triple<ImageVector, String, String>>) {
@@ -41,9 +31,10 @@ internal fun OnboardingTipListPage(tips: List<Triple<ImageVector, String, String
     }
 }
 
-
-/** Second-to-last step: a quick tip list covering the app's core gestures. Followed by
- *  [OnboardingFeaturesPage], the actual final step. */
+/**
+ * Second-to-last step: a quick tip list covering the app's core gestures. Followed by
+ * [OnboardingFeaturesPage], the actual final step.
+ */
 @Composable
 internal fun OnboardingTipsPage() {
     OnboardingTipListPage(
@@ -56,17 +47,10 @@ internal fun OnboardingTipsPage() {
     )
 }
 
-
 /**
- * The actual final step -- the one screen shown right before "Enter Bloo" hands off to the
- * garage, so it is the one place every new user is guaranteed to see these highlighted at
- * least once, unlike a feature that only shows itself to someone who happens to open
- * Settings. Distinct from [OnboardingCrashCoursePage] just before it: that page is about
- * *how to use the screen you're about to land on* (gestures); this one is about
- * *things the app can do that aren't obvious from looking at it* (AutoLock, live charging,
- * natural-language search). On-device AI is the one entry gated on
- * [UiState.aiSupported] -- the others work on every device, but advertising a feature this
- * phone's own hardware can't run would be a promise the app can't keep.
+ * The actual final step -- the one screen shown right before "Enter Bloo" hands off to the garage,
+ * so it is the one place every new user is guaranteed to see these highlighted at least once,
+ * unlike a feature that only shows itself to someone who happens to open Settings.
  */
 @Composable
 internal fun OnboardingFeaturesPage(state: UiState) {

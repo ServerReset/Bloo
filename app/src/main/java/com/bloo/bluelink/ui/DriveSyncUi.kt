@@ -35,19 +35,15 @@ import com.bloo.bluelink.data.syncDeviceName
 import com.bloo.bluelink.data.watchLockTiming
 
 /**
- * Multi-device Drive sync UI: the device list/reorder section, per-device row,
- * and the setup dialog + its choice row. Split out of Rows.kt to separate this
- * self-contained cluster from the smaller settings-row primitives there.
+ * Multi-device Drive sync UI: the device list/reorder section, per-device row, and the setup dialog
+ * + its choice row. Split out of Rows.kt to separate this self-contained cluster from the smaller
+ * settings-row primitives there.
  */
 
 /**
- * The synced-devices registry shown in the "Backup & sync" card: a
- * drag-to-reorder list (same gesture as the car-order list in Settings) where
- * the TOP device is the primary — the source of truth other devices adopt.
- * Dragging a device to the top makes it primary. Each row shows a drag handle, a
- * device icon (★ on the primary), its name (with a "This device" marker for
- * self + a rename affordance), model, and how long ago it last synced. Renders
- * nothing until the first sync populates the registry.
+ * The synced-devices registry shown in the "Backup & sync" card: a drag-to-reorder list (same
+ * gesture as the car-order list in Settings) where the TOP device is the primary — the source of
+ * truth other devices adopt.
  */
 @Composable
 internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
@@ -55,17 +51,17 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
     SettingsGroup("Synced devices") { SyncDevicesContent(state, vm) }
 }
 
-/** The inside of the "Synced devices" box: a hint, every phone (drag the top one to make it primary)
- *  with its watch tucked underneath, and a warning when a device has gone quiet. */
+/**
+ * The inside of the "Synced devices" box: a hint, every phone (drag the top one to make it primary)
+ * with its watch tucked underneath, and a warning when a device has gone quiet.
+ */
 @Composable
 private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     val devices = state.syncDevices
     var renaming by remember { mutableStateOf(false) }
 
-    // Order the list so the primary is on top (that's the invariant the drag
-    // gesture maintains); everyone else falls in by most-recently-seen. Dragging
-    // a device to the top sets it primary, after which this same sort keeps it
-    // there — so the visual order and the "primary" concept stay in lockstep.
+    // Order the list so the primary is on top (that's the invariant the drag gesture maintains);
+    // everyone else falls in by most-recently-seen.
     val ordered = remember(devices, state.syncPrimaryId) {
         devices.sortedWith(
             compareByDescending<com.bloo.bluelink.data.SyncMerge.SyncDevice> { it.id == state.syncPrimaryId }
@@ -95,8 +91,8 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     ReorderColumn(
         items = phones,
         keyOf = { it.id },
-        // Dropped in a new order → the new TOP device becomes primary. setPrimaryDevice
-        // persists it + triggers a sync so every device converges on the choice.
+        // Dropped in a new order → the new TOP device becomes primary. setPrimaryDevice persists it
+        // + triggers a sync so every device converges on the choice.
         onReorder = { reordered -> reordered.firstOrNull()?.let { vm.setPrimaryDevice(it.id) } },
         spacing = GapRow,
     ) { device, itemDragHandle, dragging ->
@@ -143,8 +139,8 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                 )
             }
             if (isSelf && live == null && registered.isEmpty()) {
-                // Under THIS phone on purpose: setting a watch up connects it to the device you
-                // are holding, and the placement says so.
+                // Under THIS phone on purpose: setting a watch up connects it to the device you are
+                // holding, and the placement says so.
                 Spacer(Modifier.height(6.dp))
                 CompanionActionRow(
                     label = "Set up watch",
@@ -184,8 +180,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     if (renaming) {
         var draft by remember { mutableStateOf(state.syncDeviceName) }
         val scheme = MaterialTheme.colorScheme
-        // Standardized on the shared GlassAlertDialog shell (was the legacy
-        // BlooDialog, now removed). Stacked full-width buttons.
+        // Stacked full-width buttons.
         GlassAlertDialog(
             onDismissRequest = { renaming = false },
             icon = Icons.Filled.Smartphone,
@@ -195,14 +190,6 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                     "Shown in the devices list on all your synced devices.",
                     color = scheme.onSurfaceVariant,
                 )
-                // FieldShape with the DEFAULT outlined colours -- the same field
-                // ClimatePebble's "Save preset" and the palette editor's "Name" draw
-                // inside this identical glass shell. borderlessFieldColors() (which
-                // this used to pass) is the credential-over-glass treatment: the lock
-                // screen, onboarding's PIN pair and the PIN dialog, where the field
-                // sits on the aurora and needs its own opaque fill. "Name this device"
-                // is an ordinary form field, and it was the only one of those wearing
-                // the credential look.
                 BlooTextField(
                     value = draft,
                     onValueChange = { draft = it },
@@ -233,7 +220,6 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
         )
     }
 }
-
 
 /** How far a companion is inset under its phone row. */
 private val CompanionIndent = 22.dp

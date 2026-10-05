@@ -21,14 +21,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
- * Represents a single remote action taken on a vehicle.
- * Used for displaying action history in RemoteActionsHistoryCard.
- *
- * @param id Unique identifier for this action
- * @param action Type of action ("Lock", "Unlock", "Climate", "Charge", etc.)
- * @param timestamp ISO 8601 formatted timestamp (UTC)
- * @param status Success/failure status ("Success", "Failed", "Pending")
- * @param details Optional additional details (temperature setting, charge level, etc.)
+ * Represents a single remote action taken on a vehicle. Used for displaying action history in
+ * RemoteActionsHistoryCard.
  */
 data class RemoteAction(
     val id: String,
@@ -48,8 +42,8 @@ private fun statusColor(status: String) = when (status.lowercase()) {
 }
 
 /**
- * One action on one line: a status dot, the name, and the time. Deliberately flat: this list sits inside
- * the lock pebble, so status is the only thing worth colour.
+ * One action on one line: a status dot, the name, and the time. Deliberately flat: this list sits
+ * inside the lock pebble, so status is the only thing worth colour.
  */
 @Composable
 private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
@@ -109,12 +103,14 @@ private fun shortTime(iso: String, use24Hour: Boolean): String = runCatching {
 }.getOrDefault(iso)
 
 /**
- * Recent remote commands for one car, rendered inline with no card, header or disclosure control (it is
- * revealed inside the lock pebble). A plain Column avoids a nested lazy list's infinite-constraint crash.
+ * Recent remote commands for one car, rendered inline with no card, header or disclosure control
+ * (it is revealed inside the lock pebble). A plain Column avoids a nested lazy list's
+ * infinite-constraint crash.
  */
 @Composable
 internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
-    // The panel owns its insets: the pebble's content inset on the sides and real bottom clearance for the corner radius.
+    // The panel owns its insets: the pebble's content inset on the sides and real bottom clearance
+    // for the corner radius.
     Column(
         Modifier
             .fillMaxWidth()
@@ -123,7 +119,8 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
         // A hairline separating the controls from the history.
         SectionDivider(alpha = 0.35f, modifier = Modifier.padding(bottom = 6.dp))
         if (actions.isEmpty()) {
-            // Not nothing: the press that reveals this panel has no chrome, so the empty state is its only feedback.
+            // Not nothing: the press that reveals this panel has no chrome, so the empty state is
+            // its only feedback.
             Text(
                 text = "No remote actions yet",
                 style = MaterialTheme.typography.labelSmall,

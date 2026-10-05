@@ -12,34 +12,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.bloo.uicommon.ReorderColumn
 
-/**
- * "Cars" section content -- see the call site in [SettingsScreen] for context.
- * `expandedCar`/`single` are genuinely local to this section (nothing else reads
- * them), so they're declared here rather than threaded down as parameters. [pick]
- * is the one piece of behavior this section needs from its caller: it reaches into
- * `pickTarget`/`photoLauncher`, both of which live in [SettingsScreen] itself (the
- * crop flow below the scrolling list also reads `pickTarget`), so it's passed in
- * explicitly instead of being redeclared here.
- */
+/** "Cars" section content -- see the call site in [SettingsScreen] for context. */
 @Composable
 internal fun CarsCardContent(state: UiState, vm: AppViewModel, pick: (String) -> Unit) {
                 var expandedCar by remember { mutableStateOf<String?>(null) }
                 val single = state.vehicles.size == 1
                 if (single) {
-                    // With one car, CarSettingsCard IS the section's card --
-                    // forceExpanded already gives it the exact same always-open,
-                    // no-chevron header every other top-level SettingsCard has.
-                    // Wrapping it in another SettingsCard("Car") on top used to
-                    // stack two pebble headers both announcing the same car for
-                    // no reason (one titled "Car", the other the car's own
-                    // name) -- redundant chrome with nothing to expand,
-                    // collapse or reorder underneath it.
+                    // With one car, CarSettingsCard IS the section's card -- forceExpanded already
+                    // gives it the exact same always-open, no-chevron header every other top-level
+                    // SettingsCard has.
                     val v = state.vehicles[0]
-                    // The exact same wrapper SettingsCard itself uses (gap + heading()
-                    // semantics), via settingsCardSlot() -- this bypasses SettingsCard to
-                    // avoid stacking two pebble headers for one car, but still wants its
-                    // outer chrome, so it shares that one definition instead of a second
-                    // hand-written copy.
+                    // The exact same wrapper SettingsCard itself uses (gap + heading() semantics),
+                    // via settingsCardSlot() -- this bypasses SettingsCard to avoid stacking two
+                    // pebble headers for one car, but still wants its outer chrome, so it shares
+                    // that one definition instead of a second hand-written copy.
                     Box(Modifier.settingsCardSlot()) {
                         CarSettingsCard(
                             v = v, state = state, vm = vm,
@@ -66,4 +52,3 @@ internal fun CarsCardContent(state: UiState, vm: AppViewModel, pick: (String) ->
                     }
                 }
 }
-

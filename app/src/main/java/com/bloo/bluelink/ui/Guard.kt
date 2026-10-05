@@ -57,21 +57,12 @@ import kotlin.math.max
 
 @Composable
 internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
-    // Both directions SNAP, neither animates the radius. Animating a full-screen 22dp blur
-    // radius means re-rasterizing the whole app tree at a different radius on EVERY frame of
-    // the animation -- measured on the API 34 emulator as a 2.3s frame of which ~1s was this
-    // blur -- and on real devices the unlock then still chugs for the whole 450ms. Locking
-    // snaps in anyway (the lock's own UI covers the content), and on unlock the 450ms fade is
-    // carried by LockAlphaOverlay's own alpha, so the blur snapping off behind it is not a
-    // visible pop -- the lock UI is what is fading, not the blur.
+    // Both directions SNAP, neither animates the radius.
     val lockBlur = remember { Animatable(0f) }
     LaunchedEffect(locked) {
         lockBlur.snapTo(if (locked) LOCK_BLUR_DP else 0f)
     }
-    // The blur modifier is applied only while there IS one. Modifier.blur(0.dp) installs no
-    // RenderEffect, but it still forces the whole app tree into its own graphicsLayer on every
-    // frame -- for the entire life of the process, to serve a lock screen that is almost never
-    // up. This wraps every screen in the app, so it was the most expensive no-op in the tree.
+    // The blur modifier is applied only while there IS one.
     Box(
         Modifier
             .fillMaxSize()
@@ -81,10 +72,7 @@ internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
     }
 }
 
-
-/** The locked blur radius (was an inline 22.dp at its one call site). */
 private const val LOCK_BLUR_DP = 22f
-
 
 @Composable
 internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel, opaqueBackdrop: Boolean = false) {
@@ -102,44 +90,28 @@ internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel, opaqueBackdrop:
     }
 }
 
-
 /**
- * The app lock, drawn as an overlay on top of the blurred app. High-contrast
- * white-on-scrim text reads over any wallpaper of cars behind it; a floating
- * back arrow returns to the login screen. Centered + width-capped so it sits
- * well on phones and tablets alike.
- *
- * Two mechanisms, one overlay:
- *  - **Biometric/biometric** when the device has biometrics enrolled AND
- *    the biometric lock is on (the classic prompt, plus a "Use PIN" link);
- *  - **PIN** when a device PIN is installed -- which is always the case on
- *    the device when it has no biometrics at all (the onboarding flow
- *    requires one there, since otherwise the app could never lock) -- or
- *    when the user picks the PIN route from the biometric prompt.
- *
- * All controls are the app's standard components (MorphButton /
- * MorphTextButton / the FieldShape outline field), so the lock reads as part
- * of the same app, not a leftover scaffold screen.
+ * The app lock, drawn as an overlay on top of the blurred app. High-contrast white-on-scrim text
+ * reads over any wallpaper of cars behind it; a floating back arrow returns to the login screen.
  */
 @Composable
 internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     val context = LocalContext.current
     val appState by vm.state.collectAsStateWithLifecycle()
-    // The device-biometric gate is a binder call -- evaluate once per overlay
-    // mount, not per recomposition of the (frequently updating) state below.
+    // The device-biometric gate is a binder call -- evaluate once per overlay mount, not per
+    // recomposition of the (frequently updating) state below.
     val bioAvailable = remember { vm.canUseBiometrics() }
     val appearance by vm.appearance.collectAsStateWithLifecycle()
-    // Start on the biometric prompt when there's one to show; the user can
-    // switch to PIN; devices without biometrics land straight on PIN.
+    // Start on the biometric prompt when there's one to show; the user can switch to PIN; devices
+    // without biometrics land straight on PIN.
     var usePinMode by remember { mutableStateOf(!bioAvailable) }
     var pin by remember { mutableStateOf("") }
-    // A wall-clock ticker that only runs while a rejection window is open --
-    // the countdown line needs a fresh "seconds left" each second, and
-    // nothing else here wants a 1s recomposition loop.
+    // A wall-clock ticker that only runs while a rejection window is open -- the countdown line
+    // needs a fresh "seconds left" each second, and nothing else here wants a 1s recomposition
+    // loop.
     var nowTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    // The monotonic reading is ticked alongside the wall clock, so the countdown this screen
-    // SHOWS agrees with the one verifyAppPin enforces. Reading only the wall clock here would
-    // have the UI cheerfully offer a keypad while the attempt was still being rejected.
+    // The monotonic reading is ticked alongside the wall clock, so the countdown this screen SHOWS
+    // agrees with the one verifyAppPin enforces.
     var elapsedTick by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
     val lockout = appState.pinLockout
     val rejected = lockout.isLocked(nowTick, elapsedTick)
@@ -167,16 +139,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
         vm.acknowledgePinRejection()
         if (!usePinMode) authenticateBiometric()
     }
-    // Tick ONLY while a rejection window is actually counting down.
-    //
-    // This loop used to be `while (true)` inside the effect above -- two state writes every
-    // 250ms for as long as the lock screen was composed, i.e. 4Hz forever, on a countdown that
-    // is only ever on screen during a lockout. Its own comment already claimed the conditional
-    // behaviour it did not have. Every tick invalidated every reader of `nowTick`/
-    // `elapsedTick` (the countdown line and the keypad's own enablement), and the writes are
-    // what made the whole lock screen -- and anything sharing its scope -- recompose four
-    // times a second for no reason, which is exactly the shape of churn the heap profile
-    // showed during a locked cold start.
+    // Tick ONLY while a rejection window is actually counting down. Its own comment already claimed
+    // the conditional behaviour it did not have.
     LaunchedEffect(rejected) {
         while (rejected) {
             delay(250)
@@ -184,20 +148,15 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             elapsedTick = android.os.SystemClock.elapsedRealtime()
         }
     }
-    // Pattern for "pick the PIN route": tapping "Use PIN" once; a failed
-    // biometric prompt stays on the biometric UI; PIN always returns here on
-    // the next lock anyway (fresh overlay remounts at the default mode).
-    // The lock screen follows the app theme: a dark veil with light text in dark mode, a pale one with
-    // dark text in light mode (it used to force white-on-black either way).
+    // Pattern for "pick the PIN route": tapping "Use PIN" once; a failed biometric prompt stays on
+    // the biometric UI; PIN always returns here on the next lock anyway (fresh overlay remounts at
+    // the default mode).
     val lockBg = MaterialTheme.colorScheme.background
     val lockFg = MaterialTheme.colorScheme.onBackground
     val haptics = LocalHaptics.current
     val showBiometric = bioAvailable && !usePinMode
-    // The backdrop animates between fully opaque (the first frames of a cold start, before
-    // the content underneath has settled -- see LockBlurLayer's own note) and the 45% scrim.
-    // It used to snap between the two the instant `opaqueBackdrop` flipped, which read as the
-    // whole lock screen "going transparent" in one frame; a short cross-fade makes the
-    // hand-off to the blurred garage imperceptible.
+    // The backdrop animates between fully opaque (the first frames of a cold start, before the
+    // content underneath has settled -- see LockBlurLayer's own note) and the 45% scrim.
     val backdropAlpha by animateFloatAsState(
         targetValue = if (opaqueBackdrop) 1f else 0.30f,
         animationSpec = tween(MotionMedium),
@@ -206,18 +165,10 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     Box(
         Modifier
             .fillMaxSize()
-            // Darken the blur for legibility, and swallow taps to the app behind. While the
-            // backdrop is NOT blurred (the first frames of a cold start, before the app
-            // underneath has finished composing) this is fully opaque instead: a 45% scrim
-            // over a sharp garage would show car names, plates and status through the lock
-            // screen, which is the one thing it exists to prevent.
+            // Darken the blur for legibility, and swallow taps to the app behind.
             .drawBehind { drawRect(lockBg.copy(alpha = backdropAlpha)) }
             .noRippleClickable {},
     ) {
-        // Floating back arrow -> login: the same FloatingIcon every other floating
-        // circular button in the app uses, with the lock scrim's plain-white
-        // override colours (this is what its old hand-rolled Surface now
-        // passes in -- one circle button, one component).
         FloatingIcon(
             icon = Icons.AutoMirrored.Filled.ArrowBack,
             description = "Back to login",
@@ -237,8 +188,9 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (showBiometric) {
-                // The same liquid glass as the rest of the app, over the force-blurred app behind it: the blur
-                // (LockBlurLayer) is what keeps data from leaking, the glass is what makes this one of us.
+                // The same liquid glass as the rest of the app, over the force-blurred app behind
+                // it: the blur (LockBlurLayer) is what keeps data from leaking, the glass is what
+                // makes this one of us.
                 GlassSurface(
                     shape = ExtraLargeShape,
                     modifier = Modifier.fillMaxWidth(),
@@ -281,9 +233,9 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     fillOnPress = true,
                     groupWeight = GroupWeightProportional,
                 ) {
-                    // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays
-                    // larger (24dp) than the standard 18dp, an intentional emphasis for the
-                    // screen's one primary CTA.
+                    // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays larger
+                    // (24dp) than the standard 18dp, an intentional emphasis for the screen's one
+                    // primary CTA.
                     MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
                 }
                 if (appState.appPinSet) {
@@ -361,8 +313,6 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                         val pinUnlockSource = remember { MutableInteractionSource() }
                         MorphButton(
                             onClick = { attemptPin() },
-                            // heightIn(min), not a fixed 52dp: the "Unlock" label grows past
-                            // this at a large accessibility font, and a hard height clipped it.
                             modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                             interactionSource = pinUnlockSource,
                             enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
@@ -383,9 +333,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     }
                 }
             } else {
-                // No mechanism at all -- should not be reachable (the lock
-                // gate refuses to engage without one); a calm fallback so the
-                // overlay never dead-ends silently.
+                // No mechanism at all -- should not be reachable (the lock gate refuses to engage
+                // without one); a calm fallback so the overlay never dead-ends silently.
                 Icon(
                     Icons.Filled.Lock,
                     contentDescription = null,

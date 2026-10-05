@@ -16,26 +16,13 @@ import com.bloo.bluelink.data.Vehicle
 /** How far the floating chrome slides down during a pull-to-refresh. */
 internal val RefreshPullShift = 96.dp
 
-/**
- * Wraps content with the pull-to-refresh gesture -- no visual indicator at all,
- * app-wide. The drawn indicator was removed after several rounds of real,
- * reported visual bugs across its call sites (a stuck "blob" look, bleed-through
- * under the expanded map, the same shared badge misfiring elsewhere). The gesture
- * and [onRefresh] still fire normally; only the drawing is gone.
- *
- * [onRefresh] is a plain lambda, not a fixed `vm.refreshStatus(v)` call, so
- * this same wrapper also covers [GarageStatusCard] (Guard.kt) -- the "no
- * vehicles"/"no connection" page has no [Vehicle] to refresh, just
- * [AppViewModel.loadGarage] to retry, and reported directly as wanting to be
- * "just another card like the rest of them" rather than its own one-off
- * Reload button.
- */
+/** Wraps content with the pull-to-refresh gesture -- no visual indicator at all, app-wide. */
 @Composable
 internal fun Refreshable(
     // The single UiState field this needs, and NOT the whole UiState: passing the state object
-    // subscribed every caller's composition to every emission -- a weather tick for another car,
-    // an AI probe, a log line -- for all three live pager pages at once, which is exactly what
-    // the callers' State<UiState> indirection exists to avoid.
+    // subscribed every caller's composition to every emission -- a weather tick for another car, an
+    // AI probe, a log line -- for all three live pager pages at once, which is exactly what the
+    // callers' State<UiState> indirection exists to avoid.
     refreshing: Boolean,
     onRefresh: () -> Unit,
     content: @Composable BoxScope.() -> Unit,
@@ -43,9 +30,9 @@ internal fun Refreshable(
     val ptrState = rememberPullToRefreshState()
     val haptics = LocalHaptics.current
 
-    // Publish the pull distance so GarageScreen's floating chrome tracks the pull live.
-    // The pull draws nothing itself; the app's ONE indicator (PullRefreshIndicatorHost,
-    // mounted at the root) draws it.
+    // Publish the pull distance so GarageScreen's floating chrome tracks the pull live. The pull
+    // draws nothing itself; the app's ONE indicator (PullRefreshIndicatorHost, mounted at the root)
+    // draws it.
     val pullFractionState = LocalPullFraction.current
     // The one app-wide indicator: this page feeds it and draws nothing of its own.
     val indicator = LocalRefreshIndicator.current
@@ -55,8 +42,8 @@ internal fun Refreshable(
             indicator?.pull?.value = it
         }
     }
-    // One stable key per Refreshable instance, so this page's own in-flight flag contributes to
-    // the app-wide OR without clearing a DIFFERENT page's (neighbour car pages stay composed).
+    // One stable key per Refreshable instance, so this page's own in-flight flag contributes to the
+    // app-wide OR without clearing a DIFFERENT page's (neighbour car pages stay composed).
     val indicatorKey = remember { Any() }
     LaunchedEffect(refreshing, indicator) {
         indicator?.setRefreshing(indicatorKey, refreshing)

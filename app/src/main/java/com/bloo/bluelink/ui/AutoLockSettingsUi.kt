@@ -32,18 +32,7 @@ import kotlin.math.roundToInt
 import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.setAutoLockConfig
 
-/**
- * AutoLock's per-car Settings section, inside [CarSettingsCard]. Ported feature from the
- * i5-AutoLock reference implementation by Vel-San (github.com/Vel-San/i5-AutoLock): locks
- * this car automatically when the phone disconnects from its paired Bluetooth device, once
- * Activity Recognition confirms you're actually walking away -- see app/.../autolock/ for
- * the detection + policy machinery this configures.
- *
- * Collapsed to one [SettingsGroup] plus a "Test" group: Bluetooth is the only trigger (no
- * geofence option -- that whole confirmation path, and the location permissions it needed,
- * were cut entirely), motion confirmation is mandatory and not a toggle, and the remaining
- * controls are Enable, the paired device picker, grace period, dry-run, and a way to test it.
- */
+/** AutoLock's per-car Settings section, inside [CarSettingsCard]. */
 @Composable
 internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
     val context = LocalContext.current
@@ -68,9 +57,9 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
     val bluetoothConnectLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> if (granted) showDevicePicker = true }
-    // Motion is a soft confirmation (it promotes the evaluation early when it fires, and is
-    // simply skipped when it doesn't -- see AutoLockController), so ACTIVITY_RECOGNITION is
-    // requested alongside the other permissions but is not gating.
+    // Motion is a soft confirmation (it promotes the evaluation early when it fires, and is simply
+    // skipped when it doesn't -- see AutoLockController), so ACTIVITY_RECOGNITION is requested
+    // alongside the other permissions but is not gating.
     val corePermissions = remember {
         buildList {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(Manifest.permission.BLUETOOTH_CONNECT)
@@ -97,8 +86,8 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
         ToggleRow("Enabled", current.enabled, onChange = { onEnabledChanged(it) })
 
         // AutoLock's notification controls (its alerts, the watcher notification, and the
-        // permission and reliability prompts it depends on) are in Settings -> Notifications,
-        // next to every other reason an alert might or might not arrive.
+        // permission and reliability prompts it depends on) are in Settings -> Notifications, next
+        // to every other reason an alert might or might not arrive.
 
         if (current.enabled) {
             StatusRow("Car Bluetooth device", current.deviceName ?: "Not set")
@@ -146,10 +135,10 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 )
             }
 
-            // The shared StatusChip (Widgets.kt), not a one-off Surface: the Updates
-            // card elsewhere in Settings had hand-rolled the same live-status pill
-            // with a different fill and padding, and a detection state and an update
-            // state are the same kind of readout in the same kind of card.
+            // The shared StatusChip (Widgets.kt), not a one-off Surface: the Updates card elsewhere
+            // in Settings had hand-rolled the same live-status pill with a different fill and
+            // padding, and a detection state and an update state are the same kind of readout in
+            // the same kind of card.
             val evalStates by vm.autoLockState.collectAsStateWithLifecycle()
             evalStates[v.vin]?.takeIf { it.detection != DetectionState.IDLE }?.let { s ->
                 StatusChip(
@@ -160,20 +149,11 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             }
         }
     }
-    // The i5-AutoLock attribution that used to sit here (a Surface + Text,
-    // shown only while AutoLock is enabled) moved to a single app-wide Credits
-    // card -- SettingsScreen.kt's own "Credits" SettingsCard -- alongside every
-    // other third-party project/API this app draws on, rather than one feature's
-    // settings section being the only place any of them were ever acknowledged.
 
     if (showDevicePicker) {
         val devices = remember { vm.pairedBluetoothDevices() }
-        // GlassAlertDialog (Ambient.kt), like every other dialog in the app. This was
-        // the last raw M3 AlertDialog left: a tonal M3 card with M3's own title/text
-        // slot split and 28dp-but-not-glass chrome, popping up two rows below a
-        // Settings screen where the PIN, preset, rename, palette, OTP, troubleshoot
-        // and Drive-sync dialogs all share one frosted shell. Nothing about picking a
-        // Bluetooth device needs its own dialog treatment.
+        // GlassAlertDialog (Ambient.kt), like every other dialog in the app. Nothing about picking
+        // a Bluetooth device needs its own dialog treatment.
         GlassAlertDialog(
             onDismissRequest = { showDevicePicker = false },
             icon = Icons.Filled.Bluetooth,
@@ -185,11 +165,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 } else {
-                    // A plain Column, not the LazyColumn + fixed 56dp-per-row height this
-                    // used to compute: the shell's own `text` slot already scrolls (capped
-                    // at 360dp), so a second vertical scroller nested inside it meant a
-                    // short list padded to a fixed height and a long one scrolling inside
-                    // a scroller. The paired-device list is a handful of rows, not a feed.
+                    // The paired-device list is a handful of rows, not a feed.
                     devices.forEach { device ->
                         MorphButton(
                             onClick = {
@@ -199,8 +175,8 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                             contentPadding = PaddingValues(horizontal = GapGroup, vertical = GapRow),
                         ) {
-                            // name/address pair, the same label-over-caption rhythm
-                            // every settings row in the app uses.
+                            // name/address pair, the same label-over-caption rhythm every settings
+                            // row in the app uses.
                             Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                                 BodyMediumText(device.name)
                                 LabelSmallText(device.address)
@@ -210,11 +186,10 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 }
             },
             buttons = {
-                // MorphTextButton, not M3's TextButton: the only bare Material button left in
-                // the app's own UI, and it rendered with stock M3 styling -- no morph, no
-                // haptic, none of the app's own button language -- next to dialogs whose
-                // dismiss action is always a MorphTextButton. Full width, like every other
-                // GlassAlertDialog's own dismiss action (the shell stacks its buttons).
+                // MorphTextButton, not M3's TextButton: the only bare Material button left in the
+                // app's own UI, and it rendered with stock M3 styling -- no morph, no haptic, none
+                // of the app's own button language -- next to dialogs whose dismiss action is
+                // always a MorphTextButton.
                 MorphTextButton(
                     "Close",
                     onClick = { showDevicePicker = false },

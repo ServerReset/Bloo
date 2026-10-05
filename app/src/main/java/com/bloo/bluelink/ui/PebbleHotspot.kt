@@ -45,27 +45,18 @@ import kotlin.math.abs
 import com.bloo.uicommon.ReorderColumn
 import androidx.compose.runtime.derivedStateOf
 
-/**
- * The dual-column "hot spot": slots under the car-info column for pinned pebbles.
- * Slot 1: Primary pebble (defaulting to "controls" with lights/horn, but removable)
- * Slot 2: Secondary user-selectable slot where they can pin additional pebbles
- */
+/** The dual-column "hot spot": slots under the car-info column for pinned pebbles. */
 @Composable
 internal fun HotspotSlot(
     v: Vehicle,
     hotspots: List<String>,
-    /**
-     * State SOURCE. It was already immediately re-wrapped into a rememberUpdatedState here,
-     * so nothing downstream ever wanted the snapshot -- but taking the snapshot meant the
-     * CALLER had to read state.value in its own body, subscribing the whole dual-column view
-     * to every UiState emission. Reading it here confines that to this slot.
-     */
+    /** State SOURCE. Reading it here confines that to this slot. */
     stateSource: State<UiState>,
     vm: AppViewModel,
 ) {
-    // Derived, not `val state = stateSource.value`: same reason as PebbleList's own — a body
-    // read subscribes this whole dual-column view to every UiState emission. The list compare
-    // below then makes an unrelated emission free.
+    // Derived, not `val state = stateSource.value`: same reason as PebbleList's own — a body read
+    // subscribes this whole dual-column view to every UiState emission. The list compare below then
+    // makes an unrelated emission free.
     val allAvailable by remember(v.vin) {
         derivedStateOf {
             val state = stateSource.value
@@ -89,17 +80,12 @@ internal fun HotspotSlot(
         allAvailable.filter { it != primaryPebble && it != secondaryPebble }
     }
 
-    // 12dp between the two slots, the SAME gap every other pair of pebbles in this view sits
-    // at (ReorderColumn's own default spacing for the pebble list, and ExpandedCar's
-    // `spacedBy(GapGroup)` for the column this slot lives in). It was 2.dp, which is the one
-    // spacing in the multi-column layout that made the pinned pebbles read as a stuck-together
-    // pair of a different kind from the cards around them -- part of the same report that the
-    // controls pebble looks unlike every other pebble there. The INNER column below keeps its
-    // own 2dp: that gap is between the secondary slot's small pin/Remove label and the pebble
-    // that label belongs to, where tight is the point.
+    // 12dp between the two slots, the SAME gap every other pair of pebbles in this view sits at
+    // (ReorderColumn's own default spacing for the pebble list, and ExpandedCar's
+    // `spacedBy(GapGroup)` for the column this slot lives in).
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-        // PRIMARY SLOT (Top) - Always "controls" (lights/horn), permanently pinned
-        // No removal option - this slot is hardcoded and locked
+        // PRIMARY SLOT (Top) - Always "controls" (lights/horn), permanently pinned No removal
+        // option - this slot is hardcoded and locked
         CompositionLocalProvider(LocalForceExpanded provides true) {
             SinglePebble(primaryPebble, v, stateSource, vm, Modifier)
         }
@@ -113,11 +99,6 @@ internal fun HotspotSlot(
 
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(
-                    // No fixed 32dp height any more: the standard MorphTextButton beside this
-                    // label is a 48dp target (ButtonTargetHeight), and clamping the row to 32dp
-                    // clipped it -- the reported "janky button when you go to remove the pinned
-                    // one", since its press morph grew past the row it was trapped in. The row
-                    // now sizes to the button and the label centres against it.
                     Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 8.dp),
@@ -161,11 +142,9 @@ internal fun HotspotSlot(
                 }
             }
         } else {
-            // Secondary slot is empty. Dragging a pebble here -- from the reorderable list in
-            // the other column -- is what pins it (see PebbleList's onDragRelease); this
-            // surface is just that drop target's resting/hover affordance. It used to ALSO
-            // open a DropdownMenu listing every unpinned pebble on tap; that pop-up is gone at
-            // the user's request, so a pebble now reaches this slot only by drag-and-drop.
+            // Secondary slot is empty. Dragging a pebble here -- from the reorderable list in the
+            // other column -- is what pins it (see PebbleList's onDragRelease); this surface is
+            // just that drop target's resting/hover affordance.
             if (unpinned.isNotEmpty()) {
                 Box(
                     Modifier.onGloballyPositioned {

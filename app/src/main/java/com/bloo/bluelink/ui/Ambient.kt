@@ -38,19 +38,8 @@ internal fun borderlessFieldColors(): androidx.compose.material3.TextFieldColors
 }
 
 /**
- * The Screen.Loading bootstrapping placeholder -- see that state's own doc
- * (AppViewModel.kt) for why it exists. Same AuroraBackground + "Bloo"
- * wordmark [LoginScreen] opens with, so if this resolves to Login next
- * there's nothing to visually reconcile: same backdrop, same brand mark,
- * already faded in. No form, no fields, nothing interactive -- this is a
- * "still deciding" placeholder, shown for however long the cold-start
- * auto-login coroutine takes to resolve, not a real destination on its own.
- *
- * The wordmark fades in on its own (not present from frame one) rather than
- * being static: a car-status app booting into a full-strength logo the
- * INSTANT the process starts reads as an abrupt, slightly jarring "already
- * finished loading" claim before anything has actually happened yet; easing
- * it in over a beat reads as the app settling into itself instead.
+ * The Screen.Loading bootstrapping placeholder -- see that state's own doc (AppViewModel.kt) for
+ * why it exists.
  */
 @Composable
 internal fun LoadingScreen(modifier: Modifier = Modifier) {
@@ -62,12 +51,7 @@ internal fun LoadingScreen(modifier: Modifier = Modifier) {
         label = "loadingWordmarkFade",
     )
     Box(modifier.fillMaxSize()) {
-        // Gated on the user's own setting, like the garage already gates it. This is the FIRST
-        // screen of every cold start, and it was painting a full-screen 44dp blur -- an offscreen
-        // buffer for the whole window, a blur shader compiled on first use, and a 12.5fps drift
-        // loop invalidating it -- unconditionally, including for people who had turned the aurora
-        // background off. The most expensive frames in the app were the ones before it had drawn
-        // anything, doing work that was switched off.
+        // Gated on the user's own setting, like the garage already gates it.
         if (LocalAppearance.current.auroraBackground) AuroraBackground(Modifier.matchParentSize())
         Text(
             "Bloo",
@@ -79,8 +63,4 @@ internal fun LoadingScreen(modifier: Modifier = Modifier) {
     }
 }
 
-// A synced device not seen this long is flagged as possibly on a different Drive
-// file (the two-files trap) in the sync settings. 2 days is well past any normal
-// gap for a device in active use, so it doesn't false-alarm on a phone you simply
-// didn't open yesterday.
 internal const val STALE_DEVICE_MS = 2L * 24 * 60 * 60 * 1000

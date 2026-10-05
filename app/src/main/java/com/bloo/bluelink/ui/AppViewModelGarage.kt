@@ -26,17 +26,22 @@ import com.bloo.bluelink.data.vehicleOrder
 
 // --- Garage loading, cached publish, and per-car config seeding (extracted from AppViewModel) --
 
-/** Result of [perCarConfig]: a UiState transform folding in the config fields, plus the shortcut
- *  set the caller needs for [com.bloo.bluelink.Shortcuts.refresh]. */
+/**
+ * Result of [perCarConfig]: a UiState transform folding in the config fields, plus the shortcut set
+ * the caller needs for [com.bloo.bluelink.Shortcuts.refresh].
+ */
 internal class PerCarConfig(val apply: (UiState) -> UiState, val shortcutSet: Set<String>?)
 
-
-/** Full garage (re)load wrapped in [launchBusy]: shows [UiState.loading], and a thrown exception becomes a snackbar. */
+/**
+ * Full garage (re)load wrapped in [launchBusy]: shows [UiState.loading], and a thrown exception
+ * becomes a snackbar.
+ */
 fun AppViewModel.loadGarage() = launchBusy { loadGarageInternal() }
 
-
-/** Re-entrancy guard around [loadGarageInner]: only one garage load runs at a time.
- *  `@Volatile` because it is read and written from different threads. */
+/**
+ * Re-entrancy guard around [loadGarageInner]: only one garage load runs at a time. `@Volatile`
+ * because it is read and written from different threads.
+ */
 internal suspend fun AppViewModel.loadGarageInternal() {
     if (loadingGarage) return
     loadingGarage = true
@@ -47,9 +52,10 @@ internal suspend fun AppViewModel.loadGarageInternal() {
     }
 }
 
-
-/** Whether the device has a validated internet-capable network (not merely an interface that is up).
- *  Separates a real API/auth failure from having no connection at all. */
+/**
+ * Whether the device has a validated internet-capable network (not merely an interface that is up).
+ * Separates a real API/auth failure from having no connection at all.
+ */
 private fun AppViewModel.isDeviceOnline(): Boolean {
     val cm = getApplication<Application>()
         .getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
@@ -59,12 +65,9 @@ private fun AppViewModel.isDeviceOnline(): Boolean {
         caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
 }
 
-
 /**
- * Publish the last-known garage from disk, before [loadGarageInner]'s network round trip.
- *
- * The fetch replaces it moments later; if the fetch fails the cached garage stays. Only fires on
- * the cold-start path when the resolved screen is Garage, so first run and CarSetup are unaffected.
+ * Publish the last-known garage from disk, before [loadGarageInner]'s network round trip. The fetch
+ * replaces it moments later; if the fetch fails the cached garage stays.
  */
 private suspend fun AppViewModel.publishCachedGarage() {
     if (_state.value.screen != Screen.Loading) return
@@ -91,10 +94,10 @@ private suspend fun AppViewModel.publishCachedGarage() {
     AppLog.log("⚡ Cached garage shown before the network: ${cachedVehicles.size} vehicle(s)")
 }
 
-
 suspend fun AppViewModel.loadGarageInner() {
     logStartup("loadGarageInner: started")
-    // Fire-and-forget, parallel to the vehicle fetch: refreshes the device's own location on app open.
+    // Fire-and-forget, parallel to the vehicle fetch: refreshes the device's own location on app
+    // open.
     refreshDeviceLocation()
     com.bloo.bluelink.data.StartupTrace.markIfStarting(
         "loadGarageInner: refreshDeviceLocation() dispatched (repos=${repos.size})",
@@ -102,7 +105,6 @@ suspend fun AppViewModel.loadGarageInner() {
     // Started once per app open; no explicit stop, the subscription dies with the process.
     beginLiveDeviceLocation()
     com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: live device location started")
-    // Show the last-known garage now, before the vehicle-list round trip (see publishCachedGarage).
     publishCachedGarage()
     // Merge vehicles from every signed-in brand; one brand failing must not hide the others.
     // Failures are tracked apart from "zero vehicles" so an API failure never reads as signed out.
@@ -112,7 +114,8 @@ suspend fun AppViewModel.loadGarageInner() {
     val vehiclesFetchStartedAt = System.currentTimeMillis()
     val fetched = repos.values.toList().flatMap { r ->
         runCatching {
-            // Cold-start diagnostic: separates time waiting for statusMutex from r.vehicles() itself.
+            // Cold-start diagnostic: separates time waiting for statusMutex from r.vehicles()
+            // itself.
             val lockWaitStartedAt = System.currentTimeMillis()
             statusMutex.withLock {
                 val lockWaitMs = System.currentTimeMillis() - lockWaitStartedAt
@@ -136,7 +139,8 @@ suspend fun AppViewModel.loadGarageInner() {
             "${System.currentTimeMillis() - vehiclesFetchStartedAt}ms: ${fetched.size} vehicle(s)",
     )
     if (fetched.isEmpty()) {
-        // Still bootstrap Drive sync on an empty/failed cold start; bootstrapDriveSync is idempotent.
+        // Still bootstrap Drive sync on an empty/failed cold start; bootstrapDriveSync is
+        // idempotent.
         bootstrapDriveSync()
         com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: publishing empty garage")
         _state.update {
@@ -144,7 +148,8 @@ suspend fun AppViewModel.loadGarageInner() {
                 // Keep whatever cars are already on screen (the cached garage) so the error banner
                 // shows beside them rather than an empty garage.
                 vehicles = it.vehicles,
-                // Garage, not a separate empty screen: GarageScreen folds the status card in as a pager page.
+                // Garage, not a separate empty screen: GarageScreen folds the status card in as a
+                // pager page.
                 screen = Screen.Garage,
                 garageLoadError = lastError,
                 garageLoadOffline = lastError != null && !isDeviceOnline(),
@@ -153,7 +158,8 @@ suspend fun AppViewModel.loadGarageInner() {
         return
     }
     // One Preferences read for every per-car setting below (including vehicleOrder). Taken here,
-    // after the network work, so it is not stale if a setting changed meanwhile. See SettingsStore.snapshot().
+    // after the network work, so it is not stale if a setting changed meanwhile. See
+    // SettingsStore.snapshot().
     val snapshotStartedAt = System.currentTimeMillis()
     val prefs = settingsStore.snapshot()
     val snapshotMs = System.currentTimeMillis() - snapshotStartedAt
@@ -169,7 +175,8 @@ suspend fun AppViewModel.loadGarageInner() {
     val lastVin = settingsStore.lastVehicleVin(prefs)
     val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
     val screen = resolveScreen(vehicles, prefs)
-    // Folded into this update to avoid an extra UiState emission (a full recomposition) at the Loading-to-Garage flip.
+    // Folded into this update to avoid an extra UiState emission (a full recomposition) at the
+    // Loading-to-Garage flip.
     val defaultPresets = vehicles.associate { v -> v.vin to (settingsStore.defaultClimatePreset(v.vin, prefs) ?: "smart") }
     _state.update {
         // Shared config first, then the fields only the full garage load owns.
@@ -180,31 +187,29 @@ suspend fun AppViewModel.loadGarageInner() {
             defaultClimatePresets = defaultPresets,
         )
     }
-    // Startup breadcrumb for CrashActivity's AppLog tail: shows whether the crash came before the garage appeared.
+    // Startup breadcrumb for CrashActivity's AppLog tail: shows whether the crash came before the
+    // garage appeared.
     AppLog.log("✓ Garage loaded: ${vehicles.size} vehicle(s), screen=$screen")
     val shortcutSet = cfg.shortcutSet
-    // Restores the last-selected car (currentIndex lives in its own flow, so it is set alongside the copy).
+    // Restores the last-selected car (currentIndex lives in its own flow, so it is set alongside
+    // the copy).
     _currentIndex.value = index
-    // Disk write for the whole garage. Must run after the _state.update above: snapshotOf() reads
-    // `_state.value.hasBattery(v)`, which that update populates (earlier, every car persisted hasBattery = false).
-    // saveVehiclesKeepingStatus (not saveVehicles) because snapshotOf(v, null) carries identity only;
-    // the store keeps status fields inside its own edit transaction, avoiding a race with the cache restore.
+    // Disk write for the whole garage.
     snapshotStore.saveVehiclesKeepingStatus(vehicles.map { snapshotOf(it, null, _state.value) })
     // seedDefaultClimatePresets() is folded into the main update; bootstrapDriveSync calls it once
-    // per process for the empty-vehicles cold start.
-    // One-time: start the Drive auto-sync bootstrap + collector.
+    // per process for the empty-vehicles cold start. One-time: start the Drive auto-sync bootstrap
+    // + collector.
     bootstrapDriveSync()
     // Keep app-icon shortcuts in sync, off the main thread: ShortcutManagerCompat does a
     // synchronous binder round trip per call.
     viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         runCatching { com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, shortcutSet) }
     }
-    // Run any shortcut that was tapped before the garage finished loading.
     tryRunPendingShortcut()
-    // Defer status fetching while the app is (or will be) locked, so it does not jank the lock-away blur.
+    // Defer status fetching while the app is (or will be) locked, so it does not jank the lock-away
+    // blur.
     val currentLocked = _state.value.locked
     if (!currentLocked) {
-        // Unlocked session: fetch status now (no lock animation to worry about).
         logStartup("loadGarageInner: fetching status for ${vehicles[index].name} (current car)")
         ensureStatus(vehicles[index], logStartupTiming = true)
         viewModelScope.launch {
@@ -217,13 +222,14 @@ suspend fun AppViewModel.loadGarageInner() {
     }
 }
 
-
-/** Re-reads this device's local per-car config for the loaded vehicles and folds it into state, no network call. */
 /**
- * Decides which screen a signed-in session with [vehicles] already loaded lands on, from a fresh [prefs] snapshot.
- *
- * [firstRunScreen] for a first-run device, [Screen.CarSetup] for any vehicle it does not cover,
- * else the garage. Shared by [loadGarageInner] and [restoreFromSyncThenContinue].
+ * Re-reads this device's local per-car config for the loaded vehicles and folds it into state, no
+ * network call.
+ */
+/**
+ * Decides which screen a signed-in session with [vehicles] already loaded lands on, from a fresh
+ * [prefs] snapshot. [firstRunScreen] for a first-run device, [Screen.CarSetup] for any vehicle it
+ * does not cover, else the garage.
  */
 internal suspend fun AppViewModel.resolveScreen(
     vehicles: List<Vehicle>,

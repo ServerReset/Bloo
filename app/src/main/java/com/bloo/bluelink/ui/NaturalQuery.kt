@@ -1,18 +1,11 @@
 package com.bloo.bluelink.ui
 
-/**
- * Turns a sentence somebody typed into the handful of words worth matching.
- *
- * The settings index is written in the app's own vocabulary; people ask in theirs: "how do I make the
- * text bigger", "turn off the vibrations", "my screen is too small", "stop the buzzing". Matching every
- * word of that against the index (tokens are ANDed) finds nothing, because "how", "do", "i" and "turn"
- * appear in no setting. So a query is first rewritten (known phrases become the words the index uses),
- * then stripped of the conversational scaffolding around the real subject, and only then matched.
- *
- * Pure string work with no Compose dependency, so it is pinned by plain JVM tests.
- */
+/** Turns a sentence somebody typed into the handful of words worth matching. */
 
-/** Phrases people say that map onto what the index contains. Applied in order, to the lowercased query. */
+/**
+ * Phrases people say that map onto what the index contains. Applied in order, to the lowercased
+ * query.
+ */
 internal val NaturalPhrases: List<Pair<Regex, String>> = listOf(
     Regex("\\b(dark|night) ?mode\\b") to "theme dark",
     Regex("\\blight ?mode\\b") to "theme light",
@@ -34,7 +27,9 @@ internal val NaturalPhrases: List<Pair<Regex, String>> = listOf(
     Regex("\\bmake (it )?(pretty|prettier|nicer)\\b") to "theme color glass",
 )
 
-/** Conversational scaffolding: dropped when a real subject remains, kept when it is all there is. */
+/**
+ * Conversational scaffolding: dropped when a real subject remains, kept when it is all there is.
+ */
 internal val NaturalFiller: Set<String> = setOf(
     "how", "do", "does", "did", "can", "could", "would", "should", "will", "you", "your", "i", "im", "ive",
     "we", "it", "its", "this", "that", "there", "way", "please", "pls", "want", "wanna", "need", "like",
@@ -45,16 +40,14 @@ internal val NaturalFiller: Set<String> = setOf(
     "look", "looks", "feel", "feels", "when", "if", "then", "got", "have", "has", "had", "rid",
 )
 
-/** Light plural trim so "alerts" finds "alert" and "vibrations" finds "vibration"; words with a synonym keep their form. */
+/**
+ * Light plural trim so "alerts" finds "alert" and "vibrations" finds "vibration"; words with a
+ * synonym keep their form.
+ */
 private fun trimPlural(t: String): String =
     if (t.length > 3 && t.endsWith("s") && !t.endsWith("ss") && t !in SearchSynonyms) t.dropLast(1) else t
 
-/**
- * The words of [query] worth matching, in order.
- *
- * Falls back in two steps so a short query never matches nothing by being too polite: if scaffolding
- * removal would leave no words, only stopwords go; and a query that is entirely stopwords keeps all.
- */
+/** The words of [query] worth matching, in order. */
 internal fun searchTokens(query: String): List<String> {
     var q = query.lowercase().replace("'", "")
     for ((rx, to) in NaturalPhrases) q = rx.replace(q, " $to ")

@@ -1,6 +1,9 @@
 package com.bloo.bluelink.ui
 
-/** Climate controls: ClimatePebble, SeatControl, seatTint, preset section, PresetPill, ChargeLimitPill. */
+/**
+ * Climate controls: ClimatePebble, SeatControl, seatTint, preset section, PresetPill,
+ * ChargeLimitPill.
+ */
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -68,7 +71,10 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import com.bloo.uicommon.ReorderColumn
 
-/** Reusable climate-control pieces: seat/wheel heat controls, preset pills and the charge-limit pill (also used by EnergyPebble). */
+/**
+ * Reusable climate-control pieces: seat/wheel heat controls, preset pills and the charge-limit pill
+ * (also used by EnergyPebble).
+ */
 
 @Composable
 internal fun SeatControl(
@@ -82,7 +88,8 @@ internal fun SeatControl(
     if (range.size <= 1) return
     val index = range.indexOf(level).let { if (it < 0) range.indexOf(SeatLevel.OFF) else it }
     val current = range.getOrNull(index) ?: range.firstOrNull() ?: return
-    // Deeper colour the stronger the setting; cross-fades through neutral between cooling (blues) and heating (reds).
+    // Deeper colour the stronger the setting; cross-fades through neutral between cooling (blues)
+    // and heating (reds).
     val tint by androidx.compose.animation.animateColorAsState(
         targetValue = seatTint(current),
         animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
@@ -114,7 +121,9 @@ internal fun WheelHeatControl(level: WheelHeatLevel, onChange: (WheelHeatLevel) 
     }
 }
 
-/** Steering wheel heat tint by intensity: the same light-to-dark red ramp as [seatTint]'s heat half. */
+/**
+ * Steering wheel heat tint by intensity: the same light-to-dark red ramp as [seatTint]'s heat half.
+ */
 @Composable
 internal fun wheelHeatTint(level: WheelHeatLevel): Color = when (level) {
     WheelHeatLevel.OFF -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -122,7 +131,10 @@ internal fun wheelHeatTint(level: WheelHeatLevel): Color = when (level) {
     WheelHeatLevel.HIGH -> Heat
 }
 
-/** Seat colour by intensity: light-to-dark blue for cool, red for heat, on the canonical [Cool]/[Heat] tokens. */
+/**
+ * Seat colour by intensity: light-to-dark blue for cool, red for heat, on the canonical
+ * [Cool]/[Heat] tokens.
+ */
 @Composable
 internal fun seatTint(level: SeatLevel): Color = when {
     level.isCool -> androidx.compose.ui.graphics.lerp(
@@ -159,7 +171,8 @@ internal fun ClimatePresetSection(
         exit = expandExitSized(Alignment.Bottom),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // The heading lives inside the visibility gate so an empty section shows no heading and it animates away with the last preset.
+            // The heading lives inside the visibility gate so an empty section shows no heading and
+            // it animates away with the last preset.
             SectionLabel("Presets")
             Spacer(Modifier.height(GapHairline))
             // Full-width reorderable rows: drag handle to re-rank, tap to apply.
@@ -203,7 +216,8 @@ internal fun ClimatePresetSection(
 /** A compact "79° · Defrost · Heat" summary of what a preset will set. */
 internal fun presetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
     val parts = mutableListOf<String>()
-    // Bare "°" rather than degLabel's "°F"/"°C": the unit is established by context. Conversion is shared with degLabel.
+    // Bare "°" rather than degLabel's "°F"/"°C": the unit is established by context. Conversion is
+    // shared with degLabel.
     parts += "${degValue(req.tempF.toDouble(), fahrenheit)}°"
     if (req.defrost) parts += "Defrost"
     val seats = listOf(req.seatFrontLeft, req.seatFrontRight, req.seatRearLeft, req.seatRearRight)
@@ -213,14 +227,10 @@ internal fun presetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
     return parts.joinToString(" · ")
 }
 
-
 /**
  * A two-segment split button for a saved preset (M3 Expressive connected-button group): a wider
  * "start" half and a narrow "delete" half, pill on the outer edge and smaller radius on the inner,
  * separated by a real gap.
- *
- * The start half loads and fires the preset; while [active] it morphs to a rounded rectangle with
- * the running-climate highlight. The delete half removes it.
  */
 @Composable
 internal fun PresetPill(
@@ -232,7 +242,8 @@ internal fun PresetPill(
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHaptics.current
-    // Delete needs a second tap to confirm (same 4s auto-reset as Sign out); a mis-aimed tap beside Apply dropped a preset irreversibly.
+    // Delete needs a second tap to confirm (same 4s auto-reset as Sign out); a mis-aimed tap beside
+    // Apply dropped a preset irreversibly.
     val confirm = rememberConfirmArm()
     // Corners use CornerSize(Dp) directly, with no measured row height. Remembered because this is
     // one item body per preset in a ReorderColumn and splitPillShapes is a pure function.
@@ -244,8 +255,6 @@ internal fun PresetPill(
     }
 
     // The drag handle wraps the whole pill so long-press anywhere reorders.
-    // A real button group: groupWeight on Apply makes it span the row (Modifier.weight cannot
-    // reach a member), and membership lets either half take width from the other on press.
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min),
         spacing = SplitSeam,
@@ -289,7 +298,8 @@ internal fun PresetPill(
                 }
             }
         }
-        // Delete nub: inner (left) corners match the gap, outer (right) are pill-rounded; error colours while armed.
+        // Delete nub: inner (left) corners match the gap, outer (right) are pill-rounded; error
+        // colours while armed.
         val deleteSource = remember { MutableInteractionSource() }
         MorphButton(
             onClick = {
@@ -318,10 +328,9 @@ internal fun PresetPill(
 // --- Charge limits --------------------------------------------------------
 
 /**
- * Two-segment split pill for the charge-limit control, styled like the climate
- * presets: wide left half shows the current value and hosts the inline slider;
- * narrow right half ("Set ⚡") sends the command. Morphs from pill to rounded
- * rectangle when pressed, identical motion to [PresetPill].
+ * Two-segment split pill for the charge-limit control, styled like the climate presets: wide left
+ * half shows the current value and hosts the inline slider; narrow right half ("Set ⚡") sends the
+ * command.
  */
 @Composable
 internal fun ChargeLimitPill(
@@ -334,7 +343,8 @@ internal fun ChargeLimitPill(
     onApply: () -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    // Same split-pill geometry as the preset pill. Remembered because this pill recomposes on every slider-drag tick.
+    // Same split-pill geometry as the preset pill. Remembered because this pill recomposes on every
+    // slider-drag tick.
     val leftShapeForCorner: (Float, Int) -> Shape = remember {
         { morph, cp -> splitPillShapes(morph, cp).first }
     }
@@ -388,7 +398,8 @@ internal fun ChargeLimitPill(
                     )
                 }
             }
-            // Right half: "Set" nub. Inner (left) corners match the gap, outer are pill-rounded; active while the command is in flight.
+            // Right half: "Set" nub. Inner (left) corners match the gap, outer are pill-rounded;
+            // active while the command is in flight.
             val applySource = remember { MutableInteractionSource() }
             MorphButton(
                 onClick = { onApply() },
@@ -401,7 +412,8 @@ internal fun ChargeLimitPill(
                 pillCornerPercent = 50f,
                 morphedCornerPercent = MorphedCornerPercent,
                 minHeight = 0.dp,
-                // The pending spinner must not fade with the disabled content, so pin the full tone.
+                // The pending spinner must not fade with the disabled content, so pin the full
+                // tone.
                 disabledContentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.fillMaxHeight(),
             ) {
@@ -424,8 +436,8 @@ internal fun ChargeLimitPill(
 }
 
 /**
- * The stepped level slider both [SeatControl] and [WheelHeatControl] drive: a discrete [range],
- * the current [index] into it, and the tint the level (and its label) wears.
+ * The stepped level slider both [SeatControl] and [WheelHeatControl] drive: a discrete [range], the
+ * current [index] into it, and the tint the level (and its label) wears.
  */
 @Composable
 private fun <T> LevelSlider(index: Int, range: List<T>, tint: Color, onChange: (T) -> Unit) {

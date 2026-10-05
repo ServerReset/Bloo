@@ -13,13 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 
-/**
- * Plays a short celebratory sound for the first-run confetti moment.
- *
- * If a bundled clip exists at `res/raw/celebrate` (drop in a royalty-free
- * fireworks / party-popper file to use it), that's played; otherwise it falls
- * back to the device's default notification sound. No audio is synthesized.
- */
+/** Plays a short celebratory sound for the first-run confetti moment. */
 object Fireworks {
 
     fun playSound(context: Context) {
@@ -45,17 +39,9 @@ object Fireworks {
 
 internal class Burst(val x: Float, val y: Float, val start: Float, val life: Float, val hue: Float, val count: Int, val maxR: Float)
 /**
- * A short, lightweight particle-burst fireworks animation drawn on a Canvas.
- *
- * Seven [Burst]s are generated once (`remember`) with randomized position,
- * start-delay, lifetime, hue, particle count, and max radius. A single
- * [Animatable] `t` is driven from 0 to 1 over 2.6s and is the *only* thing
- * that changes over time; each burst reads its own local progress
- * `(t - start) / life` from that shared clock and is invisible outside
- * [0, 1]. For a visible burst, particles are placed evenly around a circle
- * of growing radius `local * maxR`, faded out via `alpha = 1 - local`, and
- * given a small downward drift (`local² * height * 0.06`) to mimic gravity.
- * Nothing here loops -- once `t` reaches 1 all bursts are permanently done.
+ * A short, lightweight particle-burst fireworks animation drawn on a Canvas. Seven [Burst]s are
+ * generated once (`remember`) with randomized position, start-delay, lifetime, hue, particle count,
+ * and max radius.
  */
 @Composable
 internal fun FireworksOverlay(modifier: Modifier = Modifier) {

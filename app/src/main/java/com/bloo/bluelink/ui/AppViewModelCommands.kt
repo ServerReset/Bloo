@@ -21,17 +21,18 @@ import com.bloo.bluelink.data.saveClimate
 // See runCommand for pending/optimistic/statusMutex/rollback behaviour.
 
 /**
- * Starts a continuous [UiState.deviceLocation] subscription ([com.bloo.bluelink.autolock.LocationHelper.liveUpdates])
- * for the app's lifetime; called once from [loadGarageInner], with no matching stop.
- *
- * [restart] replaces an "active" job: liveUpdates emits nothing without permission but never completes,
- * so a job started before the grant would otherwise never be replaced. [rememberLocateAction] passes true after a grant.
+ * Starts a continuous [UiState.deviceLocation] subscription
+ * ([com.bloo.bluelink.autolock.LocationHelper.liveUpdates]) for the app's lifetime; called once
+ * from [loadGarageInner], with no matching stop. [restart] replaces an "active" job: liveUpdates
+ * emits nothing without permission but never completes, so a job started before the grant would
+ * otherwise never be replaced. [rememberLocateAction] passes true after a grant.
  */
 fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
     if (!restart && liveLocationJob?.isActive == true) return
     liveLocationJob?.cancel()
     liveLocationJob = viewModelScope.launch {
-        // See MIN_DEVICE_LOCATION_INTERVAL_MS/_MOVE_METERS: publishing every raw fix caused OOM from recompositions.
+        // See MIN_DEVICE_LOCATION_INTERVAL_MS/_MOVE_METERS: publishing every raw fix caused OOM
+        // from recompositions.
         var lastPublished: android.location.Location? = null
         var lastPublishedAtMs = 0L
         com.bloo.bluelink.autolock.LocationHelper.liveUpdates(getApplication()).collect { loc ->
@@ -50,12 +51,12 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
 }
 
 fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
-    // "Locate" refreshes the device position alongside the car's; fire-and-forget so a slow device fix never delays the car locate.
+    // "Locate" refreshes the device position alongside the car's; fire-and-forget so a slow device
+    // fix never delays the car locate.
     refreshDeviceLocation()
     // GPS rides along with a status refresh; prefer it over the rate-limited findMyCar.
     val s = repoFor(v).status(v, refresh = true)
     s?.let { st ->
-        // Advance lastFetched too so "updated X ago" and maybeRelock's stale check stay correct.
         _state.update {
             it.copy(
                 statuses = it.statuses + (v.vin to st),
@@ -64,7 +65,8 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location upda
         }
     }
     val statusLoc = s.toGeoLocation()
-    // Only call the rate-limited findMyCar if the status had no GPS; on failure keep the existing fix.
+    // Only call the rate-limited findMyCar if the status had no GPS; on failure keep the existing
+    // fix.
     val hadCached = _state.value.locations[v.vin] != null
     val loc = statusLoc ?: try {
         repoFor(v).location(v)
@@ -84,7 +86,8 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location upda
             }
             loadCarWeather(v, force = true)
             persistCache()
-            // persistCache() updates only the phone's status cache, not SnapshotStore (read by snapshot surfaces), so publish here too.
+            // persistCache() updates only the phone's status cache, not SnapshotStore (read by
+            // snapshot surfaces), so publish here too.
             persistSnapshots()
         }
         hadCached -> _state.update {
@@ -99,11 +102,12 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location upda
 // --- Commands (per-action pending + optimistic state flip) -----------
 
 /**
- * The endpoint family (EV vs ICE) comes from [v.isEv], but a user-marked PHEV that the API reports as gas
- * must use the EV climate/charge endpoints.
+ * The endpoint family (EV vs ICE) comes from [v.isEv], but a user-marked PHEV that the API reports
+ * as gas must use the EV climate/charge endpoints.
  */
 
-// Lock/unlock share the "doors" key so they cannot race; each optimistically flips VehicleStatus.doorLock.
+// Lock/unlock share the "doors" key so they cannot race; each optimistically flips
+// VehicleStatus.doorLock.
 fun AppViewModel.lock(v: Vehicle) = runCommand(v.vin, "doors", "Locked", { it.copy(doorLock = true) }) { repoFor(v).lock(v) }
 fun AppViewModel.unlock(v: Vehicle) = runCommand(v.vin, "doors", "Unlocked", { it.copy(doorLock = false) }) { repoFor(v).unlock(v) }
 
@@ -111,21 +115,17 @@ fun AppViewModel.unlock(v: Vehicle) = runCommand(v.vin, "doors", "Unlocked", { i
 fun AppViewModel.flashLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Lights flashing", null) { repoFor(v).flashLights(v) }
 fun AppViewModel.hornAndLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Horn & lights", null) { repoFor(v).hornAndLights(v) }
 
-/** Turn climate off; optimistically flips [VehicleStatus.airCtrlOn] and cancels any pending
- *  [ClimateExtendWorker] chain so a scheduled follow-up cannot turn climate back on. */
+/**
+ * Turn climate off; optimistically flips [VehicleStatus.airCtrlOn] and cancels any pending
+ * [ClimateExtendWorker] chain so a scheduled follow-up cannot turn climate back on.
+ */
 fun AppViewModel.stopClimate(v: Vehicle) =
     runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) {
         com.bloo.bluelink.work.ClimateExtendWorker.cancel(getApplication(), v.vin)
         repoFor(v).stopClimate(v)
     }
 
-/**
- * Start climate with [req]. Shares the "climate" key with [stopClimate] so they cannot race.
- *
- * The vendor API caps one command at [com.bloo.bluelink.data.CLIMATE_DURATION_RANGE]'s upper bound (10 min);
- * longer runs are split by [com.bloo.bluelink.data.climateChunks]: the first chunk is sent now and
- * [ClimateExtendWorker] sends each next one when the previous elapses.
- */
+/** Start climate with [req]. Shares the "climate" key with [stopClimate] so they cannot race. */
 fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
     // degLabel converts and suffixes the °F value per the user's unit.
     runCommand(
@@ -161,7 +161,6 @@ fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
             com.bloo.bluelink.work.ClimateExtendWorker.cancel(ctx, v.vin)
         }
     }.also {
-    // "Last used" is what the car was last told to do, not where a slider was left.
     viewModelScope.launch { settingsStore.saveClimate(v.vin, req) }
 }
 
@@ -169,8 +168,6 @@ fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
 
 /**
  * One-tap climate for surfaces with no room for the Climate pebble (the flip cover's action bar).
- * Resolves the request from the car's last-saved settings (see [com.bloo.bluelink.data.CarAction.TOGGLE_CLIMATE]),
- * falling back to 72F / 10 min if never configured.
  */
 fun AppViewModel.toggleClimate(v: Vehicle) {
     if (_state.value.statusFor(v)?.airCtrlOn == true) {
@@ -195,12 +192,15 @@ fun AppViewModel.stopCharge(v: Vehicle) =
         repoFor(v).stopCharge(electric(v, _state.value))
     }
 
-/** Set the AC (L2) and DC (fast) charge-target percentages. Uses its own "chargeLimit" key so it does not
- *  block start/stop; no optimistic field maps onto the limits. */
+/**
+ * Set the AC (L2) and DC (fast) charge-target percentages. Uses its own "chargeLimit" key so it
+ * does not block start/stop; no optimistic field maps onto the limits.
+ */
 fun AppViewModel.setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
     runCommand(
         v.vin, "chargeLimit", "Charge limits set (AC $acPercent% / DC $dcPercent%)",
-        // Optimistic: the limit is the seam in the hero's charge bar and the live notification; runCommand reverts on refusal.
+        // Optimistic: the limit is the seam in the hero's charge bar and the live notification;
+        // runCommand reverts on refusal.
         { st ->
             val ev = st.evStatus
             if (ev == null) {
@@ -208,7 +208,8 @@ fun AppViewModel.setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
             } else {
                 st.copy(
                     evStatus = ev.copy(
-                        // Replaced wholesale: these two plug types are the entire list and setChargeTargets sends both.
+                        // Replaced wholesale: these two plug types are the entire list and
+                        // setChargeTargets sends both.
                         reservChargeInfos = ReservChargeInfos(
                             listOf(
                                 TargetSOC(plugType = 0, targetSOClevel = dcPercent),
@@ -224,7 +225,8 @@ fun AppViewModel.setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
     }
 
 /**
- * Runs a command with a per-action spinner; on success logs, shows a message and optimistically flips the cached status.
+ * Runs a command with a per-action spinner; on success logs, shows a message and optimistically
+ * flips the cached status.
  */
 internal fun AppViewModel.runCommand(
     vin: String,
@@ -271,8 +273,6 @@ internal fun AppViewModel.runCommand(
             recordRemoteAction(vin, success, status = "Failed", details = msg)
             AppLog.log("⚠ $msg")
             _state.update { it.copy(message = msg, messageType = "error") }
-            // Revert the optimistic flip locally and re-persist so every surface returns to last-known-good;
-            // skipped when `prior` is null (nothing was flipped).
             if (optimistic != null && prior != null) {
                 _state.update { st -> st.copy(statuses = st.statuses + (vin to prior)) }
                 persistSnapshots()
@@ -282,7 +282,8 @@ internal fun AppViewModel.runCommand(
                 _state.value.vehicles.firstOrNull { it.vin == vin }?.let { refreshStatus(it) }
             }
         } finally {
-            // Hold the lock for at least MIN_COMMAND_LOCK_MS so a double-tap cannot fire an overlapping request.
+            // Hold the lock for at least MIN_COMMAND_LOCK_MS so a double-tap cannot fire an
+            // overlapping request.
             val elapsed = System.currentTimeMillis() - startedAt
             if (elapsed < MIN_COMMAND_LOCK_MS) {
                 kotlinx.coroutines.delay(MIN_COMMAND_LOCK_MS - elapsed)
@@ -292,8 +293,10 @@ internal fun AppViewModel.runCommand(
     }
 }
 
-/** Appends one entry to [UiState.remoteActionHistory] for [vin], newest first, in a rolling
- *  [REMOTE_ACTION_HISTORY_DAYS]-day window. Called from both [runCommand] resolution paths. */
+/**
+ * Appends one entry to [UiState.remoteActionHistory] for [vin], newest first, in a rolling
+ * [REMOTE_ACTION_HISTORY_DAYS]-day window. Called from both [runCommand] resolution paths.
+ */
 internal fun AppViewModel.recordRemoteAction(vin: String, action: String, status: String, details: String? = null) {
     val entry = RemoteAction(
         id = java.util.UUID.randomUUID().toString(),
@@ -302,7 +305,8 @@ internal fun AppViewModel.recordRemoteAction(vin: String, action: String, status
         status = status,
         details = details,
     )
-    // Pruned by age on every write (the only sweep). An unparseable timestamp is kept rather than dropped.
+    // Pruned by age on every write (the only sweep). An unparseable timestamp is kept rather than
+    // dropped.
     val cutoff = java.time.Instant.now().minus(
         java.time.Duration.ofDays(REMOTE_ACTION_HISTORY_DAYS),
     )

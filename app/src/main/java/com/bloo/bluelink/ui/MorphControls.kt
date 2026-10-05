@@ -33,9 +33,8 @@ import kotlinx.coroutines.flow.first
 
 /**
  * The morph family's icon-only member: [IconButton]'s containerless chrome and 40dp target, plus
- * the family's click haptic and a press scale dip on the [SoftDamping] spring (no container
- * corner to morph). Same parameters as [IconButton]; remove any hand-called haptic at converted
- * call sites since it fires here.
+ * the family's click haptic and a press scale dip on the [SoftDamping] spring (no container corner
+ * to morph).
  */
 @Composable
 fun MorphIconButton(
@@ -74,7 +73,8 @@ fun MorphIconButton(
 }
 
 /**
- * A unified selectable chip: a pill when unselected, morphing into a filled rounded box when selected.
+ * A unified selectable chip: a pill when unselected, morphing into a filled rounded box when
+ * selected.
  */
 @Composable
 fun MorphChip(
@@ -104,8 +104,8 @@ fun MorphChip(
         // semantics{} `selected` resolves to the SemanticsPropertyReceiver's property.
         modifier = modifier.semantics { this.selected = chipSelected },
     ) {
-        // The shared label (standard glyph gap, compacts to glyphs when short on room). SemiBold when
-        // selected like every button label; the filled container already signals selection.
+        // The shared label (standard glyph gap, compacts to glyphs when short on room). SemiBold
+        // when selected like every button label; the filled container already signals selection.
         if (icon != null) {
             MorphButtonLabel(icon, label, pending = false)
         } else {
@@ -123,22 +123,23 @@ fun MorphChip(
 }
 
 /**
- * Right-side expand control for pebbles with no action button: a pill that morphs to a
- * rounded square when the section is open.
+ * Right-side expand control for pebbles with no action button: a pill that morphs to a rounded
+ * square when the section is open.
  */
 @Composable
 internal fun MorphExpandButton(
     expanded: Boolean,
     onToggle: () -> Unit,
-    /** Reports this button's live pressed state so the pebble card can square its outer shape
-     *  with the chevron's. Null for callers that don't care. */
+    /**
+     * Reports this button's live pressed state so the pebble card can square its outer shape with
+     * the chevron's. Null for callers that don't care.
+     */
     onPressChange: ((Boolean) -> Unit)? = null,
 ) {
     val haptics = LocalHaptics.current
     // Shared with SplitExpandButton's chevron; see [rememberChevronSpin].
     val chevron = rememberChevronSpin(expanded, label = "morphChevron")
-    // A FIXED 50dp square: 50% is a true circle and 10dp is 20%; overrides the default 28 to keep
-    // the 10dp corners. With expansion animation.
+    // With expansion animation.
     val chevronSource = remember { MutableInteractionSource() }
     if (onPressChange != null) {
         val pressed by chevronSource.collectIsPressedAsState()
@@ -166,8 +167,8 @@ internal fun MorphExpandButton(
             pillCornerPercent = 50f,
             morphedCornerPercent = 20f,
             minHeight = 0.dp,
-            // As SplitExpandButton's chevron: contentDescription is the next action, this is the current
-            // state. Tap toggles; holding spins the chevron without toggling.
+            // As SplitExpandButton's chevron: contentDescription is the next action, this is the
+            // current state. Tap toggles; holding spins the chevron without toggling.
             // ButtonTargetHeight like everything tappable.
             modifier = Modifier
                 .size(ButtonTargetHeight)

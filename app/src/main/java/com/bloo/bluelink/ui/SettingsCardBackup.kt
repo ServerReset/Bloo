@@ -43,9 +43,9 @@ import com.bloo.bluelink.data.syncUri
 import com.bloo.bluelink.data.syncWifiOnly
 
 /**
- * The "Backup & sync" card. Two ways to keep a setup safe: automatic Drive sync across devices
- * (the everyday one) and a manual snapshot file (advanced). Everything here is either one of
- * those or the state of the first.
+ * The "Backup & sync" card. Two ways to keep a setup safe: automatic Drive sync across devices (the
+ * everyday one) and a manual snapshot file (advanced). Everything here is either one of those or
+ * the state of the first.
  */
 @Composable
 internal fun BackupSyncCardContent(
@@ -123,8 +123,8 @@ internal fun BackupSyncCardContent(
                 SyncDiagnostics(state, vm)
             }
 
-            // A one-shot export/import file is a power-user fallback next to the always-on
-            // sync above, which is what most people want and shouldn't be buried.
+            // A one-shot export/import file is a power-user fallback next to the always-on sync
+            // above, which is what most people want and shouldn't be buried.
             AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 1), enter = expandEnterSized(), exit = expandExitSized()) {
                 ManualBackup(vm, context)
             }
@@ -149,7 +149,10 @@ private fun SyncErrorBanner(message: String) {
     }
 }
 
-/** Troubleshooting, folded away: when it last synced, the file's fingerprint, and the repair actions. */
+/**
+ * Troubleshooting, folded away: when it last synced, the file's fingerprint, and the repair
+ * actions.
+ */
 @Composable
 private fun SyncDiagnostics(state: UiState, vm: AppViewModel) {
     var open by rememberSaveable { mutableStateOf(false) }
@@ -158,8 +161,9 @@ private fun SyncDiagnostics(state: UiState, vm: AppViewModel) {
         SettingsGroup("Diagnostics") {
             val lastSync = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
             StatusRow("Last synced", lastSync.ifBlank { "Never" })
-            // Two phones truly on the SAME Drive file show the same code. If they differ they picked
-            // different files (Drive allows duplicate names), the usual reason sync doesn't converge.
+            // Two phones truly on the SAME Drive file show the same code. If they differ they
+            // picked different files (Drive allows duplicate names), the usual reason sync doesn't
+            // converge.
             state.syncFileFingerprint?.let { StatusRow("File ID", it, valueMono = true) }
             ActionRow {
                 // A non-destructive round trip through the real provider, to confirm sync works.

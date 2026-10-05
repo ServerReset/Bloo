@@ -51,20 +51,15 @@ import kotlinx.coroutines.isActive
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
-/**
- * A small slippy map centred on the car, built from key-free OpenStreetMap raw tiles.
- * One/two-finger drag pans, pinch zooms; no on-screen +/- buttons by design.
- * [state] is private per call site by default; a new `location` moves only the tile/pin origin, never the view.
- * [deviceLocation] adds a secondary marker as a reference point; it never moves the camera.
- */
+/** A small slippy map centred on the car, built from key-free OpenStreetMap raw tiles. */
 @Composable
 internal fun CarMap(
     location: GeoLocation,
     modifier: Modifier = Modifier,
     state: CarMapState = rememberCarMapState(),
     /**
-     * The device's own last-known position ([UiState.deviceLocation]), not fetched here.
-     * Null (no fix/permission) omits the marker.
+     * The device's own last-known position ([UiState.deviceLocation]), not fetched here. Null (no
+     * fix/permission) omits the marker.
      */
     deviceLocation: GeoLocation? = null,
 ) {
@@ -86,8 +81,8 @@ internal fun CarMap(
         MaterialTheme.colorScheme.surfaceContainerLowest
     }
 
-    // Client-side dark filter over the same OSM tiles: invert() + hue-rotate(180deg) turns a light raster
-    // into a passable dark one (inversion alone flips hues to their RGB complement).
+    // Client-side dark filter over the same OSM tiles: invert() + hue-rotate(180deg) turns a light
+    // raster into a passable dark one (inversion alone flips hues to their RGB complement).
     val darkMapFilter = remember(isDarkMode) {
         if (!isDarkMode) return@remember null
         val invert = android.graphics.ColorMatrix(
@@ -98,7 +93,8 @@ internal fun CarMap(
                 0f, 0f, 0f, 1f, 0f,
             ),
         )
-        // W3C hue-rotate(180deg) matrix, applied after `invert` to match CSS `invert(1) hue-rotate(180deg)`.
+        // W3C hue-rotate(180deg) matrix, applied after `invert` to match CSS `invert(1)
+        // hue-rotate(180deg)`.
         val hueRotate180 = android.graphics.ColorMatrix(
             floatArrayOf(
                 -0.574f, 1.430f, 0.144f, 0f, 0f,
@@ -120,8 +116,8 @@ internal fun CarMap(
             .onSizeChanged { boxSizePx = it }
             .pointerInput(state) {
                 detectTransformGestures { _, gesturePan, gestureZoom, _ ->
-                    // Tiles sit in a layer scaled by state.scale (0.5..2), so a drag of d px moves them d * scale;
-                    // divide by scale to track the finger 1:1.
+                    // Tiles sit in a layer scaled by state.scale (0.5..2), so a drag of d px moves
+                    // them d * scale; divide by scale to track the finger 1:1.
                     val s = state.scale
                     state.pan(gesturePan.x / s, gesturePan.y / s)
                     state.pinch(gestureZoom)
@@ -138,8 +134,8 @@ internal fun CarMap(
         val yTileF = MapTiles.tileY(location.latitude, zoom)
         val tileDp = with(density) { tilePx.toDp() }
 
-        // Zooms out (never in) to bring the device into view the first time both fixes are known and the
-        // map is at rest; see CarMapState.fitBothLocations.
+        // Zooms out (never in) to bring the device into view the first time both fixes are known
+        // and the map is at rest; see CarMapState.fitBothLocations.
         LaunchedEffect(location.latitude, location.longitude, deviceLocation?.latitude, deviceLocation?.longitude, wPx, hPx) {
             val dev = deviceLocation
             if (dev != null) {
@@ -147,9 +143,9 @@ internal fun CarMap(
             }
         }
 
-        // Needed tile range, derived so a live pan/pinch only recomposes when it crosses a tile boundary.
-        // fetchScaleCoverage over-fetches by 1/scale so a pinched-out grid (even past CarMapMinZoom)
-        // never shows blank margins.
+        // Needed tile range, derived so a live pan/pinch only recomposes when it crosses a tile
+        // boundary. fetchScaleCoverage over-fetches by 1/scale so a pinched-out grid (even past
+        // CarMapMinZoom) never shows blank margins.
         val range by remember(zoom, xTileF, yTileF, wPx, hPx) {
             derivedStateOf {
                 val fetchScaleCoverage = 1f / state.scale.coerceAtLeast(0.5f)
@@ -188,7 +184,8 @@ internal fun CarMap(
                     val lastY = floor(cy + halfTilesY).toInt().coerceAtMost(span - 1)
                     for (tx in firstX..lastX) {
                         for (ty in firstY..lastY) {
-                            // enqueue() has no suspension point; check cancellation explicitly so a superseded batch stops.
+                            // enqueue() has no suspension point; check cancellation explicitly so a
+                            // superseded batch stops.
                             currentCoroutineContext().ensureActive()
                             val wrappedX = MapTiles.wrapX(tx, targetZoom)
                             disposables += loader.enqueue(
@@ -205,14 +202,16 @@ internal fun CarMap(
             }
         }
 
-        // Tiles, pin and device dot sit in their own scaled layer, not the outer Box (which hosts the
-        // 1x expand button). state.scale is the continuous pinch part, applied every frame for fluid zoom.
+        // Tiles, pin and device dot sit in their own scaled layer, not the outer Box (which hosts
+        // the 1x expand button). state.scale is the continuous pinch part, applied every frame for
+        // fluid zoom.
         Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    // Pan is one layer translation; children are placed at pan-independent positions.
-                    // Divide by `scale` to bring tile-space pan into parent space (keeps 1:1 finger tracking).
+                    // Pan is one layer translation; children are placed at pan-independent
+                    // positions. Divide by `scale` to bring tile-space pan into parent space (keeps
+                    // 1:1 finger tracking).
                     translationX = state.panX * state.scale
                     translationY = state.panY * state.scale
                     scaleX = state.scale
@@ -225,15 +224,16 @@ internal fun CarMap(
                 val wrappedX = MapTiles.wrapX(tx, zoom)
                 // key() gives each tile a stable slot so remember() below is safe in a loop.
                 key(wrappedX, ty) {
-                    // Remembered: ImageRequest has no equals(), so a fresh build() would restart AsyncImage's load
-                    // (flicker) on every location update.
+                    // Remembered: ImageRequest has no equals(), so a fresh build() would restart
+                    // AsyncImage's load (flicker) on every location update.
                     val request = remember(wrappedX, ty, zoom) {
                         ImageRequest.Builder(context)
                             .data(MapTiles.tileUrl(zoom, wrappedX, ty))
                             // OSM blocks clients whose User-Agent does not identify the app.
                             .setHeader("User-Agent", MapTiles.userAgent("Android"))
-                            // No crossfade: Coil skips it only for memory hits, and the pebble map and full-screen sheet are
-                            // separate CarMaps requesting the same URLs, so fading would look like a refresh.
+                            // No crossfade: Coil skips it only for memory hits, and the pebble map
+                            // and full-screen sheet are separate CarMaps requesting the same URLs,
+                            // so fading would look like a refresh.
                             .crossfade(false)
                             .build()
                     }
@@ -266,7 +266,8 @@ internal fun CarMap(
         }
         // Under this many px apart the pins overlap; merge them.
         val mergeThresholdPx = with(density) { 36.dp.toPx() }
-        // Non-null only when the pins collide; carries the offset so the merged branch can use it directly.
+        // Non-null only when the pins collide; carries the offset so the merged branch can use it
+        // directly.
         val mergedOffsetPx = devTileOffsetPx?.takeIf { (dx, dy) ->
             kotlin.math.hypot(dx, dy) < mergeThresholdPx
         }
@@ -296,8 +297,9 @@ internal fun CarMap(
                     .offset(y = (-20).dp),
             )
         }
-        // Device position, drawn whenever a fix exists, outside the merged branch so it never vanishes.
-        // Its offset comes from its own tile coordinate (tile delta in px plus pan), since it is not the view centre.
+        // Device position, drawn whenever a fix exists, outside the merged branch so it never
+        // vanishes. Its offset comes from its own tile coordinate (tile delta in px plus pan),
+        // since it is not the view centre.
         devTileOffsetPx?.let { (dx, dy) ->
             Box(
                 Modifier

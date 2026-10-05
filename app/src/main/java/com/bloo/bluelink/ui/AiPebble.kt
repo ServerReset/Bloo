@@ -29,38 +29,21 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
     val summary = state.aiSummaries[v.vin]
     Pebble(
         v, "ai", "AI summary", Icons.Filled.AutoAwesome, state, vm, modifier,
-        // What the tile can tell you, not what engine it runs on. This was the constant string
-        // "On-device Gemini Nano", which as a collapsed summary -- and, on the cover, as the
-        // tile's whole headline -- spent the most prominent line saying something that is true
-        // of this pebble forever and answers nothing. The engine is still named in the body copy
-        // ("generated privately on your device"), where a fact you read once belongs.
+        // What the tile can tell you, not what engine it runs on. The engine is still named in the
+        // body copy ("generated privately on your device"), where a fact you read once belongs.
         summary = when {
             busy -> "Summarizing…"
             summary != null -> "Summary ready"
             else -> "Not summarized yet"
         },
         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-        // The one pebble whose subject is not a part of the car, so it is the one
-        // that earns a different surface: a gradient marks "this was generated"
-        // rather than measured, the same way the Summarize action is the only
-        // header action that makes something rather than sending a command.
-        //
-        // Built from the scheme's own container roles rather than fixed hues, so it
-        // follows the user's accent, their vibrancy setting and light/dark with no
-        // second palette to maintain -- the mistake ChargeGreen's phone-side
-        // re-declaration made, which is why colours live in tokens here.
-        //
-        // containerColor stays tertiaryContainer underneath. The gradient paints
-        // over it, but it is what contentColorFor() reads to pick the text colour,
-        // and all three stops are container-toned, so the contrast that colour was
-        // chosen for holds across the whole sweep.
         background = {
             val scheme = MaterialTheme.colorScheme
             val brush = remember(scheme.tertiaryContainer, scheme.primaryContainer, scheme.secondaryContainer) {
                 Brush.linearGradient(
-                    // Diagonal rather than vertical: a pebble is much wider than it
-                    // is tall when collapsed, so a vertical sweep would compress to
-                    // a flat band and read as a slightly-off solid fill.
+                    // Diagonal rather than vertical: a pebble is much wider than it is tall when
+                    // collapsed, so a vertical sweep would compress to a flat band and read as a
+                    // slightly-off solid fill.
                     0f to scheme.tertiaryContainer,
                     0.55f to scheme.primaryContainer.copy(alpha = 0.55f),
                     1f to scheme.secondaryContainer.copy(alpha = 0.65f),
@@ -76,20 +59,17 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
             onClick = { vm.summarizeCar(v) },
             pending = busy,
         ),
-        // NOT alwaysExpandedInSimpleMode -- see the note on LocationPebble. This tile has a
-        // summary paragraph and a footnote, not a single setting, and the flag costs it its
-        // chevron entirely.
+        // NOT alwaysExpandedInSimpleMode -- see the note on LocationPebble. This tile has a summary
+        // paragraph and a footnote, not a single setting, and the flag costs it its chevron
+        // entirely.
     ) {
-        // Its old glance hero repeated the tile's own title and subtitle verbatim --
-        // four lines carrying two strings before a word of the actual summary. The
-        // summary IS the point of the tile, so it leads.
+        // Its old glance hero repeated the tile's own title and subtitle verbatim -- four lines
+        // carrying two strings before a word of the actual summary. The summary IS the point of the
+        // tile, so it leads.
         if (summary != null) {
-            // Bulleted, not one raw string: the model's own prompt asks for a "* " bullet per
-            // fact, and drawing that straight through showed the literal asterisk as text --
-            // "* Daisy (2025) is charging..." -- confirmed from a real screenshot. Any line
-            // that IS a bullet gets a real one; anything else (a stray lead-in sentence, if
-            // the model ever writes one) prints as plain text, so this degrades safely rather
-            // than assuming every summary is bulleted.
+            // Bulleted, not one raw string: the model's own prompt asks for a "* " bullet per fact,
+            // and drawing that straight through showed the literal asterisk as text -- "* Daisy
+            // (2025) is charging..." -- confirmed from a real screenshot.
             Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                 summary.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
                     val bulleted = line.startsWith("* ") || line.startsWith("- ")
@@ -122,4 +102,3 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
         )
     }
 }
-

@@ -25,11 +25,12 @@ import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.snapshot
 
 /**
- * Reads this device's per-car / per-tile config for [vehicles] from one [prefs] snapshot and returns a UiState
- * transform folding them in, plus the resolved shortcut set (needed outside the copy to re-push launcher shortcuts).
- * `firstRun` yields an empty collapsed set, so all pebbles start expanded on first open.
+ * Reads this device's per-car / per-tile config for [vehicles] from one [prefs] snapshot and
+ * returns a UiState transform folding them in, plus the resolved shortcut set (needed outside the
+ * copy to re-push launcher shortcuts).
  */
-// Runs on Dispatchers.Default: decoding each car's preset list must not run on the main thread during the Loading -> Garage frame.
+// Runs on Dispatchers.Default: decoding each car's preset list must not run on the main thread
+// during the Loading -> Garage frame.
 internal suspend fun AppViewModel.perCarConfig(
     vehicles: List<Vehicle>,
     prefs: androidx.datastore.preferences.core.Preferences,
@@ -70,7 +71,6 @@ internal suspend fun AppViewModel.perCarConfig(
     )
 }
 
-
 internal suspend fun AppViewModel.refreshLocalCarConfig() {
     // One Preferences read for every per-car setting; see SettingsStore.snapshot().
     val prefs = settingsStore.snapshot()
@@ -84,11 +84,9 @@ internal suspend fun AppViewModel.refreshLocalCarConfig() {
     com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, cfg.shortcutSet)
 }
 
-
 /**
- * Seeds [UiState.defaultClimatePresets] from the current vehicle list.
- *
- * Runs per garage load, not inside the once-per-process [bootstrapDriveSync], which can run before any vehicle exists.
+ * Seeds [UiState.defaultClimatePresets] from the current vehicle list. Runs per garage load, not
+ * inside the once-per-process [bootstrapDriveSync], which can run before any vehicle exists.
  */
 internal suspend fun AppViewModel.seedDefaultClimatePresets() {
     val vehicles = _state.value.vehicles

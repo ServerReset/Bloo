@@ -1,6 +1,9 @@
 package com.bloo.bluelink.ui
 
-/** Search results surface: the ranked settings/car-data result list, its stagger timing constant and the per-result pop-in helper. */
+/**
+ * Search results surface: the ranked settings/car-data result list, its stagger timing constant and
+ * the per-result pop-in helper.
+ */
 
 import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedVisibility
@@ -90,12 +93,8 @@ internal fun SettingsSearchResults(
         buildSettingsSearchEntries(state, appearance, notif, vm, canBio)
     }
 
-    // Matches render first and the AI answer last; placed above the floating search bar, the
-    // stack reads [suggested results] [AI tile] [search bar] top to bottom.
-    // Ranked, not filtered. The fuzzy pass is only a fallback when the strict pass found nothing,
-    // so a real match is never outranked by a one-typo guess.
-    // remember(entries, tokens, limit): scoring scans every entry (twice with the fuzzy fallback) and sorts,
-    // so it must not rerun on unrelated UiState emissions.
+    // Matches render first and the AI answer last; placed above the floating search bar, the stack
+    // reads [suggested results] [AI tile] [search bar] top to bottom. Ranked, not filtered.
     val results = remember(entries, tokens, limit) {
         if (tokens.isEmpty()) {
             entries
@@ -141,7 +140,8 @@ internal fun SettingsSearchResults(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(Modifier.padding(16.dp)) {
-                        // A small leading icon badge per result, as in the update pebble and settings hero stats.
+                        // A small leading icon badge per result, as in the update pebble and
+                        // settings hero stats.
                         IconBadge(
                             AppIcons.Search,
                             tint = MaterialTheme.colorScheme.primary,
@@ -185,14 +185,12 @@ internal fun SettingsSearchResults(
 
     // A recognised command ("lock my Ioniq") runs via VehicleCommandRunner, the same path as the
     // rest of the app. No named car falls back to a single car, or asks which when several exist.
-    // Gated on submittedQuery, not the live query: this sends a command to the car, so it must
-    // never run mid-typing off a debounce timer.
-    // parseVehicleCommand reads a bare temperature ("climate at 70"), so this follows the TEMPERATURE unit.
     val metricUnits = !appearance.useFahrenheit
     var command by remember(submittedQuery, metricUnits) {
         mutableStateOf(if (submittedQuery.isBlank()) null else parseVehicleCommand(submittedQuery, metricUnits))
     }
-    // When Gemini Nano is enabled, use it to enhance command parsing for ambiguous/unmatched queries
+    // When Gemini Nano is enabled, use it to enhance command parsing for ambiguous/unmatched
+    // queries
     if (state.aiEnabled && command == null && submittedQuery.isNotBlank()) {
         LaunchedEffect(submittedQuery) {
             try {
@@ -210,8 +208,8 @@ internal fun SettingsSearchResults(
     if (resolvedCommand != null) {
         val ctx = LocalContext.current
         // Whole-word, longest-match car resolution, not a bare substring test ("Ioniq" must not
-        // match inside "Ioniq 5"). Ties at the longest length are ambiguous: refuse and ask which car.
-        // Memoized because Regex compiles on construction, once per car, on every UiState emission.
+        // match inside "Ioniq 5"). Ties at the longest length are ambiguous: refuse and ask which
+        // car.
         val targetVehicle = remember(submittedQuery, state.vehicles) {
             val q = submittedQuery.lowercase()
             val nameMatches = state.vehicles.filter { v ->
@@ -220,7 +218,8 @@ internal fun SettingsSearchResults(
             }
             val longestMatchLen = nameMatches.maxOfOrNull { it.name.length }
             val namedVehicle = nameMatches.filter { it.name.length == longestMatchLen }.singleOrNull()
-            // Fall back to "the one car" only when NO name matched; an ambiguous match must not pick one.
+            // Fall back to "the one car" only when NO name matched; an ambiguous match must not
+            // pick one.
             namedVehicle ?: if (nameMatches.isEmpty()) state.vehicles.singleOrNull() else null
         }
         var actionResult by remember(submittedQuery) { mutableStateOf<String?>(null) }
@@ -279,9 +278,6 @@ internal fun SettingsSearchResults(
     }
 
     // Free-form command via the AI when the deterministic parser did not recognise the phrasing.
-    // It asks before acting: a model's reading of an unanticipated sentence is a guess, and a
-    // wrong guess can unlock a car on a street. aiResolveCommand already rejects anything that is
-    // not a real action on one of your cars.
     if (command == null && state.aiEnabled && submittedQuery.isNotBlank()) {
         val ctx = LocalContext.current
         var proposal by remember(submittedQuery) { mutableStateOf<Pair<String, String>?>(null) }
@@ -312,8 +308,8 @@ internal fun SettingsSearchResults(
                     )
                     if (ran == null && car != null) {
                         val scope = rememberCoroutineScope()
-                        // MorphTextButton for the press morph and click haptic. primary/onPrimary are
-                        // explicit because this is the card's primary action.
+                        // MorphTextButton for the press morph and click haptic. primary/onPrimary
+                        // are explicit because this is the card's primary action.
                         SafeMorphTextButton(
                             text = if (running) "Working…" else "Run it",
                             onClick = {
@@ -336,8 +332,9 @@ internal fun SettingsSearchResults(
         }
     }
 
-    // On-device AI reply (when enabled): a plain-language answer, a complement to structured matches.
-    // Gated on submittedQuery, not the live query: it fires a real AI request and must wait for a deliberate submit.
+    // On-device AI reply (when enabled): a plain-language answer, a complement to structured
+    // matches. Gated on submittedQuery, not the live query: it fires a real AI request and must
+    // wait for a deliberate submit.
     if (state.aiEnabled) {
         LaunchedEffect(submittedQuery) {
             if (submittedQuery.isNotBlank()) {
@@ -375,11 +372,7 @@ internal fun SettingsSearchResults(
     }
 }
 
-/**
- * One AutoLock toggle, as a search result. AutoLockConfig lives in SettingsStore's DataStore
- * rather than [UiState], so this loads its own copy (as AutoLockSettingsGroup does) and renders
- * only once that read completes, avoiding a flash of the default.
- */
+/** One AutoLock toggle, as a search result. */
 @Composable
 internal fun AutoLockSearchToggle(
     v: Vehicle,
@@ -398,8 +391,10 @@ internal fun AutoLockSearchToggle(
     }
 }
 
-
-/** AutoLock's grace period as a search result: the same slider the AutoLock card shows, loaded and saved the same way. */
+/**
+ * AutoLock's grace period as a search result: the same slider the AutoLock card shows, loaded and
+ * saved the same way.
+ */
 @Composable
 internal fun AutoLockGraceSearchRow(v: Vehicle, vm: AppViewModel) {
     var config by remember(v.vin) { mutableStateOf<AutoLockConfig?>(null) }

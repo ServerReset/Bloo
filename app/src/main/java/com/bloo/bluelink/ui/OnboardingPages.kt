@@ -47,7 +47,10 @@ import com.bloo.bluelink.data.setBiometricLock
 import com.bloo.bluelink.data.setSyncUri
 import com.bloo.bluelink.data.syncUri
 
-/** Step 1: a short welcome + feature highlights, sharing [OnboardingTipListPage]'s shape (no per-item entrance animation). */
+/**
+ * Step 1: a short welcome + feature highlights, sharing [OnboardingTipListPage]'s shape (no
+ * per-item entrance animation).
+ */
 @Composable
 internal fun OnboardingWelcomePage() {
     OnboardingTipListPage(
@@ -59,11 +62,9 @@ internal fun OnboardingWelcomePage() {
     )
 }
 
-
 /**
- * Step 2: set the app up to work. Notifications and a lock (biometrics if available, else a PIN) are
- * required before Next unlocks; the lock card swaps to whichever the device supports. Drive sync stays
- * optional (see [buildOnboardingSteps]' `preConfiguredVins`).
+ * Step 2: set the app up to work. Notifications and a lock (biometrics if available, else a PIN)
+ * are required before Next unlocks; the lock card swaps to whichever the device supports.
  */
 @Composable
 internal fun OnboardingSetupPage(
@@ -175,11 +176,9 @@ internal fun OnboardingSetupPage(
     }
 }
 
-
 /**
  * First-run only: bring this device's setup in from another one. Picking a sync file joins it and
  * re-resolves where this device lands (straight to the app if the file already covered everything).
- * Anyone starting fresh just swipes on.
  */
 @Composable
 internal fun OnboardingRestorePage(vm: AppViewModel) {
@@ -209,7 +208,6 @@ internal fun OnboardingRestorePage(vm: AppViewModel) {
     BodySmallText("New here? Swipe on to set up fresh.", color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-
 /** How the app looks and reads: theme and units, the two choices everyone has an opinion on. */
 @Composable
 internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppViewModel) {
@@ -226,10 +224,10 @@ internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppVie
     BodySmallText("Both live in Settings whenever you want to change them.", color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-
 /**
- * The create-a-PIN mini form (also the base of the Settings PIN dialogs): two matching 4-8 digit fields,
- * Save enabled once valid. The caller decides what [existing] means; this form only reports a valid new PIN.
+ * The create-a-PIN mini form (also the base of the Settings PIN dialogs): two matching 4-8 digit
+ * fields, Save enabled once valid. The caller decides what [existing] means; this form only reports
+ * a valid new PIN.
  */
 @Composable
 internal fun OnboardingPinForm(
@@ -285,18 +283,25 @@ internal fun OnboardingPinForm(
     }
 }
 
-
-/** One onboarding Setup card: icon, title and body on a solid surface (not the busy Aurora backdrop). */
+/**
+ * One onboarding Setup card: icon, title and body on a solid surface (not the busy Aurora
+ * backdrop).
+ */
 @Composable
 internal fun OnboardingSetupCard(
     icon: ImageVector,
     title: String,
     body: String,
     done: Boolean,
-    /** Required to leave this card: a "Required" chip until [done], so the user knows why Next
-     *  is disabled rather than just finding it greyed out. */
+    /**
+     * Required to leave this card: a "Required" chip until [done], so the user knows why Next is
+     * disabled rather than just finding it greyed out.
+     */
     required: Boolean = false,
-    /** The action that gets it done. Shown only until [done]: a finished item says so and gets out of the way. */
+    /**
+     * The action that gets it done. Shown only until [done]: a finished item says so and gets out
+     * of the way.
+     */
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -323,10 +328,10 @@ internal fun OnboardingSetupCard(
     }
 }
 
-
 /**
  * A single "tip" row: a primary-tinted icon beside a bold title and a muted one-line body, with a
- * hairline edge on the glass card. The welcome, tips and features cards each render a list of these.
+ * hairline edge on the glass card. The welcome, tips and features cards each render a list of
+ * these.
  */
 @Composable
 internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
@@ -337,7 +342,8 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
         border = androidx.compose.foundation.BorderStroke(1.dp, hairlineColor()),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        // Same leading-circle icon badge as search results, the update pebble and the settings hero stats.
+        // Same leading-circle icon badge as search results, the update pebble and the settings hero
+        // stats.
         IconLeadRow(
             icon,
             tint = scheme.primary,
@@ -349,7 +355,10 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
     }
 }
 
-/** Which alerts to get. The same switches as Settings → Notifications, the ones most people want decided up front. */
+/**
+ * Which alerts to get. The same switches as Settings → Notifications, the ones most people want
+ * decided up front.
+ */
 @Composable
 internal fun OnboardingAlertsPage(notif: SettingsStore.NotificationPrefs, vm: AppViewModel) {
     BodySmallText("Choose what Bloo tells you about. You can change any of these later in Settings.")
@@ -362,7 +371,10 @@ internal fun OnboardingAlertsPage(notif: SettingsStore.NotificationPrefs, vm: Ap
     }
 }
 
-/** The watch: optional, so it is offered rather than required, with the same setup dialog Settings uses. */
+/**
+ * The watch: optional, so it is offered rather than required, with the same setup dialog Settings
+ * uses.
+ */
 @Composable
 internal fun OnboardingWatchPage(state: UiState) {
     var show by remember { mutableStateOf(false) }
@@ -371,4 +383,3 @@ internal fun OnboardingWatchPage(state: UiState) {
     BodySmallText("No watch? Swipe on. You can set one up later from Settings → Backup & sync.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     if (show) SetupWatchDialog(phoneName = "this phone", onDismiss = { show = false })
 }
-

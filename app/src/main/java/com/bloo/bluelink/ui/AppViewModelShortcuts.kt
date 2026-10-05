@@ -17,8 +17,8 @@ import com.bloo.bluelink.data.setEnabledShortcuts
 // --- App-icon shortcuts and OEM app launch (extracted from AppViewModel) --
 
 /**
- * Handle an app-icon shortcut. If the garage isn't loaded yet the request is
- * queued and run once it is.
+ * Handle an app-icon shortcut. If the garage isn't loaded yet the request is queued and run once it
+ * is.
  */
 fun AppViewModel.handleShortcut(vin: String, cmd: String) {
     pendingShortcut = vin to cmd
@@ -31,21 +31,16 @@ internal fun AppViewModel.tryRunPendingShortcut() {
     pendingShortcut = null
     val idx = _state.value.vehicles.indexOf(v)
     if (idx >= 0) selectIndex(idx)
-    // selectIndex only updates which car is current, not which screen is
-    // showing -- tapping a car-specific shortcut while the app was sitting
-    // on Settings (or any other screen) previously selected the right car
-    // underneath without ever bringing it into view. A shortcut
-    // tap always means "look at this car," so force back to the garage.
+    // A shortcut tap always means "look at this car," so force back to the garage.
     _state.update { it.copy(screen = Screen.Garage, expandedIndex = null) }
     val status = _state.value.statusFor(v)
     when (cmd) {
         // Toggles: do the opposite of the last-known state.
         "doors" -> if (status?.doorLock == true) unlock(v) else lock(v)
         "climate" -> if (status?.airCtrlOn == true) stopClimate(v) else {
-            // Gate the start on !isDriving, matching the in-app control (which
-            // goes read-only while driving) -- the car rejects remote climate
-            // while moving, so firing it would only waste a serialized request
-            // slot and surface a spurious "command failed".
+            // Gate the start on !isDriving, matching the in-app control (which goes read-only while
+            // driving) -- the car rejects remote climate while moving, so firing it would only
+            // waste a serialized request slot and surface a spurious "command failed".
             if (!_state.value.isDriving(v)) {
                 startClimate(v, ClimateRequest(tempF = DEFAULT_CLIMATE_TEMP_F, defrost = false, durationMinutes = DEFAULT_CLIMATE_DURATION_MIN))
             }

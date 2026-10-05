@@ -57,7 +57,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.toColorInt
 
-/** The round colour disc shared by every palette swatch: the colour, a ring + check and a small pop when selected. */
+/**
+ * The round colour disc shared by every palette swatch: the colour, a ring + check and a small pop
+ * when selected.
+ */
 @Composable
 private fun SwatchDisc(color: Color, selected: Boolean, description: String, onClick: () -> Unit) {
     val ring by animateDpAsState(if (selected) 3.dp else 0.dp, spring(stiffness = Spring.StiffnessMediumLow), label = "swatchRing")
@@ -66,7 +69,8 @@ private fun SwatchDisc(color: Color, selected: Boolean, description: String, onC
         spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "swatchScale",
     )
-    // The 58dp slot leaves room for the 1.12x pop. Exposed as a RadioButton so TalkBack announces name and state.
+    // The 58dp slot leaves room for the 1.12x pop. Exposed as a RadioButton so TalkBack announces
+    // name and state.
     Box(
         Modifier
             .size(58.dp)
@@ -113,7 +117,8 @@ internal fun CustomPaletteSwatch(palette: CustomPaletteData, selected: Boolean, 
         Spacer(Modifier.height(GapHairline))
         Row(horizontalArrangement = Arrangement.spacedBy(SplitSeam), verticalAlignment = Alignment.CenterVertically) {
             Text(palette.name, style = MaterialTheme.typography.labelSmall, color = swatchLabelColor(selected))
-            // 32dp, not 48dp: it sits in a caption row inside a 58dp-wide swatch column in a tight grid.
+            // 32dp, not 48dp: it sits in a caption row inside a 58dp-wide swatch column in a tight
+            // grid.
             MorphIconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Filled.Settings,
@@ -126,11 +131,9 @@ internal fun CustomPaletteSwatch(palette: CustomPaletteData, selected: Boolean, 
     }
 }
 
-
 /**
- * Canvas-based colour picker: hue bar + saturation/value square.
- * HSV state is seeded once from [color] and never re-synced; drags report via [onColorChange].
- * `hexInput` mirrors the colour and only overwrites the canvas on `commitHex()` (Done/focus-loss).
+ * Canvas-based colour picker: hue bar + saturation/value square. HSV state is seeded once from
+ * [color] and never re-synced; drags report via [onColorChange].
  */
 @Composable
 internal fun ColorPickerCanvas(
@@ -164,7 +167,8 @@ internal fun ColorPickerCanvas(
     val hueGradient = remember(Unit) {
         (0..12).map { i -> Color(android.graphics.Color.HSVToColor(floatArrayOf(i * 30f, 1f, 1f))) }
     }
-    // Hoisted out of the draw scope to avoid per-frame List + Brush allocation: satValueBrush changes only with hue.
+    // Hoisted out of the draw scope to avoid per-frame List + Brush allocation: satValueBrush
+    // changes only with hue.
     val satValueBrush = remember(pureHue) { Brush.horizontalGradient(listOf(Color.White, pureHue)) }
     val hueBrush = remember(hueGradient) { Brush.horizontalGradient(hueGradient) }
     fun hexOf(c: Color) = String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and c.toArgb())
@@ -283,8 +287,6 @@ internal fun ColorPickerCanvas(
     }
 }
 
-
-/** Rounds [v] to the nearest multiple of [step]; the picker only offers fixed values. */
 private fun snapStep(v: Float, step: Float): Float = Math.round(v / step) * step
 
 /** The check mark a chosen swatch wears, shared by both swatch rows. */

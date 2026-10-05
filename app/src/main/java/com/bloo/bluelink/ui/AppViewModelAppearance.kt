@@ -49,11 +49,9 @@ fun AppViewModel.setActiveCustomPaletteId(id: String?) = viewModelScope.launch {
 /** Swap which dual-column side the "hot spot" pebble lives on. */
 fun AppViewModel.setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
 
-// Deferred variants for the settings sliders: these two values recompose
-// ~the whole app (colorScheme / LocalDensity), so the commit waits a beat
-// past slider release to let the settle-bounce animation get a clean run.
-// In viewModelScope, not a screen-tied scope, so closing Settings inside
-// that beat can't drop the change.
+// Deferred variants for the settings sliders: these two values recompose ~the whole app
+// (colorScheme / LocalDensity), so the commit waits a beat past slider release to let the
+// settle-bounce animation get a clean run.
 fun AppViewModel.setUiScaleSoon(value: Float) =
     viewModelScope.launch { settingsStore.setUiScale(value) }
 fun AppViewModel.setGlassClaritySoon(value: Float) =
@@ -65,22 +63,17 @@ fun AppViewModel.setVibrancySoon(value: Float) =
     viewModelScope.launch { settingsStore.setVibrancy(value) }
 fun AppViewModel.setHapticsEnabled(value: Boolean) = viewModelScope.launch { settingsStore.setHapticsEnabled(value) }
 
-// More of the same appearance-setter pattern described above the
-// setThemeMode group: DataStore write only, UI updates via the
-// `appearance` StateFlow mirror. setAuroraMotion configures the animated
-// background's speed; its colors always derive from the current theme.
+// More of the same appearance-setter pattern described above the setThemeMode group: DataStore
+// write only, UI updates via the `appearance` StateFlow mirror. setAuroraMotion configures the
+// animated background's speed; its colors always derive from the current theme.
 fun AppViewModel.setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
 
-/** Where the floating search bubble was last dragged to (fractions
- *  of its own drag range), or null if never dragged. See SettingsStore's own doc. */
+/** See SettingsStore's own doc. */
 suspend fun AppViewModel.searchBubblePosition(): Pair<Float, Float>? = settingsStore.searchBubblePosition()
 fun AppViewModel.setSearchBubblePosition(xFrac: Float, yFrac: Float) =
     viewModelScope.launch { settingsStore.setSearchBubblePosition(xFrac, yFrac) }
 
-/** Toggle the opt-in Shizuku silent-install path (device-local; see SettingsStore).
- *  Turning it ON prompts for the Shizuku permission immediately — that request is
- *  also what makes Bloo appear in the Shizuku manager's app list (declaring the
- *  provider alone isn't enough). If Shizuku isn't running, guide the user. */
+/** Toggle the opt-in Shizuku silent-install path (device-local; see SettingsStore). */
 fun AppViewModel.setSeamlessInstallShizuku(value: Boolean) {
     viewModelScope.launch { settingsStore.setSeamlessInstallShizuku(value) }
     if (value) {
@@ -95,9 +88,11 @@ fun AppViewModel.setSeamlessInstallShizuku(value: Boolean) {
     }
 }
 
-/** Re-probe Shizuku availability off the main thread (binder ping). Called from
- *  init and on warm resume, so starting Shizuku while the app is open reveals the
- *  "Updates" toggle without needing a cold restart. */
+/**
+ * Re-probe Shizuku availability off the main thread (binder ping). Called from init and on warm
+ * resume, so starting Shizuku while the app is open reveals the "Updates" toggle without needing a
+ * cold restart.
+ */
 fun AppViewModel.refreshShizukuAvailable() {
     com.bloo.bluelink.data.StartupTrace.markIfStarting("Shizuku probe: begin")
     viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {

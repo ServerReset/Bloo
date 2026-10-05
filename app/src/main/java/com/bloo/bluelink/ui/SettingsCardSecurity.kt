@@ -66,15 +66,9 @@ internal fun SecurityCardContent(
     }
 }
 
-
 /**
- * The app-lock control: Off / Screen off / Immediate. Shared by the Security card and settings search, so
- * the two can never disagree about what turning the lock off means.
- *
- * Turning it OFF or ON needs a biometric confirmation (otherwise one tap from an already-unlocked app could
- * remove the lock for good); failing to confirm keeps things as they were. "Off" also removes the app PIN,
- * since the cold-start lock is "biometrics on OR a PIN set" and leaving the PIN would keep asking on every
- * launch. Changing only WHEN it re-locks needs no extra proof.
+ * The app-lock control: Off / Screen off / Immediate. Shared by the Security card and settings
+ * search, so the two can never disagree about what turning the lock off means.
  */
 @Composable
 internal fun AppLockRow(state: UiState, appearance: SettingsStore.Appearance, vm: AppViewModel, context: Context) {

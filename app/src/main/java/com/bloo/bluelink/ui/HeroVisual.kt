@@ -44,16 +44,19 @@ import com.bloo.bluelink.data.VehicleStatus
 import kotlinx.coroutines.delay
 
 /**
- * The hero's car-photo rendering: tonal fallback brush, photo backdrop, and the shared
- * charge/fuel bar (also used by Cover.kt and EnergyPebble.kt).
+ * The hero's car-photo rendering: tonal fallback brush, photo backdrop, and the shared charge/fuel
+ * bar (also used by Cover.kt and EnergyPebble.kt).
  */
 
-/** Tonal primary-tertiary-secondary gradient used as the fallback fill behind car photos.
- *  Callers apply their own `.alpha(...)`; this returns only the brush. */
+/**
+ * Tonal primary-tertiary-secondary gradient used as the fallback fill behind car photos. Callers
+ * apply their own `.alpha(...)`; this returns only the brush.
+ */
 @Composable
 internal fun carTonalBrush(scheme: ColorScheme): Brush {
-    // Deepened accent family (primary -> container -> tertiary -> secondary) so the hero's light text
-    // always has contrast, in light and dark themes alike, and the card reads as one lit, saturated surface.
+    // Deepened accent family (primary -> container -> tertiary -> secondary) so the hero's light
+    // text always has contrast, in light and dark themes alike, and the card reads as one lit,
+    // saturated surface.
     val deepen = { c: Color -> lerp(c, Color.Black, if (appIsDarkTheme()) 0.25f else 0.38f) }
     return Brush.linearGradient(
         listOf(
@@ -67,7 +70,9 @@ internal fun carTonalBrush(scheme: ColorScheme): Brush {
     )
 }
 
-/** Coil model for a stored car photo: a [java.io.File] for a cropped local path, else the raw URL. */
+/**
+ * Coil model for a stored car photo: a [java.io.File] for a cropped local path, else the raw URL.
+ */
 @Composable
 internal fun rememberPhotoModel(url: String): Any =
     remember(url) { if (url.startsWith("/")) java.io.File(url) else url }
@@ -76,10 +81,8 @@ internal fun rememberPhotoModel(url: String): Any =
 
 /**
  * The car photo plus a contrast scrim so overlaid text (title, chevron, charge readout) stays
- * legible on any photo. The gradient covers the FULL height and never reaches transparent;
- * heaviest at top and bottom, where content sits.
- * Remembered because Brush.verticalGradient allocates and the card recomposes on every status change.
- * [aspectRatio] null means size by [height]; the phone hero passes 16:9.
+ * legible on any photo. The gradient covers the FULL height and never reaches transparent; heaviest
+ * at top and bottom, where content sits.
  */
 @Composable
 internal fun HeroPhotoBackdrop(
@@ -91,9 +94,7 @@ internal fun HeroPhotoBackdrop(
 ) {
     Box(Modifier.fillMaxWidth()) {
         HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio)
-        // Always a dark scrim with light text, in both themes: a photo is its own backdrop, and a
-        // light veil over it (the old dark-theme look) just washes the car out. A colour wash with no
-        // photo needs only a gentle one.
+        // A colour wash with no photo needs only a gentle one.
         val gentle = imageUrl.isNullOrBlank()
         val scrim = remember(gentle) {
             val (top, mid, low, bottom) = if (gentle) listOf(0.12f, 0.02f, 0.05f, 0.22f) else listOf(0.5f, 0.16f, 0.2f, 0.62f)
@@ -109,11 +110,9 @@ internal fun HeroPhotoBackdrop(
 }
 
 /**
- * Spaces out hero photo loads that start close together so a multi-car account doesn't decode
- * and upload several bitmaps in the same frame (the per-request `.size()` cap bounds each
- * decode, not simultaneous ones).
- * Coalescing: only a request within [COALESCE_WINDOW_MS] of the previous one is pushed back by
- * [STAGGER_STEP_MS]; after a quiet gap a load starts immediately.
+ * Spaces out hero photo loads that start close together so a multi-car account doesn't decode and
+ * upload several bitmaps in the same frame (the per-request `.size()` cap bounds each decode, not
+ * simultaneous ones).
  */
 private object HeroLoadStagger {
     private const val COALESCE_WINDOW_MS = 80L
@@ -122,7 +121,9 @@ private object HeroLoadStagger {
     private var lastClaimAtMs = 0L
     private var burstSlot = 0
 
-    /** Call once per load attempt (inside `remember(model) {}`), never from a plain composable body. */
+    /**
+     * Call once per load attempt (inside `remember(model) {}`), never from a plain composable body.
+     */
     fun claimDelayMs(): Long = synchronized(lock) {
         val now = android.os.SystemClock.uptimeMillis()
         burstSlot = if (now - lastClaimAtMs < COALESCE_WINDOW_MS) burstSlot + 1 else 0
@@ -156,12 +157,11 @@ internal fun HeroVisual(
     } else {
         // A locally-cropped photo is an absolute path; a pasted one is a URL.
         val model: Any = rememberPhotoModel(imageUrl)
-        // A transparent PNG renders edge-to-edge with no opaque box, so it blends
-        // seamlessly into the pebble (fit, not crop, so the whole subject shows).
+        // A transparent PNG renders edge-to-edge with no opaque box, so it blends seamlessly into
+        // the pebble (fit, not crop, so the whole subject shows).
         val transparent = imageUrl.endsWith(".png", ignoreCase = true)
         // The photo arrives with a fade+slide+scale rather than popping (same language as
-        // ReorderColumn's intro). `loadedFrom` records the success kind so a memory-cache hit
-        // (flipping back to a decoded photo) shows instantly instead of replaying.
+        // ReorderColumn's intro).
         var loadedFrom by remember(model) { mutableStateOf<DataSource?>(null) }
         val entrance = remember(model) { Animatable(0f) }
         LaunchedEffect(loadedFrom) {
@@ -171,9 +171,11 @@ internal fun HeroVisual(
                 else -> entrance.animateTo(1f, tween(360, easing = FastOutSlowInEasing))
             }
         }
-        // See HeroLoadStagger: claimed once per model; delays only when another hero load just started.
+        // See HeroLoadStagger: claimed once per model; delays only when another hero load just
+        // started.
         var staggerReady by remember(model) { mutableStateOf(false) }
-        // Cold-start diagnostic: marks when AsyncImage starts so Success can log this photo's own decode time.
+        // Cold-start diagnostic: marks when AsyncImage starts so Success can log this photo's own
+        // decode time.
         var loadStartedAtMs by remember(model) { mutableLongStateOf(0L) }
         LaunchedEffect(model) {
             val delayMs = HeroLoadStagger.claimDelayMs()
@@ -181,19 +183,21 @@ internal fun HeroVisual(
             loadStartedAtMs = System.currentTimeMillis()
             staggerReady = true
         }
-        // Memoized like the map tiles: a fresh ImageRequest per recomposition would reload and flicker.
+        // Memoized like the map tiles: a fresh ImageRequest per recomposition would reload and
+        // flicker.
         val context = LocalContext.current
         val imageRequest = remember(model) {
             ImageRequest.Builder(context)
                 .data(model)
-                // Explicit decode cap (not Coil's automatic sizing): photos from older builds or Drive sync
-                // may be larger than the crop export's 1080px, and two large decodes stall the main thread.
-                // Never trust the input, always cap the output.
+                // Explicit decode cap (not Coil's automatic sizing): photos from older builds or
+                // Drive sync may be larger than the crop export's 1080px, and two large decodes
+                // stall the main thread. Never trust the input, always cap the output.
                 .size(1080, 1080)
                 .build()
         }
         if (!staggerReady) {
-            // Same tonal fallback as the no-photo branch, shown while the stagger holds the load back.
+            // Same tonal fallback as the no-photo branch, shown while the stagger holds the load
+            // back.
             val scheme = MaterialTheme.colorScheme
             Box(
                 sizeModifier
@@ -208,8 +212,8 @@ internal fun HeroVisual(
                 onState = { state ->
                     if (state is AsyncImagePainter.State.Success) {
                         loadedFrom = state.result.dataSource
-                        // Cold-start trace: when the photo finished decoding, keyed per-VIN with elapsed time and
-                        // source file size, to diagnose bitmap-decode memory.
+                        // Cold-start trace: when the photo finished decoding, keyed per-VIN with
+                        // elapsed time and source file size, to diagnose bitmap-decode memory.
                         val elapsedMs = if (loadStartedAtMs > 0) System.currentTimeMillis() - loadStartedAtMs else -1
                         val sourceSize = (model as? java.io.File)?.let {
                             runCatching { it.length() }.getOrNull()
@@ -225,7 +229,8 @@ internal fun HeroVisual(
                     .then(if (transparent) Modifier else Modifier.clip(RoundedCornerShape(corner)))
                     .graphicsLayer {
                         alpha = entrance.value
-                        // A short upward drift and 0.97-1 scale: a hint of settling into a place the photo already occupies.
+                        // A short upward drift and 0.97-1 scale: a hint of settling into a place
+                        // the photo already occupies.
                         translationY = (1f - entrance.value) * 10.dp.toPx()
                         val s = 0.97f + 0.03f * entrance.value
                         scaleX = s
@@ -237,9 +242,9 @@ internal fun HeroVisual(
 }
 
 /**
- * The battery/fuel percentage readout: headline percent + range, a status line (charging
- * details > driving/parked > plain label), and a gradient progress bar with a charge-limit
- * marker when plugged in. The bar fill springs rather than snapping.
+ * The battery/fuel percentage readout: headline percent + range, a status line (charging details >
+ * driving/parked > plain label), and a gradient progress bar with a charge-limit marker when
+ * plugged in.
  */
 @Composable
 internal fun ChargeFuelBar(
@@ -249,16 +254,16 @@ internal fun ChargeFuelBar(
     drivingLabel: String? = null,
     metric: Boolean = false,
 ) {
-    // [HeroMorphReadout] held at its expanded end (`t = 1f`, inert): the one readout
-    // implementation shared by the hero, the flip cover tile and the EV Charge pebble.
+    // [HeroMorphReadout] held at its expanded end (`t = 1f`, inert): the one readout implementation
+    // shared by the hero, the flip cover tile and the EV Charge pebble.
     HeroMorphReadout(chargeReadoutOf(status, hasBattery, hasFuel, drivingLabel, metric), t = 1f)
 }
 
 /**
  * Everything the charge/fuel readout says, derived once so the collapsed one-line and expanded
- * block densities agree on the percentage, the charging > driving > plain priority order and
- * the charging colour. Only the layout differs.
+ * block densities agree on the percentage, the charging > driving > plain priority order and the
+ * charging colour. Only the layout differs.
  */
 
-// Colours, sizes and motion specs shared across screens live in UiTokens.kt.
-// The shared floating/card edge (glassRim) lives in GlassChrome.kt.
+// Colours, sizes and motion specs shared across screens live in UiTokens.kt. The shared
+// floating/card edge (glassRim) lives in GlassChrome.kt.

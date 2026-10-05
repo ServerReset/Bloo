@@ -71,8 +71,9 @@ import androidx.compose.ui.window.DialogProperties
 /** Shared app-wide chrome: the glass dialog shell and the animated aurora background. */
 
 /**
- * The app's shared pop-up dialog shell: one elevated card (icon, headline, content, stacked actions) per the
- * M3 basic-dialog layout, not AlertDialog's slots, which render as disconnected clipped boxes.
+ * The app's shared pop-up dialog shell: one elevated card (icon, headline, content, stacked
+ * actions) per the M3 basic-dialog layout, not AlertDialog's slots, which render as disconnected
+ * clipped boxes.
  */
 @Composable
 internal fun GlassAlertDialog(
@@ -88,7 +89,8 @@ internal fun GlassAlertDialog(
     val host = LocalDialogHost.current
     val card: @Composable () -> Unit = { DialogCard(icon, title, titleTrailing, text, buttons) }
     if (host != null) {
-        // Drawn by the app's dialog layer (DialogMotion.kt): glass over the live app, animating in and out.
+        // Drawn by the app's dialog layer (DialogMotion.kt): glass over the live app, animating in
+        // and out.
         val entry = remember { DialogEntry() }
         SideEffect {
             entry.onDismiss = onDismissRequest
@@ -162,30 +164,29 @@ internal fun triangleWave(elapsedMs: Long, periodMs: Long): Float {
     return if (phase < periodMs) phase.toFloat() / periodMs else 2f - phase.toFloat() / periodMs
 }
 
-/**
- * Animated gradient-blob backdrop for login, onboarding and (optionally) the garage.
- * Blob hues derive from the surface colour rotated 180° plus tertiary/secondary. [motionMode] `static` drifts
- * on its own; `motion` adds accelerometer tilt, isolated from how the phone is held by subtracting a slow
- * moving average. `refreshing` drives a one-shot grow/hold/shrink pulse.
- */
+/** Animated gradient-blob backdrop for login, onboarding and (optionally) the garage. */
 @Composable
 internal fun AuroraBackground(
     modifier: Modifier = Modifier,
     appearance: SettingsStore.Appearance? = null,
     refreshing: Boolean = false,
-    /** Freezes the ambient drift and tilt sensor while true; the search panel pauses it to spare blur redraws during the IME animation. */
+    /**
+     * Freezes the ambient drift and tilt sensor while true; the search panel pauses it to spare
+     * blur redraws during the IME animation.
+     */
     paused: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
-    // Battery saver (or pre-S, where the blur can't run): one flat surface fill, no sensor, drift or blur.
+    // Battery saver (or pre-S, where the blur can't run): one flat surface fill, no sensor, drift
+    // or blur.
     if (!canBlurBackdrops()) {
         Box(modifier.fillMaxSize().background(scheme.surface))
         return
     }
     val motionMode = appearance?.auroraMotion ?: "static"
 
-    // Motion follows the phone's tilt; Static gets a slow ambient drift.
-    // A low smoothing alpha keeps tilt from jittering on hand tremor.
+    // Motion follows the phone's tilt; Static gets a slow ambient drift. A low smoothing alpha
+    // keeps tilt from jittering on hand tremor.
     var tiltX by remember { mutableFloatStateOf(0f) }
     var tiltY by remember { mutableFloatStateOf(0f) }
     // Live pause flag: the sensor callback and coroutines start once and must see the newest value.
@@ -196,8 +197,9 @@ internal fun AuroraBackground(
         DisposableEffect(ctx) {
             val mgr = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
             val sensor = mgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-            // Raw accelerometer values include gravity (~±9.8) from how the phone is held. raw* tracks the sensor,
-            // base* a much slower average; tilt is their difference, so it stays centred whatever the resting angle.
+            // Raw accelerometer values include gravity (~±9.8) from how the phone is held. raw*
+            // tracks the sensor, base* a much slower average; tilt is their difference, so it stays
+            // centred whatever the resting angle.
             var rawX = 0f; var rawY = 0f
             var baseX = 0f; var baseY = 0f
             val listener = object : SensorEventListener {
@@ -236,7 +238,8 @@ internal fun AuroraBackground(
         Triple(primary, scheme.tertiary, scheme.secondary)
     }
 
-    // Guaranteed grow-then-shrink pulse with a brief hold at the peak, so a quick refresh still visibly animates.
+    // Guaranteed grow-then-shrink pulse with a brief hold at the peak, so a quick refresh still
+    // visibly animates.
     val explosion = remember { Animatable(0f) }
     LaunchedEffect(refreshing) {
         if (refreshing) {
@@ -245,22 +248,25 @@ internal fun AuroraBackground(
         }
         explosion.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow))
     }
-    // Fade the blobs in so the heaviest draw (full-screen blur) isn't at full cost on the cold-start first frame.
-    // Alpha is read in drawBehind (draw phase only).
+    // Fade the blobs in so the heaviest draw (full-screen blur) isn't at full cost on the
+    // cold-start first frame. Alpha is read in drawBehind (draw phase only).
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, tween(MotionMedium)) }
-    // Defer the blur one frame: the blobs are invisible at first, so blurring a flat surface is wasted GPU.
+    // Defer the blur one frame: the blobs are invisible at first, so blurring a flat surface is
+    // wasted GPU.
     var blurOn by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         withFrameNanos { }
         blurOn = true
     }
-    // Read inside drawBehind, not composition: reading it here would recompose and rebuild the full-screen RenderEffect every frame.
+    // Read inside drawBehind, not composition: reading it here would recompose and rebuild the
+    // full-screen RenderEffect every frame.
     val explodeAlpha = { 1f + explosion.value * 2.5f }
     val explodeSize = { 1f + explosion.value * 0.8f }
     val explodeSpread = { 1f + explosion.value * 0.3f }
-    // Both modes run this ambient drift (Motion adds tilt on top) so a still phone isn't a frozen frame.
-    // Hand-ticked at ~12fps, not Compose's per-frame clock, which forced a full-screen blur redraw every vsync.
+    // Both modes run this ambient drift (Motion adds tilt on top) so a still phone isn't a frozen
+    // frame. Hand-ticked at ~12fps, not Compose's per-frame clock, which forced a full-screen blur
+    // redraw every vsync.
     var p1 by remember { mutableFloatStateOf(0.5f) }
     var p2 by remember { mutableFloatStateOf(0.5f) }
     var p3 by remember { mutableFloatStateOf(0.5f) }
@@ -283,8 +289,9 @@ internal fun AuroraBackground(
     Box(
         modifier
             .fillMaxSize()
-            // 44dp: heavier blur washes the blobs out and redraws at every drift tick (the app's costliest steady draw).
-            // Constant radius: animating it rebuilds the RenderEffect each frame; the pulse rides on blob alpha/size/spread.
+            // 44dp: heavier blur washes the blobs out and redraws at every drift tick (the app's
+            // costliest steady draw). Constant radius: animating it rebuilds the RenderEffect each
+            // frame; the pulse rides on blob alpha/size/spread.
             .then(if (blurOn) Modifier.blur(44.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded) else Modifier)
             .drawBehind {
                 drawRect(scheme.surface)

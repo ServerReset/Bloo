@@ -45,10 +45,8 @@ import com.bloo.bluelink.update.UpdateInfo
 import kotlin.math.roundToInt
 
 /**
- * Standalone update tile pinned below the hero whenever the checker finds a newer build (Bloo is not on the Play Store).
- * Built directly on [PebbleShell] since it is not tied to a car/section. The header action doubles as the
- * primary control with live download state; expanded adds install steps, release notes and Remind-me/Not-now.
- * Downloads the rolling GitHub Release APK directly.
+ * Standalone update tile pinned below the hero whenever the checker finds a newer build (Bloo is
+ * not on the Play Store). Built directly on [PebbleShell] since it is not tied to a car/section.
  */
 @Composable
 internal fun UpdateAvailableTile(
@@ -58,7 +56,8 @@ internal fun UpdateAvailableTile(
     hazeState: dev.chrisbanes.haze.HazeState? = null,
 ) {
     val info = state.updateAvailable
-    // Visible during the pending-dismiss (undo) window; only the committed updateTileDismissed hides it.
+    // Visible during the pending-dismiss (undo) window; only the committed updateTileDismissed
+    // hides it.
     AnimatedVisibility(
         visible = info != null && !state.updateTileDismissed,
         enter = expandEnter(Alignment.Bottom),
@@ -66,12 +65,13 @@ internal fun UpdateAvailableTile(
     ) {
         if (info == null) return@AnimatedVisibility
         val context = LocalContext.current
-        // Progress is collected from its own StateFlow so per-chunk ticks invalidate only this tile;
-        // state.updateDownloading stays on UiState since it changes rarely.
+        // Progress is collected from its own StateFlow so per-chunk ticks invalidate only this
+        // tile; state.updateDownloading stays on UiState since it changes rarely.
         val downloadProgress by vm.updateDownloadProgress.collectAsStateWithLifecycle()
         val hasDirectDownload = info.run.phoneApkUrl != null
         val current = vm.currentBuildNumber
-        // Build delta ("build 812 → build 828") when the installed build is known, else just the target.
+        // Build delta ("build 812 → build 828") when the installed build is known, else just the
+        // target.
         val newLabel = com.bloo.bluelink.data.buildLabel(info.run.runNumber)
         val deltaLabel = if (current > 0) {
             "${com.bloo.bluelink.data.buildLabel(current)} → $newLabel"
@@ -81,7 +81,8 @@ internal fun UpdateAvailableTile(
         val seamless = LocalAppearance.current.seamlessInstallShizuku && state.shizukuAvailable
         // Keyed on the build number so a different build starts collapsed.
         var expanded by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
-        // Always visible: this composable only renders when an update exists (matches SettingsHeroCard's dot).
+        // Always visible: this composable only renders when an update exists (matches
+        // SettingsHeroCard's dot).
         UpdateBadgedCard(visible = true, modifier = Modifier.fillMaxWidth()) {
         PebbleShell(
             expanded = expanded,
@@ -94,7 +95,8 @@ internal fun UpdateAvailableTile(
             headerAction = PebbleHeaderAction(
                 label = when {
                     state.updateInstalling -> "Installing…"
-                    // Rounded to the nearest 5%; this chip is the only place the download percentage shows.
+                    // Rounded to the nearest 5%; this chip is the only place the download
+                    // percentage shows.
                     state.updateDownloading -> downloadProgress?.let { "${(it * 100 / 5f).roundToInt() * 5}%" } ?: "Downloading…"
                     state.updateApkReady -> if (seamless) "Install now" else "Install"
                     hasDirectDownload -> "Update"
@@ -103,7 +105,8 @@ internal fun UpdateAvailableTile(
                 icon = if (state.updateApkReady) Icons.Filled.SystemUpdate else Icons.Filled.Download,
                 pending = state.updateDownloading || state.updateInstalling,
                 enabled = !state.updateInstalling,
-                // Same ChargeGreen/white pairing as ChargePebble's active headerAction, for the install-ready call to action.
+                // Same ChargeGreen/white pairing as ChargePebble's active headerAction, for the
+                // install-ready call to action.
                 active = state.updateApkReady,
                 activeContainer = ChargeGreen,
                 activeContent = Color.White,
@@ -124,17 +127,18 @@ internal fun UpdateAvailableTile(
         ) {
             val scheme = MaterialTheme.colorScheme
             UpdateDeltaHero(current, info.run.runNumber)
-            // One state-driven status line (icon + text); the build delta is already in the header summary.
-            // Ready uses ChargeGreen; the rest stay neutral.
-            // statusKind (not the rendered string) drives the AnimatedContent so only the percent animates, not the sentence.
-        // Glass surface; shadow = false because it sits inside the pebble's already-elevated card (see glassEdge).
+            // One state-driven status line (icon + text); the build delta is already in the header
+            // summary.
+        // Glass surface; shadow = false because it sits inside the pebble's already-elevated card
+        // (see glassEdge).
         GlassSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = SmallShape,
             hazeState = hazeState,
             shadow = false,
         ) {
-            // Column, not Box: UpdateStatusLine emits two top-level siblings that a Box would stack on top of each other.
+            // Column, not Box: UpdateStatusLine emits two top-level siblings that a Box would stack
+            // on top of each other.
             Column(Modifier.padding(12.dp)) {
                 UpdateStatusLine(
                     deltaLabel, seamless, state, vm,
@@ -142,7 +146,8 @@ internal fun UpdateAvailableTile(
                 )
             }
         }
-            // Release notes ("What's new"), capped, with a "Full notes" link; shared block (see UpdateReleaseNotes).
+            // Release notes ("What's new"), capped, with a "Full notes" link; shared block (see
+            // UpdateReleaseNotes).
             PopVisible(visible = info.run.releaseNotes != null) {
                 UpdateReleaseNotes(info, collapsedLines = 5, hazeState = hazeState)
             }
@@ -162,7 +167,8 @@ internal fun UpdateAvailableTile(
                         shadow = false,
                     ) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-                            // Without Shizuku the OS installer interferes and the Play Protect sheet is collapsed by default, so say so up front.
+                            // Without Shizuku the OS installer interferes and the Play Protect
+                            // sheet is collapsed by default, so say so up front.
                             if (!state.shizukuAvailable || !LocalAppearance.current.seamlessInstallShizuku) {
                                 Text(
                                     "Shizuku is off, so Android asks you to confirm each update. On the next screen tap \"More details\" to expand it, then \"Install anyway\".",
@@ -174,7 +180,8 @@ internal fun UpdateAvailableTile(
                                 if (hasDirectDownload) "1. Tap \"Update\", then \"Install\" once it downloads" else "1. Download the APK, then open it",
                                 style = MaterialTheme.typography.bodySmall,
                             )
-                            // Play Protect flags any non-Play-Store APK; the tip stops "Blocked by Play Protect" reading as a failure.
+                            // Play Protect flags any non-Play-Store APK; the tip stops "Blocked by
+                            // Play Protect" reading as a failure.
                             Text(
                                 "2. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
                                 style = MaterialTheme.typography.bodySmall,
@@ -183,8 +190,9 @@ internal fun UpdateAvailableTile(
                     }
                 }
             }
-            // The header pill already carries the primary action; only "Keep it" (pending-dismiss undo) lives here.
-            // Dismiss / undo / remind in one shared row (UpdateDismissRow) so the app tile and Settings card cannot drift.
+            // The header pill already carries the primary action; only "Keep it" (pending-dismiss
+            // undo) lives here. Dismiss / undo / remind in one shared row (UpdateDismissRow) so the
+            // app tile and Settings card cannot drift.
             UpdateDismissRow(state, vm)
         }
         }
@@ -192,8 +200,8 @@ internal fun UpdateAvailableTile(
 }
 
 /**
- * What the update's primary action says and does; shared by the pebble header action and the Settings
- * button so the label, glyph and branch never differ.
+ * What the update's primary action says and does; shared by the pebble header action and the
+ * Settings button so the label, glyph and branch never differ.
  */
 internal data class UpdateAction(val label: String, val icon: ImageVector, val ready: Boolean)
 

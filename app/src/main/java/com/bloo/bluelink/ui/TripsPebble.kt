@@ -1,8 +1,6 @@
 package com.bloo.bluelink.ui
 
-/**
- * Trips/drive-history pebbles: TripsPebble, TripRow, tripDate and climateChunksLabel.
- */
+/** Trips/drive-history pebbles: TripsPebble, TripRow, tripDate and climateChunksLabel. */
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -36,11 +34,10 @@ import com.bloo.bluelink.data.climateChunks
 import kotlinx.coroutines.flow.first
 import kotlin.math.max
 
-
 /**
- * Recent drives from the Hyundai/Genesis US trip-details feed: distance, time, speeds and (EVs)
- * the energy/regen breakdown. Loaded lazily once per session; head units that report no trips
- * show an empty state.
+ * Recent drives from the Hyundai/Genesis US trip-details feed: distance, time, speeds and (EVs) the
+ * energy/regen breakdown. Loaded lazily once per session; head units that report no trips show an
+ * empty state.
  */
 @Composable
 internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Modifier) {
@@ -68,8 +65,8 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
             trips.isEmpty() -> Text("No recent trips reported by this car.")
             else -> Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 val tMetric = LocalAppearance.current.metricDistance
-                // In a forced-open/glance context (LocalForceExpanded) only the 3 most recent trips show so the
-                // tile fits without scrolling; the full pebble keeps up to 8.
+                // In a forced-open/glance context (LocalForceExpanded) only the 3 most recent trips
+                // show so the tile fits without scrolling; the full pebble keeps up to 8.
                 val glance = LocalForceExpanded.current
                 trips.take(if (glance) 3 else 8).forEach { TripRow(it, metric = tMetric) }
             }
@@ -102,8 +99,9 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
             trip.avgspeed?.value?.let { add("avg ${formatSpeedMph(it, metric)}") }
             trip.maxspeed?.value?.let { add("max ${formatSpeedMph(it, metric)}") }
         } }
-        // Same color-role swap as DiagnosticsPebble's indented rows: onSurfaceVariant is full alpha, so
-        // dimness is the role. Boosted on the cover, which has no other contrast handling.
+        // Same color-role swap as DiagnosticsPebble's indented rows: onSurfaceVariant is full
+        // alpha, so dimness is the role. Boosted on the cover, which has no other contrast
+        // handling.
         val captionColor = if (LocalForceExpanded.current) {
             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
         } else {
@@ -124,7 +122,9 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
 
 internal fun tripDate(raw: String?): String = com.bloo.bluelink.data.tripDate(raw)
 
-/** "10 + 3 min" for a 13-minute request: the per-command chunks [climateChunks] splits an
- *  auto-extended climate run into, shown on the Run time slider. */
+/**
+ * "10 + 3 min" for a 13-minute request: the per-command chunks [climateChunks] splits an
+ * auto-extended climate run into, shown on the Run time slider.
+ */
 internal fun climateChunksLabel(totalMinutes: Int): String =
     climateChunks(totalMinutes).joinToString(" + ") + " min"

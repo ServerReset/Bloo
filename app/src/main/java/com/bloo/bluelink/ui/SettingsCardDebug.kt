@@ -53,7 +53,10 @@ import androidx.compose.ui.text.font.FontWeight
 import com.bloo.bluelink.data.links
 import kotlin.math.max
 
-/** The "Debug" card: this device's diagnostics and the activity log, one place for support troubleshooting. */
+/**
+ * The "Debug" card: this device's diagnostics and the activity log, one place for support
+ * troubleshooting.
+ */
 @Composable
 internal fun DebugCardContent(logs: List<String>, vm: AppViewModel, clipboardScope: CoroutineScope, clipboard: Clipboard) {
     fun copy(label: String, text: String) {
@@ -166,13 +169,6 @@ private data class CreditEntry(
     val icon: ImageVector,
 )
 
-/**
- * One row of the Credits card: a small icon chip, the project's name/description,
- * and its actual URL as a tappable link (opened via [openUrl] in a Custom Tab) --
- * replacing what used to be three plain, uncoloured, unclickable Text lines with no
- * visual distinction between them at all. Reported directly as wanting this whole
- * section "beefed out" with real links, not a flat wall of tiny grey text.
- */
 @Composable
 private fun CreditRow(entry: CreditEntry) {
     val context = LocalContext.current
@@ -194,11 +190,11 @@ private fun CreditRow(entry: CreditEntry) {
                 entry.description,
             )
             Spacer(Modifier.height(GapHairline))
-            // The actual link, styled and tappable -- not a caption-coloured, inert
-            // copy of the URL. clip+clickable (not the whole Row, which would make
-            // the icon/name/description look tappable too when only the link is)
-            // sized to just this Row's own content via wrapContentWidth, so the tap
-            // target doesn't stretch across empty space to the card's far edge.
+            // The actual link, styled and tappable -- not a caption-coloured, inert copy of the
+            // URL. clip+clickable (not the whole Row, which would make the icon/name/description
+            // look tappable too when only the link is) sized to just this Row's own content via
+            // wrapContentWidth, so the tap target doesn't stretch across empty space to the card's
+            // far edge.
             Row(
                 Modifier
                     .clip(TinyShape)

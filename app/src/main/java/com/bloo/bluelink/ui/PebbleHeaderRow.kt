@@ -1,8 +1,6 @@
 package com.bloo.bluelink.ui
 
-/**
- * The pebble header row, split out of PebbleShell.kt.
- */
+/** The pebble header row, split out of PebbleShell.kt. */
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -45,9 +43,8 @@ import kotlin.math.floor
 import kotlin.math.max
 
 /**
- * The pebble's header row: glyph, title, summary, and at the far end the split action button or the chevron.
- * Tapping toggles the pebble unless forced open or non-toggleable; [onMeasured] reports its size so the shell
- * can round its corner and cap the action button's width.
+ * The pebble's header row: glyph, title, summary, and at the far end the split action button or the
+ * chevron.
  */
 @Composable
 internal fun PebbleHeaderRow(
@@ -71,17 +68,19 @@ internal fun PebbleHeaderRow(
 ) {
     val haptics = LocalHaptics.current
     val density = LocalDensity.current
-    // Header: tap anywhere to toggle, long-press to drag-reorder; the action button and chevron handle their own clicks.
-    // headerActionMaxWidth reserves room for the icon, gaps, padding and a 140dp title floor before SplitExpandButton
-    // gets the rest, so the button compacts (and the text keeps priority) when the title and status compete.
+    // Header: tap anywhere to toggle, long-press to drag-reorder; the action button and chevron
+    // handle their own clicks. headerActionMaxWidth reserves room for the icon, gaps, padding and a
+    // 140dp title floor before SplitExpandButton gets the rest, so the button compacts (and the
+    // text keeps priority) when the title and status compete.
     val headerActionMaxWidth = (
         rowWidthDp - 16.dp - 20.dp - ButtonIconGap - 10.dp - 12.dp - 140.dp
         ).coerceAtLeast(0.dp)
     Row(
         Modifier
             .fillMaxWidth()
-            // Feeds collapsedCorner: this row's height is the collapsed card height and is stable across the animation.
-            // Also feeds headerActionMaxWidth from the same callback (see rowWidthDp).
+            // Feeds collapsedCorner: this row's height is the collapsed card height and is stable
+            // across the animation. Also feeds headerActionMaxWidth from the same callback (see
+            // rowWidthDp).
             .onSizeChanged {
                 onMeasured(it.height, with(density) { it.width.toDp() })
             }
@@ -98,8 +97,9 @@ internal fun PebbleHeaderRow(
             .padding(start = 16.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Tinted with [titleColor] so the icon matches the title (the hero draws over a scrimmed photo).
-        // takeOrElse: titleColor is Unspecified for other pebbles, which Icon would treat as an untinted raw vector.
+        // Tinted with [titleColor] so the icon matches the title (the hero draws over a scrimmed
+        // photo). takeOrElse: titleColor is Unspecified for other pebbles, which Icon would treat
+        // as an untinted raw vector.
         Icon(
             icon,
             contentDescription = null,
@@ -131,8 +131,8 @@ internal fun PebbleHeaderRow(
             }
             headerContent?.invoke()
         }
-        // AnimatedVisibility wraps the gap and control together so the trailing area slides/fades as one unit
-        // when a single-setting pebble loses its chevron (inlineSettingInSimpleMode).
+        // AnimatedVisibility wraps the gap and control together so the trailing area slides/fades
+        // as one unit when a single-setting pebble loses its chevron (inlineSettingInSimpleMode).
         AnimatedVisibility(
             visible = !forceExpanded && (headerAction != null || canToggle),
             enter = fadeIn(tween(MotionShort)) + expandHorizontally(tween(MotionShort)),
@@ -142,7 +142,8 @@ internal fun PebbleHeaderRow(
         // Gap between the weighted text column and the trailing control.
         Spacer(Modifier.width(10.dp))
             if (headerAction != null) {
-                // Renders the action half regardless; canToggle decides whether the chevron half comes with it (see SplitExpandButton).
+                // Renders the action half regardless; canToggle decides whether the chevron half
+                // comes with it (see SplitExpandButton).
                 SplitExpandButton(
                     action = headerAction,
                     expanded = expanded,

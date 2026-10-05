@@ -51,22 +51,22 @@ import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.SegmentOption
 
 /**
- * True while the Activity is in multi-window/split-screen/freeform mode.
- * Set from [com.bloo.bluelink.MainActivity]. A top-level state (one Activity per process); read by [StatusBarScrim],
- * which skips its blur because the OS draws an opaque bar and the window doesn't extend behind it.
+ * True while the Activity is in multi-window/split-screen/freeform mode. Set from
+ * [com.bloo.bluelink.MainActivity].
  */
 internal var inMultiWindowMode by mutableStateOf(false)
 
-
 /**
  * A soft blurred scrim behind the status bar so content underneath doesn't fight the system icons.
- * Skipped in [inMultiWindowMode]; the blur is always on when [hazeState] and [canBlurBackdrops] allow it.
+ * Skipped in [inMultiWindowMode]; the blur is always on when [hazeState] and [canBlurBackdrops]
+ * allow it.
  */
 @Composable
 internal fun StatusBarScrim(
     /**
      * The [HazeState] whose [dev.chrisbanes.haze.hazeSource] marks the content behind this scrim.
-     * Null falls back to a self-blur, which only softens the flat gradient (so it's nearly a no-op).
+     * Null falls back to a self-blur, which only softens the flat gradient (so it's nearly a
+     * no-op).
      */
     hazeState: HazeState? = null,
 ) {
@@ -83,9 +83,9 @@ internal fun StatusBarScrim(
             .height(topInset)
             .then(
                 if (hazeState != null && canBlur) {
-                    // Blurs what is drawn behind this scrim via the screen's hazeSource. fadeOut tapers the
-                    // blur toward the bottom; edgeWarp = false uses the Surface profile, since a full-width
-                    // strip has no curved rim for the Edge profile to bend.
+                    // Blurs what is drawn behind this scrim via the screen's hazeSource. fadeOut
+                    // tapers the blur toward the bottom; edgeWarp = false uses the Surface profile,
+                    // since a full-width strip has no curved rim for the Edge profile to bend.
                     Modifier.fadeOutBottom().appGlassEffect(hazeState, RoundedCornerShape(0.dp), fadeOut = true, edgeWarp = false)
                 } else {
                     Modifier
@@ -107,11 +107,8 @@ internal fun StatusBarScrim(
     )
 }
 
-
 /**
  * Settings mode (Simple/Advanced) toggle hanging flush from the status bar as one piece of chrome.
- * A single [GlassSurface] with its normal downward shadow (so the seam above stays clean), no [ambientRing],
- * and a border-free [MorphSegmented] on top.
  */
 @Composable
 internal fun SettingsModeTab(
@@ -122,7 +119,8 @@ internal fun SettingsModeTab(
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
 
-    // Sits below the status bar like the other floating header chrome, so it doesn't blur into the system icons.
+    // Sits below the status bar like the other floating header chrome, so it doesn't blur into the
+    // system icons.
     Box(
         Modifier
             .fillMaxWidth()
@@ -155,21 +153,25 @@ internal fun SettingsModeTab(
     }
 }
 
-
 /** The shared gap below the status bar that free-floating header elements align to. */
 internal val HeaderCornerGap = 12.dp
 
-
-/** The shared size of every free-floating header button, so buttons in one row share a vertical centre. */
+/**
+ * The shared size of every free-floating header button, so buttons in one row share a vertical
+ * centre.
+ */
 internal val HeaderButtonSize = 48.dp
 
-
-/** Extra room reserved below a header button's footprint, since its ambient/drop shadow extends past the logical box. */
+/**
+ * Extra room reserved below a header button's footprint, since its ambient/drop shadow extends past
+ * the logical box.
+ */
 internal val HeaderContentClearance = 12.dp
 
-
-/** A small translucent circular icon button used as a floating overlay control.
- *  [outerPadding] is the breathing room around the [HeaderButtonSize] circle; tight rows can pass a smaller value. */
+/**
+ * A small translucent circular icon button used as a floating overlay control. [outerPadding] is
+ * the breathing room around the [HeaderButtonSize] circle; tight rows can pass a smaller value.
+ */
 @Composable
 internal fun FloatingIcon(
     icon: ImageVector,
@@ -177,12 +179,19 @@ internal fun FloatingIcon(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     outerPadding: Dp = HeaderCornerGap,
-    // Overrides for surfaces over a dark scrim (the lock overlay's back arrow uses plain white, not the glass fill).
+    // Overrides for surfaces over a dark scrim (the lock overlay's back arrow uses plain white, not
+    // the glass fill).
     containerColor: Color? = null,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    /** The screen's [HazeState] for a real backdrop blur; null keeps a plain glass tint with no blur. */
+    /**
+     * The screen's [HazeState] for a real backdrop blur; null keeps a plain glass tint with no
+     * blur.
+     */
     hazeState: HazeState? = null,
-    /** Swaps [icon] for a spinning [LoadingIndicator] and ignores taps while the action is in flight. */
+    /**
+     * Swaps [icon] for a spinning [LoadingIndicator] and ignores taps while the action is in
+     * flight.
+     */
     busy: Boolean = false,
 ) {
     val haptics = LocalHaptics.current
@@ -199,7 +208,8 @@ internal fun FloatingIcon(
         modifier = modifier
             .padding(outerPadding)
             .size(HeaderButtonSize)
-            // Lambda form: the press spring is read at draw time, so it never recomposes this button.
+            // Lambda form: the press spring is read at draw time, so it never recomposes this
+            // button.
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -220,27 +230,22 @@ internal fun FloatingIcon(
     }
 }
 
-
-
-
-
-
-
 /**
- * The current [SettingsStore.Appearance], provided once at the app root so pebbles read it
- * instead of each collecting the flow. The default degrades gracefully outside the provider.
+ * The current [SettingsStore.Appearance], provided once at the app root so pebbles read it instead
+ * of each collecting the flow. The default degrades gracefully outside the provider.
  */
 internal val LocalAppearance = staticCompositionLocalOf { SettingsStore.Appearance() }
 
-
 /**
- * When true (pinned pebbles and full-screen/car-glance contexts), pebbles render permanently
- * open with no collapse chevron or drag handle.
+ * When true (pinned pebbles and full-screen/car-glance contexts), pebbles render permanently open
+ * with no collapse chevron or drag handle.
  */
 internal val LocalForceExpanded = staticCompositionLocalOf { false }
 
-
-/** The live pull-to-refresh distance (0..1+), published by [Refreshable] so [GarageScreen]'s overlays track the pull. */
+/**
+ * The live pull-to-refresh distance (0..1+), published by [Refreshable] so [GarageScreen]'s
+ * overlays track the pull.
+ */
 internal val LocalPullFraction =
 
     staticCompositionLocalOf<androidx.compose.runtime.MutableState<Float>> { mutableFloatStateOf(0f) }

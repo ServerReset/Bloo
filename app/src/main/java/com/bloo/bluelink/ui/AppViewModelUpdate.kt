@@ -10,41 +10,31 @@ import kotlinx.coroutines.launch
 // The download-progress flow stays on the ViewModel because it must survive the calls;
 // everything else is plain logic over UiState.
 
-/** "Not now" on the update tile: hides the tile immediately (until the next update check
- *  re-surfaces it -- see checkForUpdate, which clears the flag on any Available result).
- *  There is no undo window any more; the old "Dismissing…" + "Keep it" strip was reported
- *  as janky and removed. */
 fun AppViewModel.dismissUpdate() {
     _state.update { it.copy(updateTileDismissed = true) }
 }
 
-/** "Remind me": hide the tile now, snooze checks so it doesn't re-surface on
- *  every refresh in the meantime, and schedule a one-time worker that in ~1 day
- *  posts a reminder notification AND clears the snooze so the tile comes back. */
 fun AppViewModel.snoozeUpdate() {
     _state.update { it.copy(updateTileDismissed = true) }
     viewModelScope.launch {
-        // Snooze for 1 day to match the reminder worker's 1-day delay: if the
-        // worker is delayed by Doze, a normal refresh still revives the tile at
-        // ~1 day rather than it staying hidden for the longer default window.
+        // Snooze for 1 day to match the reminder worker's 1-day delay: if the worker is delayed by
+        // Doze, a normal refresh still revives the tile at ~1 day rather than it staying hidden for
+        // the longer default window.
         com.bloo.bluelink.update.UpdateChecker.snooze(getApplication(), UPDATE_REMINDER_DELAY_MS)
         com.bloo.bluelink.work.UpdateReminderWorker.schedule(getApplication())
     }
 }
 
-/** Fixed on-disk location for the downloaded update APK, inside the app's
- *  cache dir (so the system can reclaim it under storage pressure, and
- *  it's automatically cleaned up on uninstall). Always the same filename,
- *  so a later download simply overwrites a stale one. */
+/** Always the same filename, so a later download simply overwrites a stale one. */
 private fun AppViewModel.apkCacheFile(): java.io.File {
     val ctx = getApplication<Application>()
     return java.io.File(java.io.File(ctx.cacheDir, "apk"), "Bloo.apk")
 }
 
-/** The update tile's primary button, first tap: downloads the APK in the
- *  background with no other UI change yet -- lets someone start the
- *  update mid-something-else and come back to it. The button then swaps
- *  to "Install" (see [installDownloadedUpdate]) once this finishes. */
+/**
+ * The update tile's primary button, first tap: downloads the APK in the background with no other UI
+ * change yet -- lets someone start the update mid-something-else and come back to it.
+ */
 fun AppViewModel.downloadUpdateInBackground() {
     val url = _state.value.updateAvailable?.run?.phoneApkUrl
     if (url == null) {
@@ -52,21 +42,14 @@ fun AppViewModel.downloadUpdateInBackground() {
         return
     }
     if (_state.value.updateDownloading || _state.value.updateApkReady) return
-    // Starting a download is an explicit "keep this update" signal: abort any
-    // in-flight dismiss (undo-window) timer and un-hide the tile, so the pending
-    // dismiss can't fire mid-download and strand the finished APK behind a hidden tile.
-    // Progress starts at 0f, not null: a server with no Content-Length never fires
-    // onProgress (UpdateApi gates on total > 0), so leaving it null would flip the bar from
-    // determinate-0% to indeterminate. Kept the exact value sequence the UiState field had.
+    // Starting a download is an explicit "keep this update" signal: abort any in-flight dismiss
+    // (undo-window) timer and un-hide the tile, so the pending dismiss can't fire mid-download and
+    // strand the finished APK behind a hidden tile.
     _updateDownloadProgress.value = 0f
     _state.update { it.copy(updateDownloading = true, updateTileDismissed = false) }
     viewModelScope.launch {
         val dest = apkCacheFile()
-        // Throttled to whole percents. UpdateApi calls back once per 64KB buffer, which on
-        // a fast connection is hundreds of emissions a second for a multi-MB APK -- and
-        // every one of them recomposed the whole update tile, on the main thread, while the
-        // user may well be scrolling. A progress bar cannot show more than a percent
-        // anyway, so the emissions it cannot render are pure cost.
+        // Throttled to whole percents.
         var lastPercent = -1
         val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
             val percent = (progress * 100f).toInt()
@@ -83,15 +66,14 @@ fun AppViewModel.downloadUpdateInBackground() {
     }
 }
 
-/** The update tile's second tap, once [downloadUpdateInBackground] has
- *  finished: the APK is already sitting in cache. If the user opted into
- *  seamless install AND Shizuku is running, install silently via ADB; otherwise
- *  (or on any Shizuku failure) hand it to the system installer as before. */
+/**
+ * The update tile's second tap, once [downloadUpdateInBackground] has finished: the APK is already
+ * sitting in cache.
+ */
 fun AppViewModel.installDownloadedUpdate() {
     if (!_state.value.updateApkReady) return
-    // Guard against a second tap (or a permission-grant retry) re-entering while a
-    // seamless install is already running — otherwise two concurrent installer
-    // sessions write/commit the same APK.
+    // Guard against a second tap (or a permission-grant retry) re-entering while a seamless install
+    // is already running — otherwise two concurrent installer sessions write/commit the same APK.
     if (_state.value.updateInstalling) return
     val dest = apkCacheFile()
     if (!dest.exists()) {
@@ -105,8 +87,8 @@ fun AppViewModel.installDownloadedUpdate() {
         return
     }
     if (!installer.hasPermission()) {
-        // Ask; the grant arrives on onShizukuPermissionResult, which retries. Until
-        // then leave the APK ready so a second tap (or the grant) completes it.
+        // Ask; the grant arrives on onShizukuPermissionResult, which retries. Until then leave the
+        // APK ready so a second tap (or the grant) completes it.
         _state.update { it.copy(message = "Grant Shizuku access to install updates silently.", messageType = "info") }
         installer.requestPermission(SHIZUKU_INSTALL_REQUEST_CODE)
         return
@@ -114,33 +96,30 @@ fun AppViewModel.installDownloadedUpdate() {
     seamlessInstall(dest)
 }
 
-/** Runs the Shizuku silent install off the main thread, falling back to the
- *  system installer on any failure. */
+/**
+ * Runs the Shizuku silent install off the main thread, falling back to the system installer on any
+ * failure.
+ */
 private fun AppViewModel.seamlessInstall(dest: java.io.File) {
     if (_state.value.updateInstalling) return
     val ctx = getApplication<Application>()
-    // messageType is REQUIRED here: it defaults to "error" (and clearMessage()
-    // resets it to "error"), and the snackbar's colour `when` falls through to
-    // the red errorContainer branch for anything it doesn't recognise. Without
-    // it this progress message rendered as a red error toast mid-install.
+    // messageType is REQUIRED here: it defaults to "error" (and clearMessage() resets it to
+    // "error"), and the snackbar's colour `when` falls through to the red errorContainer branch for
+    // anything it doesn't recognise.
     _state.update { it.copy(updateInstalling = true, message = "Installing update…", messageType = "info") }
     viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         val result = com.bloo.bluelink.update.ShizukuInstaller.installApk(dest, ctx.packageName)
         if (result.isFailure) {
-            // Silent path failed (Shizuku died, OEM restriction, timed out, etc.) —
-            // clear the in-flight flag and fall back to the system installer.
+            // Silent path failed (Shizuku died, OEM restriction, timed out, etc.) — clear the
+            // in-flight flag and fall back to the system installer.
             launch(kotlinx.coroutines.Dispatchers.Main) {
                 _state.update { it.copy(updateInstalling = false) }
                 fallbackInstall(dest)
             }
         } else {
-            // Success. Usually the OS force-stops us as it swaps the APK, so this
-            // never renders — BUT a replace-install commit reports STATUS_SUCCESS as
-            // soon as it's staged and some OEMs defer the process kill. Give a
-            // terminal state so the tile can't stay locked on "Installing…" forever:
-            // clear the flags + prompt to reopen. (The running process still reports
-            // the old build number, so a later auto-check may re-surface the same
-            // update — acceptable, and far better than a permanent lock.)
+            // Success. Usually the OS force-stops us as it swaps the APK, so this never renders —
+            // BUT a replace-install commit reports STATUS_SUCCESS as soon as it's staged and some
+            // OEMs defer the process kill.
             launch(kotlinx.coroutines.Dispatchers.Main) {
                 _state.update {
                     it.copy(
@@ -155,21 +134,25 @@ private fun AppViewModel.seamlessInstall(dest: java.io.File) {
     }
 }
 
-/** The classic tap-through system installer (also the fallback for the seamless
- *  path). Reports only if even this can't be launched. */
+/**
+ * The classic tap-through system installer (also the fallback for the seamless path). Reports only
+ * if even this can't be launched.
+ */
 private fun AppViewModel.fallbackInstall(dest: java.io.File) {
     if (!com.bloo.bluelink.data.installDownloadedApk(getApplication<Application>(), dest)) {
         _state.update { it.copy(message = "Couldn't open the installer. Find Bloo.apk in Downloads.") }
     }
 }
 
-/** Shizuku permission result forwarded from MainActivity. If the user just
- *  granted it and an update is still staged, complete the seamless install. */
+/**
+ * Shizuku permission result forwarded from MainActivity. If the user just granted it and an update
+ * is still staged, complete the seamless install.
+ */
 fun AppViewModel.onShizukuPermissionResult(requestCode: Int, grantResult: Int) {
     if (requestCode != SHIZUKU_INSTALL_REQUEST_CODE) return
     if (grantResult != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-        // Info, not error: the user made a choice and the normal installer still
-        // works, so nothing is actually broken to report in red.
+        // Info, not error: the user made a choice and the normal installer still works, so nothing
+        // is actually broken to report in red.
         _state.update { it.copy(message = "Shizuku access denied. Updates will use the normal installer.", messageType = "info") }
         return
     }

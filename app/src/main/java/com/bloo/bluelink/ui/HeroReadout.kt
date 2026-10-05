@@ -58,7 +58,10 @@ internal class ChargeReadout(
     val charging: Boolean,
     /** Whether the state line is worth bolding: charging, or actually moving. */
     val emphasizeStatus: Boolean,
-    /** Target fill, 0..1. The target, not an animated value, so this object isn't rebuilt every frame. */
+    /**
+     * Target fill, 0..1. The target, not an animated value, so this object isn't rebuilt every
+     * frame.
+     */
     val frac: Float,
     /** The AC/DC charge limit to mark, when plugged in and below full. */
     val limitPct: Int?,
@@ -67,7 +70,6 @@ internal class ChargeReadout(
     /** Plug-in hybrid only: the fuel tank alongside the pack; null when there is none. */
     val fuelPct: Int?,
 )
-
 
 /** Derives the [ChargeReadout] — the single source for both densities. */
 @Composable
@@ -81,7 +83,8 @@ internal fun chargeReadoutOf(
     val pct = status?.percentFor(hasBattery)
     val range = status?.rangeMiFor(hasBattery)
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
-    // displayChargeLimit, not targetForCurrentPlug: the latter is null when unplugged, which would drop the split bar.
+    // displayChargeLimit, not targetForCurrentPlug: the latter is null when unplugged, which would
+    // drop the split bar.
     val limitPct = status?.evStatus?.displayChargeLimit()?.takeIf { it in 1..99 }
     // Charging time + type go in the badge slot (parked/driving is hidden while charging).
     val chargeMinutes = status?.evStatus?.minutesToFull
@@ -93,7 +96,8 @@ internal fun chargeReadoutOf(
     return ChargeReadout(
         pctText = pct?.let { "$it%" } ?: "--",
         rangeText = range?.let { formatDistance(it, metric) },
-        // State line: charging (time/type), then driving/parked, then a plain battery/fuel descriptor.
+        // State line: charging (time/type), then driving/parked, then a plain battery/fuel
+        // descriptor.
         statusLine = when {
             charging -> buildString {
                 append("Charging")
@@ -106,12 +110,13 @@ internal fun chargeReadoutOf(
         statusColor = when {
             charging -> ChargeGreen
             drivingLabel == "Driving" || drivingLabel == "Running" -> MaterialTheme.colorScheme.primary
-            // Color.Unspecified: the render site resolves it to LocalContentColor, so "Parked" tracks the
-            // on-photo colour as the card morphs. This object is shared by both densities and can't hold a
-            // frame-varying colour.
+            // Color.Unspecified: the render site resolves it to LocalContentColor, so "Parked"
+            // tracks the on-photo colour as the card morphs. This object is shared by both
+            // densities and can't hold a frame-varying colour.
             drivingLabel == "Parked" -> Color.Unspecified
             else -> {
-                // Muted inherited content colour; tracks the active scheme and the hero's on-photo scrim.
+                // Muted inherited content colour; tracks the active scheme and the hero's on-photo
+                // scrim.
                 LocalContentColor.current.copy(
                     alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
                 )
@@ -126,7 +131,6 @@ internal fun chargeReadoutOf(
     )
 }
 
-
 /** The one spring the charge fill uses, so collapsed and expanded bars animate identically. */
 @Composable
 internal fun animatedChargeFrac(target: Float): Float {
@@ -138,22 +142,17 @@ internal fun animatedChargeFrac(target: Float): Float {
     return frac
 }
 
-
 /**
- * The hero's readout as one set of components that morphs between collapsed and expanded.
- *
- * [t] is 0 collapsed, 1 expanded; type sizes, state-line alpha and gaps all lerp on it. No
- * `SharedTransitionLayout`: its lookahead scopes double-measure during pager drags and judder the car swipe.
- * Travel is free because anchoring to the card's bottom rides its existing height animation.
+ * The hero's readout as one set of components that morphs between collapsed and expanded. [t] is 0
+ * collapsed, 1 expanded; type sizes, state-line alpha and gaps all lerp on it.
  */
 /** How far above its resting position the hero photo starts (entrance) or travels to (exit). */
 internal val HeroPhotoSlideDistance = 28.dp
 
-
 /**
- * The COLLAPSED percentage and range, drawn as trailing content on the pebble's title Row so the Row
- * places them beside the name. A second copy exists in [HeroMorphReadout]; disjoint alpha ranges keep
- * the two from overlapping.
+ * The COLLAPSED percentage and range, drawn as trailing content on the pebble's title Row so the
+ * Row places them beside the name. A second copy exists in [HeroMorphReadout]; disjoint alpha
+ * ranges keep the two from overlapping.
  */
 @Composable
 internal fun HeroCollapsedNumbers(
@@ -161,19 +160,24 @@ internal fun HeroCollapsedNumbers(
     t: Float,
     /** Reports where this row landed, in the overlay's coordinate space. */
     onPositioned: (LayoutCoordinates) -> Unit = {},
-    /** True once the overlay draws the real numbers; this row still measures and positions but paints nothing. */
+    /**
+     * True once the overlay draws the real numbers; this row still measures and positions but
+     * paints nothing.
+     */
     hoisted: Boolean = false,
 ) {
-    // Gone by t = 0.35 where the expanded copy appears, unless hoisted (then it stays as an unpainted anchor).
+    // Gone by t = 0.35 where the expanded copy appears, unless hoisted (then it stays as an
+    // unpainted anchor).
     val fade = (1f - t / 0.35f).coerceIn(0f, 1f)
     if (fade <= 0f && !hoisted) return
-    // Name/numbers alignment lives on the name's side (see PebbleShell's `atRestScale`): at rest both use
-    // the identical titleMedium style, so plain CenterVertically lines them up.
+    // Name/numbers alignment lives on the name's side (see PebbleShell's `atRestScale`): at rest
+    // both use the identical titleMedium style, so plain CenterVertically lines them up.
     Row(
-        // Leading gap off the car name; PebbleShell adds no Spacer before `titleTrailing`.
-        // Inside the faded Row so it leaves with the numbers.
+        // Leading gap off the car name; PebbleShell adds no Spacer before `titleTrailing`. Inside
+        // the faded Row so it leaves with the numbers.
         Modifier
-            // Keeps reporting its position but gives up its width as the card opens, so the name isn't squeezed.
+            // Keeps reporting its position but gives up its width as the card opens, so the name
+            // isn't squeezed.
             .layout { measurable, constraints ->
                 val p = measurable.measure(constraints.copy(maxWidth = androidx.compose.ui.unit.Constraints.Infinity))
                 val w = (p.width * fade).roundToInt().coerceAtMost(constraints.maxWidth)
@@ -188,21 +192,24 @@ internal fun HeroCollapsedNumbers(
     }
 }
 
-
 /**
- * The percentage and range as one definition, rendered by the collapsed anchor, the expanded anchor and
- * the overlay's travelling instance. The anchors are only measured; [t] drives only type size.
+ * The percentage and range as one definition, rendered by the collapsed anchor, the expanded anchor
+ * and the overlay's travelling instance. The anchors are only measured; [t] drives only type size.
  */
 @Composable
 internal fun HeroNumbers(
     data: ChargeReadout,
     t: Float,
     width: Dp? = null,
-    // Stretches the inner Row to the width the parent already resolved; ignored when [width] is set.
+    // Stretches the inner Row to the width the parent already resolved; ignored when [width] is
+    // set.
     fillWidth: Boolean = false,
     // The status line's own fade; defaults to `t`.
     statusAlpha: Float = t,
-    /** Vertical alignment for the numbers. Expanded bottom-aligns; the collapsed copy centres beside the name. */
+    /**
+     * Vertical alignment for the numbers. Expanded bottom-aligns; the collapsed copy centres beside
+     * the name.
+     */
     verticalAlign: Alignment.Vertical = Alignment.Bottom,
 ) {
     val type = MaterialTheme.typography
@@ -216,7 +223,8 @@ internal fun HeroNumbers(
             else -> Modifier
         },
         verticalAlignment = verticalAlign,
-        // With a width, the percentage sits left and the range right; collapsed it equals content width.
+        // With a width, the percentage sits left and the range right; collapsed it equals content
+        // width.
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         // RollingNumber keeps the digit roll on the only percentage instance.
@@ -224,7 +232,8 @@ internal fun HeroNumbers(
             data.pctText,
             pctStyle,
             FontWeight.Bold,
-            // Collapsed charging shows in colour (no room for the word); it fades to content colour on open.
+            // Collapsed charging shows in colour (no room for the word); it fades to content colour
+            // on open.
             color = if (data.charging) lerp(ChargeGreen, LocalContentColor.current, t)
             else LocalContentColor.current,
         )
@@ -237,10 +246,8 @@ internal fun HeroNumbers(
                 FontWeight.Bold,
                 color = LocalContentColor.current,
             )
-            // The status line ("Parked", "Charging - 25 min - DC") travels under the range, right-aligned.
-            // Height is lerped, not dropped, so the bottom-aligned range doesn't jump a line; clipToBounds
-            // because the Text keeps its intrinsic height. [statusAlpha] stays exactly 0 until `t` has finished
-            // the height reveal, so a half-clipped glyph is never half-transparent.
+            // The status line ("Parked", "Charging - 25 min - DC") travels under the range,
+            // right-aligned.
             val statusSlot = with(LocalDensity.current) { type.labelLarge.lineHeight.toDp() }
             Box(
                 Modifier

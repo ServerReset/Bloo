@@ -17,9 +17,8 @@ import kotlinx.coroutines.flow.first
 import kotlin.math.floor
 
 /**
- * Live view state for one [CarMap]: zoom level, pixel pan offset from the car-centred origin, and pinch scale.
- * Lives outside CarMap so discrete actions (zoom buttons, Recentre) can call into it and the full-screen map
- * gets its own independent state. Add future per-map view state here, not as loose CarMap parameters.
+ * Live view state for one [CarMap]: zoom level, pixel pan offset from the car-centred origin, and
+ * pinch scale.
  */
 internal class CarMapState {
     var zoom by mutableIntStateOf(CarMapDefaultZoom)
@@ -29,15 +28,21 @@ internal class CarMapState {
     var panY by mutableFloatStateOf(0f)
         private set
 
-    // Pinch scale, 1x at [zoom]'s tile resolution. CarMap applies it as a graphicsLayer scale every frame for
-    // continuous zoom; only crossing a whole octave (2x/0.5x) swaps tiles (see pinch()).
+    // Pinch scale, 1x at [zoom]'s tile resolution. CarMap applies it as a graphicsLayer scale every
+    // frame for continuous zoom; only crossing a whole octave (2x/0.5x) swaps tiles (see pinch()).
     var scale by mutableFloatStateOf(1f)
         private set
 
-    /** True once the user has panned or pinched; the automatic [fitBothLocations] only runs before that. [recenter] clears it. */
+    /**
+     * True once the user has panned or pinched; the automatic [fitBothLocations] only runs before
+     * that. [recenter] clears it.
+     */
     private var userAdjusted = false
 
-    /** A continuous drag in screen pixels: the map slides with the finger, so the offset accumulates in the drag direction. */
+    /**
+     * A continuous drag in screen pixels: the map slides with the finger, so the offset accumulates
+     * in the drag direction.
+     */
     fun pan(dx: Float, dy: Float) {
         // A pinch frame reports a pure pan of (0,0); skip the writes so readers aren't invalidated.
         if (dx == 0f && dy == 0f) return
@@ -46,7 +51,7 @@ internal class CarMapState {
         panY += dy
     }
 
-    /** One pinch frame's ratio, folded into [scale]. Pan is halved/doubled on each whole-level change: it is in tile pixels at the old zoom. */
+    /** One pinch frame's ratio, folded into [scale]. */
     fun pinch(ratio: Float) {
         // A drag reports ratio 1f: nothing to fold in.
         if (ratio == 1f) return
@@ -58,12 +63,16 @@ internal class CarMapState {
         while (scale <= 0.5f && zoom > CarMapMinZoom) {
             zoom--; panX /= 2f; panY /= 2f; scale *= 2f
         }
-        // At the zoom ceiling/floor, clamp the continuous scale: CarMap's tile grid is sized for scale 1 (and
-        // over-fetches by 1/scale within this clamp), so a smaller scale would leave blank margins.
+        // At the zoom ceiling/floor, clamp the continuous scale: CarMap's tile grid is sized for
+        // scale 1 (and over-fetches by 1/scale within this clamp), so a smaller scale would leave
+        // blank margins.
         scale = scale.coerceIn(0.5f, 2f)
     }
 
-    /** Back to the car, centred, default zoom (the Recentre action). Clears [userAdjusted] so [fitBothLocations] can run again. */
+    /**
+     * Back to the car, centred, default zoom (the Recentre action). Clears [userAdjusted] so
+     * [fitBothLocations] can run again.
+     */
     fun recenter() {
         userAdjusted = false
         zoom = CarMapDefaultZoom
@@ -72,7 +81,10 @@ internal class CarMapState {
         scale = 1f
     }
 
-    /** Pans so the device is centred at the current zoom. The car is the origin (pan 0), so the offset is the device's tile distance, negated. */
+    /**
+     * Pans so the device is centred at the current zoom. The car is the origin (pan 0), so the
+     * offset is the device's tile distance, negated.
+     */
     fun showDevice(carLat: Double, carLon: Double, deviceLat: Double, deviceLon: Double) {
         userAdjusted = true
         scale = 1f
@@ -81,8 +93,9 @@ internal class CarMapState {
     }
 
     /**
-     * Zooms out (never in past [CarMapDefaultZoom]) so both the car (dead-centre) and the device fit with a margin.
-     * Runs once, when both fixes are available and the map is still at rest (see [userAdjusted]).
+     * Zooms out (never in past [CarMapDefaultZoom]) so both the car (dead-centre) and the device
+     * fit with a margin. Runs once, when both fixes are available and the map is still at rest (see
+     * [userAdjusted]).
      */
     fun fitBothLocations(
         carLat: Double, carLon: Double,
@@ -94,7 +107,8 @@ internal class CarMapState {
         while (z > CarMapMinZoom) {
             val dxPx = kotlin.math.abs(MapTiles.tileX(deviceLon, z) - MapTiles.tileX(carLon, z)) * MapTiles.TILE_PX
             val dyPx = kotlin.math.abs(MapTiles.tileY(deviceLat, z) - MapTiles.tileY(carLat, z)) * MapTiles.TILE_PX
-            // The car sits dead-centre, so the device need only fit in half the viewport per side (*2); 0.8x leaves margin.
+            // The car sits dead-centre, so the device need only fit in half the viewport per side
+            // (*2); 0.8x leaves margin.
             if (dxPx * 2f <= viewWidthPx * 0.8f && dyPx * 2f <= viewHeightPx * 0.8f) break
             z--
         }
@@ -109,11 +123,9 @@ internal class CarMapState {
 internal fun rememberCarMapState(): CarMapState = remember { CarMapState() }
 
 /**
- * Cross-composable state for expanding a Location pebble's compact map in place: when a host ([GarageScreen])
- * provides one via [LocalExpandedMap], the same [CarMapState] and the compact map's last on-screen rect carry
- * into a full-screen overlay. With none, a separate [CarMap] in a [CarMapSheet] dialog is used instead.
- *
- * Not `remember`ed in [LocationPebble]: the two call sites share it, so it must live where neither owns it.
+ * Cross-composable state for expanding a Location pebble's compact map in place: when a host
+ * ([GarageScreen]) provides one via [LocalExpandedMap], the same [CarMapState] and the compact
+ * map's last on-screen rect carry into a full-screen overlay.
  */
 internal class ExpandedMapState {
     /** VIN of the car whose map is currently expanded, or null. */
@@ -122,10 +134,16 @@ internal class ExpandedMapState {
     private val perVinOrigin = mutableMapOf<String, MutableState<Rect?>>()
     private val perVinLocation = mutableMapOf<String, MutableState<GeoLocation?>>()
 
-    /** The one [CarMapState] a car's compact map and expanded overlay share, created per VIN on first use. */
+    /**
+     * The one [CarMapState] a car's compact map and expanded overlay share, created per VIN on
+     * first use.
+     */
     fun mapStateFor(vin: String): CarMapState = perVinMapState.getOrPut(vin) { CarMapState() }
 
-    /** The compact map's last-measured on-screen rect, kept live even when not expanded so there is always a current origin to grow from. */
+    /**
+     * The compact map's last-measured on-screen rect, kept live even when not expanded so there is
+     * always a current origin to grow from.
+     */
     fun originBoundsFor(vin: String): MutableState<Rect?> = perVinOrigin.getOrPut(vin) { mutableStateOf(null) }
 
     /** The location for this VIN's map, kept live for the screen-level map layer. */

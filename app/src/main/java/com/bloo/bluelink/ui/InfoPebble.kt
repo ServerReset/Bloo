@@ -1,9 +1,8 @@
 package com.bloo.bluelink.ui
 
 /**
- * Car-info pebble and owner links: InfoPebble, OwnerLinks -- extracted from
- * Pebbles.kt to keep the UI file focused. The buttons themselves are the shared
- * MorphActionButton (Morph.kt); this file no longer declares a button of its own.
+ * Car-info pebble and owner links: InfoPebble, OwnerLinks -- extracted from Pebbles.kt to keep the
+ * UI file focused.
  */
 
 import android.content.Context
@@ -56,7 +55,6 @@ import com.bloo.bluelink.data.isPluggedOrCharging
 import com.bloo.bluelink.data.lastServiceMiles
 import com.bloo.bluelink.data.serviceIntervalMiles
 
-
 // --- Car info (status + service + links combined) -------------------------
 
 @Composable
@@ -75,25 +73,17 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     val ev = status?.evStatus
     val plugged = ev.isPluggedOrCharging
 
-    // Tri-state: null (unknown -- no status yet, or the car hasn't reported lock state) must
-    // NOT read as "Unlocked". A null summary is omitted by Pebble, so the header simply carries
-    // no lock word until we actually know -- rather than asserting a state as fact in visible
-    // text and to TalkBack. Matches StateControl, which already handles unknown.
+    // A null summary is omitted by Pebble, so the header simply carries no lock word until we
+    // actually know -- rather than asserting a state as fact in visible text and to TalkBack.
+    // Matches StateControl, which already handles unknown.
     val infoSummary = status?.doorLock?.let { if (it) "Locked" else "Unlocked" }
     val glance = LocalForceExpanded.current
-    // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting
-    // that reads better inline without an expand/collapse control (see its own doc).
-    // This one renders ~15 info rows (below), so forcing it always open in simple
-    // mode just removed the ability to collapse it.
+    // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting that reads
+    // better inline without an expand/collapse control (see its own doc).
     Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, modifier, summary = infoSummary) {
-        // The old cover hero repeated the summary, already the tile headline: the lock
-        // state used to appear THREE times on one tile -- summary, hero, and the "Doors"
-        // row below.
         PebbleStatusGate(status, state.refreshing) { status ->
             SectionLabel("Status")
             status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
-            // Absent when the lock state is unknown, matching the engine row above --
-            // "Unlocked" was being shown for a car that simply hadn't reported it.
             status.doorLock?.let { StatusRow("Doors", if (it) "Locked" else "Unlocked") }
             status.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
                 ?.let { StatusRow("Doors open", it.joinToString(", ")) }
@@ -102,8 +92,6 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
             if (status.trunkOpen == true) StatusRow("Trunk", "Open")
             if (status.hoodOpen == true) StatusRow("Hood", "Open")
             if (status.acc == true) StatusRow("Accessory power", "On")
-            // Absent when climate state is unknown (airCtrlOn null), like the engine/doorLock
-            // rows above -- "Off" was being shown as fact for a car that never reported it.
             status.airCtrlOn?.let { StatusRow("Climate", if (it) "On" else "Off") }
             if (status.defrost == true) StatusRow("Defrost", "On")
             status.airTemp?.let { t ->
@@ -118,16 +106,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
             status.steerWheelHeat?.takeIf { it != 0 }?.let { StatusRow("Steering wheel heat", "On") }
             status.sideMirrorHeat?.takeIf { it != 0 }?.let { StatusRow("Mirror heat", "On") }
             status.sideBackWindowHeat?.takeIf { it != 0 }?.let { StatusRow("Rear defroster", "On") }
-            // Resolved place name when geocoding's landed (same source the
-            // Location pebble and the AI summary both use); raw coordinates
-            // ONLY as the fallback until it does, never as the steady state --
-            // this row used to show coordString() unconditionally, the one
-            // place in the app that never even tried to resolve an address.
-            //
-            // On the cover, the COMPACT form (street + ZIP, not street + city) -- this
-            // row's own value column is narrow enough that the long form reliably wrapped
-            // onto two lines, a real reported "looks bad" bug. Phone keeps the long form,
-            // which has the room for it.
+            // Phone keeps the long form, which has the room for it.
             location?.let {
                 val place = if (glance) state.placeZips[v.vin] ?: state.placeNames[v.vin] else state.placeNames[v.vin]
                 StatusRow("Location", place ?: it.coordString())
@@ -143,11 +122,9 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
             }
         }
 
-        // "Service & identity" (VIN/plate/odometer/service) and the owner-links block
-        // are lookup/management surfaces with no at-a-glance value on a ~1-inch cover
-        // tile, and they're what overflows it into a long scroll. Show them only on
-        // the phone (not glance). Odometer stays visible on the cover as one
-        // quick row since it's genuinely glanceable.
+        // "Service & identity" (VIN/plate/odometer/service) and the owner-links block are
+        // lookup/management surfaces with no at-a-glance value on a ~1-inch cover tile, and they're
+        // what overflows it into a long scroll.
         if (glance) {
             odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }
         } else {
@@ -177,25 +154,14 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
 }
 
 /**
- * Owner/assistance destinations as compact labelled buttons that flow 2+ per row
- * where they fit. Each says where it goes; the phone icon dials, others open
- * links. All destinations come from [BrandLinks] - the per-brand single source
- * of truth - so nothing here is defined twice.
- *
- * In-car payments (Hyundai Pay) and Plug & Charge are deliberately absent:
- * they live only inside the OEM app with no public web page or documented deep
- * link, so a button could only open an unrelated marketing page - better to
- * omit them than mislead.
+ * Owner/assistance destinations as compact labelled buttons that flow 2+ per row where they fit.
+ * Each says where it goes; the phone icon dials, others open links.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
     val links = v.brand.links
 
-    // ExpressiveButtonRow, not FlowRow: it wraps the same way, but a FlowRow has no notion of a
-    // shared budget, so a pressed link button grew for real and simply shoved its neighbours
-    // along -- the reported "they expand but just push the other buttons away". As a group the
-    // line's total is fixed and the neighbours give the width back.
     @Composable
     fun group(title: String, content: @Composable () -> Unit) {
         SectionLabel(title)
@@ -221,9 +187,9 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
                 icon = Icons.Filled.Person,
                 onClick = { openUrl(context, links.ownersUrl) },
             )
-            // Features-on-Demand store (themes, lighting patterns…): ccNC-era
-            // head units only - older Gen5W cars have nothing to buy. Honours
-            // the user's own confirmed generation over the raw API guess.
+            // Features-on-Demand store (themes, lighting patterns…): ccNC-era head units only -
+            // older Gen5W cars have nothing to buy. Honours the user's own confirmed generation
+            // over the raw API guess.
             if (state.supportsConnectedStoreEffective(v)) {
                 MorphActionButton(
                     label = "Car store",
@@ -254,10 +220,8 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
                 onClick = { dial(context, links.roadsidePhone) },
             )
         }
-        // Digital Key: Gen5W head units use DK1 (BLE/NFC dedicated app).
-        // Gen3+ and all Kia models use DK2 (UWB via wallet).
-        // Kia has no gen field so isGen5W is always false for them. Honours
-        // the user's own confirmed generation over the raw API guess.
+        // Digital Key: Gen5W head units use DK1 (BLE/NFC dedicated app). Gen3+ and all Kia models
+        // use DK2 (UWB via wallet). Kia has no gen field so isGen5W is always false for them.
         val isGen5W = state.isGen5WEffective(v)
         group("Digital Car Key") {
             if (isGen5W) {
@@ -312,8 +276,3 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
         }
     }
 }
-
-// LinkButton used to live here: the same tonal pill, minus the rim, re-declared for this
-// one pebble. It IS the app's standard action button and nothing about it was link-specific,
-// so it moved to Morph.kt as MorphActionButton, beside the rest of the button family, and
-// these owner-area destinations are now just its first callers.

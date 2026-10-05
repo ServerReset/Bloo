@@ -22,7 +22,9 @@ internal fun AiCardContent(state: UiState, advanced: Boolean, vm: AppViewModel) 
     }
 }
 
-/** The "App shortcuts" card: which actions each car offers from the launcher icon's long-press menu. */
+/**
+ * The "App shortcuts" card: which actions each car offers from the launcher icon's long-press menu.
+ */
 @Composable
 internal fun AppShortcutsCardContent(state: UiState, vm: AppViewModel) {
     SettingsCard("App shortcuts", AppIcons.Bolt, vm) {

@@ -11,7 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.unit.Density
 
-/** Cache of resting child widths for one [ExpressiveButtonGroup]; a plain object, not snapshot state. */
+/**
+ * Cache of resting child widths for one [ExpressiveButtonGroup]; a plain object, not snapshot
+ * state.
+ */
 internal class NaturalWidths {
     /**
      * Whether the last layout dropped members to their symbols. Sticky: it returns to words only
@@ -32,9 +35,10 @@ internal class NaturalWidths {
     var compact: IntArray? = null
 }
 
-
-/** Carries a child's live press fraction to the group's measure policy; a lambda so the group
- *  reads it during layout without the child recomposing. */
+/**
+ * Carries a child's live press fraction to the group's measure policy; a lambda so the group reads
+ * it during layout without the child recomposing.
+ */
 internal data class ExpressiveGroupData(
     val pressFraction: () -> Float,
     /**
@@ -46,14 +50,12 @@ internal data class ExpressiveGroupData(
     override fun Density.modifyParentData(parentData: Any?): Any = this@ExpressiveGroupData
 }
 
-
 /**
- * A [ExpressiveGroupData.weight] meaning "take spare room in proportion to my own label width".
- * The default for every labelled button ([MorphTextButton], [MorphActionButton]); icon-only buttons
+ * A [ExpressiveGroupData.weight] meaning "take spare room in proportion to my own label width". The
+ * default for every labelled button ([MorphTextButton], [MorphActionButton]); icon-only buttons
  * keep 0 and therefore their size.
  */
 internal const val GroupWeightProportional = -1f
-
 
 /** Receiver for [ExpressiveButtonGroup]'s children. */
 @Stable
@@ -78,18 +80,17 @@ object ExpressiveButtonGroupScope {
                 .then(ExpressiveGroupData({ press }, groupWeight)),
             propagateMinConstraints = true,
         ) {
-            // FALSE inside, as SafeExpansiveButton's group branch does: this slot already joined the group,
-            // so the MorphButton must not join a second time.
+            // FALSE inside, as SafeExpansiveButton's group branch does: this slot already joined
+            // the group, so the MorphButton must not join a second time.
             CompositionLocalProvider(LocalExpressiveGroup provides false) { content() }
         }
     }
 }
 
-
 /**
- * Splits buttons of the given [widths] into lines for a group [maxWidth] wide, [gap] apart.
- * Greedy like a FlowRow first, then balanced: same line count, break points moved so lines are
- * as even as possible. Order is preserved; an unbounded width is one line.
+ * Splits buttons of the given [widths] into lines for a group [maxWidth] wide, [gap] apart. Greedy
+ * like a FlowRow first, then balanced: same line count, break points moved so lines are as even as
+ * possible.
  */
 internal fun balancedLineBreaks(widths: IntArray, gap: Int, maxWidth: Int): List<IntArray> {
     fun breakInto(cap: Int): List<IntArray> {

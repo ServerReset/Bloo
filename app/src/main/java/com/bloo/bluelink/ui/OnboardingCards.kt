@@ -104,7 +104,10 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
     )
 }
 
-/** One dot per card; the current one stretches into a pill, so the deck's length and your place in it read at a glance. */
+/**
+ * One dot per card; the current one stretches into a pill, so the deck's length and your place in
+ * it read at a glance.
+ */
 @Composable
 internal fun OnboardingDots(count: Int, current: Int, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
@@ -144,8 +147,6 @@ internal fun onboardingAccent(kind: OnboardingStepKind): Color {
 internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean, onTap: () -> Unit = {}) {
     // Only the card in view breathes and floats; the neighbours the pager keeps ready stay still,
     // so a deck of seven runs one animation, not seven.
-    // States, read only inside the draw and layer lambdas below, so a frame of the animation redraws
-    // the glyph without recomposing it.
     val glow: androidx.compose.runtime.State<Float>
     val bob: androidx.compose.runtime.State<Float>
     if (current) {
@@ -194,8 +195,7 @@ internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean, 
 
 /**
  * One card of the deck: frosted glass over the blurred aurora, a glowing hero glyph, a big title
- * and its summary, then the card's own content. Replaces the pebble chrome here -- these cards
- * are the app's first impression and want to be the most expressive thing in it.
+ * and its summary, then the card's own content.
  */
 @Composable
 internal fun OnboardingGlassCard(
@@ -210,7 +210,6 @@ internal fun OnboardingGlassCard(
         shape = ExtraLargeShape,
         liquid = false,
         shadow = false,
-        // No backdrop blur on the deck (it was the swipe lag): a plain, mostly opaque tint over the backdrop.
         modifier = Modifier.fillMaxWidth(),
         tint = scheme.surfaceContainerHigh.copy(alpha = 0.82f),
         contentAlignment = Alignment.TopStart,

@@ -65,9 +65,8 @@ import com.bloo.bluelink.data.setSearchBubblePosition
 internal enum class SearchForm { BUBBLE, PILL, BAR }
 
 /**
- * The single search element, hoisted to the app root so it outlives screen transitions and morphs between them.
- * Shape follows the screen: Settings = full bar at the bottom; Garage = small corner circle;
- * Cover = smaller, draggable circle (the free corner depends on the tile); open anywhere = the bar.
+ * The single search element, hoisted to the app root so it outlives screen transitions and morphs
+ * between them.
  */
 @Composable
 internal fun SearchLayer(
@@ -76,21 +75,25 @@ internal fun SearchLayer(
     appearance: SettingsStore.Appearance,
     notif: SettingsStore.NotificationPrefs,
     onSettings: Boolean,
-    /** Reports whether the search UI is open; the ambient aurora pauses while true so typing frames stay cheap. */
+    /**
+     * Reports whether the search UI is open; the ambient aurora pauses while true so typing frames
+     * stay cheap.
+     */
     onOpenChanged: ((Boolean) -> Unit)? = null,
-    /** Screens.kt's shared instance that the underlying screens mark their content with; null leaves the
-     *  glass fill without a blur source (flat tint). */
+    /**
+     * Screens.kt's shared instance that the underlying screens mark their content with; null leaves
+     * the glass fill without a blur source (flat tint).
+     */
     hazeState: HazeState? = null,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var submitted by rememberSaveable { mutableStateOf("") }
     var focused by rememberSaveable { mutableStateOf(false) }
     val open = focused || query.isNotEmpty()
-    // Dragged bubble position in dp from the top-left (NaN = resting corner). Saved across rotation;
-    // mutableStateOf for rememberSaveable's guaranteed Saver path.
+    // Dragged bubble position in dp from the top-left (NaN = resting corner). Saved across
+    // rotation; mutableStateOf for rememberSaveable's guaranteed Saver path.
     @Suppress("AutoboxingStateCreation")
     var dragX by rememberSaveable { mutableStateOf(Float.NaN) }
-    // Normal (phone) layout only: which of three docks the bubble sits in, and how fast the last drag move was.
     var dockName by rememberSaveable { mutableStateOf(SearchDock.RIGHT.name) }
     val dock = SearchDock.valueOf(dockName)
     var lastDx by remember { mutableFloatStateOf(0f) }
@@ -102,8 +105,9 @@ internal fun SearchLayer(
     BackHandler(enabled = open) { query = ""; focused = false }
     // Report open-state so the aurora can pause (see AuroraBackground `paused`).
     SideEffect { onOpenChanged?.invoke(open) }
-    // Click on open, tick on close (same asymmetry as PebbleShell's header), on the frame the shape starts moving.
-    // Armed after first composition so a LaunchedEffect born false does not buzz on launch.
+    // Click on open, tick on close (same asymmetry as PebbleShell's header), on the frame the shape
+    // starts moving. Armed after first composition so a LaunchedEffect born false does not buzz on
+    // launch.
     var hapticArmed by remember { mutableStateOf(false) }
     LaunchedEffect(open) {
         if (hapticArmed) {
@@ -116,14 +120,15 @@ internal fun SearchLayer(
         if (query.isBlank()) { vm.clearAiReply(); submitted = "" }
     }
 
-    // IME/nav insets are read here, outside the BoxWithConstraints lambda, so keystroke-driven re-runs of
-    // that lambda do not resubscribe; the panel re-measures only when the keyboard crosses open/closed.
+    // IME/nav insets are read here, outside the BoxWithConstraints lambda, so keystroke-driven
+    // re-runs of that lambda do not resubscribe; the panel re-measures only when the keyboard
+    // crosses open/closed.
     val keyboardUp = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 80.dp
     val bottomInset = WindowInsets.navigationBars.union(WindowInsets.ime)
         .asPaddingValues().calculateBottomPadding()
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // With the keyboard up only a sliver is free; the panel gets what remains above the bar minus a margin.
-        // The blur cost is handled by AuroraBackground's `paused`.
+        // With the keyboard up only a sliver is free; the panel gets what remains above the bar
+        // minus a margin. The blur cost is handled by AuroraBackground's `paused`.
         val edge = 16.dp
         val bubble = 52.dp
         val barW = minOf(maxWidth - edge * 2, 640.dp)
@@ -136,8 +141,9 @@ internal fun SearchLayer(
             onSettings || dock == SearchDock.CENTER -> SearchForm.PILL
             else -> SearchForm.BUBBLE
         }
-        // Publish the search element's location so toasts clear it: a corner dock or CENTER (pill or open bar);
-        // null while hidden. SideEffect because the registry is state read by other composables.
+        // Publish the search element's location so toasts clear it: a corner dock or CENTER (pill
+        // or open bar); null while hidden. SideEffect because the registry is state read by other
+        // composables.
         val floatingRegistry = LocalFloatingRegistry.current
         SideEffect {
             floatingRegistry.searchDock = if (open) SearchDock.CENTER else dock
@@ -175,22 +181,26 @@ internal fun SearchLayer(
         }
         val targetY = if (form == SearchForm.BUBBLE) bubbleY else maxHeight - barH - edge - bottomInset
 
-        // Two springs: SIZE overshoots a little, POSITION is critically damped (one bouncy spring slides past rest).
-        // Width and height share theirs; numbers are the shared PebbleBounce tokens.
+        // Two springs: SIZE overshoots a little, POSITION is critically damped (one bouncy spring
+        // slides past rest). Width and height share theirs; numbers are the shared PebbleBounce
+        // tokens.
         val sizeSpec = lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
-        // A spring is wrong for a drag (trails the finger); position snaps 1:1 while the finger is down.
+        // A spring is wrong for a drag (trails the finger); position snaps 1:1 while the finger is
+        // down.
         val posSpec = if (dragging) snap<Dp>() else {
-            // Bouncy on purpose: the edge-snap should read as landing, with the same shared bounce as `sizeSpec`.
+            // Bouncy on purpose: the edge-snap should read as landing, with the same shared bounce
+            // as `sizeSpec`.
             lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         }
-        // key(compact) restarts these animations at the new target so the ball does not crawl across the
-        // screen when the layout flips; SearchPill's entrance spring takes over.
+        // key(compact) restarts these animations at the new target so the ball does not crawl
+        // across the screen when the layout flips; SearchPill's entrance spring takes over.
         val w = animateDpAsState(targetW, sizeSpec, label = "searchW").value
         val h = animateDpAsState(targetH, sizeSpec, label = "searchH").value
         val x = animateDpAsState(targetX, posSpec, label = "searchX").value
         val y = animateDpAsState(targetY, posSpec, label = "searchY").value
 
-        // Dismiss scrim, below the pill so it never eats its taps; uses the shared collapse effects spec for the fade.
+        // Dismiss scrim, below the pill so it never eats its taps; uses the shared collapse effects
+        // spec for the fade.
         AnimatedVisibility(
             visible = open,
             enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
@@ -229,10 +239,12 @@ internal fun SearchLayer(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (query.isNotBlank()) {
-                        // Fewer results while the keyboard is up; a short list beats one you cannot see the bottom of.
+                        // Fewer results while the keyboard is up; a short list beats one you cannot
+                        // see the bottom of.
                         SettingsSearchResults(
                             query, submitted, vm, state.value, appearance, notif,
-                            // Cover with keyboard up (~260dp square, mostly keyboard): two visible results beat six to scroll through.
+                            // Cover with keyboard up (~260dp square, mostly keyboard): two visible
+                            // results beat six to scroll through.
                             limit = when {
                                 keyboardUp -> 4
                                 else -> Int.MAX_VALUE
@@ -258,7 +270,8 @@ internal fun SearchLayer(
             onQueryChange = { query = it },
             onFocusChange = { focused = it },
             onSubmit = { submitted = query },
-            // Dragging exists only for the bubble: a bar spans the screen, and a docked camera band has nowhere to go.
+            // Dragging exists only for the bubble: a bar spans the screen, and a docked camera band
+            // has nowhere to go.
             onDrag = if (form != SearchForm.BAR) {
                 { dx, _ ->
                     dragX = ((if (dragX.isNaN()) x else dragX.dp) + dx).coerceIn(minX, maxX).value
@@ -271,7 +284,6 @@ internal fun SearchLayer(
                 lastDx = 0f
             },
             onDragEnd = {
-                // Land in a dock: thrown the way it was flung, or dropped where it was let go.
                 val widthNow = if (form == SearchForm.PILL) pillW else bubble
                 val center = (if (dragX.isNaN()) x else dragX.dp) + widthNow / 2
                 val next = SearchDock.landing((center / maxWidth).coerceIn(0f, 1f), lastDx, dock)

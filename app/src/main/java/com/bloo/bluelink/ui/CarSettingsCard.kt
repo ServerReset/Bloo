@@ -44,8 +44,6 @@ import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.settingsMode
 
-
-
 /** One reorderable car entry in Settings; tap to expand its setup + photo. */
 @Composable
 internal fun CarSettingsCard(
@@ -66,20 +64,6 @@ internal fun CarSettingsCard(
         animationSpec = tween(MotionShort),
         label = "carCardBg",
     )
-    // The exact same collapsible pebble every car's own pebble list on the
-    // garage screen uses -- same bounce-open/calm-close springs, same corner
-    // morph, same per-row staggered reveal, same "hold the header to drag"
-    // idiom (no separate drag-handle icon; PebbleShell never draws one, and
-    // this card used to be the only place in Settings that did). It used to
-    // be its own bespoke Card + Row + AnimatedVisibility, a lookalike that
-    // drifted from every other pebble's motion any time that shared spec
-    // changed, which is what "standard" was pointing at.
-    //
-    // The collapsed header traded the old car-photo thumbnail for the same
-    // icon + title + summary shape every other pebble uses -- the photo
-    // itself is unchanged and still front-and-centre in the Photo group
-    // below once expanded, so nothing about it is actually lost, only where
-    // it first appears.
     PebbleShell(
         expanded = expanded,
         onToggle = onToggle,
@@ -110,7 +94,8 @@ internal fun CarSettingsCard(
                         .clip(StandardShape),
                 )
             }
-            // A group, not a plain Row: the buttons share the row's width and press against each other.
+            // A group, not a plain Row: the buttons share the row's width and press against each
+            // other.
             ExpressiveButtonRow(spacing = GapRow) {
                 MorphTextButton(if (hasPhoto) "Change photo" else "Choose photo", onClick = onPickPhoto)
                 if (hasPhoto) MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") })
@@ -181,5 +166,3 @@ internal fun CarSettingsCard(
       }
     }
 }
-
-

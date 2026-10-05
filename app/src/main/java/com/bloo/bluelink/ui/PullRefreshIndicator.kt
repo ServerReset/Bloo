@@ -23,28 +23,20 @@ import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 
 /**
- * The app's ONE pull-to-refresh indicator, drawn as a single floating overlay at
- * the app root rather than per screen.
- *
- * Every [Refreshable] (each car page, the status card) feeds its live pull
- * distance and in-flight state into [RefreshIndicatorState] instead of drawing
- * anything itself, so there is exactly one indicator for the whole app: pull on
- * any screen and the same liquid-glass disc drops from the top edge, stays put
- * across a screen change mid-refresh, and disappears once the work is done.
- *
- * The background is the app's real liquid glass -- the same [GlassSurface] /
- * [appGlassEffect] refraction every floating chip uses -- so it warps what is
- * behind it instead of being a flat tinted disc.
+ * The app's ONE pull-to-refresh indicator, drawn as a single floating overlay at the app root
+ * rather than per screen.
  */
 internal class RefreshIndicatorState {
-    /** How far the visible page has been pulled, 0..1+ (the raw M3 distanceFraction). Written by
-     *  whichever page is being pulled; only the pulled page ever has a non-zero fraction, so this
-     *  needs no per-page bookkeeping. */
+    /**
+     * How far the visible page has been pulled, 0..1+ (the raw M3 distanceFraction). Written by
+     * whichever page is being pulled; only the pulled page ever has a non-zero fraction, so this
+     * needs no per-page bookkeeping.
+     */
     val pull: MutableState<Float> = mutableFloatStateOf(0f)
 
-    // Several Refreshables are alive at once (the pager keeps neighbour car pages composed), so
-    // "is a refresh in flight" is an OR across them, tracked by identity rather than a single bool
-    // one page could clear while another is still working.
+    // Several Refreshables are alive at once (the pager keeps neighbour car pages composed), so "is
+    // a refresh in flight" is an OR across them, tracked by identity rather than a single bool one
+    // page could clear while another is still working.
     private val refreshingKeys = mutableStateListOf<Any>()
 
     /** True while ANY page has a refresh in flight. */
@@ -59,13 +51,7 @@ internal class RefreshIndicatorState {
 internal val LocalRefreshIndicator =
     staticCompositionLocalOf<RefreshIndicatorState?> { null }
 
-/**
- * The single floating indicator. Reads [state] and draws a liquid-glass disc that
- * slides in from the top edge under the pull and then spins while the refresh runs.
- *
- * [hazeState] is the app's backdrop source (see [LocalBackdropHaze]); passing it is
- * what makes the disc real refracting glass rather than a flat tint.
- */
+/** The single floating indicator. */
 @Composable
 internal fun PullRefreshIndicatorHost(
     state: RefreshIndicatorState,
@@ -74,7 +60,7 @@ internal fun PullRefreshIndicatorHost(
 ) {
     // The disc is driven DIRECTLY by the finger while pulling (1:1, no spring lag), and only
     // springs for the refreshing endpoint -- a pull that trails the finger on a spring reads as
-    // disconnected. `refreshSpring` is the settled-open position for the in-flight refresh.
+    // disconnected.
     val refreshSpring = remember { Animatable(0f) }
     LaunchedEffect(state.refreshing) {
         refreshSpring.animateTo(
@@ -91,8 +77,6 @@ internal fun PullRefreshIndicatorHost(
     val settlePx = with(density) { 30.dp.toPx() }
     val travelPx = with(density) { 84.dp.toPx() }
     Box(modifier.fillMaxSize()) {
-        // The disc, sized to pair with the spinner inside it (48dp disc, 28dp spinner -- the
-        // earlier 64/36 read as a big empty circle with a tiny ring lost inside it).
         GlassSurface(
             shape = androidx.compose.foundation.shape.CircleShape,
             modifier = Modifier

@@ -10,9 +10,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.bloo.bluelink.data.Vehicle
 
 /**
- * Command index for the search system: intent-based commands that act on vehicles or app state,
- * as a command palette complementing SettingsIndex. Each action has natural-language variations,
- * matched by partial matching and synonyms and executed through VehicleCommandRunner.
+ * Command index for the search system: intent-based commands that act on vehicles or app state, as
+ * a command palette complementing SettingsIndex.
  */
 
 internal enum class CommandCategory {
@@ -20,8 +19,8 @@ internal enum class CommandCategory {
 }
 
 /**
- * Metadata for one executable command: the action it performs, its aliases,
- * category, and whether it applies to a specific vehicle or the whole app.
+ * Metadata for one executable command: the action it performs, its aliases, category, and whether
+ * it applies to a specific vehicle or the whole app.
  */
 internal data class CommandMetadata(
     val id: String,
@@ -190,13 +189,15 @@ internal val CommandCatalog = listOf(
     ),
 )
 
-/** The command index's word splitter, compiled once. Separate from SettingsIndex's [RxSearchTokens]
- *  because `%` is meaningful in a typed query ("charge to 80%") but not in a command title or alias. */
+/**
+ * The command index's word splitter, compiled once. Separate from SettingsIndex's [RxSearchTokens]
+ * because `%` is meaningful in a typed query ("charge to 80%") but not in a command title or alias.
+ */
 private val RxCommandWords = Regex("[^a-z0-9]+")
 
 /**
- * Command search scoring: how well a command matches a query.
- * Uses partial matching on title, keywords, and aliases.
+ * Command search scoring: how well a command matches a query. Uses partial matching on title,
+ * keywords, and aliases.
  */
 internal fun commandSearchScore(query: String, command: CommandMetadata, fuzzy: Boolean = false): Int? {
     val q = query.lowercase()
@@ -246,21 +247,20 @@ internal fun commandSearchScore(query: String, command: CommandMetadata, fuzzy: 
 }
 
 /**
- * Get commands available for the given vehicles.
- * Filters out commands that aren't available on any of the vehicles.
+ * Get commands available for the given vehicles. Filters out commands that aren't available on any
+ * of the vehicles.
  */
 internal fun getAvailableCommands(vehicles: List<Vehicle>): List<CommandMetadata> {
     if (vehicles.isEmpty()) return emptyList()
 
     return CommandCatalog.filter { command ->
-        // Command is available if it's not per-vehicle, or if it's available on at least one vehicle
+        // Command is available if it's not per-vehicle, or if it's available on at least one
+        // vehicle
         !command.perVehicle || vehicles.any { command.isAvailable(it) }
     }
 }
 
-/**
- * Get commands that match the query, sorted by relevance.
- */
+/** Get commands that match the query, sorted by relevance. */
 internal fun searchCommands(query: String, vehicles: List<Vehicle>, fuzzy: Boolean = false): List<CommandMetadata> {
     val available = getAvailableCommands(vehicles)
     // RxSearchTokens (SettingsIndex.kt), the same pattern as the settings half of this search bar.
@@ -283,8 +283,8 @@ internal fun searchCommands(query: String, vehicles: List<Vehicle>, fuzzy: Boole
 }
 
 /**
- * Extension function to check if a vehicle supports charging.
- * This is a simplified check; the real app would check the powertrain/capabilities.
+ * Extension function to check if a vehicle supports charging. This is a simplified check; the real
+ * app would check the powertrain/capabilities.
  */
 internal fun Vehicle.canCharge(): Boolean {
     // Simplified: assumes all vehicles can charge (the actual command fails appropriately).

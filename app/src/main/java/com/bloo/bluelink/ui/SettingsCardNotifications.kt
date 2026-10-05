@@ -30,14 +30,8 @@ import com.bloo.bluelink.data.isBackgroundUnrestricted
 import com.bloo.bluelink.data.requestBackgroundUnrestricted
 
 /**
- * "Notifications" card: every alert the app can post, and everything that decides whether those
- * alerts actually arrive, in one place -- including AutoLock's, which used to keep its own
- * permission prompts inside each car's settings.
- *
- * Simple mode is the handful of switches most people want. Advanced adds the timing thresholds,
- * the charging notification's look, the less common alerts and the troubleshooting tools. The
- * "Needs attention" block is neither: it shows only when something is genuinely stopping an
- * enabled alert from arriving, in either mode.
+ * Simple mode is the handful of switches most people want. Advanced adds the timing thresholds, the
+ * charging notification's look, the less common alerts and the troubleshooting tools.
  */
 @Composable
 internal fun NotificationsCardContent(
@@ -75,9 +69,8 @@ internal fun NotificationsCardContent(
                 description = "A live notification with progress, the charge limit and a Stop button; on Android 16+ it also shows in the status bar.",
             ) { vm.setNotifyCharging(it) }
             // The troubleshooting lives WITH the live notification it is about -- in the same
-            // "Charging" group, right under the toggle that turns it on -- not tucked at the
-            // bottom of the card behind advanced mode. Someone whose live bar isn't showing is
-            // looking at this exact switch; the "why isn't it showing" steps belong here.
+            // "Charging" group, right under the toggle that turns it on -- not tucked at the bottom
+            // of the card behind advanced mode.
             PopVisible(visible = notif.charging) {
                 var showTroubleshoot by remember { mutableStateOf(false) }
                 SafeMorphTextButton(
@@ -148,10 +141,8 @@ internal fun NotificationsCardContent(
                                         },
                                     )
                                 },
-                                // No explicit contentColor: forcing `primary` (a blue) onto the
-                                // tonal button's grey container was the "blue on grey, impossible
-                                // to read" report. The tonal emphasis already pairs the container
-                                // with its own legible on-colour; letting it do that is the fix.
+                                // The tonal emphasis already pairs the container with its own
+                                // legible on-colour; letting it do that is the fix.
                                 icon = Icons.Filled.NotificationsOff,
                             )
                         }
@@ -212,9 +203,6 @@ private fun AttentionRow(problem: String, action: String, onClick: () -> Unit) {
     SafeMorphTextButton(
         action,
         onClick = onClick,
-        // No forced `primary` content colour: the tonal button's own on-container colour is
-        // the legible pairing, and forcing a blue overrode it into the "blue on grey,
-        // impossible to read" the watcher button was reported as.
         icon = AppIcons.Warning,
     )
 }

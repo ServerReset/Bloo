@@ -18,16 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/**
- * The shared motion pieces for things that were static: a piece of text that changes, a row you press,
- * a card that first appears. One place, so every surface that uses them moves the same way.
- */
+/** One place, so every surface that uses them moves the same way. */
 
-/**
- * Text that fades in when [text] changes, instead of swapping in a frame. One plain Text and one alpha
- * (no cross-fade, which composes both strings at once): this sits inside every button label, so it has
- * to be close to free when nothing is changing.
- */
+/** Text that fades in when [text] changes, instead of swapping in a frame. */
 @Composable
 internal fun AnimatedText(
     text: String,
@@ -39,11 +32,8 @@ internal fun AnimatedText(
     softWrap: Boolean = true,
     overflow: TextOverflow = TextOverflow.Clip,
 ) {
-    // COMPACT changing values (single line, short, contains digits) route through
-    // the standard rolling component instead of this fade, so every refreshed
-    // quantity (chip captions like "Updated 4 min ago", status readouts) rolls in
-    // the same digit language everywhere. Long / wrapping / digit-free text keeps
-    // this fade, which is the right shape for wholesale changes.
+    // Long / wrapping / digit-free text keeps this fade, which is the right shape for wholesale
+    // changes.
     if (maxLines == 1 && text.length <= 24 && text.any { it.isDigit() } && !text.contains('\n')) {
         RollingNumber(
             text,
@@ -78,8 +68,7 @@ private val enteredThisSession = mutableSetOf<String>()
 
 /**
  * Fades and lifts a surface in the first time it appears (once per [key] per session), so cards
- * arrive instead of being there. Read in the draw phase, so it costs no recomposition, and a card
- * scrolled away and back does not replay it.
+ * arrive instead of being there.
  */
 @Composable
 internal fun Modifier.entrance(key: String): Modifier {
@@ -98,7 +87,8 @@ internal fun Modifier.entrance(key: String): Modifier {
 
 /**
  * Fades everything this modifier's content draws to nothing at the bottom edge, so the effect gets
- * weaker the further down it goes (the status bar's glass). Place it BEFORE the effect it should fade.
+ * weaker the further down it goes (the status bar's glass). Place it BEFORE the effect it should
+ * fade.
  */
 internal fun Modifier.fadeOutBottom(): Modifier = this
     .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }

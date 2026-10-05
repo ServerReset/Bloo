@@ -30,28 +30,15 @@ import com.bloo.bluelink.R
 import kotlinx.serialization.Serializable
 
 /** User-selectable appearance. */
-/** Dark mode is always true-black (OLED-friendly) now -- see [blooColorScheme]'s own
- *  doc. This used to also offer separate "AMOLED"/"+AMOLED" variants alongside plain
- *  DARK/SYSTEM; there was never a real reason to make dark mode dimmer than it needs
- *  to be by default, so that's just what DARK/SYSTEM-while-dark do now, with no extra
- *  choice to make. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-
 /**
- * User-selectable typeface. GOOGLE_SANS uses Google Sans Flex — Google's
- * officially open-sourced (OFL) sibling of the proprietary Product Sans — so it
- * ships legitimately as the geometric option.
+ * User-selectable typeface. GOOGLE_SANS uses Google Sans Flex — Google's officially open-sourced
+ * (OFL) sibling of the proprietary Product Sans — so it ships legitimately as the geometric option.
  */
 enum class FontChoice { SYSTEM, ATKINSON, GOOGLE_SANS }
 
-
-/**
- * Built-in colour palettes the user can pick from when dynamic colour
- * (Material You) is off. Each is derived from the hand-tuned Expressive scheme
- * by rotating its accent hues, so every palette keeps the same expressive
- * multi-hue structure and tonal balance.
- */
+/** Built-in colour palettes the user can pick from when dynamic colour (Material You) is off. */
 enum class ColorPalette(val label: String, val swatch: Color, internal val hue: Float) {
     BLUE("Bloo", Color(0xFF005AC1), 217f),
     VIOLET("Violet", Color(0xFF7B4DFF), 255f),
@@ -61,11 +48,9 @@ enum class ColorPalette(val label: String, val swatch: Color, internal val hue: 
     ROSE("Rose", Color(0xFFB02E55), 338f),
 }
 
-
 /**
- * A user-authored colour palette. Each field stores a packed Android ARGB int
- * (same encoding as [android.graphics.Color]). Only [primaryArgb] is required;
- * secondary and tertiary default to the base scheme's relative offsets from primary.
+ * A user-authored colour palette. Each field stores a packed Android ARGB int (same encoding as
+ * [android.graphics.Color]).
  */
 @Serializable
 data class CustomPaletteData(
@@ -76,16 +61,10 @@ data class CustomPaletteData(
     val tertiaryArgb: Int? = null,
 )
 
-
 /** The Expressive scheme is authored around this primary hue (see [LightExpressive]). */
 private const val BasePaletteHue = 217f
 
-
-/** Rotate a colour's hue (HSV) by [degrees]; preserves saturation/value/alpha.
- *  Converts to HSV, shifts the hue channel by [degrees] wrapping modulo 360 (the double
- *  `(x % 360f + 360f) % 360f` handles negative deltas correctly, since Kotlin's `%` can
- *  return a negative remainder), then converts back, re-applying the original alpha
- *  (HSVToColor itself doesn't carry alpha through). */
+/** Rotate a colour's hue (HSV) by [degrees]; preserves saturation/value/alpha. */
 private fun Color.rotateHue(degrees: Float): Color {
     if (degrees == 0f) return this
     val hsv = FloatArray(3)
@@ -94,30 +73,22 @@ private fun Color.rotateHue(degrees: Float): Color {
     return Color(android.graphics.Color.HSVToColor((alpha * 255).toInt(), hsv))
 }
 
-
-/** The hue channel (0..360) of this colour in HSV space, used to measure how far a
- *  user-picked colour has drifted from the palette's reference hue. */
 private fun Color.extractHue(): Float {
     val hsv = FloatArray(3)
     android.graphics.Color.colorToHSV(toArgb(), hsv)
     return hsv[0]
 }
 
-
 /**
- * Recolour a scheme from a [CustomPaletteData]. Primary group rotates by however
- * much the user's primary hue differs from the base palette hue. Secondary and
- * tertiary each rotate independently if the user provided an override; otherwise
- * they follow the same delta as primary (preserving the expressive offset).
+ * Recolour a scheme from a [CustomPaletteData]. Primary group rotates by however much the user's
+ * primary hue differs from the base palette hue.
  */
 internal fun ColorScheme.applyCustomPalette(p: CustomPaletteData): ColorScheme {
-    // The picked colours' own hue AND saturation drive the accent roles (the old version only rotated the
-    // base scheme's hue, so a deep navy and a pastel blue came out the same). Lightness is NOT taken from
-    // the pick: each role sits at a fixed tone for the theme, which is what keeps text readable on it.
     val dark = surface.luminance() < 0.5f
     val (pri, onPri, priCont, onPriCont) = accentRoles(p.primaryArgb, dark)
-    // Secondary and tertiary: their own colour when the palette has one, otherwise the base scheme's own
-    // roles carried round to the primary's hue (so a one-colour palette still reads as one family).
+    // Secondary and tertiary: their own colour when the palette has one, otherwise the base
+    // scheme's own roles carried round to the primary's hue (so a one-colour palette still reads as
+    // one family).
     val primaryDelta = Color(p.primaryArgb.toLong() and 0xFFFFFFFFL).extractHue() - BasePaletteHue
     val sec = p.secondaryArgb?.let { accentRoles(it, dark) }
     val ter = p.tertiaryArgb?.let { accentRoles(it, dark) }
@@ -134,7 +105,6 @@ internal fun ColorScheme.applyCustomPalette(p: CustomPaletteData): ColorScheme {
     )
 }
 
-/** The four roles of one accent (colour, on-colour, container, on-container) at the theme's fixed tones. */
 private fun accentRoles(argb: Int, dark: Boolean): List<Color> {
     fun role(tone: Float, satScale: Float): Color {
         val hsl = FloatArray(3)
@@ -150,7 +120,6 @@ private fun accentRoles(argb: Int, dark: Boolean): List<Color> {
     }
 }
 
-
 /** Recolour the accent roles of a scheme to match [palette] by rotating their hue. */
 internal fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
     val delta = palette.hue - BasePaletteHue
@@ -165,7 +134,6 @@ internal fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
         tertiaryContainer = tertiaryContainer.r(), onTertiaryContainer = onTertiaryContainer.r(),
     )
 }
-
 
 // Widget theme functions removed - widget system deleted
 
@@ -194,7 +162,6 @@ private val LightExpressive = lightColorScheme(
     error = Color(0xFFBA1A1A),
 )
 
-
 private val DarkExpressive = darkColorScheme(
     primary = Color(0xFFADC6FF),
     onPrimary = Color(0xFF002E69),
@@ -216,9 +183,8 @@ private val DarkExpressive = darkColorScheme(
     error = Color(0xFFFFB4AB),
 )
 
-
-// Expressive shapes: generous rounded corners, with a cut-corner accent on the
-// smallest slot to create the intentional "visual tension" of mixed geometry.
+// Expressive shapes: generous rounded corners, with a cut-corner accent on the smallest slot to
+// create the intentional "visual tension" of mixed geometry.
 val ExpressiveShapes = Shapes(
     extraSmall = CutCornerShape(6.dp),
     small = RoundedCornerShape(16.dp),
@@ -227,23 +193,13 @@ val ExpressiveShapes = Shapes(
     extraLarge = RoundedCornerShape(40.dp),
 )
 
-
-/** Map each weight of a variable font via fontVariationSettings (wght axis). A variable
- *  font ships as a single file with a continuous "wght" (weight) axis rather than separate
- *  bold/regular files; [axis] is the numeric weight value (400=regular..800=extra bold) fed
- *  into that axis, and [weight] is just the Compose [FontWeight] this entry gets registered
- *  under so [FontFamily] can pick the closest match when text asks for that weight. */
+/** Map each weight of a variable font via fontVariationSettings (wght axis). */
 private fun variableFont(resId: Int, weight: FontWeight, axis: Int) = Font(
     resId,
     weight,
     variationSettings = FontVariation.Settings(FontVariation.weight(axis)),
 )
 
-
-/** Builds the [FontFamily] for a [FontChoice]: the system default needs nothing extra,
- *  while the two custom variable fonts register five distinct weight variants each (via
- *  [variableFont]) so normal/medium/semibold/bold/extrabold text all render distinctly
- *  instead of the renderer synthesizing (faux-bolding) missing weights. */
 private fun fontFamilyFor(choice: FontChoice): FontFamily = when (choice) {
     FontChoice.SYSTEM -> FontFamily.Default
     FontChoice.ATKINSON -> FontFamily(
@@ -261,7 +217,6 @@ private fun fontFamilyFor(choice: FontChoice): FontFamily = when (choice) {
         variableFont(R.font.google_sans_flex, FontWeight.ExtraBold, 800),
     )
 }
-
 
 /** Apply the chosen typeface across the type scale and lean into bold display text. */
 fun expressiveTypography(choice: FontChoice): Typography {
@@ -286,22 +241,16 @@ fun expressiveTypography(choice: FontChoice): Typography {
     )
 }
 
-
 /**
- * A flat, no-outline button fill, pushed away from the background -- lighter in dark
- * themes, a touch darker in light themes -- so it still reads clearly with no border
- * of its own. No longer [MorphButton]'s idle default (that's the tonal-with-outline
- * treatment now, promoted from the map's own buttons); this remains for the handful
- * of call sites that want a flat, borderless tone on purpose -- an explicit STATE
- * colour (a toggle's off position, a segmented track) rather than the shared idle
- * button look. Delegates to the shared :uicommon helper.
+ * A flat, no-outline button fill, pushed away from the background -- lighter in dark themes, a
+ * touch darker in light themes -- so it still reads clearly with no border of its own. Delegates to
+ * the shared :uicommon helper.
  */
 @Composable
 fun buttonContainer(): Color = com.bloo.uicommon.BlooColors.buttonContainer(
     MaterialTheme.colorScheme.surfaceContainerHighest,
     MaterialTheme.colorScheme.onSurface,
 )
-
 
 /** Scale a colour's saturation (HSV) by [factor]; 1 = unchanged. */
 private fun Color.saturate(factor: Float): Color {
@@ -312,10 +261,9 @@ private fun Color.saturate(factor: Float): Color {
     return Color(android.graphics.Color.HSVToColor((alpha * 255).toInt(), hsv))
 }
 
-
 /**
- * Resolve the final Material 3 [ColorScheme] for the given appearance, outside
- * composition. [BlooTheme] uses it.
+ * Resolve the final Material 3 [ColorScheme] for the given appearance, outside composition.
+ * [BlooTheme] uses it.
  */
 fun blooColorScheme(
     context: Context,
@@ -328,9 +276,9 @@ fun blooColorScheme(
     val canDynamic = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     // Priority order for the base scheme: dynamic (Material You, extracted from the user's
-    // wallpaper by the OS) wins if enabled and available; otherwise a user custom palette
-    // recolors the hand-tuned Expressive base; otherwise one of the built-in enum palettes
-    // recolors it instead. Each combination picks the light or dark variant per [dark].
+    // wallpaper by the OS) wins if enabled and available; otherwise a user custom palette recolors
+    // the hand-tuned Expressive base; otherwise one of the built-in enum palettes recolors it
+    // instead.
     val base = when {
         canDynamic && dark -> dynamicDarkColorScheme(context)
         canDynamic && !dark -> dynamicLightColorScheme(context)
@@ -341,11 +289,8 @@ fun blooColorScheme(
     }
 
     // Dark mode overrides just the background/surface tiers to true (or near-true) black --
-    // actually turning off OLED pixels for the big flat areas -- while leaving every other
-    // role (text, accents, containers) exactly as the resolved base scheme already has them.
-    // This used to be a separate opt-in "AMOLED"/"+AMOLED" mode alongside plain DARK/SYSTEM;
-    // there is no reason to make dark mode dimmer-than-necessary on an OLED screen by default,
-    // so true black is just what dark mode IS now, with no extra choice to make.
+    // actually turning off OLED pixels for the big flat areas -- while leaving every other role
+    // (text, accents, containers) exactly as the resolved base scheme already has them.
     val amoled = if (dark) {
         val black = Color(0xFF000000)
         base.copy(
@@ -361,10 +306,7 @@ fun blooColorScheme(
         base
     }
 
-    // Vibrancy: scale the saturation of every tinted colour role. Neutral roles (background/
-    // surface/onSurface etc, already resolved above into `amoled`) are deliberately left out
-    // of this .copy() -- only accent and semantic (error) roles get the saturation scale, so
-    // vibrancy affects how "punchy" the UI's colours look without tinting plain backgrounds.
+    // Vibrancy: scale the saturation of every tinted colour role.
     return if (vibrancy == 1f) amoled else {
         fun Color.v() = saturate(vibrancy)
         amoled.copy(
@@ -392,21 +334,13 @@ fun blooColorScheme(
     }
 }
 
-
 /**
  * The app's root theme wrapper, applied once around the whole Compose tree (see
- * [com.bloo.bluelink.MainActivity]). Resolves [themeMode]/[dynamicColor]/[colorPalette]/
- * [customPalette]/[vibrancy] into a concrete [ColorScheme] via [blooColorScheme], applies
- * [uiScale] by scaling the font-scale component of [LocalDensity] (so a user's "make
- * everything bigger" preference scales text-driven layout without needing every composable
- * to read a separate scale value), and reads the system's global animator-duration-scale
- * setting once (`remember`, so it isn't re-queried every recomposition) to drive
- * [LocalReduceMotion] for composables that should skip animation when it's off.
+ * [com.bloo.bluelink.MainActivity]).
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 /** Process-wide cache for the animator-duration-scale probe -- see its use in BlooTheme. */
 private var reduceMotionCache: Boolean? = null
-
 
 fun reduceMotionCached(context: android.content.Context): Boolean =
     reduceMotionCache ?: runCatching {

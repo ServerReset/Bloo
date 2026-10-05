@@ -54,7 +54,9 @@ import kotlinx.coroutines.launch
 
 internal enum class OnboardingStepKind {
     WELCOME, RESTORE, SETUP, LOOK, ALERTS, WATCH,
-    /** The three per-car questions. Each one blocks until it is answered: see [needsConfirmation]. */
+    /**
+     * The three per-car questions. Each one blocks until it is answered: see [needsConfirmation].
+     */
     CAR_POWERTRAIN, CAR_PLATFORM, CAR_CLIMATE,
     TIPS, FEATURES,
 }
@@ -79,8 +81,7 @@ internal sealed interface OnboardingMode {
 
 /**
  * Whether notifications block leaving the [OnboardingStepKind.SETUP] card: required on API 33+
- * (POST_NOTIFICATIONS exists) until the permission is granted. Pure so the gate can be pinned
- * by a plain JVM test without a running Activity or a permission dialog.
+ * (POST_NOTIFICATIONS exists) until the permission is granted.
  */
 internal fun notifRequiredOnSetup(
     onSetup: Boolean,
@@ -89,8 +90,8 @@ internal fun notifRequiredOnSetup(
 ): Boolean = onSetup && notificationsSupported && !notifGranted
 
 /**
- * Whether a lock blocks leaving the SETUP card. Exactly ONE mechanism is required: biometrics
- * when the device has them enrolled, otherwise a PIN. Pure, so the truth table is testable.
+ * Whether a lock blocks leaving the SETUP card. Exactly ONE mechanism is required: biometrics when
+ * the device has them enrolled, otherwise a PIN. Pure, so the truth table is testable.
  */
 internal fun lockRequiredOnSetup(
     onSetup: Boolean,
@@ -112,16 +113,14 @@ internal fun setupIsBlocked(
         lockRequiredOnSetup(onSetup, canBio, biometricLock, appPinSet)
 
 /**
- * The cards in a deck, in order.
- *
- *  - First run: welcome, restore-from-sync, setup (notifications, lock, Drive), look and feel, which
- *    alerts to get, then three cards for each car that isn't already configured (powertrain, head
- *    unit where it applies, seats and steering wheel), the watch, tips and the features card.
- *  - New cars: just those three cards for each car in [OnboardingMode.NewCars.vins].
- *  - Replay: welcome, setup, look, alerts, every car's cards (ungated, to revisit answers), watch, tips, features.
- *
- * [preConfiguredVins] skips a car's card on first run: a backup restored on the RESTORE card can
- * bring in real powertrain/seat config for a car already set up on another device.
+ * The cards in a deck, in order. - First run: welcome, restore-from-sync, setup (notifications,
+ * lock, Drive), look and feel, which alerts to get, then three cards for each car that isn't
+ * already configured (powertrain, head unit where it applies, seats and steering wheel), the watch,
+ * tips and the features card. - New cars: just those three cards for each car in
+ * [OnboardingMode.NewCars.vins]. - Replay: welcome, setup, look, alerts, every car's cards
+ * (ungated, to revisit answers), watch, tips, features. [preConfiguredVins] skips a car's card on
+ * first run: a backup restored on the RESTORE card can bring in real powertrain/seat config for a
+ * car already set up on another device.
  */
 internal fun buildOnboardingSteps(
     mode: OnboardingMode,
@@ -161,10 +160,8 @@ internal fun buildOnboardingSteps(
 }
 
 /**
- * Every setup flow in the app: first run, newly detected cars, and the welcome cards summoned
- * again from Settings. A deck of pebble cards swiped left and right like the garage's own; the
- * cards differ by [mode], the chrome never does. The setup card gates leaving it on first run
- * (notifications and a lock), and the last card's button finishes the deck for its mode.
+ * Every setup flow in the app: first run, newly detected cars, and the welcome cards summoned again
+ * from Settings.
  */
 @Composable
 internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = OnboardingMode.FirstRun) {
@@ -176,7 +173,8 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     val appearance by vm.appearance.collectAsStateWithLifecycle()
     val notif by vm.notifications.collectAsStateWithLifecycle()
     val firstRun = mode == OnboardingMode.FirstRun
-    // Notifications are required on the setup card (API 33+), so the grant is visible to the Next gate; re-checked on resume.
+    // Notifications are required on the setup card (API 33+), so the grant is visible to the Next
+    // gate; re-checked on resume.
     var notifGranted by remember { mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context)) }
     val notifLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(notifLifecycle) {
@@ -189,14 +187,15 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         onDispose { notifLifecycle.lifecycle.removeObserver(obs) }
     }
 
-    // The deck is a pager whose length is held here because the step list depends on the card reached.
+    // The deck is a pager whose length is held here because the step list depends on the card
+    // reached.
     var pageCount by remember { mutableIntStateOf(1) }
     val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { pageCount })
     val pageIndex = pagerState.currentPage
     val pageScope = androidx.compose.runtime.rememberCoroutineScope()
 
-    // Cars a restored backup already configured, frozen (latched) once past the setup card so configuring
-    // a car can't shrink the deck under the visible card.
+    // Cars a restored backup already configured, frozen (latched) once past the setup card so
+    // configuring a car can't shrink the deck under the visible card.
     var preConfiguredVins by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pastSetup by remember { mutableStateOf(false) }
     LaunchedEffect(state.powertrains.keys, pageIndex) {
@@ -214,14 +213,12 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     // when the device has them, else a PIN) are both required before Next unlocks.
     val notificationsSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     // Car cards ask a real question (does it have heated seats? is it a hybrid?), so each one must
-    // be answered -- confirmed -- before the deck lets you past it. Confirmed answers are kept for
-    // the life of the deck, keyed by card kind and car.
+    // be answered -- confirmed -- before the deck lets you past it.
     var confirmed by remember { mutableStateOf(emptySet<String>()) }
     fun confirmKey(step: OnboardingStep) = "${step.kind}:${step.vin}"
     val confirm: (OnboardingStep) -> Unit = { step -> confirmed = confirmed + confirmKey(step) }
     val setupUnmetNow = firstRun &&
         setupIsBlocked(true, notificationsSupported, notifGranted, canBio, appearance.biometricLock, state.appPinSet)
-    /** Whether leaving card [i] is blocked right now, and why. */
     fun blockReason(i: Int): String? {
         val step = steps.getOrNull(i) ?: return null
         return when {
@@ -236,8 +233,8 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     val blockedHere = blockReason(pageIndex)
 
     val gateIndex = steps.indices.firstOrNull { blockReason(it) != null } ?: Int.MAX_VALUE
-    // Swiping is free, but not past a card whose question is still open: the deck settles back onto it,
-    // the same gate the Next button enforces.
+    // Swiping is free, but not past a card whose question is still open: the deck settles back onto
+    // it, the same gate the Next button enforces.
     LaunchedEffect(pagerState.settledPage, gateIndex) {
         if (pagerState.settledPage > gateIndex) pagerState.animateScrollToPage(gateIndex)
     }
@@ -297,7 +294,8 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             haptics?.heavy()
         }
     }
-    // The finish: the closing card of a first run (and of a new car's setup) goes off like New Year's.
+    // The finish: the closing card of a first run (and of a new car's setup) goes off like New
+    // Year's.
     LaunchedEffect(isLast) {
         if (isLast && !replayMode(mode)) celebrate(big = true)
     }
@@ -339,8 +337,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             .background(scheme.background)
             .pointerInput(Unit) {},
     ) {
-        // A cheap static backdrop: the surface plus a wash of the current card's accent. No aurora or blur
-        // (their cost was this screen's lag); the accent is read in the draw block so it never recomposes.
+        // A cheap static backdrop: the surface plus a wash of the current card's accent.
         val accent by androidx.compose.animation.animateColorAsState(
             onboardingAccent(steps.getOrNull(pageIndex)?.kind ?: OnboardingStepKind.WELCOME),
             androidx.compose.animation.core.tween(MotionLong),

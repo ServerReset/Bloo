@@ -31,12 +31,7 @@ import kotlinx.coroutines.withContext
 
 private enum class WatchSetupStep { Prepare, Pair, Install, Done }
 
-/**
- * "Set up watch". The watch app is not on Google Play and never will be, so the first install goes
- * over the watch's own Wireless debugging: the phone pairs with it, downloads the watch APK from
- * the project's builds, and sideloads it ([WatchAdbInstaller]). Nothing is typed into a computer.
- * Once the watch app is installed and connected, later updates are pushed over the Data Layer.
- */
+/** "Set up watch". */
 @Composable
 internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
     val context = LocalContext.current

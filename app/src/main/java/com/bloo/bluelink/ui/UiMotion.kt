@@ -28,7 +28,8 @@ import androidx.compose.material.icons.filled.Settings
 // `motionScheme` is a MaterialTheme member, so it needs no import.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-// Explicit import required: State<T>'s `by` delegate resolves to this file-scope operator extension.
+// Explicit import required: State<T>'s `by` delegate resolves to this file-scope operator
+// extension.
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +37,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.layout.VerticalAlignmentLine
 
-/** Shared animation tokens and helpers: springs, expand/collapse transitions and the per-row stagger. */
+/**
+ * Shared animation tokens and helpers: springs, expand/collapse transitions and the per-row
+ * stagger.
+ */
 
 // ---- Motion -------------------------------------------------------------------
 
@@ -48,34 +52,9 @@ internal val PillCornerPercent get() = com.bloo.uicommon.PillCornerPercent
 
 internal val MorphedCornerPercent get() = com.bloo.uicommon.MorphedCornerPercent
 
-/**
- * The app's collapse/expand transition, supplied by the Material theme.
- *
- * Height is spatial and the fade is effects, per the M3 Expressive split; both are springs
- * because a collapse toggle is re-tappable and springs preserve velocity on interruption.
- *
- * [expandFrom] is a layout fact, not a timing one: a body under a header grows from its top,
- * a bubble above the bottom bar reveals from its bottom.
- *
- * AnimatedVisibility + shrinkVertically is used instead of animateContentSize because it
- * measures the child once at unchanged constraints (content is sliced, not reflowed) and removes
- * the node from composition at the end, so it is not left transparent and reachable by TalkBack.
- *
- * Do not simplify either token to fade-only: fadeOut has a null changeSize, so the child reports
- * its full size every frame and then drops in a single frame. scaleIn/scaleOut keep the full
- * footprint and do not help.
- *
- * AnimatedVisibility only waits for animations in its own Transition, so an independent
- * animate*AsState (such as heroT) can be cut off before it finishes.
- *
- * The open half uses a dedicated bounce spring ([PebbleBounceDamping]): one spring tuned to
- * overshoot keeps a single source of truth for the card's bounds. The close half is critically
- * damped ([PebbleCloseDamping] = 1.0) because there is nothing past "gone" for an overshoot to
- * mean; it shares [PebbleBounceStiffness] so the timing still reads as one card.
- *
- * Overshoot is set by damping ratio alone; stiffness only changes speed.
- */
-// internal: PebbleShell's corner-radius morph shares these springs so height and corners move as one.
+/** The app's collapse/expand transition, supplied by the Material theme. */
+// internal: PebbleShell's corner-radius morph shares these springs so height and corners move as
+// one.
 internal val PebbleBounceDamping = 0.68f
 
 // Slightly underdamped (0.95) for a smoother close that isn't stiff.
@@ -83,30 +62,25 @@ internal val PebbleCloseDamping = 0.95f
 
 internal val PebbleBounceStiffness = Spring.StiffnessLow
 
-/** Standard enter animation for expanding surfaces: a fade-in plus a slide from the direction of expansion. */
+/**
+ * Standard enter animation for expanding surfaces: a fade-in plus a slide from the direction of
+ * expansion.
+ */
 internal fun expandEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
     fadeIn(tween(MotionShort)) + slideInVertically {
         if (expandFrom == Alignment.Top) -it / 3 else it / 3
     }
 
 /**
- * Standard exit animation for expanding surfaces: mirrors [expandEnter] in reverse.
- *
- * [fade] false suits nested content with its own per-row fades (e.g. StaggeredRevealColumn).
+ * Standard exit animation for expanding surfaces: mirrors [expandEnter] in reverse. [fade] false
+ * suits nested content with its own per-row fades (e.g. StaggeredRevealColumn).
  */
 internal fun expandExit(shrinkTowards: Alignment.Vertical = Alignment.Top, fade: Boolean = true): ExitTransition =
     (if (fade) fadeOut(tween(MotionFast)) else ExitTransition.None) + slideOutVertically {
         if (shrinkTowards == Alignment.Top) -it / 3 else it / 3
     }
 
-/**
- * [expandEnter] plus real container-height growth via [expandVertically].
- *
- * For plain `AnimatedVisibility` disclosure sites inline in a Column; without a size transition
- * the layout snaps to the revealed height and, on exit, holds full height until the end.
- * Not folded into [expandEnter]/[expandExit] because AnimatedContent owns its own size
- * interpolation via `sizeTransform`. Use only with `AnimatedVisibility`'s `enter=`/`exit=`.
- */
+/** [expandEnter] plus real container-height growth via [expandVertically]. */
 internal fun expandEnterSized(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
     expandEnter(expandFrom) + expandVertically(expandFrom = expandFrom)
 
@@ -118,27 +92,12 @@ internal fun expandExitSized(shrinkTowards: Alignment.Vertical = Alignment.Top, 
 internal fun expandContentTransform(): ContentTransform =
     expandEnter() togetherWith expandExit()
 
-/**
- * Independent pop-in/pop-out for ONE row-level element that appears while its pebble is open.
- *
- * Each call site has its own [AnimatedVisibility], so rows never wait on or share alpha with
- * each other (unlike [collapseEnter]/[collapseExit], which animate the body as one block).
- *
- * Scale-and-fade, not height-based: the pebble body already animates its size, and a second
- * height animation would double-animate and stutter. Scale uses [PebbleBounceDamping] to match
- * the card's open bounce.
- */
+/** Independent pop-in/pop-out for ONE row-level element that appears while its pebble is open. */
 @Composable
 internal fun PopVisible(
     visible: Boolean,
     modifier: Modifier = Modifier,
-    /**
-     * True also interpolates the container's height, not just fade+scale in place.
-     *
-     * Use it where the container reflows siblings when this content's height changes (e.g. the
-     * reorderable list, whose siblings animate via `Modifier.animatePlacement()`); otherwise the
-     * two visibly overlap while the sibling is still mid-spring.
-     */
+    /** True also interpolates the container's height, not just fade+scale in place. */
     sizeAnimated: Boolean = false,
     content: @Composable AnimatedVisibilityScope.() -> Unit,
 ) {
@@ -184,15 +143,14 @@ fun pebbleRowOvershoot(t: Float, overshoot: Float = 1.15f): Float {
 
 /**
  * How much of the shared progress each row's stagger window is offset by, end to end (see
- * [StaggeredRevealColumn]). 0.85 gives each row a narrow 15% window so up to 5 rows never
- * overlap and each reads as a distinct step.
+ * [StaggeredRevealColumn]). 0.85 gives each row a narrow 15% window so up to 5 rows never overlap
+ * and each reads as a distinct step.
  */
 const val PebbleStaggerSpan = 0.85f
 
 /**
  * The app's one "working" spin for icons that turn while something loads: accelerates from rest,
  * holds a fast spin, and when [spinning] ends decelerates to the next full turn and resets.
- * Idle icons hold no live animation; apply in a layer (`graphicsLayer { rotationZ = angle.value }`).
  */
 @androidx.compose.runtime.Composable
 internal fun rememberSpinAngle(spinning: Boolean): androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D> {

@@ -37,16 +37,13 @@ fun AppViewModel.updatePin(brand: Brand, pin: String) {
     }
 }
 
-/** Dismiss the lock overlay (the garage was already loaded behind it).
- *  A successful PIN verify routes through here too -- and resets the
- *  failure counter (see [verifyAppPin]). */
+/**
+ * A successful PIN verify routes through here too -- and resets the failure counter (see
+ * [verifyAppPin]).
+ */
 fun AppViewModel.unlocked() {
     _state.update { it.copy(locked = false, lockedToLogin = false, pinAttemptRejected = false) }
     if (_state.value.vehicles.isEmpty() && !loadingGarage) loadGarage()
-    // If status fetching was deferred waiting for the lock screen to unlock,
-    // perform the deferred fetch now — wait for the lock-away blur animation
-    // (450ms) to complete first so pebble recompositions from incoming status
-    // don't overlap the expensive unlock animation.
     if (deferredStatusLoad) {
         deferredStatusLoad = false
         val vehicles = _state.value.vehicles
@@ -65,32 +62,27 @@ fun AppViewModel.unlocked() {
     }
 }
 
-/** From the lock overlay, back out to the login screen.
- *  Sets lockedToLogin so Cancel on the login form re-locks instead of bypassing auth. */
+/**
+ * From the lock overlay, back out to the login screen. Sets lockedToLogin so Cancel on the login
+ * form re-locks instead of bypassing auth.
+ */
 fun AppViewModel.lockToLogin() = _state.update { it.copy(locked = false, addingAccount = true, lockedToLogin = true) }
 
-/** Persist how long after backgrounding the app should re-lock (see
- *  [maybeRelock], which reads this back out of [SettingsStore] on the next
- *  foreground). Fire-and-forget: the write is async, nothing in [_state]
- *  reflects the new value directly since the lock-timing setting itself
- *  isn't rendered anywhere that needs it synchronously. */
+/**
+ * Persist how long after backgrounding the app should re-lock (see [maybeRelock], which reads this
+ * back out of [SettingsStore] on the next foreground).
+ */
 fun AppViewModel.setLockTiming(value: LockTiming) {
     viewModelScope.launch { settingsStore.setLockTiming(value) }
 }
 
-/**
- * Re-engage the lock when returning to the foreground, honouring the user's
- * [LockTiming] setting. [backgroundedAtMs] is when the app was last stopped;
- * [screenTurnedOff] is whether the screen turned off while the app was away, which
- * [LockTiming.SCREEN_OFF] keys off.
- */
 fun AppViewModel.maybeRelock(backgroundedAtMs: Long, screenTurnedOff: Boolean = false) {
     if (_state.value.locked) return
     viewModelScope.launch {
         val a = settingsStore.appearance.first()
-        // Either mechanism re-arms the lock: the biometric lock when the
-        // device has usable biometrics, or the app PIN when one is set. The PIN
-        // half reads the encrypted prefs, so the whole check is taken on IO.
+        // Either mechanism re-arms the lock: the biometric lock when the device has usable
+        // biometrics, or the app PIN when one is set. The PIN half reads the encrypted prefs, so
+        // the whole check is taken on IO.
         val armed = withContext(Dispatchers.IO) { (a.biometricLock && canUseBiometrics()) || pinInstalled() }
         if (!armed) return@launch
         val elapsed = System.currentTimeMillis() - backgroundedAtMs
@@ -105,19 +97,21 @@ fun AppViewModel.maybeRelock(backgroundedAtMs: Long, screenTurnedOff: Boolean = 
     }
 }
 
-/** Whether the device currently has usable biometrics (biometric/face)
- *  enrolled -- gates whether [UiState.locked] / [maybeRelock] can ever
- *  apply, since there's nothing to authenticate against otherwise.
- *  BIOMETRIC_WEAK is used (rather than STRONG) so a wider range of
- *  device authenticators (including some face-only ones) still qualify. */
+/**
+ * Whether the device currently has usable biometrics (biometric/face) enrolled -- gates whether
+ * [UiState.locked] / [maybeRelock] can ever apply, since there's nothing to authenticate against
+ * otherwise.
+ */
 fun AppViewModel.canUseBiometrics(): Boolean =
     BiometricManager.from(getApplication())
         .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
         BiometricManager.BIOMETRIC_SUCCESS
 
-/** Turn the biometric app-lock on/off in Settings. Persists only -- the
- *  actual locking/unlocking flow is driven separately by [maybeRelock]
- *  and [unlocked] reading this flag back out on each foreground. */
+/**
+ * Turn the biometric app-lock on/off in Settings. Persists only -- the actual locking/unlocking
+ * flow is driven separately by [maybeRelock] and [unlocked] reading this flag back out on each
+ * foreground.
+ */
 fun AppViewModel.setBiometricLock(enabled: Boolean) {
     viewModelScope.launch { settingsStore.setBiometricLock(enabled) }
 }
@@ -125,13 +119,15 @@ fun AppViewModel.setBiometricLock(enabled: Boolean) {
 /** Whether a PIN record currently exists in the credential store. */
 private fun AppViewModel.pinInstalled(): Boolean = credentialStore.getPinRecord() != null
 
-/** Re-mirrors PIN presence + lockout state from the credential store
- *  into [UiState] (called on cold start and after every mutation). */
+/**
+ * Re-mirrors PIN presence + lockout state from the credential store into [UiState] (called on cold
+ * start and after every mutation).
+ */
 fun AppViewModel.refreshPinState() {
-    // Reads CredentialStore's lazy encrypted prefs (Tink/AndroidKeystore), so this
-    // runs on IO: every caller is a state refresh, none of them can observe the
-    // result synchronously, and doing it on Main.immediate put the first
-    // EncryptedSharedPreferences construction on the cold-start critical path.
+    // Reads CredentialStore's lazy encrypted prefs (Tink/AndroidKeystore), so this runs on IO:
+    // every caller is a state refresh, none of them can observe the result synchronously, and doing
+    // it on Main.immediate put the first EncryptedSharedPreferences construction on the cold-start
+    // critical path.
     viewModelScope.launch(Dispatchers.IO) {
         val pinSet = credentialStore.getPinRecord() != null
         val lockout = PinLockout(
@@ -144,9 +140,9 @@ fun AppViewModel.refreshPinState() {
 }
 
 /**
- * Sets (or replaces) the app PIN. The PIN is never persisted: only its
- * PBKDF2-stretched hash + salt live in CredentialStore's encrypted
- * storage (see [PinRecord]). The stretch runs off the main thread.
+ * Sets (or replaces) the app PIN. The PIN is never persisted: only its PBKDF2-stretched hash + salt
+ * live in CredentialStore's encrypted storage (see [PinRecord]). The stretch runs off the main
+ * thread.
  */
 fun AppViewModel.setAppPin(pin: String) {
     viewModelScope.launch {
@@ -159,8 +155,10 @@ fun AppViewModel.setAppPin(pin: String) {
     }
 }
 
-/** Removes the app PIN entirely (the caller must have already verified
- *  the current PIN -- see [verifyAppPin] for the gate). */
+/**
+ * Removes the app PIN entirely (the caller must have already verified the current PIN -- see
+ * [verifyAppPin] for the gate).
+ */
 fun AppViewModel.removeAppPin() {
     viewModelScope.launch {
         credentialStore.setPinRecord(null)
@@ -169,23 +167,15 @@ fun AppViewModel.removeAppPin() {
 }
 
 /**
- * Verifies a PIN attempt against the stored record, enforcing the
- * [PinLockout] policy: while the rejection window is open the attempt is
- * rejected outright (no work spent on it), otherwise a wrong PIN records
- * a failure and every fifth failure opens a window that doubles per
- * batch (30s, 1m, 2m, ...). A correct PIN resets the counter and unlocks
- * like a biometric would.
- *
- * Result surfaces through [UiState.pinAttemptRejected] /
- * [UiState.pinLockout]; the overlay acknowledges via
- * [acknowledgePinRejection].
+ * Verifies a PIN attempt against the stored record, enforcing the [PinLockout] policy: while the
+ * rejection window is open the attempt is rejected outright (no work spent on it), otherwise a
+ * wrong PIN records a failure and every fifth failure opens a window that doubles per batch (30s,
+ * 1m, 2m, ...).
  */
 fun AppViewModel.verifyAppPin(pin: String) {
     viewModelScope.launch {
         val record = PinRecord.decode(credentialStore.getPinRecord()) ?: return@launch
         val now = System.currentTimeMillis()
-        // The monotonic reading alongside the wall clock: the wall clock is what someone
-        // holding the device can move, and moving it used to retire the rejection window.
         val nowElapsed = android.os.SystemClock.elapsedRealtime()
         var lockout = PinLockout(
             credentialStore.getPinFailures(),
@@ -210,8 +200,6 @@ fun AppViewModel.verifyAppPin(pin: String) {
     }
 }
 
-/** Clears the transient "last attempt was rejected" flag the lock
- *  overlay shows; called when the overlay re-shows its input state. */
 fun AppViewModel.acknowledgePinRejection() {
     _state.update { it.copy(pinAttemptRejected = false) }
 }

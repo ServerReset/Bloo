@@ -20,8 +20,8 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
     // Defrost implies climate at full heat unless the query also names a temperature.
     val wantsDefrost = RxDefrost.containsMatchIn(q)
     return when {
-        // Checked first: "open Bluelink"/"open the app" launches the OEM companion app (dispatched in
-        // SearchResults.kt via openApp with the vehicle's BrandLinks), not a car command.
+        // Checked first: "open Bluelink"/"open the app" launches the OEM companion app (dispatched
+        // in SearchResults.kt via openApp with the vehicle's BrandLinks), not a car command.
         RxOpenApp.containsMatchIn(q) ->
             ParsedVehicleCommand("open_app", label = "Opening the app for")
         // Unlock before lock: "unlock" contains "lock".
@@ -52,7 +52,8 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
             } else {
                 ParsedVehicleCommand("climate_on", "default", "Starting climate for")
             }
-        // Bare "heat <car> to 80": needs a real temperature, the same guard that stops "Ioniq 5" reading as one.
+        // Bare "heat <car> to 80": needs a real temperature, the same guard that stops "Ioniq 5"
+        // reading as one.
         temp != null && RxHeatCoolVerb.containsMatchIn(q) ->
             ParsedVehicleCommand("climate_on", VehicleCommandRunner.TEMP_PREFIX + temp, "Starting climate at $tempLabel for")
         // Charge limit before charge start/stop: "set the charge limit to 80" contains "charg".
@@ -77,10 +78,10 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
     }
 }
 
-
 /**
  * Every constant search/command pattern, compiled once at class init instead of per call (the token
- * splitter would otherwise compile on every keystroke). Patterns built from runtime values stay inline.
+ * splitter would otherwise compile on every keystroke). Patterns built from runtime values stay
+ * inline.
  */
 internal val RxColdest = Regex("coldest|as cold as|max(imum)? (cold|cool)|lowest temp|full (cold|cool)")
 
@@ -92,8 +93,9 @@ internal val RxTempDegrees = Regex("\\b(\\d{2,3})\\s*°?\\s*(?:degrees?\\b|([fc]
 
 internal val RxDefrost = Regex("defrost|defog|demist|clear (the )?(wind(screen|shield)|glass|ice)|de-ice")
 
-// "open" plus a known companion-app name/alias or "the app"/"my app"; not bare "open" (that is RxUnlock's
-// territory) or bare "app". Brand names are lowercase and kept in sync with BrandLinks.appName (Brand.kt) by hand.
+// "open" plus a known companion-app name/alias or "the app"/"my app"; not bare "open" (that is
+// RxUnlock's territory) or bare "app". Brand names are lowercase and kept in sync with
+// BrandLinks.appName (Brand.kt) by hand.
 internal val RxOpenApp = Regex(
     "\\bopen\\b.*(bluelink|kia access|kia connect|uvo|genesis( app| connected)?|" +
         "\\bthe app\\b|\\bmy app\\b|\\bowner('?s)? app\\b|\\bcar app\\b|\\bcompanion app\\b)",
@@ -128,15 +130,15 @@ internal val RxChargeStop = Regex("(stop|turn off|cancel|halt|end) (the )?charg|
 
 internal val RxChargeStart = Regex("(start|begin|turn on|resume) (the )?charg|charge (it|the car|my car)( now)?|top (it )?up")
 
-// Bare verb; always paired with `temp != null` at its call site so it doesn't fire on unrelated sentences.
+// Bare verb; always paired with `temp != null` at its call site so it doesn't fire on unrelated
+// sentences.
 internal val RxHeatCoolVerb = Regex("\\b(heat|cool|warm)\\b")
 
 internal val RxSearchTokens = Regex("[^a-z0-9%]+")
 
-
 /**
- * Enhances command parsing with Gemini Nano when available and the regex parse found nothing;
- * falls back gracefully if it is unavailable or fails.
+ * Enhances command parsing with Gemini Nano when available and the regex parse found nothing; falls
+ * back gracefully if it is unavailable or fails.
  */
 internal suspend fun enhanceCommandWithAi(
     query: String,

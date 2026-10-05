@@ -55,11 +55,15 @@ internal fun CriticalContent(
     v: Vehicle,
     stateSource: State<UiState>,
     vm: AppViewModel,
-    /** Rides the hero card's drag-handle slot: in the dual-column view it is the "swipe to switch cars" gesture. */
+    /**
+     * Rides the hero card's drag-handle slot: in the dual-column view it is the "swipe to switch
+     * cars" gesture.
+     */
     modifier: Modifier = Modifier,
     onCollapse: (() -> Unit)? = null,
 ) {
-    // Narrow derived reads, one per thing the hero draws, so unrelated UiState emissions don't recompose it.
+    // Narrow derived reads, one per thing the hero draws, so unrelated UiState emissions don't
+    // recompose it.
     val status by remember(v.vin) { derivedStateOf { stateSource.value.statuses[v.vin] } }
     val imageUrl by remember(v.vin) { derivedStateOf { stateSource.value.imageUrls[v.vin] } }
     val hasBattery by remember(v.vin) { derivedStateOf { stateSource.value.hasBattery(v) } }
@@ -76,7 +80,8 @@ internal fun CriticalContent(
         modifier = modifier,
         drivingLabel = drivingLabel, metric = metric, photoExpanded = photoExpanded,
         expandAction = onCollapse?.let {
-            // Icon-only: the dual-column header is narrow, and a labelled pill would truncate the car name.
+            // Icon-only: the dual-column header is narrow, and a labelled pill would truncate the
+            // car name.
             PebbleHeaderAction(
                 label = "",
                 icon = Icons.AutoMirrored.Filled.ArrowBack,
@@ -87,24 +92,20 @@ internal fun CriticalContent(
     )
 }
 
-
 /**
- * The lock/unlock quick control: [StateControl] with its status, in a pebble-shaped card with no header or chevron.
- *
- * Rolls its own Surface because [PebbleShell] assumes a header row; everything else of the shell's card look
- * (edge, colours, shadow, corners, insets) is mirrored here, so change them together. Long-press drag reorders as usual.
+ * The lock/unlock quick control: [StateControl] with its status, in a pebble-shaped card with no
+ * header or chevron.
  */
 @Composable
 internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Modifier) {
     // Honours the pebbleOutline setting like every other pebble, since this one bypasses Pebble().
     val pebbleOutline = LocalAppearance.current.pebbleOutline
-    // Recent remote commands, revealed by pressing the card's background. Deliberately has no visible
-    // affordance; per-car and not saved, so reopening lands on the plain lock control.
+    // Recent remote commands, revealed by pressing the card's background. Deliberately has no
+    // visible affordance; per-car and not saved, so reopening lands on the plain lock control.
     var showHistory by remember(v.vin) { mutableStateOf(false) }
     val history = state.remoteActionHistory[v.vin].orEmpty()
     // The corner follows only its own revealed history, never LocalForceExpanded: with no body to
-    // disclose it would otherwise show expanded corners while collapsed. PebbleCornerCollapsed is
-    // ControlHeight/2 because the resting content is pinned to ControlHeight.
+    // disclose it would otherwise show expanded corners while collapsed.
     val expanded = showHistory
     val corner by animateDpAsState(
         targetValue = if (expanded) PebbleCornerExpanded else PebbleCornerCollapsed,
@@ -133,24 +134,28 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
             .glassCardFill(shape, MaterialTheme.colorScheme.surfaceVariant),
         shape = shape,
         color = Color.Transparent,
-        // contentColorFor the container, as PebbleShell's cardColors does, so muted labels share the same base colour.
+        // contentColorFor the container, as PebbleShell's cardColors does, so muted labels share
+        // the same base colour.
         contentColor = contentColorFor(MaterialTheme.colorScheme.surfaceVariant),
-        // Card's default 1dp elevation, which a bare Surface lacks (nothing else covers it in light mode);
-        // tonal elevation stays 0 as it would be a no-op.
+        // Card's default 1dp elevation, which a bare Surface lacks (nothing else covers it in light
+        // mode); tonal elevation stays 0 as it would be a no-op.
         shadowElevation = 0.dp,
     ) {
         Column(Modifier.fillMaxWidth()) {
-            // Asymmetric padding matches pebble header alignment. Height lives here, not on the Surface, so the
-            // pebble keeps its resting silhouette; heightIn(min) lets it grow with large accessibility fonts.
+            // Asymmetric padding matches pebble header alignment. Height lives here, not on the
+            // Surface, so the pebble keeps its resting silhouette; heightIn(min) lets it grow with
+            // large accessibility fonts.
             Box(Modifier.fillMaxWidth().heightIn(min = ControlHeight).padding(start = 12.dp, end = 4.dp)) {
-                // Insets line the lock icon up with other pebbles' header icons (4 + 12 == PebbleContentInset)
-                // and the trailing control with their chevrons (4 + 8 = 12dp from the edge).
+                // Insets line the lock icon up with other pebbles' header icons (4 + 12 ==
+                // PebbleContentInset) and the trailing control with their chevrons (4 + 8 = 12dp
+                // from the edge).
                 PrimaryActions(
                     v, state, vm,
                     contentPadding = PaddingValues(start = PebbleContentInset - 12.dp, end = 8.dp),
                 )
             }
-            // Gated on the toggle alone: RemoteActionsInline draws its own empty state, and a silent no-op reads as a missing gesture.
+            // Gated on the toggle alone: RemoteActionsInline draws its own empty state, and a
+            // silent no-op reads as a missing gesture.
             AnimatedVisibility(
                 visible = showHistory,
                 enter = expandEnterSized(Alignment.Top),
@@ -162,10 +167,9 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     }
 }
 
-
 /**
- * The lock/unlock [StateControl] plus brand-conditional Flash-lights/Horn icon actions, shared by every
- * quick-action surface; each passes its own [contentPadding] to match its inset convention.
+ * The lock/unlock [StateControl] plus brand-conditional Flash-lights/Horn icon actions, shared by
+ * every quick-action surface; each passes its own [contentPadding] to match its inset convention.
  */
 @Composable
 internal fun PrimaryActions(
@@ -186,8 +190,9 @@ internal fun PrimaryActions(
             onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
             highlightWhenOff = true,
             offTextColor = MaterialTheme.colorScheme.error,
-            // Kia's US API has no horn/lights endpoint (see Vehicle.supportsHornLights), so Hyundai/Genesis only.
-            // Icon-only, connected to the Lock button; contentDescription keeps them labelled for TalkBack.
+            // Kia's US API has no horn/lights endpoint (see Vehicle.supportsHornLights), so
+            // Hyundai/Genesis only. Icon-only, connected to the Lock button; contentDescription
+            // keeps them labelled for TalkBack.
             groupActions = if (v.supportsHornLights) {
                 val hlPending = state.isPending(v.vin, "hornLights")
                 listOf(

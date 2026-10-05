@@ -18,14 +18,7 @@ import com.bloo.bluelink.data.setClimatePresets
 /** Restore the last-used climate settings for a car (null if never saved). */
 suspend fun AppViewModel.loadSavedClimate(v: Vehicle): ClimateRequest? = settingsStore.savedClimate(v.vin)
 
-/**
- * Debounced cross-composition mirror of the live climate draft. Lives in viewModelScope on
- * purpose: a LaunchedEffect-side debounce is cancelled when the ClimatePebble leaves composition
- * (cover-screen tile swipe, car switch, collapse), dropping a change made in the final 400ms.
- *
- * It no longer PERSISTS the draft: only a climate run that is actually started is saved (see
- * [startClimate]), so "last used" means what the car was told, and a collapsed pebble can reset to it.
- */
+/** Debounced cross-composition mirror of the live climate draft. */
 fun AppViewModel.saveClimateDebounced(v: Vehicle, req: ClimateRequest, activePresetId: String?) {
     climateSaveJobs[v.vin]?.cancel()
     climateSaveJobs[v.vin] = viewModelScope.launch {
@@ -34,15 +27,14 @@ fun AppViewModel.saveClimateDebounced(v: Vehicle, req: ClimateRequest, activePre
     }
 }
 
-// Climate-preset CRUD: each of these three follows the same optimistic
-// pattern -- compute the new per-VIN preset list, write it into
-// UiState.climatePresets immediately so the UI updates without waiting on
-// disk I/O, then persist the same change to SettingsStore asynchronously.
-// The [_state.map { it.climatePresets }...] collector in init mirrors the
-// result, so none of these need to publish it themselves.
+// Climate-preset CRUD: each of these three follows the same optimistic pattern -- compute the new
+// per-VIN preset list, write it into UiState.climatePresets immediately so the UI updates without
+// waiting on disk I/O, then persist the same change to SettingsStore asynchronously.
 
-/** Save the current climate draft as a new named preset (a fresh
- *  timestamp-based id, so presets never collide even if named the same). */
+/**
+ * Save the current climate draft as a new named preset (a fresh timestamp-based id, so presets
+ * never collide even if named the same).
+ */
 fun AppViewModel.saveClimatePreset(v: Vehicle, name: String, req: ClimateRequest) {
     val preset = ClimatePreset(
         id = System.currentTimeMillis().toString(),
@@ -71,9 +63,9 @@ fun AppViewModel.reorderClimatePresets(v: Vehicle, ordered: List<ClimatePreset>)
 }
 
 /**
- * Mirror this car's live climate draft + active preset to the cross-composition
- * state. Skips the write when nothing changed, so state received from another
- * live composition doesn't echo straight back and loop.
+ * Mirror this car's live climate draft + active preset to the cross-composition state. Skips the
+ * write when nothing changed, so state received from another live composition doesn't echo straight
+ * back and loop.
  */
 fun AppViewModel.publishClimateState(vin: String, presetId: String?, req: ClimateRequest) {
     val cs = req.toClimateSync(presetId)

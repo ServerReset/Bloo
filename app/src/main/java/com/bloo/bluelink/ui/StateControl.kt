@@ -77,8 +77,9 @@ internal fun StateControl(
 ) {
     // Which state is the "highlighted" (on) one.
     val highlighted = enabled && (if (highlightWhenOff) isOn == false else isOn == true)
-    // The row's measured width via onSizeChanged (BoxWithConstraints would subcompose on every car page).
-    // The 1000.dp default is deliberately high so the first frame is never falsely compacted.
+    // The row's measured width via onSizeChanged (BoxWithConstraints would subcompose on every car
+    // page). The 1000.dp default is deliberately high so the first frame is never falsely
+    // compacted.
     var rowWidthDp by remember { mutableStateOf(1000.dp) }
     val density = LocalDensity.current
     // Caps the button group's width: Row measures non-weighted children first, and the column's
@@ -144,7 +145,8 @@ internal fun StateControl(
                                 (fadeIn(tween(MotionShort)) + scaleIn(initialScale = 0.85f, animationSpec = tween(MotionShort))) togetherWith
                                 (fadeOut(tween(150)) + scaleOut(targetScale = 1.1f, animationSpec = tween(150)))
                             },
-                            // Centre-aligned: "Locked"/"Unlocked" differ in intrinsic height, which nudged the control.
+                            // Centre-aligned: "Locked"/"Unlocked" differ in intrinsic height, which
+                            // nudged the control.
                             contentAlignment = Alignment.CenterStart,
                             label = "lockStateAnim",
                         ) { (ic, label) ->
@@ -152,7 +154,8 @@ internal fun StateControl(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(GapRow),
                             ) {
-                                // null: the Text beside it carries the same words (avoids a redundant swipe stop).
+                                // null: the Text beside it carries the same words (avoids a
+                                // redundant swipe stop).
                                 Icon(ic, contentDescription = null, tint = stateColor, modifier = Modifier.size(22.dp))
                                 Text(
                                     label,
@@ -184,18 +187,17 @@ internal fun StateControl(
         // 12dp spacing between text and buttons.
         Spacer(Modifier.width(GapGroup))
         val haptics = LocalHaptics.current
-        // Extra icon actions plus the lock/unlock button form one connected button group (a single child of
-        // the outer Row, so the outer spacing isn't piled on top).
+        // Extra icon actions plus the lock/unlock button form one connected button group (a single
+        // child of the outer Row, so the outer spacing isn't piled on top).
         val segmentCount = groupActions.size + 1
-        // Phone-sized targets: ControlsPebble is the only caller and appears in the hot-spot column and
-        // single-column list, never on a cover tile.
+        // Phone-sized targets: ControlsPebble is the only caller and appears in the hot-spot column
+        // and single-column list, never on a cover tile.
         val groupBtnSize = 50.dp
         val actionIconSize = 22.dp
-        // ExpressiveButtonRow: pressing one segment widens it and squeezes the others while the group's
-        // outer width stays fixed. wrap = false because a connected group is one silhouette, so segments
-        // compact rather than wrap to a new line. Modifier.size on a segment is coerced to the width the group assigns.
+        // Modifier.size on a segment is coerced to the width the group assigns.
         val mainSource = remember { MutableInteractionSource() }
-        // Reserves width for both "Lock" and "Unlock" labels so the button doesn't collapse mid optimistic flip.
+        // Reserves width for both "Lock" and "Unlock" labels so the button doesn't collapse mid
+        // optimistic flip.
         val lockContent: @Composable () -> Unit = {
             Box(contentAlignment = Alignment.Center) {
                 val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
@@ -205,8 +207,9 @@ internal fun StateControl(
                 }
             }
         }
-        // The lock/unlock button itself: alone it keeps the pill<->rounded-square morph; as the last
-        // segment of a connected group the group's static silhouette ([shapeForCorner]) takes over.
+        // The lock/unlock button itself: alone it keeps the pill<->rounded-square morph; as the
+        // last segment of a connected group the group's static silhouette ([shapeForCorner]) takes
+        // over.
         val mainButton: @Composable (((Float, Int) -> androidx.compose.ui.graphics.Shape)?) -> Unit = { shapeForCorner ->
             MorphButton(
                 onClick = { if (isOn == true) onDeactivate() else onActivate() },
@@ -249,7 +252,8 @@ internal fun StateControl(
                         expressive = true,
                     ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
                 }
-                // Pill when off, rounded rectangle + highlight when on; in a group the static connected shape takes over.
+                // Pill when off, rounded rectangle + highlight when on; in a group the static
+                // connected shape takes over.
                 mainButton { morph, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp, morph) }
             }
         }

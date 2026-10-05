@@ -63,20 +63,10 @@ internal data class GroupIconAction(
     val onClick: () -> Unit,
 )
 
-
 /**
  * The one button style used across the app: rests as a **pill**, becomes a **rounded rectangle**
- * while [active] or pressed, and fills with [activeContainerColor] when active. Width springs
- * when the content width changes.
- *
- * This is the shared [MorphButtonCore] from :uicommon with Material colours, haptics and padding.
- * Every other button-looking control is this component with different shapes/colours.
- *
- *  - [minHeight] 48dp (the M3 touch target) unless a caller opts out for a shorter pill.
- *  - `selected = [active]` so TalkBack hears the state, not just the label.
- *
- * The default fill is tonal (`secondaryContainer`) with a hairline `outline` rim; `active` fills
- * solid `primary`.
+ * while [active] or pressed, and fills with [activeContainerColor] when active. Width springs when
+ * the content width changes.
  */
 @Composable
 fun MorphButton(
@@ -90,8 +80,10 @@ fun MorphButton(
     activeContentColor: Color = MaterialTheme.colorScheme.onPrimary,
     border: BorderStroke? = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
-    /** Overrides the disabled content tone (default: content at 38% alpha, so only the label fades).
-     *  The cover action button passes a full-alpha tone because it dims the whole pill itself. */
+    /**
+     * Overrides the disabled content tone (default: content at 38% alpha, so only the label fades).
+     * The cover action button passes a full-alpha tone because it dims the whole pill itself.
+     */
     disabledContentColor: Color? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     // Asymmetric shape replacing the plain pill-to-square morph (connected group segment, split
@@ -101,30 +93,43 @@ fun MorphButton(
     onLongClick: (() -> Unit)? = null,
     /** Haptic for a plain click; null = the standard click() pulse. */
     onClickHaptic: (() -> Unit)? = null,
-    /** Corner percent when idle (50 = perfect pill) and when [active]/pressed (28 = standard rounded square). */
+    /**
+     * Corner percent when idle (50 = perfect pill) and when [active]/pressed (28 = standard rounded
+     * square).
+     */
     pillCornerPercent: Float = PillCornerPercent,
     morphedCornerPercent: Float = MorphedCornerPercent,
-    /** The app's one button height ([ButtonTargetHeight]); pass 0.dp to let a short pill keep its natural height. */
+    /**
+     * The app's one button height ([ButtonTargetHeight]); pass 0.dp to let a short pill keep its
+     * natural height.
+     */
     minHeight: Dp = ButtonTargetHeight,
     /**
      * Inside a button group, this button's share of the row's leftover space (0 = natural width).
      * Replaces Modifier.weight, which cannot reach a group member.
      */
     groupWeight: Float = 0f,
-    /** Wraps the button in [SafeExpansiveButton] for press-grow feedback; always on inside an [ExpressiveButtonGroup]. */
+    /**
+     * Wraps the button in [SafeExpansiveButton] for press-grow feedback; always on inside an
+     * [ExpressiveButtonGroup].
+     */
     expressive: Boolean = false,
-    /** For a labelled button alone on its row: rests at natural width on the start edge and widens
-     *  to the row when pressed. Only takes effect together with [expressive]. */
+    /**
+     * For a labelled button alone on its row: rests at natural width on the start edge and widens
+     * to the row when pressed. Only takes effect together with [expressive].
+     */
     fillOnPress: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
     val clickHaptic = onClickHaptic ?: { haptics?.click() }
-    // The content tone content lambdas inherit (the shared core cannot reach material3's LocalContentColor).
+    // The content tone content lambdas inherit (the shared core cannot reach material3's
+    // LocalContentColor).
     val resolvedContent = if (active) activeContentColor else contentColor
     // What this button's label reports, for the long-press name hint.
     val hint = remember { LabelHintState() }
-    // The frost's animation state only exists for a button that has ever been inert (nearly all never are).
+    // The frost's animation state only exists for a button that has ever been inert (nearly all
+    // never are).
     var everInert by remember { mutableStateOf(!enabled) }
     SideEffect { if (!enabled) everInert = true }
     val frost = if (everInert || !enabled) {
@@ -133,7 +138,8 @@ fun MorphButton(
         Modifier
     }
     // Press and hold a symbol-only button: haptic ticks build, then the button shakes, a heavy
-    // pulse lands and a bubble shows the symbol and name. The hold never touches the button's layout.
+    // pulse lands and a bubble shows the symbol and name. The hold never touches the button's
+    // layout.
     if (enabled && onLongClick == null) {
         LaunchedEffect(interactionSource) {
             interactionSource.interactions.collectLatest { interaction ->
@@ -171,7 +177,8 @@ fun MorphButton(
     val providedContent = if (enabled) {
         resolvedContent
     } else {
-        // Keep the full background when disabled (only the label fades); M3's onSurface@12% is invisible on light cards.
+        // Keep the full background when disabled (only the label fades); M3's onSurface@12% is
+        // invisible on light cards.
         disabledContentColor ?: resolvedContent
     }
     val body: @Composable () -> Unit = {
@@ -179,7 +186,8 @@ fun MorphButton(
             MorphButtonCore(
                 onClick = { clickHaptic(); onClick() },
                 modifier = modifier
-                    // Makes every MorphButton announce its state to TalkBack, not only a colour change.
+                    // Makes every MorphButton announce its state to TalkBack, not only a colour
+                    // change.
                     .semantics { selected = active }
                     .onSizeChanged { hint.sizePx = it }
                     // While its lifted copy is up, the original steps aside.
@@ -204,7 +212,8 @@ fun MorphButton(
                 activeContainerColor = activeContainerColor,
                 contentPadding = contentPadding,
                 border = if (active) null else border,
-                // Disabled = frosted glass (translucent shared tint with a matching rim), not a washed-out pill.
+                // Disabled = frosted glass (translucent shared tint with a matching rim), not a
+                // washed-out pill.
                 disabledContainerColor = glassTint(canBlurBackdrops()),
                 disabledBorder = BorderStroke(1.dp, hairlineColor()),
                 interactionSource = interactionSource,
@@ -220,10 +229,8 @@ fun MorphButton(
         }
     }
     // Join a group without the call site knowing: a button only takes part in the press
-    // redistribution if it carries the group's parent data from SafeExpansiveButton. Wrapping is idempotent.
-    // A labelled button (declares a width weight) follows the standard press behaviour anywhere:
-    // shares the line in a group, rests at natural width alone. [LocalExpressiveGrowth] is true
-    // inside a wrapper that already did this, so it is never applied twice.
+    // redistribution if it carries the group's parent data from SafeExpansiveButton. Wrapping is
+    // idempotent.
     val standalone = groupWeight != 0f && !LocalExpressiveGrowth.current
     if (LocalExpressiveGroup.current || expressive || standalone) {
         SafeExpansiveButton(
@@ -237,16 +244,11 @@ fun MorphButton(
     }
 }
 
-
 /**
- * How loudly a button speaks, resolved to colours in one place.
- *
- *  - [Tonal]: the standard button.
- *  - [Primary]: the screen's or card's main action.
- *  - [Destructive]: removes or signs out.
+ * How loudly a button speaks, resolved to colours in one place. - [Tonal]: the standard button. -
+ * [Primary]: the screen's or card's main action. - [Destructive]: removes or signs out.
  */
 enum class ButtonEmphasis { Tonal, Primary, Destructive }
-
 
 @Composable
 internal fun ButtonEmphasis.container(): Color = when (this) {
@@ -255,7 +257,6 @@ internal fun ButtonEmphasis.container(): Color = when (this) {
     ButtonEmphasis.Destructive -> MaterialTheme.colorScheme.errorContainer
 }
 
-
 @Composable
 internal fun ButtonEmphasis.content(): Color = when (this) {
     ButtonEmphasis.Tonal -> MaterialTheme.colorScheme.onSurface
@@ -263,8 +264,9 @@ internal fun ButtonEmphasis.content(): Color = when (this) {
     ButtonEmphasis.Destructive -> MaterialTheme.colorScheme.onErrorContainer
 }
 
-
-/** A text-only [MorphButton] used wherever a plain labelled button is needed (dialogs, settings). */
+/**
+ * A text-only [MorphButton] used wherever a plain labelled button is needed (dialogs, settings).
+ */
 @Composable
 fun MorphTextButton(
     text: String,
@@ -315,7 +317,6 @@ fun MorphTextButton(
     }
 }
 
-
 /** [MorphTextButton] that owns its interaction source and wraps itself in [SafeExpansiveButton]. */
 @Composable
 fun SafeMorphTextButton(
@@ -330,14 +331,18 @@ fun SafeMorphTextButton(
     showIcon: Boolean = true,
     pending: Boolean = false,
     groupWeight: Float = GroupWeightProportional,
-    /** False for a button sharing its row with other content: it keeps the small press push instead of widening. */
+    /**
+     * False for a button sharing its row with other content: it keeps the small press push instead
+     * of widening.
+     */
     fillOnPress: Boolean = true,
 ) {
     val source = remember { MutableInteractionSource() }
     SafeExpansiveButton(
         interactionSource = source,
         enabled = enabled,
-        // The group reads the wrapper, so the weight must be declared here, not only on the inner button.
+        // The group reads the wrapper, so the weight must be declared here, not only on the inner
+        // button.
         groupWeight = groupWeight,
         fillOnPress = fillOnPress,
     ) {
@@ -358,13 +363,9 @@ fun SafeMorphTextButton(
     }
 }
 
-
 /**
- * **The** standard action button: a glyph, a label, a tonal fill and a hairline rim.
- *
- * Padding is 18dp/8dp on the shared [ButtonTargetHeight]. Not for destructive actions, a screen's
- * primary CTA (`active = true`), toggles (StateControl), pickers ([MorphSegmented]) or tertiary
- * links ([MorphTextButton]).
+ * **The** standard action button: a glyph, a label, a tonal fill and a hairline rim. Padding is
+ * 18dp/8dp on the shared [ButtonTargetHeight].
  */
 @Composable
 fun MorphActionButton(
@@ -402,23 +403,20 @@ fun MorphActionButton(
         contentColor = if (emphasis == ButtonEmphasis.Tonal) MaterialTheme.colorScheme.onSecondaryContainer else emphasis.content(),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
     ) {
-        // The shared label gives the glyph its standard gap and lets a cramped group know how small it can get.
+        // The shared label gives the glyph its standard gap and lets a cramped group know how small
+        // it can get.
         MorphButtonLabel(icon, label, pending = pending)
     }
 }
 
-
 /** Every button in the app is this tall, so a row of them lines up whatever it contains. */
 val ButtonTargetHeight = 48.dp
-
 
 /** The glyph beside a label. One size for push buttons, chips and cover actions alike. */
 val ButtonIconSize = 18.dp
 
-
 /** The glyph in a label-less button (the expand chevron); larger because the icon IS the button. */
 val ButtonIconOnlySize = 24.dp
-
 
 /** The one label style every button uses. */
 val ButtonLabelStyle: TextStyle

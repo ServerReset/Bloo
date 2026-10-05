@@ -45,7 +45,10 @@ import kotlin.math.roundToInt
 internal fun weatherIcon(code: WeatherCode, isDay: Boolean): ImageVector =
     com.bloo.uicommon.weatherIcon(code.toCode(), isDay)
 
-/** A weather symbol in its condition's own tint -- the icon + tint + size every weather surface repeated. */
+/**
+ * A weather symbol in its condition's own tint -- the icon + tint + size every weather surface
+ * repeated.
+ */
 @Composable
 internal fun WeatherGlyph(code: WeatherCode, isDay: Boolean, size: Dp, describe: Boolean = true) {
     Icon(
@@ -61,9 +64,9 @@ internal fun weatherTint(code: WeatherCode, isDay: Boolean): Color =
     com.bloo.uicommon.weatherTint(code.toCode(), isDay, MaterialTheme.colorScheme.onSurfaceVariant)
 
 /**
- * A compact one-line weather readout: icon, temperature and condition, with a
- * small caption (place name) underneath. Used inside the Location pebble when it
- * renders collapsed on the cover, where the full [WeatherBlock] has no room.
+ * A compact one-line weather readout: icon, temperature and condition, with a small caption (place
+ * name) underneath. Used inside the Location pebble when it renders collapsed on the cover, where
+ * the full [WeatherBlock] has no room.
  */
 @Composable
 internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: String) {
@@ -88,15 +91,9 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
 }
 
 /**
- * The full, information-dense weather block for ONE location: a big current
- * conditions hero (icon, temperature, condition), the next several hours as a
- * horizontal strip, the day's detail rows (feels-like/humidity/wind/high-low) and a
- * multi-day forecast. This is the redesigned replacement for the old
- * [WeatherDetail], which showed only current conditions.
- *
- * [title] labels which location this is ("At the car" / "Your location" / the merged
- * "Here & at the car"); it is shown as a small caption so two stacked blocks are
- * distinguishable at a glance. [subtitle] is the place name when one is known.
+ * The full, information-dense weather block for ONE location: a big current conditions hero (icon,
+ * temperature, condition), the next several hours as a horizontal strip, the day's detail rows
+ * (feels-like/humidity/wind/high-low) and a multi-day forecast.
  */
 @Composable
 internal fun WeatherBlock(
@@ -106,9 +103,9 @@ internal fun WeatherBlock(
     title: String,
     subtitle: String? = null,
     /**
-     * When true this is one half of a merged (car and phone co-located) readout, so the
-     * block drops its own heading and the surrounding [WeatherLocations] draws one shared
-     * heading instead -- avoids saying "Here & at the car" twice.
+     * When true this is one half of a merged (car and phone co-located) readout, so the block drops
+     * its own heading and the surrounding [WeatherLocations] draws one shared heading instead --
+     * avoids saying "Here & at the car" twice.
      */
     merged: Boolean = false,
 ) {
@@ -134,7 +131,10 @@ private fun WeatherLocationHeading(title: String, subtitle: String?, weather: We
     }
 }
 
-/** The big current-conditions hero: 64dp condition icon, display-temperature, condition + feels-like. */
+/**
+ * The big current-conditions hero: 64dp condition icon, display-temperature, condition +
+ * feels-like.
+ */
 @Composable
 private fun CurrentConditions(weather: Weather, fahrenheit: Boolean, tint: Color) {
     Row(
@@ -159,16 +159,12 @@ private fun CurrentConditions(weather: Weather, fahrenheit: Boolean, tint: Color
 }
 
 /**
- * The next several hours as a horizontal strip: hourly cell (hour, icon, temperature,
- * optional precip %). Starts at the hour nearest the reading so the leftmost cell is
- * "now"-ish rather than the API's midnight. Scrolls horizontally when more hours exist
- * than fit, so a glance lands on the nearest hours first.
+ * The next several hours as a horizontal strip: hourly cell (hour, icon, temperature, optional
+ * precip %). Scrolls horizontally when more hours exist than fit, so a glance lands on the nearest
+ * hours first.
  */
 @Composable
 private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
-    // Nearest hour to whenever the reading was fetched, so the strip is anchored to "now".
-    // HourPoint.time is the LOCATION's local wall-clock; the device's hour is a good-enough
-    // proxy for "which cell is now" and avoids re-parsing the API's zone-offset strings.
     val nowHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
     val startIndex = weather.hourly.indexOfFirst { (it.hour ?: 0) >= nowHour }.coerceAtLeast(0)
     val hours = weather.hourly.drop(startIndex).take(12)
@@ -239,9 +235,9 @@ private fun WeatherDetailRows(weather: Weather, fahrenheit: Boolean, metric: Boo
 }
 
 /**
- * The multi-day forecast: one row per day, "Today" for the first, weekday name
- * otherwise, with an icon, condition word and the day's high/low. The first
- * [MAX_FORECAST_DAYS] days are shown so the card stays bounded.
+ * The multi-day forecast: one row per day, "Today" for the first, weekday name otherwise, with an
+ * icon, condition word and the day's high/low. The first [MAX_FORECAST_DAYS] days are shown so the
+ * card stays bounded.
  */
 @Composable
 private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
@@ -291,10 +287,8 @@ private fun weekdayName(date: String): String {
 }
 
 /**
- * How close (miles) the phone must be to the car for their two weather blocks to be
- * merged into one "Here & at the car" readout rather than shown as two. Roughly
- * "same neighbourhood" -- close enough that the car's weather and yours are the same
- * weather, so showing two copies would be redundant.
+ * How close (miles) the phone must be to the car for their two weather blocks to be merged into one
+ * "Here & at the car" readout rather than shown as two.
  */
 private const val WEATHER_MERGE_MILES = 7.0
 
@@ -302,13 +296,9 @@ private const val WEATHER_MERGE_MILES = 7.0
 private const val MAX_FORECAST_DAYS = 5
 
 /**
- * The Location pebble's weather: the car's weather and (when the phone has a fix) the
- * phone's own, as either ONE merged block when you are within [WEATHER_MERGE_MILES] of
- * the car, or TWO clearly-labelled blocks when you are not. The merged case draws a
- * single shared heading and one set of current/forecast content (the two are the same
- * weather), while the separate case labels each location so a glance tells them apart.
- *
- * [place] is the car location's place name, [devicePlace] the phone's (may be null).
+ * The Location pebble's weather: the car's weather and (when the phone has a fix) the phone's own,
+ * as either ONE merged block when you are within [WEATHER_MERGE_MILES] of the car, or TWO
+ * clearly-labelled blocks when you are not.
  */
 @Composable
 internal fun WeatherLocations(
@@ -351,35 +341,13 @@ internal fun WeatherLocations(
 
 // --- Service & links ------------------------------------------------------
 
-
-/**
- * The one safe Activity launch.
- *
- * `startActivity` from a non-Activity Context (`Application`, a `BroadcastReceiver`) throws
- * unless `FLAG_ACTIVITY_NEW_TASK` is set, and throws again when no app can serve the intent —
- * so every open-a-thing helper used to hand-roll the same `addFlags` + `runCatching` pair, of
- * which the codebase had accumulated several (maps, custom tabs, dial, share, release pages,
- * the OTA installer). All of them route through this now, so "can I open this" is answered
- * exactly once and a new external-intent surface can't silently skip the guard.
- *
- * True when something actually launched, so callers that need to know fell-back from served
- * (the update tile's "you must dismiss it yourself" path) can tell the difference; silently
- * ignoring a failed open is how an action button starts reading as dead.
- */
+/** The one safe Activity launch. */
 internal fun Context.tryStart(intent: Intent): Boolean = runCatching {
     if (this !is android.app.Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     startActivity(intent)
 }.isSuccess
 
-/**
- * The one permission check.
- *
- * Five objects kept a `fun hasPermission(context)` that differed only in the permission
- * string and the OS level where the check stops being needed — and each had to be re-read
- * (or, more often, forgotten) by every new caller. One extension answers it: [minSdk]
- * encodes "below this OS level the permission is unconditionally granted", so a caller
- * states the OS-version knowledge it already has rather than re-deriving it.
- */
+/** The one permission check. */
 @Suppress("ObsoleteSdkInt") // minSdk is a caller-supplied OS level, not a literal
 internal fun Context.hasPermission(permission: String, minSdk: Int = 1): Boolean =
     android.os.Build.VERSION.SDK_INT < minSdk ||
@@ -387,11 +355,8 @@ internal fun Context.hasPermission(permission: String, minSdk: Int = 1): Boolean
             android.content.pm.PackageManager.PERMISSION_GRANTED
 
 /**
- * Opens the car's location in the device's default Maps app -- a `geo:` intent
- * rather than hardcoding Google Maps, since the OS resolves it to whatever the user
- * actually has set. Shared by [LocationPebble]'s own "Open in maps" button and
- * [CarMapFullScreenDialog]'s [MapFeature] row so the two never drift on the URI
- * format.
+ * Opens the car's location in the device's default Maps app -- a `geo:` intent rather than
+ * hardcoding Google Maps, since the OS resolves it to whatever the user actually has set.
  */
 internal fun openInExternalMaps(context: Context, location: GeoLocation, label: String) {
     val uri = (
@@ -402,10 +367,8 @@ internal fun openInExternalMaps(context: Context, location: GeoLocation, label: 
 }
 
 /**
- * Shares the car's location through the system share sheet -- a Google-Maps link, so any
- * receiving app can resolve it. The second real [MapFeature] the expanded map's bottom row
- * gained (see [MapFeatureRow]); the share chooser is deliberately the OS's own, not a
- * hand-rolled contact picker.
+ * Shares the car's location through the system share sheet -- a Google-Maps link, so any receiving
+ * app can resolve it.
  */
 internal fun shareLocation(context: Context, location: GeoLocation, label: String) {
     val text = "$label: https://maps.google.com/?q=${location.latitude},${location.longitude}"
@@ -439,16 +402,16 @@ internal fun dial(context: Context, number: String) {
     context.tryStart(Intent(Intent.ACTION_DIAL, "tel:$number".toUri()))
 }
 
-
-/** How wide the strip's soft edge is: cells blur and fade as they slide into it and sharpen as they leave it. */
+/**
+ * How wide the strip's soft edge is: cells blur and fade as they slide into it and sharpen as they
+ * leave it.
+ */
 private val ScrollEdgeFade = 72.dp
 
 /**
  * A cell of a horizontally scrolling strip that melts into blur as it nears an edge that has more
- * content past it, and comes back into focus as it scrolls toward the middle -- the same soft edge a
- * faded list has, with focus going as well as opacity. An edge with nothing beyond it stays sharp, so a
- * strip at rest is never blurry. Everything is read in the layer block, so scrolling re-records the
- * layer only, never recomposes; [blur] false (battery saver, pre-Android 12) keeps just the fade.
+ * content past it, and comes back into focus as it scrolls toward the middle -- the same soft edge
+ * a faded list has, with focus going as well as opacity.
  */
 @Composable
 private fun Modifier.scrollEdgeBlur(scroll: ScrollState, viewportPx: androidx.compose.runtime.State<Int>, blur: Boolean): Modifier {

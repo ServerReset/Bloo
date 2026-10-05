@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -52,7 +51,10 @@ import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
-/** The pebble header's title line, with an optional trailing stat beside the name or pushed to the far end. */
+/**
+ * The pebble header's title line, with an optional trailing stat beside the name or pushed to the
+ * far end.
+ */
 @Composable
 internal fun PebbleTitleRow(
     title: String,
@@ -62,9 +64,8 @@ internal fun PebbleTitleRow(
     titleTrailing: (@Composable () -> Unit)?,
     titleTrailingAtEnd: Boolean,
 ) {
-    // The hero title grows on expand via a slow, lightly bouncy spring (damping 0.62, StiffnessVeryLow) so
-    // intermediate sizes read as motion. Collapse is critically damped at PebbleBounceStiffness so the name
-    // finishes shrinking with the card frame. Other pebbles target a constant 0 and never animate.
+    // The hero title grows on expand via a slow, lightly bouncy spring (damping 0.62,
+    // StiffnessVeryLow) so intermediate sizes read as motion.
     val expandingTitle = expanded && growTitleOnExpand
     val headerTState = animateFloatAsState(
         targetValue = if (expandingTitle) 1f else 0f,
@@ -75,32 +76,33 @@ internal fun PebbleTitleRow(
         },
         label = "pebbleHeaderGrow",
     )
-    // Drawn at the larger size and scaled down (draw phase only): animating the font size would relayout
-    // the text every frame (single-slot ParagraphLayoutCache). Scaling down keeps glyphs crisp.
+    // Drawn at the larger size and scaled down (draw phase only): animating the font size would
+    // relayout the text every frame (single-slot ParagraphLayoutCache). Scaling down keeps glyphs
+    // crisp.
     val titleStyle = MaterialTheme.typography.headlineSmall
     // Ratio of the real type steps, so the collapsed size equals titleMedium exactly.
     val collapsedTitleScale = with(LocalDensity.current) {
         MaterialTheme.typography.titleMedium.fontSize.toPx() /
             MaterialTheme.typography.headlineSmall.fontSize.toPx()
     }
-    // Plain arithmetic: the Float `lerp` overload is not imported here.
-    // A lambda so each reader pulls the current value in its own phase.
+    // Plain arithmetic: the Float `lerp` overload is not imported here. A lambda so each reader
+    // pulls the current value in its own phase.
     val titleScale: () -> Float = if (!growTitleOnExpand) {
         { collapsedTitleScale }
     } else {
         { collapsedTitleScale + (1f - collapsedTitleScale) * headerTState.value }
     }
-    // True when the title is at its collapsed rest size (every non-hero pebble, or the hero settled near 0).
-    // Rest renders a native titleMedium Text so its baseline matches the hero numbers beside it.
-    // The 0.02f threshold (not 0f) fires the swap before animateFloatAsState's internal snap, so the
-    // Crossfade absorbs the last bit of motion and the spring can't leave it stuck on the scaled path.
+    // True when the title is at its collapsed rest size (every non-hero pebble, or the hero settled
+    // near 0). Rest renders a native titleMedium Text so its baseline matches the hero numbers
+    // beside it.
     val atRestScale = !growTitleOnExpand || headerTState.value < 0.02f
     Row(
-        // Stretched only when the trailing slot is pushed to the end; otherwise stays shrink-wrapped.
+        // Stretched only when the trailing slot is pushed to the end; otherwise stays
+        // shrink-wrapped.
         modifier = if (titleTrailingAtEnd) Modifier.fillMaxWidth() else Modifier,
         verticalAlignment = Alignment.CenterVertically,
-        // SpaceBetween (not a filled title) pushes the trailing slot to the far end without measuring
-        // the scaled title wider than its own content.
+        // SpaceBetween (not a filled title) pushes the trailing slot to the far end without
+        // measuring the scaled title wider than its own content.
         horizontalArrangement = if (titleTrailingAtEnd) {
             Arrangement.SpaceBetween
         } else {
@@ -109,13 +111,14 @@ internal fun PebbleTitleRow(
     ) {
     // Title modifier chain shared by both branches below.
     val titleBaseModifier = Modifier
-        // fill = false: weight caps the max width so long titles ellipsize, without forcing a wide box.
+        // fill = false: weight caps the max width so long titles ellipsize, without forcing a wide
+        // box.
         .weight(1f, fill = false)
         // Minimum gap before titleTrailing, on the title so SpaceBetween still sees two children.
         .then(if (titleTrailingAtEnd) Modifier.padding(end = 12.dp) else Modifier)
     if (growTitleOnExpand) {
-        // Only the hero flips atRestScale. The Crossfade hides the pop when the scaled and native paths
-        // swap; CenterStart keeps their glyphs aligned despite differing box heights.
+        // Only the hero flips atRestScale. The Crossfade hides the pop when the scaled and native
+        // paths swap; CenterStart keeps their glyphs aligned despite differing box heights.
         Box(modifier = titleBaseModifier, contentAlignment = Alignment.CenterStart) {
         Crossfade(
             targetState = atRestScale,
@@ -128,11 +131,11 @@ internal fun PebbleTitleRow(
                     Modifier
                 } else {
                     Modifier
-                        // Reports the drawn size: graphicsLayer scales drawing but not the measured box.
-                        // Measured once at headlineSmall, then sized by the draw scale.
+                        // Reports the drawn size: graphicsLayer scales drawing but not the measured
+                        // box. Measured once at headlineSmall, then sized by the draw scale.
                         .layout { measurable, constraints ->
-                            // Measured against constraints widened by 1/titleScale so the text ellipsizes
-                            // at the width it is actually drawn at.
+                            // Measured against constraints widened by 1/titleScale so the text
+                            // ellipsizes at the width it is actually drawn at.
                             val scale = titleScale()
                             val room = if (constraints.hasBoundedWidth && scale > 0f) {
                                 constraints.copy(
@@ -179,9 +182,8 @@ internal fun PebbleTitleRow(
             overflow = TextOverflow.Ellipsis,
         )
     }
-    // Trailing slot on the title row. No Spacer or styling here; the slot owns both.
-    // A plain Box: child baselines are not forwarded, so alignByBaseline falls back to the box bottom.
-    // AnimatedVisibility with the last non-null content so the exit animation still has a node to fade.
+    // Trailing slot on the title row. No Spacer or styling here; the slot owns both. A plain Box:
+    // child baselines are not forwarded, so alignByBaseline falls back to the box bottom.
     var lastTitleTrailing by remember { mutableStateOf(titleTrailing) }
     if (titleTrailing != null) lastTitleTrailing = titleTrailing
     AnimatedVisibility(

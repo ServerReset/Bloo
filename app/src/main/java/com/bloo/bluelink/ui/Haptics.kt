@@ -8,22 +8,15 @@ import android.os.VibratorManager
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
- * A carefully-tuned haptic vocabulary. Each interaction gets its own *distinct*
- * feel, built from [VibrationEffect] composition primitives on capable motors
- * (API 31+) and graceful waveform fallbacks below that.
- *
- * Intensity is intentionally left to the system/motor; the character of each
- * effect (rhythm, rise/fall, deceleration) is what makes them recognisable.
+ * A carefully-tuned haptic vocabulary. Each interaction gets its own *distinct* feel, built from
+ * [VibrationEffect] composition primitives on capable motors (API 31+) and graceful waveform
+ * fallbacks below that.
  */
 class Haptics(context: Context) {
 
-    // API 31 (S) moved vibrator access behind VibratorManager; below that the vibrator
-    // is fetched directly from the Context (deprecated but still the only path pre-S).
-    // LAZY, not eager: the vibrator service lookup and its capability probes (hasVibrator /
-    // areAllPrimitivesSupported / hasAmplitudeControl) are synchronous Binder calls that used
-    // to run inside Haptics' constructor -- i.e. in the middle of BlooApp's first composition,
-    // on the cold-start critical path, for a capability nothing needs until the user actually
-    // triggers a haptic. Deferring them to first use keeps the first frame free of them.
+    // API 31 (S) moved vibrator access behind VibratorManager; below that the vibrator is fetched
+    // directly from the Context (deprecated but still the only path pre-S). Deferring them to first
+    // use keeps the first frame free of them.
     private val vibrator: Vibrator? by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
@@ -36,9 +29,11 @@ class Haptics(context: Context) {
     @Volatile
     var enabled: Boolean = true
 
-    /** Rich composition primitives are available (API 31+ with hardware support). The SDK
-     *  check stays eager (so the API-30 `add` guard is visible to lint); the hardware probes
-     *  are synchronous Binder calls deferred to first use. */
+    /**
+     * Rich composition primitives are available (API 31+ with hardware support). The SDK check
+     * stays eager (so the API-30 `add` guard is visible to lint); the hardware probes are
+     * synchronous Binder calls deferred to first use.
+     */
     private val composes: Boolean
         @androidx.annotation.ChecksSdkIntAtLeast(api = android.os.Build.VERSION_CODES.S)
         get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && compositionHardware
@@ -54,14 +49,16 @@ class Haptics(context: Context) {
             }.getOrDefault(false)
     }
 
-    /** Whether the motor can vary vibration strength, not just on/off -- gates whether
-     *  [oneShot]/[waveform] pass through a real amplitude or fall back to DEFAULT_AMPLITUDE. */
+    /**
+     * Whether the motor can vary vibration strength, not just on/off -- gates whether
+     * [oneShot]/[waveform] pass through a real amplitude or fall back to DEFAULT_AMPLITUDE.
+     */
     private val hasAmplitude: Boolean by lazy { vibrator?.hasAmplitudeControl() == true }
 
-    /** Central gate every effect funnels through: skips entirely if haptics are disabled,
-     *  there's no effect to play, or the device genuinely has no vibrator motor. Any
-     *  platform exception from the actual vibrate() call is swallowed since a missed
-     *  haptic is never worth crashing over. */
+    /**
+     * Central gate every effect funnels through: skips entirely if haptics are disabled, there's no
+     * effect to play, or the device genuinely has no vibrator motor.
+     */
     private fun play(effect: VibrationEffect?) {
         if (!enabled || effect == null) return
         val v = vibrator ?: return
@@ -69,16 +66,20 @@ class Haptics(context: Context) {
         runCatching { v.vibrate(effect) }
     }
 
-    /** A one-shot fallback for pre-31 devices, honouring amplitude when possible.
-     *  No SDK guard: createOneShot exists since O and the module minSdk is 26. */
+    /**
+     * A one-shot fallback for pre-31 devices, honouring amplitude when possible. No SDK guard:
+     * createOneShot exists since O and the module minSdk is 26.
+     */
     private fun oneShot(ms: Long, amplitude: Int) {
         val amp = if (hasAmplitude) amplitude else VibrationEffect.DEFAULT_AMPLITUDE
         play(VibrationEffect.createOneShot(ms, amp))
     }
 
-    /** Multi-step fallback for devices without composition primitives: [timings] and
-     *  [amplitudes] are parallel arrays alternating off/on segments in milliseconds and
-     *  0-255 strength (the `-1` argument means "don't repeat, play once end-to-end"). */
+    /**
+     * Multi-step fallback for devices without composition primitives: [timings] and [amplitudes]
+     * are parallel arrays alternating off/on segments in milliseconds and 0-255 strength (the `-1`
+     * argument means "don't repeat, play once end-to-end").
+     */
     private fun waveform(timings: LongArray, amplitudes: IntArray) {
         // No SDK guard, same reason as oneShot (minSdk 26 = O).
         if (hasAmplitude) play(VibrationEffect.createWaveform(timings, amplitudes, -1))
@@ -122,8 +123,8 @@ class Haptics(context: Context) {
     }
 
     /**
-     * Pull-to-refresh release: a tumbling "shake the dice" burst — irregular
-     * ticks of varied weight that land on a final knock.
+     * Pull-to-refresh release: a tumbling "shake the dice" burst — irregular ticks of varied weight
+     * that land on a final knock.
      */
     fun diceRoll() {
         if (composes) composed {
@@ -140,14 +141,14 @@ class Haptics(context: Context) {
     }
 
     /**
-     * Slot-machine settle: rapid ticking that decelerates and stops — used when
-     * refreshed numbers roll into place.
+     * Slot-machine settle: rapid ticking that decelerates and stops — used when refreshed numbers
+     * roll into place.
      */
     fun slotSettle() {
         if (composes) {
-            // 16 ticks, each one both later (delay *= 1.22, capped at 150ms) and weaker
-            // (scale *= 0.92, floored at 0.25) than the last -- the growing gap plus
-            // shrinking strength together read as something spinning down to a stop.
+            // 16 ticks, each one both later (delay *= 1.22, capped at 150ms) and weaker (scale *=
+            // 0.92, floored at 0.25) than the last -- the growing gap plus shrinking strength
+            // together read as something spinning down to a stop.
             val c = VibrationEffect.startComposition()
             var delay = 16
             var scale = 0.85f
@@ -175,8 +176,8 @@ class Haptics(context: Context) {
     }
 
     /**
-     * A short left-to-right "sweep" (soft → strong rise), looped by the UI while
-     * something is loading so progress is felt, not just seen.
+     * A short left-to-right "sweep" (soft → strong rise), looped by the UI while something is
+     * loading so progress is felt, not just seen.
      */
     fun loadingSweep() {
         if (composes) composed {
@@ -210,15 +211,16 @@ class Haptics(context: Context) {
 
     // --- Composition helpers --------------------------------------------
 
-    /** Small DSL so each effect above can declare its primitives as a plain `add(...)`
-     *  list instead of manually managing a [VibrationEffect.Composition] builder; wraps
-     *  the whole built sequence into one [play] call once [build] finishes adding steps. */
+    /**
+     * Small DSL so each effect above can declare its primitives as a plain `add(...)` list instead
+     * of manually managing a [VibrationEffect.Composition] builder; wraps the whole built sequence
+     * into one [play] call once [build] finishes adding steps.
+     */
     private inline fun composed(build: CompositionBuilder.() -> Unit) {
-        // startComposition/addPrimitive are API 30+; the `composes` gate above
-        // only lets callers through on API 31+, but the gate lives in a
-        // separate property and lint can't track that -- explicit guard keeps
-        // the invariant self-contained and absolutely crash-proof on
-        // API 26-29 devices (oneShot/waveform covers those).
+        // startComposition/addPrimitive are API 30+; the `composes` gate above only lets callers
+        // through on API 31+, but the gate lives in a separate property and lint can't track that
+        // -- explicit guard keeps the invariant self-contained and absolutely crash-proof on API
+        // 26-29 devices (oneShot/waveform covers those).
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         val c = VibrationEffect.startComposition()
         CompositionBuilder(c).build()
@@ -227,8 +229,6 @@ class Haptics(context: Context) {
 
     @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.R)
     private class CompositionBuilder(val c: VibrationEffect.Composition) {
-        /** [scale] is per-primitive strength (0..1); [delayMs] is the gap before this
-         *  primitive starts, relative to the previous one finishing. */
         fun add(primitive: Int, scale: Float, delayMs: Int) {
             c.addPrimitive(primitive, scale, delayMs)
         }

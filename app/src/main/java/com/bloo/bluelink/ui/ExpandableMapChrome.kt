@@ -77,8 +77,9 @@ internal fun rememberShowMyLocation(
 }
 
 /**
- * The buttons under a map: one [MorphActionButton] per [MapFeature] in the standard [ExpressiveButtonRow]
- * (balanced lines, a press pushes neighbours, a lone button rests at the start edge and widens when pressed).
+ * The buttons under a map: one [MorphActionButton] per [MapFeature] in the standard
+ * [ExpressiveButtonRow] (balanced lines, a press pushes neighbours, a lone button rests at the
+ * start edge and widens when pressed).
  */
 @Composable
 internal fun MapFeatureRow(
@@ -101,11 +102,11 @@ internal fun MapFeatureRow(
 }
 
 /**
- * The one-bar header over an expanded map sheet: name (and status) at start, drag handle centred, refresh at end,
- * positioned independently in one [Box] so the handle stays centred whatever the name length.
- *
- * [onRefreshLocation] null omits the refresh side. [dragModifier] carries the drag-to-dismiss gesture, built by
- * the caller because each call site closes over its own drag state.
+ * The one-bar header over an expanded map sheet: name (and status) at start, drag handle centred,
+ * refresh at end, positioned independently in one [Box] so the handle stays centred whatever the
+ * name length. [onRefreshLocation] null omits the refresh side. [dragModifier] carries the
+ * drag-to-dismiss gesture, built by the caller because each call site closes over its own drag
+ * state.
  */
 @Composable
 internal fun MapTopBar(
@@ -116,11 +117,14 @@ internal fun MapTopBar(
     /** "88% · 415 km": the car's charge and range, under its name. Null leaves the name alone. */
     statusLine: String? = null,
     onRefreshLocation: (() -> Unit)? = null,
-    /** True while the refresh from [onRefreshLocation] is in flight (the real command-pending flag); drives the icon spin. */
+    /**
+     * True while the refresh from [onRefreshLocation] is in flight (the real command-pending flag);
+     * drives the icon spin.
+     */
     refreshing: Boolean = false,
 ) {
-    // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without consuming,
-    // so dragModifier and the refresh click still receive the touch.
+    // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without
+    // consuming, so dragModifier and the refresh click still receive the touch.
     var pillPressed by remember { mutableStateOf(false) }
     val pillScale by animateFloatAsState(
         targetValue = if (pillPressed) 1.04f else 1f,
@@ -141,18 +145,19 @@ internal fun MapTopBar(
             }
             .graphicsLayer { scaleX = pillScale; scaleY = pillScale },
         hazeState = mapHazeState,
-        // No contentColor override: the map follows the app theme (dark filter only in dark mode), so a forced white
-        // glyph vanishes on a light map. GlassSurface's onSurface default tracks the theme and custom palettes.
+        // No contentColor override: the map follows the app theme (dark filter only in dark mode),
+        // so a forced white glyph vanishes on a light map. GlassSurface's onSurface default tracks
+        // the theme and custom palettes.
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .then(dragModifier)
-                // heightIn(min), not fixed: at large font sizes the two-line name + status block exceeds 60dp and would clip.
                 .heightIn(min = 60.dp)
                 .padding(horizontal = 18.dp),
         ) {
-            // Car icon, name, and the charge/range line beneath. Reserves room at the end so the name never runs under the refresh circle.
+            // Car icon, name, and the charge/range line beneath. Reserves room at the end so the
+            // name never runs under the refresh circle.
             Row(
                 Modifier
                     .align(Alignment.CenterStart)
@@ -177,7 +182,8 @@ internal fun MapTopBar(
                     }
                 }
             }
-            // Frosted drag handle, centre-aligned. Purely visual: the pop and drag belong to the whole bar (`dragModifier`).
+            // Frosted drag handle, centre-aligned. Purely visual: the pop and drag belong to the
+            // whole bar (`dragModifier`).
             GlassSurface(
                 shape = CircleShape,
                 modifier = Modifier.align(Alignment.Center).size(width = 44.dp, height = 18.dp),
@@ -193,15 +199,17 @@ internal fun MapTopBar(
             if (onRefreshLocation != null) {
                 // Icon-only; spins while the real pending flag is set.
                 val angle = rememberSpinAngle(refreshing)
-                // 40dp circle, centred in the bar like the handle and name; end padding keeps it off the edge.
+                // 40dp circle, centred in the bar like the handle and name; end padding keeps it
+                // off the edge.
                 GlassSurface(
                     shape = CircleShape,
                     modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp).size(40.dp),
                     hazeState = mapHazeState,
                     onClick = onRefreshLocation,
                     contentDescription = "Refresh location",
-                    // Over the same theme-following map, so it inherits GlassSurface's onSurface default.
-                    // Nested in the bar's elevated GlassSurface, so it skips the second shadow (see glassEdge, GlassChrome.kt).
+                    // Over the same theme-following map, so it inherits GlassSurface's onSurface
+                    // default. Nested in the bar's elevated GlassSurface, so it skips the second
+                    // shadow (see glassEdge, GlassChrome.kt).
                     shadow = false,
                 ) {
                     Icon(
@@ -217,11 +225,9 @@ internal fun MapTopBar(
     }
 }
 
-
 /**
  * The pull-down-to-close drag both map sheets use on their top bar: the sheet follows the finger
  * ([dragPx]), and on release a pull of 96dp or more closes it while anything less springs back.
- * Distance, not velocity: a fixed 96dp pull is a close enough stand-in for "clearly meant to close".
  */
 internal fun Modifier.pullDownToDismiss(
     dragPx: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
@@ -242,7 +248,6 @@ internal fun Modifier.pullDownToDismiss(
         onDragCancel = { scope.launch { dragPx.animateTo(0f, spring) } },
     )
 }
-
 
 /** "88% · 415 km": a car's charge and range for the map pill, or null when it has neither yet. */
 // @Composable because chargeReadoutOf resolves theme locals.

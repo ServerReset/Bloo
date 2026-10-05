@@ -29,9 +29,7 @@ import androidx.compose.ui.unit.dp
 import android.os.Build
 import com.bloo.bluelink.BuildConfig
 
-/**
- * A debug information item shown in DebugSettingsPanel; [copyable] lets a tap copy the value.
- */
+/** A debug information item shown in DebugSettingsPanel; [copyable] lets a tap copy the value. */
 data class DebugInfo(
     val label: String,
     val value: String,
@@ -39,9 +37,7 @@ data class DebugInfo(
     val copyable: Boolean = false,
 )
 
-/**
- * Single debug information row: label, value, optional icon and copy.
- */
+/** Single debug information row: label, value, optional icon and copy. */
 @Composable
 private fun DebugInfoItem(
     info: DebugInfo,
@@ -77,7 +73,8 @@ private fun DebugInfoItem(
             )
         }
 
-        // A vector Icon, not an emoji: consistent with the app's ContentCopy affordance and tintable.
+        // A vector Icon, not an emoji: consistent with the app's ContentCopy affordance and
+        // tintable.
         if (info.copyable && onCopy != null) {
             Icon(
                 Icons.Filled.ContentCopy,
@@ -89,9 +86,7 @@ private fun DebugInfoItem(
     }
 }
 
-/**
- * Collects the debug information (app, device, runtime) shown in DebugSettingsPanel.
- */
+/** Collects the debug information (app, device, runtime) shown in DebugSettingsPanel. */
 @Composable
 fun getDebugInfo(): List<DebugInfo> {
     return listOf(
@@ -146,8 +141,8 @@ fun getDebugInfo(): List<DebugInfo> {
 }
 
 /**
- * Debug settings panel showing technical information about the app and device.
- * [onCopyToClipboard] is called when the user copies a value.
+ * Debug settings panel showing technical information about the app and device. [onCopyToClipboard]
+ * is called when the user copies a value.
  */
 @Composable
 fun DebugSettingsPanel(
@@ -156,7 +151,8 @@ fun DebugSettingsPanel(
 ) {
     val debugInfo = getDebugInfo()
 
-    // No self-styled card: it renders inside SettingsCard("Debug", ...), whose title row already says so.
+    // No self-styled card: it renders inside SettingsCard("Debug", ...), whose title row already
+    // says so.
     Column(modifier.fillMaxWidth()) {
         Text(
             "Tap a copyable value to copy it to the clipboard.",
@@ -165,8 +161,8 @@ fun DebugSettingsPanel(
         )
         Spacer(Modifier.height(GapRow))
 
-        // heightIn is required: the Settings LazyColumn item measures with unbounded max height, which a
-        // vertically scrollable child cannot take (crash).
+        // heightIn is required: the Settings LazyColumn item measures with unbounded max height,
+        // which a vertically scrollable child cannot take (crash).
         LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
             items(debugInfo) { info ->
                 DebugInfoItem(
@@ -197,4 +193,3 @@ fun DebugSettingsPanel(
         }
     }
 }
-

@@ -32,9 +32,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 
 /**
- * A pill track + circular thumb, spring-timed like [MorphButton] instead of
- * the stock Material [Switch]. Purely visual -- [ToggleRow]'s own toggleable()
- * modifier owns the real click target and semantics, so this clears its own.
+ * Purely visual -- [ToggleRow]'s own toggleable() modifier owns the real click target and
+ * semantics, so this clears its own.
  */
 @Composable
 internal fun MorphToggleTrack(checked: Boolean) {
@@ -80,7 +79,6 @@ internal fun MorphToggleTrack(checked: Boolean) {
     }
 }
 
-
 /** One seat's heat + cool capability toggles, shown as two compact filter chips. */
 @Composable
 internal fun SeatConfigRow(
@@ -98,14 +96,10 @@ internal fun SeatConfigRow(
             label,
             Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
-            // The two chips are fixed-width; cap the label so a long seat name at a
-            // large font size wraps at spaces rather than being crushed mid-word.
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.width(GapRow))
-        // A group, so pressing Heat takes width from Cool rather than shoving it -- the pair is
-        // exactly the "several buttons in one space" case, and it was a plain Row.
         ExpressiveButtonRow(spacing = GapRow) {
             MorphChip(selected = heat, onClick = { onHeat(!heat) }, label = "Heat")
             MorphChip(selected = cool, onClick = { onCool(!cool) }, label = "Cool")

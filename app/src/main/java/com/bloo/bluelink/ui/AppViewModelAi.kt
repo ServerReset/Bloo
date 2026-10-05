@@ -10,14 +10,16 @@ import com.bloo.bluelink.data.setAiEnabled
 
 // --- On-device AI (Gemini Nano): summaries, free-form questions, command resolution (extracted from AppViewModel) --
 
-/** The only actions [AppViewModel.aiResolveCommand] may return: exactly the ids VehicleCommandRunner can execute. */
+/**
+ * The only actions [AppViewModel.aiResolveCommand] may return: exactly the ids VehicleCommandRunner
+ * can execute.
+ */
 private val AI_COMMANDS = setOf(
     "lock", "unlock", "charge_on", "charge_off", "climate_on", "climate_off",
     "lights", "horn",
 )
-// charge_limit is deliberately absent: it carries a number a model could get wrong undetectably, so the
-// deterministic parser reads it from the query instead.
-
+// charge_limit is deliberately absent: it carries a number a model could get wrong undetectably, so
+// the deterministic parser reads it from the query instead.
 
 fun AppViewModel.setAiEnabled(value: Boolean) {
     _state.update { it.copy(aiEnabled = value) }
@@ -25,8 +27,8 @@ fun AppViewModel.setAiEnabled(value: Boolean) {
 }
 
 /**
- * Auto-summarize a car (after open/refresh/command) when on-device AI is enabled. Silent: no nudge and
- * no error toast, since the user didn't ask.
+ * Auto-summarize a car (after open/refresh/command) when on-device AI is enabled. Silent: no nudge
+ * and no error toast, since the user didn't ask.
  */
 internal fun AppViewModel.autoSummarize(v: Vehicle) {
     val s = _state.value
@@ -71,7 +73,8 @@ fun AppViewModel.summarizeCar(v: Vehicle) {
                     st.copy(aiBusy = st.aiBusy - v.vin, aiSummaries = st.aiSummaries + (v.vin to s))
                 },
                 onFailure = { e ->
-                    // The exception text is AICore implementation detail: log it, show the user a sentence.
+                    // The exception text is AICore implementation detail: log it, show the user a
+                    // sentence.
                     AppLog.log("⚠ AI summary: ${e.message}")
                     st.copy(aiBusy = st.aiBusy - v.vin, message = "Couldn't summarize ${v.name} right now.")
                 },
@@ -91,7 +94,8 @@ fun AppViewModel.askAi(query: String) {
         val reply = runCatching {
             ai.summarize("Answer this question using only the data below.\nQuestion: $query\n\nData:\n$data")
         }.onFailure { AppLog.log("⚠ AI search: ${it.message}") }.getOrNull()
-        // On failure the card would silently vanish (it renders on `thinking || reply != null`), so say something.
+        // On failure the card would silently vanish (it renders on `thinking || reply != null`), so
+        // say something.
         _state.update {
             it.copy(
                 aiBusy = it.aiBusy - "search",
@@ -110,11 +114,8 @@ internal suspend fun AppViewModel.enhanceCommandParsing(
     enhanceCommandWithAi(query, initialCommand, ai)
 
 /**
- * Maps a free-form command to a structured one the app can run, or null if it cannot be mapped safely.
- *
- * Gemini Nano has no function calling, so it returns one fixed-shape line that is validated: the action
- * must be one of the runner's command ids, and the car must match one of this user's cars by name (the
- * model never supplies a VIN). A hallucination can only produce null, never reach the vehicle.
+ * Maps a free-form command to a structured one the app can run, or null if it cannot be mapped
+ * safely. A hallucination can only produce null, never reach the vehicle.
  */
 suspend fun AppViewModel.aiResolveCommand(query: String): Pair<String, String>? {
     if (!_state.value.aiEnabled || query.isBlank()) return null

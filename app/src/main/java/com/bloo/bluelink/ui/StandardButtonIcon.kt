@@ -55,9 +55,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * The standard glyph for a button label, keyed on the user-facing string so one decision ("Copy takes the
- * copy glyph") lives in one place. Unrecognised labels have no icon and call sites may pass their own;
- * the map is grouped by meaning so a renamed label lands next to its neighbours.
+ * The standard glyph for a button label, keyed on the user-facing string so one decision ("Copy
+ * takes the copy glyph") lives in one place.
  */
 fun standardButtonIcon(label: String): ImageVector? = when (label) {
     // Dismissive
@@ -96,10 +95,9 @@ fun standardButtonIcon(label: String): ImageVector? = when (label) {
     else -> null
 }
 
-
 /**
- * Standard leading slot for a [MorphButton]: shows the [icon], or a same-sized
- * spinner while [pending], so the button width never changes just from loading.
+ * Standard leading slot for a [MorphButton]: shows the [icon], or a same-sized spinner while
+ * [pending], so the button width never changes just from loading.
  */
 @Composable
 private fun MorphButtonGlyph(
@@ -113,7 +111,8 @@ private fun MorphButtonGlyph(
         LoadingIndicator(Modifier.size(iconSize))
     } else {
         val angle = rememberSpinAngle(spinning)
-        // The glyph cross-fades on change; the spin is applied in the draw phase so `angle` never recomposes the Icon per frame.
+        // The glyph cross-fades on change; the spin is applied in the draw phase so `angle` never
+        // recomposes the Icon per frame.
         androidx.compose.animation.Crossfade(
             targetState = icon,
             modifier = Modifier.size(iconSize).graphicsLayer { rotationZ = angle.value },
@@ -123,7 +122,8 @@ private fun MorphButtonGlyph(
             Icon(
                 glyph,
                 contentDescription = null,
-                // Unspecified falls back to the content colour; Icon would otherwise draw the vector's own colours.
+                // Unspecified falls back to the content colour; Icon would otherwise draw the
+                // vector's own colours.
                 tint = if (tint.isSpecified) tint else LocalContentColor.current,
                 modifier = Modifier.size(iconSize),
             )
@@ -131,16 +131,13 @@ private fun MorphButtonGlyph(
     }
 }
 
-
 /** The gap between a button's glyph and its label. */
 val ButtonIconGap = 8.dp
 
-
 /**
- * A button's glyph and label as one layout that drops the label when it lacks room, the app's fit rule.
- *
- * Intrinsics carry the contract: maxIntrinsicWidth is glyph + gap + label, minIntrinsicWidth the glyph alone.
- * The label is shown whole or not at all, never ellipsized or wrapped (which would change the row height mid-press).
+ * A button's glyph and label as one layout that drops the label when it lacks room, the app's fit
+ * rule. Intrinsics carry the contract: maxIntrinsicWidth is glyph + gap + label, minIntrinsicWidth
+ * the glyph alone.
  */
 @Composable
 fun MorphButtonLabel(
@@ -149,7 +146,10 @@ fun MorphButtonLabel(
     pending: Boolean,
     iconSize: Dp = ButtonIconSize,
     spinning: Boolean = false,
-    /** An accent for the glyph alone, where it carries state the label doesn't; Unspecified uses the content colour. */
+    /**
+     * An accent for the glyph alone, where it carries state the label doesn't; Unspecified uses the
+     * content colour.
+     */
     iconTint: Color = Color.Unspecified,
 ) {
     // Icon only: skip the Layout so no gap is reserved and the glyph stays centred.
@@ -158,7 +158,8 @@ fun MorphButtonLabel(
         return
     }
     val gap = ButtonIconGap
-    // Lets the enclosing MorphButton learn the label and whether it shrank to its symbol (for the long-press hint).
+    // Lets the enclosing MorphButton learn the label and whether it shrank to its symbol (for the
+    // long-press hint).
     val hint = LocalLabelHint.current
     SideEffect { hint?.describe(label, icon) }
     Layout(
@@ -183,10 +184,12 @@ fun MorphButtonLabel(
                     val gapPx = gap.roundToPx()
                     val free = constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity, minHeight = 0)
                     val glyph = measurables[0].measure(free)
-                    // Measure the label unbounded under the same `free` constraints so Compose caches its layout;
-                    // maxIntrinsicWidth() re-laid it out every frame of a button-group press.
+                    // Measure the label unbounded under the same `free` constraints so Compose
+                    // caches its layout; maxIntrinsicWidth() re-laid it out every frame of a
+                    // button-group press.
                     val text = measurables[1].measure(free)
-                    // Whole label or no label; a symbol-only button shows its name on long press (see LabelHint).
+                    // Whole label or no label; a symbol-only button shows its name on long press
+                    // (see LabelHint).
                     if (constraints.maxWidth < glyph.width + gapPx + text.width) {
                         val w = glyph.width.coerceAtMost(constraints.maxWidth)
                         // Height still accounts for the undrawn label.
@@ -231,6 +234,5 @@ fun MorphButtonLabel(
         },
     )
 }
-
 
 // --- Pebble (expandable, reorderable section) -----------------------------

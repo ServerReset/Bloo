@@ -37,11 +37,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.first
 
-/**
- * A Wear OS companion shown UNDER the phone it belongs to, not as a peer row. Deliberately not a
- * [SyncDeviceRow]: a watch has no drag handle and no star, because it depends on its phone.
- * [onRemove] is null for a live Data Layer watch -- pairing is managed by Wear OS, not by Bloo.
- */
+/** A Wear OS companion shown UNDER the phone it belongs to, not as a peer row. */
 @Composable
 fun WearCompanionRow(
     name: String,
@@ -95,7 +91,6 @@ fun WearCompanionRow(
     }
 }
 
-
 /**
  * An action hanging off a device row in the sync list: the standard button with a one-line caption
  * under it, indented to sit under the device it belongs to. "Set up watch" and "Sign watch in" are
@@ -118,32 +113,22 @@ fun CompanionActionRow(label: String, caption: String, modifier: Modifier = Modi
     }
 }
 
-
 /**
- * The Google Drive sync setup dialog, shared between onboarding and the
- * Settings "Backup & sync" card so both look and behave identically (they
- * used to be two separately hand-rolled dialogs -- one BlooDialog, one plain
- * AlertDialog with an awkward confirmButton/dismissButton split -- that had
- * drifted out of sync with each other). Two tappable choice cards instead of
- * three same-weight text buttons, so "start fresh" vs. "join an existing
- * sync" reads as an actual decision rather than an arbitrary button order.
+ * Two tappable choice cards instead of three same-weight text buttons, so "start fresh" vs. "join
+ * an existing sync" reads as an actual decision rather than an arbitrary button order.
  */
 @Composable
 internal fun DriveSyncSetupDialog(
     onDismissRequest: () -> Unit,
     onSaveToDrive: () -> Unit,
     onOpenFromDrive: () -> Unit,
-    // True when this device has synced before / knows about other devices. In
-    // that case "Save to Drive" would create a SEPARATE new file (Google Drive
-    // allows duplicate names) — the exact trap that leaves two devices on two
-    // files that never converge — so it's gated behind a warning + confirm, and
-    // "Open from Drive" (join the existing file) is emphasized as the right path.
+    // True when this device has synced before / knows about other devices.
     hasExistingSync: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
-    // Local warning step: first tap of "Save to Drive" while already synced flips
-    // this on and swaps the row for a warning + explicit "Create anyway"; the
-    // recommended action is to join the existing file instead.
+    // Local warning step: first tap of "Save to Drive" while already synced flips this on and swaps
+    // the row for a warning + explicit "Create anyway"; the recommended action is to join the
+    // existing file instead.
     var warnNewFile by remember { mutableStateOf(false) }
     GlassAlertDialog(
         onDismissRequest = onDismissRequest,
@@ -154,9 +139,9 @@ internal fun DriveSyncSetupDialog(
                 "Keep settings in sync across devices with one Drive file.",
                 color = scheme.onSurfaceVariant,
             )
-            // Join first — it's the correct choice when another device already set
-            // sync up, and making it the emphasized (active) card steers people away
-            // from accidentally creating a second file.
+            // Join first — it's the correct choice when another device already set sync up, and
+            // making it the emphasized (active) card steers people away from accidentally creating
+            // a second file.
             DriveSyncChoiceRow(
                 icon = Icons.Filled.FileOpen,
                 title = "Open from Drive",
@@ -201,7 +186,6 @@ internal fun DriveSyncSetupDialog(
     )
 }
 
-
 @Composable
 internal fun DriveSyncChoiceRow(
     icon: ImageVector,
@@ -211,9 +195,8 @@ internal fun DriveSyncChoiceRow(
     // Highlights this choice as the recommended one (filled/active MorphButton).
     emphasized: Boolean = false,
 ) {
-    // The app's standard button component (MorphButton), not a bespoke
-    // Surface row -- so this dialog's actions look and feel like every other
-    // button in the app instead of a one-off.
+    // The app's standard button component (MorphButton), not a bespoke Surface row -- so this
+    // dialog's actions look and feel like every other button in the app instead of a one-off.
     MorphButton(
         onClick = onClick,
         active = emphasized,

@@ -36,30 +36,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
-/**
- * A coarse, self-ticking "x min ago" string for [millis] (null → null).
- *
- * Holds the LABEL in state rather than a clock, which is the whole efficiency of it. A
- * `mutableStateOf` write only invalidates readers when the value actually changes, so a tick
- * that recomputes "4h ago" and finds "4h ago" costs nothing at all. The previous version kept
- * `now` in state and returned a value derived from it, so every tick invalidated its caller
- * unconditionally -- for a car refreshed hours ago that was 120 recompositions an hour, each
- * producing a byte-identical string, at three or four call sites, times however many car pages
- * the pager holds live.
- *
- * The interval now matches the label's own resolution instead of being a flat 30s. Under a
- * minute the text really does change every few seconds, so tick at 10s; under an hour it can
- * only change once a minute; past that it cannot change more than every quarter of an hour.
- * Strictly more responsive at the fine end and ~30x less work at the coarse end.
- *
- * Also gone: `if (now >= 0)`, which was always true (it tested a wall-clock millis) and existed
- * only to make the composable read the state and thus subscribe to the timer. It worked, but a
- * condition that cannot be false is a trap for the next reader -- holding the label in state
- * makes the subscription honest and the guard unnecessary.
- *
- * The bucket thresholds themselves stay in shared/relativeLabel(), which owns them; this had
- * drifted from that once already ("d ago" here vs "day ago" there).
- */
+/** Holds the LABEL in state rather than a clock, which is the whole efficiency of it. */
 @Composable
 internal fun rememberRelativeTime(millis: Long?): String? {
     if (millis == null) return null
@@ -82,27 +59,21 @@ internal fun rememberRelativeTime(millis: Long?): String? {
     return label
 }
 
-
 /**
- * A clean, fully custom slider: a rounded track with an accent fill, subtle step
- * ticks, and a circular thumb that springs to the nearest step. Drawn entirely on
- * a Canvas (no Material Slider) so its look is consistent and theme-driven.
+ * A clean, fully custom slider: a rounded track with an accent fill, subtle step ticks, and a
+ * circular thumb that springs to the nearest step.
  */
 @Composable
 internal fun AnimatedSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
-    // No default and never zero: every slider in the app picks from fixed values, none are free.
     steps: Int,
     accent: Color = MaterialTheme.colorScheme.primary,
-    // Fired once, with the final value, when the drag/tap settles — for callers
-    // whose real commit is expensive (see the Vibrancy/UI-scale sliders, which
-    // otherwise call onValueChange on every drag tick and each one recomposes
-    // the whole app since they feed BlooTheme's colorScheme/LocalDensity). Those
-    // should update local/visual state cheaply in onValueChange and do the
-    // actual expensive write here instead, matching "sync on commit" everywhere
-    // else in the app.
+    // Fired once, with the final value, when the drag/tap settles — for callers whose real commit
+    // is expensive (see the Vibrancy/UI-scale sliders, which otherwise call onValueChange on every
+    // drag tick and each one recomposes the whole app since they feed BlooTheme's
+    // colorScheme/LocalDensity).
     onValueSettled: ((Float) -> Unit)? = null,
 ) {
     val haptics = LocalHaptics.current
@@ -123,7 +94,6 @@ internal fun AnimatedSlider(
     )
 }
 
-
 @Composable
 internal fun WiggleText(
     text: String,
@@ -143,11 +113,10 @@ internal fun WiggleText(
     )
 }
 
-
 /**
- * Softly fades the top/bottom [length] of a vertically scrolling area instead of
- * hard-clipping it at the bounds. The fade only appears on an edge that has more
- * content past it, and eases in as you scroll toward it.
+ * Softly fades the top/bottom [length] of a vertically scrolling area instead of hard-clipping it
+ * at the bounds. The fade only appears on an edge that has more content past it, and eases in as
+ * you scroll toward it.
  */
 internal fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modifier = this
     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -180,14 +149,7 @@ internal fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modi
         }
     }
 
-
-
-/**
- * Shared state for dragging a pebble onto (or off) the dual-column hot spot. The
- * dragged section and the live finger position (window coords) are tracked here,
- * and the hot-spot slot publishes its window bounds so we can tell when a drag is
- * hovering it.
- */
+/** Shared state for dragging a pebble onto (or off) the dual-column hot spot. */
 internal class HotSeatDrag {
     var section by mutableStateOf<String?>(null)
     var pointer by mutableStateOf(Offset.Zero)
@@ -199,13 +161,13 @@ internal class HotSeatDrag {
             pointer.y in slotTopLeft.y..(slotTopLeft.y + slotSize.height)
 }
 
-
 internal val LocalHotSeatDrag = staticCompositionLocalOf<HotSeatDrag?> { null }
 
-
-/** Trivial full-size [Box] wrapper; exists as a distinct composable purely so
- *  the hot-seat drag machinery has a single, stable, named host to reason
- *  about/hang [LocalHotSeatDrag] state around rather than an anonymous Box. */
+/**
+ * Trivial full-size [Box] wrapper; exists as a distinct composable purely so the hot-seat drag
+ * machinery has a single, stable, named host to reason about/hang [LocalHotSeatDrag] state around
+ * rather than an anonymous Box.
+ */
 @Composable
 internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
     Box(Modifier.fillMaxSize()) { content() }

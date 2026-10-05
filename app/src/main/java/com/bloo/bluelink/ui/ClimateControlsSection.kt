@@ -1,8 +1,8 @@
 package com.bloo.bluelink.ui
 
 /**
- * Climate controls: ClimatePebble, SeatControl, seatTint, preset section,
- * PresetPill, ChargeLimitPill -- extracted from Pebbles.kt.
+ * Climate controls: ClimatePebble, SeatControl, seatTint, preset section, PresetPill,
+ * ChargeLimitPill -- extracted from Pebbles.kt.
  */
 
 import androidx.compose.animation.AnimatedContent
@@ -37,9 +37,7 @@ import kotlin.math.roundToInt
 
 /**
  * The climate pebble's controls -- temperature, run time, defrost, steering-wheel and seat heat,
- * and Save as preset -- peeled out of [ClimatePebble]. State lives in the pebble (the running
- * request, presets and the car's own settings all read and write it), so this takes each value and
- * its setter. While [locked] (climate is running) the whole block sits behind glass.
+ * and Save as preset -- peeled out of [ClimatePebble].
  */
 @Composable
 internal fun ClimateControlsSection(
@@ -76,12 +74,11 @@ internal fun ClimateControlsSection(
         ) {
             Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 MutedText("Set temperature")
-                // color resolved explicitly to onSurface -- same fix, same reason as
-                // the update pebble's own AnimatedValue calls: BasicText (which this
-                // renders through) doesn't fall back to LocalContentColor the way a
-                // plain Text() does, so this rendered unreadably dark instead of
-                // standing out against the muted label beside it -- the value, not
-                // the label, is the important half of this row.
+                // color resolved explicitly to onSurface -- same fix, same reason as the update
+                // pebble's own AnimatedValue calls: BasicText (which this renders through) doesn't
+                // fall back to LocalContentColor the way a plain Text() does, so this rendered
+                // unreadably dark instead of standing out against the muted label beside it -- the
+                // value, not the label, is the important half of this row.
                 com.bloo.uicommon.AnimatedValue(
                     degLabel(tempF.toString(), fahrenheit),
                     style = MaterialTheme.typography.bodySmall.copy(
@@ -93,16 +90,10 @@ internal fun ClimateControlsSection(
             }
         }
 
-        // Was a hand-rolled version of the same blue->green->warm mapping
-        // uicommon.tempColor() now centralizes (an earlier copy had drifted to
-        // a different, unanimated palette).
         val tempRange = CLIMATE_TEMP_RANGE_F.first.toFloat()..CLIMATE_TEMP_RANGE_F.last.toFloat()
         val tempColor = com.bloo.uicommon.tempColor(tempF, tempRange.start, tempRange.endInclusive)
-        // The label + value readout is the same in either unit -- only degLabel's
-        // suffix (°F/°C) and the slider below differ -- so it's hoisted out of the
-        // branch. RollingNumber (used for the hero's %/range) rather than the plain
-        // AnimatedValue this had: it rolls the DIRECTION the value actually moved (up
-        // when dragged warmer, down when cooler) instead of always sliding one way.
+        // The label + value readout is the same in either unit -- only degLabel's suffix (°F/°C)
+        // and the slider below differ -- so it's hoisted out of the branch.
         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             MutedText("Temperature")
             RollingNumber(
@@ -121,8 +112,8 @@ internal fun ClimateControlsSection(
                 accent = tempColor,
             )
         } else {
-            // Celsius: drive the slider in whole °C but keep tempF canonical for
-            // the command, converting on each side.
+            // Celsius: drive the slider in whole °C but keep tempF canonical for the command,
+            // converting on each side.
             val tempC = ((tempF - 32) * 5 / 9f).roundToInt()
             AnimatedSlider(
                 value = tempC.toFloat(),
@@ -142,11 +133,9 @@ internal fun ClimateControlsSection(
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.width(GapRow))
-            // RollingNumber, not StepRow's built-in roll: StepRow's AnimatedContent
-            // always slides the same direction regardless of which way the value
-            // moved, which reads oddly on a slider you're actively dragging both
-            // ways. RollingNumber rolls up when the minutes increase, down when
-            // they decrease, matching every other draggable number in the app.
+            // RollingNumber, not StepRow's built-in roll: StepRow's AnimatedContent always slides
+            // the same direction regardless of which way the value moved, which reads oddly on a
+            // slider you're actively dragging both ways.
             RollingNumber(
                 text = "$duration min",
                 style = MaterialTheme.typography.bodyMedium,
@@ -155,11 +144,10 @@ internal fun ClimateControlsSection(
         }
         AnimatedSlider(
             value = duration.toFloat(),
-            // Extended range: the car itself has no single command past
-            // CLIMATE_DURATION_RANGE's 10-minute cap -- a request beyond that
-            // is auto-chained into follow-up commands instead (see
-            // AppViewModel.startClimate / ClimateExtendWorker), so the slider
-            // can go further than any one command actually could.
+            // Extended range: the car itself has no single command past CLIMATE_DURATION_RANGE's
+            // 10-minute cap -- a request beyond that is auto-chained into follow-up commands
+            // instead (see AppViewModel.startClimate / ClimateExtendWorker), so the slider can go
+            // further than any one command actually could.
             onValueChange = { onDuration(it.roundToInt()) },
             valueRange = CLIMATE_EXTENDED_DURATION_RANGE.first.toFloat()..CLIMATE_EXTENDED_DURATION_RANGE.last.toFloat(),
             steps = CLIMATE_EXTENDED_DURATION_RANGE.last - CLIMATE_EXTENDED_DURATION_RANGE.first - 1,

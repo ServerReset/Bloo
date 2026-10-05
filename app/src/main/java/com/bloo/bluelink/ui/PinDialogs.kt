@@ -23,19 +23,8 @@ import androidx.compose.ui.Modifier
 // --- App PIN dialogs ------------------------------------------------------
 
 /**
- * The Security card's PIN dialogs, one [GlassAlertDialog] shell with three
- * stages: verify the CURRENT PIN, then either enter a new one (set/change)
- * or confirm removal. Everything is the standard component set -- the shared
- * pin form, Morph buttons, the glass dialog shell -- so the PIN flow's UI
- * is no more bespoke than any other dialog in the app.
- *
- * The current-PIN stage routes through [AppViewModel.verifyAppPin] so it
- * enjoys the SAME lockout policy the lock screen has (and is not an
- * unguarded oracle for it): wrong PINs here count toward the app's own
- * rejection windows. A rejected attempt lands in [UiState.pinAttemptRejected]
- * (cleared via acknowledgePinRejection once this dialog has shown it); a
- * successful verify bumps [UiState.pinAcceptedTick], which advances the
- * stage.
+ * The Security card's PIN dialogs, one [GlassAlertDialog] shell with three stages: verify the
+ * CURRENT PIN, then either enter a new one (set/change) or confirm removal.
  */
 @Composable
 internal fun PinDialogs(
@@ -53,22 +42,18 @@ internal fun PinDialogs(
         else -> "Remove PIN"
     }
 
-    // current-PIN gate -> (new PIN entry | remove confirm)
-    // A fresh setup (no PIN installed yet) has no "current PIN" to prove --
-    // jump straight to choosing the new one. Change and Remove always gate
-    // on knowing the existing PIN first.
+    // current-PIN gate -> (new PIN entry | remove confirm) A fresh setup (no PIN installed yet) has
+    // no "current PIN" to prove -- jump straight to choosing the new one. Change and Remove always
+    // gate on knowing the existing PIN first.
     var stage by remember(mode) {
         mutableStateOf(if (mode == "set" && !state.appPinSet) "finish" else "current")
     }
     var currentPin by remember { mutableStateOf("") }
     var rejected by remember { mutableStateOf(false) }
-    // Baselines, so the effects below react to CHANGES only -- the initial
-    // composition must not treat a stale flag (left by an earlier lock
-    // screen session, say) as a fresh event.
     var seenRejected by remember(mode) { mutableStateOf(state.pinAttemptRejected) }
     var seenTick by remember(mode) { mutableIntStateOf(state.pinAcceptedTick) }
-    // Watch the verify outcome: a wrong PIN flags pinAttemptRejected (shown
-    // as an inline error here, then acknowledged), a right one advances.
+    // Watch the verify outcome: a wrong PIN flags pinAttemptRejected (shown as an inline error
+    // here, then acknowledged), a right one advances.
     LaunchedEffect(state.pinAttemptRejected) {
         if (state.pinAttemptRejected && !seenRejected) {
             seenRejected = true
@@ -174,10 +159,6 @@ internal fun PinDialogs(
                 "finish" -> {
                     if (mode == "remove") {
                         // equalWidths on the group, NOT Modifier.weight on each child.
-                        // RowScope.weight is parent data read by a Row's own measure policy;
-                        // inside this group's policy it is not read at all, so it would have
-                        // silently done nothing while the two halves went back to hugging
-                        // their labels. See ExpressiveButtons.kt.
                         ExpressiveButtonRow(
                             modifier = Modifier.fillMaxWidth(),
                             spacing = GapRow,

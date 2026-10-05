@@ -54,13 +54,7 @@ internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() ->
     }
 }
 
-/**
- * A digits-only "minutes" field for the notification-delay settings, clamped to 1..120.
- * It owns the edit buffer: [initial] seeds it and re-seeds whenever the persisted value
- * changes (via `remember(initial)`), while [onSet] fires only for an in-range number, so
- * a half-typed or out-of-range value is shown but never persisted. The three delay fields
- * (door-open, running, unlocked) differ only in seed, label and setter.
- */
+/** A digits-only "minutes" field for the notification-delay settings, clamped to 1..120. */
 @Composable
 internal fun MinutesField(initial: Int, label: String, onSet: (Int) -> Unit) {
     var text by remember(initial) { mutableStateOf(initial.toString()) }
@@ -77,13 +71,7 @@ internal fun MinutesField(initial: Int, label: String, onSet: (Int) -> Unit) {
     )
 }
 
-/**
- * A digits-only mileage field. The service card lays two of these side by side (each
- * `Modifier.weight(1f)`) while the search index surfaces the same two one at a time
- * (`Modifier.fillMaxWidth()`), so the width sits with the caller; everything else --
- * the digit filter, number keyboard, single line and [FieldShape] -- is identical and
- * lives here so the four copies can't drift apart.
- */
+/** A digits-only mileage field. */
 @Composable
 internal fun MilesField(value: Int?, label: String, modifier: Modifier, onSet: (Int?) -> Unit) {
     BlooTextField(

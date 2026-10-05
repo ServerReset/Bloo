@@ -56,8 +56,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * The car's hero card: photo/visual on top, [ChargeFuelBar] below. Corner radius eases
- * 24dp-40dp with `charging`; fades and slides up on first composition.
+ * The car's hero card: photo/visual on top, [ChargeFuelBar] below. Corner radius eases 24dp-40dp
+ * with `charging`; fades and slides up on first composition.
  */
 @Composable
 internal fun HeroHeader(
@@ -71,8 +71,10 @@ internal fun HeroHeader(
     drivingLabel: String? = null,
     height: Dp = 150.dp,
     metric: Boolean = false,
-    /** Whether the photo box is showing. Passed in (not collected here) so the hero doesn't
-     *  recompose on unrelated state changes. */
+    /**
+     * Whether the photo box is showing. Passed in (not collected here) so the hero doesn't
+     * recompose on unrelated state changes.
+     */
     photoExpanded: Boolean = true,
     /**
      * Grid "expand to full screen" / expanded-view "back to all cars" toggle, shown as this
@@ -92,22 +94,18 @@ internal fun HeroHeader(
     }
     // On the phone the hero is a pebble on PebbleShell; its body collapses with the shared
     // collapseEnter/collapseExit transition, so no photo collapse logic is needed here.
-    // Percentage, range and charging state are derived once and shared by both densities.
     val readout = chargeReadoutOf(status, hasBattery, hasFuel, drivingLabel, metric)
-    // 0 collapsed, 1 expanded: the one value the readout morph (type sizes, gaps, paddings,
-    // header reservation) lerps on.
-    // Critically damped: this drives a SIZE, and an under-damped spatial spring would overshoot type size.
+    // 0 collapsed, 1 expanded: the one value the readout morph (type sizes, gaps, paddings, header
+    // reservation) lerps on. Critically damped: this drives a SIZE, and an under-damped spatial
+    // spring would overshoot type size.
     val heroT by animateFloatAsState(
         targetValue = if (photoExpanded) 1f else 0f,
         animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow),
         label = "heroMorph",
     )
 
-    // The status line fades on its own clock, not heroT: heroT is spring-driven with no fixed
-    // duration to carve a delay from. Delayed only going in (photoExpanded true); collapsing
-    // fades it out immediately. 350ms avoids reading as a snap.
-    // One reveal curve (smoothstep on heroT with a head start) for numbers, status line and
-    // fuel row so they fade in together. The bar stays persistent.
+    // Delayed only going in (photoExpanded true); collapsing fades it out immediately. 350ms avoids
+    // reading as a snap.
     val statusAlpha = run {
         val t = ((heroT - 0.15f) / 0.5f).coerceIn(0f, 1f)
         t * t * (3f - 2f * t)
@@ -139,8 +137,8 @@ internal fun HeroHeader(
             }
         }
 
-    // Follows the morph: the name travels from the surface colour to the light one the scrim
-    // is built for; snapping would flash a white name on a white card.
+    // Follows the morph: the name travels from the surface colour to the light one the scrim is
+    // built for; snapping would flash a white name on a white card.
     val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, heroOnPhoto(), heroT)
     PebbleShell(
         expanded = photoExpanded,
@@ -159,22 +157,12 @@ internal fun HeroHeader(
         },
         // The travelling numbers: a plain lerp between the two anchors in this Box's space.
         // Rendered as `foreground` so they cross the header row above its buttons, not under.
-        // Plain lerp (no two-phase easing) keeps width and type size in lockstep.
-        // Not alpha = statusAlpha: that is the status line's delayed fade.
         foreground = {
             HeroForeground(collapsedNumbers, expandedNumbers, hoisted, heroT, readout, statusAlpha)
         },
-        // Collapsed: name, percentage and range on one row, with the bar directly under it.
-        // No shared element: SharedTransitionLayout is a LookaheadScope, which adds a lookahead
-        // pass per placement and costs car-swipe frames. One [ChargeReadout] derivation feeds
-        // both densities.
-        // Both collapsed slots stay non-null and gate with AnimatedVisibility inside, so the
-        // exit can play (a null slot deletes the node on the frame the pebble opens).
-        // Row 1 of the collapsed card: percentage and range on the car name's own line, laid out in
-        // the header's Row rather than positioned by hand. The numbers have two instances (this and
-        // [HeroMorphReadout]); this one is gone by t = 0.35, when the expanded copy appears.
-        // Kept alive past 0.35 once hoisted: it is the collapsed anchor, and a removed anchor
-        // stops reporting.
+        // Collapsed: name, percentage and range on one row, with the bar directly under it. No
+        // shared element: SharedTransitionLayout is a LookaheadScope, which adds a lookahead pass
+        // per placement and costs car-swipe frames.
         titleTrailing = if (heroT > 0.35f && !hoisted) null else {
             {
                 HeroCollapsedNumbers(
@@ -186,12 +174,9 @@ internal fun HeroHeader(
         },
         summary = null,
         headerContent = {
-            // A reservation, not content: stops the header text from sitting on the readout while the
-            // card is short. Derived from the readout's tokens (pct line + gap + bar), not a constant.
-            // TextUnit.toDp() throws on Unspecified/Em, so this relies on titleMedium keeping an sp
-            // lineHeight; guard it if typography ever sets TextUnit.Unspecified.
-            // The bar only, not the numbers row: the numbers share the title's row, so reserving
-            // only what sits below it keeps the collapsed pill at two rows.
+            // A reservation, not content: stops the header text from sitting on the readout while
+            // the card is short. Derived from the readout's tokens (pct line + gap + bar), not a
+            // constant.
             val collapsedReadoutHeight = 2.dp + ChargeBarHeight
             // Plus the readout's bottom inset (HeroReadoutBottomInset above the card edge).
             val h = lerp(collapsedReadoutHeight + HeroReadoutBottomInset, 0.dp, heroT)
@@ -199,8 +184,8 @@ internal fun HeroHeader(
             Spacer(Modifier.fillMaxWidth().height(h))
         },
     ) {
-        // Empty by design: the photo and readout live in `background`, positioned against the image.
+        // Empty by design: the photo and readout live in `background`, positioned against the
+        // image.
         Spacer(Modifier.height(0.dp))
     }
 }
-

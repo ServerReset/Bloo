@@ -34,14 +34,13 @@ import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.blockPageSwipe
 
 /**
- * Small shared composables built on UiTokens: text styles, icon badges, dividers, and padding/no-ripple Modifiers.
+ * Small shared composables built on UiTokens: text styles, icon badges, dividers, and
+ * padding/no-ripple Modifiers.
  */
 
 // ---- Common Composable Helpers -----------------------------------------------
 
-/**
- * Body text (bodySmall, onSurfaceVariant) for secondary/muted content.
- */
+/** Body text (bodySmall, onSurfaceVariant) for secondary/muted content. */
 @Composable
 internal fun MutedText(text: String, modifier: Modifier = Modifier) {
     Text(
@@ -52,7 +51,10 @@ internal fun MutedText(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** A pebble body that needs live status: shows [content] with it once there is one, else the loading or empty line. */
+/**
+ * A pebble body that needs live status: shows [content] with it once there is one, else the loading
+ * or empty line.
+ */
 @Composable
 internal fun <T : Any> PebbleStatusGate(status: T?, refreshing: Boolean, content: @Composable (T) -> Unit) {
     when {
@@ -62,9 +64,7 @@ internal fun <T : Any> PebbleStatusGate(status: T?, refreshing: Boolean, content
     }
 }
 
-/**
- * Label text styling (labelMedium) for subtle secondary text.
- */
+/** Label text styling (labelMedium) for subtle secondary text. */
 @Composable
 internal fun LabelText(text: String, modifier: Modifier = Modifier) {
     Text(
@@ -75,9 +75,7 @@ internal fun LabelText(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/**
- * Body text (bodySmall, onSurfaceVariant) -- muted/secondary content.
- */
+/** Body text (bodySmall, onSurfaceVariant) -- muted/secondary content. */
 @Composable
 internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
     Text(
@@ -88,9 +86,7 @@ internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: C
     )
 }
 
-/**
- * Body text (bodyMedium, onSurface) -- regular secondary content.
- */
+/** Body text (bodyMedium, onSurface) -- regular secondary content. */
 @Composable
 internal fun BodyMediumText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
     Text(
@@ -101,9 +97,7 @@ internal fun BodyMediumText(text: String, modifier: Modifier = Modifier, color: 
     )
 }
 
-/**
- * Label text (labelSmall) -- compact labels and captions.
- */
+/** Label text (labelSmall) -- compact labels and captions. */
 @Composable
 internal fun LabelSmallText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
     Text(
@@ -114,9 +108,7 @@ internal fun LabelSmallText(text: String, modifier: Modifier = Modifier, color: 
     )
 }
 
-/**
- * Label text (labelLarge) -- prominent labels and tags.
- */
+/** Label text (labelLarge) -- prominent labels and tags. */
 @Composable
 internal fun LabelLargeText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
     Text(
@@ -127,9 +119,7 @@ internal fun LabelLargeText(text: String, modifier: Modifier = Modifier, color: 
     )
 }
 
-/**
- * Title text (titleSmall) -- section headers and card titles; bold by default.
- */
+/** Title text (titleSmall) -- section headers and card titles; bold by default. */
 @Composable
 internal fun TitleSmallText(
     text: String,
@@ -146,11 +136,7 @@ internal fun TitleSmallText(
     )
 }
 
-/**
- * The circular tinted container [IconBadge] draws into. A separate name (not an `IconBadge` overload) avoids a K2
- * "recursive type checking" error when callers pass a conditional [ImageVector]. [content] is a full `@Composable`
- * slot so animated icons share the chrome.
- */
+/** The circular tinted container [IconBadge] draws into. */
 @Composable
 internal fun IconBadgeContainer(
     modifier: Modifier = Modifier,
@@ -166,8 +152,8 @@ internal fun IconBadgeContainer(
 }
 
 /**
- * [IconBadgeContainer] with a single centered [Icon]. [containerColor] defaults to a 14%-alpha tint of [tint];
- * pass a *Container role for the solid tonal look.
+ * [IconBadgeContainer] with a single centered [Icon]. [containerColor] defaults to a 14%-alpha tint
+ * of [tint]; pass a *Container role for the solid tonal look.
  */
 @Composable
 internal fun IconBadge(
@@ -184,8 +170,8 @@ internal fun IconBadge(
 }
 
 /**
- * An [IconBadge] leading a title + optional muted subtitle, text column filling the row.
- * [trailing] is an optional slot after the text (chevron, switch, status chip).
+ * An [IconBadge] leading a title + optional muted subtitle, text column filling the row. [trailing]
+ * is an optional slot after the text (chevron, switch, status chip).
  */
 @Composable
 internal fun IconLeadRow(
@@ -213,16 +199,15 @@ internal fun IconLeadRow(
     }
 }
 
-/**
- * A [HorizontalDivider] at the app's standard faint weight.
- */
+/** A [HorizontalDivider] at the app's standard faint weight. */
 @Composable
 internal fun SectionDivider(modifier: Modifier = Modifier, alpha: Float = 0.3f) {
     HorizontalDivider(modifier = modifier, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = alpha))
 }
 
 /**
- * `Modifier.clickable` with no ripple and a fresh interaction source, for full-bleed scrims and tap-swallowing surfaces.
+ * `Modifier.clickable` with no ripple and a fresh interaction source, for full-bleed scrims and
+ * tap-swallowing surfaces.
  */
 @Composable
 internal fun Modifier.noRippleClickable(onClickLabel: String? = null, onClick: () -> Unit): Modifier =
@@ -234,7 +219,8 @@ internal fun Modifier.noRippleClickable(onClickLabel: String? = null, onClick: (
     )
 
 /**
- * Tappable modifier for non-[MorphButton] controls: [noRippleClickable] plus the shared click haptic.
+ * Tappable modifier for non-[MorphButton] controls: [noRippleClickable] plus the shared click
+ * haptic.
  */
 @Composable
 internal fun Modifier.hapticClickable(
@@ -247,6 +233,4 @@ internal fun Modifier.hapticClickable(
         .clickable(interactionSource = source, indication = null, onClickLabel = onClickLabel) { haptics?.click(); onClick() }
 }
 
-
 internal fun Modifier.padding16() = padding(16.dp)
-

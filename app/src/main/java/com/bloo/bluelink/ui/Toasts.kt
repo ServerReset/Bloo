@@ -68,7 +68,6 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** Most toasts shown at once; a newer one past this starts the oldest one's exit. */
 private const val MaxToasts = 4
 
 /** Minimum gap between one toast's expiry and the next, so they leave one after another. */
@@ -79,8 +78,10 @@ private fun toastDurationMs(message: String, type: String): Long =
     if (type == "error") (5_500L + message.length * 45L).coerceAtMost(10_000L)
     else (3_500L + message.length * 30L).coerceAtMost(6_500L)
 
-/** One message on screen. [visible] drives its enter/exit animation and, once it has finished
- *  leaving, its removal from the stack. */
+/**
+ * One message on screen. [visible] drives its enter/exit animation and, once it has finished
+ * leaving, its removal from the stack.
+ */
 @Stable
 internal class Toast(val id: Long, val message: String, val type: String, expireAt: Long) {
     var expireAt by mutableLongStateOf(expireAt)
@@ -91,10 +92,9 @@ internal class Toast(val id: Long, val message: String, val type: String, expire
 internal val LocalToasts = androidx.compose.runtime.staticCompositionLocalOf<ToastState?> { null }
 
 /**
- * The stack of live toasts, oldest at the top and newest at the bottom. Each toast expires on
- * its own clock, but never before the one above it -- so they always go oldest to newest, however
- * long each message happens to be. A repeat of the newest message refreshes it instead of
- * stacking an identical copy.
+ * The stack of live toasts, oldest at the top and newest at the bottom. Each toast expires on its
+ * own clock, but never before the one above it -- so they always go oldest to newest, however long
+ * each message happens to be.
  */
 @Stable
 internal class ToastState {
@@ -130,10 +130,8 @@ internal fun ToastHost(
     onCopy: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Negotiate with the search element: the BOTTOM toast (the one on the search's own row)
-    // clears it, every toast stacked above stays full width. Reads the search's published bounds
-    // and dock from the floating registry -- see FloatingRegistry.searchDock. Recomposes when the
-    // search moves/docks, which is fine (it is off during a drag that would matter).
+    // Negotiate with the search element: the BOTTOM toast (the one on the search's own row) clears
+    // it, every toast stacked above stays full width.
     val registry = LocalFloatingRegistry.current
     val density = LocalDensity.current
     val gapPx = with(density) { GapRow.toPx() }
@@ -142,15 +140,14 @@ internal fun ToastHost(
     val visible = state.items.filter { it.visible.targetState }
     val bottomId = visible.lastOrNull()?.id
 
-    // The search's live rect, read ONLY while a toast is up (null otherwise, so the common
-    // no-toast case never subscribes to the registry's bounds map -- which the search bubble
-    // writes on every drag frame). LIVE, not snapshotted: the pill can register or move AFTER a
-    // toast mounts, and a frozen rect left the clearance stuck at "none".
+    // The search's live rect, read ONLY while a toast is up (null otherwise, so the common no-toast
+    // case never subscribes to the registry's bounds map -- which the search bubble writes on every
+    // drag frame).
     val searchRect = if (bottomId == null) null else registry.boundsOf(FloatingIds.Search)
     // The one piece of search-negotiation geometry, kept pure and unit-tested (see
-    // ToastClearanceTest): given the search's rect and the window, it says where the BOTTOM
-    // toast's content box must be inset (start/end) and how far the whole stack must lift
-    // (bottom), in pixels. Everything below just applies it.
+    // ToastClearanceTest): given the search's rect and the window, it says where the BOTTOM toast's
+    // content box must be inset (start/end) and how far the whole stack must lift (bottom), in
+    // pixels.
     val windowSize = LocalWindowInfo.current.containerSize
     val imeBottomPx = with(density) { WindowInsets.ime.getBottom(density).toFloat() }
     val navBottomPx = with(density) { WindowInsets.navigationBars.getBottom(density).toFloat() }
@@ -168,11 +165,9 @@ internal fun ToastHost(
     Column(
         modifier
             .fillMaxWidth()
-            // IME first, then the navigation bar: the keyboard's inset wins when it is up
-            // (the toast rides just above it), and the bar's inset keeps the toast clear of
-            // the gesture bar otherwise. This host used to be the Scaffold's snackbar, which
-            // the Scaffold lifted above the navigation bar for free -- as an edge-to-edge
-            // overlay of its own it has to ask for that inset now.
+            // IME first, then the navigation bar: the keyboard's inset wins when it is up (the
+            // toast rides just above it), and the bar's inset keeps the toast clear of the gesture
+            // bar otherwise.
             .imePadding()
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -180,9 +175,9 @@ internal fun ToastHost(
     ) {
         state.items.forEach { toast ->
             key(toast.id) {
-                // Only the bottom toast sits on the search's own row, so only IT is inset
-                // (start OR end) to slot beside a corner-docked pill; the ones above it stay
-                // full width. A centred pill is handled by the column lift below instead.
+                // Only the bottom toast sits on the search's own row, so only IT is inset (start OR
+                // end) to slot beside a corner-docked pill; the ones above it stay full width. A
+                // centred pill is handled by the column lift below instead.
                 val box = if (toast.id == bottomId) {
                     Modifier.padding(
                         start = with(density) { clearance.startInsetPx.toDp() },
@@ -194,8 +189,8 @@ internal fun ToastHost(
                 Box(box) { ToastItem(toast, state, hazeState, onCopy) }
             }
         }
-        // The middle-search lift, as the LAST column child so it sits below every toast and
-        // pushes the whole stack up clear of the centred pill. Absent (0dp) otherwise.
+        // The middle-search lift, as the LAST column child so it sits below every toast and pushes
+        // the whole stack up clear of the centred pill. Absent (0dp) otherwise.
         if (liftPx > 0.dp) Spacer(Modifier.height(liftPx))
     }
 }
@@ -239,10 +234,9 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
     val scope = rememberCoroutineScope()
     val dismissPx = with(LocalDensity.current) { 110.dp.toPx() }
     val offsetX by remember { derivedStateOf { if (dragging) dragPx.floatValue else settle.value } }
-    // The toast POPS UP out of the search bubble: the whole pill, text and all, starts small and centred on
-    // the bubble, then springs up to size and slides into its slot, overshooting a touch before it settles.
-    // A uniform scale, not a clip: the words are never cut off and never stretched. [origin] is the
-    // bubble's last known place (null when search isn't on screen, and then it simply pops in place).
+    // The toast POPS UP out of the search bubble: the whole pill, text and all, starts small and
+    // centred on the bubble, then springs up to size and slides into its slot, overshooting a touch
+    // before it settles.
     val registry = LocalFloatingRegistry.current
     val origin = remember(toast.id) { registry.boundsOf(FloatingIds.Search) }
     val emerge = remember(toast.id) { Animatable(0f) }
@@ -267,17 +261,13 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
             },
     ) {
     GlassSurface(
-        // A rounded card, not the search bar's own pill shape: a one-line toast read fine as
-        // a pill, but a five-line error became a stadium with fully-round ends, which looked
-        // like a sliver of text wrapped in a lozenge. The blob STILL emerges from the search
-        // circle (see `origin`, which `emerge` pops it up from), so the
-        // "it came out of search" read is unchanged; only the resting shape is.
-        // A pill (fully rounded ends), not a fixed 24dp corner: the toasts read as smooth
-        // rounded pills, the app's floating-chrome language.
+        // A rounded card, not the search bar's own pill shape: a one-line toast read fine as a
+        // pill, but a five-line error became a stadium with fully-round ends, which looked like a
+        // sliver of text wrapped in a lozenge.
         shape = CircleShape,
         hazeState = hazeState,
-        // Mostly clear: the glass does the work (refraction over a barely-there tint), but enough tint
-        // that the words read the instant it lands.
+        // Mostly clear: the glass does the work (refraction over a barely-there tint), but enough
+        // tint that the words read the instant it lands.
         tint = scheme.surface.copy(alpha = if (canBlurBackdrops()) 0.16f else 0.96f),
         modifier = Modifier
             .fillMaxWidth()
@@ -335,11 +325,7 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
                     maxLines = 5,
                 )
             }
-            // Copy is always offered now, not only on errors. An error detail is the
-            // message that most often wants pasting into a bug report, but a build number,
-            // an address, or any other info toast is worth a tap too -- gating it by type
-            // meant the one time a user DID want a success text there was no button. The
-            // glyph swaps to a check for a moment so the tap visibly registers.
+            // The glyph swaps to a check for a moment so the tap visibly registers.
             var copied by remember(toast.id) { mutableStateOf(false) }
             val copyScope = rememberCoroutineScope()
             MorphIconButton(
@@ -366,22 +352,7 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
     }
 }
 
-
-/**
- * The bottom toast's inset and the stack's lift, from where the search element is.
- *
- * Pure and JVM-testable (see ToastClearanceTest) so the arithmetic that decides "slot beside
- * the pill / lift above it / leave it alone" cannot silently regress the way it did when it was
- * inline and compared raw root coordinates against the wrong edge.
- *
- * Rules:
- *  - No search rect -> all zeros (full width, no lift).
- *  - Search centre in the middle third -> [bottomLiftPx] lifts the whole stack above it (the
- *    lift is measured from the rect's TOP up to the content bottom, i.e. excluding the IME/nav
- *    insets the toast column already pads by).
- *  - Search centre left/right -> the bottom toast is inset on that side so it ends clear of the
- *    pill (start for LEFT, end for RIGHT).
- */
+/** The bottom toast's inset and the stack's lift, from where the search element is. */
 internal data class ToastClearance(val startInsetPx: Float, val endInsetPx: Float, val bottomLiftPx: Float)
 
 internal fun toastClearance(
@@ -396,23 +367,23 @@ internal fun toastClearance(
     if (searchRect == null || windowWidthPx <= 0f) return ToastClearance(0f, 0f, 0f)
     val dock = SearchDock.fromFrac(((searchRect.left + searchRect.right) / 2f) / windowWidthPx)
     return when (dock) {
-        // Beside a LEFT-docked pill: the toast's content box starts at baseEdgePx, so pad the
-        // start so it begins just right of the pill.
+        // Beside a LEFT-docked pill: the toast's content box starts at baseEdgePx, so pad the start
+        // so it begins just right of the pill.
         SearchDock.LEFT -> ToastClearance(
             startInsetPx = (searchRect.right + gapPx - baseEdgePx).coerceAtLeast(0f),
             endInsetPx = 0f,
             bottomLiftPx = 0f,
         )
-        // Beside a RIGHT-docked pill: the content box ends at windowWidth - baseEdgePx, so pad
-        // the end so it ends just left of the pill.
+        // Beside a RIGHT-docked pill: the content box ends at windowWidth - baseEdgePx, so pad the
+        // end so it ends just left of the pill.
         SearchDock.RIGHT -> ToastClearance(
             startInsetPx = 0f,
             endInsetPx = ((windowWidthPx - baseEdgePx) - (searchRect.left - gapPx)).coerceAtLeast(0f),
             bottomLiftPx = 0f,
         )
         // Middle: lift the whole stack above the pill, measured from the pill's top up to the
-        // content bottom (window minus the IME and nav insets the column already pads by), plus
-        // two rows of breathing room.
+        // content bottom (window minus the IME and nav insets the column already pads by), plus two
+        // rows of breathing room.
         SearchDock.CENTER -> ToastClearance(
             startInsetPx = 0f,
             endInsetPx = 0f,

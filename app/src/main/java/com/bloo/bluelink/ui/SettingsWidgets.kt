@@ -64,7 +64,6 @@ import com.bloo.bluelink.data.collapsedSections
 /** One option in a [MorphSegmented] control; re-exported from :uicommon. */
 typealias SegmentOption = com.bloo.uicommon.SegmentOption
 
-
 /**
  * A full-width segmented selector: a tonal track whose active segment fills with the primary
  * accent. Thin wrapper over [com.bloo.uicommon.MorphSegmented] supplying M3 colours, label
@@ -99,9 +98,10 @@ fun MorphSegmented(
     )
 }
 
-
-
-/** A [MorphSegmented] over every entry of an enum: the option key is the enum's name, so call sites state only labels and icons. */
+/**
+ * A [MorphSegmented] over every entry of an enum: the option key is the enum's name, so call sites
+ * state only labels and icons.
+ */
 @Composable
 internal fun <T : Enum<T>> EnumSegmented(
     entries: List<T>,
@@ -125,7 +125,10 @@ internal fun PowertrainPicker(current: Powertrain, onSelect: (Powertrain) -> Uni
     icon = { when (it) { Powertrain.GAS -> Icons.Filled.LocalGasStation; Powertrain.HYBRID -> Icons.Filled.Bolt; Powertrain.PHEV -> Icons.Filled.Power; Powertrain.EV -> Icons.Filled.FlashOn } },
 )
 
-/** A car's confirmed head-unit generation (Gen5W / ccNC). Only shown where [platformOverridable] is true. */
+/**
+ * A car's confirmed head-unit generation (Gen5W / ccNC). Only shown where [platformOverridable] is
+ * true.
+ */
 @Composable
 internal fun PlatformPicker(current: VehiclePlatform, onSelect: (VehiclePlatform) -> Unit) = EnumSegmented(
     VehiclePlatform.entries, current, onSelect = onSelect,
@@ -135,7 +138,10 @@ internal fun PlatformPicker(current: VehiclePlatform, onSelect: (VehiclePlatform
 /** The three theme modes as segment options, defined once for every call site. */
 val ThemeModeOptions = ThemeMode.entries.map { SegmentOption(it.name, it.name.lowercase().replaceFirstChar(Char::uppercase), null) }
 
-/** The Display card's "Appearance" segmented row, shared with the Settings search entry and onboarding. */
+/**
+ * The Display card's "Appearance" segmented row, shared with the Settings search entry and
+ * onboarding.
+ */
 @Composable
 fun ThemeModeSegmentedRow(
     appearance: SettingsStore.Appearance,
@@ -170,17 +176,9 @@ fun SettingsSegmentedRow(
     }
 }
 
-
-
-
-
-
-
 /**
- * A Settings card built on [PebbleShell], the same expandable-card system as garage pebbles
- * (shared bounce/close springs, [StaggeredRevealColumn], tonal fill). Starts EXPANDED;
- * open/closed lives in the shared `collapsedSections` store via [AppViewModel.togglePebble].
- * A null [icon] falls back to a generic settings glyph.
+ * A Settings card built on [PebbleShell], the same expandable-card system as garage pebbles (shared
+ * bounce/close springs, [StaggeredRevealColumn], tonal fill).
  */
 
 /**
@@ -194,7 +192,6 @@ internal fun Modifier.settingsCardSlot(): Modifier =
         .padding(bottom = SettingsCardGap)
         .semantics { heading() }
 
-
 @Composable
 internal fun SettingsCard(
     title: String,
@@ -202,12 +199,13 @@ internal fun SettingsCard(
     vm: AppViewModel,
     /**
      * For a card whose body is ONE control: render it on the title row and drop the
-     * expand/collapse. Unconditional (not gated on simple mode) since there is nothing else to show.
+     * expand/collapse. Unconditional (not gated on simple mode) since there is nothing else to
+     * show.
      */
     inlineSetting: (@Composable () -> Unit)? = null,
     /**
-     * A short state string for the title row ("2 accounts", "On · auto"). Ignored when the card
-     * has an [inlineSetting], whose control already says it.
+     * A short state string for the title row ("2 accounts", "On · auto"). Ignored when the card has
+     * an [inlineSetting], whose control already says it.
      */
     status: String? = null,
     content: @Composable () -> Unit,
@@ -219,9 +217,6 @@ internal fun SettingsCard(
     val expanded = !inline && "$SETTINGS_CARD_VIN:$title" !in collapsed
     // heading() sits on the outer wrapper because PebbleShell exposes no hook into its title
     // Modifier; its header row is already one merged TalkBack stop.
-    // The inter-card gap lives on this wrapper (settingsCardSlot()), not the parent Column's
-    // spacedBy: spacedBy would keep a full gap for a card shrunk to zero by its outer
-    // AnimatedVisibility, then drop it in one frame. On the wrapper it shrinks with the card.
     Box(Modifier.entrance("settings:$title").settingsCardSlot()) {
         PebbleShell(
             expanded = expanded,
@@ -242,13 +237,13 @@ internal fun SettingsCard(
             },
             // Hard right like every other settings control (titleTrailingAtEnd).
             titleTrailingAtEnd = true,
-            // Cards space their own rows with explicit Spacers, so the shell must not add its row gap.
+            // Cards space their own rows with explicit Spacers, so the shell must not add its row
+            // gap.
             contentGap = 0.dp,
             content = { content() },
         )
     }
 }
-
 
 @Composable
 internal fun SecretRow(label: String, value: String) {
@@ -287,7 +282,6 @@ internal fun SecretRow(label: String, value: String) {
         }
     }
 }
-
 
 @Composable
 internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {

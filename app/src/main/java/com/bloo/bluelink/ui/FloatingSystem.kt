@@ -32,10 +32,8 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
- * Registry of where every floating element (corner buttons, search bubble, refresh indicator) currently is.
- *
- * Each floater reports its root-space bounds under an id ([Modifier.floatingElement]); anything that must
- * get out of the way asks the registry ([Modifier.dodgeFloating]), so no call site in between has to know.
+ * Registry of where every floating element (corner buttons, search bubble, refresh indicator)
+ * currently is.
  */
 @Immutable
 @JvmInline
@@ -43,29 +41,38 @@ value class FloatingId(val name: String)
 
 /** The app's own floaters; anything may define its own id. */
 object FloatingIds {
-    /** The search bubble/bar, the one floater a person positions (dragged along an edge or docked in a camera island). See SearchLayer. */
+    /**
+     * The search bubble/bar, the one floater a person positions (dragged along an edge or docked in
+     * a camera island). See SearchLayer.
+     */
     val Search = FloatingId("search")
 }
 
 @Stable
 class FloatingRegistry {
-    // Snapshot-backed so a dodger recomposes when a neighbour moves; written from onGloballyPositioned (post-layout).
+    // Snapshot-backed so a dodger recomposes when a neighbour moves; written from
+    // onGloballyPositioned (post-layout).
     private val bounds = mutableStateMapOf<FloatingId, Rect>()
 
     /**
      * Pull-to-refresh progress, 0..1, as a lambda so the drag is read in the layout phase
      * ([Modifier.floatingOverlay]'s offset lambda) and never recomposes the screen per frame.
-     * Published chrome state is applied by [Modifier.floatingOverlay]: it shifts down on pull and fades during refresh.
      */
     var chromePull: () -> Float = { 0f }
 
-    /** A refresh is in flight and the shift holds open; narrower than [chromeHidden], which is also true during the pull. */
+    /**
+     * A refresh is in flight and the shift holds open; narrower than [chromeHidden], which is also
+     * true during the pull.
+     */
     var chromeHolding by mutableStateOf(false)
 
     /** Chrome should fade: true through the pull AND the refresh, unlike [chromeHolding]. */
     var chromeHidden by mutableStateOf(false)
 
-    /** Back to rest. A publishing screen must call this when it leaves so its state doesn't outlive it. */
+    /**
+     * Back to rest. A publishing screen must call this when it leaves so its state doesn't outlive
+     * it.
+     */
     fun resetChrome() {
         chromePull = { 0f }
         chromeHolding = false
@@ -75,12 +82,7 @@ class FloatingRegistry {
     /** Who last published each id, so a withdrawal can be checked against it. */
     private val owners = mutableStateMapOf<FloatingId, Any>()
 
-    /**
-     * Publish (or with null, withdraw) this element's live bounds under [id].
-     *
-     * A withdrawal only applies if [owner] still holds the id: several instances can share one id
-     * (warm pager pages, grid columns, crossfades), and a newly mounted inactive one must not erase a visible one's bounds.
-     */
+    /** Publish (or with null, withdraw) this element's live bounds under [id]. */
     fun report(id: FloatingId, rect: Rect?, owner: Any) {
         if (rect == null) {
             if (owners[id] === owner) {
@@ -95,15 +97,24 @@ class FloatingRegistry {
 
     fun boundsOf(id: FloatingId): Rect? = bounds[id]
 
-    /** Where the search element is docked (null when off screen); CENTER means "above it", LEFT/RIGHT "beside it". */
+    /**
+     * Where the search element is docked (null when off screen); CENTER means "above it",
+     * LEFT/RIGHT "beside it".
+     */
     internal var searchDock by mutableStateOf<SearchDock?>(null)
 
-    /** Does anything else registered overlap [rect]? [marginPx] pads the other element so near misses count. */
+    /**
+     * Does anything else registered overlap [rect]? [marginPx] pads the other element so near
+     * misses count.
+     */
     fun collidesWithOthers(
         self: FloatingId,
         rect: Rect?,
         marginPx: Float,
-        /** Ids worth yielding to; null means every other floater. Name them so a new floater can't hide an existing one (e.g. a user-parked search bubble). */
+        /**
+         * Ids worth yielding to; null means every other floater. Name them so a new floater can't
+         * hide an existing one (e.g. a user-parked search bubble).
+         */
         avoid: Set<FloatingId>? = null,
     ): Boolean {
         if (rect == null) return false
@@ -116,18 +127,19 @@ class FloatingRegistry {
     }
 
     internal companion object {
-        /** Delegates to uicommon's [com.bloo.uicommon.floatersOverlap], where its JVM tests live. */
+        /**
+         * Delegates to uicommon's [com.bloo.uicommon.floatersOverlap], where its JVM tests live.
+         */
         fun overlaps(a: Rect, b: Rect, marginPx: Float): Boolean =
             com.bloo.uicommon.floatersOverlap(a, b, marginPx)
     }
 }
 
 /**
- * Everything a floating element needs in one modifier: publishes its bounds, rides the pull-to-refresh shift,
- * and fades during a refresh.
- *
- * [fade] is off for chrome about the refresh itself and for persistent navigation; [shift] is off for
- * anything anchored to the screen rather than the page (the Settings cog).
+ * Everything a floating element needs in one modifier: publishes its bounds, rides the
+ * pull-to-refresh shift, and fades during a refresh. [fade] is off for chrome about the refresh
+ * itself and for persistent navigation; [shift] is off for anything anchored to the screen rather
+ * than the page (the Settings cog).
  */
 fun Modifier.floatingOverlay(
     id: FloatingId,
@@ -136,7 +148,8 @@ fun Modifier.floatingOverlay(
     shift: Boolean = true,
 ): Modifier = composed {
     val registry = LocalFloatingRegistry.current
-    // The hold is animated; the drag is not, so a pull tracks the finger. Both are read in the offset lambda.
+    // The hold is animated; the drag is not, so a pull tracks the finger. Both are read in the
+    // offset lambda.
     val holdState = animateFloatAsState(
         targetValue = if (registry.chromeHolding) 1f else 0f,
         animationSpec = spring(
@@ -166,8 +179,8 @@ fun Modifier.floatingOverlay(
 val LocalFloatingRegistry = staticCompositionLocalOf { FloatingRegistry() }
 
 /**
- * Publishes this element's live bounds under [id] so other floaters can avoid it.
- * [active] false withdraws them (present but not currently floating).
+ * Publishes this element's live bounds under [id] so other floaters can avoid it. [active] false
+ * withdraws them (present but not currently floating).
  */
 fun Modifier.floatingElement(id: FloatingId, active: Boolean = true): Modifier = composed {
     val registry = LocalFloatingRegistry.current
@@ -186,9 +199,8 @@ fun Modifier.floatingElement(id: FloatingId, active: Boolean = true): Modifier =
 
 /**
  * Fades this element out while another registered floater overlaps it, and back in when clear.
- *
- * Draw-phase only; the animation is keyed on the collision boolean, not the bounds, which would restart it every frame.
- * MUST be paired with [floatingElement] using the same [self] id, or it finds no bounds and silently never dodges.
+ * Draw-phase only; the animation is keyed on the collision boolean, not the bounds, which would
+ * restart it every frame.
  */
 fun Modifier.dodgeFloating(
     self: FloatingId,
@@ -213,11 +225,6 @@ fun Modifier.dodgeFloating(
     graphicsLayer { this.alpha = alpha.value }
 }
 
-/**
- * Trailing space a scrolling screen reserves so its last row clears the floating search bar ([FloatingIds.Search]),
- * computed from that element's live reported bounds plus [extraMargin] of breathing room.
- * Uses [fallback] (never zero) until the bar has reported its first layout.
- */
 @Composable
 internal fun searchBarClearance(fallback: Dp, extraMargin: Dp = 16.dp): Dp {
     val registry = LocalFloatingRegistry.current

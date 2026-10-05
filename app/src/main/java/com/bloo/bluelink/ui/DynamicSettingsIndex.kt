@@ -3,11 +3,8 @@ package com.bloo.bluelink.ui
 import com.bloo.bluelink.data.settingsMode
 
 /**
- * Helpers to determine which settings are available in the current mode
- * (simple vs. advanced) and should appear in search results.
- *
- * When in simple mode, advanced-only settings are completely hidden from
- * search and cannot be accessed via any search/command interface.
+ * Helpers to determine which settings are available in the current mode (simple vs. advanced) and
+ * should appear in search results.
  */
 
 /**
@@ -41,8 +38,8 @@ internal val ADVANCED_ONLY_SETTINGS = setOf(
 )
 
 /**
- * Check if a setting should be visible in the current mode.
- * Returns true if the setting is available, false if hidden in current mode.
+ * Check if a setting should be visible in the current mode. Returns true if the setting is
+ * available, false if hidden in current mode.
  */
 internal fun isSettingAvailableInMode(
     settingTitle: String,

@@ -65,13 +65,14 @@ import com.bloo.bluelink.data.settingsMode
 // --- Settings -------------------------------------------------------------
 
 /**
- * The Settings screen: one scrolling list of [SettingsCard]s, with the search bar hoisted outside the scroll.
- * Advanced-only cards animate in staggered via staggeredAdvancedVisible; leaving Advanced does not stagger.
+ * The Settings screen: one scrolling list of [SettingsCard]s, with the search bar hoisted outside
+ * the scroll. Advanced-only cards animate in staggered via staggeredAdvancedVisible; leaving
+ * Advanced does not stagger.
  */
 
 /**
- * Settings is a page inside the garage car pager, always the one after the last car.
- * Swiping is how you reach and leave it, so no back arrow or scrim; system back exits the app.
+ * Settings is a page inside the garage car pager, always the one after the last car. Swiping is how
+ * you reach and leave it, so no back arrow or scrim; system back exits the app.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -83,8 +84,8 @@ internal fun SettingsScreen(
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
-    // Keyed on the log's version counter: the snapshot (a list copy) is only taken when the
-    // log actually changed, and only while this screen is collecting.
+    // Keyed on the log's version counter: the snapshot (a list copy) is only taken when the log
+    // actually changed, and only while this screen is collecting.
     val logsVersion by vm.logsVersion.collectAsStateWithLifecycle()
     val logs = remember(logsVersion) { vm.logSnapshot() }
     val context = LocalContext.current
@@ -106,8 +107,8 @@ internal fun SettingsScreen(
   val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-  // Search is an app-root element (SearchLayer) that handles its own back.
-  // This is the last pager page, so system back exits the app; no BackHandler needed.
+  // Search is an app-root element (SearchLayer) that handles its own back. This is the last pager
+  // page, so system back exits the app; no BackHandler needed.
   BackdropHost {
         // Single column like a car page; the pager pins every page to one car-column width.
         // LazyColumn so only visible sections compose.
@@ -116,8 +117,8 @@ internal fun SettingsScreen(
                 .fillMaxSize(),
             contentAlignment = Alignment.TopCenter
         ) {
-        // Hoisted out of the list content (not a composable scope) so an advanced-only card is skipped as an
-        // item: an empty item still keeps its slot and item spacing.
+        // Hoisted out of the list content (not a composable scope) so an advanced-only card is
+        // skipped as an item: an empty item still keeps its slot and item spacing.
         val advVisible = rememberAdvancedVisibility(state.settingsMode == "advanced", ADVANCED_CARD_COUNT)
         // remember() needs a composable scope, so the gated-card transitions are hoisted here.
         val advTransition0 = rememberGridItemVisibility(advVisible[0])
@@ -128,7 +129,8 @@ internal fun SettingsScreen(
                 .widthIn(max = 1100.dp)
                 .fillMaxWidth()
                 .hazeSource(hazeState)
-                // Edge-to-edge disables adjustResize; imePadding shrinks the list so focused fields scroll into view.
+                // Edge-to-edge disables adjustResize; imePadding shrinks the list so focused fields
+                // scroll into view.
                 .imePadding()
                 .padding(horizontal = ScreenGutter),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -144,11 +146,8 @@ internal fun SettingsScreen(
             }
             run {
                 val advanced = state.settingsMode == "advanced"
-            // Advanced-only cards share expandEnter()/expandExit() with staggeredAdvancedVisible so revealing many
-            // cascades instead of overshooting in lockstep.
-            // No Arrangement.spacedBy (SettingsCard carries the gap) and no animateContentSize: cards animate their own
-            // height, and a second height animation would chase it and lag.
-            // Each card is its own lazy item so only visible cards compose.
+            // Advanced-only cards share expandEnter()/expandExit() with staggeredAdvancedVisible so
+            // revealing many cascades instead of overshooting in lockstep.
             item {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
                 AccountsCardContent(state, vm)
@@ -176,7 +175,8 @@ internal fun SettingsScreen(
             // Gates the item: with no cars yet it would still hold a slot and gap.
             if (state.vehicles.isNotEmpty()) item {
 
-            // Cars: drag to reorder, tap to expand setup + photo. Shown in Simple and Advanced; power-user groups gate themselves.
+            // Cars: drag to reorder, tap to expand setup + photo. Shown in Simple and Advanced;
+            // power-user groups gate themselves.
             CarsCardContent(
                 state = state,
                 vm = vm,
@@ -202,8 +202,8 @@ internal fun SettingsScreen(
             }
             item {
 
-            // Location: "My location" sets Appearance.weatherFollowsDevice and feeds both weather and the map
-            // (see WeatherController.refreshDeviceLocationForWeather).
+            // Location: "My location" sets Appearance.weatherFollowsDevice and feeds both weather
+            // and the map (see WeatherController.refreshDeviceLocationForWeather).
             LocationCardContent(appearance, vm)
             }
             item {
@@ -218,19 +218,20 @@ internal fun SettingsScreen(
             }
             item {
 
-            // Sounds & vibration
-            // One switch, rendered as a single row (SettingsCard inlineSetting).
+            // Sounds & vibration One switch, rendered as a single row (SettingsCard inlineSetting).
             SoundsVibrationCardContent(appearance, vm)
             }
         }
             item {
-                // Credits for third-party projects/APIs; OpenStreetMap's tile policy expects visible attribution.
+                // Credits for third-party projects/APIs; OpenStreetMap's tile policy expects
+                // visible attribution.
                 CreditsCardContent(vm)
             }
           // Trailing footer, not a card.
           item {
           Column {
-          // Installed build (the update tile shows the available one); buildLabel is the shared formatter.
+          // Installed build (the update tile shows the available one); buildLabel is the shared
+          // formatter.
           Spacer(Modifier.height(GapRow))
           Text(
               "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
@@ -245,8 +246,8 @@ internal fun SettingsScreen(
           }
         }
         } // Box (wide-screen centering)
-        // No StatusBarScrim or back arrow: the garage pager already draws one over every page, and leaving is a swipe.
-        // Simple/Advanced tab hanging from the status bar, top-right.
+        // No StatusBarScrim or back arrow: the garage pager already draws one over every page, and
+        // leaving is a swipe. Simple/Advanced tab hanging from the status bar, top-right.
         SettingsModeTab(
             settingsMode = state.settingsMode,
             onSettingsModeChange = { vm.setSettingsMode(it) },

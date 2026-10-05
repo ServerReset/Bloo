@@ -25,8 +25,8 @@ import com.bloo.bluelink.data.syncUri
 // --- Settings export/import and Drive auto-sync (extracted from AppViewModel) --
 
 /**
- * Share a full settings backup (colours and palettes included) via the share sheet as a real
- * file, since most file-saving targets reject raw EXTRA_TEXT.
+ * Share a full settings backup (colours and palettes included) via the share sheet as a real file,
+ * since most file-saving targets reject raw EXTRA_TEXT.
  */
 fun AppViewModel.exportSettings(context: android.content.Context) = viewModelScope.launch {
     val json = settingsStore.exportSettingsJson()
@@ -72,7 +72,8 @@ fun AppViewModel.importSettings(context: android.content.Context, uri: android.n
     AppLog.log(if (error == null) "Settings imported from backup" else "⚠ Settings import: $error")
     _state.update { it.copy(message = error ?: "Settings restored", messageType = if (error == null) "success" else "error") }
     if (error == null) {
-        // Refresh loaded vehicles' local config (seats, powertrain, photo) so the restore shows immediately.
+        // Refresh loaded vehicles' local config (seats, powertrain, photo) so the restore shows
+        // immediately.
         refreshLocalCarConfig()
     }
 }
@@ -86,15 +87,16 @@ fun AppViewModel.setSyncUri(uri: android.net.Uri) = viewModelScope.launch {
         )
     }.isSuccess
     if (!granted) {
-        // Without a PERSISTED grant the picker's temporary access dies with the process and every sync
-        // fails with a SecurityException; refuse to enable sync instead.
+        // Without a PERSISTED grant the picker's temporary access dies with the process and every
+        // sync fails with a SecurityException; refuse to enable sync instead.
         AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
         _state.update { it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = "error") }
         return@launch
     }
     AppLog.log("Drive auto-sync enabled")
-    // Reset per-file sync gate state before pointing at the file: stale hash/synced-ever/lastSync/dirty
-    // would block adoption and convergence. This re-arms join-adopt (synced_ever=false).
+    // Reset per-file sync gate state before pointing at the file: stale
+    // hash/synced-ever/lastSync/dirty would block adoption and convergence. This re-arms join-adopt
+    // (synced_ever=false).
     settingsStore.resetSyncStateForNewFile()
     settingsStore.setSyncUri(uri.toString())
     _state.update { it.copy(syncUri = uri.toString()) }
@@ -111,19 +113,15 @@ fun AppViewModel.clearSyncUri() = viewModelScope.launch {
     AppLog.log("Drive auto-sync disabled")
 }
 
-/** Join an existing Drive sync file and set up auto-sync to it.
- *
- * Adoption goes through [SettingsStore.performMainToMainSync]'s join-adopt path, not an up-front
- * `importSettingsJson` (which routed through `editTracked` and marked every key dirty, so the
- * device never converged). Steps: confirm readable, take a persisted grant, reset gate state, run one pass. */
+/** Join an existing Drive sync file and set up auto-sync to it. */
 fun AppViewModel.importSettingsAndSync(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
     importSettingsAndSyncSuspend(context, uri)
 }
 
 /**
- * Suspending body of [importSettingsAndSync], so [restoreFromSyncThenContinue] can await the
- * whole join. Returns whether the join succeeded (grant obtained, pass ran), not whether the
- * file had anything to adopt.
+ * Suspending body of [importSettingsAndSync], so [restoreFromSyncThenContinue] can await the whole
+ * join. Returns whether the join succeeded (grant obtained, pass ran), not whether the file had
+ * anything to adopt.
  */
 internal suspend fun AppViewModel.importSettingsAndSyncSuspend(context: android.content.Context, uri: android.net.Uri): Boolean {
     // Read once only to confirm the file is reachable; do NOT import it here.
@@ -149,7 +147,6 @@ internal suspend fun AppViewModel.importSettingsAndSyncSuspend(context: android.
     settingsStore.resetSyncStateForNewFile()
     settingsStore.setSyncUri(uri.toString())
     _state.update { it.copy(syncUri = uri.toString(), message = "Auto-sync enabled", messageType = "success") }
-    // One real pass now: join-adopts the file's settings (if any) and uploads; refreshLocalCarConfig() reflects them.
     runDriveSyncNow()
     if (_state.value.syncError == null) refreshLocalCarConfig()
     return true
@@ -171,8 +168,7 @@ fun AppViewModel.setWatchLockTiming(timing: com.bloo.bluelink.data.WatchLockTimi
     }
 }
 
-/** Manual "Sync now": force a full Drive push/pull, available whenever sync is configured.
- *  Surfaces the outcome as a snackbar. */
+/** Surfaces the outcome as a snackbar. */
 fun AppViewModel.syncNow() {
     if (_state.value.syncUri == null) return
     viewModelScope.launch {
@@ -182,8 +178,10 @@ fun AppViewModel.syncNow() {
     }
 }
 
-/** Designate [id] as the primary device (source of truth + tiebreaker); persisted locally and
- *  written to the Drive file on the next pass. */
+/**
+ * Designate [id] as the primary device (source of truth + tiebreaker); persisted locally and
+ * written to the Drive file on the next pass.
+ */
 fun AppViewModel.setPrimaryDevice(id: String) {
     viewModelScope.launch {
         settingsStore.setPrimaryDevice(id)
@@ -192,8 +190,6 @@ fun AppViewModel.setPrimaryDevice(id: String) {
     }
 }
 
-/** "Pull from primary now": force this device to fully adopt the file's settings
- *  on the next pass (the primary is the source of truth), then run it. */
 fun AppViewModel.pullFromPrimary() {
     if (_state.value.syncUri == null) return
     viewModelScope.launch {
@@ -204,8 +200,10 @@ fun AppViewModel.pullFromPrimary() {
     }
 }
 
-/** Rename THIS device in the sync registry. Persists locally and republishes on
- *  the next sync pass (name changes ride the registry heartbeat). */
+/**
+ * Rename THIS device in the sync registry. Persists locally and republishes on the next sync pass
+ * (name changes ride the registry heartbeat).
+ */
 fun AppViewModel.renameThisDevice(name: String) {
     viewModelScope.launch {
         settingsStore.setSyncDeviceName(name)
@@ -227,8 +225,7 @@ fun AppViewModel.removeSyncedDevice(id: String) {
     }
 }
 
-/** Settings "Test sync" diagnostic: a non-destructive Drive round-trip (permission, read, write,
- *  verify) reported as a snackbar. Writes the file's own bytes back verbatim. */
+/** Writes the file's own bytes back verbatim. */
 fun AppViewModel.testSync() {
     viewModelScope.launch {
         val result = withContext(Dispatchers.IO) { settingsStore.testSyncRoundTrip() }
@@ -236,9 +233,10 @@ fun AppViewModel.testSync() {
     }
 }
 
-/** Runs one [SettingsStore.performMainToMainSync] pass right now and folds the outcome into
- *  [UiState]. Called right after [setSyncUri] and [importSettingsAndSync] so enabling sync
- *  pushes/pulls immediately instead of waiting for the passive refresh collector. */
+/**
+ * Called right after [setSyncUri] and [importSettingsAndSync] so enabling sync pushes/pulls
+ * immediately instead of waiting for the passive refresh collector.
+ */
 internal suspend fun AppViewModel.runDriveSyncNow() {
     val outcome = withContext(Dispatchers.IO) { settingsStore.performMainToMainSync() }
     // Recompute the file biometric each pass; it is derived purely from the persisted URI.
@@ -249,7 +247,8 @@ internal suspend fun AppViewModel.runDriveSyncNow() {
             it.copy(
                 lastSyncMs = outcome.syncedAtMs,
                 syncError = outcome.error,
-                // A transient download failure yields an empty device list; keep the last shown list.
+                // A transient download failure yields an empty device list; keep the last shown
+                // list.
                 syncDevices = outcome.devices.ifEmpty { it.syncDevices },
                 syncPrimaryId = outcome.primaryDeviceId ?: it.syncPrimaryId,
                 thisDeviceId = outcome.selfDeviceId ?: it.thisDeviceId,

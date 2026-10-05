@@ -1,9 +1,9 @@
 package com.bloo.bluelink.ui
 
 /**
- * The app's immutable UI state snapshot, its screen dispatcher, and the pure
- * decision functions that answer "what shows for this car".
- * Plain Kotlin over plain data (no Android, no coroutines) so it runs as JVM unit tests.
+ * The app's immutable UI state snapshot, its screen dispatcher, and the pure decision functions
+ * that answer "what shows for this car". Plain Kotlin over plain data (no Android, no coroutines)
+ * so it runs as JVM unit tests.
  */
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.ClimatePreset
@@ -28,20 +28,27 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 sealed interface Screen {
-    /** Bootstrapping state shown until the cold-start auto-login decides Login vs. the garage.
-     *  Renders as just the app background (see its branch in Screens.kt). */
+    /**
+     * Bootstrapping state shown until the cold-start auto-login decides Login vs. the garage.
+     * Renders as just the app background (see its branch in Screens.kt).
+     */
     data object Loading : Screen
     data object Login : Screen
     /** First-run deck of welcome cards: restore, setup, look and feel, and a card per car. */
     data object Onboarding : Screen
     /** The same deck, with just a card per newly detected car (post-first-run). */
     data class CarSetup(val vins: List<String>) : Screen
-    /** Main screen: the car carousel/grid. Zero-vehicle accounts land here too, via
-     *  GarageStatusCard (Guard.kt) as a pager page. */
+    /**
+     * Main screen: the car carousel/grid. Zero-vehicle accounts land here too, via GarageStatusCard
+     * (Guard.kt) as a pager page.
+     */
     data object Garage : Screen
 }
 
-/** Reserved pseudo-VIN for Settings cards so they share car pebbles' collapse state. No real VIN collides. */
+/**
+ * Reserved pseudo-VIN for Settings cards so they share car pebbles' collapse state. No real VIN
+ * collides.
+ */
 internal const val SETTINGS_CARD_VIN = "__settings__"
 
 /**
@@ -59,27 +66,31 @@ internal val SettingsPseudoVehicle = Vehicle(
 )
 
 /**
- /**
-  * Keeps UiState STABLE for Compose: its List/Map/Set fields are interfaces, so without this
-  * every pebble taking it would be non-skippable and recompose with each parent frame.
-  * Every property is a `val` and collections are rebuilt via `copy()`, never mutated in place;
-  * never add a MutableList/mutableStateListOf field.
-  */
+ * Keeps UiState STABLE for Compose: its List/Map/Set fields are interfaces, so without this every
+ * pebble taking it would be non-skippable and recompose with each parent frame.
+ */
 @androidx.compose.runtime.Immutable
 data class UiState(
     // Loading, not Login: see Screen.Loading.
     val screen: Screen = Screen.Loading,
-    /** Biometric app-lock overlay (real app renders blurred behind it). True when biometric lock
-     *  is usable or an app PIN is installed ([appPinSet]). */
+    /**
+     * Biometric app-lock overlay (real app renders blurred behind it). True when biometric lock is
+     * usable or an app PIN is installed ([appPinSet]).
+     */
     val locked: Boolean = false,
     /** An app PIN is installed (4-8 digits), mirrored from CredentialStore. */
     val appPinSet: Boolean = false,
     /** Live mirror of the PIN wrong-attempt lockout policy (failures + rejection deadline). */
     val pinLockout: PinLockout = PinLockout(),
-    /** A PIN verify just rejected the attempt; the overlay shows the error, then calls
-     *  [AppViewModel.acknowledgePinRejection]. */
+    /**
+     * A PIN verify just rejected the attempt; the overlay shows the error, then calls
+     * [AppViewModel.acknowledgePinRejection].
+     */
     val pinAttemptRejected: Boolean = false,
-    /** Bumped on every successful PIN verify so settings dialogs can advance past the current-PIN stage. */
+    /**
+     * Bumped on every successful PIN verify so settings dialogs can advance past the current-PIN
+     * stage.
+     */
     val pinAcceptedTick: Int = 0,
     val loading: Boolean = false,
     val refreshing: Boolean = false,
@@ -97,14 +108,18 @@ data class UiState(
      */
     val deviceLocation: GeoLocation? = null,
     /**
-     * Reverse-geocoded name for [deviceLocation]. Null until geocoded; geocode failure is not an error.
+     * Reverse-geocoded name for [deviceLocation]. Null until geocoded; geocode failure is not an
+     * error.
      */
     val devicePlace: String? = null,
     /** Recent EV trips by VIN (loaded lazily when the Trips pebble is shown). */
     val trips: Map<String, List<EvTrip>> = emptyMap(),
     /** User-named climate presets by VIN. */
     val climatePresets: Map<String, List<ClimatePreset>> = emptyMap(),
-    /** Live climate draft by VIN, shared between simultaneous compositions of one car's climate pebble. */
+    /**
+     * Live climate draft by VIN, shared between simultaneous compositions of one car's climate
+     * pebble.
+     */
     val climateSync: Map<String, com.bloo.bluelink.data.ClimateSync> = emptyMap(),
     val seatConfigs: Map<String, SeatConfig> = emptyMap(),
     val powertrains: Map<String, Powertrain> = emptyMap(),
@@ -113,8 +128,10 @@ data class UiState(
     val sectionOrders: Map<String, List<String>> = emptyMap(),
     val imageUrls: Map<String, String> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
-    /** Compact form of [placeNames] (street + ZIP) for space-constrained glance layouts.
-     *  In-memory only; not persisted to statusCache. */
+    /**
+     * Compact form of [placeNames] (street + ZIP) for space-constrained glance layouts. In-memory
+     * only; not persisted to statusCache.
+     */
     val placeZips: Map<String, String> = emptyMap(),
     /** Current weather at the user's configured "home" location, if loaded. */
     val homeWeather: Weather? = null,
@@ -130,13 +147,17 @@ data class UiState(
     val serviceIntervalMiles: Map<String, Int> = emptyMap(),
     /** In-flight commands, keyed "vin:action", so each control can show its own spinner. */
     val pending: Set<String> = emptySet(),
-    /** Recent remote commands by VIN, newest first, a rolling [REMOTE_ACTION_HISTORY_DAYS]-day
-     *  window written by [AppViewModel.runCommand]. Shown by RemoteActionsInline. */
+    /**
+     * Recent remote commands by VIN, newest first, a rolling [REMOTE_ACTION_HISTORY_DAYS]-day
+     * window written by [AppViewModel.runCommand]. Shown by RemoteActionsInline.
+     */
     val remoteActionHistory: Map<String, List<RemoteAction>> = emptyMap(),
     /** Collapsed pebbles, keyed "vin:section". Absent = expanded. */
     val collapsedPebbles: Set<String> = emptySet(),
-    /** Per-VIN pebbles pinned to the dual-column hotspot. Primary slot is always "controls"
-     *  (not stored); the secondary slot is user-selected, a String or null. */
+    /**
+     * Per-VIN pebbles pinned to the dual-column hotspot. Primary slot is always "controls" (not
+     * stored); the secondary slot is user-selected, a String or null.
+     */
     val hotspotSections: Map<String, String?> = emptyMap(),
     /** Enabled app-icon shortcut ids ("cmd_vin"); null = show all. */
     val shortcutSet: Set<String>? = null,
@@ -149,14 +170,20 @@ data class UiState(
     /** In-flight AI work: VINs being summarized, plus "search" for the query box. */
     val aiBusy: Set<String> = emptySet(),
     val aiSearchReply: String? = null,
-    /** The garage's collapsed pager is settled on its Settings slot (always the last page).
-     *  The only "looking at Settings" signal; drives SearchLayer's bubble/pill morph. */
+    /**
+     * The garage's collapsed pager is settled on its Settings slot (always the last page). The only
+     * "looking at Settings" signal; drives SearchLayer's bubble/pill morph.
+     */
     val onSettingsPageSlot: Boolean = false,
-    /** A car's full-screen map overlay is expanded. Hides the floating search bubble, which
-     *  shares a corner with the map's bottom action row. */
+    /**
+     * A car's full-screen map overlay is expanded. Hides the floating search bubble, which shares a
+     * corner with the map's bottom action row.
+     */
     val mapExpanded: Boolean = false,
-    /** Gentle hint shown on the garage right after onboarding, nudging the user
-     *  toward Settings to fine-tune each car. */
+    /**
+     * Gentle hint shown on the garage right after onboarding, nudging the user toward Settings to
+     * fine-tune each car.
+     */
     val showSettingsHint: Boolean = false,
     /** The welcome cards, summoned again from Settings (see [showWelcomeCards]). */
     val welcomeCardsOpen: Boolean = false,
@@ -164,8 +191,10 @@ data class UiState(
     val accounts: List<Credentials> = emptyList(),
     /** Showing the login form to add another account while already signed in. */
     val addingAccount: Boolean = false,
-    /** True when the user backed out of the biometric prompt to the login screen.
-     *  Cancelling in this state must re-lock rather than navigate to the garage. */
+    /**
+     * True when the user backed out of the biometric prompt to the login screen. Cancelling in this
+     * state must re-lock rather than navigate to the garage.
+     */
     val lockedToLogin: Boolean = false,
     /** Kia sign-in only: a pending one-time-code challenge. */
     val kiaOtp: KiaOtpUi? = null,
@@ -176,18 +205,23 @@ data class UiState(
     val messageType: String = "error",
     /** A newer CI build than installed, if found. Drives the update tile; null means no tile. */
     val updateAvailable: com.bloo.bluelink.update.UpdateInfo? = null,
-    /** "Not now" on the update tile: hides it until the next update check. "Remind me" also sets
-     *  this, plus a snooze and a 1-day reminder worker. */
+    /** "Remind me" also sets this, plus a snooze and a 1-day reminder worker. */
     val updateTileDismissed: Boolean = false,
     /** True while the update APK downloads in-app (see AppViewModel.downloadUpdateInBackground). */
     val updateDownloading: Boolean = false,
     // Download progress is NOT here: it ticks per 64KB chunk and would recompose every live pebble.
     // It lives in AppViewModel.updateDownloadProgress and only the update tile collects it.
-    /** The update APK is downloaded and ready to install; reset when a fresh check finds a different/no build. */
+    /**
+     * The update APK is downloaded and ready to install; reset when a fresh check finds a
+     * different/no build.
+     */
     val updateApkReady: Boolean = false,
     /** A Shizuku seamless install is running; blocks a concurrent PackageInstaller session. */
     val updateInstalling: Boolean = false,
-    /** A manual "Check for updates" is in flight (spinner + disabled button). Background checks don't set it. */
+    /**
+     * A manual "Check for updates" is in flight (spinner + disabled button). Background checks
+     * don't set it.
+     */
     val updateChecking: Boolean = false,
     /** Settings mode: "simple" (essential settings) or "advanced" (all settings). */
     val settingsMode: String = "simple",
@@ -195,7 +229,6 @@ data class UiState(
     val defaultClimatePresets: Map<String, String> = emptyMap(),
     /** Drive URI (content://...) for auto-backup; null when not configured. */
     val syncUri: String? = null,
-    /** Last time settings were synced with Drive (ms), for merge decisions. */
     val lastSyncMs: Long = 0L,
     /** Wi-Fi only sync (true) or any network (false). */
     val syncWifiOnly: Boolean = true,
@@ -211,13 +244,20 @@ data class UiState(
     val syncDeviceName: String = "",
     /** When a paired watch asks for the app PIN. Device-local; see WatchLockTiming. */
     val watchLockTiming: com.bloo.bluelink.data.WatchLockTiming = com.bloo.bluelink.data.WatchLockTiming.OFF,
-    /** Short biometric of the Drive file this device syncs to; differing values mean different files. Null if sync is off. */
+    /**
+     * Short biometric of the Drive file this device syncs to; differing values mean different
+     * files. Null if sync is off.
+     */
     val syncFileFingerprint: String? = null,
-    /** The garage fetch came back empty because a request failed, not because the account has no
-     *  vehicles. Cleared by the next successful load. */
+    /**
+     * The garage fetch came back empty because a request failed, not because the account has no
+     * vehicles. Cleared by the next successful load.
+     */
     val garageLoadError: String? = null,
-    /** [garageLoadError] happened with no real connectivity (vs. an API/auth failure while online).
-     *  Meaningless when [garageLoadError] is null. */
+    /**
+     * [garageLoadError] happened with no real connectivity (vs. an API/auth failure while online).
+     * Meaningless when [garageLoadError] is null.
+     */
     val garageLoadOffline: Boolean = false,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
@@ -241,8 +281,10 @@ data class UiState(
 
     fun sectionsFor(v: Vehicle): List<String> = sectionOrders[v.vin] ?: DEFAULT_SECTIONS
 
-    /** Effective powertrain: user override, else inferred from the API
-     *  ([com.bloo.bluelink.data.resolvePowertrain], shared with CarAlerts). */
+    /**
+     * Effective powertrain: user override, else inferred from the API
+     * ([com.bloo.bluelink.data.resolvePowertrain], shared with CarAlerts).
+     */
     fun powertrainOf(v: Vehicle): Powertrain =
         com.bloo.bluelink.data.resolvePowertrain(v, powertrains[v.vin])
 
@@ -252,30 +294,37 @@ data class UiState(
     /** Burns fuel (everything except a pure EV). */
     fun hasFuel(v: Vehicle): Boolean = powertrainOf(v) != Powertrain.EV
 
-    /** Effective head-unit generation: user override, else API inference. Not overridable where
-     *  [com.bloo.bluelink.data.platformOverridable] is false. */
+    /**
+     * Effective head-unit generation: user override, else API inference. Not overridable where
+     * [com.bloo.bluelink.data.platformOverridable] is false.
+     */
     fun platformOf(v: Vehicle): VehiclePlatform =
         platforms[v.vin] ?: if (v.isGen5W) VehiclePlatform.GEN5W else VehiclePlatform.CCNC
 
     /** [com.bloo.bluelink.data.isGen5W] honouring the user override; all UI gates read this. */
     fun isGen5WEffective(v: Vehicle): Boolean = platformOf(v) == VehiclePlatform.GEN5W
 
-    /** [com.bloo.bluelink.data.supportsConnectedStore] honouring the override; Kia is always eligible. */
+    /**
+     * [com.bloo.bluelink.data.supportsConnectedStore] honouring the override; Kia is always
+     * eligible.
+     */
     fun supportsConnectedStoreEffective(v: Vehicle): Boolean =
         v.brand == com.bloo.bluelink.data.Brand.KIA || (v.platformOverridable && platformOf(v) == VehiclePlatform.CCNC)
 
     /**
-     * Whether [section] has anything to show for [v]; the one predicate every section list
-     * filters through. Caller-specific gates (the cover's "charge" hasBattery check,
-     * CompactKnownTiles membership) are applied on top.
+     * Whether [section] has anything to show for [v]; the one predicate every section list filters
+     * through. Caller-specific gates (the cover's "charge" hasBattery check, CompactKnownTiles
+     * membership) are applied on top.
      */
     fun isSectionAvailable(v: Vehicle, section: String): Boolean {
         return when (section) {
             "ai" -> aiEnabled
-            // Trips: EV-only, not Gen5W, and only Hyundai/Genesis US has the endpoint (Brand.supportsTrips).
-            // An unavailable section would leave a phantom slot or a blank swipeable page.
+            // Trips: EV-only, not Gen5W, and only Hyundai/Genesis US has the endpoint
+            // (Brand.supportsTrips). An unavailable section would leave a phantom slot or a blank
+            // swipeable page.
             "trips" -> hasBattery(v) && !isGen5WEffective(v) && v.brand.supportsTrips
-            // `!updateTileDismissed`: a dismissed tile renders nothing and would leave a phantom slot.
+            // `!updateTileDismissed`: a dismissed tile renders nothing and would leave a phantom
+            // slot.
             "update" -> updateAvailable != null && !updateTileDismissed
             else -> true
         }
@@ -303,7 +352,8 @@ data class UiState(
 
     /**
      * The car's best-known speed: the tracked location's, else the last status's. One accessor so
-     * [isDriving] and [drivingLabel] agree; `locations` is fresher but only written with lat AND lon.
+     * [isDriving] and [drivingLabel] agree; `locations` is fresher but only written with lat AND
+     * lon.
      */
     fun speedOf(v: Vehicle): Double? =
         locations[v.vin]?.speed ?: statusFor(v)?.vehicleLocation?.speed?.value

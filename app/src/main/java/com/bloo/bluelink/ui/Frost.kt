@@ -31,23 +31,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 // The frost's own cool-ice accents, named so the three cannot drift apart as bare hex.
-// A deliberately separate, cold-white family from the brand palette: frost is about a frozen
-// surface, not the app's accent colour, so these stay their own small set.
 private val FrostIceVeil = Color(0xFFDCEBFF)
 private val FrostIceRim = Color(0xFFBFE3FF)
 private val FrostIceEdge = Color(0xFF8FD8FF)
 
-/**
- * The app's one "this is switched off right now" look: frost. Not a grey wash. The content goes soft
- * behind a clear, cool veil of ice, brighter at the top and clearing toward the bottom, with a thin
- * frosted rim catching light, so a locked or unavailable thing still reads as something real you
- * can see, just behind glass, rather than something broken or dimmed.
- *
- * [active] animates the frost in and out. The blur needs Android 12; before that (or under battery
- * saver, see [canBlurBackdrops]) the content is faded a little instead, under the same veil.
- * [blurRadius] is how soft the content gets: a button needs less than a panel of sliders. [rim]
- * draws the frosted outline, which a panel wants and a button (already outlined) does not.
- */
+/** Not a grey wash. */
 @Composable
 internal fun Modifier.frosted(
     active: Boolean,
@@ -109,7 +97,9 @@ internal fun Modifier.frosted(
         )
 }
 
-/** The pill that says why something is frozen: a snowflake-cool lock and the reason, in clear glass. */
+/**
+ * The pill that says why something is frozen: a snowflake-cool lock and the reason, in clear glass.
+ */
 @Composable
 internal fun FrostMessage(message: String, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme

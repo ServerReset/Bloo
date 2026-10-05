@@ -34,7 +34,10 @@ import com.bloo.bluelink.data.setHapticsEnabled
 import com.bloo.bluelink.data.setPebbleOutline
 import com.bloo.bluelink.data.setThemeMode
 
-/** The "Visuals" card: theme and colour, font, units, text scale, the search bubble, and the welcome cards. */
+/**
+ * The "Visuals" card: theme and colour, font, units, text scale, the search bubble, and the welcome
+ * cards.
+ */
 @Composable
 internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
     SettingsCard(
@@ -45,8 +48,9 @@ internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: 
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             ThemeGroups(appearance, advanced, vm)
-            // SIMPLE, not advanced: Atkinson Hyperlegible is a typeface for low vision, and an accessibility
-            // choice behind "advanced" is the one the people who need it are least likely to find.
+            // SIMPLE, not advanced: Atkinson Hyperlegible is a typeface for low vision, and an
+            // accessibility choice behind "advanced" is the one the people who need it are least
+            // likely to find.
             FontGroup(appearance, vm)
             SettingsGroup("Units") {
                 UnitSystemRow(appearance, vm)
@@ -107,7 +111,10 @@ internal fun SoundsVibrationCardContent(appearance: SettingsStore.Appearance, vm
     ) {}
 }
 
-/** The theme groups of the Display card: light or dark, the background, colour and style. The finer controls are advanced. */
+/**
+ * The theme groups of the Display card: light or dark, the background, colour and style. The finer
+ * controls are advanced.
+ */
 @Composable
 private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {

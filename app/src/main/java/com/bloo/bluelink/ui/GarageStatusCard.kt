@@ -43,14 +43,11 @@ import kotlin.math.max
 
 // --- Garage status card -----------------------------------------------
 
-/**
- * The garage pager's page shown in place of a car when there are none, like Settings after it.
- * Only the card's content: GarageScreen supplies the backdrop, scrim and blur source. [Refreshable] provides
- * the retry, so pulling down calls [AppViewModel.loadGarage].
- */
+/** The garage pager's page shown in place of a car when there are none, like Settings after it. */
 @Composable
 internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState: HazeState? = null) {
-    // Derived reads of the four fields it draws, so other UiState emissions don't recompose this pager page.
+    // Derived reads of the four fields it draws, so other UiState emissions don't recompose this
+    // pager page.
     val accounts by remember { derivedStateOf { state.value.accounts } }
     val garageLoadError by remember { derivedStateOf { state.value.garageLoadError } }
     val garageLoadOffline by remember { derivedStateOf { state.value.garageLoadOffline } }
@@ -92,7 +89,8 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
         launch { contentOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
 
-    // loadGarage() sets state.loading (not state.refreshing, which covers one car's fetch), so the pull gesture tracks that.
+    // loadGarage() sets state.loading (not state.refreshing, which covers one car's fetch), so the
+    // pull gesture tracks that.
     Refreshable(refreshing = loading, onRefresh = { vm.loadGarage() }) {
         Box(
             Modifier
