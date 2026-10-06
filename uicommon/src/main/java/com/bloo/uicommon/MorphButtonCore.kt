@@ -1,15 +1,13 @@
 package com.bloo.uicommon
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.LocalIndication
@@ -37,7 +35,7 @@ import kotlin.math.roundToInt
  *
  * - Morph: a pill at rest, a rounded rectangle while [active] or pressed. [active] also drives the
  *   highlight colour ([activeContainerColor], theme primary by default): one state, one colour.
- * - Press and click: pressed is read from [interactionSource]; [onLongClick] rides `combinedClickable`.
+ * - Press and click: pressed is read from [interactionSource]; the click rides `clickable`.
  * - Container colours only: stays painted when disabled (only content dims). Content colour is the
  *   wrapper's job (this is foundation-only, no LocalContentColor).
  *
@@ -45,8 +43,8 @@ import kotlin.math.roundToInt
  * [morphedCornerPercent] (28), exact on every height. Asymmetric corners come from [shapeForCorner],
  * which receives the raw [morph] progress (0 = pill, 1 = morphed) and the animated [cornerPercent].
  *
- * Not a `Button`: M3's has no long-click slot and cannot animate corner percent per frame, so this
- * draws a flat filled shape with `combinedClickable`, clipped so the ripple follows the pill.
+ * Not a `Button`: M3's has no per-frame corner-percent morph and cannot animate corner percent per
+ * frame, so this draws a flat filled shape with `clickable`, clipped so the ripple follows the pill.
  */
 @Composable
 fun MorphButtonCore(
@@ -66,18 +64,10 @@ fun MorphButtonCore(
     /** Border used while disabled (overrides [border]). */
     disabledBorder: BorderStroke? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
-    /**
-     * Hold-to-act variety: the chevron easter egg, the cover screen's flash-lights. Null means
-     * plain click-only, exactly like M3 `Button`.
-     */
-    onLongClick: (() -> Unit)? = null,
     pillCornerPercent: Float = PillCornerPercent,
     morphedCornerPercent: Float = MorphedCornerPercent,
     /** Asymmetric shapes get the raw morph progress and animated corner percent; null is the plain pill. */
     shapeForCorner: ((morph: Float, cornerPercent: Int) -> Shape)? = null,
-    /** Spring for the morph; default is gentle (StiffnessLow). */
-    morphSpring: SpringSpec<Float> = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-    colorSpring: FiniteAnimationSpec<Color> = spring(stiffness = Spring.StiffnessMediumLow),
     content: @Composable RowScope.() -> Unit,
 ) {
     val pressed by interactionSource.collectIsPressedAsState()
@@ -100,10 +90,7 @@ fun MorphButtonCore(
             disabledContainerColor = disabledContainerColor,
             disabledBorder = disabledBorder,
             border = border,
-            morphSpring = morphSpring,
-            colorSpring = colorSpring,
             enabled = enabled,
-            onLongClick = onLongClick,
             onClick = onClick,
         )
         // Stable content drawn over the chrome; taps reach the chrome below. Wrap-content: gives the button its size.
@@ -118,7 +105,7 @@ fun MorphButtonCore(
 }
 
 /** The clickable animated half: morphing shape + clip (ripple tracks it), sprung background, press
- *  scale, click and long-click. The ONLY composable that recomposes per animation frame. */
+ *  scale and click. The ONLY composable that recomposes per animation frame. */
 @Composable
 private fun BoxScope.MorphChrome(
     pressed: Boolean,
@@ -132,10 +119,7 @@ private fun BoxScope.MorphChrome(
     disabledContainerColor: Color?,
     disabledBorder: BorderStroke?,
     border: BorderStroke?,
-    morphSpring: SpringSpec<Float>,
-    colorSpring: FiniteAnimationSpec<Color>,
     enabled: Boolean,
-    onLongClick: (() -> Unit)?,
     onClick: () -> Unit,
 ) {
     // `active` drives the morph only for a STANDALONE button (shapeForCorner == null). Connected halves
@@ -143,14 +127,14 @@ private fun BoxScope.MorphChrome(
     // outer cap and seam corners out of agreement with its neighbour; they react to PRESS only.
     val morph by animateFloatAsState(
         targetValue = if ((active && shapeForCorner == null) || pressed) 1f else 0f,
-        animationSpec = morphSpring,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphProgress",
     )
     val cornerPercent = (pillCornerPercent + (morphedCornerPercent - pillCornerPercent) * morph).roundToInt()
     val shape = shapeForCorner?.invoke(morph, cornerPercent) ?: RoundedCornerShape(percent = cornerPercent)
     val bg by animateColorAsState(
         targetValue = if (active) activeContainerColor else containerColor,
-        animationSpec = colorSpring,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "morphBg",
     )
     val fill = if (!enabled && disabledContainerColor != null) disabledContainerColor else bg
@@ -172,11 +156,10 @@ private fun BoxScope.MorphChrome(
                     Modifier.background(color = fill, shape = shape)
                 },
             )
-            .combinedClickable(
+            .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 enabled = enabled,
-                onLongClick = onLongClick,
                 onClick = onClick,
             ),
     )

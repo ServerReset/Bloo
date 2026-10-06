@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.LocalContentColor
@@ -68,8 +67,6 @@ fun MorphButton(
     // Asymmetric shape replacing the plain pill-to-square morph (connected group segment, split
     // button half). Receives the raw morph progress (0 = pill, 1 = morphed) and the corner percent.
     shapeForCorner: ((morph: Float, cornerPercent: Int) -> Shape)? = null,
-    /** Hold-to-act action (chevron easter egg, cover flash-lights). */
-    onLongClick: (() -> Unit)? = null,
     /** Haptic for a plain click; null = the standard click() pulse. */
     onClickHaptic: (() -> Unit)? = null,
     /**
@@ -158,7 +155,6 @@ fun MorphButton(
                 disabledContainerColor = glassTint(canBlurBackdrops()),
                 disabledBorder = BorderStroke(1.dp, hairlineColor()),
                 interactionSource = interactionSource,
-                onLongClick = onLongClick,
                 pillCornerPercent = pillCornerPercent,
                 morphedCornerPercent = morphedCornerPercent,
                 shapeForCorner = shapeForCorner,
