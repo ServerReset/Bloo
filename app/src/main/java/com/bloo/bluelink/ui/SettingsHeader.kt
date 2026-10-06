@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.contentDescription
@@ -245,12 +246,25 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                         )
                     }
                     // The Shizuku row is gated on Shizuku being present; the card and update
-                    // controls are not.
+                    // controls are not. When it is NOT present, point the user at how to get it --
+                    // silently hiding the whole seamless-install option left no way to discover it.
                     if (state.shizukuAvailable) {
                         Spacer(Modifier.height(GapHairline))
                         ToggleRow("Install seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
                             vm.setSeamlessInstallShizuku(it)
                         }
+                    } else {
+                        Spacer(Modifier.height(GapHairline))
+                        BodySmallText(
+                            "Install Shizuku to update without tapping through Android's installer each time. " +
+                                "It runs the install as a local ADB service, no root needed.",
+                        )
+                        Spacer(Modifier.height(GapHairline))
+                        SafeMorphTextButton(
+                            "Get Shizuku",
+                            onClick = { openUrl(context, "https://shizuku.rikka.app/") },
+                            icon = Icons.AutoMirrored.Filled.OpenInNew,
+                        )
                     }
                     // The full download-install flow, driven by the same state machine as the
                     // update pebble and rendered through the shared UpdateStatusLine.

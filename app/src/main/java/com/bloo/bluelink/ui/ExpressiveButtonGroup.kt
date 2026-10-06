@@ -43,6 +43,12 @@ fun ExpressiveButtonGroup(
      * of capping each member at its glyph width, so the row still spans its full width.
      */
     stretchCompact: Boolean = false,
+    /**
+     * Whether a member alone on its line may expand to fill the line while pressed. True for a
+     * labelled action alone on its row (a lone "Sync now"); FALSE for a connected cluster (the
+     * pebble header chevron, the lock group), where a single icon button must never balloon.
+     */
+    growWhenAlone: Boolean = true,
     content: @Composable ExpressiveButtonGroupScope.() -> Unit,
 ) {
     // Natural (unpressed) child widths from the last resting pass. Deliberately not snapshot state:
@@ -310,7 +316,7 @@ fun ExpressiveButtonGroup(
                 // redistribution above left it unchanged and its press would be a corner-only
                 // change with NO growth. Instead it EXPANDS to fill the line's budget: laid out
                 // left-aligned at rest, full-width while pressed.
-                if (memberIdx.size == 1) {
+                if (memberIdx.size == 1 && growWhenAlone) {
                     val i = memberIdx[0]
                     if (press[i] > 0f) {
                         val fill = minOf(room, maxSinglePx).coerceAtLeast(basis[i])

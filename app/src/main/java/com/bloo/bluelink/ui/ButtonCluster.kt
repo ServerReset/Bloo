@@ -84,6 +84,9 @@ internal fun ButtonCluster(
         horizontalAlignment = horizontalAlignment,
         // One connected control must never break onto two lines: when room runs out it compacts to symbols.
         wrap = false,
+        // A lone member of a cluster (the pebble header chevron) must NOT expand to fill the row on
+        // press -- it is a connected control, not a standalone action button.
+        growWhenAlone = false,
     ) {
         buttons.forEachIndexed { i, b ->
             key(i) {

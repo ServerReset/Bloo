@@ -99,7 +99,9 @@ internal val ControlHeight = 84.dp
 
 /** Uniform collapsed-header height so every pebble lines up at the same size. */
 internal val PebbleHeaderHeight = ControlHeight
-internal val PebbleCornerCollapsed = 38.dp
+
+/** A collapsed pebble's corner: half its height, so it is a true pill. */
+internal val PebbleCornerCollapsed = ControlHeight / 2
 internal val PebbleCornerExpanded = 20.dp
 
 /** The charge bar's height, shared by every surface that draws it. */
