@@ -2,7 +2,6 @@ package com.bloo.uicommon
 
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -17,5 +16,8 @@ val FieldShape: RoundedCornerShape = RoundedCornerShape(18.dp)
 
 /** The shared inner (seam) corner: a soft nub at rest that opens toward the morphed radius as
  *  the segment is pressed. Stated in Dp, so it is the same physical corner at any row height. */
-fun seamCorner(morph: Float, idle: Dp = 10.dp, morphed: Dp = 16.dp): CornerSize =
-    CornerSize(idle + (morphed - idle) * morph)
+fun seamCorner(morph: Float): CornerSize {
+    val idle = 10.dp
+    val morphed = 16.dp
+    return CornerSize(idle + (morphed - idle) * morph)
+}

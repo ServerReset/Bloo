@@ -349,11 +349,7 @@ enum class SeatLevel(val apiValue: Int, val label: String) {
     }
 }
 
-/**
- * Wraps the range figure for one fuel/energy source; the API models this as a list (see
- * [EvStatus.drvDistance]) even though in practice only the first entry (the car's primary energy
- * source) is ever read.
- */
+/** Steering-wheel heater level for the US Blue Link climate command (Off / Low / High). */
 @Serializable
 enum class WheelHeatLevel(val apiValue: Int, val label: String) {
     OFF(0, "Off"),
@@ -367,10 +363,7 @@ enum class WheelHeatLevel(val apiValue: Int, val label: String) {
     }
 }
 
-/**
- * The actual range value, one level deeper than [DrvDistance] — the API nests it this way to allow
- * (unused here) per-fuel-type breakdowns.
- */
+/** The US Blue Link climate command: temperature, defrost, duration, and the seat/wheel heat levels. */
 @Serializable
 data class ClimateRequest(
     val tempF: Int,
