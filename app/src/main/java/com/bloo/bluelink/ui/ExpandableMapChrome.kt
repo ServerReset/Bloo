@@ -82,7 +82,7 @@ internal fun MapFeatureRow(
     features: List<MapFeature>,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier.padding(horizontal = 12.dp, vertical = GapRow)) {
+    Box(modifier.padding(horizontal = GapGroup, vertical = GapRow)) {
         ActionRow {
             features.forEach { feature ->
                 MorphActionButton(label = feature.label, icon = feature.icon, onClick = feature.onClick, enabled = feature.enabled)
@@ -144,7 +144,7 @@ internal fun MapTopBar(
                 .fillMaxWidth()
                 .then(dragModifier)
                 .heightIn(min = 60.dp)
-                .padding(horizontal = 18.dp),
+                .padding(horizontal = GapPage),
         ) {
             // Reserves room on the end for the refresh icon (never under it) regardless of
             // alignment, since both float independently in this Box rather than sharing a Row's own
@@ -197,7 +197,7 @@ internal fun MapTopBar(
                 // off the edge.
                 GlassSurface(
                     shape = CircleShape,
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp).size(40.dp),
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = GapGroup).size(40.dp),
                     hazeState = mapHazeState,
                     onClick = onRefreshLocation,
                     contentDescription = "Refresh location",

@@ -369,7 +369,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             Spacer(Modifier.height(GapSection))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 GlassSurface(shape = CircleShape, liquid = false, tint = scheme.surfaceContainerHighest.copy(alpha = 0.7f)) {
-                    OnboardingDots(count = steps.size, current = pageIndex, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+                    OnboardingDots(count = steps.size, current = pageIndex, modifier = Modifier.padding(horizontal = GapSection, vertical = GapGroup))
                 }
             }
 
@@ -396,7 +396,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                             alpha = 1f - 0.45f * away
                         }
                         .verticalScroll(rememberScrollState())
-                        .padding(top = 16.dp, bottom = 24.dp),
+                        .padding(top = GapSection, bottom = GapBlock),
                 ) {
                     val vehicle = step.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
                     OnboardingGlassCard(
@@ -434,9 +434,9 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 shape = ExtraLargeShape,
                 liquid = false,
                 tint = scheme.surfaceContainerHighest.copy(alpha = 0.7f),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = GapPage, vertical = GapGroup),
             ) {
-                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
+                Column(Modifier.fillMaxWidth().padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                     ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
                         if (pageIndex > 0) {
                             SafeMorphTextButton(text = "Back", onClick = { goBack() })

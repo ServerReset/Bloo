@@ -150,7 +150,7 @@ internal fun LoginScreen(
                     .fillMaxWidth()
                     .widthIn(max = 480.dp)
                     .statusBarsPadding()
-                    .padding(horizontal = 24.dp)
+                    .padding(horizontal = GapBlock)
                     .padding(top = if (shortScreen) 16.dp else 48.dp, bottom = 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(GapGroup),
@@ -203,12 +203,12 @@ internal fun LoginScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 480.dp)
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 24.dp),
+                        .padding(horizontal = GapSection)
+                        .padding(bottom = GapBlock),
                     contentAlignment = Alignment.TopStart,
                 ) {
                     Column(
-                        Modifier.fillMaxWidth().padding(20.dp),
+                        Modifier.fillMaxWidth().padding(GapPage),
                         verticalArrangement = Arrangement.spacedBy(GapGroup),
                     ) {
                         // Where the car lives, then which account: two selectors, one thought.

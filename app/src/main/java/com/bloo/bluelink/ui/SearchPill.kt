@@ -197,11 +197,11 @@ internal fun SearchPill(
             ) { (shape, isOpen) ->
                 when {
                     isOpen -> Row(
-                        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                        Modifier.fillMaxSize().padding(horizontal = GapSection),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(GapGroup))
                         Box(Modifier.weight(1f)) {
                             BasicTextField(
                                 value = query,
@@ -245,7 +245,7 @@ internal fun SearchPill(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(GapGroup))
                         Text("Search", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
                     }
                     // Closed BUBBLE: the glyph alone; contentDescription is on the icon since there

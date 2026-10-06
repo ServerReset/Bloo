@@ -109,7 +109,7 @@ internal fun GlassAlertDialog(
     ) {
         GlassSurface(
             shape = ExtraLargeShape,
-            modifier = Modifier.padding(horizontal = 24.dp).widthIn(max = 560.dp).fillMaxWidth(),
+            modifier = Modifier.padding(horizontal = GapBlock).widthIn(max = 560.dp).fillMaxWidth(),
             tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.97f),
         ) { card() }
     }
@@ -125,7 +125,7 @@ private fun DialogCard(
     buttons: @Composable ColumnScope.() -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    Column(Modifier.padding(24.dp)) {
+    Column(Modifier.padding(GapBlock)) {
         if (icon != null) {
             Box(
                 Modifier.size(48.dp).background(scheme.primaryContainer, CircleShape),

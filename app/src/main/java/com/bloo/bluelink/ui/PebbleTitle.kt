@@ -117,7 +117,7 @@ internal fun PebbleTitleRow(
         // box.
         .weight(1f, fill = false)
         // Minimum gap before titleTrailing, on the title so SpaceBetween still sees two children.
-        .then(if (titleTrailingAtEnd) Modifier.padding(end = 12.dp) else Modifier)
+        .then(if (titleTrailingAtEnd) Modifier.padding(end = GapGroup) else Modifier)
     if (growTitleOnExpand) {
         // Only the hero flips atRestScale. The Crossfade hides the pop when the scaled and native
         // paths swap; CenterStart keeps their glyphs aligned despite differing box heights.

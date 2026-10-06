@@ -155,7 +155,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
             // Asymmetric padding matches pebble header alignment. Height lives here, not on the
             // Surface, so the pebble keeps its resting silhouette; heightIn(min) lets it grow with
             // large accessibility fonts.
-            Box(Modifier.fillMaxWidth().heightIn(min = ControlHeight).padding(start = 12.dp, end = 4.dp)) {
+            Box(Modifier.fillMaxWidth().heightIn(min = ControlHeight).padding(start = GapGroup, end = GapHairline)) {
                 // PrimaryActions' own default start padding (26.dp) plus this Box's 12.dp put the
                 // lock icon noticeably further right than every other pebble's header icon (Charge,
                 // Climate, ...), which only ever get Pebble's flat PebbleContentInset row padding.

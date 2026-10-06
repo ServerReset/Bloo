@@ -148,7 +148,7 @@ internal fun ToastHost(
             // the gesture bar otherwise.
             .imePadding()
             .navigationBarsPadding()
-            .padding(horizontal = ToastEdge, vertical = 8.dp),
+            .padding(horizontal = ToastEdge, vertical = GapRow),
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         state.items.forEach { toast ->
@@ -227,12 +227,12 @@ private fun ToastCard(toast: Toast, pop: State<Float>, onDismiss: () -> Unit, ha
             modifier = Modifier
                 .fillMaxWidth()
                 // The search pill's height, so a toast and the bar it emerges from read as the same element.
-                .heightIn(min = 52.dp)
+                .heightIn(min = ButtonTargetHeight)
                 .semantics { liveRegion = LiveRegionMode.Polite }
                 .then(swipe),
         ) {
             Row(
-                Modifier.padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                Modifier.padding(start = GapGroup, end = GapHairline, top = GapRow, bottom = GapRow),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconBadge(icon = icon, tint = accent, size = 36.dp, iconSize = 20.dp)

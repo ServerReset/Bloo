@@ -211,7 +211,7 @@ private fun HourCell(hour: HourPoint, fahrenheit: Boolean, label: String, modifi
     Column(
         modifier.width(56.dp).outlinedPanel(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(GapHairline),
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         WeatherGlyph(hour.condition, true, 22.dp)

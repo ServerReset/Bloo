@@ -68,7 +68,7 @@ fun WearCompanionRow(
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(20.dp),
         )
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(GapGroup))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -160,7 +160,7 @@ internal fun DriveSyncSetupDialog(
                         .fillMaxWidth()
                         .clip(StandardShape)
                         .background(scheme.errorContainer.copy(alpha = 0.5f))
-                        .padding(16.dp),
+                        .padding(GapSection),
                     verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
                     Text(

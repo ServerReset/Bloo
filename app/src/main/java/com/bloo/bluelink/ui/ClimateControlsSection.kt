@@ -72,7 +72,7 @@ internal fun ClimateControlsSection(
             enter = expandEnterSized(),
             exit = expandExitSized(),
         ) {
-            Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth().padding(bottom = GapRow), horizontalArrangement = Arrangement.SpaceBetween) {
                 BodySmallText("Set temperature")
                 // color resolved explicitly to onSurface -- same fix, same reason as the update
                 // pebble's own AnimatedValue calls: BasicText (which this renders through) doesn't

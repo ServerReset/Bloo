@@ -101,7 +101,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = GapPage),
             contentAlignment = Alignment.Center,
         ) {
             // The shared GlassSurface card shell, blurring the real Aurora behind it.
@@ -121,7 +121,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(GapSection),
-                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 32.dp),
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = GapHero),
                 ) {
                     // The tonal icon badge shared with SettingsCard headers.
                     val badgeTint = if (loadFailed) scheme.error else scheme.onSurfaceVariant

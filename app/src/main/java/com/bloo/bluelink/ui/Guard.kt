@@ -187,7 +187,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             Modifier
                 .align(Alignment.Center)
                 .widthIn(max = 420.dp)
-                .padding(horizontal = 32.dp, vertical = 24.dp),
+                .padding(horizontal = GapHero, vertical = GapBlock),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (showBiometric) {
@@ -200,7 +200,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     hazeState = LocalBackdropHaze.current,
                 ) {
                 Column(
-                    Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+                    Modifier.padding(horizontal = GapBlock, vertical = GapBlock),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                 // --- Classic biometric prompt ---------------------------------
@@ -210,7 +210,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     modifier = Modifier.size(72.dp),
                     tint = lockFg,
                 )
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(GapPage))
                 Text(
                     "Bloo is locked",
                     style = MaterialTheme.typography.headlineSmall,
@@ -265,8 +265,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     modifier = Modifier.fillMaxWidth(),
                     hazeState = LocalBackdropHaze.current,
                 ) {
-                    Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(Modifier.padding(horizontal = GapBlock, vertical = GapPage)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapSection)) {
                             IconBadge(
                                 icon = AppIcons.Lock,
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -316,7 +316,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                         val pinUnlockSource = remember { MutableInteractionSource() }
                         MorphButton(
                             onClick = { attemptPin() },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = ButtonTargetHeight),
                             interactionSource = pinUnlockSource,
                             enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
                             expressive = true,

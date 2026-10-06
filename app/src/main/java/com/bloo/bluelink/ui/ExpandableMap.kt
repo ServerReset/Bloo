@@ -195,7 +195,7 @@ internal fun ExpandableMapLayer(
                     dragModifier = Modifier.pullDownToDismiss(dragPx, scope, density, dragSpring, ::close),
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                        .padding(start = GapSection, end = GapSection, top = GapSection)
                         .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
                 )
             }

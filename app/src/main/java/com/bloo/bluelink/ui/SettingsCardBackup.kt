@@ -140,11 +140,11 @@ private fun SyncErrorBanner(message: String) {
             .fillMaxWidth()
             .clip(StandardShape)
             .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
-            .padding(horizontal = 12.dp, vertical = GapRow),
+            .padding(horizontal = GapGroup, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Filled.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(GapGroup))
         BodySmallText(message, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
     }
 }

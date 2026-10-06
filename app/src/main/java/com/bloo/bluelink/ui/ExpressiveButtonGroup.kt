@@ -72,6 +72,8 @@ fun ExpressiveButtonGroup(
             // again.
             val hysteresisPx = CompactHysteresis.roundToPx()
             val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+            // A lone button's press-to-fill is capped here, not stretched across a whole row.
+            val maxSinglePx = MaxSingleButtonWidth.roundToPx()
 
             // Press fractions are read at layout time so a press invalidates layout only. Only
             // children carrying ExpressiveGroupData are members; Spacers, labels and icons keep
@@ -311,7 +313,7 @@ fun ExpressiveButtonGroup(
                 if (memberIdx.size == 1) {
                     val i = memberIdx[0]
                     if (press[i] > 0f) {
-                        val fill = room.coerceAtLeast(basis[i])
+                        val fill = minOf(room, maxSinglePx).coerceAtLeast(basis[i])
                         exact[i] = base[i] + (fill - base[i]) * press[i]
                     }
                 }

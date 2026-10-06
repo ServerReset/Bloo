@@ -173,7 +173,7 @@ private fun CreditRow(entry: CreditEntry) {
     val context = LocalContext.current
     Row(
         Modifier.fillMaxWidth().outlinedPanel(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(GapSection),
     ) {
         IconBadge(
             entry.icon,
@@ -200,7 +200,7 @@ private fun CreditRow(entry: CreditEntry) {
                     .hapticClickable { openUrl(context, entry.url) }
                     .wrapContentWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(GapHairline),
             ) {
                 Text(
                     entry.url.removePrefix("https://").removePrefix("http://"),

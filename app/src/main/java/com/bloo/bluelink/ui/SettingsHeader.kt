@@ -169,7 +169,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
         shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        Column(Modifier.padding(20.dp)) {
+        Column(Modifier.padding(GapPage)) {
             // The chip's compactness is handled by MorphButtonLabel.
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconBadge(
@@ -199,7 +199,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     onToggle = { vm.togglePebble(SettingsPseudoVehicle, "Updates") },
                 )
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(GapSection))
             // The build number is the app's real version (versionName stays "0.1"), so it carries
             // the hero stat like a car's charge % or range, with the full label as caption.
             val headline = state.updateAvailable?.takeIf { !state.updateTileDismissed }
@@ -213,8 +213,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
                 )
-                Spacer(Modifier.width(10.dp))
-                LabelText(label, modifier = Modifier.padding(bottom = 6.dp))
+                Spacer(Modifier.width(GapGroup))
+                LabelText(label, modifier = Modifier.padding(bottom = GapRow))
             }
             AnimatedVisibility(
                 visible = expanded,
@@ -271,7 +271,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                     .fillMaxWidth()
                                     .clip(StandardShape)
                                     .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f))
-                                    .padding(16.dp),
+                                    .padding(GapSection),
                                 verticalArrangement = Arrangement.spacedBy(GapRow),
                             ) {
                                 Text(

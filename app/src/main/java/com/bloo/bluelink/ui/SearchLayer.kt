@@ -222,7 +222,7 @@ internal fun SearchLayer(
             enter = expandEnter(Alignment.Bottom),
             exit = expandExit(Alignment.Bottom),
             modifier = Modifier.align(Alignment.BottomCenter)
-                .padding(bottom = barH + edge + bottomInset + 8.dp),
+                .padding(bottom = barH + edge + bottomInset + GapRow),
         ) {
             val panelShape = ExtraLargeShape
             // GlassSurface (GlassChrome.kt): the shared fill/rim/shadow.
@@ -236,8 +236,8 @@ internal fun SearchLayer(
                         .fillMaxWidth()
                         .heightIn(max = minOf(360.dp, freeAbovePill))
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                        .padding(GapSection),
+                    verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
                     if (query.isNotBlank()) {
                         // Fewer results while the keyboard is up. This is what the new ranking

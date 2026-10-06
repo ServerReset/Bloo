@@ -39,7 +39,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -160,10 +159,6 @@ fun MorphButtonLabel(
         return
     }
     val gap = ButtonIconGap
-    // Lets the enclosing MorphButton learn the label and whether it shrank to its symbol (for the
-    // long-press hint).
-    val hint = LocalLabelHint.current
-    SideEffect { hint?.describe(label, icon) }
     Layout(
         content = {
             MorphButtonGlyph(icon, pending, iconSize, spinning, iconTint)
@@ -190,22 +185,18 @@ fun MorphButtonLabel(
                     // caches its layout; maxIntrinsicWidth() re-laid it out every frame of a
                     // button-group press.
                     val text = measurables[1].measure(free)
-                    // Whole label or no label -- anything in between is a truncated word. (Holding
-                    // a symbol-only button shows its name in a bubble above it instead, see
-                    // LabelHint.)
-                    if (hint?.glyphOnly == true || constraints.maxWidth < glyph.width + gapPx + text.width) {
+                    // Whole label or no label -- anything in between is a truncated word.
+                    if (constraints.maxWidth < glyph.width + gapPx + text.width) {
                         val w = glyph.width.coerceAtMost(constraints.maxWidth)
                         // Height still accounts for the undrawn label.
                         val h = maxOf(glyph.height, text.height)
                         return layout(w, h) {
-                            hint?.collapsed = true
                             glyph.place((w - glyph.width) / 2, (h - glyph.height) / 2)
                         }
                     }
                     val w = glyph.width + gapPx + text.width
                     val h = maxOf(glyph.height, text.height)
                     return layout(w, h) {
-                        hint?.collapsed = false
                         glyph.place(0, (h - glyph.height) / 2)
                         text.place(glyph.width + gapPx, (h - text.height) / 2)
                     }

@@ -95,7 +95,7 @@ internal fun UpdateReleaseNotes(
     ) {
         Column(
             Modifier
-                .padding(12.dp)
+                .padding(GapGroup)
                 // Animate the card's own height when "Show more" expands the notes (and back when
                 // it collapses), so the box grows/shrinks smoothly instead of jumping to the new
                 // size on one frame. Same spring the rest of the update card uses.
@@ -209,7 +209,7 @@ internal fun UpdateStatusLine(
         animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "updateStatusTint",
     )
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
         // A tonal badge behind the icon, not a bare glyph -- the same "icon gets its own coloured
         // circle" weight every pebble's stat hero leads with.
         IconBadgeContainer(containerColor = animatedStatusTint.copy(alpha = 0.15f), size = 36.dp) {

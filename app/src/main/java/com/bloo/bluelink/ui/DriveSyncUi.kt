@@ -114,14 +114,14 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             val live = liveWatch.takeIf { isSelf }
             val registered = registryWatches.takeIf { device.id == watchHost?.id && live == null }.orEmpty()
             live?.let { watch ->
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(GapRow))
                 WearCompanionRow(
                     name = watch.name,
                     detail = "Connected to this phone",
                     modifier = Modifier.padding(start = CompanionIndent),
                     onRemove = null,
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(GapRow))
                 CompanionActionRow(
                     label = "Sign watch in",
                     caption = "Lets it run your car without this phone",
@@ -130,7 +130,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                 )
             }
             registered.forEach { watch ->
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(GapRow))
                 WearCompanionRow(
                     name = watch.name,
                     detail = listOf(watch.model, com.bloo.bluelink.data.relativeLabel(watch.lastSeenMs))
@@ -142,7 +142,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             if (isSelf && live == null && registered.isEmpty()) {
                 // Under THIS phone on purpose: setting a watch up connects it to the device you are
                 // holding, and the placement says so.
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(GapRow))
                 CompanionActionRow(
                     label = "Set up watch",
                     caption = "Connects to ${device.name.ifBlank { "this phone" }}",

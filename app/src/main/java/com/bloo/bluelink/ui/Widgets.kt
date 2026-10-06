@@ -146,10 +146,9 @@ internal val HeaderCornerGap = 12.dp
 
 /**
  * The one shared size every free-floating header BUTTON -- [FloatingIcon]'s circle, and anything
- * meant to sit in the same row as one -- is drawn at, so two buttons on the same header always
- * share a vertical centre.
+ * meant to sit in the same row as one -- is drawn at. The app's one button height.
  */
-internal val HeaderButtonSize = 48.dp
+internal val HeaderButtonSize = ButtonTargetHeight
 
 /**
  * A small translucent circular icon button used as a floating overlay control. [outerPadding] is

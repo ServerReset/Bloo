@@ -58,7 +58,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
     ) {
         Row(
-            Modifier.padding(horizontal = 8.dp, vertical = GapHairline),
+            Modifier.padding(horizontal = GapRow, vertical = GapHairline),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null) {
@@ -99,12 +99,12 @@ internal fun StatusChip(
         modifier
             .clip(CircleShape)
             .background(tint.copy(alpha = 0.15f))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = GapGroup, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(GapRow))
         }
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.material3.LocalContentColor provides tint,

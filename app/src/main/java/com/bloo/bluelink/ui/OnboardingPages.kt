@@ -353,7 +353,7 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
             title = title,
             subtitle = body,
             badgeSize = 28.dp,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(GapSection),
         )
     }
 }

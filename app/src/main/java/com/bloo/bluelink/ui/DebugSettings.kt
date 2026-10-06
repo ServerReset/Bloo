@@ -53,7 +53,7 @@ private fun DebugInfoItem(
                     Modifier
                 }
             )
-            .padding(horizontal = 12.dp, vertical = GapRow),
+            .padding(horizontal = GapGroup, vertical = GapRow),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -80,7 +80,7 @@ private fun DebugInfoItem(
                 Icons.Filled.ContentCopy,
                 contentDescription = "Copy",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 8.dp).size(16.dp),
+                modifier = Modifier.padding(start = GapRow).size(16.dp),
             )
         }
     }

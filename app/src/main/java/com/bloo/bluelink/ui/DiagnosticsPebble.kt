@@ -149,7 +149,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
                     MaterialTheme.colorScheme.onSurfaceVariant
                 }
                 Row(
-                    Modifier.fillMaxWidth().padding(start = 20.dp),
+                    Modifier.fillMaxWidth().padding(start = GapPage),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
@@ -158,7 +158,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.onSurfaceVariant),
                     )
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(GapGroup))
                     Text(
                         row.label,
                         Modifier.weight(1f),

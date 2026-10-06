@@ -78,7 +78,7 @@ internal fun SyncDeviceRow(
             .clip(shape)
             .background(if (isPrimary) scheme.primaryContainer.copy(alpha = 0.40f) else Color.Transparent)
             .border(1.dp, if (isPrimary) scheme.primary.copy(alpha = 0.45f) else hairlineColor(), shape)
-            .padding(horizontal = 8.dp, vertical = GapRow),
+            .padding(horizontal = GapRow, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -87,14 +87,14 @@ internal fun SyncDeviceRow(
             tint = scheme.onSurfaceVariant,
             modifier = modifier.size(20.dp),
         )
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(GapGroup))
         Icon(
             if (isPrimary) Icons.Filled.Star else Icons.Filled.Smartphone,
             contentDescription = if (isPrimary) "Primary device" else null,
             tint = if (isPrimary) scheme.primary else scheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp),
         )
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(GapGroup))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -116,7 +116,7 @@ internal fun SyncDeviceRow(
                     DeviceHealth.UNKNOWN -> scheme.outlineVariant
                 }
                 Box(Modifier.size(7.dp).clip(CircleShape).background(dot))
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(GapRow))
                 val seen = when {
                     isSelf || health == DeviceHealth.ACTIVE -> "Active now"
                     else -> com.bloo.bluelink.data.relativeLabel(device.lastSeenMs).ifBlank { "Never synced" }
@@ -155,7 +155,7 @@ internal fun DeviceTag(text: String, color: Color) {
         style = MaterialTheme.typography.labelSmall,
         color = color,
         maxLines = 1,
-        modifier = Modifier.padding(start = 6.dp),
+        modifier = Modifier.padding(start = GapRow),
     )
 }
 

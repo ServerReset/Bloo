@@ -138,7 +138,7 @@ internal fun UpdateAvailableTile(
         ) {
             // Column, not Box: UpdateStatusLine emits two top-level siblings that a Box would stack
             // on top of each other.
-            Column(Modifier.padding(12.dp)) {
+            Column(Modifier.padding(GapGroup)) {
                 UpdateStatusLine(
                     deltaLabel, seamless, state, vm,
                     showDelta = info.run.displayTitle?.isNotBlank() == true,
@@ -167,7 +167,7 @@ internal fun UpdateAvailableTile(
                         hazeState = hazeState,
                         shadow = false,
                     ) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
+                        Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                             // Without Shizuku the OS installer gets in the way EVERY time, and the
                             // player-protect sheet is folded shut by default, so an update looks
                             // like it failed when the real answer is "expand it, then tap Install

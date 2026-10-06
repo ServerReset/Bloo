@@ -101,7 +101,7 @@ internal fun HotspotSlot(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp),
+                        .padding(horizontal = GapRow),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -110,7 +110,7 @@ internal fun HotspotSlot(
                         modifier = Modifier.size(12.dp),
                         tint = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(GapRow))
                     Text(
                         if (lifted) "Release to unpin" else sectionLabel(secondaryPebble),
                         style = MaterialTheme.typography.labelSmall,
@@ -166,7 +166,7 @@ internal fun HotspotSlot(
                         },
                     ) {
                         Box(
-                            Modifier.fillMaxWidth().padding(vertical = 20.dp, horizontal = 12.dp),
+                            Modifier.fillMaxWidth().padding(vertical = GapPage, horizontal = GapGroup),
                             contentAlignment = Alignment.Center,
                         ) {
                             MorphButtonLabel(

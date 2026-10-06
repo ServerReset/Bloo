@@ -70,7 +70,7 @@ class ButtonGroupLayoutTest {
     }
 
     @Test
-    fun aLoneButtonRestsNaturalAtTheStartAndFillsWhenPressed() {
+    fun aLoneButtonRestsNaturalAtTheStartAndGrowsToTheCapWhenPressed() {
         rule.setContent {
             BlooTheme {
                 Box(Modifier.width(rowWidth)) {
@@ -85,7 +85,12 @@ class ButtonGroupLayoutTest {
         assertTrue("a lone button rests narrower than its row", widthOf("lone") < rowWidth.value - 40f)
         assertEquals("and sits on the start edge", 0f, rest.left.value, 1.5f)
         rule.onNodeWithTag("lone").performTouchInput { down(center) }
-        rule.waitUntil(3_000) { widthOf("lone") > rowWidth.value - 8f }
+        // Pressed, it grows to the shared single-button cap -- NOT across the whole row.
+        rule.waitUntil(3_000) { widthOf("lone") >= MaxSingleButtonWidth.value - 2f }
+        assertTrue(
+            "a lone button never exceeds MaxSingleButtonWidth (was ${widthOf("lone")})",
+            widthOf("lone") <= MaxSingleButtonWidth.value + 2f,
+        )
         rule.onNodeWithTag("lone").performTouchInput { up() }
     }
 

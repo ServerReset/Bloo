@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -343,7 +344,9 @@ internal fun ChargeLimitPill(
                     else Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
                 }
             ),
-            Modifier.fillMaxWidth(),
+            // The same target height as every other button (the 11dp content padding alone left
+            // these a few dp short of the standard control height).
+            Modifier.fillMaxWidth().heightIn(min = ButtonTargetHeight),
         )
         Spacer(Modifier.height(GapRow))
         AnimatedSlider(

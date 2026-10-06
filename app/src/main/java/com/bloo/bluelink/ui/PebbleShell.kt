@@ -274,7 +274,7 @@ internal fun PebbleShell(
                             // animates those in place too.
                             modifier = Modifier.animateContentSize(
                                 lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                            ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                            ).padding(start = GapSection, end = GapSection, bottom = GapSection, top = GapHairline),
                             verticalGap = contentGap,
                             content = content,
                         )

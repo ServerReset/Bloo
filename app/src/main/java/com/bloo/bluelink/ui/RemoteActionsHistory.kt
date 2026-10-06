@@ -70,7 +70,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
         // Details ride on the SAME line, muted, and give up their space first -- a failure reason
         // is worth showing but never worth a row of its own here.
         if (action.details != null) {
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(GapRow))
             Text(
                 text = action.details,
                 style = MaterialTheme.typography.labelSmall,
@@ -119,10 +119,10 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(start = PebbleContentInset, end = PebbleContentInset, bottom = 16.dp),
+            .padding(start = PebbleContentInset, end = PebbleContentInset, bottom = GapSection),
     ) {
         // A hairline separating the controls from the history.
-        SectionDivider(alpha = 0.35f, modifier = Modifier.padding(bottom = 6.dp))
+        SectionDivider(alpha = 0.35f, modifier = Modifier.padding(bottom = GapRow))
         if (actions.isEmpty()) {
             // NOT nothing. This panel is revealed by pressing the pebble's background -- a gesture
             // with no chrome to announce it -- so drawing nothing for a car that has not been

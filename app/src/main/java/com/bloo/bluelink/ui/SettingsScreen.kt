@@ -137,7 +137,7 @@ internal fun SettingsScreen(
                 // scroll into view.
                 .imePadding()
                 .padding(horizontal = ScreenGutter),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(GapGroup),
         ) {
             // Leading spacer, not a card.
             item {

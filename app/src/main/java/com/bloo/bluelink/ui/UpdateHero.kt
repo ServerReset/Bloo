@@ -32,7 +32,7 @@ internal fun UpdateDeltaHero(currentBuild: Int, newBuild: Int, modifier: Modifie
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Normal,
                 color = scheme.onSurface,
-                modifier = Modifier.padding(bottom = 4.dp),
+                modifier = Modifier.padding(bottom = GapHairline),
             )
             Icon(AppIcons.ArrowForward, contentDescription = "to", tint = scheme.onSurfaceVariant, modifier = Modifier.size(18.dp).padding(bottom = 2.dp))
         }
@@ -46,7 +46,7 @@ internal fun UpdateDeltaHero(currentBuild: Int, newBuild: Int, modifier: Modifie
             "build",
             style = MaterialTheme.typography.labelMedium,
             color = scheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier.padding(bottom = GapRow),
         )
     }
 }

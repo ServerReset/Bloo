@@ -112,7 +112,7 @@ private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean
                 // text reads whatever is behind. Denser where the blur is unavailable.
                 tint = scheme.surfaceContainerHigh.copy(alpha = if (canBlurBackdrops()) 0.58f else 0.97f),
                 modifier = Modifier
-                    .padding(horizontal = 24.dp)
+                    .padding(horizontal = GapBlock)
                     .widthIn(max = 560.dp)
                     .fillMaxWidth()
                     // Rises from below the screen.

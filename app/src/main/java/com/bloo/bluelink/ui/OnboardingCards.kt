@@ -210,7 +210,7 @@ internal fun OnboardingGlassCard(
         tint = scheme.surfaceContainerHigh.copy(alpha = 0.82f),
         contentAlignment = Alignment.TopStart,
     ) {
-        Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+        Column(Modifier.fillMaxWidth().padding(GapBlock), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             OnboardingHero(spec.icon, accent, current)
             Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                 Text(

@@ -266,7 +266,7 @@ internal fun CarHeaderRow(
     ) {
         Column(Modifier.weight(1f)) {
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(GapRow),
                 verticalArrangement = Arrangement.spacedBy(GapHairline),
             ) {
                 MetaChip(meta, hazeState = hazeState)

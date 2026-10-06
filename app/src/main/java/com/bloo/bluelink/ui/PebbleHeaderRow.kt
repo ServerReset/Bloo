@@ -94,7 +94,7 @@ internal fun PebbleHeaderRow(
             .then(modifier)
             .heightIn(min = PebbleHeaderHeight)
             // Asymmetric padding: 16dp left, 12dp right.
-            .padding(start = 16.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+            .padding(start = GapSection, end = GapGroup, top = GapRow, bottom = GapRow),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Tinted with [titleColor] so the icon matches the title (the hero draws over a scrimmed
@@ -140,7 +140,7 @@ internal fun PebbleHeaderRow(
         ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
         // Gap between the weighted text column and the trailing control.
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(GapGroup))
             if (headerAction != null) {
                 // Renders the action half regardless; canToggle decides whether the chevron half
                 // comes with it (see SplitExpandButton).

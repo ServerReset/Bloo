@@ -274,7 +274,7 @@ internal fun SecretRow(label: String, value: String) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.widthIn(max = 168.dp),
         )
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(GapGroup))
         RevealToggle(show, label) { show = !show }
     }
 }

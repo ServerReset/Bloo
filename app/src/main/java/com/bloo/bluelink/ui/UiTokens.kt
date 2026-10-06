@@ -95,7 +95,7 @@ internal fun heroOnPhoto(): Color = if (appIsDarkTheme()) Color(0xFF1A1B20) else
 // ---- Sizing -------------------------------------------------------------------
 
 /** Shared control height: a collapsed pebble matches the lock/unlock button. */
-internal val ControlHeight = 76.dp
+internal val ControlHeight = 84.dp
 
 /** Uniform collapsed-header height so every pebble lines up at the same size. */
 internal val PebbleHeaderHeight = ControlHeight
@@ -143,6 +143,9 @@ internal val GapHairline: Dp @Composable get() = SpaceUnit
 internal val GapRow: Dp @Composable get() = SpaceUnit * 2
 internal val GapGroup: Dp @Composable get() = SpaceUnit * 3
 internal val GapSection: Dp @Composable get() = SpaceUnit * 4
+internal val GapPage: Dp @Composable get() = SpaceUnit * 5
+internal val GapBlock: Dp @Composable get() = SpaceUnit * 6
+internal val GapHero: Dp @Composable get() = SpaceUnit * 8
 
 /** The seam between the two halves of a split button (action + chevron, preset + menu). */
 internal val SplitSeam = 3.dp

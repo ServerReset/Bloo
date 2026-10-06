@@ -128,7 +128,7 @@ internal fun SettingsSearchResults(
         ) {
             Text(
                 "No matches for \"$query\"",
-                Modifier.padding(16.dp),
+                Modifier.padding(GapSection),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -144,7 +144,7 @@ internal fun SettingsSearchResults(
                     shape = resultCardShape,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Row(Modifier.padding(16.dp)) {
+                    Row(Modifier.padding(GapSection)) {
                         // A small leading icon badge per result, as in the update pebble and
                         // settings hero stats.
                         IconBadge(
@@ -171,7 +171,7 @@ internal fun SettingsSearchResults(
                 shape = resultCardShape,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Row(Modifier.padding(16.dp)) {
+                Row(Modifier.padding(GapSection)) {
                     IconBadge(
                         cmd.icon,
                         tint = MaterialTheme.colorScheme.secondary,
@@ -260,7 +260,7 @@ internal fun SettingsSearchResults(
             modifier = Modifier.fillMaxWidth(),
             hazeState = hazeState,
         ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+            Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(GapRow))
@@ -301,7 +301,7 @@ internal fun SettingsSearchResults(
                 modifier = Modifier.fillMaxWidth(),
                 hazeState = hazeState,
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(GapRow))
@@ -361,7 +361,7 @@ internal fun SettingsSearchResults(
                 modifier = Modifier.fillMaxWidth(),
                 hazeState = hazeState,
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(GapRow))

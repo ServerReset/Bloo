@@ -58,7 +58,7 @@ private val IndicatorSize = 52.dp
 private val SpinnerSize = 40.dp
 
 /** How far below the status bar's lower edge the indicator rests. */
-private val RestBelowStatusBar = 30.dp
+private val RestBelowStatusBar = 12.dp
 
 /** The single floating indicator. */
 @Composable
@@ -95,17 +95,13 @@ internal fun PullRefreshIndicatorHost(
                 .size(IndicatorSize)
                 .graphicsLayer {
                     // Drops from OFF the top edge as the pull grows and lands below the status bar.
+                    //
+                    // A pure SLIDE, no scale. It used to also scale 0.75 -> 1 as it dropped, which
+                    // read as the disc "growing in" rather than falling into place -- and a
+                    // graphicsLayer alpha below 1 (also tried) clipped the drop shadow to a square.
+                    // Sliding the full-size disc down from off-screen is the whole motion; the
+                    // spinner's own progress arc does the rest.
                     translationY = -sizePx + t * (sizePx + restPx)
-                    // NO `alpha` here. A graphicsLayer alpha below 1 makes Compose composite the
-                    // node offscreen, which clips the drop shadow's out-of-bounds drawing to the
-                    // node's rectangular bounds -- so while the disc was moving (alpha < 1) the
-                    // shadow read as a SQUARE around the circle, and only became a circle once it
-                    // settled at alpha = 1. The disc already slides in from fully off-screen
-                    // (translationY starts at -sizePx), so it needs no fade to appear smoothly;
-                    // dropping the alpha keeps the shadow a clean circle the whole way in.
-                    val k = 0.75f + 0.25f * t.coerceIn(0f, 1f)
-                    scaleX = k
-                    scaleY = k
                 },
             hazeState = hazeState,
             // Bare liquid glass: the rim bends what is behind it, nothing milky over the middle.
