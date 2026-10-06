@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -331,7 +332,9 @@ internal fun CarMap(
                     .size(16.dp)
                     .background(Color.White, CircleShape)
                     .padding(3.dp)
-                    .background(deviceLocationColor, CircleShape),
+                    .background(deviceLocationColor, CircleShape)
+                    // The dot carries no text, so TalkBack would skip it entirely; name it.
+                    .semantics { contentDescription = "Your location" },
             )
         }
         } // close the scaled layer

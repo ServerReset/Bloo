@@ -63,9 +63,7 @@ internal fun rememberDeviceLocationRequest(vm: AppViewModel): DeviceLocationRequ
     }
     return remember(vm) {
         val ask = {
-            val granted = androidx.core.content.ContextCompat.checkSelfPermission(
-                context, android.Manifest.permission.ACCESS_FINE_LOCATION,
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val granted = context.hasLocationPermission()
             if (granted) {
                 vm.beginLiveDeviceLocation()
                 vm.refreshDeviceLocation()
@@ -105,9 +103,7 @@ internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
         }
     }
     return {
-        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
-            context, android.Manifest.permission.ACCESS_FINE_LOCATION,
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val granted = context.hasLocationPermission()
         if (granted) vm.locate(v) else fineLocationLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
     }
 }

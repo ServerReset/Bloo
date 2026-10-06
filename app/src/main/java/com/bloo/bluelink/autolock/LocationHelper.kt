@@ -12,15 +12,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
-import com.bloo.bluelink.ui.hasPermission
+import com.bloo.bluelink.ui.hasLocationPermission
 
 /**
  * A single best-effort current-location read (the phone's own last-known position), and a
  * continuous stream of the same for surfaces that want it live.
  */
 object LocationHelper {
-    private fun hasPermission(context: Context): Boolean =
-        context.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+    private fun hasPermission(context: Context): Boolean = context.hasLocationPermission()
 
     suspend fun currentLocation(context: Context): android.location.Location? {
         if (!hasPermission(context)) return null

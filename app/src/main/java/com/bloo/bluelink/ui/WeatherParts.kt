@@ -371,6 +371,16 @@ internal fun Context.hasPermission(permission: String, minSdk: Int = 1): Boolean
             android.content.pm.PackageManager.PERMISSION_GRANTED
 
 /**
+ * The one location-permission check, accepting EITHER accuracy. The map's "you are here" dot and
+ * the distance-to-car readout only need an approximate fix, and Android 12+ lets a user grant
+ * COARSE without FINE -- a FINE-only test read that as "no permission" and silently hid the dot
+ * forever, no matter how many times the map was reopened.
+ */
+internal fun Context.hasLocationPermission(): Boolean =
+    hasPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ||
+        hasPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+
+/**
  * Opens the car's location in the device's default Maps app -- a `geo:` intent rather than
  * hardcoding Google Maps, since the OS resolves it to whatever the user actually has set. Shared by
  * [LocationPebble]'s own "Open in maps" button and [CarMapFullScreenDialog]'s [MapFeature] row so
