@@ -251,14 +251,7 @@ fun MorphTextButton(
         if (glyph != null) {
             MorphButtonLabel(glyph, text, pending = pending)
         } else {
-            Text(
-                text,
-                style = ButtonLabelStyle,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-            )
+            ButtonLabelText(text)
         }
     }
 }
@@ -354,6 +347,22 @@ val ButtonIconSize = 18.dp
 
 /** The glyph in a label-less button (the expand chevron); larger because the icon IS the button. */
 val ButtonIconOnlySize = 24.dp
+
+/**
+ * The one button-label [Text]: the shared [ButtonLabelStyle], semi-bold, single line, ellipsized.
+ * Used wherever a button shows a bare label with no glyph ([MorphTextButton], [MorphChip]).
+ */
+@Composable
+internal fun ButtonLabelText(text: String) {
+    Text(
+        text,
+        style = ButtonLabelStyle,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
 
 /** The one label style every button uses. */
 val ButtonLabelStyle: TextStyle

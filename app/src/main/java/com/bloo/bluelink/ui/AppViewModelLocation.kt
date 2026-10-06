@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import android.location.Geocoder
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.GeoLocation
+import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -41,6 +42,23 @@ internal fun AppViewModel.refreshDeviceLocation() {
  */
 internal suspend fun AppViewModel.reverseGeocode(loc: GeoLocation): com.bloo.bluelink.data.GeocodedPlace? =
     com.bloo.bluelink.data.reverseGeocode(getApplication(), loc.latitude, loc.longitude)
+
+/**
+ * Reverse-geocode [loc] and store the resulting place name/zip for [v]. Best-effort: a failed
+ * geocode leaves the maps untouched and returns false. The ONE place the two callers (Locate, and a
+ * status refresh that carried GPS) apply a reverse-geocoded place, so they cannot drift on which
+ * fields they set.
+ */
+internal suspend fun AppViewModel.applyPlace(v: Vehicle, loc: GeoLocation): Boolean {
+    val place = reverseGeocode(loc) ?: return false
+    _state.update {
+        it.copy(
+            placeNames = it.placeNames + (v.vin to place.full),
+            placeZips = it.placeZips + (v.vin to place.compact),
+        )
+    }
+    return true
+}
 
 /**
  * Kept in sync by GarageScreen's `LaunchedEffect(expandedMap.vin)` (see [UiState.mapExpanded]).

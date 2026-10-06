@@ -39,11 +39,6 @@ fun ExpressiveButtonGroup(
      */
     wrap: Boolean = true,
     /**
-     * For an equal-width row compacted to icon-only (see `wrap`): keep the true equal share instead
-     * of capping each member at its glyph width, so the row still spans its full width.
-     */
-    stretchCompact: Boolean = false,
-    /**
      * Whether a member alone on its line may expand to fill the line while pressed. True for a
      * labelled action alone on its row (a lone "Sync now"); FALSE for a connected cluster (the
      * pebble header chevron, the lock group), where a single icon button must never balloon.
@@ -216,9 +211,9 @@ fun ExpressiveButtonGroup(
                     val each = room.toDouble() / memberIdx.size
                     val isCompact = basis !== full
                     for (i in memberIdx) {
-                        base[i] = if (isCompact && !stretchCompact) minOf(each, natLine[i].toDouble()) else each
+                        base[i] = if (isCompact) minOf(each, natLine[i].toDouble()) else each
                     }
-                    total = if (isCompact && !stretchCompact) memberIdx.sumOf { base[it] }.roundToInt() else room
+                    total = if (isCompact) memberIdx.sumOf { base[it] }.roundToInt() else room
                 } else {
                     // Weighted members stretch to fill the line's leftover, inside the budget, so a
                     // split pill spans its row and still redistributes on press.

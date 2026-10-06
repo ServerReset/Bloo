@@ -151,8 +151,8 @@ internal val HeaderCornerGap = 12.dp
 internal val HeaderButtonSize = ButtonTargetHeight
 
 /**
- * A small translucent circular icon button used as a floating overlay control. [outerPadding] is
- * the breathing room around the [HeaderButtonSize] circle; tight rows can pass a smaller value.
+ * A small translucent circular icon button used as a floating overlay control, with
+ * [HeaderCornerGap] of breathing room around the [HeaderButtonSize] circle.
  */
 @Composable
 internal fun FloatingIcon(
@@ -160,7 +160,6 @@ internal fun FloatingIcon(
     description: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    outerPadding: Dp = HeaderCornerGap,
     // Overrides for surfaces over a dark scrim (the lock overlay's back arrow uses plain white, not
     // the glass fill).
     containerColor: Color? = null,
@@ -188,7 +187,7 @@ internal fun FloatingIcon(
     GlassSurface(
         shape = CircleShape,
         modifier = modifier
-            .padding(outerPadding)
+            .padding(HeaderCornerGap)
             .size(HeaderButtonSize)
             // Lambda form: the press spring is read at DRAW time, so the animation never recomposes
             // this button (the arg-taking overload reads it in composition instead -- see

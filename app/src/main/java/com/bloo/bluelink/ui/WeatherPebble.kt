@@ -139,8 +139,6 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
             pending = locating,
             bounceIcon = true,
         ),
-        // Not alwaysExpandedInSimpleMode: that flag removes the chevron, and this pebble must stay
-        // collapsible.
     ) {
         val glance = LocalForceExpanded.current
         AnimatedVisibility(

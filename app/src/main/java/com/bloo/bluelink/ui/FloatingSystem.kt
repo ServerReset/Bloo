@@ -97,11 +97,11 @@ fun Modifier.floatingElement(id: FloatingId, active: Boolean = true): Modifier =
 }
 
 @Composable
-internal fun searchBarClearance(fallback: Dp, extraMargin: Dp = 16.dp): Dp {
+internal fun searchBarClearance(fallback: Dp): Dp {
     val registry = LocalFloatingRegistry.current
     // Snapshot-backed read; recomposes when the search bar's bounds change.
     val searchTop = registry.boundsOf(FloatingIds.Search)?.top ?: return fallback
     val windowHeightPx = LocalWindowInfo.current.containerSize.height
     val density = LocalDensity.current
-    return with(density) { (windowHeightPx - searchTop).coerceAtLeast(0f).toDp() } + extraMargin
+    return with(density) { (windowHeightPx - searchTop).coerceAtLeast(0f).toDp() } + 16.dp
 }

@@ -63,9 +63,6 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
             onClick = { vm.summarizeCar(v) },
             pending = busy,
         ),
-        // NOT alwaysExpandedInSimpleMode -- see the note on LocationPebble. This tile has a summary
-        // paragraph and a footnote, not a single setting, and the flag costs it its chevron
-        // entirely.
     ) {
         // Its old glance hero repeated the tile's own title and subtitle verbatim -- four lines
         // carrying two strings before a word of the actual summary. The summary IS the point of the

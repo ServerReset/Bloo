@@ -151,13 +151,7 @@ internal fun AppViewModel.loadStatus(
                 // Auto-AI: refresh the summary off the new data if enabled.
                 autoSummarize(v)
                 statusLoc?.let { loc ->
-                    reverseGeocode(loc)?.let { place ->
-                        _state.update {
-                            it.copy(
-                                placeNames = it.placeNames + (v.vin to place.full),
-                                placeZips = it.placeZips + (v.vin to place.compact),
-                            )
-                        }
+                    if (applyPlace(v, loc)) {
                         // Re-persist. Next cold start then showed the wrong place, or none, beside
                         // a correct position. This second write only happens when a label actually
                         // arrived, so the common no-location path pays nothing.

@@ -137,10 +137,11 @@ object NoOpColumnScope : ColumnScope {
 
 /**
  * A gentle "back ease": rises past 1.0 near the end, then settles, like a spring without being one
- * (a real spring would be a third timed animation beside the shared [Transition] progress).
- * [overshoot] stays small (the canonical 1.70158 is too showy for a row-sized element).
+ * (a real spring would be a third timed animation beside the shared [Transition] progress). The
+ * overshoot stays small (the canonical 1.70158 is too showy for a row-sized element).
  */
-fun pebbleRowOvershoot(t: Float, overshoot: Float = 1.15f): Float {
+fun pebbleRowOvershoot(t: Float): Float {
+    val overshoot = 1.15f
     val c3 = overshoot + 1f
     val x = t - 1f
     return 1f + c3 * x * x * x + overshoot * x * x

@@ -85,14 +85,7 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location upda
     when {
         loc != null -> {
             _state.update { it.copy(locations = it.locations + (v.vin to loc)) }
-            reverseGeocode(loc)?.let { place ->
-                _state.update {
-                    it.copy(
-                        placeNames = it.placeNames + (v.vin to place.full),
-                        placeZips = it.placeZips + (v.vin to place.compact),
-                    )
-                }
-            }
+            applyPlace(v, loc)
             loadCarWeather(v, force = true)
             persistCache()
             // persistCache() writes the PHONE's own status cache (statusCache) so the next cold

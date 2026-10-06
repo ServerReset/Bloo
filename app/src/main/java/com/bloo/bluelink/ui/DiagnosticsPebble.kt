@@ -130,8 +130,6 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
             isWarning = true,
             contentDescription = "Diagnostics warning",
         ) else null,
-        // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting that reads
-        // better inline without an expand/collapse control (see its own doc).
     ) {
         // See diagSummary above.
         if (rows.isEmpty()) {

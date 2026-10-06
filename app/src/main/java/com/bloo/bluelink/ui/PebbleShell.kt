@@ -72,11 +72,6 @@ internal fun Pebble(
     /** Drawn behind the header and body, clipped to the pebble's shape. */
     background: (@Composable BoxScope.() -> Unit)? = null,
     /**
-     * If true and in simple mode, the pebble is always expanded and cannot be collapsed. Use for
-     * pebbles with a single setting that benefit from inline display without expand/collapse.
-     */
-    alwaysExpandedInSimpleMode: Boolean = false,
-    /**
      * For a pebble whose body is a single setting: in simple mode, render that control on the title
      * row (via `titleTrailing`) and skip the body/disclosure. Null leaves normal expand/collapse.
      */
@@ -85,14 +80,11 @@ internal fun Pebble(
 ) {
     val forceExpanded = LocalForceExpanded.current
     val simpleMode = state.settingsMode != "advanced"
-    val forceAlwaysExpanded = alwaysExpandedInSimpleMode && simpleMode
     val inlineSimple = inlineSettingInSimpleMode != null && simpleMode
-    // Body only ever opens via the user's own stored toggle when neither special mode is active --
-    // forceAlwaysExpanded already shows the body unconditionally, and inlineSimple has nothing left
-    // to disclose (the one setting it holds is already on the title row).
-    val expanded = forceExpanded || forceAlwaysExpanded ||
-        (!inlineSimple && state.isPebbleExpanded(v.vin, section))
-    val canToggle = !forceAlwaysExpanded && !inlineSimple
+    // Body only ever opens via the user's own stored toggle unless simple mode is inlining the one
+    // setting on the title row (which has nothing left to disclose).
+    val expanded = forceExpanded || (!inlineSimple && state.isPebbleExpanded(v.vin, section))
+    val canToggle = !inlineSimple
     PebbleShell(
         expanded = expanded,
         onToggle = if (canToggle) { { vm.togglePebble(v, section) } } else { {} },

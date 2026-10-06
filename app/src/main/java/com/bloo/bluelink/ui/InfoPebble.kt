@@ -78,10 +78,6 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     // Matches the lock control, which already handles unknown.
     val infoSummary = status?.doorLock?.let { if (it) "Locked" else "Unlocked" }
     val glance = LocalForceExpanded.current
-    // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting that reads
-    // better inline without an expand/collapse control (see its own doc). This one renders ~15 info
-    // rows (below), so forcing it always open in simple mode just removed the ability to collapse
-    // it.
     Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, modifier, summary = infoSummary) {
         PebbleStatusGate(status, state.refreshing) { status ->
             SectionLabel("Status")

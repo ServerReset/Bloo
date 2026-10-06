@@ -104,7 +104,6 @@ private fun MorphButtonGlyph(
     pending: Boolean,
     iconSize: Dp,
     spinning: Boolean,
-    tint: Color,
 ) {
     if (pending) {
         LoadingIndicator(Modifier.size(iconSize))
@@ -122,10 +121,7 @@ private fun MorphButtonGlyph(
             Icon(
                 glyph,
                 contentDescription = null,
-                // Unspecified means "whatever the content colour is", which is Icon's own default.
-                // It cannot simply be passed through: Icon treats Unspecified as "draw the vector's
-                // own colours", which is a different thing entirely.
-                tint = if (tint.isSpecified) tint else LocalContentColor.current,
+                tint = LocalContentColor.current,
                 modifier = Modifier.size(iconSize),
             )
         }
@@ -147,21 +143,16 @@ fun MorphButtonLabel(
     pending: Boolean,
     iconSize: Dp = ButtonIconSize,
     spinning: Boolean = false,
-    /**
-     * An accent for the glyph alone, where it carries state the label doesn't; Unspecified uses the
-     * content colour.
-     */
-    iconTint: Color = Color.Unspecified,
 ) {
     // Icon only: skip the Layout so no gap is reserved and the glyph stays centred.
     if (label.isEmpty()) {
-        MorphButtonGlyph(icon, pending, iconSize, spinning, iconTint)
+        MorphButtonGlyph(icon, pending, iconSize, spinning)
         return
     }
     val gap = ButtonIconGap
     Layout(
         content = {
-            MorphButtonGlyph(icon, pending, iconSize, spinning, iconTint)
+            MorphButtonGlyph(icon, pending, iconSize, spinning)
             // The one button label style, shared with MorphTextButton.
             AnimatedText(
                 label,

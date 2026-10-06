@@ -61,10 +61,6 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
         trips.isEmpty() -> "No recent trips"
         else -> "${trips.size} recent"
     }
-    // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting that reads
-    // better inline without an expand/collapse control (see its own doc). This one renders a list
-    // of up to 8 trips, so forcing it always open in simple mode just removed the ability to
-    // collapse it.
     Pebble(v, "trips", "Trips", Icons.Filled.Route, state, vm, modifier, summary = summary) {
         when {
             trips == null -> Text(if (loading) "Fetching trip history…" else "No trip data yet.")

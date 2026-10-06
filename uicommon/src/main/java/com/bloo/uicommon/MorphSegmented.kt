@@ -126,7 +126,6 @@ fun MorphSegmented(
     trackHeight: Dp = if (options.any { it.icon != null }) 48.dp else 44.dp,
     /** Hairline rim colour, or null for a borderless track. */
     borderColor: Color? = null,
-    indicatorVisible: Boolean = true,
 ) {
     val n = options.size
     val selectedIndex = options.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
@@ -149,7 +148,7 @@ fun MorphSegmented(
             pendingIndex = null
         }
     }
-    val visualIndex = dragIndex ?: pendingIndex ?: if (indicatorVisible) selectedIndex else -1
+    val visualIndex = dragIndex ?: pendingIndex ?: selectedIndex
 
     // ONE spring drives everything: the highlight's position along the track (0..n-1, fractional
     // while it travels). The segment widths and the highlight are both derived from it every frame,
