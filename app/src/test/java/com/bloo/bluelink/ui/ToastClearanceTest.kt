@@ -54,9 +54,8 @@ class ToastClearanceTest {
 
     @Test
     fun `centred pill lifts the stack above it, excluding ime and nav`() {
-        // Pill centred, top at 1800. With a 400px keyboard and 48px nav, the content bottom is
-        // 2000-400-48 = 1552, so the lift is negative -> coerced to 0 + two gaps... make the
-        // pill high enough to be positive.
+        // Pill centred, top at 1200. The stack's own content bottom is window minus max(nav, ime)
+        // minus the edge: 2000 - 400 - 16 = 1584, so the lift is 1584 - 1200 + gap.
         val c = toastClearance(
             searchRect = Rect(440f, 1200f, 560f, 1252f),
             windowWidthPx = window,
@@ -66,15 +65,14 @@ class ToastClearanceTest {
             baseEdgePx = edge,
             gapPx = gap,
         )
-        // content bottom = 1552; pill top = 1200 -> 352 + 2*gap.
-        assertEquals(352f + gap + gap, c.bottomLiftPx, 0.001f)
+        assertEquals((height - 400f - edge - 1200f) + gap, c.bottomLiftPx, 0.001f)
         assertEquals(0f, c.startInsetPx, 0.001f)
         assertEquals(0f, c.endInsetPx, 0.001f)
     }
 
     @Test
     fun `lift never goes negative`() {
-        // Pill BELOW the content bottom (keyboard up under it): lift floors at two gaps.
+        // Pill BELOW the toast content bottom (keyboard up under it): lift floors at zero.
         val c = toastClearance(
             searchRect = Rect(440f, 1900f, 560f, 1952f),
             windowWidthPx = window,
@@ -84,6 +82,24 @@ class ToastClearanceTest {
             baseEdgePx = edge,
             gapPx = gap,
         )
-        assertEquals(gap + gap, c.bottomLiftPx, 0.001f)
+        assertEquals(0f, c.bottomLiftPx, 0.001f)
+    }
+
+    @Test
+    fun `a docked search beside a too-narrow toast lifts instead of squeezing`() {
+        // Pill hugging the left edge, but the window is so narrow the beside toast cannot fit.
+        val c = toastClearance(
+            searchRect = Rect(16f, 1800f, 300f, 1852f),
+            windowWidthPx = 360f,
+            windowHeightPx = height,
+            imeBottomPx = 0f,
+            navBottomPx = 0f,
+            baseEdgePx = edge,
+            gapPx = gap,
+            minToastWidthPx = 220f,
+        )
+        assertEquals(0f, c.startInsetPx, 0.001f)
+        assertEquals(0f, c.endInsetPx, 0.001f)
+        kotlin.test.assertTrue(c.bottomLiftPx > 0f, "a squeezed beside toast lifts instead")
     }
 }

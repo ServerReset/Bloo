@@ -131,9 +131,9 @@ internal fun SearchLayer(
         // would otherwise take. Measure what is actually free rather than guessing: the panel gets
         // what remains above the bar, minus a margin so it never looks wedged.
         val edge = 16.dp
-        val bubble = 52.dp
+        val bubble = SearchElementHeight
         val barW = minOf(maxWidth - edge * 2, 640.dp)
-        val barH = 52.dp
+        val barH = SearchElementHeight
         val freeAbovePill = (maxHeight - bottomInset - barH - edge * 2 - 24.dp).coerceAtLeast(96.dp)
         // A medium pill: wide enough for icon and word, far short of the bar.
         val pillW = minOf(168.dp, barW)

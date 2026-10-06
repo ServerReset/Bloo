@@ -129,6 +129,12 @@ internal val PebbleContentInset = 12.dp
 internal val ScreenGutter = 12.dp
 
 /**
+ * The one height shared by the search element (bubble / pill / bar) and the toasts that pop out of
+ * it, so the two read as one family -- a toast is exactly the bar it emerged from.
+ */
+internal val SearchElementHeight = 52.dp
+
+/**
  * The app's vertical rhythm: one base unit ([SpaceUnit]) that every gap and inset is a multiple of.
  * Scales at half the display scale (see [spaceScaleFor]); provided by [BlooTheme], read via
  * [LocalSpaceScale].
