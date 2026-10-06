@@ -38,6 +38,14 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
  */
 enum class FontChoice { SYSTEM, ATKINSON, GOOGLE_SANS }
 
+/** The human label for each [FontChoice], shared by the Visuals card and the settings search. */
+val FontChoice.label: String
+    get() = when (this) {
+        FontChoice.SYSTEM -> "System default"
+        FontChoice.ATKINSON -> "Atkinson Hyperlegible"
+        FontChoice.GOOGLE_SANS -> "Google Sans"
+    }
+
 /** Built-in colour palettes the user can pick from when dynamic colour (Material You) is off. */
 enum class ColorPalette(val label: String, val swatch: Color, internal val hue: Float) {
     BLUE("Bloo", Color(0xFF005AC1), 217f),

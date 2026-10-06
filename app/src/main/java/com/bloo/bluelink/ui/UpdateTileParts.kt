@@ -65,6 +65,25 @@ import com.bloo.bluelink.update.UpdateInfo
 import com.bloo.bluelink.data.Weather
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 
+/**
+ * A full-width glass panel nested inside an already-elevated card: `shadow = false` so it does not
+ * draw a second drop shadow inside the card (see glassEdge's own doc). Shared by every nested panel
+ * on the update surfaces.
+ */
+@Composable
+internal fun NestedGlassPanel(
+    hazeState: dev.chrisbanes.haze.HazeState?,
+    content: @Composable () -> Unit,
+) {
+    GlassSurface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = SmallShape,
+        hazeState = hazeState,
+        shadow = false,
+        content = content,
+    )
+}
+
 /** The release notes block: "What's new", an excerpt, and a link to the full notes. */
 @Composable
 internal fun UpdateReleaseNotes(
@@ -87,12 +106,7 @@ internal fun UpdateReleaseNotes(
     // SettingsHeroCard's expanded body (this composable's own doc), both of which already nest this
     // inside another elevated card/group; see glassEdge's own doc for why a nested panel skips the
     // second shadow.
-    GlassSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = SmallShape,
-        hazeState = hazeState,
-        shadow = false,
-    ) {
+    NestedGlassPanel(hazeState) {
         Column(
             Modifier
                 .padding(GapGroup)

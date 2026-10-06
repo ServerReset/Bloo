@@ -112,12 +112,11 @@ internal fun BoxScope.HeroBackground(
         Modifier
             .align(Alignment.BottomStart)
             .fillMaxWidth()
-            // These insets derive from the header's geometry (PebbleShell: padding(h=16, v=6),
-            // Icon(20), Spacer(10), then the weighted text column), not from tuning. start  16 + 20
-            // + 10 = 46dp, the text column's left edge; expanded has no icon, so 16dp. end    the
-            // chevron is ~48dp inside 16dp padding, so 76dp clears it with an optical gap. bottom
-            // the readout is bottom-anchored and the header reserves collapsedReadoutHeight +
-            // HeroReadoutBottomInset, so the two line up by construction.
+            // The insets that place the readout against the card, derived from the header's own
+            // geometry (its icon + gap + weighted text column) rather than tuned by eye: `start`
+            // lines the collapsed readout up under the header's text column, `end` clears the
+            // chevron (plus the expand action when present), and `bottom` sits on the header's
+            // reserved readout slot (collapsedReadoutHeight + HeroReadoutBottomInset).
             .padding(
                 // Clears the car icon only; the name-clearing offset belongs to the numbers Row
                 // (`numbersStart`), or the bar would start under the percentage.

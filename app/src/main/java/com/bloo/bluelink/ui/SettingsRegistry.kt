@@ -95,14 +95,9 @@ internal val ChoiceSettings: List<SettingSpec> = listOf(
         keywords = "typeface atkinson hyperlegible google sans accessibility low vision text",
         phrases = "change the font easier to read dyslexia friendly",
     ) { a, _, _, vm ->
-        val labels = mapOf(
-            FontChoice.SYSTEM to "System default",
-            FontChoice.ATKINSON to "Atkinson Hyperlegible",
-            FontChoice.GOOGLE_SANS to "Google Sans",
-        )
         Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
             FontChoice.entries.forEach { choice ->
-                ChoiceRow(labels.getValue(choice), a.fontChoice == choice) { vm.setFontChoice(choice) }
+                ChoiceRow(choice.label, a.fontChoice == choice) { vm.setFontChoice(choice) }
             }
         }
     },

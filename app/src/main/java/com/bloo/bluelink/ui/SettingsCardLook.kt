@@ -88,14 +88,9 @@ private fun displayStatus(appearance: SettingsStore.Appearance): String = listOf
 /** The "Font" group of the Visuals card: which typeface the app is set in. */
 @Composable
 private fun FontGroup(appearance: SettingsStore.Appearance, vm: AppViewModel) {
-    val labels = mapOf(
-        FontChoice.SYSTEM to "System default",
-        FontChoice.ATKINSON to "Atkinson Hyperlegible",
-        FontChoice.GOOGLE_SANS to "Google Sans",
-    )
     SettingsGroup("Font") {
         FontChoice.entries.forEach { choice ->
-            ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
+            ChoiceRow(choice.label, appearance.fontChoice == choice) { vm.setFontChoice(choice) }
         }
     }
 }

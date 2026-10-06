@@ -134,7 +134,7 @@ internal fun PebbleList(
             // Below the fold, so this transient state is never seen or interacted with.
             // heightIn(min), not a fixed height: a pebble header carries a title plus an optional
             // summary line, and at a large accessibility font that stacked text is taller than
-            // ControlHeight -- a hard 76dp clipped it.
+            // ControlHeight -- a hard height clipped it.
             Box(Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).then(itemDragHandle))
         }
     }

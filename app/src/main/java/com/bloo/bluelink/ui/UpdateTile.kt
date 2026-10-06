@@ -130,12 +130,7 @@ internal fun UpdateAvailableTile(
             // summary.
         // Glass surface; shadow = false because it sits inside the pebble's already-elevated card
         // (see glassEdge).
-        GlassSurface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = SmallShape,
-            hazeState = hazeState,
-            shadow = false,
-        ) {
+        NestedGlassPanel(hazeState) {
             // Column, not Box: UpdateStatusLine emits two top-level siblings that a Box would stack
             // on top of each other.
             Column(Modifier.padding(GapGroup)) {
@@ -161,12 +156,7 @@ internal fun UpdateAvailableTile(
                 )
                 PopVisible(visible = showHelp) {
                     // Glass surface, fillMaxWidth to match siblings; shadow = false (nested panel).
-                    GlassSurface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = SmallShape,
-                        hazeState = hazeState,
-                        shadow = false,
-                    ) {
+                    NestedGlassPanel(hazeState) {
                         Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                             // Without Shizuku the OS installer gets in the way EVERY time, and the
                             // player-protect sheet is folded shut by default, so an update looks
