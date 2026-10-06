@@ -29,6 +29,16 @@ object ApiHttp {
             },
         )
         .build()
+
+    /**
+     * A fresh client for the side HTTP calls that want shorter, bounded timeouts than the brand APIs
+     * (weather, update checks): a slow or absent server should fail fast rather than hold a screen.
+     * A new instance per caller (its own pool), not the shared [client].
+     */
+    fun shortTimeoutClient(): OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .build()
 }
 
 /**

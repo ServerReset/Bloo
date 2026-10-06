@@ -135,15 +135,8 @@ class CanadaRepository(
     ): T = withSession { s ->
         val summary = summaryFor(s, v)
         val pin = s.pin.orEmpty()
-        val cached = pAuths[v.vin]
-        try {
-            val pAuth = cached ?: api.pinAuth(s, summary.id, pin).also { pAuths[v.vin] = it }
+        controlTokenAuth(pAuths, v.vin, mint = { api.pinAuth(s, summary.id, pin) }) { pAuth ->
             block(s, summary, pAuth)
-        } catch (e: BlueLinkException) {
-            if (e.code != 401 || cached == null) throw e
-            val fresh = api.pinAuth(s, summary.id, pin)
-            pAuths[v.vin] = fresh
-            block(s, summary, fresh)
         }
     }
 

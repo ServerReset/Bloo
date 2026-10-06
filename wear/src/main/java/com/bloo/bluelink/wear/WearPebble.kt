@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -90,18 +91,12 @@ fun WearActionRow(
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    MorphButtonCore(
-        onClick = {
-            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-            onClick()
-        },
-        modifier = modifier.fillMaxWidth(),
-        enabled = enabled,
+    WearButton(
         active = active,
-        containerColor = scheme.secondaryContainer,
-        activeContainerColor = scheme.primary,
+        enabled = enabled,
+        modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        onClick = onClick,
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
@@ -114,6 +109,37 @@ fun WearActionRow(
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+/**
+ * The watch's own [MorphButtonCore]: a heavy haptic on tap and the watch's container roles
+ * (secondaryContainer idle, primary active). Shared by [WearActionRow] and [WearQuickActions] so the
+ * two can't drift on either.
+ */
+@Composable
+private fun WearButton(
+    active: Boolean,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    contentPadding: PaddingValues,
+    onClick: () -> Unit,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    MorphButtonCore(
+        onClick = {
+            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+            onClick()
+        },
+        modifier = modifier,
+        enabled = enabled,
+        active = active,
+        containerColor = scheme.secondaryContainer,
+        activeContainerColor = scheme.primary,
+        contentPadding = contentPadding,
+        content = content,
+    )
 }
 
 /**
@@ -214,21 +240,15 @@ data class WearQuickAction(
 @Composable
 fun WearQuickActions(actions: List<WearQuickAction>, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     Column(modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         actions.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { a ->
-                    MorphButtonCore(
-                        onClick = {
-                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                            a.onClick()
-                        },
-                        modifier = Modifier.weight(1f),
+                    WearButton(
                         active = a.active,
-                        containerColor = scheme.secondaryContainer,
-                        activeContainerColor = scheme.primary,
+                        modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
+                        onClick = a.onClick,
                     ) {
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                             val tint = if (a.active) scheme.onPrimary else scheme.onSecondaryContainer

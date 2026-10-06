@@ -50,6 +50,30 @@ fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStor
 }
 
 /**
+ * Runs [block] with a cached PIN-derived control token for [vin], minting it via [mint] if absent
+ * and re-minting once if the command itself 401s (an expired control token, distinct from an expired
+ * session -- the caller's own withSession handles that one layer down). Shared by the Canada and EU
+ * repositories, whose control tokens differ only in how they are minted.
+ */
+internal suspend fun <T> controlTokenAuth(
+    cache: java.util.concurrent.ConcurrentHashMap<String, String>,
+    vin: String,
+    mint: suspend () -> String,
+    block: suspend (String) -> T,
+): T {
+    val cached = cache[vin]
+    try {
+        val token = cached ?: mint().also { cache[vin] = it }
+        return block(token)
+    } catch (e: BlueLinkException) {
+        if (e.code != 401 || cached == null) throw e
+        val fresh = mint()
+        cache[vin] = fresh
+        return block(fresh)
+    }
+}
+
+/**
  * Coordinates one brand's API client with its persisted session, retrying once on an auth failure
  * by refreshing the access token. All data is live.
  */

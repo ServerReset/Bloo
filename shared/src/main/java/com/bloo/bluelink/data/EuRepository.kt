@@ -126,15 +126,8 @@ class EuRepository(
     ): T = withSession { s ->
         val summary = summaryFor(s, v)
         val pin = s.pin.orEmpty()
-        val cached = controlTokens[v.vin]
-        try {
-            val token = cached ?: api.controlToken(s, pin).also { controlTokens[v.vin] = it }
+        controlTokenAuth(controlTokens, v.vin, mint = { api.controlToken(s, pin) }) { token ->
             block(s, summary, token)
-        } catch (e: BlueLinkException) {
-            if (e.code != 401 || cached == null) throw e
-            val fresh = api.controlToken(s, pin)
-            controlTokens[v.vin] = fresh
-            block(s, summary, fresh)
         }
     }
 

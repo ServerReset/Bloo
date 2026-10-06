@@ -74,10 +74,9 @@ object UpdateApi {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .build()
+    // Short bounded timeouts: an update check should fail fast, not hold a screen. See
+    // ApiHttp.shortTimeoutClient.
+    private val client: OkHttpClient = ApiHttp.shortTimeoutClient()
 
     /**
      * One file attached to a GitHub Release. [name] is matched against the known phone asset

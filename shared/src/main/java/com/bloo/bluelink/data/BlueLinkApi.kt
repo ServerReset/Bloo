@@ -61,16 +61,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
                 put("password", kotlinx.serialization.json.JsonPrimitive(password))
             }
         ).toRequestBody(jsonMedia)
-
-        val request = Request.Builder()
-            .url("$baseUrl/v2/ac/oauth/token")
-            .post(body)
-            .header("Content-Type", "application/json")
-            .header("client_id", clientId)
-            .header("client_secret", clientSecret)
-            .header("User-Agent", UA_POSTMAN)
-            .build()
-        json.decodeFromString(TokenResponse.serializer(), call(request))
+        json.decodeFromString(TokenResponse.serializer(), call(tokenRequest("/v2/ac/oauth/token", body)))
     }
 
     /**
@@ -85,17 +76,19 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
                 put("refresh_token", kotlinx.serialization.json.JsonPrimitive(refreshToken))
             }
         ).toRequestBody(jsonMedia)
-
-        val request = Request.Builder()
-            .url("$baseUrl/v2/ac/oauth/token/refresh")
-            .post(body)
-            .header("Content-Type", "application/json")
-            .header("client_id", clientId)
-            .header("client_secret", clientSecret)
-            .header("User-Agent", UA_POSTMAN)
-            .build()
-        json.decodeFromString(TokenResponse.serializer(), call(request))
+        json.decodeFromString(TokenResponse.serializer(), call(tokenRequest("/v2/ac/oauth/token/refresh", body)))
     }
+
+    /** The OAuth token endpoints' own request shape: POST [path] with the JSON [body] and the
+     *  client_id/secret + Postman UA headers they expect. */
+    private fun tokenRequest(path: String, body: okhttp3.RequestBody): Request = Request.Builder()
+        .url("$baseUrl$path")
+        .post(body)
+        .header("Content-Type", "application/json")
+        .header("client_id", clientId)
+        .header("client_secret", clientSecret)
+        .header("User-Agent", UA_POSTMAN)
+        .build()
 
     // --- Vehicles --------------------------------------------------------
 

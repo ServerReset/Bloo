@@ -7,7 +7,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
 /**
@@ -153,14 +152,10 @@ object WeatherApi {
     // isLenient to tolerate minor JSON quirks from the API.
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    // A dedicated client (not shared with other API callers in the app) with generous-but-bounded
-    // timeouts: weather is a nice-to-have, so we'd rather give a flaky connection a real chance to
-    // succeed than fail fast, but still cap it so a hung request doesn't block a caller
-    // indefinitely.
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .build()
+    // A dedicated client (its own pool) with generous-but-bounded timeouts: weather is a
+    // nice-to-have, so give a flaky connection a real chance to succeed, but still cap it so a hung
+    // request doesn't block a caller indefinitely. See ApiHttp.shortTimeoutClient.
+    private val client: OkHttpClient = ApiHttp.shortTimeoutClient()
 
     @Serializable
     private data class Response(
