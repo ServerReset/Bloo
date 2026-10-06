@@ -2,6 +2,8 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
@@ -135,12 +137,25 @@ internal val LocalLabelHint = androidx.compose.runtime.staticCompositionLocalOf<
 /**
  * Watches whether a finger is down on the button without ever consuming an event, so it can sit over a button's own
  * gesture handling. The hold reads it to keep the button popped out for as long as the finger stays down.
+ *
+ * `awaitEachGesture` + `awaitFirstDown(requireUnconsumed = false)` is the non-consuming way to observe a gesture. A
+ * bare `awaitPointerEventScope { while (true) awaitPointerEvent(...) }` loop looked equivalent but broke every
+ * neighbouring gesture: because it stayed subscribed for the whole gesture, it defeated the parent clickable's and
+ * the pager's own gesture detection, so taps and swipes simply stopped registering (confirmed by the instrumented
+ * tests). `awaitEachGesture` scopes the subscription to a single down..up gesture and never consumes, so the button's
+ * own click and any parent drag still resolve normally.
  */
 internal fun Modifier.trackFinger(hint: LabelHintState): Modifier = pointerInput(hint) {
-    awaitPointerEventScope {
-        while (true) {
-            val event = awaitPointerEvent(PointerEventPass.Initial)
-            hint.fingerDown = event.changes.any { it.pressed }
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        hint.fingerDown = true
+        try {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.changes.none { it.pressed }) break
+            }
+        } finally {
+            hint.fingerDown = false
         }
     }
 }
