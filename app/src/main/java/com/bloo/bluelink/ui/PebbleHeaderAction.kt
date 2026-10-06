@@ -132,7 +132,10 @@ internal fun SplitExpandButton(
 
     ButtonCluster(
         listOfNotNull(actionButton, chevronButton.takeIf { canToggle }),
-        // A chevron on its own is as tall as any tap target.
-        if (action == null) modifier.heightIn(min = ButtonTargetHeight) else modifier,
+        // The same target height as the legacy lock/unlock/horn/lights group (and every other
+        // button), so a pebble's main header action lines up with the quick-action buttons instead
+        // of resting a few dp short. The pebble header is already PebbleHeaderHeight (76dp), so
+        // this does not inflate it.
+        modifier.heightIn(min = ButtonTargetHeight),
     )
 }
