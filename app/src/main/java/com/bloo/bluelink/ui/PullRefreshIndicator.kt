@@ -16,7 +16,9 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,6 +26,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
+import kotlinx.coroutines.delay
 
 /**
  * The app's ONE pull-to-refresh indicator, drawn as a single floating overlay at the app root
@@ -48,6 +51,14 @@ internal class RefreshIndicatorState {
     fun setRefreshing(key: Any, on: Boolean) {
         if (on) { if (key !in refreshingKeys) refreshingKeys.add(key) } else refreshingKeys.remove(key)
     }
+
+    /**
+     * Set the instant the pull is released past the threshold (from Refreshable's own onRefresh),
+     * BEFORE the caller's async refresh flag flips. Without it the disc slid back up during that gap
+     * and then dropped down again once [refreshing] finally turned true -- reported as the indicator
+     * "going away then pulling down from the top again". Holds the disc at the rest position instead.
+     */
+    var requested by mutableStateOf(false)
 }
 
 /** The one app-wide [RefreshIndicatorState]. Null only if no host is mounted (a preview). */
@@ -55,7 +66,7 @@ internal val LocalRefreshIndicator =
     staticCompositionLocalOf<RefreshIndicatorState?> { null }
 
 private val IndicatorSize = 52.dp
-private val SpinnerSize = 40.dp
+private val SpinnerSize = 44.dp
 
 /** How far below the status bar's lower edge the indicator rests. */
 private val RestBelowStatusBar = 12.dp
@@ -67,19 +78,35 @@ internal fun PullRefreshIndicatorHost(
     hazeState: HazeState?,
     modifier: Modifier = Modifier,
 ) {
+    // Held once the pull is released into a refresh (either the real flag or the synchronous
+    // request), driven by the finger otherwise.
+    val active = state.refreshing || state.requested
     // The disc is driven DIRECTLY by the finger while pulling (1:1, no spring lag), and only
     // springs for the refreshing endpoint -- a pull that trails the finger on a spring reads as
     // disconnected.
     val refreshSpring = remember { Animatable(0f) }
-    LaunchedEffect(state.refreshing) {
-        refreshSpring.animateTo(
-            targetValue = if (state.refreshing) 1f else 0f,
-            animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
-        )
+    LaunchedEffect(active) {
+        if (active) {
+            // Continue from wherever the finger left the disc, so it never jumps back to the top
+            // and re-drops.
+            if (refreshSpring.value < 0.01f) refreshSpring.snapTo(state.pull.value.coerceIn(0f, 1f))
+            refreshSpring.animateTo(1f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium))
+        } else {
+            refreshSpring.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium))
+        }
+    }
+    // The real flag takes over from the synchronous request...
+    LaunchedEffect(state.refreshing) { if (state.refreshing) state.requested = false }
+    // ...and if a caller's refresh never sets one at all, don't hold the disc forever.
+    LaunchedEffect(state.requested) {
+        if (state.requested) {
+            delay(700)
+            if (!state.refreshing) state.requested = false
+        }
     }
     val raw = state.pull.value.coerceIn(0f, 1f)
-    // While refreshing, hold at the sprung-open endpoint; otherwise track the finger exactly.
-    val t = if (state.refreshing) refreshSpring.value else raw
+    // While a refresh is in flight, hold at the sprung-open endpoint; otherwise track the finger.
+    val t = if (active) refreshSpring.value else raw
     if (t <= 0.01f) return
 
     val density = LocalDensity.current
@@ -109,7 +136,7 @@ internal fun PullRefreshIndicatorHost(
             clear = true,
             shadow = true,
         ) {
-            if (state.refreshing) {
+            if (active) {
                 LoadingIndicator(Modifier.size(SpinnerSize))
             } else {
                 // While dragging, the spinner's own progress follows the pull exactly.

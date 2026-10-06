@@ -76,7 +76,7 @@ internal fun SplitExpandButton(
 ) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
-    val chevron = rememberChevronRotation(expanded, label = "splitChevron")
+    val chevron = rememberChevronSpin(expanded, label = "splitChevron")
     // The location button's icon bounces when it is tapped.
     val bounceY = remember { Animatable(0f) }
     val bounceScope = rememberCoroutineScope()
@@ -122,6 +122,9 @@ internal fun SplitExpandButton(
     val chevronButton = ClusterButton(
         onClick = onToggle,
         onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
+        // Easter egg: hold the chevron to spin it (two eased turns) and buzz. A long press never
+        // toggles -- only a tap does.
+        onLongClick = { chevron.spin(); haptics?.heavy() },
         active = expanded,
         square = true,
         contentPadding = PaddingValues(start = 13.dp, end = 12.dp),

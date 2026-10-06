@@ -50,6 +50,9 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
             lastPublishedAtMs = now
             _state.update { it.copy(deviceLocation = loc.toDeviceGeoLocation()) }
             weather.refreshDeviceLocationForWeather(loc)
+            // Keep the weather card's "where you are" block tracking the live fix too, so its
+            // car-vs-you merge decision uses the current position, not a one-shot reading.
+            weather.loadPhoneWeather()
         }
     }
 }

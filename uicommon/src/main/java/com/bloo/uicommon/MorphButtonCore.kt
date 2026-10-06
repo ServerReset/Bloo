@@ -7,7 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.LocalIndication
@@ -35,7 +35,7 @@ import kotlin.math.roundToInt
  *
  * - Morph: a pill at rest, a rounded rectangle while [active] or pressed. [active] also drives the
  *   highlight colour ([activeContainerColor], theme primary by default): one state, one colour.
- * - Press and click: pressed is read from [interactionSource]; the click rides `clickable`.
+ * - Press and click: pressed is read from [interactionSource]; the click and long-press ride `combinedClickable`.
  * - Container colours only: stays painted when disabled (only content dims). Content colour is the
  *   wrapper's job (this is foundation-only, no LocalContentColor).
  *
@@ -44,7 +44,7 @@ import kotlin.math.roundToInt
  * which receives the raw [morph] progress (0 = pill, 1 = morphed) and the animated [cornerPercent].
  *
  * Not a `Button`: M3's has no per-frame corner-percent morph and cannot animate corner percent per
- * frame, so this draws a flat filled shape with `clickable`, clipped so the ripple follows the pill.
+ * frame, so this draws a flat filled shape with `combinedClickable`, clipped so the ripple follows the pill.
  */
 @Composable
 fun MorphButtonCore(
@@ -64,6 +64,11 @@ fun MorphButtonCore(
     /** Border used while disabled (overrides [border]). */
     disabledBorder: BorderStroke? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    /**
+     * Hold-to-act variety (the chevron's spin easter egg). Null means plain click-only, exactly
+     * like M3 `Button`.
+     */
+    onLongClick: (() -> Unit)? = null,
     pillCornerPercent: Float = PillCornerPercent,
     morphedCornerPercent: Float = MorphedCornerPercent,
     /** Asymmetric shapes get the raw morph progress and animated corner percent; null is the plain pill. */
@@ -91,6 +96,7 @@ fun MorphButtonCore(
             disabledBorder = disabledBorder,
             border = border,
             enabled = enabled,
+            onLongClick = onLongClick,
             onClick = onClick,
         )
         // Stable content drawn over the chrome; taps reach the chrome below. Wrap-content: gives the button its size.
@@ -120,6 +126,7 @@ private fun BoxScope.MorphChrome(
     disabledBorder: BorderStroke?,
     border: BorderStroke?,
     enabled: Boolean,
+    onLongClick: (() -> Unit)?,
     onClick: () -> Unit,
 ) {
     // `active` drives the morph only for a STANDALONE button (shapeForCorner == null). Connected halves
@@ -156,10 +163,11 @@ private fun BoxScope.MorphChrome(
                     Modifier.background(color = fill, shape = shape)
                 },
             )
-            .clickable(
+            .combinedClickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 enabled = enabled,
+                onLongClick = onLongClick,
                 onClick = onClick,
             ),
     )

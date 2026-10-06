@@ -67,6 +67,8 @@ fun MorphButton(
     // Asymmetric shape replacing the plain pill-to-square morph (connected group segment, split
     // button half). Receives the raw morph progress (0 = pill, 1 = morphed) and the corner percent.
     shapeForCorner: ((morph: Float, cornerPercent: Int) -> Shape)? = null,
+    /** Hold-to-act action (the chevron's spin easter egg). Null = plain click-only. */
+    onLongClick: (() -> Unit)? = null,
     /** Haptic for a plain click; null = the standard click() pulse. */
     onClickHaptic: (() -> Unit)? = null,
     /**
@@ -155,6 +157,7 @@ fun MorphButton(
                 disabledContainerColor = glassTint(canBlurBackdrops()),
                 disabledBorder = BorderStroke(1.dp, hairlineColor()),
                 interactionSource = interactionSource,
+                onLongClick = onLongClick,
                 pillCornerPercent = pillCornerPercent,
                 morphedCornerPercent = morphedCornerPercent,
                 shapeForCorner = shapeForCorner,
@@ -342,9 +345,9 @@ val ButtonTargetHeight = 56.dp
 
 /**
  * A lone button never grows wider than this, even when pressed to fill its row: a single action
- * stretched across a whole phone (or tablet) row reads as a slab, not a button.
+ * stretched across a whole phone (or tablet) row reads as a slab, not a button. (2x the previous cap.)
  */
-internal val MaxSingleButtonWidth = 240.dp
+internal val MaxSingleButtonWidth = 480.dp
 
 /** The glyph beside a label. One size for push buttons, chips and cover actions alike. */
 val ButtonIconSize = 18.dp

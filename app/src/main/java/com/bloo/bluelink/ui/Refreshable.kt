@@ -50,7 +50,13 @@ internal fun Refreshable(
 
     PullToRefreshBox(
         isRefreshing = refreshing,
-        onRefresh = { haptics?.diceRoll(); onRefresh() },
+        onRefresh = {
+            haptics?.diceRoll()
+            // Synchronously, before the caller's async refresh flag flips: holds the disc at rest
+            // instead of letting it slide back up and re-drop. See RefreshIndicatorState.requested.
+            indicator?.requested = true
+            onRefresh()
+        },
         state = ptrState,
         modifier = Modifier.fillMaxSize(),
         // No per-page indicator: the one app-wide disc is drawn by PullRefreshIndicatorHost.

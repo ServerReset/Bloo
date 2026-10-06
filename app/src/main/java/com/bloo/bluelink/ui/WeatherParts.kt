@@ -304,6 +304,14 @@ private const val WEATHER_MERGE_MILES = 7.0
 private const val MAX_FORECAST_DAYS = 5
 
 /**
+ * Whether the car's and the phone's weather are close enough to show as ONE merged "Here & at the
+ * car" block. False (two labelled blocks) whenever there is no phone fix to compare, or it is
+ * farther than [WEATHER_MERGE_MILES].
+ */
+internal fun weatherLocationsMerge(phone: Weather?, milesApart: Double?): Boolean =
+    phone != null && milesApart != null && milesApart <= WEATHER_MERGE_MILES
+
+/**
  * The Location pebble's weather: the car's weather and (when the phone has a fix) the phone's own,
  * as either ONE merged block when you are within [WEATHER_MERGE_MILES] of the car, or TWO
  * clearly-labelled blocks when you are not.
@@ -318,7 +326,7 @@ internal fun WeatherLocations(
     fahrenheit: Boolean,
     metric: Boolean,
 ) {
-    val merged = phone != null && milesApart != null && milesApart <= WEATHER_MERGE_MILES
+    val merged = weatherLocationsMerge(phone, milesApart)
     Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
         if (merged) {
             WeatherLocationHeading(
@@ -434,7 +442,7 @@ internal fun dial(context: Context, number: String) {
  * How wide the strip's soft edge is: cells blur and fade as they slide into it and sharpen as they
  * leave it.
  */
-private val ScrollEdgeFade = 40.dp
+private val ScrollEdgeFade = 48.dp
 
 /**
  * A cell of a horizontally scrolling strip that melts into blur as it nears an edge that has more
@@ -447,7 +455,7 @@ private fun Modifier.scrollEdgeBlur(scroll: ScrollState, viewportPx: androidx.co
     var w by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     val density = androidx.compose.ui.platform.LocalDensity.current
     val fadePx = with(density) { ScrollEdgeFade.toPx() }
-    val maxBlurPx = with(density) { 3.dp.toPx() }
+    val maxBlurPx = with(density) { 5.dp.toPx() }
     return this
         .onPlaced { x = it.positionInParent().x; w = it.size.width.toFloat() }
         .graphicsLayer {
@@ -460,7 +468,7 @@ private fun Modifier.scrollEdgeBlur(scroll: ScrollState, viewportPx: androidx.co
             val intoLeft = ((fadePx - left) / fadePx).coerceIn(0f, 1f) * leftGate
             val intoRight = ((right - (vp - fadePx)) / fadePx).coerceIn(0f, 1f) * rightGate
             val t = maxOf(intoLeft, intoRight)
-            alpha = 1f - 0.5f * t
+            alpha = 1f - 0.65f * t
             renderEffect = if (blur && t > 0.03f) {
                 androidx.compose.ui.graphics.BlurEffect(maxBlurPx * t, maxBlurPx * t, androidx.compose.ui.graphics.TileMode.Decal)
             } else {

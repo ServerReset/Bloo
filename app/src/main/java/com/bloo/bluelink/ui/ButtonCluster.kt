@@ -48,6 +48,8 @@ internal class ClusterButton(
     /** Never narrower than the cluster is tall, so an icon-only button is a true circle (or a round nub in a cluster). */
     val square: Boolean = false,
     val onClickHaptic: (() -> Unit)? = null,
+    /** Hold-to-act action (the chevron's spin easter egg). Null = plain click-only. */
+    val onLongClick: (() -> Unit)? = null,
     /** Pass one to observe presses from outside; otherwise the cluster makes its own. */
     val interactionSource: MutableInteractionSource? = null,
     val content: @Composable RowScope.() -> Unit,
@@ -97,6 +99,7 @@ internal fun ButtonCluster(
                     contentPadding = b.contentPadding ?: standardPadding,
                     interactionSource = b.interactionSource ?: remember { MutableInteractionSource() },
                     onClickHaptic = b.onClickHaptic,
+                    onLongClick = b.onLongClick,
                     shapeForCorner = { morph, cornerPercent -> clusterShape(buttons, i, morph, cornerPercent) },
                     pillCornerPercent = PillCornerPercent,
                     morphedCornerPercent = MorphedCornerPercent,
