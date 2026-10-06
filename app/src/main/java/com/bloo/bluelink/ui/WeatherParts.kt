@@ -184,9 +184,6 @@ private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
                 .bleedHorizontally(PebbleContentInset)
                 .onSizeChanged { viewportPx.intValue = it.width }
                 .horizontalScroll(scroll)
-                // The standard glass edge on both sides: the strip fades and warps into a glass rim
-                // at whichever edge still has hours past it, instead of hard-cutting at the card.
-                .glassScrollEdges(scroll, ScrollAxis.Horizontal)
                 .padding(horizontal = PebbleContentInset),
             horizontalArrangement = Arrangement.spacedBy(GapRow),
         ) {
@@ -445,7 +442,7 @@ internal fun dial(context: Context, number: String) {
  * How wide the strip's soft edge is: cells blur and fade as they slide into it and sharpen as they
  * leave it.
  */
-private val ScrollEdgeFade = 48.dp
+private val ScrollEdgeFade = 40.dp
 
 /**
  * A cell of a horizontally scrolling strip that melts into blur as it nears an edge that has more
@@ -458,7 +455,7 @@ private fun Modifier.scrollEdgeBlur(scroll: ScrollState, viewportPx: androidx.co
     var w by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     val density = androidx.compose.ui.platform.LocalDensity.current
     val fadePx = with(density) { ScrollEdgeFade.toPx() }
-    val maxBlurPx = with(density) { 5.dp.toPx() }
+    val maxBlurPx = with(density) { 3.dp.toPx() }
     return this
         .onPlaced { x = it.positionInParent().x; w = it.size.width.toFloat() }
         .graphicsLayer {
@@ -471,7 +468,7 @@ private fun Modifier.scrollEdgeBlur(scroll: ScrollState, viewportPx: androidx.co
             val intoLeft = ((fadePx - left) / fadePx).coerceIn(0f, 1f) * leftGate
             val intoRight = ((right - (vp - fadePx)) / fadePx).coerceIn(0f, 1f) * rightGate
             val t = maxOf(intoLeft, intoRight)
-            alpha = 1f - 0.65f * t
+            alpha = 1f - 0.5f * t
             renderEffect = if (blur && t > 0.03f) {
                 androidx.compose.ui.graphics.BlurEffect(maxBlurPx * t, maxBlurPx * t, androidx.compose.ui.graphics.TileMode.Decal)
             } else {
