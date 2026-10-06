@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -41,7 +40,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -54,7 +52,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
@@ -108,27 +105,14 @@ internal fun SearchPill(
         }
     }
     val interaction = remember { MutableInteractionSource() }
-    // Springs in on first appearance; because SearchLayer keys the animations on the layout mode,
-    // "first appearance" includes arriving from a different docked position. The ball lands in its
-    // corner rather than sliding to it.
-    var appeared by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { appeared = true }
-    // Not DampingRatioMediumBouncy on both: entrance and press springs multiply into the same scale
-    // and read as too bouncy. The entrance uses the shared PebbleBounceDamping/Stiffness tokens.
-    val entrance by animateFloatAsState(
-        targetValue = if (appeared) 1f else 0.55f,
-        animationSpec = lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
-        label = "searchEntrance",
-    )
-    // No ambient glow: the pill's affordance is its filled shape and border.
+    // No entrance scale: a graphicsLayer scale on this box re-rasterized the glass blur (and the
+    // border) every frame of the spring, which read as jank. The container's own size/position
+    // springs already carry the arrival.
     val latestDrag = androidx.compose.runtime.rememberUpdatedState(onDrag)
     val latestDragStart = androidx.compose.runtime.rememberUpdatedState(onDragStart)
     val latestDragEnd = androidx.compose.runtime.rememberUpdatedState(onDragEnd)
     Box(
-        modifier.size(width, height).graphicsLayer {
-            scaleX = entrance
-            scaleY = entrance
-        }
+        modifier.size(width, height)
             // Publishes the pill's bounds (after .size) so other floating chrome can avoid it. Does
             // not use floatingOverlay: this pill is placed by the user, not owned by the page.
             .floatingElement(FloatingIds.Search),
