@@ -45,7 +45,7 @@ import kotlinx.coroutines.delay
 
 /**
  * The hero's car-photo rendering: tonal fallback brush, photo backdrop, and the shared charge/fuel
- * bar (also used by Cover.kt and EnergyPebble.kt).
+ * bar (also used by the EV Charge pebble).
  */
 
 /**
@@ -266,7 +266,7 @@ internal fun ChargeFuelBar(
     metric: Boolean = false,
 ) {
     // [HeroMorphReadout] held at its expanded end (`t = 1f`, inert): the one readout implementation
-    // shared by the hero, the flip cover tile and the EV Charge pebble.
+    // shared by the hero and the EV Charge pebble.
     HeroMorphReadout(chargeReadoutOf(status, hasBattery, hasFuel, drivingLabel, metric), t = 1f)
 }
 

@@ -2,7 +2,7 @@
 
 I wanted an app for my Hyundai that felt like Google built it. So I made one.
 
-Bloo is a third-party Android app for controlling **Hyundai**, **Genesis**, and **Kia** vehicles through their connected-car services (US, Canada, and Hyundai Europe). Built with Jetpack Compose and Material 3 Expressive for phones, foldables (including flip-phone cover screens), and tablets. No simulated data -- every screen talks to live servers.
+Bloo is a third-party Android app for controlling **Hyundai**, **Genesis**, and **Kia** vehicles through their connected-car services (US, Canada, and Hyundai Europe). Built with Jetpack Compose and Material 3 Expressive for phones, foldables, and tablets. No simulated data -- every screen talks to live servers.
 
 ## Supported brands
 
@@ -31,7 +31,7 @@ Multiple accounts can be signed in at once. Credentials are stored encrypted on-
 - Commands run through one serialized gate (Blue Link rate-limits overlapping requests), and climate-start is blocked while the car is driving
 
 ### Experience
-- Adaptive layouts for flip-phone cover screens (content flows around the camera cutout), foldable open/closed states, dual-column expanded views, and tablets
+- Adaptive layouts for foldable open/closed states, dual-column expanded views, and tablets
 - Drag-to-reorder pebbles per car, custom colour palettes, theme and font choices, and an animated Aurora background
 - **Drive sync**: settings, presets, and photos sync across your devices via Google Drive
 - **Self-update**: checks GitHub Releases on launch, on refresh, and periodically in the background, then downloads and hands the APK to the system installer (optionally silently, via Shizuku)

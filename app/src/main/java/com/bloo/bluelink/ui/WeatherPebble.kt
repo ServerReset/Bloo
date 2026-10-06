@@ -119,8 +119,8 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     // user who's never touched AutoLock grant it at all.
     val locateWithPermission = rememberLocateAction(vm, v)
     val deviceRequest = rememberDeviceLocationRequest(vm)
-    // On the cover this is the identity pill's headline; the compact street + ZIP form has no space
-    // to wrap on.
+    // In a pinned/glance context this is the identity pill's headline; the compact street + ZIP form
+    // has no space to wrap on.
     val place = if (LocalForceExpanded.current) {
         state.placeZips[v.vin] ?: state.placeNames[v.vin]
     } else {

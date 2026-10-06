@@ -246,8 +246,8 @@ internal fun SearchLayer(
                         // worse than a short list you can.
                         SettingsSearchResults(
                             query, submitted, vm, state.value, appearance, notif,
-                            // Cover with keyboard up (~260dp square, mostly keyboard): two visible
-                            // results beat six to scroll through.
+                            // Keyboard up on a small screen: two visible results beat six to
+                            // scroll through.
                             limit = when {
                                 keyboardUp -> 4
                                 else -> Int.MAX_VALUE

@@ -67,8 +67,8 @@ internal fun weatherTint(code: WeatherCode, isDay: Boolean): Color =
 
 /**
  * A compact one-line weather readout: icon, temperature and condition, with a small caption (place
- * name) underneath. Used inside the Location pebble when it renders collapsed on the cover, where
- * the full [WeatherBlock] has no room.
+ * name) underneath. Used inside the Location pebble when it renders collapsed in a glance context,
+ * where the full [WeatherBlock] has no room.
  */
 @Composable
 internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: String) {

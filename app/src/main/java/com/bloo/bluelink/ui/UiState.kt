@@ -333,8 +333,8 @@ data class UiState(
 
     /**
      * Whether [section] has anything to show for [v]; the one predicate every section list filters
-     * through. Caller-specific gates (the cover's "charge" hasBattery check, CompactKnownTiles
-     * membership) are applied on top.
+     * through. Caller-specific gates (the "charge" hasBattery check, CompactKnownTiles membership)
+     * are applied on top.
      */
     fun isSectionAvailable(v: Vehicle, section: String): Boolean {
         return when (section) {

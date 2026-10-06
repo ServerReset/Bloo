@@ -121,7 +121,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         }
 
         // "Service & identity" (VIN/plate/odometer/service) and the owner-links block are
-        // lookup/management surfaces with no at-a-glance value on a ~1-inch cover tile, and they're
+        // lookup/management surfaces with no at-a-glance value in a pinned/glance tile, and they're
         // what overflows it into a long scroll.
         if (glance) {
             odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }

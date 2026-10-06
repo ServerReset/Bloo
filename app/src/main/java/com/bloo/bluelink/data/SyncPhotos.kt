@@ -21,8 +21,7 @@ internal object SyncPhotos {
     /**
      * Longest edge a synced photo is downscaled to before base64-embedding -- small enough that
      * even several cars' photos keep the whole settings backup a reasonable size for repeated
-     * auto-sync uploads, still sharp enough for the hero card / cover-screen tile it's actually
-     * shown at.
+     * auto-sync uploads, still sharp enough for the hero card it's actually shown at.
      */
     private const val SYNCED_PHOTO_MAX_DIM = 640
 

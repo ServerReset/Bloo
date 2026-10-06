@@ -81,7 +81,7 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
 internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
     val primaryColor = MaterialTheme.colorScheme.onSurface
     // Same color-role swap as DiagnosticsPebble's indented rows: onSurfaceVariant is full alpha, so
-    // dimness is the role. Boosted on the cover, which has no other contrast handling.
+    // dimness is the role. Boosted in a glance context, which has no other contrast handling.
     val captionColor = if (LocalForceExpanded.current) {
         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
     } else {

@@ -160,7 +160,7 @@ internal fun SearchPill(
             interactionSource = interaction,
             modifier = Modifier
                 .fillMaxSize()
-                // The cover screen gets neither shadow nor glass rim: on a 40dp circle they read as
+                // The search pill gets neither shadow nor glass rim: on a 40dp circle they read as
                 // a smudge. glassEdge (GlassChrome.kt) is the dropShadow + glassRim pair with the
                 // theme-aware shadow weight, so a change there reaches this pill too. shadow =
                 // !expanded: a full-width shadow on the expanded bar darkens the whole backdrop.
@@ -273,7 +273,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
     // Plain Surface chips, not MorphButton, so click() is wired by hand.
     val haptics = LocalHaptics.current
     val carName = state.vehicles.firstOrNull()?.name
-    // Short forms when room is short (cover screen with keyboard up): a long hint would wrap and
+    // Short forms when room is short (keyboard up): a long hint would wrap and
     // push the next chip off the panel. Long forms teach the syntax.
     val examples = buildList {
         if (compact) {

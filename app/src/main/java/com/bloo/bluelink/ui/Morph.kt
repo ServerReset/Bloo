@@ -60,7 +60,7 @@ fun MorphButton(
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     /**
      * Overrides the disabled content tone (default: content at 38% alpha, so only the label fades).
-     * The cover action button passes a full-alpha tone because it dims the whole pill itself.
+     * A caller that dims the whole pill itself passes a full-alpha tone.
      */
     disabledContentColor: Color? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
@@ -342,7 +342,7 @@ val ButtonTargetHeight = 56.dp
  */
 internal val MaxSingleButtonWidth = 480.dp
 
-/** The glyph beside a label. One size for push buttons, chips and cover actions alike. */
+/** The glyph beside a label. One size for push buttons, chips and icon buttons alike. */
 val ButtonIconSize = 18.dp
 
 /** The glyph in a label-less button (the expand chevron); larger because the icon IS the button. */

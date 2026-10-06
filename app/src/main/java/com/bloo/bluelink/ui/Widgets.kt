@@ -226,7 +226,7 @@ internal val LocalForceExpanded = staticCompositionLocalOf { false }
 
 /**
  * The live pull-to-refresh distance (0..1+), published by [Refreshable] so the floating overlays in
- * [GarageScreen] (settings/back/flip buttons) can track the pull in real time instead of only
+ * [GarageScreen] (settings/back buttons) can track the pull in real time instead of only
  * animating once refresh starts.
  */
 internal val LocalPullFraction =
