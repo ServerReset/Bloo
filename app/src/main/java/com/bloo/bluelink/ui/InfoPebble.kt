@@ -75,7 +75,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
 
     // A null summary is omitted by Pebble, so the header simply carries no lock word until we
     // actually know -- rather than asserting a state as fact in visible text and to TalkBack.
-    // Matches StateControl, which already handles unknown.
+    // Matches the lock control, which already handles unknown.
     val infoSummary = status?.doorLock?.let { if (it) "Locked" else "Unlocked" }
     val glance = LocalForceExpanded.current
     // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting that reads

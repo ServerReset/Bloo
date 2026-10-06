@@ -54,14 +54,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.bloo.uicommon.MorphButtonCore
 
-/** One icon-only segment in a connected button group (see [ButtonCluster]). */
-internal data class GroupIconAction(
-    val icon: ImageVector,
-    val contentDescription: String,
-    val enabled: Boolean,
-    val onClick: () -> Unit,
-)
-
 /**
  * The one button style used across the app: rests as a **pill**, becomes a **rounded rectangle**
  * while [active] or pressed, and fills with [activeContainerColor] when active. Width springs when

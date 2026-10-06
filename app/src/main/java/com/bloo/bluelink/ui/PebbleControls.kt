@@ -1,16 +1,25 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -25,8 +34,10 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,10 +46,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.supportsHornLights
 import androidx.compose.runtime.derivedStateOf
@@ -87,7 +103,7 @@ internal fun CriticalContent(
 }
 
 /**
- * The lock/unlock quick control: [StateControl] with its status, in a pebble-shaped card with no
+ * The lock/unlock quick control: [PrimaryActions] with its status, in a pebble-shaped card with no
  * header or chevron.
  */
 @Composable
@@ -164,8 +180,13 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
 }
 
 /**
- * The lock/unlock [StateControl] plus brand-conditional Flash-lights/Horn icon actions, shared by
+ * The lock/unlock control plus brand-conditional Flash-lights/Horn icon actions, shared by
  * every quick-action surface; each passes its own [contentPadding] to match its inset convention.
+ *
+ * Built directly from the new button family: the control is a three-member [ButtonCluster] exactly
+ * like a hero card's header control ([SplitExpandButton]) but with three buttons instead of two,
+ * with the lock state as the pebble's own "title" beside it. This replaces the old stateful-control
+ * component (the last place still using it), which is now gone.
  */
 @Composable
 internal fun PrimaryActions(
@@ -175,27 +196,123 @@ internal fun PrimaryActions(
     contentPadding: PaddingValues = PaddingValues(start = 26.dp, end = 8.dp),
 ) {
     val status = state.statusFor(v)
-    Column(Modifier.fillMaxWidth().padding(contentPadding)) {
-        StateControl(
-            name = "",
-            isOn = status?.doorLock,
-            stateOn = "Locked", stateOff = "Unlocked",
-            turnOn = "Lock", turnOff = "Unlock",
-            icon = Icons.Filled.Lock, deactivateIcon = Icons.Filled.LockOpen,
-            pending = state.isPending(v.vin, "doors"),
-            onActivate = { vm.lock(v) }, onDeactivate = { vm.unlock(v) },
-            highlightWhenOff = true,
-            offTextColor = MaterialTheme.colorScheme.error,
-            // Kia's US API has no horn/lights endpoint (see Vehicle.supportsHornLights), so
-            // Hyundai/Genesis only. Icon-only, connected to the Lock button; contentDescription
-            // keeps them labelled for TalkBack.
-            groupActions = if (v.supportsHornLights) {
-                val hlPending = state.isPending(v.vin, "hornLights")
-                listOf(
-                    GroupIconAction(Icons.Filled.FlashOn, "Flash lights", !hlPending) { vm.flashLights(v) },
-                    GroupIconAction(Icons.Filled.Campaign, "Horn & lights", !hlPending) { vm.hornAndLights(v) },
+    val locked = status?.doorLock
+    val pending = state.isPending(v.vin, "doors")
+    val hlPending = state.isPending(v.vin, "hornLights")
+    val haptics = LocalHaptics.current
+    val scheme = MaterialTheme.colorScheme
+    // The lock button highlights while UNLOCKED, so the "Lock" action draws the eye; the state line
+    // reads red then too. Locked is the calm default.
+    val highlighted = locked == false
+    val stateText = when {
+        pending -> "Sending…"
+        locked == true -> "Locked"
+        locked == false -> "Unlocked"
+        else -> "Unknown"
+    }
+    val stateColor = when {
+        locked == false -> scheme.error
+        else -> mutedContentColor()
+    }
+    // Caps the cluster's width: the status is weighted, but a long "Unlocked" plus a wide cluster
+    // would otherwise squeeze the lock label to a glyph. Reserves room for the status column.
+    var rowWidthDp by remember { mutableStateOf(1000.dp) }
+    val density = LocalDensity.current
+    val groupMaxWidth = (rowWidthDp - 120.dp - GapGroup).coerceAtLeast(0.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(contentPadding)
+            // heightIn(min): the status and button text outgrow ControlHeight at large font sizes.
+            .heightIn(min = ControlHeight)
+            .onSizeChanged { rowWidthDp = with(density) { it.width.toDp() } },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // The lock state, as this control's own title -- the same slot a pebble header gives its
+        // name. Icon + word, side by side.
+        Row(
+            Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(GapRow),
+        ) {
+            if (pending) {
+                LoadingIndicator(Modifier.size(22.dp))
+            } else {
+                Icon(
+                    if (locked == true) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                    contentDescription = null,
+                    tint = stateColor,
+                    modifier = Modifier.size(22.dp),
                 )
-            } else emptyList(),
+            }
+            AnimatedContent(
+                targetState = stateText,
+                transitionSpec = { expandContentTransform() },
+                label = "lockStateText",
+            ) { text ->
+                Text(
+                    text,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = stateColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Spacer(Modifier.width(GapGroup))
+        // The control: a three-button connected cluster, the hero header's own silhouette.
+        val mainSource = remember { MutableInteractionSource() }
+        val lockContent: @Composable RowScope.() -> Unit = {
+            Box(contentAlignment = Alignment.Center) {
+                val buttonIcon = if (locked == true) Icons.Filled.LockOpen else Icons.Filled.Lock
+                MorphButtonLabel(buttonIcon, if (locked == true) "Unlock" else "Lock", pending)
+                // Reserves the width of the longer label so the button doesn't jump on the flip.
+                Box(Modifier.alpha(0f)) { MorphButtonLabel(Icons.Filled.Lock, "Unlock", false) }
+            }
+        }
+        ButtonCluster(
+            buttons = buildList {
+                if (v.supportsHornLights) {
+                    add(
+                        ClusterButton(
+                            onClick = { vm.flashLights(v) },
+                            enabled = !hlPending,
+                            square = true,
+                            contentPadding = PaddingValues(0.dp),
+                        ) { Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights", modifier = Modifier.size(22.dp)) },
+                    )
+                    add(
+                        ClusterButton(
+                            onClick = { vm.hornAndLights(v) },
+                            enabled = !hlPending,
+                            square = true,
+                            contentPadding = PaddingValues(0.dp),
+                        ) { Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights", modifier = Modifier.size(22.dp)) },
+                    )
+                }
+                add(
+                    ClusterButton(
+                        onClick = { haptics?.heavy(); if (locked == true) vm.unlock(v) else vm.lock(v) },
+                        onClickHaptic = { haptics?.heavy() },
+                        enabled = !pending,
+                        active = highlighted,
+                        activeContainerColor = scheme.primary,
+                        activeContentColor = scheme.onPrimary,
+                        interactionSource = mainSource,
+                        weight = GroupWeightProportional,
+                    ) { lockContent() },
+                )
+            },
+            // The same target height as the hero header control and every other button.
+            modifier = Modifier
+                .widthIn(max = groupMaxWidth)
+                .heightIn(min = ButtonTargetHeight)
+                .testTag(PrimaryActionsClusterTag),
+            horizontalAlignment = Alignment.CenterHorizontally,
         )
     }
 }
+
+/** The lock control's button cluster, for the instrumented height test. */
+internal const val PrimaryActionsClusterTag = "primaryActionsCluster"
