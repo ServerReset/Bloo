@@ -1,9 +1,7 @@
 package com.bloo.bluelink.wear
 
-import android.content.Intent
-import android.net.Uri
-import androidx.core.content.FileProvider
 import com.bloo.bluelink.data.WatchSyncProtocol
+import com.bloo.bluelink.data.installDownloadedApk
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
@@ -47,7 +45,8 @@ class WatchDataListenerService : WearableListenerService() {
     /**
      * Pull the APK asset off the Data Layer, write it, and launch the system installer. This is
      * the seamless path: the phone did the network work, and the user stays on the watch -- a
-     * single tap on the system installer is the only interaction.
+     * single tap on the system installer is the only interaction. Reuses the shared
+     * [installDownloadedApk], so the unknown-sources handling matches every other install path.
      */
     @android.annotation.SuppressLint("WearRecents") // starting the installer from a Service
     private suspend fun installPushedApk(asset: com.google.android.gms.wearable.Asset) {
@@ -56,19 +55,7 @@ class WatchDataListenerService : WearableListenerService() {
                 .getFdForAsset(asset).await().inputStream?.use { it.readBytes() }
         }.getOrNull() ?: return
         val file = WearDataLayerSync.writePushedApk(applicationContext, bytes) ?: return
-        runCatching {
-            val uri: Uri = FileProvider.getUriForFile(
-                applicationContext,
-                "${packageName}.fileprovider",
-                file,
-            )
-            startActivity(
-                Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "application/vnd.android.package-archive")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                },
-            )
-        }
+        installDownloadedApk(applicationContext, file)
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
