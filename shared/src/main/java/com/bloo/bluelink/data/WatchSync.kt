@@ -62,15 +62,17 @@ object WatchSyncProtocol {
      */
     const val PATH_COMMAND_RESULT = "/bloo/command_result"
     /**
-     * Phone → watch message: "I'd like to sign you in" -- the watch answers with [PATH_CRED_KEY].
+     * Watch → phone message: a [WatchNotifyPrefs] (JSON) the user changed on the watch.
      */
-    /** Watch → phone message: a [WatchNotifyPrefs] (JSON) the user changed on the watch. */
     const val PATH_NOTIF_PREFS = "/bloo/notif_prefs"
     /**
      * Capability the watch app advertises, so the phone can tell a Bloo watch from any other Wear
      * device.
      */
     const val CAPABILITY_WATCH_APP = "bloo_watch_app"
+    /**
+     * Phone → watch message: "I'd like to sign you in" -- the watch answers with [PATH_CRED_KEY].
+     */
     const val PATH_CRED_OFFER = "/bloo/cred_offer"
     /** Watch → phone message: the public half of the watch's Keystore transfer key. */
     const val PATH_CRED_KEY = "/bloo/cred_key"

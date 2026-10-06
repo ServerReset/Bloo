@@ -150,9 +150,7 @@ class WearActionReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                if (WearCredentialSync.runLocally(context, vin, action) == null) {
-                    WearDataLayerSync.sendCommand(context, vin, action)
-                }
+                runWatchCommand(context, vin, action)
             } finally {
                 pending.finish()
             }

@@ -41,11 +41,7 @@ class WearSnapshotRepository(private val context: Context) {
     }
 
     private fun run(vin: String, action: String) {
-        scope.launch {
-            if (WearCredentialSync.runLocally(context, vin, action) == null) {
-                WearDataLayerSync.sendCommand(context, vin, action)
-            }
-        }
+        scope.launch { runWatchCommand(context, vin, action) }
     }
 
     /** The last command result, so the UI can clear pending + show a failure. */
@@ -53,4 +49,15 @@ class WearSnapshotRepository(private val context: Context) {
 
     /** Whether a snapshot has been received from the phone at least once this session. */
     val connected = WearDataLayerSync.connected
+}
+
+/**
+ * Runs [action] for [vin] on the watch itself when it has its own session, else hands it to the
+ * phone. The watch's one command path, shared by [WearSnapshotRepository] and [WearActionReceiver]
+ * (a notification's Stop action).
+ */
+internal suspend fun runWatchCommand(context: Context, vin: String, action: String) {
+    if (WearCredentialSync.runLocally(context, vin, action) == null) {
+        WearDataLayerSync.sendCommand(context, vin, action)
+    }
 }
