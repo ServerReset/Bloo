@@ -118,42 +118,6 @@ internal fun WiggleText(
     )
 }
 
-/**
- * Softly fades the top/bottom [length] of a vertically scrolling area instead of hard-clipping it
- * at the bounds. The fade only appears on an edge that has more content past it, and eases in as
- * you scroll toward it.
- */
-internal fun Modifier.fadingEdges(scroll: ScrollState, length: Dp = 28.dp): Modifier = this
-    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-    .drawWithContent {
-        drawContent()
-        val lenPx = length.toPx()
-        val topAlpha = (scroll.value / lenPx).coerceIn(0f, 1f)
-        val botAlpha = ((scroll.maxValue - scroll.value) / lenPx).coerceIn(0f, 1f)
-        if (topAlpha > 0.001f) {
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, Color.Black),
-                    startY = 0f,
-                    endY = lenPx,
-                ),
-                blendMode = BlendMode.DstIn,
-                alpha = topAlpha,
-            )
-        }
-        if (botAlpha > 0.001f) {
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color.Black, Color.Transparent),
-                    startY = size.height - lenPx,
-                    endY = size.height,
-                ),
-                blendMode = BlendMode.DstIn,
-                alpha = botAlpha,
-            )
-        }
-    }
-
 /** Shared state for dragging a pebble onto (or off) the dual-column hot spot. */
 internal class HotSeatDrag {
     var section by mutableStateOf<String?>(null)

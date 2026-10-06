@@ -118,12 +118,13 @@ internal val HeroReadoutBottomInset = 14.dp
 
 /**
  * The horizontal inset every pebble's content sits at (header icon, summary, revealed content); the
- * lock pebble reaches it as 4 + 12 through a nested Box.
+ * lock pebble reaches it as 4 + 8 through a nested Box. Kept tight so content reaches closer to the
+ * card edge.
  */
-internal val PebbleContentInset = 16.dp
+internal val PebbleContentInset = 12.dp
 
 /** The horizontal gutter a full page's content sits inside (car pages and Settings). */
-internal val ScreenGutter = 16.dp
+internal val ScreenGutter = 12.dp
 
 /**
  * The app's vertical rhythm: one base unit ([SpaceUnit]) that every gap and inset is a multiple of.

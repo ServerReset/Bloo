@@ -93,8 +93,8 @@ internal fun PebbleHeaderRow(
             )
             .then(modifier)
             .heightIn(min = PebbleHeaderHeight)
-            // Asymmetric padding: 16dp left, 12dp right.
-            .padding(start = GapSection, end = GapGroup, top = GapRow, bottom = GapRow),
+            // Asymmetric padding: PebbleContentInset left, GapGroup right.
+            .padding(start = PebbleContentInset, end = GapGroup, top = GapRow, bottom = GapRow),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Tinted with [titleColor] so the icon matches the title (the hero draws over a scrimmed

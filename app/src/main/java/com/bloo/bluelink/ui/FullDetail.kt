@@ -101,6 +101,9 @@ internal fun VehicleDetailContent(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(scroll)
+                // Content warps into the glass rim as it scrolls off the top/bottom of the screen,
+                // the same standard edge the weather strip and the debug log use.
+                .fadingEdges(scroll)
                 .padding(horizontal = ScreenGutter),
             verticalArrangement = Arrangement.spacedBy(GapGroup),
         ) {

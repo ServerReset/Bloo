@@ -80,49 +80,70 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
-    // No color override here, so Text inherits onSurfaceVariant; the primary date/distance line is
-    // pinned to full onSurface so it stands apart from the caption.
     val primaryColor = MaterialTheme.colorScheme.onSurface
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    // Same color-role swap as DiagnosticsPebble's indented rows: onSurfaceVariant is full alpha, so
+    // dimness is the role. Boosted on the cover, which has no other contrast handling.
+    val captionColor = if (LocalForceExpanded.current) {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    // Each trip is its own zone: an outlined panel with a header line (when + how far) and a neat
+    // grid of stats underneath.
+    Column(
+        Modifier.fillMaxWidth().outlinedPanel(GapGroup),
+        verticalArrangement = Arrangement.spacedBy(GapRow),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
             Text(
                 tripDate(trip.startdate),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
                 color = primaryColor,
             )
             trip.distance?.let {
-                Text(formatTripDistance(it, metric), style = MaterialTheme.typography.bodyMedium, color = primaryColor)
+                Text(
+                    formatTripDistance(it, metric),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         }
-        val pace = remember(trip, metric) { buildList {
-            // fmtMinutes for these fields ("1h 35m" rather than "95 min").
-            trip.driveMinutes?.let { add(fmtMinutes(it)) }
-            trip.idleMinutes?.takeIf { it > 0 }?.let { add("${fmtMinutes(it)} idle") }
+        androidx.compose.foundation.layout.FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(GapGroup),
+            verticalArrangement = Arrangement.spacedBy(GapHairline),
+        ) {
+            trip.driveMinutes?.let { TripStat("Time", fmtMinutes(it), captionColor) }
+            trip.idleMinutes?.takeIf { it > 0 }?.let { TripStat("Idle", fmtMinutes(it), captionColor) }
             // formatSpeedMph, not formatSpeed: these values are mph and formatSpeed takes km/h.
-            trip.avgspeed?.value?.let { add("avg ${formatSpeedMph(it, metric)}") }
-            trip.maxspeed?.value?.let { add("max ${formatSpeedMph(it, metric)}") }
-        } }
-        // Same color-role swap as DiagnosticsPebble's indented rows: onSurfaceVariant is full
-        // alpha, so dimness is the role. Boosted on the cover, which has no other contrast
-        // handling.
-        val captionColor = if (LocalForceExpanded.current) {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            trip.avgspeed?.value?.let { TripStat("Avg", formatSpeedMph(it, metric), captionColor) }
+            trip.maxspeed?.value?.let { TripStat("Max", formatSpeedMph(it, metric), captionColor) }
+            trip.usedKwh?.let { TripStat("Used", "$it kWh", captionColor) }
+            trip.regenKwh?.takeIf { it > 0 }?.let { TripStat("Regen", "$it kWh", captionColor) }
         }
-        if (pace.isNotEmpty()) {
-            Text(pace.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = captionColor)
-        }
-        val energy = remember(trip) { buildList {
-            trip.usedKwh?.let { add("$it kWh used") }
-            trip.regenKwh?.takeIf { it > 0 }?.let { add("$it kWh regen") }
-        } }
-        if (energy.isNotEmpty()) {
-            Text(energy.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = captionColor)
-        }
+    }
+}
+
+/** One label-over-value stat in a trip's zone. */
+@Composable
+private fun TripStat(label: String, value: String, captionColor: androidx.compose.ui.graphics.Color) {
+    Column {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = captionColor, maxLines = 1)
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
     }
 }
 

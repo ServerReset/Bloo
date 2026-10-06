@@ -77,26 +77,30 @@ internal fun rememberShowMyLocation(
 }
 
 /**
- * The buttons under a map: one connected [ButtonCluster] -- the app's standard button framework --
- * with a button per [MapFeature], sharing the row in proportion to their labels (and compacting to
- * symbols when the row is narrow), at the one shared button height.
+ * The buttons under a map: one action button per [MapFeature], in the same row the car info pebble
+ * uses ([ExpressiveButtonRow] of [MorphActionButton]s) -- the app's standard labelled-button row.
  */
 @Composable
 internal fun MapFeatureRow(
     features: List<MapFeature>,
     modifier: Modifier = Modifier,
 ) {
-    ButtonCluster(
-        features.map { feature ->
-            ClusterButton(onClick = feature.onClick, enabled = feature.enabled, weight = GroupWeightProportional) {
-                MorphButtonLabel(feature.icon, feature.label, pending = false)
+    Box(modifier.padding(horizontal = GapGroup, vertical = GapRow)) {
+        ExpressiveButtonRow(
+            modifier = Modifier.fillMaxWidth(),
+            spacing = GapRow,
+            lineSpacing = GapRow,
+        ) {
+            features.forEach { feature ->
+                MorphActionButton(
+                    label = feature.label,
+                    icon = feature.icon,
+                    onClick = feature.onClick,
+                    enabled = feature.enabled,
+                )
             }
-        },
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = ButtonTargetHeight)
-            .padding(horizontal = GapGroup, vertical = GapRow),
-    )
+        }
+    }
 }
 
 /**

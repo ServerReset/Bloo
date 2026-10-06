@@ -184,6 +184,9 @@ private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
                 .bleedHorizontally(PebbleContentInset)
                 .onSizeChanged { viewportPx.intValue = it.width }
                 .horizontalScroll(scroll)
+                // The standard glass edge on both sides: the strip fades and warps into a glass rim
+                // at whichever edge still has hours past it, instead of hard-cutting at the card.
+                .glassScrollEdges(scroll, ScrollAxis.Horizontal)
                 .padding(horizontal = PebbleContentInset),
             horizontalArrangement = Arrangement.spacedBy(GapRow),
         ) {
