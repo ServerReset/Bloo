@@ -403,6 +403,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                     val vehicle = step.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
                     OnboardingGlassCard(
                         spec = onboardingCardSpec(step.kind, vehicle?.name, newCar = mode is OnboardingMode.NewCars),
+                        category = onboardingCategory(step.kind),
                         accent = onboardingAccent(step.kind),
                         current = idx == pageIndex,
                         onHeroTap = { celebrate(big = false) },

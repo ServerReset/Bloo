@@ -114,6 +114,21 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
     )
 }
 
+/** A short, uppercase category label shown as a chip above a card's title. */
+internal fun onboardingCategory(kind: OnboardingStepKind): String = when (kind) {
+    OnboardingStepKind.WELCOME -> "Welcome"
+    OnboardingStepKind.RESTORE -> "Restore"
+    OnboardingStepKind.SETUP -> "Setup"
+    OnboardingStepKind.LOOK -> "Look"
+    OnboardingStepKind.ALERTS -> "Alerts"
+    OnboardingStepKind.WATCH -> "Watch"
+    OnboardingStepKind.CAR_POWERTRAIN -> "Your car"
+    OnboardingStepKind.CAR_PLATFORM -> "Your car"
+    OnboardingStepKind.CAR_CLIMATE -> "Your car"
+    OnboardingStepKind.TIPS -> "Tips"
+    OnboardingStepKind.FEATURES -> "Features"
+}
+
 /** The accent a card glows with, so the deck changes colour as you move through it. */
 @Composable
 internal fun onboardingAccent(kind: OnboardingStepKind): Color {
@@ -365,6 +380,7 @@ internal fun OnboardingSwipeHint() {
 @Composable
 internal fun OnboardingGlassCard(
     spec: OnboardingCardSpec,
+    category: String,
     accent: Color,
     current: Boolean,
     onHeroTap: () -> Unit = {},
@@ -419,6 +435,21 @@ internal fun OnboardingGlassCard(
             verticalArrangement = Arrangement.spacedBy(GapGroup),
         ) {
             OnboardingHero(spec.icon, accent, current, onTap = onHeroTap, onLongPress = onHeroLongPress)
+            // A small glass chip naming the card's part of the flow.
+            Box(
+                Modifier
+                    .clip(CircleShape)
+                    .background(accent.copy(alpha = 0.18f))
+                    .border(1.dp, accent.copy(alpha = 0.35f), CircleShape)
+                    .padding(horizontal = GapRow, vertical = GapHairline),
+            ) {
+                Text(
+                    category,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = accent,
+                )
+            }
             Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                 Text(
                     spec.title,
