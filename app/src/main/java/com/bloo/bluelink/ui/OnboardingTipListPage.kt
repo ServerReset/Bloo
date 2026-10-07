@@ -35,6 +35,8 @@ internal fun OnboardingTipListPage(tips: List<Triple<ImageVector, String, String
  */
 @Composable
 internal fun OnboardingTipsPage() {
+    // A real, tappable pebble first, then the written tips.
+    OnboardingPebbleDemo()
     OnboardingTipListPage(
         tips = listOf(
             Triple(Icons.Filled.SwapHoriz, "Swipe between cars", "Swipe left or right on any pebble's top row, or anywhere on the hero card, to change cars, even when a pebble is open"),

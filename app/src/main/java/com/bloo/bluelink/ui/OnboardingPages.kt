@@ -12,6 +12,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
@@ -393,6 +402,56 @@ internal fun OnboardingWatchPage() {
     SafeMorphTextButton("Set up my watch", onClick = { show = true }, icon = Icons.Filled.Watch, emphasis = ButtonEmphasis.Confirm)
     BodySmallText("No watch? Swipe on. You can set one up later from Settings → Backup & sync.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     if (show) SetupWatchDialog(phoneName = "this phone", onDismiss = { show = false })
+}
+
+/**
+ * A little live pebble the user can actually tap and expand, so "tap a pebble for details" is
+ * something they do, not just read. Shown on the Getting around card.
+ */
+@Composable
+internal fun OnboardingPebbleDemo() {
+    val scheme = MaterialTheme.colorScheme
+    val haptics = LocalHaptics.current
+    var open by remember { mutableStateOf(false) }
+    GlassSurface(
+        shape = StandardShape,
+        liquid = false,
+        shadow = false,
+        onClick = {
+            open = !open
+            if (open) haptics?.click() else haptics?.tick()
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().animateContentSize().padding(GapSection),
+            verticalArrangement = Arrangement.spacedBy(GapRow),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconBadge(AppIcons.Bolt, tint = scheme.primary, size = 28.dp, iconSize = 15.dp)
+                Spacer(Modifier.width(GapRow))
+                Text(
+                    "Charge",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = scheme.onSurface,
+                )
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = if (open) "Collapse" else "Expand",
+                    tint = scheme.onSurfaceVariant,
+                )
+            }
+            AnimatedVisibility(visible = open) {
+                Text(
+                    "That is a pebble. Tap it for details, hold to reorder, and swipe its top row to change cars.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }
 
 /**

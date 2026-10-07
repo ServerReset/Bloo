@@ -62,5 +62,10 @@ class OnboardingShotTest {
 
         nextTo("Look and feel")
         shot("onb_dark_look")
+
+        nextTo("What to tell you")
+        nextTo("Your watch")
+        nextTo("Getting around")
+        shot("onb_dark_tips")
     }
 }
