@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,8 +47,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -151,6 +154,20 @@ internal fun onboardingAccent(kind: OnboardingStepKind): Color {
         OnboardingStepKind.TIPS -> androidx.compose.ui.graphics.lerp(p, s, 0.25f)
         OnboardingStepKind.FEATURES -> androidx.compose.ui.graphics.lerp(p, t, 0.6f)
     }
+}
+
+/**
+ * A child that pops in shortly after its host, later the further down the list it sits, so a card
+ * arrives as a little cascade rather than all at once.
+ */
+@Composable
+internal fun OnboardingStagger(index: Int, content: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60L + index * 70L)
+        visible = true
+    }
+    PopVisible(visible = visible) { content() }
 }
 
 /**
@@ -461,6 +478,18 @@ internal fun OnboardingGlassCard(
             }
             Spacer(Modifier.size(2.dp))
             content()
+        }
+        // A big, faint watermark glyph in the corner, so each card reads as designed rather than a
+        // plain sheet.
+        Box(Modifier.matchParentSize().clip(ExtraLargeShape), contentAlignment = Alignment.BottomEnd) {
+            Icon(
+                spec.icon,
+                contentDescription = null,
+                tint = accent.copy(alpha = 0.05f),
+                modifier = Modifier
+                    .size(230.dp)
+                    .offset(x = 78.dp, y = 64.dp),
+            )
         }
         // The one-shot sheen rides over the glass, clipped to the card, so a new card catches the
         // light as it lands.

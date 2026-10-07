@@ -81,6 +81,7 @@ internal fun OnboardingSetupPage(
         val notifLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
         ) { granted -> onNotifResult(granted) }
+        OnboardingStagger(0) {
         OnboardingSetupCard(
             icon = Icons.Filled.Notifications,
             title = "Notifications",
@@ -96,9 +97,11 @@ internal fun OnboardingSetupPage(
                 emphasis = ButtonEmphasis.Confirm,
             )
         }
+        }
     }
 
     // One lock card, swapped to what this device can authenticate with.
+    OnboardingStagger(1) {
     if (canBio) {
         val bioEnabled = biometricLock
         OnboardingSetupCard(
@@ -140,6 +143,7 @@ internal fun OnboardingSetupPage(
             )
         }
     }
+    }
 
     // --- Sync across devices (Google Drive or a plain file) ---
     var showDriveDialog by remember { mutableStateOf(false) }
@@ -157,6 +161,7 @@ internal fun OnboardingSetupPage(
         )
     }
     val syncEnabled = state.syncUri != null
+    OnboardingStagger(2) {
     OnboardingSetupCard(
         icon = Icons.Filled.CloudSync,
         title = "Sync across devices",
@@ -174,6 +179,7 @@ internal fun OnboardingSetupPage(
             modifier = Modifier.fillMaxWidth(),
             emphasis = ButtonEmphasis.Confirm,
         )
+    }
     }
 }
 

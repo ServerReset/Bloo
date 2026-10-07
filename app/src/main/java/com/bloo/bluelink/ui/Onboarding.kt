@@ -289,8 +289,10 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     // --- Fun: a fireworks burst, a sound and a buzz for every little win -------------------
     // [burst] is re-keyed to replay the overlay; [bigBurst] picks the fanfare over the small ding.
     var burst by remember { mutableIntStateOf(0) }
+    var burstBig by remember { mutableStateOf(false) }
     fun celebrate(big: Boolean) {
         burst++
+        burstBig = big
         if (big) {
             Fireworks.playSound(context)
             haptics?.fireworks()
@@ -350,7 +352,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             label = "deckAccent",
         )
         OnboardingAurora(backdropHaze, accent, Modifier.matchParentSize())
-        if (burst > 0 || leaving) androidx.compose.runtime.key(burst, leaving) { FireworksOverlay(Modifier.fillMaxSize()) }
+        if (burst > 0 || leaving) androidx.compose.runtime.key(burst, leaving) { FireworksOverlay(Modifier.fillMaxSize(), bursts = if (burstBig || leaving) 16 else 7) }
 
         CompositionLocalProvider(LocalBackdropHaze provides backdropHaze) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {

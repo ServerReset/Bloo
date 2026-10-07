@@ -49,10 +49,10 @@ internal class Burst(val x: Float, val y: Float, val start: Float, val life: Flo
  * and max radius.
  */
 @Composable
-internal fun FireworksOverlay(modifier: Modifier = Modifier) {
-    val bursts = remember {
+internal fun FireworksOverlay(modifier: Modifier = Modifier, bursts: Int = 7) {
+    val burstList = remember(bursts) {
         val r = kotlin.random.Random(System.nanoTime())
-        List(7) {
+        List(bursts) {
             Burst(
                 x = r.nextFloat() * 0.8f + 0.1f,
                 y = r.nextFloat() * 0.5f + 0.12f,
@@ -67,7 +67,7 @@ internal fun FireworksOverlay(modifier: Modifier = Modifier) {
     val t = remember { Animatable(0f) }
     LaunchedEffect(Unit) { t.animateTo(1f, tween(2600)) }
     Canvas(modifier) {
-        bursts.forEach { b ->
+        burstList.forEach { b ->
             val local = ((t.value - b.start) / b.life)
             if (local <= 0f || local >= 1f) return@forEach
             val cx = b.x * size.width
