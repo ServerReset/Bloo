@@ -102,4 +102,14 @@ class ToastClearanceTest {
         assertEquals(0f, c.endInsetPx, 0.001f)
         kotlin.test.assertTrue(c.bottomLiftPx > 0f, "a squeezed beside toast lifts instead")
     }
+
+    @Test
+    fun `the message's own width, not a fixed minimum, decides beside vs above`() {
+        // One docked search, two messages: a short one slots beside it, a long one lifts above.
+        val rect = Rect(16f, 1800f, 56f, 1852f)
+        val short = toastClearance(rect, window, height, 0f, 0f, edge, gap, minToastWidthPx = 400f)
+        val long = toastClearance(rect, window, height, 0f, 0f, edge, gap, minToastWidthPx = 1000f)
+        kotlin.test.assertTrue(short.startInsetPx > 0f && short.bottomLiftPx == 0f, "a short message slots beside")
+        kotlin.test.assertTrue(long.bottomLiftPx > 0f, "a long message lifts above")
+    }
 }
