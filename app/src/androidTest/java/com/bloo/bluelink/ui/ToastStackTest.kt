@@ -33,4 +33,17 @@ class ToastStackTest {
         val third = rule.onNodeWithText("Third toast").getBoundsInRoot().top.value
         assertTrue("oldest at the top, newest at the bottom ($first, $second, $third)", first < second && second < third)
     }
+
+    @Test
+    fun aRepeatBumpsACountInsteadOfStacking() {
+        val state = ToastState()
+        rule.setContent { BlooTheme { ToastHost(state, HazeState(), onCopy = {}) } }
+        rule.runOnUiThread {
+            state.show("Saved", "success")
+            state.show("Saved", "success")
+            state.show("Saved", "success")
+        }
+        rule.waitUntil(8_000) { exists("Saved") && exists("\u00d73") }
+        assertEquals("one toast, not three", 1, rule.onAllNodesWithText("Saved").fetchSemanticsNodes().size)
+    }
 }

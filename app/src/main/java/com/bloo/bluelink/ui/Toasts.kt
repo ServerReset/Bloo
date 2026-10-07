@@ -1,10 +1,14 @@
 package com.bloo.bluelink.ui
 
 import android.os.SystemClock
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -33,6 +37,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,14 +46,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -99,11 +100,22 @@ private fun toastDurationMs(message: String, type: String): Long =
     if (type == "error") (5_500L + message.length * 45L).coerceAtMost(10_000L)
     else (3_500L + message.length * 30L).coerceAtMost(6_500L)
 
+/**
+ * The stack's motion. Toasts arrive on the app's bouncy spring and leave on a quick retreat, and the
+ * reflow between slots is critically damped so a settling stack never wobbles.
+ */
+private val EnterSpring = spring<Float>(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
+private val ReflowSpring = spring<Float>(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)
+private val ExitLift = tween<Float>(MotionFast)
+private val ExitFall = tween<Float>(MotionMedium, easing = FastOutLinearInEasing)
+
 /** One message on screen. Flipping [leaving] plays its exit; it is dropped from the stack once that finishes. */
 @Stable
 internal class Toast(val id: Long, val message: String, val type: String, expireAt: Long) {
     var expireAt by mutableLongStateOf(expireAt)
     var leaving by mutableStateOf(false)
+    /** How many times this same message has repeated without leaving, shown as a count. */
+    var count by mutableIntStateOf(1)
 }
 
 /** The app's one toast stack, for any composable that needs to tell the user something. */
@@ -112,6 +124,9 @@ internal val LocalToasts = androidx.compose.runtime.staticCompositionLocalOf<Toa
 /**
  * The stack of live toasts, oldest at the top and newest at the bottom. Each toast expires on its own clock,
  * but never before the one above it, so they always go oldest to newest however long each message is.
+ *
+ * Repeats are grouped: the same message as the newest live toast re-arms it and bumps its [Toast.count]
+ * rather than stacking an identical card, so a burst of one kind of message reads as one toast.
  */
 @Stable
 internal class ToastState {
@@ -126,6 +141,7 @@ internal class ToastState {
         val newest = items.lastOrNull { !it.leaving }
         if (newest != null && newest.message == message && newest.type == type) {
             newest.expireAt = expire
+            newest.count += 1
             return
         }
         items += Toast(nextId++, message, type, expire)
@@ -141,11 +157,13 @@ internal class ToastState {
  * The toast stack, drawn above the screen and above the keyboard, newest at the bottom, going around
  * the search element.
  *
- * The stack and the search element share ONE height ([SearchElementHeight]) and ONE edge inset, so the
- * newest toast's bottom lines up exactly with the search bar's bottom when it slots beside it. Whether
- * the newest toast slots BESIDE the search or LIFTS above it is decided from ITS OWN message width: a
- * short message fits in the space left beside a docked search, a long one does not and lifts the whole
- * stack. The whole stack leans to the search's side, so it reads as one column emerging from the bar.
+ * The stack is a single one-toast-tall [Box]: every toast is laid out at the same place and moved
+ * purely by an animated `graphicsLayer` translation, so a toast entering, leaving or the stack
+ * reflowing around it never re-lays-out (and so never re-rasterises the glass of) its neighbours.
+ * The newest toast sits in the search's own row; the ones above it are one [SearchElementHeight] up
+ * each. Whether the newest slots BESIDE the search or LIFTS the whole stack above it is decided from
+ * ITS OWN message width, and the stack leans to the search's side so it reads as one column growing
+ * out of the bar.
  */
 @Composable
 internal fun ToastHost(
@@ -177,6 +195,7 @@ internal fun ToastHost(
     val maxWidthPx = contentWidthPx * ToastMaxWidthFraction
     val minWidthPx = with(density) { ToastMinWidth.toPx() }
     val chromePx = with(density) { ToastChromeWidth.toPx() }
+    val slotPx = with(density) { (SearchElementHeight + GapRow).toPx() }
 
     // THIS message decides beside vs above: measure its natural width (message plus the toast's
     // chrome) and hand that to the clearance maths instead of one fixed minimum.
@@ -200,38 +219,50 @@ internal fun ToastHost(
         SearchDock.fromFrac(((it.left + it.right) / 2f) / window.width.toFloat())
     } ?: SearchDock.CENTER
     val maxWidth = with(density) { maxWidthPx.toDp() }
+    val liftDp = with(density) { clearance.bottomLiftPx.toDp() }
+    val align = when (dock) {
+        SearchDock.LEFT -> Alignment.BottomStart
+        SearchDock.RIGHT -> Alignment.BottomEnd
+        SearchDock.CENTER -> Alignment.BottomCenter
+    }
+    val sideInset = if (beside) {
+        Modifier.padding(
+            start = with(density) { clearance.startInsetPx.toDp() },
+            end = with(density) { clearance.endInsetPx.toDp() },
+        )
+    } else {
+        Modifier
+    }
 
-    Column(
+    Box(
         modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-            .padding(start = ToastEdge, end = ToastEdge, top = GapRow, bottom = ToastEdge),
-        // Lean the whole stack to the search's side, so the newest beside it and the ones above
-        // read as one column growing out of the bar rather than a ragged pile.
-        horizontalAlignment = when (dock) {
-            SearchDock.LEFT -> Alignment.Start
-            SearchDock.RIGHT -> Alignment.End
-            SearchDock.CENTER -> Alignment.CenterHorizontally
-        },
-        verticalArrangement = Arrangement.spacedBy(GapRow),
+            .padding(start = ToastEdge, end = ToastEdge, bottom = ToastEdge)
+            // A centred (or too-narrow-to-sit-beside) search lifts the whole stack above it.
+            .padding(bottom = liftDp),
     ) {
-        state.items.forEach { toast ->
+        state.items.forEachIndexed { i, toast ->
             key(toast.id) {
+                // Slot 0 is the NEWEST (in the search's own row); older toasts count up from it, so
+                // the list (oldest first) runs the other way.
+                val index = state.items.lastIndex - i
                 // Only the newest toast shares the search element's row, so only it is inset to slot
                 // beside a corner-docked search; the ones above keep their full width.
-                val besideModifier = if (toast.id == newestId && beside) {
-                    Modifier.padding(
-                        start = with(density) { clearance.startInsetPx.toDp() },
-                        end = with(density) { clearance.endInsetPx.toDp() },
-                    )
-                } else {
-                    Modifier
-                }
-                Box(besideModifier) { ToastSlot(toast, state, maxWidth, hazeState, onCopy) }
+                val besideThis = if (index == 0) sideInset else Modifier
+                ToastSlot(
+                    toast = toast,
+                    index = index,
+                    slotPx = slotPx,
+                    align = align,
+                    beside = besideThis,
+                    maxWidth = maxWidth,
+                    hazeState = hazeState,
+                    onCopy = onCopy,
+                    onGone = { state.items.remove(toast) },
+                )
             }
         }
-        // A centred (or too-narrow-to-sit-beside) search lifts the whole stack above it.
-        if (clearance.bottomLiftPx > 0f) Spacer(Modifier.height(with(density) { clearance.bottomLiftPx.toDp() }))
     }
 }
 
@@ -254,57 +285,66 @@ private fun naturalToastWidthPx(
 }
 
 /**
- * One toast's slot in the stack: it owns the toast's expiry clock, splits off from the search bar and
- * merges back into it, and drops itself from the stack the moment its exit finishes.
+ * One toast: it owns its expiry clock, rises out of the search bar into its slot and retreats back
+ * into it on the way out, and drops itself from the stack the moment its exit finishes.
+ *
+ * It is laid out once, at the bottom of the stack, and its whole motion is a `graphicsLayer`
+ * translation: [slot] is the slot index it currently occupies (animated, so older toasts glide up as
+ * newer ones arrive) and [enter] is how far it has risen out of the search. Nothing here changes a
+ * measured size, so no neighbour is ever re-laid-out or re-blurred by another toast's motion.
  */
 @Composable
-private fun ToastSlot(
+private fun BoxScope.ToastSlot(
     toast: Toast,
-    state: ToastState,
+    index: Int,
+    slotPx: Float,
+    align: Alignment,
+    beside: Modifier,
     maxWidth: Dp,
     hazeState: HazeState,
     onCopy: (String) -> Unit,
+    onGone: () -> Unit,
 ) {
     // Its own clock, re-armed whenever the expiry moves (a repeat of the same message).
     LaunchedEffect(toast.id, toast.expireAt) {
         delay((toast.expireAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L))
         toast.leaving = true
     }
-    // The app's one pop (shared with dialogs): a bouncy rise in, an anticipatory lift and a quick
-    // retreat out. It is what drives the whole split-off.
-    val pop = rememberPop(toast.leaving) { state.items.remove(toast) }
-    val registry = LocalFloatingRegistry.current
-    var slotCenter by remember(toast.id) { mutableStateOf<Offset?>(null) }
+    // The slot it rests in, animated toward [index]. Starts AT its index (no initial glide) so the
+    // first frame is already in place.
+    val slot = remember(toast.id) { Animatable(index.toFloat()) }
+    LaunchedEffect(index) { slot.animateTo(index.toFloat(), ReflowSpring) }
+    // 0 = merged with the search bar, 1 = resting in its slot.
+    val enter = remember(toast.id) { Animatable(0f) }
+    LaunchedEffect(toast.id) { enter.animateTo(1f, EnterSpring) }
+    LaunchedEffect(toast.leaving) {
+        if (toast.leaving) {
+            // A small anticipatory lift, then a quick retreat into the bar.
+            enter.animateTo(1.04f, ExitLift)
+            enter.animateTo(0f, ExitFall)
+            onGone()
+        }
+    }
+    val swipe = rememberSwipeToDismiss(toast.id) { toast.leaving = true }
     Box(
         Modifier
-            .onGloballyPositioned { slotCenter = it.boundsInRoot().center }
-            // Grow and shrink the slot with the pop, so the stack makes room as a toast splits off
-            // and closes the gap as it merges back.
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints)
-                val h = (placeable.height * pop.value.coerceIn(0f, 1f)).roundToInt()
-                layout(placeable.width, h) { placeable.place(0, 0) }
-            }
-            // Split off from the search bar: the pill travels from the bar's centre to this slot.
-            // Translation only -- scaling the glass re-rasterised its blur every frame, and an alpha
-            // on the layer clipped its shadow, which was the old jank.
+            .align(align)
+            .then(beside)
             .graphicsLayer {
-                val p = if (slotCenter == null) 0f else pop.value
-                val origin = registry.boundsOf(FloatingIds.Search)?.center
-                val slot = slotCenter
-                if (origin != null && slot != null) {
-                    translationX = (origin.x - slot.x) * (1f - p)
-                    translationY = (origin.y - slot.y) * (1f - p)
-                }
-            },
+                val p = enter.value
+                // Rise out of the search: at p = 0 the toast sits one slot BELOW its place (in the
+                // search's row), at p = 1 it is exactly in its slot.
+                translationY = -slot.value * slotPx + (1f - p.coerceIn(0f, 1f)) * slotPx
+            }
+            .then(swipe),
     ) {
         ToastCard(
             toast = toast,
             maxWidth = maxWidth,
             // Fade the CONTENT, not the glass: the pill stays a solid piece of the bar while it
-            // peels off, and the message appears on it.
-            contentAlpha = { pop.value.coerceIn(0f, 1f) },
-            onDismiss = { state.dismiss(toast) },
+            // peels off, and an alpha on the glass layer would clip its shadow.
+            contentAlpha = { enter.value.coerceIn(0f, 1f) },
+            onDismiss = { toast.leaving = true },
             hazeState = hazeState,
             onCopy = onCopy,
         )
@@ -326,7 +366,6 @@ private fun ToastCard(
         "info" -> AppIcons.Info to scheme.tertiary
         else -> Icons.Filled.ErrorOutline to scheme.error
     }
-    val swipe = rememberSwipeToDismiss(toast.id, onDismiss)
     GlassSurface(
         // A pill, like the search bar it emerges from; mostly clear glass with just enough tint to read.
         shape = CircleShape,
@@ -340,8 +379,7 @@ private fun ToastCard(
             // the icon buttons (40dp) get the small padding that keeps the content inside it.
             .height(SearchElementHeight)
             .semantics { liveRegion = LiveRegionMode.Polite }
-            .testTag(ToastCardTag)
-            .then(swipe),
+            .testTag(ToastCardTag),
     ) {
         Row(
             Modifier
@@ -357,6 +395,15 @@ private fun ToastCard(
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+            }
+            // A grouped repeat shows its count, so a burst of one message reads as one toast.
+            if (toast.count > 1) {
+                Spacer(Modifier.width(GapRow))
+                Text(
+                    "×${toast.count}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = accent,
                 )
             }
             CopyButton(toast, accent, onCopy)
@@ -394,7 +441,7 @@ private fun CopyButton(toast: Toast, accent: Color, onCopy: (String) -> Unit) {
 private fun rememberSwipeToDismiss(key: Any, onDismiss: () -> Unit): Modifier {
     var dragging by remember(key) { mutableStateOf(false) }
     val dragPx = remember(key) { mutableFloatStateOf(0f) }
-    val settle = remember(key) { androidx.compose.animation.core.Animatable(0f) }
+    val settle = remember(key) { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val dismissPx = with(LocalDensity.current) { DismissDistance.toPx() }
     val offsetX by remember { derivedStateOf { if (dragging) dragPx.floatValue else settle.value } }
