@@ -42,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -371,6 +372,14 @@ internal fun OnboardingGlassCard(
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    // A one-shot light sweep across the glass when this card becomes the current one.
+    val sheen = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(current) {
+        if (current) {
+            sheen.snapTo(0f)
+            sheen.animateTo(1f, tween(950, easing = LinearEasing))
+        }
+    }
     Box(Modifier.fillMaxWidth()) {
         // A soft accent halo behind the card, so it glows with the page's colour and reads as a lit
         // pane rather than a flat panel.
@@ -422,5 +431,21 @@ internal fun OnboardingGlassCard(
             Spacer(Modifier.size(2.dp))
             content()
         }
+        // The one-shot sheen rides over the glass, clipped to the card, so a new card catches the
+        // light as it lands.
+        Box(
+            Modifier.matchParentSize().clip(ExtraLargeShape).drawBehind {
+                val p = sheen.value
+                val x = -0.45f + 1.9f * p
+                drawRoundRect(
+                    brush = Brush.linearGradient(
+                        listOf(Color.Transparent, Color.White.copy(alpha = 0.16f), Color.Transparent),
+                        start = Offset(size.width * (x - 0.22f), 0f),
+                        end = Offset(size.width * (x + 0.22f), size.height),
+                    ),
+                    cornerRadius = CornerRadius(40.dp.toPx()),
+                )
+            },
+        )
     }
 }
