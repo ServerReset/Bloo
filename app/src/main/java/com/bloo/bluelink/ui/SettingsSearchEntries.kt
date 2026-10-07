@@ -8,8 +8,10 @@ package com.bloo.bluelink.ui
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,6 +77,12 @@ internal fun buildSettingsSearchEntries(
         add("App lock", "biometric biometrics fingerprint face lock security app unlock require timing grace re-lock screen off immediate") {
             AppLockRow(state, appearance, vm, LocalContext.current)
         }
+    }
+    // The welcome-cards replay action: SettingsCardLook's Visuals card draws this button by hand, so
+    // unlike the registry-driven settings it needs its own search entry. "welcome cards" is exactly
+    // what someone would type for it.
+    add("Show welcome cards", "welcome cards onboarding intro tour replay walkthrough tips tutorial bring back show visuals") {
+        SafeMorphTextButton("Show welcome cards", onClick = { vm.showWelcomeCards() }, icon = Icons.Filled.Style)
     }
     // Every range and every picker, straight from the registry: no per-setting code here.
     (RangeSettings + ChoiceSettings).forEach { spec ->

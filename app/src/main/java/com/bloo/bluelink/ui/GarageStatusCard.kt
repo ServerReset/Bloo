@@ -143,6 +143,15 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
+                    // The body says "pull down to try again"; this makes the retry an actual, visible
+                    // control rather than a gesture someone has to already know.
+                    if (loadFailed) {
+                        SafeMorphTextButton(
+                            text = "Try again",
+                            onClick = { vm.loadGarage() },
+                            emphasis = ButtonEmphasis.Confirm,
+                        )
+                    }
                 }
             }
         }
