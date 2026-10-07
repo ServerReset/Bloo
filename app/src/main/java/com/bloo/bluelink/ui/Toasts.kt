@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
@@ -390,8 +390,9 @@ private fun ToastCard(
         tint = scheme.surface.copy(alpha = if (canBlurBackdrops()) 0.16f else 0.96f),
         modifier = Modifier
             .fillMaxWidth()
-            // EXACTLY the search element's height, not a min: a toast is the bar it emerged from.
-            .height(SearchElementHeight)
+            // At least the search element's height: normally it is exactly the bar it emerged
+            // from, but a long message may wrap to a second line and grow past it.
+            .heightIn(min = SearchElementHeight)
             .semantics { liveRegion = LiveRegionMode.Polite }
             .testTag(ToastCardTag),
     ) {
@@ -411,7 +412,7 @@ private fun ToastCard(
                 Text(
                     toast.message,
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
