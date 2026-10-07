@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -126,11 +127,19 @@ internal fun SettingsSearchResults(
             shape = resultCardShape,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(
-                "No matches for \"$query\"",
-                Modifier.padding(GapSection),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(Modifier.padding(GapSection)) {
+                Text(
+                    "No matches for \"$query\"",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(GapRow))
+                // Not a dead end: point at the three kinds of thing the bar understands.
+                Text(
+                    "Try a car name, a setting, or a command like \"lock my car\".",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     } else {
         // Restarts the stagger whenever the actual SET of results changes -- not on every
