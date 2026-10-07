@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import dev.chrisbanes.haze.HazeState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,9 +62,8 @@ class SearchToastHeightTest {
     }
 
     @Test
-    fun aShortToastWrapsToItsMessageInsteadOfFillingTheWidth() {
-        // A short message should be a compact pill (so it can slot beside the search), not a
-        // full-width bar. This is what makes the per-message beside-vs-above choice meaningful.
+    fun aToastFillsTheAvailableWidth() {
+        // Toasts are full-width bars (the bar the search element emerged from), not compact pills.
         val toasts = ToastState().apply { show("Hi", "info") }
         rule.setContent {
             BlooTheme {
@@ -71,8 +71,8 @@ class SearchToastHeightTest {
             }
         }
         rule.waitForIdle()
+        val root = rule.onRoot().getBoundsInRoot().let { (it.right - it.left).value }
         val w = width(ToastCardTag)
-        assertTrue("a short toast is compact, not full width (was $w)", w < 260f)
-        assertTrue("but not narrower than ToastMinWidth (was $w)", w >= 179f)
+        assertTrue("the toast fills the width minus the two edge insets (root=$root, w=$w)", w >= root - 40f)
     }
 }
