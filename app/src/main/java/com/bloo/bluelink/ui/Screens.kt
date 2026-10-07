@@ -140,15 +140,16 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
-    // One registry where every floating element publishes its bounds; see FloatingSystem.kt.
-    val floatingRegistry = remember { FloatingRegistry() }
+    // The one search anchor: the search element publishes its resting rect/dock here and the toasts
+    // and page spacers read it. See SearchAnchor.kt.
+    val searchAnchor = remember { SearchAnchor() }
     val dialogHost = remember { DialogHost(searchHazeState) }
     CompositionLocalProvider(
         // Removes the default ripple app-wide (see NoTapHighlight). Material 3 components ignore
         // LocalIndication, so LocalRippleConfiguration = null turns off theirs.
         LocalIndication provides NoTapHighlight,
         LocalRippleConfiguration provides null,
-        LocalFloatingRegistry provides floatingRegistry,
+        LocalSearchAnchor provides searchAnchor,
         LocalDialogHost provides dialogHost,
         LocalToasts provides toasts,
         LocalRefreshIndicator provides refreshIndicator,

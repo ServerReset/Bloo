@@ -175,17 +175,17 @@ internal fun ToastHost(
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer()
     val textStyle = MaterialTheme.typography.bodyMedium
-    val registry = LocalFloatingRegistry.current
+    val anchor = LocalSearchAnchor.current
 
     // The newest toast is the one that shares the search element's own row; the older ones stack
     // above it.
     val newest = state.items.lastOrNull { !it.leaving }
     val newestId = newest?.id
 
-    // The search element's live rect, read ONLY while a toast is up: it writes it on every drag
-    // frame, and a frozen copy would leave the clearance stuck when it registers or moves after a
-    // toast mounts.
-    val searchRect = if (newestId == null) null else registry.boundsOf(FloatingIds.Search)
+    // The search element's RESTING rect, read only while a toast is up. It is published from the
+    // element's own state, so it changes when the search settles somewhere new -- never per drag
+    // frame.
+    val searchRect = if (newestId == null) null else anchor.rect
     val window = LocalWindowInfo.current.containerSize
     val imeBottomPx = WindowInsets.ime.getBottom(density).toFloat()
     val navBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
@@ -215,9 +215,7 @@ internal fun ToastHost(
     )
     // Beside the search (an inset on one side, no lift) or lifted above it.
     val beside = clearance.bottomLiftPx <= 0f && (clearance.startInsetPx > 0f || clearance.endInsetPx > 0f)
-    val dock = searchRect?.let {
-        SearchDock.fromFrac(((it.left + it.right) / 2f) / window.width.toFloat())
-    } ?: SearchDock.CENTER
+    val dock = if (newestId == null) SearchDock.CENTER else anchor.dock
     val maxWidth = with(density) { maxWidthPx.toDp() }
     val liftDp = with(density) { clearance.bottomLiftPx.toDp() }
     val align = when (dock) {

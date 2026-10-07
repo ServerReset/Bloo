@@ -112,10 +112,7 @@ internal fun SearchPill(
     val latestDragStart = androidx.compose.runtime.rememberUpdatedState(onDragStart)
     val latestDragEnd = androidx.compose.runtime.rememberUpdatedState(onDragEnd)
     Box(
-        modifier.size(width, height)
-            // Publishes the pill's bounds (after .size) so other floating chrome can avoid it. Does
-            // not use floatingOverlay: this pill is placed by the user, not owned by the page.
-            .floatingElement(FloatingIds.Search),
+        modifier.size(width, height),
     ) {
         // canBlur/pillShape are hoisted so the fill and the blur layer agree; the blur needs its
         // own explicit clip because Surface's clip applies after the caller's modifier.
