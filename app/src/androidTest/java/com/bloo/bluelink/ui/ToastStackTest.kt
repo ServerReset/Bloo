@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -68,5 +70,33 @@ class ToastStackTest {
         rule.waitForIdle()
         val expanded = gap()
         assertTrue("tapping fans the pile out ($collapsed -> $expanded)", expanded > collapsed + 20f)
+    }
+
+    @Test
+    fun movingTheSearchDoesNotCrashTheStack() {
+        // Regression: the placement springs are underdamped, so an inset animating toward zero used
+        // to undershoot below zero and blow up Modifier.padding ("Padding must be non-negative").
+        val anchor = SearchAnchor()
+        val toasts = ToastState().apply { show("Saved", "success") }
+        // Drive the clock by hand so the placement springs actually run, but the toast's own expiry
+        // timer does not fire mid-test.
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            BlooTheme {
+                CompositionLocalProvider(LocalSearchAnchor provides anchor) {
+                    ToastHost(state = toasts, hazeState = HazeState(), onCopy = {})
+                }
+            }
+        }
+        rule.mainClock.advanceTimeByFrame()
+        // A left-docked search beside the toast: a large positive start inset.
+        rule.runOnUiThread { anchor.publish(Rect(16f, 1800f, 56f, 1852f), SearchDock.LEFT) }
+        rule.mainClock.advanceTimeBy(900)
+        // Then a centred search: the inset springs back to zero (this is the crash path).
+        rule.runOnUiThread { anchor.publish(Rect(440f, 1200f, 560f, 1252f), SearchDock.CENTER) }
+        rule.mainClock.advanceTimeBy(900)
+        rule.runOnUiThread { anchor.publish(Rect(16f, 1800f, 56f, 1852f), SearchDock.LEFT) }
+        rule.mainClock.advanceTimeBy(900)
+        assertTrue("the stack survived the placement changes", toasts.items.isNotEmpty())
     }
 }

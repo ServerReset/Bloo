@@ -329,20 +329,23 @@ private fun BoxScope.ToastSlot(
     // The card-pile tuck: older toasts are inset from both sides while collapsed, flush when fanned.
     val stackInset = if (stacked && !expanded) CollapsedInset * index else 0.dp
     val density = LocalDensity.current
+    // The placement springs are underdamped, so an inset mid-flight can dip below zero; padding
+    // must not (it throws). Clamp before it becomes a Dp. The lift is a distance too, for the same
+    // reason.
+    val startInset = with(density) { startInsetPx.coerceAtLeast(0f).toDp() } + stackInset
+    val endInset = with(density) { endInsetPx.coerceAtLeast(0f).toDp() } + stackInset
+    val lift = liftPx.coerceAtLeast(0f)
     Box(
         Modifier
             .align(Alignment.BottomStart)
             .fillMaxWidth()
-            .padding(
-                start = with(density) { startInsetPx.toDp() } + stackInset,
-                end = with(density) { endInsetPx.toDp() } + stackInset,
-            )
+            .padding(start = startInset, end = endInset)
             .graphicsLayer {
                 val p = enter.value.coerceIn(0f, 1f)
                 // Rise out of the search's row (one toast-height below its slot) and settle into it;
                 // retreat back down into the bar on the way out. The whole stack also floats up by
                 // the search's lift when the search is centred.
-                translationY = -slot.value * stepPx - liftPx + (1f - p) * SearchElementHeight.toPx()
+                translationY = -slot.value * stepPx - lift + (1f - p) * SearchElementHeight.toPx()
             }
             .then(swipe),
     ) {
