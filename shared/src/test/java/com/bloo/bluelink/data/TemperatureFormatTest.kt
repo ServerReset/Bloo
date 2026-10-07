@@ -135,6 +135,9 @@ class TemperatureFormatTest {
         assertEquals("--°", degLabel("--", fahrenheit = false))
         assertEquals("°", degLabel("", fahrenheit = true))
         assertEquals("LO°", degLabel("LO", fahrenheit = false))
+        // A switched-off climate setpoint reads as a word, not a temperature.
+        assertEquals("Off", degLabel("OFF", fahrenheit = true))
+        assertEquals("Off", degLabel("off", fahrenheit = false))
     }
 
     // ---- weatherTemp: Celsius in, either unit out ----

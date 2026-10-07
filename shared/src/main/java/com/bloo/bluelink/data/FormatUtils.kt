@@ -220,8 +220,12 @@ fun relativeLabel(ms: Long?): String {
  * chosen unit. Non-numeric values pass through with a bare degree sign.
  */
 fun degLabel(valueF: String, fahrenheit: Boolean, sourceUnit: Int? = null): String {
-    // Non-numeric values pass through with a bare degree sign.
-    val raw = valueF.toDoubleOrNull() ?: return "$valueF°"
+    // Non-numeric values normally pass through with a bare degree sign (they are temperature
+    // indicators, e.g. "LO"). The one exception is a switched-off climate setpoint, which the API
+    // reports as "OFF" -- a degree sign there reads as a temperature, so render it as the same
+    // "Off" the Climate pebble uses.
+    val raw = valueF.toDoubleOrNull()
+        ?: return if (valueF.equals("OFF", ignoreCase = true)) "Off" else "$valueF°"
 
     // [sourceUnit] is the API's unit code for THIS value (0 = Celsius, 1 = Fahrenheit); reading it
     // stops a Celsius car being converted as °F. Null or unrecognised codes assume °F.
