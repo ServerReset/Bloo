@@ -11,7 +11,9 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +46,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +61,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 /** What a welcome card's header says: the same icon / title / summary a pebble carries. */
 internal data class OnboardingCardSpec(val icon: ImageVector, val title: String, val summary: String)
@@ -113,11 +117,23 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
 @Composable
 internal fun onboardingAccent(kind: OnboardingStepKind): Color {
     val scheme = MaterialTheme.colorScheme
+    val p = scheme.primary
+    val s = scheme.secondary
+    val t = scheme.tertiary
+    // Mixes of the three theme accents, so consecutive cards read as distinctly different hues
+    // rather than three colours on rotation.
     return when (kind) {
-        OnboardingStepKind.WELCOME, OnboardingStepKind.SETUP, OnboardingStepKind.FEATURES -> scheme.primary
-        OnboardingStepKind.RESTORE, OnboardingStepKind.CAR_POWERTRAIN, OnboardingStepKind.CAR_PLATFORM,
-        OnboardingStepKind.CAR_CLIMATE -> scheme.tertiary
-        OnboardingStepKind.LOOK, OnboardingStepKind.TIPS, OnboardingStepKind.ALERTS, OnboardingStepKind.WATCH -> scheme.secondary
+        OnboardingStepKind.WELCOME -> p
+        OnboardingStepKind.RESTORE -> androidx.compose.ui.graphics.lerp(t, p, 0.35f)
+        OnboardingStepKind.SETUP -> s
+        OnboardingStepKind.LOOK -> androidx.compose.ui.graphics.lerp(p, s, 0.5f)
+        OnboardingStepKind.ALERTS -> t
+        OnboardingStepKind.WATCH -> androidx.compose.ui.graphics.lerp(s, t, 0.5f)
+        OnboardingStepKind.CAR_POWERTRAIN -> androidx.compose.ui.graphics.lerp(p, t, 0.4f)
+        OnboardingStepKind.CAR_PLATFORM -> androidx.compose.ui.graphics.lerp(s, p, 0.4f)
+        OnboardingStepKind.CAR_CLIMATE -> androidx.compose.ui.graphics.lerp(t, s, 0.4f)
+        OnboardingStepKind.TIPS -> androidx.compose.ui.graphics.lerp(p, s, 0.25f)
+        OnboardingStepKind.FEATURES -> androidx.compose.ui.graphics.lerp(p, t, 0.6f)
     }
 }
 
@@ -171,12 +187,14 @@ internal fun OnboardingProgress(count: Int, current: Int, accent: Color, modifie
  * a pulsing glow of the card's accent colour. The disc is tappable (a little burst of colour and a
  * buzz), and springs up when its card becomes the current one.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun OnboardingHero(
     icon: ImageVector,
     accent: Color,
     current: Boolean,
     onTap: () -> Unit = {},
+    onLongPress: () -> Unit = {},
 ) {
     val scheme = MaterialTheme.colorScheme
     // Only the card in view breathes, spins and floats; the neighbours the pager keeps ready stay
@@ -185,30 +203,58 @@ internal fun OnboardingHero(
     val glow: State<Float>
     val bob: State<Float>
     val spin: State<Float>
+    val pulse: State<Float>
     if (current) {
         val loop = rememberInfiniteTransition(label = "heroLoop")
         glow = loop.animateFloat(0.55f, 1f, infiniteRepeatable(tween(2200, easing = LinearEasing), RepeatMode.Reverse), label = "glow")
         bob = loop.animateFloat(-6f, 6f, infiniteRepeatable(tween(3000, easing = LinearEasing), RepeatMode.Reverse), label = "bob")
         spin = loop.animateFloat(0f, 360f, infiniteRepeatable(tween(8000, easing = LinearEasing)), label = "spin")
+        pulse = loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2100, easing = LinearEasing)), label = "pulse")
     } else {
         glow = remember { mutableFloatStateOf(0.75f) }
         bob = remember { mutableFloatStateOf(0f) }
         spin = remember { mutableFloatStateOf(0f) }
+        pulse = remember { mutableFloatStateOf(0f) }
     }
     val pop by animateFloatAsState(
         if (current) 1f else 0.8f,
         spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "heroPop",
     )
+    // A tap squashes the disc and spins the ring up, then springs back.
+    val tap = remember { androidx.compose.animation.core.Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val onTapWithFlair = {
+        scope.launch {
+            tap.animateTo(1f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium))
+            tap.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
+        }
+        onTap()
+    }
     Box(
         Modifier
             .size(136.dp)
             .graphicsLayer {
                 translationY = bob.value
-                scaleX = pop; scaleY = pop
+                val t = tap.value
+                scaleX = pop - 0.10f * t
+                scaleY = pop - 0.10f * t
             },
         contentAlignment = Alignment.Center,
     ) {
+        // A ring that keeps rippling outward from the disc, like a sonar ping.
+        Box(
+            Modifier
+                .size(136.dp)
+                .drawBehind {
+                    val r = (0.26f + 0.24f * pulse.value) * size.minDimension
+                    drawCircle(
+                        color = accent.copy(alpha = (1f - pulse.value) * 0.35f),
+                        radius = r,
+                        style = Stroke(width = 2.dp.toPx()),
+                    )
+                },
+        )
         // Pulsing glow of the accent colour.
         Box(
             Modifier
@@ -223,11 +269,11 @@ internal fun OnboardingHero(
                     )
                 },
         )
-        // The spinning conic ring with three orbiting sparks riding it.
+        // The spinning conic ring with a comet head and two orbiting sparks riding it.
         Box(
             Modifier
                 .size(104.dp)
-                .graphicsLayer { rotationZ = spin.value }
+                .graphicsLayer { rotationZ = spin.value + tap.value * 220f }
                 .drawBehind {
                     drawCircle(
                         Brush.sweepGradient(
@@ -244,17 +290,22 @@ internal fun OnboardingHero(
                         style = Stroke(width = 4.dp.toPx()),
                     )
                     val r = size.minDimension / 2f
-                    listOf(0f, 120f, 240f).forEach { deg ->
+                    // The comet: a bright head that sweeps the ring, with a soft glow behind it.
+                    val head = Offset(center.x + r, center.y)
+                    drawCircle(accent.copy(alpha = 0.35f), radius = 11.dp.toPx(), center = head)
+                    drawCircle(Color.White, radius = 4.dp.toPx(), center = head)
+                    listOf(120f, 240f).forEach { deg ->
                         val rad = Math.toRadians(deg.toDouble())
                         drawCircle(
                             color = Color.White,
-                            radius = 3.5.dp.toPx(),
+                            radius = 3.dp.toPx(),
                             center = Offset(center.x + kotlin.math.cos(rad).toFloat() * r, center.y + kotlin.math.sin(rad).toFloat() * r),
                         )
                     }
                 },
         )
-        // The frosted disc with the glyph, and a specular glint along its top edge.
+        // The frosted disc with the glyph, and a specular glint along its top edge. Tap for a spark,
+        // hold to set the whole deck off.
         Box(
             Modifier
                 .size(84.dp)
@@ -263,7 +314,7 @@ internal fun OnboardingHero(
                     Brush.linearGradient(listOf(scheme.surfaceContainerHighest, scheme.surfaceContainerLow)),
                     CircleShape,
                 )
-                .clickable(onClick = onTap)
+                .combinedClickable(onClick = onTapWithFlair, onLongClick = onLongPress)
                 .drawBehind {
                     drawCircle(
                         Brush.linearGradient(listOf(Color.White.copy(alpha = 0.55f), Color.Transparent)),
@@ -316,6 +367,7 @@ internal fun OnboardingGlassCard(
     accent: Color,
     current: Boolean,
     onHeroTap: () -> Unit = {},
+    onHeroLongPress: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -343,10 +395,21 @@ internal fun OnboardingGlassCard(
                 // Cheap-blur glass: the aurora behind is blurred, tinted and sheened, exactly like a
                 // pebble. Falls back to a readable tint when the blur cannot run.
                 .glassCardFill(ExtraLargeShape, scheme.surfaceContainerHigh)
+                // A tinted, uneven edge on top of the frosted rim, so the glass catches the page's
+                // colour along its edge.
+                .border(
+                    androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        Brush.linearGradient(
+                            listOf(accent.copy(alpha = 0.55f), Color.Transparent, accent.copy(alpha = 0.30f)),
+                        ),
+                    ),
+                    ExtraLargeShape,
+                )
                 .padding(GapBlock),
             verticalArrangement = Arrangement.spacedBy(GapGroup),
         ) {
-            OnboardingHero(spec.icon, accent, current, onTap = onHeroTap)
+            OnboardingHero(spec.icon, accent, current, onTap = onHeroTap, onLongPress = onHeroLongPress)
             Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                 Text(
                     spec.title,

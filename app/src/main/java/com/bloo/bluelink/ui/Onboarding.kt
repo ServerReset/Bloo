@@ -406,6 +406,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                         accent = onboardingAccent(step.kind),
                         current = idx == pageIndex,
                         onHeroTap = { celebrate(big = false) },
+                        onHeroLongPress = { celebrate(big = true) },
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
                             when (step.kind) {

@@ -14,6 +14,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlin.math.cos
@@ -69,6 +70,33 @@ internal fun OnboardingAurora(hazeState: HazeState, accent: Color, modifier: Mod
                 // A brighter core behind the hero, and a counter-blob low so the deck never sits flat.
                 blob(accent.copy(alpha = base * 0.7f), 0.24f, 0.22f, 0.40f)
                 blob(tertiary.copy(alpha = base * 0.55f), 0.10f + 0.05f * cos(t * 0.55f), 0.92f, 0.45f)
+                // A slow diagonal sheen drifting across the whole field.
+                val sweep = (t * 0.055f) % 1f
+                val sx = -0.4f + 1.8f * sweep
+                drawRect(
+                    Brush.linearGradient(
+                        listOf(Color.Transparent, Color.White.copy(alpha = if (dark) 0.05f else 0.09f), Color.Transparent),
+                        start = Offset(size.width * (sx - 0.35f), 0f),
+                        end = Offset(size.width * (sx + 0.35f), size.height),
+                    ),
+                )
+                // Twinkling motes drifting up through the light: stable per index, driven by the same
+                // slow tick so they add no extra redraws.
+                val moteAlpha = if (dark) 0.55f else 0.40f
+                for (i in 0 until 20) {
+                    val seed = i * 0.61803398875f
+                    val fx = ((seed * 7.13f) % 1f + 1f) % 1f
+                    val fy = ((seed * 3.71f) % 1f + 1f) % 1f
+                    val speed = 0.018f + (i % 3) * 0.011f
+                    val yFrac = ((fy - t * speed) % 1f + 1f) % 1f
+                    val xFrac = (fx + 0.03f * sin(t * 0.3f + i)).coerceIn(0f, 1f)
+                    val twinkle = 0.35f + 0.65f * (0.5f + 0.5f * sin(t * (0.8f + (i % 4) * 0.2f) + i))
+                    drawCircle(
+                        color = Color.White.copy(alpha = moteAlpha * twinkle),
+                        radius = (1.1f + (i % 3) * 0.9f).dp.toPx(),
+                        center = Offset(size.width * xFrac, size.height * yFrac),
+                    )
+                }
                 // A faint vignette so the glass chrome reads at the edges.
                 drawRect(
                     Brush.radialGradient(
