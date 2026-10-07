@@ -5,52 +5,58 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.WavingHand
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /** What a welcome card's header says: the same icon / title / summary a pebble carries. */
@@ -103,29 +109,6 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
     )
 }
 
-/**
- * One dot per card; the current one stretches into a pill, so the deck's length and your place in
- * it read at a glance.
- */
-@Composable
-internal fun OnboardingDots(count: Int, current: Int, modifier: Modifier = Modifier) {
-    val scheme = MaterialTheme.colorScheme
-    Row(
-        modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        repeat(count) { i ->
-            val selected = i == current
-            val width by animateDpAsState(if (selected) 22.dp else 8.dp, label = "dotWidth")
-            val color by animateColorAsState(if (selected) scheme.primary else scheme.outlineVariant, label = "dotColor")
-            androidx.compose.foundation.layout.Box(
-                Modifier.width(width).height(8.dp).clip(CircleShape).background(color),
-            )
-        }
-    }
-}
-
 /** The accent a card glows with, so the deck changes colour as you move through it. */
 @Composable
 internal fun onboardingAccent(kind: OnboardingStepKind): Color {
@@ -139,79 +122,231 @@ internal fun onboardingAccent(kind: OnboardingStepKind): Color {
 }
 
 /**
- * The glyph at the head of a card: a frosted disc that floats gently over a pulsing glow of the
- * card's accent colour, and springs up when its card becomes the current one.
+ * The deck's progress at the top: a glowing glass track whose fill springs to the current card,
+ * with a bright head and a plain "3 / 14" readout beside it. Replaces the old dot row.
  */
 @Composable
-internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean) {
-    // Only the card in view breathes and floats; the neighbours the pager keeps ready stay still,
-    // so a deck of seven runs one animation, not seven. States, read only inside the draw and layer
-    // lambdas below, so a frame of the animation redraws the glyph without recomposing it.
-    val glow: androidx.compose.runtime.State<Float>
-    val bob: androidx.compose.runtime.State<Float>
+internal fun OnboardingProgress(count: Int, current: Int, accent: Color, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val frac by animateFloatAsState(
+        targetValue = if (count <= 1) 1f else current.toFloat() / (count - 1).toFloat(),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "onboardingProgress",
+    )
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapGroup)) {
+        Box(
+            Modifier
+                .weight(1f)
+                .height(9.dp)
+                .clip(CircleShape)
+                .background(scheme.surfaceContainerHighest.copy(alpha = 0.55f))
+                .drawBehind {
+                    val w = (size.width * frac.coerceIn(0f, 1f)).coerceAtLeast(size.height)
+                    drawRoundRect(
+                        brush = Brush.horizontalGradient(
+                            listOf(accent.copy(alpha = 0.55f), accent),
+                        ),
+                        size = Size(w, size.height),
+                        cornerRadius = CornerRadius(size.height / 2f),
+                    )
+                    // The glowing head rides the tip of the fill.
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.85f),
+                        radius = size.height * 0.42f,
+                        center = Offset(w - size.height / 2f, size.height / 2f),
+                    )
+                },
+        )
+        Text(
+            "${current + 1} / $count",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = scheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * The glyph at the head of a card: a frosted disc inside a slowly spinning conic ring, floating over
+ * a pulsing glow of the card's accent colour. The disc is tappable (a little burst of colour and a
+ * buzz), and springs up when its card becomes the current one.
+ */
+@Composable
+internal fun OnboardingHero(
+    icon: ImageVector,
+    accent: Color,
+    current: Boolean,
+    onTap: () -> Unit = {},
+) {
+    val scheme = MaterialTheme.colorScheme
+    // Only the card in view breathes, spins and floats; the neighbours the pager keeps ready stay
+    // still, so a deck of fourteen runs one animation, not fourteen. All read inside the draw and
+    // layer lambdas below, so a frame of the animation redraws the glyph without recomposing it.
+    val glow: State<Float>
+    val bob: State<Float>
+    val spin: State<Float>
     if (current) {
-        val pulse = rememberInfiniteTransition(label = "heroPulse")
-        glow = pulse.animateFloat(0.55f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Reverse), label = "glow")
-        bob = pulse.animateFloat(-4f, 4f, infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Reverse), label = "bob")
+        val loop = rememberInfiniteTransition(label = "heroLoop")
+        glow = loop.animateFloat(0.55f, 1f, infiniteRepeatable(tween(2200, easing = LinearEasing), RepeatMode.Reverse), label = "glow")
+        bob = loop.animateFloat(-6f, 6f, infiniteRepeatable(tween(3000, easing = LinearEasing), RepeatMode.Reverse), label = "bob")
+        spin = loop.animateFloat(0f, 360f, infiniteRepeatable(tween(8000, easing = LinearEasing)), label = "spin")
     } else {
-        glow = remember { androidx.compose.runtime.mutableFloatStateOf(0.8f) }
-        bob = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+        glow = remember { mutableFloatStateOf(0.75f) }
+        bob = remember { mutableFloatStateOf(0f) }
+        spin = remember { mutableFloatStateOf(0f) }
     }
     val pop by animateFloatAsState(
-        if (current) 1f else 0.82f,
+        if (current) 1f else 0.8f,
         spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "heroPop",
     )
     Box(
         Modifier
-            .size(92.dp)
-            .graphicsLayer { translationY = bob.value; scaleX = pop; scaleY = pop }
-            .clip(CircleShape)
-            .drawBehind {
-                drawCircle(
-                    Brush.radialGradient(listOf(accent.copy(alpha = 0.55f * glow.value), Color.Transparent), radius = size.minDimension * 0.95f),
-                    radius = size.minDimension * 0.95f,
-                )
+            .size(136.dp)
+            .graphicsLayer {
+                translationY = bob.value
+                scaleX = pop; scaleY = pop
             },
         contentAlignment = Alignment.Center,
     ) {
+        // Pulsing glow of the accent colour.
         Box(
             Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(accent.copy(alpha = 0.22f))
+                .size(136.dp)
                 .drawBehind {
-                    drawCircle(Brush.linearGradient(listOf(Color.White.copy(alpha = 0.35f), Color.Transparent)), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
+                    drawCircle(
+                        Brush.radialGradient(
+                            listOf(accent.copy(alpha = 0.60f * glow.value), accent.copy(alpha = 0.10f * glow.value), Color.Transparent),
+                            radius = size.minDimension * 0.5f,
+                        ),
+                        radius = size.minDimension * 0.5f,
+                    )
+                },
+        )
+        // The spinning conic ring with three orbiting sparks riding it.
+        Box(
+            Modifier
+                .size(104.dp)
+                .graphicsLayer { rotationZ = spin.value }
+                .drawBehind {
+                    drawCircle(
+                        Brush.sweepGradient(
+                            listOf(
+                                accent.copy(alpha = 0f),
+                                accent,
+                                accent.copy(alpha = 0f),
+                                accent,
+                                accent.copy(alpha = 0f),
+                                accent,
+                                accent.copy(alpha = 0f),
+                            ),
+                        ),
+                        style = Stroke(width = 4.dp.toPx()),
+                    )
+                    val r = size.minDimension / 2f
+                    listOf(0f, 120f, 240f).forEach { deg ->
+                        val rad = Math.toRadians(deg.toDouble())
+                        drawCircle(
+                            color = Color.White,
+                            radius = 3.5.dp.toPx(),
+                            center = Offset(center.x + kotlin.math.cos(rad).toFloat() * r, center.y + kotlin.math.sin(rad).toFloat() * r),
+                        )
+                    }
+                },
+        )
+        // The frosted disc with the glyph, and a specular glint along its top edge.
+        Box(
+            Modifier
+                .size(84.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.linearGradient(listOf(scheme.surfaceContainerHighest, scheme.surfaceContainerLow)),
+                    CircleShape,
+                )
+                .clickable(onClick = onTap)
+                .drawBehind {
+                    drawCircle(
+                        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.55f), Color.Transparent)),
+                        style = Stroke(width = 1.8.dp.toPx()),
+                    )
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(32.dp))
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(40.dp))
         }
     }
 }
 
 /**
- * One card of the deck: frosted glass over the blurred aurora, a glowing hero glyph, a big title
- * and its summary, then the card's own content.
+ * A gentle, animated "swipe" hint under the button bar, shown on the opening card so the deck's
+ * gesture is discoverable without a wall of text. The little arrow nudges side to side.
+ */
+@Composable
+internal fun OnboardingSwipeHint() {
+    val scheme = MaterialTheme.colorScheme
+    val nudge by rememberInfiniteTransition(label = "swipeHint").animateFloat(
+        initialValue = -5f,
+        targetValue = 5f,
+        animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "nudge",
+    )
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Filled.SwapHoriz,
+            contentDescription = null,
+            tint = scheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp).graphicsLayer { translationX = nudge },
+        )
+        Spacer(Modifier.width(GapHairline))
+        Text("Swipe to continue", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+    }
+}
+
+/**
+ * One card of the deck: frosted glass over the blurred aurora, a glowing hero glyph, a big title and
+ * its summary, then the card's own content.
  */
 @Composable
 internal fun OnboardingGlassCard(
     spec: OnboardingCardSpec,
     accent: Color,
     current: Boolean,
+    onHeroTap: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    GlassSurface(
-        shape = ExtraLargeShape,
-        liquid = false,
-        shadow = false,
-        modifier = Modifier.fillMaxWidth(),
-        tint = scheme.surfaceContainerHigh.copy(alpha = 0.82f),
-        contentAlignment = Alignment.TopStart,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(GapBlock), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-            OnboardingHero(spec.icon, accent, current)
+    Box(Modifier.fillMaxWidth()) {
+        // A soft accent halo behind the card, so it glows with the page's colour and reads as a lit
+        // pane rather than a flat panel.
+        Box(
+            Modifier.matchParentSize().drawBehind {
+                drawRoundRect(
+                    brush = Brush.verticalGradient(
+                        listOf(accent.copy(alpha = 0.30f), accent.copy(alpha = 0.05f), Color.Transparent),
+                    ),
+                    topLeft = Offset(-14.dp.toPx(), -14.dp.toPx()),
+                    size = Size(size.width + 28.dp.toPx(), size.height + 28.dp.toPx()),
+                    cornerRadius = CornerRadius(48.dp.toPx()),
+                )
+            },
+        )
+        Column(
+            Modifier
+                .fillMaxWidth()
+                // Rim only (no shadow): the cards scale as they settle, and a baked shadow would clip
+                // under that transform.
+                .glassRim(ExtraLargeShape)
+                // Cheap-blur glass: the aurora behind is blurred, tinted and sheened, exactly like a
+                // pebble. Falls back to a readable tint when the blur cannot run.
+                .glassCardFill(ExtraLargeShape, scheme.surfaceContainerHigh)
+                .padding(GapBlock),
+            verticalArrangement = Arrangement.spacedBy(GapGroup),
+        ) {
+            OnboardingHero(spec.icon, accent, current, onTap = onHeroTap)
             Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                 Text(
                     spec.title,

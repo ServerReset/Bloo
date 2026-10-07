@@ -27,7 +27,9 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
@@ -311,7 +313,7 @@ internal fun OnboardingSetupCard(
     Column(
         Modifier
             .fillMaxWidth()
-            .outlinedPanel(14.dp)
+            .onboardingPanel(14.dp)
             .animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
@@ -341,7 +343,7 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
     val scheme = MaterialTheme.colorScheme
     Surface(
         shape = StandardShape,
-        color = androidx.compose.ui.graphics.Color.Transparent,
+        color = scheme.surfaceContainerHighest.copy(alpha = 0.30f),
         border = androidx.compose.foundation.BorderStroke(1.dp, hairlineColor()),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -386,3 +388,15 @@ internal fun OnboardingWatchPage() {
     BodySmallText("No watch? Swipe on. You can set one up later from Settings → Backup & sync.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     if (show) SetupWatchDialog(phoneName = "this phone", onDismiss = { show = false })
 }
+
+/**
+ * A glassy inner panel: a translucent pane with the shared frosted rim, used for the setup and tip
+ * sub-cards so they layer as glass over the card's own glass rather than reading as flat outline.
+ */
+@Composable
+private fun Modifier.onboardingPanel(padding: androidx.compose.ui.unit.Dp = GapGroup): Modifier =
+    this
+        .clip(StandardShape)
+        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.30f), StandardShape)
+        .glassRim(StandardShape)
+        .padding(padding)

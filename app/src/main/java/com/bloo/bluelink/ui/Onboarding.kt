@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,11 +45,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.platformOverridable
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -339,37 +340,36 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             .background(scheme.background)
             .pointerInput(Unit) {},
     ) {
-        // A cheap, static backdrop: the theme's own surface with a wash of the colour of the card
-        // you're on, easing from one accent to the next as you swipe. No aurora and no backdrop
-        // blur here: a full-screen blur plus a blur per card was the whole of this screen's lag.
+        // The glassy backdrop: the app's own aurora (blurred, drifting) behind a wash of the colour
+        // of the card you are on, easing from one accent to the next as you swipe. This whole layer
+        // is the Haze source the glass cards blur, so the deck reads as frosted glass over light.
+        val backdropHaze = remember { HazeState() }
         val accent by androidx.compose.animation.animateColorAsState(
             onboardingAccent(steps.getOrNull(pageIndex)?.kind ?: OnboardingStepKind.WELCOME),
             androidx.compose.animation.core.tween(MotionLong),
             label = "deckAccent",
         )
-        Box(
-            Modifier.matchParentSize().drawBehind {
-                drawRect(
-                    androidx.compose.ui.graphics.Brush.verticalGradient(
-                        listOf(scheme.surface, scheme.surfaceContainerHigh, scheme.surface),
-                    ),
-                )
-                drawRect(
-                    androidx.compose.ui.graphics.Brush.radialGradient(
-                        listOf(accent.copy(alpha = 0.34f), androidx.compose.ui.graphics.Color.Transparent),
-                        center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.22f),
-                        radius = size.width * 1.1f,
-                    ),
-                )
-            },
-        )
+        OnboardingAurora(backdropHaze, accent, Modifier.matchParentSize())
         if (burst > 0 || leaving) androidx.compose.runtime.key(burst, leaving) { FireworksOverlay(Modifier.fillMaxSize()) }
 
+        CompositionLocalProvider(LocalBackdropHaze provides backdropHaze) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Spacer(Modifier.height(GapSection))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                GlassSurface(shape = CircleShape, liquid = false, tint = scheme.surfaceContainerHighest.copy(alpha = 0.7f)) {
-                    OnboardingDots(count = steps.size, current = pageIndex, modifier = Modifier.padding(horizontal = GapSection, vertical = GapGroup))
+                GlassSurface(
+                    shape = CircleShape,
+                    liquid = false,
+                    shadow = false,
+                    hazeState = backdropHaze,
+                    tint = scheme.surfaceContainerHighest.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = GapPage),
+                ) {
+                    OnboardingProgress(
+                        count = steps.size.coerceAtLeast(1),
+                        current = pageIndex,
+                        accent = accent,
+                        modifier = Modifier.padding(horizontal = GapSection, vertical = GapGroup),
+                    )
                 }
             }
 
@@ -389,11 +389,13 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            val away = kotlin.math.abs((pagerState.currentPage - idx) + pagerState.currentPageOffsetFraction)
-                                .coerceIn(0f, 1f)
-                            val scale = 1f - 0.08f * away
+                            val offset = (pagerState.currentPage - idx) + pagerState.currentPageOffsetFraction
+                            val away = kotlin.math.abs(offset).coerceIn(0f, 1f)
+                            val scale = 1f - 0.07f * away
                             scaleX = scale; scaleY = scale
-                            alpha = 1f - 0.45f * away
+                            alpha = 1f - 0.5f * away
+                            // A 3D deck feel: the card turns away as it leaves the centre.
+                            rotationY = offset * 9f
                         }
                         .verticalScroll(rememberScrollState())
                         .padding(top = GapSection, bottom = GapBlock),
@@ -403,6 +405,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                         spec = onboardingCardSpec(step.kind, vehicle?.name, newCar = mode is OnboardingMode.NewCars),
                         accent = onboardingAccent(step.kind),
                         current = idx == pageIndex,
+                        onHeroTap = { celebrate(big = false) },
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
                             when (step.kind) {
@@ -433,31 +436,53 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             GlassSurface(
                 shape = ExtraLargeShape,
                 liquid = false,
-                tint = scheme.surfaceContainerHighest.copy(alpha = 0.7f),
+                hazeState = backdropHaze,
+                tint = scheme.surfaceContainerHighest.copy(alpha = 0.6f),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = GapPage, vertical = GapGroup),
             ) {
                 Column(Modifier.fillMaxWidth().padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
-                        if (pageIndex > 0) {
-                            SafeMorphTextButton(text = "Back", onClick = { goBack() })
+                    Box(Modifier.fillMaxWidth()) {
+                        // On the closing card the bar glows with the accent, so "Enter Bloo" reads as the finale.
+                        if (isLast) {
+                            Box(
+                                Modifier.matchParentSize().drawBehind {
+                                    drawRect(
+                                        androidx.compose.ui.graphics.Brush.radialGradient(
+                                            listOf(accent.copy(alpha = 0.45f), androidx.compose.ui.graphics.Color.Transparent),
+                                            center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f),
+                                            radius = size.maxDimension * 0.7f,
+                                        ),
+                                    )
+                                },
+                            )
                         }
-                        MorphActionButton(
-                            label = when {
-                                isLast && mode == OnboardingMode.Replay -> "Dismiss"
-                                isLast && mode is OnboardingMode.NewCars -> "Done"
-                                isLast -> "Enter Bloo"
-                                firstRun && pageIndex == 0 -> "Get started"
-                                else -> "Next"
-                            },
-                            icon = if (isLast) AppIcons.CheckCircle else AppIcons.Check,
-                            onClick = { goNext() },
-                            enabled = blockedHere == null,
-                            emphasis = ButtonEmphasis.Confirm,
-                        )
+                        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
+                            if (pageIndex > 0) {
+                                SafeMorphTextButton(text = "Back", onClick = { goBack() })
+                            }
+                            MorphActionButton(
+                                label = when {
+                                    isLast && mode == OnboardingMode.Replay -> "Dismiss"
+                                    isLast && mode is OnboardingMode.NewCars -> "Done"
+                                    isLast -> "Enter Bloo"
+                                    firstRun && pageIndex == 0 -> "Get started"
+                                    else -> "Next"
+                                },
+                                icon = if (isLast) AppIcons.CheckCircle else AppIcons.Check,
+                                onClick = { goNext() },
+                                enabled = blockedHere == null,
+                                emphasis = ButtonEmphasis.Confirm,
+                            )
+                        }
                     }
-                    blockedHere?.let { BodySmallText(it) }
+                    if (blockedHere != null) {
+                        BodySmallText(blockedHere)
+                    } else if (pageIndex == 0) {
+                        OnboardingSwipeHint()
+                    }
                 }
             }
+        }
         }
     }
 }
