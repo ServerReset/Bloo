@@ -49,7 +49,10 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
     val a = LocalAppearance.current
     val fahrenheit = a.useFahrenheit
     val metric = a.metricDistance
-    val rows = remember(status, fahrenheit, metric) { buildList {
+    // A pure EV has no tank, but the API still reports fuelLevel=0, which rendered as a misleading
+    // "Fuel level 0% / Low fuel No" pair. Only show the fuel rows where there is a tank to read.
+    val hasFuel = state.powertrainOf(v) != com.bloo.bluelink.data.Powertrain.EV
+    val rows = remember(status, fahrenheit, metric, hasFuel) { buildList {
         status?.tirePressureLamp?.let { tp ->
             // No psi suffix. `TirePressure.all` was only ever populated FROM the warning lamp --
             // Kia read `tirePressure.all` (a 0/1 indicator) and Canada read
@@ -71,8 +74,10 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         status?.airTemp?.let { t ->
             t.value?.let { add(DiagRow("Climate setpoint", degLabel(it, fahrenheit, t.unit))) }
         }
-        status?.fuelLevel?.let { add(DiagRow("Fuel level", "$it%")) }
-        status?.lowFuelLight?.let { add(DiagRow("Low fuel", yesNo(it))) }
+        if (hasFuel) {
+            status?.fuelLevel?.let { add(DiagRow("Fuel level", "$it%")) }
+            status?.lowFuelLight?.let { add(DiagRow("Low fuel", yesNo(it))) }
+        }
         status?.washerFluidStatus?.let { add(DiagRow("Washer fluid", if (it) "Low" else "OK")) }
         status?.breakOilStatus?.let { add(DiagRow("Brake fluid", if (it) "Check" else "OK")) }
         status?.smartKeyBatteryWarning?.let { add(DiagRow("Key fob battery", if (it) "Low" else "OK")) }
