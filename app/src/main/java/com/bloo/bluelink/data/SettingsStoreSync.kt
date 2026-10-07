@@ -186,7 +186,7 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
                     context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
                         ?: error("Couldn't open the Drive file for writing")
                     val verify = context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
-                    if (verify != body) error("Upload didn't verify — the Drive file doesn't match what was written")
+                    if (verify != body) error("Upload didn't verify: the Drive file doesn't match what was written")
                 }
             }
             AppLog.log("Drive sync: uploaded settings")
@@ -248,7 +248,7 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
         }
     }.getOrDefault(false)
     if (!granted) {
-        return SettingsStore.SyncTestResult(false, "Lost access to the Drive file — set up sync again.")
+        return SettingsStore.SyncTestResult(false, "Lost access to the Drive file. Set up sync again.")
     }
     // Serialize with real syncs so the read-then-write-back can't interleave with a concurrent
     // performMainToMainSync writing different content.
@@ -282,9 +282,9 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
             return@withLock SettingsStore.SyncTestResult(false, "Couldn't write the Drive file ($why).")
         }
         if (verified) {
-            SettingsStore.SyncTestResult(true, "Drive sync is working — read, wrote and verified the file successfully.")
+            SettingsStore.SyncTestResult(true, "Drive sync is working: read, wrote and verified the file successfully.")
         } else {
-            SettingsStore.SyncTestResult(false, "The write didn't verify — the provider may be dropping or truncating writes.")
+            SettingsStore.SyncTestResult(false, "The write didn't verify: the provider may be dropping or truncating writes.")
         }
     }
 }

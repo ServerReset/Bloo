@@ -55,7 +55,7 @@ internal fun OnboardingTipsPage() {
 @Composable
 internal fun OnboardingFeaturesPage(state: UiState) {
     val tips = buildList<Triple<ImageVector, String, String>> {
-        add(Triple(AppIcons.Lock, "AutoLock", "Locks your car when you walk away -- enable it per car in Settings"))
+        add(Triple(AppIcons.Lock, "AutoLock", "Locks your car when you walk away. Enable it per car in Settings"))
         add(Triple(AppIcons.Bolt, "Live charging updates", "Watch an EV's charge progress from your lock screen while plugged in"))
         add(Triple(AppIcons.Search, "Just ask", "Search \"lock my car\" or \"start climate at 70\" to run it from the bar"))
         if (state.aiSupported) {

@@ -64,7 +64,7 @@ object AutoLockNotification {
             DetectionState.VERIFYING -> "Checking $carName" to "Reading the car's status…"
             DetectionState.LOCKING -> "Locking $carName" to "Sending the lock command…"
             DetectionState.LOCKED -> "$carName locked" to "AutoLock locked it for you."
-            DetectionState.SKIPPED -> "AutoLock skipped $carName" to "Nothing to do — see the activity log for why."
+            DetectionState.SKIPPED -> "AutoLock skipped $carName" to "Nothing to do. See the activity log for why."
             DetectionState.ABORTED -> "AutoLock cancelled" to "$carName wasn't touched."
             DetectionState.ERROR -> "AutoLock error" to "Couldn't finish evaluating $carName."
             else -> "AutoLock" to carName

@@ -108,7 +108,7 @@ internal fun CarSettingsCard(
             // a picker there would be a control with no effect.
             if (v.platformOverridable) {
                 LabelText("Head unit")
-                BodySmallText("Confirm this car's head unit -- the API can't always tell. Some features only show when supported.")
+                BodySmallText("Confirm this car's head unit. The API can't always tell, and some features only show when supported.")
                 PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
             }
         }

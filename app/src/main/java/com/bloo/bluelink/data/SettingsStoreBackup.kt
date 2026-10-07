@@ -46,7 +46,7 @@ suspend fun SettingsStore.importSettingsJson(json: String): String? {
     }
     val version = (root["_version"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 1
     if (version > BACKUP_VERSION) {
-        return "This backup was made with a newer version of Bloo — update the app first"
+        return "This backup was made with a newer version of Bloo. Update the app first"
     }
     if ((root["prefs"] as? JsonObject) == null) return "Settings file has no data"
     // Key typing and tombstones come from [SyncMerge.parseBackup] (device-local keys excluded); non-null after the guards above.

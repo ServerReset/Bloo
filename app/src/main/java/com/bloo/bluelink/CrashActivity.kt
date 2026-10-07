@@ -182,7 +182,7 @@ class CrashActivity : ComponentActivity() {
                         checking = false
                         statusMessage = when (result) {
                             is UpdateCheckResult.UpToDate -> "Already on the latest build."
-                            is UpdateCheckResult.Skipped -> "Couldn't check just now -- try again."
+                            is UpdateCheckResult.Skipped -> "Couldn't check just now. Try again."
                             is UpdateCheckResult.Failed -> result.error ?: "Couldn't reach GitHub."
                             is UpdateCheckResult.Available -> null
                         }
@@ -230,7 +230,7 @@ class CrashActivity : ComponentActivity() {
                     onClick = {
                         val url = info.run.phoneApkUrl
                         if (url == null) {
-                            statusMessage = "No direct download for this build -- use GitHub instead."
+                            statusMessage = "No direct download for this build. Use GitHub instead."
                             return@MorphTextButton
                         }
                         downloading = true
@@ -240,7 +240,7 @@ class CrashActivity : ComponentActivity() {
                             val ok = UpdateApi.downloadApk(url, apkFile) { downloadProgress = it }
                             downloading = false
                             apkReady = ok
-                            statusMessage = if (ok) null else "Download failed -- check your connection and try again."
+                            statusMessage = if (ok) null else "Download failed. Check your connection and try again."
                         }
                     },
                 )
@@ -269,7 +269,7 @@ class CrashActivity : ComponentActivity() {
         val clipboardScope = rememberCoroutineScope()
         SettingsGroup("Crash report") {
             Text(
-                "Copy this and send it back -- the crash, your device, and what the app was doing.",
+                "Copy this and send it back: the crash, your device, and what the app was doing.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

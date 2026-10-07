@@ -105,7 +105,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                     SetupField(connectPort, { connectPort = it.filter(Char::isDigit) }, "Connection port", KeyboardType.Number)
                     BodySmallText(
                         "If connecting fails: keep the Wireless debugging screen open (the port changes " +
-                            "when you leave it), and make sure the watch and phone are on the same Wi‑Fi — a " +
+                            "when you leave it), and make sure the watch and phone are on the same Wi‑Fi. A " +
                             "watch on its own mobile/Bluetooth network can't be reached this way.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
