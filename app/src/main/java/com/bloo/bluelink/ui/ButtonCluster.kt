@@ -84,9 +84,9 @@ internal fun ButtonCluster(
         horizontalAlignment = horizontalAlignment,
         // One connected control must never break onto two lines: when room runs out it compacts to symbols.
         wrap = false,
-        // A lone member of a cluster (the pebble header chevron) must NOT expand to fill the row on
-        // press -- it is a connected control, not a standalone action button.
-        growWhenAlone = false,
+        // A cluster of ONE is a standalone control (the pebble header chevron): it grows like any
+        // other button on press. A real cluster (two or more) must not balloon.
+        growWhenAlone = buttons.size == 1,
     ) {
         buttons.forEachIndexed { i, b ->
             key(i) {
@@ -103,7 +103,14 @@ internal fun ButtonCluster(
                     interactionSource = b.interactionSource ?: remember { MutableInteractionSource() },
                     onClickHaptic = b.onClickHaptic,
                     onLongClick = b.onLongClick,
-                    shapeForCorner = { morph, cornerPercent -> clusterShape(buttons, i, morph, cornerPercent) },
+                    // A lone button is round at rest and squares off when it is open or pressed, like
+                    // any standalone button. Only a real cluster needs the connected-corner shape,
+                    // which reacts to press alone so a member's corners agree with its neighbours.
+                    shapeForCorner = if (buttons.size == 1) {
+                        null
+                    } else {
+                        { morph, cornerPercent -> clusterShape(buttons, i, morph, cornerPercent) }
+                    },
                     pillCornerPercent = PillCornerPercent,
                     morphedCornerPercent = MorphedCornerPercent,
                     minHeight = 0.dp,
