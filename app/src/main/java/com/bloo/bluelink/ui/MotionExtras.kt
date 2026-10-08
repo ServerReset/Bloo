@@ -101,8 +101,8 @@ internal fun Modifier.pageTurn(offset: () -> Float, strength: Float = 1f): Modif
     scaleX = scale
     scaleY = scale
     alpha = 1f - 0.45f * strength * away
-    rotationY = o * 11f * strength
-    // A wide camera keeps the perspective shallow: the page clearly tilts, but its far corners do
-    // not swing so far vertically that they leave the (over-rendered) pager bounds.
-    cameraDistance = 16.dp.toPx()
+    rotationY = o * 20f * strength
+    // A very distant camera keeps the projection near-orthographic: the page still turns (its far
+    // edge narrows and dims), but its corners no longer swing off the top and bottom of the screen.
+    cameraDistance = 800.dp.toPx()
 }
