@@ -38,7 +38,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberUpdatedState
@@ -47,10 +46,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -62,7 +61,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlin.math.max
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.runtime.withFrameNanos
 import com.bloo.bluelink.data.platform
 import androidx.compose.ui.window.DialogProperties
 
@@ -253,35 +251,20 @@ internal fun AuroraBackground(
         }
         explosion.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow))
     }
-    // Fades the blobs in from nothing instead of drawing this file's own most expensive draw (the
-    // full-screen blur) at full alpha on the very first frame this composable exists -- which, for
-    // a cold start, IS the very first frame the app paints at all (LoadingScreen/LoginScreen both
-    // use this).
+    // Fades the blobs in from nothing on the first frame this composable exists -- for a cold start,
+    // that IS the very first frame the app paints at all (LoadingScreen/LoginScreen both use this).
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, tween(MotionMedium)) }
-    // Defer the blur itself past the first frame, not just the blob alpha (`appear` above). The
-    // blobs are at alpha 0 for the first ~320ms, so a full-screen 44dp blur of a flat surface on
-    // the very first frame is pure wasted GPU work -- and on a cold start that first frame is the
-    // one that decides "how long did the app take to open".
-    var blurOn by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        blurOn = true
-    }
-    // Read inside drawBehind, not here. p1/p2/p3 and the tilt were already moved into draw scope;
-    // this one stayed in composition AND fed the blur radius argument, so every frame of the
-    // refresh spring recomposed AuroraBackground and rebuilt the full-screen RenderEffect -- the
-    // most expensive draw in the app, by this file's own account.
+    // Read inside drawBehind, not here, so the refresh spring never recomposes AuroraBackground.
     val explodeAlpha = { 1f + explosion.value * 2.5f }
     val explodeSize = { 1f + explosion.value * 0.8f }
     val explodeSpread = { 1f + explosion.value * 0.3f }
     // Both modes run this ambient drift (Motion adds tilt on top) so a still phone isn't a frozen
-    // frame. Hand-ticked at ~12fps, not Compose's per-frame clock, which forced a full-screen blur
-    // redraw every vsync.
+    // frame. Hand-ticked at ~12fps, not Compose's per-frame clock.
     var p1 by remember { mutableFloatStateOf(0.5f) }
     var p2 by remember { mutableFloatStateOf(0.5f) }
     var p3 by remember { mutableFloatStateOf(0.5f) }
-    // Ticks in both modes; wide enough to be clearly visible under the heavy blur.
+    // Ticks in both modes.
     LaunchedEffect(Unit) {
         val start = System.currentTimeMillis()
         while (true) {
@@ -300,18 +283,30 @@ internal fun AuroraBackground(
     Box(
         modifier
             .fillMaxSize()
-            // 44dp: heavier blur washes the blobs out and redraws at every drift tick (the app's
-            // costliest steady draw). Constant radius: animating it rebuilds the RenderEffect each
-            // frame; the pulse rides on blob alpha/size/spread.
-            .then(if (blurOn) Modifier.blur(44.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded) else Modifier)
+            // No Modifier.blur here. A full-screen 44dp blur, rebuilt on every drift tick, was the
+            // app's costliest steady draw; the blobs are drawn as soft radial gradients instead, so
+            // the aurora reads just as soft with no RenderEffect to re-render.
             .drawBehind {
                 drawRect(scheme.surface)
-                fun blob(c: Color, fx: Float, fy: Float, r: Float) =
-                    drawCircle(c, radius = size.minDimension * r, center = Offset(size.width * fx, size.height * fy))
+                fun blob(c: Color, fx: Float, fy: Float, r: Float) {
+                    val center = Offset(size.width * fx, size.height * fy)
+                    val radius = size.minDimension * r
+                    // Solid-ish core, soft edge: the falloff the blur used to supply, without a
+                    // RenderEffect.
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(c, c.copy(alpha = c.alpha * 0.55f), Color.Transparent),
+                            center = center,
+                            radius = radius,
+                        ),
+                        radius = radius,
+                        center = center,
+                    )
+                }
                 val a = appear.value
-                blob(basePrimary.copy(alpha = (0.30f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.26f, 0.74f, p1) + tiltX) * explodeSpread(), (mix(0.30f, 0.65f, p2) + tiltY) * explodeSpread(), 0.45f * explodeSize())
-                blob(baseTertiary.copy(alpha = (0.25f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p2) - tiltX) * explodeSpread(), (mix(0.35f, 0.70f, p3) - tiltY) * explodeSpread(), 0.40f * explodeSize())
-                blob(baseSecondary.copy(alpha = (0.20f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p3) + tiltX) * explodeSpread(), (mix(0.28f, 0.62f, p1) + tiltY) * explodeSpread(), 0.38f * explodeSize())
+                blob(basePrimary.copy(alpha = (0.55f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.26f, 0.74f, p1) + tiltX) * explodeSpread(), (mix(0.30f, 0.65f, p2) + tiltY) * explodeSpread(), 0.50f * explodeSize())
+                blob(baseTertiary.copy(alpha = (0.46f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p2) - tiltX) * explodeSpread(), (mix(0.35f, 0.70f, p3) - tiltY) * explodeSpread(), 0.44f * explodeSize())
+                blob(baseSecondary.copy(alpha = (0.38f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p3) + tiltX) * explodeSpread(), (mix(0.28f, 0.62f, p1) + tiltY) * explodeSpread(), 0.42f * explodeSize())
             },
     )
 }
