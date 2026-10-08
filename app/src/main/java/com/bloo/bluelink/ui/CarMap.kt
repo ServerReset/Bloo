@@ -68,6 +68,11 @@ internal fun CarMap(
      * or no permission/fix) simply omits the marker.
      */
     deviceLocation: GeoLocation? = null,
+    /**
+     * False freezes the map: no pan and no zoom. The compact garage map is static so a horizontal
+     * swipe over it still turns the car page; only the full-screen map is draggable.
+     */
+    interactive: Boolean = true,
 ) {
     val context = LocalContext.current
     // Cold-start diagnostic; see HeroVisual's matching mark.
@@ -124,15 +129,21 @@ internal fun CarMap(
         modifier
             .background(mapBackground)
             .onSizeChanged { boxSizePx = it }
-            .pointerInput(state) {
-                detectTransformGestures { _, gesturePan, gestureZoom, _ ->
-                    // Tiles sit in a layer scaled by state.scale (0.5..2), so a drag of d px moves
-                    // them d * scale; divide by scale to track the finger 1:1.
-                    val s = state.scale
-                    state.pan(gesturePan.x / s, gesturePan.y / s)
-                    state.pinch(gestureZoom)
-                }
-            },
+            .then(
+                if (interactive) {
+                    Modifier.pointerInput(state) {
+                        detectTransformGestures { _, gesturePan, gestureZoom, _ ->
+                            // Tiles sit in a layer scaled by state.scale (0.5..2), so a drag of d px
+                            // moves them d * scale; divide by scale to track the finger 1:1.
+                            val s = state.scale
+                            state.pan(gesturePan.x / s, gesturePan.y / s)
+                            state.pinch(gestureZoom)
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         val density = LocalDensity.current
         val tilePx = MapTiles.TILE_PX.toFloat()

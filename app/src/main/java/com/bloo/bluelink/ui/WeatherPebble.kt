@@ -182,6 +182,8 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         ),
                     state = expandedMap?.mapStateFor(v.vin) ?: ownMapState,
                     deviceLocation = state.deviceLocation,
+                    // Static in the garage: a horizontal swipe over it turns the car page.
+                    interactive = false,
                 )
                 MapFeatureRow(
                     features = listOfNotNull(

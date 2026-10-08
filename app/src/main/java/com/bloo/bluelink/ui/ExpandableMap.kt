@@ -177,6 +177,8 @@ internal fun ExpandableMapLayer(
                     Modifier.fillMaxSize().hazeSource(mapHazeState),
                     state = mapState,
                     deviceLocation = deviceLocation,
+                    // Only the full-screen map is draggable; the pebble-sized sheet stays put.
+                    interactive = isExpanded,
                 )
             }
 
