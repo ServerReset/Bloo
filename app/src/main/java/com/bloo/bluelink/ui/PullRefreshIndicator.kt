@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +72,9 @@ private val SpinnerSize = 44.dp
 /** How far below the status bar's lower edge the indicator rests. */
 private val RestBelowStatusBar = 12.dp
 
+/** How much further (in disc-travel fractions) a pull past the arm point keeps going, resisted. */
+private const val OverPullTravel = 0.18f
+
 /** The single floating indicator. */
 @Composable
 internal fun PullRefreshIndicatorHost(
@@ -85,14 +89,20 @@ internal fun PullRefreshIndicatorHost(
     // springs for the refreshing endpoint -- a pull that trails the finger on a spring reads as
     // disconnected.
     val refreshSpring = remember { Animatable(0f) }
+    // True only while the disc springs away after a refresh lands, so that retract is our own smooth
+    // spring rather than whatever the underlying pull state does on its way back to zero.
+    var retracting by remember { mutableStateOf(false) }
     LaunchedEffect(active) {
         if (active) {
+            retracting = false
             // Continue from wherever the finger left the disc, so it never jumps back to the top
             // and re-drops.
             if (refreshSpring.value < 0.01f) refreshSpring.snapTo(state.pull.value.coerceIn(0f, 1f))
             refreshSpring.animateTo(1f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium))
-        } else {
-            refreshSpring.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium))
+        } else if (refreshSpring.value > 0.01f) {
+            retracting = true
+            refreshSpring.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+            retracting = false
         }
     }
     // The real flag takes over from the synchronous request...
@@ -104,9 +114,26 @@ internal fun PullRefreshIndicatorHost(
             if (!state.refreshing) state.requested = false
         }
     }
-    val raw = state.pull.value.coerceIn(0f, 1f)
-    // While a refresh is in flight, hold at the sprung-open endpoint; otherwise track the finger.
-    val t = if (active) refreshSpring.value else raw
+    // A light tick the moment the pull crosses the point where releasing arms a refresh, and again
+    // if you ease back under it and pull again.
+    val haptics = LocalHaptics.current
+    var armed by remember { mutableStateOf(false) }
+    LaunchedEffect(state) {
+        snapshotFlow { state.pull.value }.collect { p ->
+            val nowArmed = p >= 1f
+            if (nowArmed && !armed) haptics?.tick()
+            armed = nowArmed
+        }
+    }
+    // Past the arm point the pull keeps travelling a little, but resisted (a rubber band), so a
+    // deliberate over-pull still reads as doing something instead of freezing the disc at rest.
+    val pullRaw = state.pull.value
+    val raw = pullRaw.coerceIn(0f, 1f)
+    val over = (pullRaw - 1f).coerceAtLeast(0f)
+    val finger = raw + over / (1f + over) * OverPullTravel
+    // While a refresh is in flight (or the disc is springing away) the spring owns the disc;
+    // otherwise it tracks the finger 1:1.
+    val t = if (active || retracting) refreshSpring.value else finger
     if (t <= 0.01f) return
 
     val density = LocalDensity.current
@@ -131,12 +158,13 @@ internal fun PullRefreshIndicatorHost(
                     translationY = -sizePx + t * (sizePx + restPx)
                 },
             hazeState = hazeState,
-            // Bare liquid glass: the rim bends what is behind it, nothing milky over the middle.
-            tint = androidx.compose.ui.graphics.Color.Transparent,
+            // Bare liquid glass while pulling; a faint accent shows once releasing will refresh.
+            tint = if (armed) androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            else androidx.compose.ui.graphics.Color.Transparent,
             clear = true,
             shadow = true,
         ) {
-            if (active) {
+            if (active || retracting) {
                 LoadingIndicator(Modifier.size(SpinnerSize))
             } else {
                 // While dragging, the spinner's own progress follows the pull exactly.
