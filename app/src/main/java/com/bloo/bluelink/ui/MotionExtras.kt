@@ -97,12 +97,12 @@ internal fun Modifier.entrance(key: String): Modifier {
 internal fun Modifier.pageTurn(offset: () -> Float, strength: Float = 1f): Modifier = graphicsLayer {
     val o = offset()
     val away = kotlin.math.abs(o).coerceIn(0f, 1f)
-    val scale = 1f - 0.07f * strength * away
+    val scale = 1f - 0.10f * strength * away
     scaleX = scale
     scaleY = scale
-    alpha = 1f - 0.5f * strength * away
-    rotationY = o * 7f * strength
-    // A wide camera flattens the perspective, so a tilted page's corners do not swing past the top
-    // and bottom of the screen (where the pager clips them).
-    cameraDistance = 24.dp.toPx()
+    alpha = 1f - 0.45f * strength * away
+    rotationY = o * 11f * strength
+    // A wide camera keeps the perspective shallow: the page clearly tilts, but its far corners do
+    // not swing so far vertically that they leave the (over-rendered) pager bounds.
+    cameraDistance = 16.dp.toPx()
 }
