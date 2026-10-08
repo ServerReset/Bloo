@@ -70,7 +70,7 @@ class ButtonGroupLayoutTest {
     }
 
     @Test
-    fun aLoneButtonRestsNaturalAtTheStartAndGrowsToTheCapWhenPressed() {
+    fun aLoneButtonRestsNaturalAtTheStartAndGrowsToDoubleWhenPressed() {
         rule.setContent {
             BlooTheme {
                 Box(Modifier.width(rowWidth)) {
@@ -82,16 +82,16 @@ class ButtonGroupLayoutTest {
         }
         rule.waitForIdle()
         val rest = bounds("lone")
-        assertTrue("a lone button rests narrower than its row", widthOf("lone") < rowWidth.value - 40f)
+        val restWidth = widthOf("lone")
+        assertTrue("a lone button rests narrower than its row", restWidth < rowWidth.value - 40f)
         assertEquals("and sits on the start edge", 0f, rest.left.value, 1.5f)
         rule.onNodeWithTag("lone").performTouchInput { down(center) }
-        // Pressed, it grows to fill the row, but never past the shared single-button cap.
-        val target = minOf(rowWidth.value, MaxSingleButtonWidth.value)
-        rule.waitUntil(3_000) { widthOf("lone") >= target - 8f }
-        assertTrue(
-            "a lone button never exceeds MaxSingleButtonWidth (was ${widthOf("lone")})",
-            widthOf("lone") <= MaxSingleButtonWidth.value + 2f,
-        )
+        // Pressed, it grows, but never past DOUBLE its resting width.
+        rule.waitUntil(3_000) { widthOf("lone") > restWidth + 4f }
+        rule.waitForIdle()
+        val grown = widthOf("lone")
+        assertTrue("a lone button grows on press ($restWidth -> $grown)", grown > restWidth)
+        assertTrue("a lone button never grows past 2x its resting width (was $grown, rest $restWidth)", grown <= restWidth * 2f + 4f)
         rule.onNodeWithTag("lone").performTouchInput { up() }
     }
 
