@@ -158,7 +158,8 @@ internal fun OnboardingBottomBar(
     hazeState: HazeState? = null,
 ) {
     GlassSurface(
-        shape = ExtraLargeShape,
+        // Match the step cards it sits under (PebbleShell's expanded corner), not the dialog radius.
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(PebbleCornerExpanded),
         hazeState = hazeState,
         modifier = Modifier.fillMaxWidth().padding(horizontal = GapPage, vertical = GapGroup),
     ) {

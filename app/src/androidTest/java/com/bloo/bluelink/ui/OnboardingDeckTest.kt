@@ -7,10 +7,11 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.printToString
+import androidx.compose.ui.test.swipeLeft
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -37,33 +38,25 @@ class OnboardingDeckTest {
     }
 
     @Test
-    fun replayDeckAdvancesByButtonAndDismissesAtTheEnd() {
+    fun replayDeckAdvancesByButtonThenSwipesToTheEnd() {
         val vm = viewModel()
         vm.showWelcomeCards()
         rule.setContent { BlooTheme { OnboardingScreen(vm, OnboardingMode.Replay) } }
         waitForCard("Welcome to Bloo", "Welcome")
         rule.onNodeWithText("Welcome to Bloo").assertIsDisplayed()
 
-        // The bar's Next moves card by card: there is no swipe any more.
+        // The bar's Next moves the button cards one by one.
         nextTo("Quick setup")
         rule.onNodeWithText("Quick setup").assertIsDisplayed()
         nextTo("Look and feel")
         nextTo("What to tell you")
         nextTo("Your watch")
+        // The trailing information cards swipe instead of tapping Next; the bar animates away.
         nextTo("Getting around")
-        nextTo("More Bloo can do")
-
-        // The last card's button dismisses the deck.
-        try {
-            rule.waitUntil(5_000) {
-                runCatching { rule.onNodeWithText("Dismiss").assertIsDisplayed() }.isSuccess
-            }
-        } catch (e: androidx.compose.ui.test.ComposeTimeoutException) {
-            throw AssertionError("The last card never showed a Dismiss button. Semantics:\n" + rule.onRoot().printToString(40), e)
-        }
-        assertTrue("the deck is open before dismissing", vm.state.value.welcomeCardsOpen)
-        rule.onNodeWithText("Dismiss").performClick()
-        // The exit plays fireworks and a 1s fade before the deck closes; software-rendered emulators are slow at it.
+        rule.onRoot().performTouchInput { swipeLeft() }
+        waitForCard("More Bloo can do", "after a swipe")
+        // The last swipe hands off to the app and closes the deck.
+        rule.onRoot().performTouchInput { swipeLeft() }
         rule.waitUntil(30_000) { !vm.state.value.welcomeCardsOpen }
         assertFalse(vm.state.value.welcomeCardsOpen)
     }

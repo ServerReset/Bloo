@@ -6,7 +6,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,13 +33,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.platformOverridable
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 internal enum class OnboardingStepKind {
     WELCOME, RESTORE, SETUP, LOOK, ALERTS, WATCH,
@@ -51,9 +53,9 @@ internal enum class OnboardingStepKind {
     TIPS, FEATURES,
 }
 
-/** The per-car cards, whose answers shape which controls a car gets, so they must be confirmed. */
-internal fun OnboardingStepKind.needsConfirmation(): Boolean =
-    this == OnboardingStepKind.CAR_POWERTRAIN || this == OnboardingStepKind.CAR_PLATFORM || this == OnboardingStepKind.CAR_CLIMATE
+/** The trailing, information-only cards the deck lets you swipe through instead of tapping Next. */
+internal fun OnboardingStepKind.isInfoSwipe(): Boolean =
+    this == OnboardingStepKind.TIPS || this == OnboardingStepKind.FEATURES
 
 internal data class OnboardingStep(val kind: OnboardingStepKind, val vin: String? = null)
 
@@ -200,15 +202,20 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
 
     val lastIndex = steps.lastIndex
     val isLast = pageIndex == lastIndex
+    // The trailing info-only cards are the swipe section; the bar fades out when it begins and the
+    // deck becomes hand-scrollable (it stays scrollable afterwards so you can go back).
+    val swipeStart = remember(steps) {
+        steps.indexOfFirst { it.kind.isInfoSwipe() }.let { if (it < 0) steps.size else it }
+    }
+    val inSwipe = pageIndex >= swipeStart
+    var swipeUnlocked by remember { mutableStateOf(false) }
+    LaunchedEffect(inSwipe) { if (inSwipe) swipeUnlocked = true }
 
     // First run only: the setup card is BLOCKING. Notifications (API 33+) and a lock (biometrics
     // when the device has them, else a PIN) are both required before Next unlocks.
     val notificationsSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-    // Car cards ask a real question (does it have heated seats? is it a hybrid?), so each one must
-    // be answered -- confirmed -- before the deck lets you past it.
-    var confirmed by remember { mutableStateOf(emptySet<String>()) }
-    fun confirmKey(step: OnboardingStep) = "${step.kind}:${step.vin}"
-    val confirm: (OnboardingStep) -> Unit = { step -> confirmed = confirmed + confirmKey(step) }
+    // Per-car cards apply their answer the moment you pick it, so there is nothing to confirm: once
+    // the card shows what is right, Next just works.
     val setupUnmetNow = firstRun &&
         setupIsBlocked(true, notificationsSupported, notifGranted, canBio, appearance.biometricLock, state.appPinSet)
     fun blockReason(i: Int): String? {
@@ -217,8 +224,6 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             step.kind == OnboardingStepKind.SETUP && setupUnmetNow ->
                 if (notifRequiredOnSetup(true, notificationsSupported, notifGranted)) "Turn on notifications above to continue."
                 else "Set up the lock above to continue."
-            step.kind.needsConfirmation() && !replayMode(mode) && confirmKey(step) !in confirmed ->
-                "Confirm your answer above to continue."
             else -> null
         }
     }
@@ -232,6 +237,9 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     // The exit: fanfare, then the whole deck eases away (shrinks toward the app, fades) before the
     // mode's finish runs, so ending never just snaps to the next screen.
     var leaving by remember { mutableStateOf(false) }
+    // True when the deck is closed by the last swipe rather than the final button, so the hand-off
+    // to the garage is quick instead of the button path's long firework finish.
+    var swipeFinish by remember { mutableStateOf(false) }
     val exit by androidx.compose.animation.core.animateFloatAsState(
         if (leaving) 1f else 0f,
         androidx.compose.animation.core.tween(650, delayMillis = 350),
@@ -241,8 +249,21 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     // if the animation is interrupted or the window is idle.
     LaunchedEffect(leaving) {
         if (leaving) {
-            kotlinx.coroutines.delay(1100)
+            kotlinx.coroutines.delay(if (swipeFinish) 500 else 1100)
             finish()
+        }
+    }
+    // The deck is one pager. The bar drives the first (button) section; the trailing info-only
+    // section is hand-swipeable, and its final (hand-off) page lands on the garage.
+    val deck = androidx.compose.foundation.pager.rememberPagerState(pageCount = { steps.size + 1 })
+    val deckScope = rememberCoroutineScope()
+    LaunchedEffect(deck) {
+        snapshotFlow { deck.settledPage }.collect { p ->
+            when {
+                p >= steps.size ->
+                    if (!leaving) { swipeFinish = true; leaving = true }
+                pageIndex != p -> pageIndex = p
+            }
         }
     }
     fun goTo(index: Int) {
@@ -251,6 +272,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         if (next == pageIndex) return
         haptics?.click()
         pageIndex = next
+        deckScope.launch { deck.animateScrollToPage(next) }
     }
     fun goNext() {
         if (leaving || blockedHere != null) return
@@ -334,18 +356,13 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
 
         CompositionLocalProvider(LocalBackdropHaze provides backdropHaze) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-                // One standard card at a time. AnimatedContent (not a pager) because there is no
-                // swipe: the card crossfades and rises slightly as the bar advances.
-                androidx.compose.animation.AnimatedContent(
-                    targetState = pageIndex,
-                    transitionSpec = {
-                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)) +
-                            androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(MotionMedium)) { h -> h / 12 }) togetherWith
-                            (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MotionFast)) +
-                                androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(MotionFast)) { h -> -h / 12 })
-                    },
+                // One standard card at a time, in a pager. The button section does not scroll by
+                // hand; the trailing information-only section does, and its final page hands off.
+                androidx.compose.foundation.pager.HorizontalPager(
+                    state = deck,
+                    userScrollEnabled = swipeUnlocked,
                     modifier = Modifier.weight(1f).testTag(DECK_STEP_TAG),
-                    label = "onboardingStep",
+                    key = { it },
                 ) { idx ->
                     val step = steps.getOrNull(idx)
                     Column(
@@ -367,49 +384,61 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                                         OnboardingStepKind.LOOK -> OnboardingLookPage(appearance, vm)
                                         OnboardingStepKind.ALERTS -> OnboardingAlertsPage(notif, vm)
                                         OnboardingStepKind.WATCH -> OnboardingWatchPage()
-                                        OnboardingStepKind.CAR_POWERTRAIN -> vehicle?.let {
-                                            OnboardingPowertrainPage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
-                                        }
-                                        OnboardingStepKind.CAR_PLATFORM -> vehicle?.let {
-                                            OnboardingPlatformPage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
-                                        }
-                                        OnboardingStepKind.CAR_CLIMATE -> vehicle?.let {
-                                            OnboardingClimatePage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
-                                        }
+                                        OnboardingStepKind.CAR_POWERTRAIN -> vehicle?.let { OnboardingPowertrainPage(it, state, vm) }
+                                        OnboardingStepKind.CAR_PLATFORM -> vehicle?.let { OnboardingPlatformPage(it, state, vm) }
+                                        OnboardingStepKind.CAR_CLIMATE -> vehicle?.let { OnboardingClimatePage(it, state, vm) }
                                         OnboardingStepKind.TIPS -> OnboardingTipsPage()
                                         OnboardingStepKind.FEATURES -> OnboardingFeaturesPage(state)
                                     }
                                 }
                             }
+                            // The swipe section's own cue, on its first page only.
+                            if (idx == swipeStart) {
+                                androidx.compose.material3.Text(
+                                    "Swipe to continue.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = GapGroup, top = GapGroup),
+                                )
+                            }
                         }
                     }
                 }
 
-                // The one way forward: progress and Back/Next on a liquid-glass bar.
-                OnboardingBottomBar(
-                    current = pageIndex,
-                    total = steps.size,
-                    accent = accent,
-                    onBack = if (pageIndex > 0 || mode == OnboardingMode.Replay) ({ goBack() }) else null,
-                    onNext = { goNext() },
-                    nextLabel = when {
-                        isLast && mode == OnboardingMode.Replay -> "Dismiss"
-                        isLast && mode is OnboardingMode.NewCars -> "Done"
-                        isLast -> "Enter Bloo"
-                        firstRun && pageIndex == 0 -> "Get started"
-                        else -> "Next"
-                    },
-                    nextIcon = if (isLast) AppIcons.CheckCircle else AppIcons.Check,
-                    nextEnabled = blockedHere == null,
-                    hint = blockedHere,
-                    hazeState = backdropHaze,
-                )
+                // The one way forward through the button section: progress and Back/Next on a
+                // liquid-glass bar, which fluidly animates out as the swipe section begins.
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !inSwipe,
+                    enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionShort)) +
+                        androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(MotionShort)) { it },
+                    exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MotionShort)) +
+                        androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(MotionShort)) { it },
+                ) {
+                    OnboardingBottomBar(
+                        current = pageIndex,
+                        total = steps.size,
+                        accent = accent,
+                        onBack = if (pageIndex > 0 || mode == OnboardingMode.Replay) ({ goBack() }) else null,
+                        onNext = { goNext() },
+                        nextLabel = when {
+                            isLast && mode == OnboardingMode.Replay -> "Dismiss"
+                            isLast && mode is OnboardingMode.NewCars -> "Done"
+                            isLast -> "Enter Bloo"
+                            firstRun && pageIndex == 0 -> "Get started"
+                            else -> "Next"
+                        },
+                        nextIcon = if (isLast) AppIcons.CheckCircle else AppIcons.Check,
+                        nextEnabled = blockedHere == null,
+                        hint = blockedHere,
+                        hazeState = backdropHaze,
+                    )
+                }
             }
         }
     }
 }
 
-/** Lets a UI test find the deck's card area (the step content, not a pager). */
+/** Lets a UI test find the deck's card area (the pager's page content). */
 internal const val DECK_STEP_TAG = "onboardingDeckStep"
 
 private fun replayMode(mode: OnboardingMode) = mode == OnboardingMode.Replay
