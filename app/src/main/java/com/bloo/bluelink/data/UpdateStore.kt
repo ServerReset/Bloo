@@ -1,20 +1,14 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
-import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
 
 // A corruption handler so a file damaged by an interrupted write/power loss resets to empty prefs
 // instead of rethrowing an uncaught exception out of every read.
-private val Context.updateDataStore by preferencesDataStore(
-    name = "bloo_update",
-    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
-)
+private val Context.updateDataStore by safePreferencesDataStore("bloo_update")
 
 /**
  * Debounce/snooze/enable state for the update checker. "Remind me in a few days" is the one that

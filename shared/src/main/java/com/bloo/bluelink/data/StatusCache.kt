@@ -1,11 +1,9 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
-import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -15,10 +13,7 @@ import kotlinx.serialization.json.Json
 // A corruption handler so a file damaged by an interrupted write/power loss
 // resets to empty prefs instead of rethrowing an uncaught exception out of
 // every read (this cache is read at cold start, before any network call returns).
-private val Context.statusCacheStore by preferencesDataStore(
-    name = "bloo_status_cache",
-    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
-)
+private val Context.statusCacheStore by safePreferencesDataStore("bloo_status_cache")
 
 // Wire format persisted as a single JSON string under one DataStore key. Everything
 // is keyed by VIN (the map keys), so one payload can hold every vehicle on the

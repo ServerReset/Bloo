@@ -47,8 +47,8 @@ import com.bloo.uicommon.blockPageSwipe
 internal fun <T : Any> PebbleStatusGate(status: T?, refreshing: Boolean, content: @Composable (T) -> Unit) {
     when {
         status != null -> content(status)
-        refreshing -> Text("Fetching live status…")
-        else -> Text("No status yet.")
+        refreshing -> PebbleMessage("Fetching live status…")
+        else -> PebbleMessage("No status yet.")
     }
 }
 
@@ -59,6 +59,21 @@ internal fun LabelText(text: String, modifier: Modifier = Modifier) {
         text,
         modifier = modifier,
         style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/**
+ * A muted one-liner for a pebble body with nothing to show yet (loading or empty). One component so
+ * every "fetching…" / "no data" line in the app reads the same, instead of each call site picking
+ * its own style and colour.
+ */
+@Composable
+internal fun PebbleMessage(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }

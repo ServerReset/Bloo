@@ -138,11 +138,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
     ) {
         // See diagSummary above.
         if (rows.isEmpty()) {
-            Text(
-                "No diagnostics yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            PebbleMessage("No diagnostics yet.")
         }
         rows.forEach { row ->
             if (row.indent) {

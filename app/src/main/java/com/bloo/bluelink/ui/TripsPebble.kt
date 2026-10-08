@@ -58,8 +58,8 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
     }
     Pebble(v, "trips", "Trips", Icons.Filled.Route, state, vm, modifier, summary = summary) {
         when {
-            trips == null -> Text(if (loading) "Fetching trip history…" else "No trip data yet.")
-            trips.isEmpty() -> Text("No recent trips reported by this car.")
+            trips == null -> PebbleMessage(if (loading) "Fetching trip history…" else "No trip data yet.")
+            trips.isEmpty() -> PebbleMessage("No recent trips reported by this car.")
             else -> Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 val tMetric = LocalAppearance.current.metricDistance
                 // In a forced-open/glance context (LocalForceExpanded) only the 3 most recent trips

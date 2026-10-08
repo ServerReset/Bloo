@@ -1,11 +1,8 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
-import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -161,10 +158,7 @@ private data class SnapshotPayload(
 // instead of rethrowing an uncaught exception out of every read — this store is read from
 // background workers and command runners, every one of which would otherwise crash on a corrupt
 // file.
-private val Context.snapshotDataStore by preferencesDataStore(
-    name = "bloo_snapshots",
-    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
-)
+private val Context.snapshotDataStore by safePreferencesDataStore("bloo_snapshots")
 
 /**
  * Reads and writes the on-disk [VehicleSnapshot] cache. Mutations are read-modify-write inside

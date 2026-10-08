@@ -8,7 +8,6 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -156,7 +155,7 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         PebbleStatusGate(status, state.refreshing) { status ->
             fuelPct?.let { StatusRow("Fuel level", "$it%") }
             range?.let { StatusRow("Range (distance to empty)", formatDistance(it, metric)) }
-            if (fuelPct == null && range == null) Text("No fuel data reported.")
+            if (fuelPct == null && range == null) PebbleMessage("No fuel data reported.")
         }
     }
 }

@@ -1,18 +1,12 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
-import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
-import androidx.datastore.preferences.core.emptyPreferences
-import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.sync.Mutex
 
 // A corruption handler so a settings file damaged by an interrupted write / power
 // loss resets to empty prefs instead of rethrowing IOException out of every read
 // (which crashed the app on launch, since `appearance` is collected eagerly).
-internal val Context.settingsDataStore by preferencesDataStore(
-    name = "bloo_settings",
-    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
-)
+internal val Context.settingsDataStore by safePreferencesDataStore("bloo_settings")
 
 
 // Process-wide serialization for performMainToMainSync(): the periodic worker and the
