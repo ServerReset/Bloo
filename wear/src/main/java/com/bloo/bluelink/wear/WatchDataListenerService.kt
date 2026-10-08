@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.ioScope
 import com.bloo.bluelink.data.WatchSyncProtocol
 import com.bloo.bluelink.data.installDownloadedApk
 import com.google.android.gms.wearable.DataEvent
@@ -7,9 +8,6 @@ import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -20,7 +18,7 @@ import kotlinx.coroutines.tasks.await
  */
 class WatchDataListenerService : WearableListenerService() {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = ioScope()
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         for (event in dataEvents) {

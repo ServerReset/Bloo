@@ -1,5 +1,6 @@
 package com.bloo.bluelink.data
 
+import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
@@ -372,7 +373,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
                 throw e
             } catch (e: Exception) {
                 // A cancelled coroutine is not a network error: let it unwind as itself.
-                if (e is kotlinx.coroutines.CancellationException) throw e
+                rethrowIfCancellation(e)
                 throw BlueLinkException(e.message ?: "Network error", e)
             }
         }

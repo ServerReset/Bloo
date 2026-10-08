@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.ioScope
 import android.content.Context
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.CarCommandRunner
@@ -21,9 +22,6 @@ import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.serialization.json.Json
@@ -44,7 +42,7 @@ import com.bloo.bluelink.data.watchLockTiming
  */
 class PhoneWatchSyncService : WearableListenerService() {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = ioScope()
     private val json = Json { ignoreUnknownKeys = true }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
@@ -126,7 +124,7 @@ class PhoneWatchSyncService : WearableListenerService() {
          */
         fun pushWatchApk(context: Context, url: String) {
             val app = context.applicationContext
-            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            ioScope().launch {
                 runCatching {
                     val bytes = com.bloo.bluelink.data.ApiHttp.client.newCall(
                         okhttp3.Request.Builder().url(url).get().build(),
@@ -152,7 +150,7 @@ class PhoneWatchSyncService : WearableListenerService() {
             watchUpdateNotes: String? = null,
         ) {
             val app = context.applicationContext
-            val job = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            val job = ioScope().launch {
                 val snapshot = SnapshotStore(app).current()
                 val pinRecord = runCatching { CredentialStore(app).getPinRecord() }.getOrNull()
                 val timing = SettingsStore(app).watchLockTiming()

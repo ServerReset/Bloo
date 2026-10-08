@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.rethrowIfCancellation
 import androidx.compose.foundation.layout.only
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -197,7 +198,7 @@ What is the user most likely trying to do? Answer with ONLY the command name (e.
             else -> null
         }
     } catch (e: Exception) {
-        if (e is kotlinx.coroutines.CancellationException) throw e
+        rethrowIfCancellation(e)
         // Fall back to the original parse result.
         null
     }

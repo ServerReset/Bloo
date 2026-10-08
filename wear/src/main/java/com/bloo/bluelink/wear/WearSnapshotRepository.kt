@@ -1,11 +1,9 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.ioScope
 import android.content.Context
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
@@ -18,7 +16,7 @@ import kotlinx.coroutines.launch
  * [WearDataLayerSync], pushed by the phone and refreshed by the watch's own commands.
  */
 class WearSnapshotRepository(private val context: Context) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = ioScope()
 
     /** Every car the phone has pushed, live. */
     val vehicles: Flow<List<VehicleSnapshot>> = WearDataLayerSync.vehicles

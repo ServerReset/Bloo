@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.ioScope
 import android.content.Context
 import com.bloo.bluelink.data.PinRecord
 import com.bloo.bluelink.data.SnapshotStore
@@ -11,9 +12,6 @@ import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -41,7 +39,7 @@ import java.util.UUID
  */
 object WearDataLayerSync {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = ioScope()
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _vehicles = MutableStateFlow<List<VehicleSnapshot>>(emptyList())

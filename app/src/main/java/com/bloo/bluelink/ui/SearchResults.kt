@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.rethrowIfCancellation
 /**
  * Search results surface: the ranked settings/car-data result list, its stagger timing constant and
  * the per-result pop-in helper.
@@ -212,7 +213,7 @@ internal fun SettingsSearchResults(
                     command = enhanced
                 }
             } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
+                rethrowIfCancellation(e)
                 // Graceful fallback if AI enhancement fails
             }
         }

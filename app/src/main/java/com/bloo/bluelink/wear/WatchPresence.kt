@@ -1,14 +1,12 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.ioScope
 import androidx.core.content.edit
 
 import android.content.Context
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WatchSyncProtocol
 import com.google.android.gms.wearable.Wearable
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -77,7 +75,7 @@ object WatchPresence {
     }
 
     private var started = false
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = ioScope()
 
     fun start(context: Context) {
         if (started) return

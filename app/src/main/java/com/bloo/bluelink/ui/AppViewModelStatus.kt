@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.rethrowIfCancellation
 import android.location.Geocoder
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
@@ -164,7 +165,7 @@ internal fun AppViewModel.loadStatus(
             }
             logSuccess?.let { AppLog.log(it()) }
         } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
+            rethrowIfCancellation(e)
             val msg = com.bloo.bluelink.data.ResponseFraming.userMessage(e)
                 ?: e.message
                 ?: errorMessage

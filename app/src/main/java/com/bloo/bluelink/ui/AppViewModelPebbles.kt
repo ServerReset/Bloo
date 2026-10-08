@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.rethrowIfCancellation
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.CarAlerts
@@ -165,7 +166,7 @@ internal fun AppViewModel.launchBusy(block: suspend () -> Unit) {
         try {
             block()
         } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
+            rethrowIfCancellation(e)
             val msg = e.message ?: "Something went wrong"
             AppLog.log("⚠ $msg")
             _state.update { it.copy(message = msg, messageType = "error") }

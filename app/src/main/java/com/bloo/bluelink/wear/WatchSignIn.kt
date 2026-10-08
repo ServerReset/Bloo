@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.ioScope
 import android.content.Context
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
@@ -9,9 +10,6 @@ import com.bloo.bluelink.data.WatchCredentialBundle
 import com.bloo.bluelink.data.WatchCredentialTransfer
 import com.bloo.bluelink.data.WatchSyncProtocol
 import com.google.android.gms.wearable.Wearable
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +36,7 @@ object WatchSignIn {
 
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = ioScope()
 
     /** Ask the connected watch to start a sign-in. */
     fun offer(context: Context) {

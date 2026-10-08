@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.ioScope
 import android.Manifest
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -13,9 +14,6 @@ import androidx.core.content.edit
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.ensureNotificationChannel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -34,7 +32,7 @@ class WearNotificationPrefs(context: Context) {
     fun sendToPhone(context: Context) {
         val bytes = kotlinx.serialization.json.Json.encodeToString(com.bloo.bluelink.data.WatchNotifyPrefs.serializer(), current()).encodeToByteArray()
         val app = context.applicationContext
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        ioScope().launch {
             runCatching {
                 com.google.android.gms.wearable.Wearable.getNodeClient(app).connectedNodes.await().forEach {
                     com.google.android.gms.wearable.Wearable.getMessageClient(app)
@@ -148,7 +146,7 @@ class WearActionReceiver : BroadcastReceiver() {
         val vin = intent.getStringExtra(EXTRA_VIN) ?: return
         val action = intent.getStringExtra(EXTRA_ACTION) ?: return
         val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        ioScope().launch {
             try {
                 runWatchCommand(context, vin, action)
             } finally {

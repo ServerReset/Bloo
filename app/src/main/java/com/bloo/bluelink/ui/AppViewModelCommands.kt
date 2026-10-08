@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.rethrowIfCancellation
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkException
@@ -266,7 +267,7 @@ internal fun AppViewModel.runCommand(
             // Auto-AI: a command changed the car's state, refresh the summary.
             _state.value.vehicles.firstOrNull { it.vin == vin }?.let { autoSummarize(it) }
         } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
+            rethrowIfCancellation(e)
             val msg = e.message ?: "Command failed"
             recordRemoteAction(vin, success, status = "Failed", details = msg)
             AppLog.log("⚠ $msg")
