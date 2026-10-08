@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.Json
 import androidx.core.graphics.scale
 
 /**
@@ -288,7 +287,7 @@ class SettingsStore(internal val context: Context) {
     // editTracked, precisely so touching them can't pollute the dirty set or trip a
     // content-hash change.
 
-    internal val devicesJson = Json { ignoreUnknownKeys = true }
+    internal val devicesJson = BlooJson
     internal val deviceListSerializer = ListSerializer(SyncMerge.SyncDevice.serializer())
 
     /** Outcome of one [performMainToMainSync] pass. */
@@ -335,17 +334,17 @@ class SettingsStore(internal val context: Context) {
 
     // --- Per-car climate settings + presets ------------------------------
 
-    internal val climateJson = Json { ignoreUnknownKeys = true }
+    internal val climateJson = BlooJson
     internal val presetListSerializer = ListSerializer(ClimatePreset.serializer())
 
     // --- Custom colour palettes ------------------------------------------
 
-    internal val paletteJson = Json { ignoreUnknownKeys = true }
+    internal val paletteJson = BlooJson
     internal val paletteListSerializer = ListSerializer(CustomPaletteData.serializer())
 
     // --- Full settings backup --------------------------------------------
 
-    internal val backupJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
+    internal val backupJson = BlooBackupJson
 
     /** The settings-backup format version. */
     internal val BACKUP_VERSION = SyncMerge.BACKUP_VERSION

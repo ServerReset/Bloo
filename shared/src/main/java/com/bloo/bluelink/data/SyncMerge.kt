@@ -1,7 +1,6 @@
 package com.bloo.bluelink.data
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -133,7 +132,7 @@ object SyncMerge {
     )
 
     // Pretty-printed so the exported file is human-readable; unknown keys ignored on decode.
-    private val backupJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
+    private val backupJson = BlooBackupJson
 
     // --- Portable export (prefs/photos/_removed only — safe to share) ----------
 

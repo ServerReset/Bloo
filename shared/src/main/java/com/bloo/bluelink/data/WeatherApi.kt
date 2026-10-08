@@ -4,7 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import kotlin.math.roundToInt
@@ -150,7 +149,7 @@ object WeatherApi {
 
     // ignoreUnknownKeys so Open-Meteo adding new response fields later doesn't break parsing;
     // isLenient to tolerate minor JSON quirks from the API.
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val json = BlooLenientJson
 
     // A dedicated client (its own pool) with generous-but-bounded timeouts: weather is a
     // nice-to-have, so give a flaky connection a real chance to succeed, but still cap it so a hung

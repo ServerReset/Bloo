@@ -180,7 +180,7 @@ internal fun mergeVehicleUpdates(
 
 class SnapshotStore(private val context: Context) {
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = BlooJson
 
     private object Keys {
         val PAYLOAD = stringPreferencesKey("payload")

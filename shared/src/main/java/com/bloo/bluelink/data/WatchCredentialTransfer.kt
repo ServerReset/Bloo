@@ -1,7 +1,6 @@
 package com.bloo.bluelink.data
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.security.PrivateKey
@@ -49,7 +48,7 @@ object WatchCredentialTransfer {
     private const val VERSION: Byte = 1
     private const val IV_BYTES = 12
     private const val OAEP = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding"
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = BlooJson
     // Explicit SHA-256 / MGF1-SHA-1 parameters: the combination Android's Keystore implements,
     // spelled out so both ends agree whichever provider each picks.
     private val OAEP_PARAMS = OAEPParameterSpec(

@@ -3,7 +3,6 @@ package com.bloo.bluelink.data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -110,7 +109,8 @@ class EuApi(private val brand: Brand) {
         private const val REFRESH_POLLS = 5
         private const val REFRESH_POLL_INTERVAL_MS = 4000L
 
-        private val sharedJson = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+        // Same config as the shared parser -- see [ApiHttp.json].
+        private val sharedJson = ApiHttp.json
 
         // The one shared OkHttp stack -- see [ApiHttp].
         internal val sharedClient: OkHttpClient get() = ApiHttp.client

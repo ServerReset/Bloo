@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.BlooJson
 import com.bloo.bluelink.ioScope
 import android.content.Context
 import com.bloo.bluelink.data.PinRecord
@@ -16,7 +17,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import kotlinx.serialization.json.Json
 import java.util.UUID
 
 /**
@@ -40,7 +40,7 @@ import java.util.UUID
 object WearDataLayerSync {
 
     private val scope = ioScope()
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = BlooJson
 
     private val _vehicles = MutableStateFlow<List<VehicleSnapshot>>(emptyList())
     val vehicles: StateFlow<List<VehicleSnapshot>> = _vehicles

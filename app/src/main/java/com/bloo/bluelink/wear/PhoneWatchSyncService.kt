@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.BlooJson
 import com.bloo.bluelink.ioScope
 import android.content.Context
 import com.bloo.bluelink.data.AppLog
@@ -43,7 +44,7 @@ import com.bloo.bluelink.data.watchLockTiming
 class PhoneWatchSyncService : WearableListenerService() {
 
     private val scope = ioScope()
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = BlooJson
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         for (event in dataEvents) {

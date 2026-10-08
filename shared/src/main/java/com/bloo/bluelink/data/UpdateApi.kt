@@ -5,7 +5,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -72,7 +71,7 @@ object UpdateApi {
      */
     const val RELEASES_URL = "https://github.com/$OWNER/$REPO/releases"
 
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val json = BlooLenientJson
 
     // Short bounded timeouts: an update check should fail fast, not hold a screen. See
     // ApiHttp.shortTimeoutClient.
