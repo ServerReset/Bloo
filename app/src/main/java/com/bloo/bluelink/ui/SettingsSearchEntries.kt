@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,7 +23,6 @@ import com.bloo.bluelink.autolock.AutoLockConfig
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.formatDistance

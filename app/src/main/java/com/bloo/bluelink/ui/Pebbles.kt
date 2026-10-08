@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,11 +21,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onSizeChanged
 import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.ReorderColumn
-import com.bloo.uicommon.animatePlacement
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.derivedStateOf
 

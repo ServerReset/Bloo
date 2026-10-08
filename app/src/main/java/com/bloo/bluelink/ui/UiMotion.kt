@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.filled.Settings
 // `motionScheme` is a MaterialTheme member, so it needs no import.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -33,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.layout.VerticalAlignmentLine
 

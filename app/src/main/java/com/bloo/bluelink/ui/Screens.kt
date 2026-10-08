@@ -7,8 +7,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -23,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -47,19 +44,16 @@ import androidx.compose.ui.draw.blur
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
-import com.bloo.bluelink.data.brand
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import android.content.ClipData
 import androidx.compose.runtime.withFrameNanos
-import com.bloo.bluelink.data.platform
 
 /**
  * Root composable for the phone app: a gradient backdrop, a [Scaffold] that switches top-level

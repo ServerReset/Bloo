@@ -6,7 +6,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.bloo.bluelink.ui.ColorPalette
 import com.bloo.bluelink.ui.CustomPaletteData
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json

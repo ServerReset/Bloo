@@ -3,7 +3,6 @@ package com.bloo.bluelink.ui
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.SettingsStore
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.setDoorOpenMinutes

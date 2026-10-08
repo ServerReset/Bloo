@@ -22,10 +22,8 @@ import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.Weather
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 
 sealed interface Screen {
     /**

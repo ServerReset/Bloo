@@ -2,8 +2,6 @@ package com.bloo.bluelink.ui
 
 import android.app.Application
 import androidx.lifecycle.viewModelScope
-import com.bloo.bluelink.data.SessionStore
-import com.bloo.bluelink.data.SettingsStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged

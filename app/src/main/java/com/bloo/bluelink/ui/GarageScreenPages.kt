@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
@@ -23,7 +22,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 

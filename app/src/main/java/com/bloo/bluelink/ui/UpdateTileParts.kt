@@ -62,7 +62,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.bloo.bluelink.update.UpdateInfo
-import com.bloo.bluelink.data.Weather
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 
 /**

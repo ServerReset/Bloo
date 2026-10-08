@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.bluelink.data.brand
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map

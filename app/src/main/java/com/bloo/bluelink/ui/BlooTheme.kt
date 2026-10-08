@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import android.os.Build
-import android.provider.Settings
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialExpressiveTheme

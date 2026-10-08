@@ -1,10 +1,8 @@
 package com.bloo.bluelink.ui
 
-import android.location.Geocoder
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Vehicle
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch

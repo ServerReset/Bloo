@@ -10,19 +10,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Route
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.role
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.composed
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.Vehicle
@@ -31,8 +28,6 @@ import com.bloo.bluelink.data.formatSpeedMph
 import com.bloo.bluelink.data.formatTripDistance
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.climateChunks
-import kotlinx.coroutines.flow.first
-import kotlin.math.max
 
 /**
  * Recent drives from the Hyundai/Genesis US trip-details feed: distance, time, speeds and (EVs) the

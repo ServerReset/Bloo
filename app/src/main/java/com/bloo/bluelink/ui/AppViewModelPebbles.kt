@@ -4,7 +4,6 @@ import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.CarAlerts
 import com.bloo.bluelink.data.Notifications
-import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import kotlinx.coroutines.delay
@@ -17,7 +16,6 @@ import com.bloo.bluelink.data.setDefaultClimatePreset
 import com.bloo.bluelink.data.setLastVehicleVin
 import com.bloo.bluelink.data.setSectionCollapsed
 import com.bloo.bluelink.data.setVehicleOrder
-import com.bloo.bluelink.data.snapshot
 
 /**
  * AppViewModel's car selection, pebble and trip actions, as extensions of [AppViewModel], kept out

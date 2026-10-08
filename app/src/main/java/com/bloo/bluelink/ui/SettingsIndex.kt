@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F

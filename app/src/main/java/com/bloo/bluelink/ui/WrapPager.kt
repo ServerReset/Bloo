@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
@@ -8,7 +7,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlin.math.floor
 
 // Pages are keyed by raw virtual index (see [WrapPagerState]) because real-index keying crashed
 // ("Key already used") twice.

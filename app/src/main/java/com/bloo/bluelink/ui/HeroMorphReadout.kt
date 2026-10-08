@@ -26,12 +26,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
 
 @Composable

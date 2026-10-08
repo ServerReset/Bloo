@@ -15,7 +15,6 @@ import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.shouldRelockAfter
 import com.bloo.bluelink.data.wireKey
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update

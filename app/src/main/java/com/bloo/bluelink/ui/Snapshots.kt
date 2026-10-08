@@ -15,7 +15,6 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.displayChargeLimit
-import kotlinx.coroutines.flow.map
 
     internal fun snapshotOf(v: Vehicle, status: VehicleStatus?, state: UiState): VehicleSnapshot {
         // Use the effective powertrain (a PHEV reads battery %, not fuel %).

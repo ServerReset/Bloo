@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
