@@ -314,7 +314,10 @@ fun ExpressiveButtonGroup(
                 if (memberIdx.size == 1 && growWhenAlone) {
                     val i = memberIdx[0]
                     if (press[i] > 0f) {
-                        val fill = minOf(room, maxSinglePx).coerceAtLeast(basis[i])
+                        // At most DOUBLE its resting width: a lone button widening toward the whole
+                        // row reads as a slab.
+                        val fill = minOf(room.toDouble(), maxSinglePx.toDouble(), basis[i] * 2.0)
+                            .coerceAtLeast(basis[i].toDouble())
                         exact[i] = base[i] + (fill - base[i]) * press[i]
                     }
                 }
