@@ -3,25 +3,35 @@ package com.bloo.bluelink.ui
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import com.bloo.bluelink.data.Vehicle
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 
@@ -29,6 +39,57 @@ import kotlinx.coroutines.CoroutineScope
  * The garage's two layouts, peeled out of GarageScreen: ExpandedGaragePage is one car full screen,
  * CollapsedGaragePager is the pager of cars (and Settings as one more page) that cycles forever.
  */
+
+/**
+ * Resistance when paging: below [PageResistanceThreshold] of a page a drag moves the pages at
+ * [PageResistanceGive] of the finger, then past it they follow 1:1. A quick flick crosses the
+ * threshold in a single frame, so it just pages.
+ */
+private const val PageResistanceThreshold = 0.06f
+private const val PageResistanceGive = 0.5f
+
+/**
+ * Trails the pages behind the finger at the start of a swipe, then lets them catch up. [perPage] is
+ * how many pages sit side by side, so one page is a 1/[perPage] slice of the pager. The offset is
+ * read in the draw phase, so a drag never recomposes.
+ */
+@Composable
+private fun Modifier.pageResistance(pager: PagerState, perPage: Int): Modifier {
+    // The finger's travel since the drag began, as a fraction of a page. The pager's own continuous
+    // scroll (page + fraction, which never wraps) drives it rather than raw pointer coordinates:
+    // this node is itself translated, so pointer coordinates would shift underneath it and feed
+    // back on themselves.
+    val trail = remember { mutableFloatStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    var catchUp by remember { mutableStateOf<Job?>(null) }
+    return this
+        .pointerInput(pager) {
+            awaitEachGesture {
+                awaitFirstDown(requireUnconsumed = false)
+                val start = pager.currentPage + pager.currentPageOffsetFraction
+                catchUp?.cancel()
+                trail.floatValue = 0f
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull() ?: break
+                    val moved = (pager.currentPage + pager.currentPageOffsetFraction) - start
+                    trail.floatValue = moved.coerceIn(-PageResistanceThreshold, PageResistanceThreshold)
+                    if (!change.pressed) break
+                }
+                // Ease the trail (and so the offset) away during the pager's own settle, so the
+                // hand-off does not pop.
+                catchUp = scope.launch {
+                    animate(trail.floatValue, 0f, animationSpec = tween(150)) { value, _ ->
+                        trail.floatValue = value
+                    }
+                }
+            }
+        }
+        .graphicsLayer {
+            val pageW = size.width / perPage.coerceAtLeast(1)
+            if (pageW > 0f) translationX = -PageResistanceGive * trail.floatValue * pageW
+        }
+}
 
 @Composable
 internal fun ExpandedGaragePage(
@@ -53,7 +114,10 @@ internal fun ExpandedGaragePage(
         Box(Modifier.fillMaxSize()) {
             HorizontalPager(
                 state = exPager,
-                modifier = Modifier.fillMaxSize().hazeSource(hazeState),
+                modifier = Modifier.fillMaxSize().hazeSource(hazeState)
+                    // Same resistance as the collapsed pager (see there): a slow drag trails, then
+                    // follows 1:1 past the threshold; a quick flick just pages.
+                    .pageResistance(exPager, 1),
                 // One neighbour pre-warmed per side, never more pages than cars: two composed pages
                 // resolving to one car crash. count + wrap means pages composed = 1 + 2 * beyond <=
                 // count.
@@ -180,7 +244,8 @@ internal fun CollapsedGaragePager(
             HorizontalPager(
                 state = pager,
                 modifier = Modifier.fillMaxSize().hazeSource(hazeState)
-                    .onSizeChanged { boxWidthPx = it.width },
+                    .onSizeChanged { boxWidthPx = it.width }
+                    .pageResistance(pager, perPage),
                 userScrollEnabled = true,
                 pageSize = androidx.compose.foundation.pager.PageSize.Fixed(pageWidth),
                 // Never a flat 1: perPage + 2*beyond pages are composed at once, and if that
