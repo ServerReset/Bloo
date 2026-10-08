@@ -42,6 +42,8 @@ class OnboardingStepsTest {
 
     private fun kinds(steps: List<OnboardingStep>) = steps.map { it.kind }
 
+    private fun OnboardingStepKind.isCarCard() = name.startsWith("CAR_")
+
     private val firstRunHead = listOf(
         OnboardingStepKind.WELCOME, OnboardingStepKind.RESTORE, OnboardingStepKind.SETUP,
         OnboardingStepKind.LOOK, OnboardingStepKind.ALERTS,
@@ -60,14 +62,14 @@ class OnboardingStepsTest {
         )
         assertEquals(
             listOf(usHyundai.vin, usHyundai.vin, usHyundai.vin, usKia.vin, usKia.vin),
-            steps.filter { it.kind.needsConfirmation() }.map { it.vin },
+            steps.filter { it.kind.isCarCard() }.map { it.vin },
         )
     }
 
     @Test
     fun firstRun_skipsCarsARestoredBackupAlreadyConfigured() {
         val steps = buildOnboardingSteps(OnboardingMode.FirstRun, listOf(usHyundai, usKia), preConfiguredVins = setOf(usHyundai.vin))
-        assertEquals(setOf(usKia.vin), steps.filter { it.kind.needsConfirmation() }.map { it.vin }.toSet())
+        assertEquals(setOf(usKia.vin), steps.filter { it.kind.isCarCard() }.map { it.vin }.toSet())
     }
 
     @Test
@@ -97,9 +99,10 @@ class OnboardingStepsTest {
     }
 
     @Test
-    fun onlyTheCarCardsNeedConfirming() {
+    fun onlyTheTrailingInfoCardsSwipe() {
         OnboardingStepKind.entries.forEach { kind ->
-            assertEquals(kind.name.startsWith("CAR_"), kind.needsConfirmation(), kind.name)
+            val expected = kind == OnboardingStepKind.TIPS || kind == OnboardingStepKind.FEATURES
+            assertEquals(expected, kind.isInfoSwipe(), kind.name)
         }
     }
 }
