@@ -87,3 +87,19 @@ internal fun Modifier.entrance(key: String): Modifier {
             translationY = (1f - p) * 14.dp.toPx()
         }
 }
+
+/**
+ * The app's page-turn: a page shrinks, tilts away and fades as it leaves the centre of a pager.
+ * [offset] is that page's signed distance from the centre (0 on it, plus or minus 1 a full page
+ * away), read only in the draw phase so a drag never recomposes. [strength] scales the whole
+ * effect: the onboarding deck uses 1, ordinary paging a gentler fraction.
+ */
+internal fun Modifier.pageTurn(offset: () -> Float, strength: Float = 1f): Modifier = graphicsLayer {
+    val o = offset()
+    val away = kotlin.math.abs(o).coerceIn(0f, 1f)
+    val scale = 1f - 0.07f * strength * away
+    scaleX = scale
+    scaleY = scale
+    alpha = 1f - 0.5f * strength * away
+    rotationY = o * 9f * strength
+}

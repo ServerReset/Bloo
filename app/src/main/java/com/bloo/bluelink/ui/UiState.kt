@@ -231,6 +231,11 @@ data class UiState(
      */
     val updateInstalling: Boolean = false,
     /**
+     * True while the pre-install guide is up: shown before handing the APK to the system installer
+     * when Shizuku (seamless install) is off, so the Play-Protect steps are seen first.
+     */
+    val showInstallGuide: Boolean = false,
+    /**
      * A manual "Check for updates" is in flight (spinner + disabled button). Background checks
      * don't set it.
      */

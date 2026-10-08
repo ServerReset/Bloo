@@ -192,7 +192,17 @@ internal fun CollapsedGaragePager(
                 key = { page -> page },
             ) { page ->
                 val real = realItem(page)
-                Box(Modifier.fillMaxSize()) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        // The app's page-turn, gentler than the deck's: a car leans away and fades
+                        // as it leaves the centre. Read in the draw phase, so a drag never
+                        // recomposes the page.
+                        .pageTurn(
+                            offset = { (pager.currentPage - page) + pager.currentPageOffsetFraction },
+                            strength = 0.5f,
+                        ),
+                ) {
                     if (real == slots) {
                         // The folded-in Settings item, always the last one -- it's a page in this
                         // pager, not a route, so its own LazyColumn is already a single column at

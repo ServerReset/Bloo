@@ -3,26 +3,20 @@ package com.bloo.bluelink.ui
 import android.os.Build
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Build
@@ -30,12 +24,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -43,15 +35,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.platformOverridable
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 internal enum class OnboardingStepKind {
     WELCOME, RESTORE, SETUP, LOOK, ALERTS, WATCH,
@@ -160,11 +149,12 @@ internal fun buildOnboardingSteps(
         }
     }
 }
-
 /**
  * Every setup flow in the app: first run, newly detected cars, and the welcome cards summoned again
- * from Settings. A deck of pebble cards swiped left and right like the garage's own; the cards
- * differ by [mode], the chrome never does.
+ * from Settings.
+ *
+ * One standard card at a time, advanced only from the liquid-glass bar at the bottom: the deck never
+ * swipes, so the flow reads the same for everyone and nothing depends on a gesture.
  */
 @Composable
 internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = OnboardingMode.FirstRun) {
@@ -191,12 +181,8 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         onDispose { notifLifecycle.lifecycle.removeObserver(obs) }
     }
 
-    // The deck is a pager whose length is held here because the step list depends on the card
-    // reached.
-    var pageCount by remember { mutableIntStateOf(1) }
-    val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { pageCount })
-    val pageIndex = pagerState.currentPage
-    val pageScope = androidx.compose.runtime.rememberCoroutineScope()
+    // Which step is showing. Advanced only by the bottom bar's Next / Back, never a swipe.
+    var pageIndex by remember { mutableIntStateOf(0) }
 
     // Cars a restored backup already configured, frozen (latched) once past the setup card so
     // configuring a car can't shrink the deck under the visible card.
@@ -208,7 +194,9 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         if (!pastSetup) preConfiguredVins = state.powertrains.keys.toSet()
     }
     val steps = remember(mode, state.vehicles, preConfiguredVins) { buildOnboardingSteps(mode, state.vehicles, preConfiguredVins) }
-    SideEffect { pageCount = steps.size.coerceAtLeast(1) }
+    // The list can shrink under the visible step (a restored backup configuring a car); keep the
+    // index in range.
+    LaunchedEffect(steps.size) { if (pageIndex > steps.lastIndex) pageIndex = steps.lastIndex.coerceAtLeast(0) }
 
     val lastIndex = steps.lastIndex
     val isLast = pageIndex == lastIndex
@@ -236,13 +224,6 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     }
     val blockedHere = blockReason(pageIndex)
 
-    val gateIndex = steps.indices.firstOrNull { blockReason(it) != null } ?: Int.MAX_VALUE
-    // Swiping is free, but not past a card whose question is still open: the deck settles back onto
-    // it, the same gate the Next button enforces.
-    LaunchedEffect(pagerState.settledPage, gateIndex) {
-        if (pagerState.settledPage > gateIndex) pagerState.animateScrollToPage(gateIndex)
-    }
-
     fun finish() = when (mode) {
         OnboardingMode.FirstRun -> vm.finishOnboarding()
         is OnboardingMode.NewCars -> vm.finishCarSetup(mode.vins)
@@ -264,11 +245,17 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             finish()
         }
     }
-    fun goNext() {
+    fun goTo(index: Int) {
         if (leaving) return
+        val next = index.coerceIn(0, lastIndex)
+        if (next == pageIndex) return
+        haptics?.click()
+        pageIndex = next
+    }
+    fun goNext() {
+        if (leaving || blockedHere != null) return
         if (!isLast) {
-            haptics?.click()
-            pageScope.launch { pagerState.animateScrollToPage(pageIndex + 1) }
+            goTo(pageIndex + 1)
         } else {
             leaving = true
             haptics?.fireworks()
@@ -276,12 +263,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         }
     }
     fun goBack() {
-        if (pageIndex > 0) {
-            haptics?.click()
-            pageScope.launch { pagerState.animateScrollToPage(pageIndex - 1) }
-        } else if (mode == OnboardingMode.Replay) {
-            vm.dismissWelcomeCards()
-        }
+        if (pageIndex > 0) goTo(pageIndex - 1) else if (mode == OnboardingMode.Replay) vm.dismissWelcomeCards()
     }
     // Back steps back through the cards and never out of a setup the user still has to finish.
     BackHandler { goBack() }
@@ -305,13 +287,9 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     LaunchedEffect(isLast) {
         if (isLast && !replayMode(mode)) celebrate(big = true)
     }
-    // Each card settling gets a tick, so swiping has a feel.
-    var lastSettled by remember { mutableIntStateOf(-1) }
-    LaunchedEffect(pagerState.settledPage) {
-        if (lastSettled >= 0 && pagerState.settledPage != lastSettled) {
-            haptics?.tick()
-        }
-        lastSettled = pagerState.settledPage
+    // A soft tick as each step lands, so moving through the deck has a feel.
+    LaunchedEffect(pageIndex) {
+        if (pageIndex > 0) haptics?.tick()
     }
     // Every setup item that flips to done: notifications, the lock, Drive sync.
     val setupDone = (if (notifGranted) 1 else 0) +
@@ -342,9 +320,9 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             .background(scheme.background)
             .pointerInput(Unit) {},
     ) {
-        // The glassy backdrop: the app's own aurora (blurred, drifting) behind a wash of the colour
-        // of the card you are on, easing from one accent to the next as you swipe. This whole layer
-        // is the Haze source the glass cards blur, so the deck reads as frosted glass over light.
+        // The glassy backdrop: the app's own aurora behind a wash of the colour of the step you are
+        // on, easing from one accent to the next. This whole layer is the Haze source the cards and
+        // the bottom bar blur.
         val backdropHaze = remember { HazeState() }
         val accent by androidx.compose.animation.animateColorAsState(
             onboardingAccent(steps.getOrNull(pageIndex)?.kind ?: OnboardingStepKind.WELCOME),
@@ -355,144 +333,84 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         if (burst > 0 || leaving) androidx.compose.runtime.key(burst, leaving) { FireworksOverlay(Modifier.fillMaxSize(), bursts = if (burstBig || leaving) 16 else 7) }
 
         CompositionLocalProvider(LocalBackdropHaze provides backdropHaze) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-            Spacer(Modifier.height(GapSection))
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                GlassSurface(
-                    shape = CircleShape,
-                    liquid = false,
-                    shadow = false,
-                    hazeState = backdropHaze,
-                    tint = scheme.surfaceContainerHighest.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = GapPage),
-                ) {
-                    OnboardingProgress(
-                        count = steps.size.coerceAtLeast(1),
-                        current = pageIndex,
-                        accent = accent,
-                        modifier = Modifier.padding(horizontal = GapSection, vertical = GapGroup),
-                    )
-                }
-            }
-
-            androidx.compose.foundation.pager.HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.weight(1f).testTag(DECK_PAGER_TAG),
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                pageSpacing = 14.dp,
-                beyondViewportPageCount = 0,
-            ) { idx ->
-                val step = steps.getOrNull(idx) ?: return@HorizontalPager
-                // How far this card is from the centre: 0 on it, 1 a full card away. The cards
-                // shrink, fade and tilt away as they leave, so the deck has depth. Read INSIDE
-                // graphicsLayer, never here: a read in this scope recomposed every page's whole
-                // content on every drag frame, which is what made swiping lag.
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            val offset = (pagerState.currentPage - idx) + pagerState.currentPageOffsetFraction
-                            val away = kotlin.math.abs(offset).coerceIn(0f, 1f)
-                            val scale = 1f - 0.07f * away
-                            scaleX = scale; scaleY = scale
-                            alpha = 1f - 0.5f * away
-                            // A 3D deck feel: the card turns away as it leaves the centre.
-                            rotationY = offset * 9f
-                        }
-                        .verticalScroll(rememberScrollState())
-                        .padding(top = GapSection, bottom = GapBlock),
-                ) {
-                    val vehicle = step.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
-                    OnboardingGlassCard(
-                        spec = onboardingCardSpec(step.kind, vehicle?.name, newCar = mode is OnboardingMode.NewCars),
-                        category = onboardingCategory(step.kind),
-                        accent = onboardingAccent(step.kind),
-                        current = idx == pageIndex,
-                        onHeroTap = { celebrate(big = false) },
-                        onHeroLongPress = { celebrate(big = true) },
+            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+                // One standard card at a time. AnimatedContent (not a pager) because there is no
+                // swipe: the card crossfades and rises slightly as the bar advances.
+                androidx.compose.animation.AnimatedContent(
+                    targetState = pageIndex,
+                    transitionSpec = {
+                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)) +
+                            androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(MotionMedium)) { h -> h / 12 }) togetherWith
+                            (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MotionFast)) +
+                                androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(MotionFast)) { h -> -h / 12 })
+                    },
+                    modifier = Modifier.weight(1f).testTag(DECK_STEP_TAG),
+                    label = "onboardingStep",
+                ) { idx ->
+                    val step = steps.getOrNull(idx)
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = GapPage, vertical = GapGroup),
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-                            when (step.kind) {
-                                OnboardingStepKind.WELCOME -> OnboardingWelcomePage()
-                                OnboardingStepKind.RESTORE -> OnboardingRestorePage(vm)
-                                OnboardingStepKind.SETUP -> OnboardingSetupPage(vm, state, context, canBio, appearance.biometricLock, notifGranted) { notifGranted = it }
-                                OnboardingStepKind.LOOK -> OnboardingLookPage(appearance, vm)
-                                OnboardingStepKind.ALERTS -> OnboardingAlertsPage(notif, vm)
-                                OnboardingStepKind.WATCH -> OnboardingWatchPage()
-                                OnboardingStepKind.CAR_POWERTRAIN -> vehicle?.let {
-                                    OnboardingPowertrainPage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
+                        if (step != null) {
+                            val vehicle = step.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
+                            OnboardingStepCard(
+                                spec = onboardingCardSpec(step.kind, vehicle?.name, newCar = mode is OnboardingMode.NewCars),
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+                                    when (step.kind) {
+                                        OnboardingStepKind.WELCOME -> OnboardingWelcomePage()
+                                        OnboardingStepKind.RESTORE -> OnboardingRestorePage(vm)
+                                        OnboardingStepKind.SETUP -> OnboardingSetupPage(vm, state, context, canBio, appearance.biometricLock, notifGranted) { notifGranted = it }
+                                        OnboardingStepKind.LOOK -> OnboardingLookPage(appearance, vm)
+                                        OnboardingStepKind.ALERTS -> OnboardingAlertsPage(notif, vm)
+                                        OnboardingStepKind.WATCH -> OnboardingWatchPage()
+                                        OnboardingStepKind.CAR_POWERTRAIN -> vehicle?.let {
+                                            OnboardingPowertrainPage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
+                                        }
+                                        OnboardingStepKind.CAR_PLATFORM -> vehicle?.let {
+                                            OnboardingPlatformPage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
+                                        }
+                                        OnboardingStepKind.CAR_CLIMATE -> vehicle?.let {
+                                            OnboardingClimatePage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
+                                        }
+                                        OnboardingStepKind.TIPS -> OnboardingTipsPage()
+                                        OnboardingStepKind.FEATURES -> OnboardingFeaturesPage(state)
+                                    }
                                 }
-                                OnboardingStepKind.CAR_PLATFORM -> vehicle?.let {
-                                    OnboardingPlatformPage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
-                                }
-                                OnboardingStepKind.CAR_CLIMATE -> vehicle?.let {
-                                    OnboardingClimatePage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
-                                }
-                                OnboardingStepKind.TIPS -> OnboardingTipsPage()
-                                OnboardingStepKind.FEATURES -> OnboardingFeaturesPage(state)
                             }
                         }
                     }
                 }
-            }
 
-            // Back / Next on a glass bar of their own, for anyone who would rather tap than swipe.
-            GlassSurface(
-                shape = ExtraLargeShape,
-                liquid = false,
-                hazeState = backdropHaze,
-                tint = scheme.surfaceContainerHighest.copy(alpha = 0.6f),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = GapPage, vertical = GapGroup),
-            ) {
-                Column(Modifier.fillMaxWidth().padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-                    Box(Modifier.fillMaxWidth()) {
-                        // On the closing card the bar glows with the accent, so "Enter Bloo" reads as the finale.
-                        if (isLast) {
-                            Box(
-                                Modifier.matchParentSize().drawBehind {
-                                    drawRect(
-                                        androidx.compose.ui.graphics.Brush.radialGradient(
-                                            listOf(accent.copy(alpha = 0.45f), androidx.compose.ui.graphics.Color.Transparent),
-                                            center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f),
-                                            radius = size.maxDimension * 0.7f,
-                                        ),
-                                    )
-                                },
-                            )
-                        }
-                        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
-                            if (pageIndex > 0) {
-                                SafeMorphTextButton(text = "Back", onClick = { goBack() })
-                            }
-                            MorphActionButton(
-                                label = when {
-                                    isLast && mode == OnboardingMode.Replay -> "Dismiss"
-                                    isLast && mode is OnboardingMode.NewCars -> "Done"
-                                    isLast -> "Enter Bloo"
-                                    firstRun && pageIndex == 0 -> "Get started"
-                                    else -> "Next"
-                                },
-                                icon = if (isLast) AppIcons.CheckCircle else AppIcons.Check,
-                                onClick = { goNext() },
-                                enabled = blockedHere == null,
-                                emphasis = ButtonEmphasis.Confirm,
-                            )
-                        }
-                    }
-                    if (blockedHere != null) {
-                        BodySmallText(blockedHere)
-                    } else if (pageIndex == 0) {
-                        OnboardingSwipeHint()
-                    }
-                }
+                // The one way forward: progress and Back/Next on a liquid-glass bar.
+                OnboardingBottomBar(
+                    current = pageIndex,
+                    total = steps.size,
+                    accent = accent,
+                    onBack = if (pageIndex > 0 || mode == OnboardingMode.Replay) ({ goBack() }) else null,
+                    onNext = { goNext() },
+                    nextLabel = when {
+                        isLast && mode == OnboardingMode.Replay -> "Dismiss"
+                        isLast && mode is OnboardingMode.NewCars -> "Done"
+                        isLast -> "Enter Bloo"
+                        firstRun && pageIndex == 0 -> "Get started"
+                        else -> "Next"
+                    },
+                    nextIcon = if (isLast) AppIcons.CheckCircle else AppIcons.Check,
+                    nextEnabled = blockedHere == null,
+                    hint = blockedHere,
+                    hazeState = backdropHaze,
+                )
             }
-        }
         }
     }
 }
 
-/** Lets a UI test find the deck's pager and read which card it is on. */
-internal const val DECK_PAGER_TAG = "onboardingDeckPager"
+/** Lets a UI test find the deck's card area (the step content, not a pager). */
+internal const val DECK_STEP_TAG = "onboardingDeckStep"
 
 private fun replayMode(mode: OnboardingMode) = mode == OnboardingMode.Replay
 

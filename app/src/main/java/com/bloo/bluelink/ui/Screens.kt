@@ -331,6 +331,14 @@ fun BlooApp(vm: AppViewModel) {
     if (state.welcomeCardsOpen) {
         Box(Modifier.fillMaxSize()) { OnboardingScreen(vm, OnboardingMode.Replay) }
     }
+    // The pre-install guide: shown before the system installer runs when Shizuku is off, so the
+    // Play-Protect steps are seen before the sheet appears rather than after it looks broken.
+    if (state.showInstallGuide) {
+        UpdateInstallGuideDialog(
+            onDismiss = { vm.dismissInstallGuide() },
+            onContinue = { vm.confirmInstallUpdate() },
+        )
+    }
     // Every open dialog, above everything else.
     DialogLayer(dialogHost)
     }

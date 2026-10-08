@@ -92,7 +92,9 @@ fun AppViewModel.installDownloadedUpdate() {
     val installer = com.bloo.bluelink.update.ShizukuInstaller
     val wantSeamless = appearance.value.seamlessInstallShizuku && installer.isAvailable()
     if (!wantSeamless) {
-        fallbackInstall(dest)
+        // Show the install guide first (the Play-Protect steps); confirmInstallUpdate() runs the
+        // real system install once the user has seen it.
+        _state.update { it.copy(showInstallGuide = true) }
         return
     }
     if (!installer.hasPermission()) {
@@ -151,6 +153,18 @@ private fun AppViewModel.fallbackInstall(dest: java.io.File) {
     if (!com.bloo.bluelink.data.installDownloadedApk(getApplication<Application>(), dest)) {
         _state.update { it.copy(message = "Couldn't open the installer. Find Bloo.apk in Downloads.") }
     }
+}
+
+/** The install guide's Continue button: dismiss it, then hand the staged APK to the system installer. */
+fun AppViewModel.confirmInstallUpdate() {
+    _state.update { it.copy(showInstallGuide = false) }
+    val dest = apkCacheFile()
+    if (_state.value.updateApkReady && dest.exists()) fallbackInstall(dest)
+}
+
+/** The install guide's dismiss (back or scrim tap): leave the APK staged so Install can be tapped again. */
+fun AppViewModel.dismissInstallGuide() {
+    _state.update { it.copy(showInstallGuide = false) }
 }
 
 /**

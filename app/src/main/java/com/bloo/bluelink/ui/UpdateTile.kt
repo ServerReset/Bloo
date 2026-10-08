@@ -87,7 +87,7 @@ internal fun UpdateAvailableTile(
             modifier = modifier,
             icon = Icons.Filled.SystemUpdate,
             title = "Update available",
-            summary = info.run.displayTitle?.takeIf { it.isNotBlank() } ?: deltaLabel,
+            summary = info.run.displayTitle?.takeIf { it.isNotBlank() } ?: newLabel,
             // No containerColor override: uses PebbleShell's default like ordinary pebbles.
             headerAction = PebbleHeaderAction(
                 label = when {
