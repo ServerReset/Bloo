@@ -235,6 +235,9 @@ internal fun ToastHost(
                     // slot beside a corner-docked search; the ones above keep their full width.
                     startInsetPx = if (index == 0) startInset else 0f,
                     endInsetPx = if (index == 0) endInset else 0f,
+                    searchRect = searchRect,
+                    toastWidthPx = contentWidthPx,
+                    windowWidthPx = window.width.toFloat(),
                     hazeState = hazeState,
                     onCopy = onCopy,
                     onGone = { state.items.remove(toast) },
@@ -280,6 +283,9 @@ private fun BoxScope.ToastSlot(
     liftPx: Float,
     startInsetPx: Float,
     endInsetPx: Float,
+    searchRect: Rect?,
+    toastWidthPx: Float,
+    windowWidthPx: Float,
     hazeState: HazeState,
     onCopy: (String) -> Unit,
     onGone: () -> Unit,
@@ -315,11 +321,17 @@ private fun BoxScope.ToastSlot(
             .fillMaxWidth()
             .padding(start = startInset, end = endInset)
             .graphicsLayer {
-                val p = enter.value.coerceIn(0f, 1f)
-                // Rise out of the search's row (one toast-height below its slot) and settle into it;
-                // retreat back down into the bar on the way out. The whole stack also floats up by
-                // the search's lift when the search is centred.
-                translationY = -slot.value * stepPx - lift + (1f - p) * SearchElementHeight.toPx()
+                val merge = 1f - enter.value.coerceIn(0f, 1f)
+                // Rise out of the search's own row and settle into the slot; retreat on the way out.
+                translationY = -slot.value * stepPx - lift + merge * SearchElementHeight.toPx()
+                // While still merged, sit over the search element itself: centred on it and squeezed
+                // to its width, so each toast looks like it grew out of the search bubble and split
+                // off, and on the way out merges back into it.
+                if (searchRect != null && toastWidthPx > 0f) {
+                    translationX = merge * (searchRect.center.x - windowWidthPx / 2f)
+                    val grow = (searchRect.width / toastWidthPx).coerceIn(0.12f, 1f)
+                    scaleX = 1f - merge * (1f - grow)
+                }
             }
             .then(swipe),
     ) {

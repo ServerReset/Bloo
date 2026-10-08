@@ -1,13 +1,16 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -45,10 +48,12 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -234,6 +239,21 @@ fun BlooApp(vm: AppViewModel) {
             },
             label = "screen",
         ) { screen ->
+            // The app's standard page-turn, on every screen change: the screen leaving leans and
+            // shrinks away, the one arriving leans back in. Read in the draw phase.
+            val turn by transition.animateFloat(
+                transitionSpec = { tween(MotionMedium) },
+                label = "screenTurn",
+            ) { state -> if (state == EnterExitState.Visible) 0f else 1f }
+            Box(
+                Modifier.fillMaxSize().graphicsLayer {
+                    rotationY = turn * 5f
+                    val s = 1f - 0.05f * turn
+                    scaleX = s
+                    scaleY = s
+                    cameraDistance = 24.dp.toPx()
+                },
+            ) {
             // The garage draws full-bleed; other screens are inset by the Scaffold.
             when (screen) {
                 // Bootstrapping placeholder (see Screen.Loading): same aurora + wordmark as Login,
@@ -279,6 +299,7 @@ fun BlooApp(vm: AppViewModel) {
                         }
                     }
                 }
+            }
             }
         }
         // Search lives above the AnimatedContent so one element survives the transition (corner

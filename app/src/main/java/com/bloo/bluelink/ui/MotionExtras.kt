@@ -101,5 +101,8 @@ internal fun Modifier.pageTurn(offset: () -> Float, strength: Float = 1f): Modif
     scaleX = scale
     scaleY = scale
     alpha = 1f - 0.5f * strength * away
-    rotationY = o * 9f * strength
+    rotationY = o * 7f * strength
+    // A wide camera flattens the perspective, so a tilted page's corners do not swing past the top
+    // and bottom of the screen (where the pager clips them).
+    cameraDistance = 24.dp.toPx()
 }

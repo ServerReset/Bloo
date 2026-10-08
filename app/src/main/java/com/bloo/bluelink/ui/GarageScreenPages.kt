@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.abs
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
@@ -41,12 +43,18 @@ import kotlinx.coroutines.CoroutineScope
  */
 
 /**
- * Resistance when paging: below [PageResistanceThreshold] of a page a drag moves the pages at
- * [PageResistanceGive] of the finger, then past it they follow 1:1. A quick flick crosses the
- * threshold in a single frame, so it just pages.
+ * Resistance when paging: below [PageResistanceThreshold] of a page the pages crawl along at a
+ * fraction of the finger, then snap away with a bounce to meet the finger and follow it 1:1. A quick
+ * flick crosses the threshold in a single frame, so it just pages.
  */
-private const val PageResistanceThreshold = 0.06f
-private const val PageResistanceGive = 0.5f
+private const val PageResistanceThreshold = 0.16f
+private const val PageResistanceGive = 0.82f
+
+/** The most the pages trail the finger: [PageResistanceGive] of the threshold, in pages. */
+private const val MaxTrail = PageResistanceGive * PageResistanceThreshold
+
+/** The snap's spring: underdamped, so the pages overshoot and bounce as they catch the finger. */
+private val PageResistanceSnap = spring<Float>(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)
 
 /**
  * Trails the pages behind the finger at the start of a swipe, then lets them catch up. [perPage] is
@@ -55,39 +63,55 @@ private const val PageResistanceGive = 0.5f
  */
 @Composable
 private fun Modifier.pageResistance(pager: PagerState, perPage: Int): Modifier {
-    // The finger's travel since the drag began, as a fraction of a page. The pager's own continuous
-    // scroll (page + fraction, which never wraps) drives it rather than raw pointer coordinates:
-    // this node is itself translated, so pointer coordinates would shift underneath it and feed
-    // back on themselves.
+    // The lag, in fractions of a page, that the pages sit behind the finger.
     val trail = remember { mutableFloatStateOf(0f) }
     val scope = rememberCoroutineScope()
-    var catchUp by remember { mutableStateOf<Job?>(null) }
+    var anim by remember { mutableStateOf<Job?>(null) }
     return this
         .pointerInput(pager) {
             awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false)
                 val start = pager.currentPage + pager.currentPageOffsetFraction
-                catchUp?.cancel()
+                anim?.cancel()
                 trail.floatValue = 0f
+                var snapped = false
                 while (true) {
                     val event = awaitPointerEvent()
                     val change = event.changes.firstOrNull() ?: break
+                    // The pager's own continuous scroll (page + fraction, which never wraps) drives
+                    // it, not raw pointer coordinates: this node is itself translated, so pointer
+                    // coordinates would shift underneath it and feed back on themselves.
                     val moved = (pager.currentPage + pager.currentPageOffsetFraction) - start
-                    trail.floatValue = moved.coerceIn(-PageResistanceThreshold, PageResistanceThreshold)
+                    if (!snapped) {
+                        trail.floatValue = (PageResistanceGive * moved).coerceIn(-MaxTrail, MaxTrail)
+                        if (abs(moved) >= PageResistanceThreshold) {
+                            snapped = true
+                            // The snap: spring the lag away, overshooting so the pages bounce to
+                            // meet the finger, then follow it 1:1.
+                            anim = scope.launch {
+                                animate(trail.floatValue, 0f, animationSpec = PageResistanceSnap) { v, _ ->
+                                    trail.floatValue = v
+                                }
+                            }
+                        }
+                    }
                     if (!change.pressed) break
                 }
-                // Ease the trail (and so the offset) away during the pager's own settle, so the
+                // Let go before the snap: ease the lag out during the pager's own settle, so the
                 // hand-off does not pop.
-                catchUp = scope.launch {
-                    animate(trail.floatValue, 0f, animationSpec = tween(150)) { value, _ ->
-                        trail.floatValue = value
+                if (!snapped) {
+                    anim?.cancel()
+                    anim = scope.launch {
+                        animate(trail.floatValue, 0f, animationSpec = tween(150)) { v, _ ->
+                            trail.floatValue = v
+                        }
                     }
                 }
             }
         }
         .graphicsLayer {
             val pageW = size.width / perPage.coerceAtLeast(1)
-            if (pageW > 0f) translationX = -PageResistanceGive * trail.floatValue * pageW
+            if (pageW > 0f) translationX = -trail.floatValue * pageW
         }
 }
 
@@ -127,9 +151,13 @@ internal fun ExpandedGaragePage(
                 key = { page -> page },
             ) { page ->
                 // Pager offset is read only in graphicsLayer{} (draw phase) so drags never
-                // recompose the page. Plain fade/scale only: no blur, tilt or secondary snap spring
-                // (they read worse and lagged the drag).
-                Box(Modifier.fillMaxSize()) {
+                // recompose the page.
+                Box(
+                    Modifier.fillMaxSize().pageTurn(
+                        offset = { (exPager.currentPage - page) + exPager.currentPageOffsetFraction },
+                        strength = 0.6f,
+                    ),
+                ) {
                     val pv = vehicles[exWrap.real(page)]
                     ExpandedCar(
                         pv,
@@ -265,7 +293,9 @@ internal fun CollapsedGaragePager(
                         // recomposes the page.
                         .pageTurn(
                             offset = { (pager.currentPage - page) + pager.currentPageOffsetFraction },
-                            strength = 0.5f,
+                            // Only when one car fills the screen: with several columns in view the
+                            // tilt would leave a resting neighbour leaning at an angle.
+                            strength = if (perPage <= 1) 0.5f else 0f,
                         ),
                 ) {
                     if (real == slots) {
