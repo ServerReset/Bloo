@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -27,8 +25,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -83,12 +79,6 @@ private val ToastEdge = 16.dp
 /** The narrowest a toast beside the search may get before it lifts above instead. */
 private val MinBesideWidth = 220.dp
 
-/** How far each tucked toast peeks above the one in front of it while the stack is collapsed. */
-private val CollapsedStep = 14.dp
-
-/** How far each tucked toast is inset from the sides while the stack is collapsed (a card pile). */
-private val CollapsedInset = 10.dp
-
 /** The toast card's root, so a test can pin its height to the search element's. */
 internal const val ToastCardTag = "toastCard"
 
@@ -125,8 +115,9 @@ internal val LocalToasts = androidx.compose.runtime.staticCompositionLocalOf<Toa
  * The stack of live toasts, oldest at the top and newest at the bottom. Each toast expires on its own clock,
  * but never before the one above it, so they always go oldest to newest however long each message is.
  *
- * Repeats are grouped: the same message as the newest live toast re-arms it and bumps its [Toast.count]
- * rather than stacking an identical card, so a burst of one kind of message reads as one toast.
+ * Repeats are grouped: any live toast with the same message and kind is re-armed and its
+ * [Toast.count] bumped rather than stacking an identical card, so a burst of one message reads as
+ * one toast. Different messages or kinds all stay up.
  */
 @Stable
 internal class ToastState {
@@ -138,10 +129,12 @@ internal class ToastState {
         val now = SystemClock.elapsedRealtime()
         val expire = maxOf(now + toastDurationMs(message, type), lastExpireAt + ExpiryStaggerMs)
         lastExpireAt = expire
-        val newest = items.lastOrNull { !it.leaving }
-        if (newest != null && newest.message == message && newest.type == type) {
-            newest.expireAt = expire
-            newest.count += 1
+        // Identical toasts collapse into one entry wherever it sits in the stack: re-arm it and bump
+        // its count instead of pushing a duplicate card.
+        val existing = items.lastOrNull { !it.leaving && it.message == message && it.type == type }
+        if (existing != null) {
+            existing.expireAt = expire
+            existing.count += 1
             return
         }
         items += Toast(nextId++, message, type, expire)
@@ -161,10 +154,9 @@ internal class ToastState {
  * purely by an animated `graphicsLayer` translation, so a toast entering, leaving or the stack
  * reflowing around it never re-lays-out (and so never re-rasterises the glass of) its neighbours.
  *
- * When more than one toast is up they tuck into a pile; tapping the front one fans the whole pile
- * out to one full slot each, and tapping again tucks them back. The placement around the search is
- * itself animated, so dragging the search from the centre to a side SLIDES the stack from "above
- * it" to "beside it" instead of snapping.
+ * Every toast gets its own full slot (oldest on top, newest at the bottom); nothing is tucked behind
+ * the newest or clipped. The placement around the search is itself animated, so dragging the search
+ * from the centre to a side SLIDES the stack from "above it" to "beside it" instead of snapping.
  */
 @Composable
 internal fun ToastHost(
@@ -220,16 +212,8 @@ internal fun ToastHost(
     val endInset by animateFloatAsState(clearance.endInsetPx, placeSpec, label = "toastEndInset")
     val lift by animateFloatAsState(clearance.bottomLiftPx, placeSpec, label = "toastLift")
 
-    // The pile: tucked behind each other until tapped, then fanned out one full slot each.
-    val stacked = visible.count { !it.leaving } > 1
-    var expanded by remember { mutableStateOf(false) }
-    LaunchedEffect(stacked) { if (!stacked) expanded = false }
-    val stepTarget = with(density) { (if (expanded) SearchElementHeight + GapRow else CollapsedStep).toPx() }
-    val step by animateFloatAsState(
-        stepTarget,
-        lowPowerAwareSpring<Float>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
-        label = "toastStep",
-    )
+    // Every toast gets its own full slot; oldest above, newest at the bottom, nothing tucked.
+    val step = with(density) { (SearchElementHeight + GapRow).toPx() }
 
     Box(
         modifier
@@ -251,9 +235,6 @@ internal fun ToastHost(
                     // slot beside a corner-docked search; the ones above keep their full width.
                     startInsetPx = if (index == 0) startInset else 0f,
                     endInsetPx = if (index == 0) endInset else 0f,
-                    stacked = stacked,
-                    expanded = expanded,
-                    onToggle = { expanded = !expanded },
                     hazeState = hazeState,
                     onCopy = onCopy,
                     onGone = { state.items.remove(toast) },
@@ -287,9 +268,9 @@ private fun naturalToastWidthPx(
  *
  * It is laid out once, full-width at the bottom of the stack, and its whole motion is a
  * `graphicsLayer` translation: [slot] is the slot index it currently occupies (animated, so older
- * toasts glide up as newer ones arrive and as the pile fans out), and [enter] is how far it has
- * risen out of the search. Only the horizontal insets change a measured size, and only while the
- * search settles somewhere new.
+ * toasts glide up as newer ones arrive), and [enter] is how far it has risen out of the search.
+ * Only the horizontal insets change a measured size, and only while the search settles somewhere
+ * new.
  */
 @Composable
 private fun BoxScope.ToastSlot(
@@ -299,9 +280,6 @@ private fun BoxScope.ToastSlot(
     liftPx: Float,
     startInsetPx: Float,
     endInsetPx: Float,
-    stacked: Boolean,
-    expanded: Boolean,
-    onToggle: () -> Unit,
     hazeState: HazeState,
     onCopy: (String) -> Unit,
     onGone: () -> Unit,
@@ -324,14 +302,12 @@ private fun BoxScope.ToastSlot(
         }
     }
     val swipe = rememberSwipeToDismiss(toast.id) { toast.leaving = true }
-    // The card-pile tuck: older toasts are inset from both sides while collapsed, flush when fanned.
-    val stackInset = if (stacked && !expanded) CollapsedInset * index else 0.dp
     val density = LocalDensity.current
     // The placement springs are underdamped, so an inset mid-flight can dip below zero; padding
     // must not (it throws). Clamp before it becomes a Dp. The lift is a distance too, for the same
     // reason.
-    val startInset = with(density) { startInsetPx.coerceAtLeast(0f).toDp() } + stackInset
-    val endInset = with(density) { endInsetPx.coerceAtLeast(0f).toDp() } + stackInset
+    val startInset = with(density) { startInsetPx.coerceAtLeast(0f).toDp() }
+    val endInset = with(density) { endInsetPx.coerceAtLeast(0f).toDp() }
     val lift = liftPx.coerceAtLeast(0f)
     Box(
         Modifier
@@ -349,10 +325,6 @@ private fun BoxScope.ToastSlot(
     ) {
         ToastCard(
             toast = toast,
-            front = index == 0,
-            stacked = stacked,
-            expanded = expanded,
-            onToggle = onToggle,
             // Fade the CONTENT, not the glass: the pill stays a solid piece of the bar while it
             // peels off, and an alpha on the glass layer would clip its shadow.
             contentAlpha = { enter.value.coerceIn(0f, 1f) },
@@ -366,10 +338,6 @@ private fun BoxScope.ToastSlot(
 @Composable
 private fun ToastCard(
     toast: Toast,
-    front: Boolean,
-    stacked: Boolean,
-    expanded: Boolean,
-    onToggle: () -> Unit,
     contentAlpha: () -> Float,
     onDismiss: () -> Unit,
     hazeState: HazeState,
@@ -397,9 +365,6 @@ private fun ToastCard(
         Row(
             Modifier
                 .fillMaxWidth()
-                // Tapping the body of a stacked toast fans the pile out (and tucks it back). The
-                // copy/close buttons keep their own taps.
-                .clickable(enabled = stacked) { onToggle() }
                 .padding(start = GapGroup, end = GapHairline, top = GapHairline, bottom = GapHairline)
                 .graphicsLayer { alpha = contentAlpha() },
             verticalAlignment = Alignment.CenterVertically,
@@ -418,14 +383,6 @@ private fun ToastCard(
             if (toast.count > 1) {
                 Spacer(Modifier.width(GapRow))
                 Text("×${toast.count}", style = MaterialTheme.typography.labelMedium, color = accent)
-            }
-            // The pile's affordance: the front toast carries the expand/collapse chevron.
-            if (stacked && front) {
-                Icon(
-                    if (expanded) Icons.Filled.KeyboardArrowDown else Icons.Filled.KeyboardArrowUp,
-                    contentDescription = if (expanded) "Collapse" else "Show all",
-                    modifier = Modifier.size(18.dp),
-                )
             }
             CopyButton(toast, accent, onCopy)
             MorphIconButton(onClick = onDismiss) { Icon(AppIcons.Close, contentDescription = "Dismiss") }

@@ -6,13 +6,11 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import dev.chrisbanes.haze.HazeState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import kotlin.math.abs
 
 /** The toast stack: several at once, oldest on top / newest at the bottom, a repeat refreshes instead of stacking. */
 class ToastStackTest {
@@ -52,7 +50,7 @@ class ToastStackTest {
     }
 
     @Test
-    fun tappingAStackedToastFansThePileOut() {
+    fun aStackIsExpandedByDefaultWithNoTap() {
         val state = ToastState()
         rule.setContent { BlooTheme { ToastHost(state, HazeState(), onCopy = {}) } }
         rule.runOnUiThread {
@@ -60,16 +58,10 @@ class ToastStackTest {
             state.show("Second", ToastKind.INFO)
         }
         rule.waitUntil(8_000) { exists("First") && exists("Second") }
-        fun gap() = abs(
-            rule.onNodeWithText("First").getBoundsInRoot().top.value -
-                rule.onNodeWithText("Second").getBoundsInRoot().top.value,
-        )
-        val collapsed = gap()
-        // The front (newest) toast carries the fan-out tap.
-        rule.onNodeWithText("Second").performClick()
-        rule.waitForIdle()
-        val expanded = gap()
-        assertTrue("tapping fans the pile out ($collapsed -> $expanded)", expanded > collapsed + 20f)
+        val first = rule.onNodeWithText("First").getBoundsInRoot().top.value
+        val second = rule.onNodeWithText("Second").getBoundsInRoot().top.value
+        // Already a full slot apart (SearchElementHeight + gap), no tap needed.
+        assertTrue("the stack is expanded with no tap (${second - first}px)", second - first > 40f)
     }
 
     @Test
