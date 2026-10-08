@@ -43,18 +43,18 @@ import kotlinx.coroutines.CoroutineScope
  */
 
 /**
- * Resistance when paging: below [PageResistanceThreshold] of a page the pages crawl along at a
- * fraction of the finger, then snap away with a bounce to meet the finger and follow it 1:1. A quick
- * flick crosses the threshold in a single frame, so it just pages.
+ * Resistance when paging: below [PageResistanceThreshold] of a page the pages barely move (a small
+ * fraction of the finger), then snap onto the finger and follow it 1:1. A quick flick crosses the
+ * threshold in a single frame, so it just pages.
  */
-private const val PageResistanceThreshold = 0.16f
-private const val PageResistanceGive = 0.82f
+private const val PageResistanceThreshold = 0.08f
+private const val PageResistanceGive = 0.9f
 
 /** The most the pages trail the finger: [PageResistanceGive] of the threshold, in pages. */
 private const val MaxTrail = PageResistanceGive * PageResistanceThreshold
 
-/** The snap's spring: underdamped, so the pages overshoot and bounce as they catch the finger. */
-private val PageResistanceSnap = spring<Float>(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)
+/** The snap: quick, with only a slight settle, so it reads as snapping onto the finger. */
+private val PageResistanceSnap = spring<Float>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
 
 /**
  * Trails the pages behind the finger at the start of a swipe, then lets them catch up. [perPage] is
