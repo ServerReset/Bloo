@@ -72,7 +72,7 @@ fun AppViewModel.importSettings(context: android.content.Context, uri: android.n
     }
     val error = settingsStore.importSettingsJson(json)
     AppLog.log(if (error == null) "Settings imported from backup" else "⚠ Settings import: $error")
-    _state.update { it.copy(message = error ?: "Settings restored", messageType = if (error == null) "success" else "error") }
+    _state.update { it.copy(message = error ?: "Settings restored", messageType = if (error == null) ToastKind.SUCCESS else ToastKind.ERROR) }
     if (error == null) {
         // Refresh loaded vehicles' local config (seats, powertrain, photo) so the restore shows
         // immediately.
@@ -92,7 +92,7 @@ fun AppViewModel.setSyncUri(uri: android.net.Uri) = viewModelScope.launch {
         // Without a PERSISTED grant the picker's temporary access dies with the process and every
         // sync fails with a SecurityException; refuse to enable sync instead.
         AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
-        _state.update { it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = "error") }
+        _state.update { it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = ToastKind.ERROR) }
         return@launch
     }
     AppLog.log("Drive auto-sync enabled")
@@ -145,14 +145,14 @@ internal suspend fun AppViewModel.importSettingsAndSyncSuspend(context: android.
         // Without a persisted grant sync fails once the process dies, so don't claim it is enabled.
         AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
         _state.update {
-            it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = "error")
+            it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = ToastKind.ERROR)
         }
         return false
     }
     // Reset per-file gate state (synced_ever cleared) so join-adopt arms, then point sync at it.
     settingsStore.resetSyncStateForNewFile()
     settingsStore.setSyncUri(uri.toString())
-    _state.update { it.copy(syncUri = uri.toString(), message = "Auto-sync enabled", messageType = "success") }
+    _state.update { it.copy(syncUri = uri.toString(), message = "Auto-sync enabled", messageType = ToastKind.SUCCESS) }
     runDriveSyncNow()
     if (_state.value.syncError == null) refreshLocalCarConfig()
     return true

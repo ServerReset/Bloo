@@ -90,7 +90,7 @@ fun AppViewModel.setSeamlessInstallShizuku(value: Boolean) {
         val queued = installer.requestPermissionOnEnable(SHIZUKU_INSTALL_REQUEST_CODE)
         if (!queued && !installer.isAvailable()) {
             _state.update {
-                it.copy(message = "Start Shizuku, then Bloo can install updates silently.", messageType = "info")
+                it.copy(message = "Start Shizuku, then Bloo can install updates silently.", messageType = ToastKind.INFO)
             }
         }
     }

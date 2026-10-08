@@ -60,7 +60,7 @@ internal fun AppViewModel.autoSummarize(v: Vehicle) {
 fun AppViewModel.summarizeCar(v: Vehicle) {
     if (v.vin in _state.value.aiBusy) return
     val status = _state.value.statusFor(v) ?: run {
-        _state.update { it.copy(message = "Refresh ${v.name} first, then summarize.", messageType = "info") }
+        _state.update { it.copy(message = "Refresh ${v.name} first, then summarize.", messageType = ToastKind.INFO) }
         return
     }
     _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }

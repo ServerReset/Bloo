@@ -31,7 +31,7 @@ import com.bloo.bluelink.data.setVehicleOrder
 internal suspend fun AppViewModel.checkAlerts(v: Vehicle, status: VehicleStatus) {
     val alerts = CarAlerts.evaluate(settingsStore, v, status)
     alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions, it.channelId, it.localOnly) }
-    alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text, messageType = "error") } }
+    alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text, messageType = ToastKind.ERROR) } }
 }
 
 // --- App PIN (device unlock PIN) -------------------------------------
@@ -169,7 +169,7 @@ internal fun AppViewModel.launchBusy(block: suspend () -> Unit) {
             rethrowIfCancellation(e)
             val msg = e.message ?: "Something went wrong"
             AppLog.log("⚠ $msg")
-            _state.update { it.copy(message = msg, messageType = "error") }
+            _state.update { it.copy(message = msg, messageType = ToastKind.ERROR) }
         } finally {
             _state.update { it.copy(loading = false) }
         }

@@ -31,7 +31,7 @@ fun AppViewModel.updatePin(brand: Brand, pin: String) {
     viewModelScope.launch {
         store.updatePin(brand, pin.trim())
         credentialStore.updatePin(brand, pin.trim())
-        _state.update { it.copy(accounts = credentialStore.loadAll(), message = "PIN updated for ${brand.label}", messageType = "success") }
+        _state.update { it.copy(accounts = credentialStore.loadAll(), message = "PIN updated for ${brand.label}", messageType = ToastKind.SUCCESS) }
         AppLog.log("Updated PIN for ${brand.label}")
     }
 }

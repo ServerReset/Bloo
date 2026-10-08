@@ -18,7 +18,7 @@ fun AppViewModel.login(username: String, password: String, pin: String, brand: B
         _state.update {
             it.copy(
                 message = if (brand.pinRequiredToSignIn) "Email, password and PIN are all required" else "Email and password are required",
-                messageType = "error",
+                messageType = ToastKind.ERROR,
             )
         }
         return
@@ -95,7 +95,7 @@ fun AppViewModel.kiaVerifyOtp(code: String) {
     val otp = _state.value.kiaOtp ?: return
     val creds = kiaPending ?: return
     if (code.isBlank()) {
-        _state.update { it.copy(message = "Enter the code you received", messageType = "error") }
+        _state.update { it.copy(message = "Enter the code you received", messageType = ToastKind.ERROR) }
         return
     }
     launchBusy {
@@ -145,7 +145,7 @@ fun AppViewModel.canadaVerifyOtp(code: String) {
     val otp = _state.value.canadaOtp ?: return
     val creds = canadaPending ?: return
     if (code.isBlank()) {
-        _state.update { it.copy(message = "Enter the code you received", messageType = "error") }
+        _state.update { it.copy(message = "Enter the code you received", messageType = ToastKind.ERROR) }
         return
     }
     launchBusy {

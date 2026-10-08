@@ -99,7 +99,7 @@ internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
         } else {
             // A permanent denial can only be undone from system app info, so the toast points there
             // instead of re-asking.
-            toasts?.show("Location permission denied. Enable it in Settings > Apps > Bloo to see your position.", "error")
+            toasts?.show("Location permission denied. Enable it in Settings > Apps > Bloo to see your position.", ToastKind.ERROR)
         }
     }
     return {

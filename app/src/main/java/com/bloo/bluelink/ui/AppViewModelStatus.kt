@@ -170,7 +170,7 @@ internal fun AppViewModel.loadStatus(
                 ?: e.message
                 ?: errorMessage
             AppLog.log("⚠ ${v.name}: $msg")
-            if (surfaceErrors) _state.update { it.copy(message = "${v.name}: $msg", messageType = "error") }
+            if (surfaceErrors) _state.update { it.copy(message = "${v.name}: $msg", messageType = ToastKind.ERROR) }
         } finally {
             // Clear refreshing only when no more user-visible (surfaceErrors) fetches remain.
             // Background fetches finishing after a user refresh must not prematurely clear the

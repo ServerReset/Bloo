@@ -25,10 +25,10 @@ class ToastStackTest {
         val state = ToastState()
         rule.setContent { BlooTheme { ToastHost(state, HazeState(), onCopy = {}) } }
         rule.runOnUiThread {
-            state.show("First toast", "info")
-            state.show("Second toast", "info")
-            state.show("Second toast", "info")
-            state.show("Third toast", "success")
+            state.show("First toast", ToastKind.INFO)
+            state.show("Second toast", ToastKind.INFO)
+            state.show("Second toast", ToastKind.INFO)
+            state.show("Third toast", ToastKind.SUCCESS)
         }
         rule.waitUntil(8_000) { exists("First toast") && exists("Second toast") && exists("Third toast") }
         assertEquals("a repeat of the newest message is refreshed, not stacked", 1, rule.onAllNodesWithText("Second toast").fetchSemanticsNodes().size)
@@ -43,9 +43,9 @@ class ToastStackTest {
         val state = ToastState()
         rule.setContent { BlooTheme { ToastHost(state, HazeState(), onCopy = {}) } }
         rule.runOnUiThread {
-            state.show("Saved", "success")
-            state.show("Saved", "success")
-            state.show("Saved", "success")
+            state.show("Saved", ToastKind.SUCCESS)
+            state.show("Saved", ToastKind.SUCCESS)
+            state.show("Saved", ToastKind.SUCCESS)
         }
         rule.waitUntil(8_000) { exists("Saved") && exists("\u00d73") }
         assertEquals("one toast, not three", 1, rule.onAllNodesWithText("Saved").fetchSemanticsNodes().size)
@@ -56,8 +56,8 @@ class ToastStackTest {
         val state = ToastState()
         rule.setContent { BlooTheme { ToastHost(state, HazeState(), onCopy = {}) } }
         rule.runOnUiThread {
-            state.show("First", "info")
-            state.show("Second", "info")
+            state.show("First", ToastKind.INFO)
+            state.show("Second", ToastKind.INFO)
         }
         rule.waitUntil(8_000) { exists("First") && exists("Second") }
         fun gap() = abs(
@@ -77,7 +77,7 @@ class ToastStackTest {
         // Regression: the placement springs are underdamped, so an inset animating toward zero used
         // to undershoot below zero and blow up Modifier.padding ("Padding must be non-negative").
         val anchor = SearchAnchor()
-        val toasts = ToastState().apply { show("Saved", "success") }
+        val toasts = ToastState().apply { show("Saved", ToastKind.SUCCESS) }
         // Drive the clock by hand so the placement springs actually run, but the toast's own expiry
         // timer does not fire mid-test.
         rule.mainClock.autoAdvance = false

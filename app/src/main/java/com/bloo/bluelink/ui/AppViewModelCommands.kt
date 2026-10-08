@@ -96,7 +96,7 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location upda
             persistSnapshots()
         }
         hadCached -> _state.update {
-            it.copy(message = "Showing last-known location. Today's live-locate limit is used up.", messageType = "info")
+            it.copy(message = "Showing last-known location. Today's live-locate limit is used up.", messageType = ToastKind.INFO)
         }
         else -> throw BlueLinkException(
             "Couldn't get the car's location. It may be asleep, out of coverage, or over today's limit.",
@@ -271,7 +271,7 @@ internal fun AppViewModel.runCommand(
             val msg = e.message ?: "Command failed"
             recordRemoteAction(vin, success, status = "Failed", details = msg)
             AppLog.log("⚠ $msg")
-            _state.update { it.copy(message = msg, messageType = "error") }
+            _state.update { it.copy(message = msg, messageType = ToastKind.ERROR) }
             if (optimistic != null && prior != null) {
                 _state.update { st -> st.copy(statuses = st.statuses + (vin to prior)) }
                 persistSnapshots()

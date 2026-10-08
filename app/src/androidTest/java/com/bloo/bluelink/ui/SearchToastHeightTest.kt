@@ -29,7 +29,7 @@ class SearchToastHeightTest {
 
     @Test
     fun theSearchElementAndAToastAreTheSameHeight() {
-        val toasts = ToastState().apply { show("Saved", "success") }
+        val toasts = ToastState().apply { show("Saved", ToastKind.SUCCESS) }
         rule.setContent {
             BlooTheme {
                 Column {
@@ -64,7 +64,7 @@ class SearchToastHeightTest {
     @Test
     fun aToastFillsTheAvailableWidth() {
         // Toasts are full-width bars (the bar the search element emerged from), not compact pills.
-        val toasts = ToastState().apply { show("Hi", "info") }
+        val toasts = ToastState().apply { show("Hi", ToastKind.INFO) }
         rule.setContent {
             BlooTheme {
                 ToastHost(state = toasts, hazeState = remember { HazeState() }, onCopy = {})

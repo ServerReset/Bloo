@@ -37,11 +37,11 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
                     // A manual check also confirms via snackbar, since the update tile isn't
                     // visible from Settings.
                     if (surfaceResult) _state.update {
-                        it.copy(message = "Update available: ${com.bloo.bluelink.data.buildLabel(result.info.run.runNumber)}", messageType = "info")
+                        it.copy(message = "Update available: ${com.bloo.bluelink.data.buildLabel(result.info.run.runNumber)}", messageType = ToastKind.INFO)
                     }
                 }
                 is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
-                    if (surfaceResult) _state.update { it.copy(message = "Couldn't reach GitHub to check for updates.", messageType = "error") }
+                    if (surfaceResult) _state.update { it.copy(message = "Couldn't reach GitHub to check for updates.", messageType = ToastKind.ERROR) }
                 // else: silent -- next refresh tries again
                 is com.bloo.bluelink.update.UpdateCheckResult.Skipped -> {
                     // No network call happened (debounce or snooze), so this says nothing about
@@ -56,7 +56,7 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
                         if (it.updateDownloading || it.updateInstalling || it.updateApkReady) it
                         else it.copy(updateAvailable = null, updateApkReady = false, updateTileDismissed = false)
                     }
-                    if (surfaceResult) _state.update { it.copy(message = "You're on the latest build.", messageType = "info") }
+                    if (surfaceResult) _state.update { it.copy(message = "You're on the latest build.", messageType = ToastKind.INFO) }
                 }
             }
         } finally {

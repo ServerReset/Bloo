@@ -100,8 +100,8 @@ internal const val ToastCardTag = "toastCard"
 private val ToastChromeWidth = 12.dp + 34.dp + 12.dp + 40.dp + 40.dp + 4.dp
 
 /** How long a message stays: longer text and errors linger longer, up to a cap. */
-private fun toastDurationMs(message: String, type: String): Long =
-    if (type == "error") (5_500L + message.length * 45L).coerceAtMost(10_000L)
+private fun toastDurationMs(message: String, type: ToastKind): Long =
+    if (type == ToastKind.ERROR) (5_500L + message.length * 45L).coerceAtMost(10_000L)
     else (3_500L + message.length * 30L).coerceAtMost(6_500L)
 
 /** The stack's motion: a bouncy rise in, a quick retreat out, a damped reflow between slots. */
@@ -111,7 +111,7 @@ private val ReflowSpring = spring<Float>(dampingRatio = 1f, stiffness = Spring.S
 
 /** One message on screen. Flipping [leaving] plays its exit; it is dropped from the stack once that finishes. */
 @Stable
-internal class Toast(val id: Long, val message: String, val type: String, expireAt: Long) {
+internal class Toast(val id: Long, val message: String, val type: ToastKind, expireAt: Long) {
     var expireAt by mutableLongStateOf(expireAt)
     var leaving by mutableStateOf(false)
     /** How many times this same message has repeated without leaving, shown as a count. */
@@ -134,7 +134,7 @@ internal class ToastState {
     private var nextId = 0L
     private var lastExpireAt = 0L
 
-    fun show(message: String, type: String) {
+    fun show(message: String, type: ToastKind) {
         val now = SystemClock.elapsedRealtime()
         val expire = maxOf(now + toastDurationMs(message, type), lastExpireAt + ExpiryStaggerMs)
         lastExpireAt = expire
@@ -377,8 +377,8 @@ private fun ToastCard(
 ) {
     val scheme = MaterialTheme.colorScheme
     val (icon, accent) = when (toast.type) {
-        "success" -> AppIcons.CheckCircle to scheme.primary
-        "info" -> AppIcons.Info to scheme.tertiary
+        ToastKind.SUCCESS -> AppIcons.CheckCircle to scheme.primary
+        ToastKind.INFO -> AppIcons.Info to scheme.tertiary
         else -> Icons.Filled.ErrorOutline to scheme.error
     }
     GlassSurface(

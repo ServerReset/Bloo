@@ -70,6 +70,12 @@ internal val SettingsPseudoVehicle = Vehicle(
  * pebble taking it would be non-skippable and recompose with each parent frame.
  */
 @androidx.compose.runtime.Immutable
+/**
+ * What a snackbar message is telling the user: it drives the toast's colour, icon and how long it
+ * lingers.
+ */
+enum class ToastKind { ERROR, INFO, SUCCESS }
+
 data class UiState(
     // Loading, not Login: see Screen.Loading.
     val screen: Screen = Screen.Loading,
@@ -203,8 +209,8 @@ data class UiState(
     /** Canada sign-in only (Hyundai/Genesis/Kia): a pending one-time-code challenge. */
     val canadaOtp: CanadaOtpUi? = null,
     val message: String? = null,
-    /** "error" (default), "success", or "info" — controls snackbar colour. */
-    val messageType: String = "error",
+    /** Controls the snackbar's colour, icon and dwell time. */
+    val messageType: ToastKind = ToastKind.ERROR,
     /** A newer CI build than installed, if found. Drives the update tile; null means no tile. */
     val updateAvailable: com.bloo.bluelink.update.UpdateInfo? = null,
     /** "Remind me" also sets this, plus a snooze and a 1-day reminder worker. */

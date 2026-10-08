@@ -98,7 +98,7 @@ fun AppViewModel.installDownloadedUpdate() {
     if (!installer.hasPermission()) {
         // Ask; the grant arrives on onShizukuPermissionResult, which retries. Until then leave the
         // APK ready so a second tap (or the grant) completes it.
-        _state.update { it.copy(message = "Grant Shizuku access to install updates silently.", messageType = "info") }
+        _state.update { it.copy(message = "Grant Shizuku access to install updates silently.", messageType = ToastKind.INFO) }
         installer.requestPermission(SHIZUKU_INSTALL_REQUEST_CODE)
         return
     }
@@ -115,7 +115,7 @@ private fun AppViewModel.seamlessInstall(dest: java.io.File) {
     // messageType is REQUIRED here: it defaults to "error" (and clearMessage() resets it to
     // "error"), and the snackbar's colour `when` falls through to the red errorContainer branch for
     // anything it doesn't recognise.
-    _state.update { it.copy(updateInstalling = true, message = "Installing update…", messageType = "info") }
+    _state.update { it.copy(updateInstalling = true, message = "Installing update…", messageType = ToastKind.INFO) }
     viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         val result = com.bloo.bluelink.update.ShizukuInstaller.installApk(dest, ctx.packageName)
         if (result.isFailure) {
@@ -135,7 +135,7 @@ private fun AppViewModel.seamlessInstall(dest: java.io.File) {
                         updateInstalling = false,
                         updateApkReady = false,
                         message = "Update installed. Reopen Bloo to finish.",
-                        messageType = "info",
+                        messageType = ToastKind.INFO,
                     )
                 }
             }
@@ -162,7 +162,7 @@ fun AppViewModel.onShizukuPermissionResult(requestCode: Int, grantResult: Int) {
     if (grantResult != android.content.pm.PackageManager.PERMISSION_GRANTED) {
         // Info, not error: the user made a choice and the normal installer still works, so nothing
         // is actually broken to report in red.
-        _state.update { it.copy(message = "Shizuku access denied. Updates will use the normal installer.", messageType = "info") }
+        _state.update { it.copy(message = "Shizuku access denied. Updates will use the normal installer.", messageType = ToastKind.INFO) }
         return
     }
     val dest = apkCacheFile()
