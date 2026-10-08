@@ -1,10 +1,8 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
-import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.AppLog
@@ -113,7 +111,7 @@ class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
                 // and only skips the actual network call when the user's own
                 // preference says to.
                 .setConstraints(
-                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+                    connectedConstraints(),
                 )
                 // Explicit (rather than relying on the platform default) so a
                 // transient failure is retried within a minute, not the

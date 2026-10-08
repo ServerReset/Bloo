@@ -2,10 +2,8 @@ package com.bloo.bluelink.work
 
 import android.content.Context
 import androidx.work.BackoffPolicy
-import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.AppLog
@@ -144,7 +142,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
          * of the two that didn't.
          */
         private fun constraints() =
-            Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+            connectedConstraints()
 
         /**
          * Starts the poll chain right away -- called the moment some other

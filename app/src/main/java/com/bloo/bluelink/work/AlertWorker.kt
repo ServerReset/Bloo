@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.AppLog
@@ -197,7 +196,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<AlertWorker>(30, TimeUnit.MINUTES)
                 .setConstraints(
-                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+                    connectedConstraints(),
                 )
                 .build()
             WorkManagerInit.of(context).enqueueUniquePeriodicWork(

@@ -2,8 +2,6 @@ package com.bloo.bluelink.work
 
 import android.content.Context
 import androidx.work.CoroutineWorker
-import androidx.work.Constraints
-import androidx.work.NetworkType
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
@@ -78,7 +76,7 @@ class UpdateReminderWorker(context: Context, params: WorkerParameters) : Corouti
                 // other one carries -- so it was the only one that could fire with no
                 // connection, fail, and burn a one-shot reminder doing it.
                 .setConstraints(
-                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+                    connectedConstraints(),
                 )
                 .build()
             WorkManagerInit.of(context).enqueueUniqueWork(

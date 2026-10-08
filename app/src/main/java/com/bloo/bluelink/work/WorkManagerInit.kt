@@ -33,3 +33,9 @@ import androidx.work.WorkManager
 internal object WorkManagerInit {
     fun of(context: Context): WorkManager = WorkManager.getInstance(context.applicationContext)
 }
+
+/** The one constraint every periodic worker here asks for: a connected network. */
+internal fun connectedConstraints(): androidx.work.Constraints =
+    androidx.work.Constraints.Builder()
+        .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+        .build()
