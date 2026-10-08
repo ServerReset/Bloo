@@ -126,6 +126,7 @@ internal fun SettingsSearchResults(
         GlassSurface(
             shape = resultCardShape,
             modifier = Modifier.fillMaxWidth(),
+            shadow = false,
         ) {
             Column(Modifier.padding(GapSection)) {
                 Text(
@@ -152,6 +153,7 @@ internal fun SettingsSearchResults(
                 GlassSurface(
                     shape = resultCardShape,
                     modifier = Modifier.fillMaxWidth(),
+                    shadow = false,
                 ) {
                     Row(Modifier.padding(GapSection)) {
                         // A small leading icon badge per result, as in the update pebble and
@@ -179,6 +181,7 @@ internal fun SettingsSearchResults(
             GlassSurface(
                 shape = resultCardShape,
                 modifier = Modifier.fillMaxWidth(),
+                shadow = false,
             ) {
                 Row(Modifier.padding(GapSection)) {
                     IconBadge(

@@ -157,6 +157,12 @@ internal fun SearchLayer(
                 shape = ExtraLargeShape,
                 modifier = Modifier.width(barW),
                 hazeState = hazeState,
+                // Flat blur, not the liquid-glass refraction: results need to be legible, not
+                // warped, so this is a near-solid surface over a straight blur behind it.
+                liquid = false,
+                tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
+                    alpha = if (hazeState != null && canBlurBackdrops()) 0.88f else 0.98f,
+                ),
             ) {
                 Column(
                     Modifier
