@@ -5,10 +5,6 @@ import dev.chrisbanes.haze.hazeSource
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
@@ -27,7 +23,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 
@@ -35,13 +30,6 @@ import kotlinx.coroutines.CoroutineScope
  * The garage's two layouts, peeled out of GarageScreen: ExpandedGaragePage is one car full screen,
  * CollapsedGaragePager is the pager of cars (and Settings as one more page) that cycles forever.
  */
-
-/**
- * How far past the top and bottom of the viewport a page is drawn, so the page-turn's tilt never
- * clips the card. The pager is grown by twice this and shifted up by it, and the page content is
- * inset by it, so what stays on screen is exactly where it was.
- */
-private val PageTurnOverdraw = 120.dp
 
 @Composable
 internal fun ExpandedGaragePage(
@@ -63,17 +51,10 @@ internal fun ExpandedGaragePage(
                 exWrap.recenterIfNearEdge()
             }
         }
-        var exHeightPx by remember { mutableIntStateOf(0) }
-        val exDensity = LocalDensity.current
-        val exOverdrawDp = PageTurnOverdraw
-        val exPagerHeight = with(exDensity) { (exHeightPx + 2 * exOverdrawDp.toPx()).toDp() }
-        Box(Modifier.fillMaxSize().onSizeChanged { exHeightPx = it.height }) {
+        Box(Modifier.fillMaxSize()) {
             HorizontalPager(
                 state = exPager,
-                modifier = Modifier.fillMaxWidth()
-                    .height(exPagerHeight)
-                    .offset(y = -exOverdrawDp)
-                    .hazeSource(hazeState),
+                modifier = Modifier.fillMaxSize().hazeSource(hazeState),
                 // One neighbour pre-warmed per side, never more pages than cars: two composed pages
                 // resolving to one car crash. count + wrap means pages composed = 1 + 2 * beyond <=
                 // count.
@@ -90,7 +71,6 @@ internal fun ExpandedGaragePage(
                         strength = 0.6f,
                     ),
                 ) {
-                    Box(Modifier.fillMaxSize().padding(vertical = exOverdrawDp)) {
                     val pv = vehicles[exWrap.real(page)]
                     ExpandedCar(
                         pv,
@@ -108,7 +88,6 @@ internal fun ExpandedGaragePage(
                             }
                         },
                     )
-                    }
                 }
             }
             // Stays active mid-drag so it never disappears while swiping.
@@ -192,25 +171,15 @@ internal fun CollapsedGaragePager(
             if (state.value.screen != Screen.Garage) return@LaunchedEffect
             wrap.snapToReal(currentIndex.coerceIn(0, slots - 1))
         }
-        // The pager's slot size, measured (onSizeChanged, not BoxWithConstraints: its content
-        // recomposes every drag frame, and BoxWithConstraints is a SubcomposeLayout with a real
-        // extra composition pass).
+        // The pixel width of ONE item's page -- viewport width divided by perPage, so `perPage`
+        // of them sit side by side at rest.
         var boxWidthPx by remember { mutableIntStateOf(windowWidthPx) }
-        var boxHeightPx by remember { mutableIntStateOf(0) }
-        Box(Modifier.fillMaxSize().onSizeChanged { boxHeightPx = it.height }) {
+        Box(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
             val pageWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).coerceAtLeast(1).toDp() }
-            // Over-render: the pager is a touch taller than its slot and shifted up, and the page
-            // content is inset by the same amount, so the page-turn's tilt draws into the extra room
-            // instead of being clipped, while what you see stays where it was.
-            val overdrawDp = PageTurnOverdraw
-            val pagerHeight = with(density) { (boxHeightPx + 2 * overdrawDp.toPx()).toDp() }
             HorizontalPager(
                 state = pager,
-                modifier = Modifier.fillMaxWidth()
-                    .height(pagerHeight)
-                    .offset(y = -overdrawDp)
-                    .hazeSource(hazeState)
+                modifier = Modifier.fillMaxSize().hazeSource(hazeState)
                     .onSizeChanged { boxWidthPx = it.width },
                 userScrollEnabled = true,
                 pageSize = androidx.compose.foundation.pager.PageSize.Fixed(pageWidth),
@@ -236,7 +205,6 @@ internal fun CollapsedGaragePager(
                             strength = if (perPage <= 1) 0.5f else 0f,
                         ),
                 ) {
-                    Box(Modifier.fillMaxSize().padding(vertical = overdrawDp)) {
                     if (real == slots) {
                         // The folded-in Settings item, always the last one -- it's a page in this
                         // pager, not a route, so its own LazyColumn is already a single column at
@@ -253,7 +221,6 @@ internal fun CollapsedGaragePager(
                             onExpand = if (canExpand) ({ vm.expand(real) }) else null,
                             hazeState = hazeState,
                         )
-                    }
                     }
                 }
             }
