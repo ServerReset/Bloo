@@ -93,6 +93,7 @@ internal fun HotspotSlot(
             var dragY by remember(secondaryPebble) { mutableFloatStateOf(0f) }
             val lift by animateFloatAsState(if (lifted) 1.03f else 1f, label = "unpinLift")
 
+            PopVisible(visible = true, sizeAnimated = true) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(
                     Modifier
@@ -137,11 +138,13 @@ internal fun HotspotSlot(
                     }
                 }
             }
+            }
         } else {
             // Secondary slot is empty. Dragging a pebble here -- from the reorderable list in the
             // other column -- is what pins it (see PebbleList's onDragRelease); this surface is
             // just that drop target's resting/hover affordance.
             if (unpinned.isNotEmpty()) {
+                PopVisible(visible = true, sizeAnimated = true) {
                 Box(
                     Modifier.onGloballyPositioned {
                         hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
@@ -178,6 +181,7 @@ internal fun HotspotSlot(
                             )
                         }
                     }
+                }
                 }
             }
         }

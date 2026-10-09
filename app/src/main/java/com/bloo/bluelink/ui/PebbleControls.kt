@@ -107,6 +107,9 @@ internal fun CriticalContent(
                 label = "",
                 icon = if (expanded) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
                 contentDescription = if (expanded) "Leave full screen" else "Go full screen",
+                // While expanded the button reads as "on": the same active morph every toggle uses
+                // (round -> squarish) plus the active fill, so its state is obvious at a glance.
+                active = expanded,
                 onClick = action,
             )
         },
