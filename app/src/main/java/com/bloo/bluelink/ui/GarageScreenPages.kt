@@ -24,88 +24,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CoroutineScope
 
 /*
- * The garage's two layouts, peeled out of GarageScreen: ExpandedGaragePage is one car full screen,
- * CollapsedGaragePager is the pager of cars (and Settings as one more page) that cycles forever.
+ * The garage's layout, peeled out of GarageScreen: CollapsedGaragePager is the pager of cars (and
+ * Settings as one more page) that cycles forever, and it also carries the in-place expand of one car
+ * to full width.
  */
-
-@Composable
-internal fun ExpandedGaragePage(
-    vehicles: List<Vehicle>,
-    count: Int,
-    expandedIdx: Int?,
-    state: State<UiState>,
-    vm: AppViewModel,
-    hazeState: HazeState,
-    columnsFlipped: Boolean,
-    garageScope: CoroutineScope,
-    expandedT: Float,
-) {
-        // Cars, then Settings as the final page, cycling forever -- the same shape as the collapsed
-        // pager, so Settings is always one swipe past the last car in full screen too.
-        val total = count + 1
-        // Full-screen car; infinite wrap-around via a huge virtual range mapped back with modulo.
-        val exWrap = rememberWrapPager(total, (expandedIdx ?: 0).coerceIn(0, count - 1))
-        val exPager = exWrap.pager
-        LaunchedEffect(exPager, total) {
-            snapshotFlow { exPager.settledPage }.collect { page ->
-                val real = exWrap.real(page)
-                // The Settings page has no car index to expand to; the expanded car just stays put.
-                if (real < count) vm.expand(real)
-                exWrap.recenterIfNearEdge()
-            }
-        }
-        Box(Modifier.fillMaxSize()) {
-            HorizontalPager(
-                state = exPager,
-                modifier = Modifier.fillMaxSize().hazeSource(hazeState),
-                // One neighbour pre-warmed per side, never more pages than cars: two composed pages
-                // resolving to one car crash. count + wrap means pages composed = 1 + 2 * beyond <=
-                // count.
-                userScrollEnabled = true,
-                beyondViewportPageCount = ((total - 1) / 2).coerceIn(0, 1),
-                pageSize = androidx.compose.foundation.pager.PageSize.Fill,
-                key = { page -> page },
-            ) { page ->
-                val real = exWrap.real(page)
-                // Pager offset is read only in graphicsLayer{} (draw phase) so drags never
-                // recompose the page.
-                Box(
-                    Modifier.fillMaxSize().pageTurn(
-                        offset = { pageOffsetFraction(exPager.currentPage, page, exPager.currentPageOffsetFraction) },
-                        strength = 0.75f,
-                    ),
-                ) {
-                    if (real >= count) {
-                        SettingsScreen(vm)
-                    } else {
-                        val pv = vehicles[real]
-                        ExpandedCar(
-                            pv,
-                            state,
-                            vm,
-                            flipped = columnsFlipped,
-                            onCollapse = { vm.collapse() },
-                            hazeState = hazeState,
-                            expandedT = expandedT,
-                            // A horizontal swipe on the hero card steps to the neighbouring car too.
-                            onSwipeCar = { dir ->
-                                garageScope.launch {
-                                    exPager.animateScrollToPage(
-                                        (exPager.currentPage + dir).coerceIn(0, exPager.pageCount - 1),
-                                    )
-                                }
-                            },
-                        )
-                    }
-                }
-            }
-            // Stays active mid-drag so it never disappears while swiping.
-            StatusBarScrim(hazeState = hazeState)
-        }
-}
 
 /**
  * The cycling pager of cars (a status card when there are none) with Settings as the page after the

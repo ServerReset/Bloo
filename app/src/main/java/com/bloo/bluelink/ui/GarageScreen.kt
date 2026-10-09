@@ -2,10 +2,6 @@ package com.bloo.bluelink.ui
 
 import dev.chrisbanes.haze.HazeState
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -22,7 +18,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -90,9 +85,6 @@ internal fun GarageScreen(
         wasRefreshing = refreshing
     }
     val pullFractionState = remember { mutableFloatStateOf(0f) }
-    // Drives the expanded pager's programmatic car-switch (the hero card's own swipe -- see
-    // ExpandedCar's onSwipeCar).
-    val garageScope = rememberCoroutineScope()
     val count = vehicles.size
     // At least one non-Settings page even with zero cars: the "no connection"/ "not signed in"/"no
     // vehicles" status card (GarageStatusCard, Guard.kt) takes that one slot instead of a car, so
