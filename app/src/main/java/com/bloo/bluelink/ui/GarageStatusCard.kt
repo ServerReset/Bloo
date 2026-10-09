@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -98,6 +100,11 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
         Box(
             Modifier
                 .fillMaxSize()
+                // Scrollable so the pull-to-refresh gesture reaches the Refreshable above: a
+                // PullToRefreshBox only sees the drag through a scrollable child's nested scroll, and
+                // a plain (non-scrolling) card swallowed it -- which is why "pull down to try again"
+                // did nothing here while it worked on a car page.
+                .verticalScroll(rememberScrollState())
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .padding(horizontal = GapPage),

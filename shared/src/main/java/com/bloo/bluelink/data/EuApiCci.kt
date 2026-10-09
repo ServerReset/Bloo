@@ -119,7 +119,10 @@ internal suspend fun EuApi.loginCci(
     val ccs = ccsExchange(deviceId, cciAccess, nonCcs, exchangeable)
 
     return EuSession(
-        accessToken = "Bearer $ccs",
+        // Bare token: EuApi.authHeaders / controlToken prepend "Bearer " themselves. Storing
+        // "Bearer $ccs" here made every authenticated header "Bearer Bearer ...", which the EU API
+        // rejects with a 403 (the vehicle list was the first call to hit it).
+        accessToken = ccs.removePrefix("Bearer ").trim(),
         refreshToken = cci.path("refreshToken").str(),
         deviceId = deviceId,
         pin = pin,
@@ -189,7 +192,10 @@ internal suspend fun EuApi.refreshCci(session: EuSession): EuSession {
     val exchangeable = data.path("exchangeableAccessToken").str() ?: session.exchangeableToken.orEmpty()
     val ccs = ccsExchange(deviceId, cciAccess, nonCcs, exchangeable)
     return session.copy(
-        accessToken = "Bearer $ccs",
+        // Bare token: EuApi.authHeaders / controlToken prepend "Bearer " themselves. Storing
+        // "Bearer $ccs" here made every authenticated header "Bearer Bearer ...", which the EU API
+        // rejects with a 403 (the vehicle list was the first call to hit it).
+        accessToken = ccs.removePrefix("Bearer ").trim(),
         refreshToken = data.path("refreshToken").str() ?: session.refreshToken,
         cciAccessToken = cciAccess,
         exchangeableToken = exchangeable,

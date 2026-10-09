@@ -3,6 +3,7 @@ package com.bloo.bluelink.data
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import okhttp3.Request
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -24,6 +25,23 @@ import kotlin.test.assertNull
 class EuApiTest {
 
     private val api = EuApi(Brand.HYUNDAI_EU)
+
+    // ---- auth header: exactly one Bearer ----
+
+    @Test
+    fun `auth headers carry exactly one Bearer and the bare token`() {
+        // Regression: the CCI login stored the access token WITH a "Bearer " prefix while authHeaders
+        // prepends another, so every authenticated Europe call (the vehicle list first) went out as
+        // "Bearer Bearer ..." and the EU API rejected it with a 403.
+        val session = EuSession(
+            accessToken = "ccs-access-token",
+            refreshToken = null,
+            deviceId = "device-1",
+            pin = null,
+        )
+        val header = with(api) { Request.Builder().url("https://example.com/").authHeaders(session, 0) }.build().header("Authorization")
+        assertEquals("Bearer ccs-access-token", header)
+    }
 
     // ---- plug detection: ConnectorFastening.State, not ChargingDoor.State ----
 
