@@ -116,17 +116,16 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
         }
     }
 
-    /** Stream [apk] into the package installer on the connected watch, then open the app. */
+    /**
+     * Stream [apk] into the package installer on the connected watch, then open the app. Falls back
+     * to writing the file to the watch and running `pm install` if the streamed `-S` install does
+     * not report success -- the two use different code paths on the device, so a truncated-stream
+     * failure on one can succeed on the other.
+     */
     suspend fun install(apk: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            // The output side MUST be closed (`use`), not merely flushed: `cmd package install -S`
-            // reads exactly the stated byte count off the stream, and leaving it open truncated the
-            // APK -- which surfaced as INSTALL_PARSE_FAILED_NO_CERTIFICATES ("null array" reading the
-            // certs of a half-written base.apk) rather than as a short write.
-            val reply = openStream("exec:cmd package install -r -S ${apk.size}").use { stream ->
-                stream.openOutputStream().use { it.write(apk) }
-                stream.openInputStream().bufferedReader().readText()
-            }
+            val streamed = runCatching { streamInstall(apk) }.getOrDefault("")
+            val reply = if (streamed.contains("Success")) streamed else pushInstall(apk, streamed)
             check(reply.contains("Success")) {
                 // Include the installer's own words: they distinguish a truncated push from a genuine
                 // install rejection, which a generic message hides.
@@ -136,6 +135,27 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
                 openStream("shell:monkey -p $WATCH_PACKAGE -c android.intent.category.LAUNCHER 1").use { it.openInputStream().readBytes() }
             }
             Unit
+        }
+    }
+
+    private fun streamInstall(apk: ByteArray): String =
+        openStream("exec:cmd package install -r -S ${apk.size}").use { stream ->
+            stream.openOutputStream().use { it.write(apk) }
+            stream.openInputStream().bufferedReader().readText()
+        }
+
+    /** Copy the APK to the watch with `cat`, install it from there, then remove it. */
+    private fun pushInstall(apk: ByteArray, firstError: String): String {
+        val path = "/data/local/tmp/bloo-watch.apk"
+        return try {
+            openStream("exec:cat > $path").use { stream ->
+                stream.openOutputStream().use { it.write(apk) }
+            }
+            openStream("exec:pm install -r $path").use { it.openInputStream().bufferedReader().readText() }
+        } catch (t: Throwable) {
+            firstError.ifBlank { t.message ?: "Install failed" }
+        } finally {
+            runCatching { openStream("exec:rm -f $path").use { it.openInputStream().readBytes() } }
         }
     }
 
