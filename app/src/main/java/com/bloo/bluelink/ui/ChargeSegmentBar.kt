@@ -68,7 +68,7 @@ internal fun ChargeSegmentBar(
     //  - expanded, the bar sits on the photo and its scrim, and the scrim is the theme's OPPOSITE
     //    tone (black in light, white in dark), so the track is the on-photo colour.
     // These two were swapped, which left the track nearly invisible in every combination.
-    val trackColor = if (collapsed) scheme.onSurface.copy(alpha = 0.20f) else heroOnPhoto().copy(alpha = 0.30f)
+    val trackColor = if (collapsed) scheme.onSurface.copy(alpha = 0.30f) else heroOnPhoto().copy(alpha = 0.42f)
     // The past-the-limit zone. The trailing (dimmed) segments FLIP between collapsed and expanded,
     // on top of the theme's own inversion.
     val darkCardBehind = appIsDarkTheme() == collapsed
