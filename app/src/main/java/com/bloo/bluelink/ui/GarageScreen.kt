@@ -135,23 +135,16 @@ internal fun GarageScreen(
 
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
     BackdropHost {
-        AnimatedContent(
-            targetState = expandedIdx != null,
-            transitionSpec = {
-                // A plain cross-fade, no scale: the reflow of the pebbles (under the hero -> beside
-                // it) is the motion that carries the expand, so the screen itself must not also
-                // "arrive" as a new surface.
-                val spec = spring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
-                fadeIn(spec) togetherWith fadeOut(spec)
-            },
-            label = "expand",
-        ) { isExpanded ->
-            if (isExpanded) {
-                ExpandedGaragePage(vehicles, count, expandedIdx, state, vm, hazeState, appearance.columnsFlipped, garageScope, expandedT)
-            } else {
-                CollapsedGaragePager(vehicles, count, slots, perPage, canExpand, currentIndex, windowInfo.containerSize.width, state, vm, hazeState)
-            }
-        }
+        // ONE page, ALWAYS the pager: expanding reflows the focused car's page in place -- its pebbles
+        // slide from under the hero to beside it, and the other car / Settings columns slide off as
+        // the focused page grows to the full width. No second screen, no route change, nothing to
+        // fade in.
+        CollapsedGaragePager(
+            vehicles, count, slots, perPage, canExpand, currentIndex,
+            windowInfo.containerSize.width, state, vm, hazeState,
+            expandedIdx = expandedIdx,
+            expandedT = expandedT,
+        )
         // THE SINGLE CarMap instance, positioned at the screen level. It animates from the pebble
         // location (collapsed) to full-screen (expanded). Same instance, literally growing -- not
         // two separate maps or morphing.

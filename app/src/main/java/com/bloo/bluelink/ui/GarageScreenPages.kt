@@ -123,6 +123,10 @@ internal fun CollapsedGaragePager(
     state: State<UiState>,
     vm: AppViewModel,
     hazeState: HazeState,
+    /** The car currently expanded to full width, or null. */
+    expandedIdx: Int? = null,
+    /** 0 collapsed, 1 expanded: drives the focused page's own reflow. */
+    expandedT: Float = 0f,
 ) {
         // Settings is appended as one more ITEM to the sequence this pager cycles through (index
         // `slots`, right after the last real page), always rendered at exactly one car-column's
@@ -188,12 +192,16 @@ internal fun CollapsedGaragePager(
         var boxWidthPx by remember { mutableIntStateOf(windowWidthPx) }
         Box(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
-            val pageWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).coerceAtLeast(1).toDp() }
+            val columnWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).coerceAtLeast(1).toDp() }
+            val fullWidth = with(density) { boxWidthPx.coerceAtLeast(1).toDp() }
+            // The focused page grows from one column to the whole width as it expands; every other
+            // column is pushed off the side by the same amount.
+            val pageWidth = androidx.compose.ui.unit.lerp(columnWidth, fullWidth, expandedT)
             HorizontalPager(
                 state = pager,
                 modifier = Modifier.fillMaxSize().hazeSource(hazeState)
                     .onSizeChanged { boxWidthPx = it.width },
-                userScrollEnabled = true,
+                userScrollEnabled = expandedIdx == null,
                 pageSize = androidx.compose.foundation.pager.PageSize.Fixed(pageWidth),
                 // Never a flat 1: perPage + 2*beyond pages are composed at once, and if that
                 // exceeds `total` two virtual pages resolve to the same real item (e.g. Settings
@@ -226,6 +234,16 @@ internal fun CollapsedGaragePager(
                     } else if (count == 0) {
                         // No cars: the status card takes the one other slot (Guard.kt).
                         GarageStatusCard(state, vm, hazeState = hazeState)
+                    } else if (real == expandedIdx) {
+                        // The expanded car: the SAME page, reflowing its pebbles from under the hero
+                        // to beside it as expandedT runs, while it grows to take the whole width.
+                        ExpandedCar(
+                            vehicles[real], state, vm,
+                            flipped = false,
+                            onCollapse = { vm.collapse() },
+                            expandedT = expandedT,
+                            hazeState = hazeState,
+                        )
                     } else {
                         val gv = vehicles[real]
                         VehicleDetailContent(
