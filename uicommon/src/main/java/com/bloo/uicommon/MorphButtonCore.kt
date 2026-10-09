@@ -82,7 +82,7 @@ fun MorphButtonCore(
     // The content Row wraps and the chrome uses matchParentSize(), so CONTENT decides the button's size
     // and `modifier` stretches it. fillMaxSize() children would leave the Box with no intrinsic size
     // (growing to full width, or zero height in unbounded parents).
-    Box(modifier = modifier.blockPageSwipe(), contentAlignment = Alignment.Center) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
         MorphChrome(
             pressed = pressed,
             active = active,
