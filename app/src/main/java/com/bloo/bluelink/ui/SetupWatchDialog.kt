@@ -167,9 +167,10 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                 }
                 WatchSetupStep.Done -> {
                     BodyMediumText("Bloo is installed on the watch. Open it there and it will connect to $phoneName.")
-                    // The security nudge the flow was missing: turn the debug port back off.
+                    // The security nudge, now that the flow switches it off for the user where it can.
                     BodySmallText(
-                        "Now turn Wireless debugging OFF on the watch (Developer options), so its debug port is not left open.",
+                        "Wireless debugging was turned off on the watch. If it still shows as on, turn it " +
+                            "off yourself (Developer options) so its debug port is not left open.",
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
@@ -242,7 +243,14 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                             if (connected.isFailure) return@launch report(connected) {}
                             status = "Installing on the watch…"
                             installProgress = 0.55f
-                            report(held.install(bytes)) { step = WatchSetupStep.Done; status = null; apk = null }
+                            val installed = held.install(bytes)
+                            if (installed.isSuccess) {
+                                // Best effort: switch the watch's Wireless debugging back off for the
+                                // user; the Done step still reminds them in case it no-op'd.
+                                status = "Turning Wireless debugging off…"
+                                held.disableWirelessDebugging()
+                            }
+                            report(installed) { step = WatchSetupStep.Done; status = null; apk = null }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),

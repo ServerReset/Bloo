@@ -127,10 +127,26 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
                 stream.openOutputStream().use { it.write(apk) }
                 stream.openInputStream().bufferedReader().readText()
             }
-            check(reply.contains("Success")) { reply.trim().ifBlank { "The watch didn't accept the install" } }
+            check(reply.contains("Success")) {
+                // Include the installer's own words: they distinguish a truncated push from a genuine
+                // install rejection, which a generic message hides.
+                reply.trim().ifBlank { "The watch didn't accept the install" }
+            }
             runCatching {
                 openStream("shell:monkey -p $WATCH_PACKAGE -c android.intent.category.LAUNCHER 1").use { it.openInputStream().readBytes() }
             }
+            Unit
+        }
+    }
+
+    /**
+     * Best-effort: turn the watch's Wireless debugging back OFF once we're done with it, so its debug
+     * port is not left listening. Harmless if the setting doesn't exist -- the caller still shows the
+     * manual reminder.
+     */
+    suspend fun disableWirelessDebugging(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            openStream("shell:settings put global adb_wifi_enabled 0").use { it.openInputStream().readBytes() }
             Unit
         }
     }
