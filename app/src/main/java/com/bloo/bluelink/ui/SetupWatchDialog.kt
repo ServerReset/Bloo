@@ -166,7 +166,13 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                         failed = false
                         scope.launch {
                             status = "Connecting…"
-                            val connected = held.connectTo(host, connectPort.toInt())
+                            val connected = held.connectTo(host, connectPort.toInt()).let { primary ->
+                                // The port under "Pair new device" is NOT the connection port, but it
+                                // is the one people paste here, and some watches accept it anyway.
+                                // Try it before failing so that mix-up does not dead-end the install.
+                                if (primary.isSuccess || pairPort.isBlank() || pairPort == connectPort) primary
+                                else held.connectTo(host, pairPort.toInt())
+                            }
                             if (connected.isFailure) return@launch report(connected) {}
                             status = "Downloading the watch app…"
                             val apk = held.download(url).getOrElse { return@launch report(Result.failure(it)) {} }
