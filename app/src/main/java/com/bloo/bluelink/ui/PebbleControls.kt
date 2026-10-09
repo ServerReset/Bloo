@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -89,12 +90,14 @@ internal fun CriticalContent(
         v, status, imageUrl, hasBattery, hasFuel, vm,
         modifier = modifier,
         drivingLabel = drivingLabel, metric = metric, photoExpanded = photoExpanded,
+        // Full screen always shows the car photo; the user's own choice is remembered and restored
+        // when the phone collapses back.
+        forcedExpanded = true,
         expandAction = onCollapse?.let {
-            // Icon-only, deliberately: this is the dual-column view, where the header is already
-            // narrower (one column) AND carries the same collapse chevron every pebble has.
+            // The full-screen toggle replaces the hero's own expand/collapse chevron here.
             PebbleHeaderAction(
                 label = "",
-                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                icon = Icons.Filled.FullscreenExit,
                 contentDescription = "Back to all cars",
                 onClick = it,
             )
