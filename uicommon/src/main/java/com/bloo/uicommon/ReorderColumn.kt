@@ -89,6 +89,7 @@ fun <T> ReorderColumn(
     val reorderActive = draggingKey != null
     CompositionLocalProvider(LocalReorderActive provides reorderActive) {
     var offsetY by remember { mutableFloatStateOf(0f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
     val heights = remember { mutableStateMapOf<Any, Int>() }
     // Consumed the instant this key is first read, so navigating back to the garage (or a second
     // car's column composing) later never replays it.
@@ -129,6 +130,10 @@ fun <T> ReorderColumn(
                         // manually via graphicsLayer below.
                         .then(if (dragging) Modifier else Modifier.animatePlacement())
                         .graphicsLayer {
+                            // The dragged pebble follows the finger on BOTH axes, so it can be
+                            // carried sideways onto the hot-seat column (the vertical part still
+                            // drives the reorder). Non-dragged items keep their intro offset only.
+                            translationX = if (dragging) offsetX else 0f
                             translationY = if (dragging) offsetY else (1f - intro.value) * 28.dp.toPx()
                             scaleX = lift
                             scaleY = lift
@@ -164,16 +169,17 @@ fun <T> ReorderColumn(
                         }
                         .pointerInput(k) {
                     detectDragGesturesAfterLongPress(
-                        onDragStart = { draggingKey = k; offsetY = 0f },
+                        onDragStart = { draggingKey = k; offsetY = 0f; offsetX = 0f },
                         onDragEnd = {
                             val handled = onDragReleaseNow?.invoke(k) ?: false
-                            draggingKey = null; offsetY = 0f
+                            draggingKey = null; offsetY = 0f; offsetX = 0f
                             if (!handled) onReorderNow(order)
                         },
-                        onDragCancel = { onDragReleaseNow?.invoke(k); draggingKey = null; offsetY = 0f },
+                        onDragCancel = { onDragReleaseNow?.invoke(k); draggingKey = null; offsetY = 0f; offsetX = 0f },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             offsetY += dragAmount.y
+                            offsetX += dragAmount.x
                             handleCoords.value?.takeIf { it.isAttached }?.let {
                                 onDragMoveNow?.invoke(k, it.localToWindow(change.position))
                             }
