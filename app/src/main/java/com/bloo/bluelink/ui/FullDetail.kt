@@ -178,67 +178,34 @@ internal fun ExpandedCar(
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }) {
-        // Each column keeps its own hoisted scroll state, so a scroll sticks with its CONTENT
-        // across a swap rather than with whichever physical side it currently renders on.
-        val flipWrap = rememberWrapPager(2, if (flipped) 1 else 0)
-        val flipPager = flipWrap.pager
-        LaunchedEffect(flipPager) {
-            snapshotFlow { flipPager.settledPage }.collect { page ->
-                flipWrap.recenterIfNearEdge()
-                val nowFlipped = flipWrap.real(page) == 1
-                if (nowFlipped != flipped) vm.setColumnsFlipped(nowFlipped)
-            }
-        }
-        val skipFirstFlipSnap = remember { mutableStateOf(true) }
-        LaunchedEffect(flipped) {
-            if (skipFirstFlipSnap.value) { skipFirstFlipSnap.value = false; return@LaunchedEffect }
-            flipWrap.snapToReal(if (flipped) 1 else 0)
-        }
-        HorizontalPager(
-            state = flipPager,
-            modifier = Modifier.fillMaxSize(),
-            pageSize = PageSize.Fill,
-            beyondViewportPageCount = 0,
-            key = { page -> page },
-        ) { page ->
-            val isFlipped = flipWrap.real(page) == 1
-            val leftCol = if (isFlipped) pebbles else controls
-            val rightCol = if (isFlipped) controls else pebbles
-            val leftScroll = if (isFlipped) pebblesScroll else controlsScroll
-            val rightScroll = if (isFlipped) controlsScroll else pebblesScroll
-            // Just the status-bar inset, matching [VehicleDetailContent]'s single-column page
-            // (which uses a bare `Spacer(topInset)`). The shared StatusBarScrim still blurs the bar
-            // itself.
-            val topSpacerHeight = topInset
-            val bottomSpacerHeight = searchBarClearance(fallback = bottomInset + 132.dp)
-            Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
+        // Plain, centred two columns: the hero + controls column on the START side (left in LTR)
+        // always, and the standard pebble cards on the other. No flip pager any more -- the columns
+        // never swap sides. Horizontal swipes belong to the car pager one level up (and the hero and
+        // chip row carry carSwipe), so paging back and forth changes car from anywhere in the view.
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Row(
+                Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 960.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = ScreenGutter),
+                horizontalArrangement = Arrangement.spacedBy(GapSection),
             ) {
-                Row(
-                    Modifier
-                        .fillMaxHeight()
-                        .widthIn(max = 960.dp)
-                        .fillMaxWidth()
-                        .padding(horizontal = ScreenGutter),
-                    horizontalArrangement = Arrangement.spacedBy(GapSection),
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().verticalScroll(controlsScroll),
+                    verticalArrangement = Arrangement.spacedBy(GapGroup),
                 ) {
-                    Column(
-                        Modifier.weight(1f).fillMaxHeight().verticalScroll(leftScroll),
-                        verticalArrangement = Arrangement.spacedBy(GapGroup),
-                    ) {
-                        Spacer(Modifier.height(topSpacerHeight))
-                        leftCol()
-                        Spacer(Modifier.height(bottomSpacerHeight))
-                    }
-                    Column(
-                        Modifier.weight(1f).fillMaxHeight().verticalScroll(rightScroll),
-                        verticalArrangement = Arrangement.spacedBy(GapGroup),
-                    ) {
-                        Spacer(Modifier.height(topSpacerHeight))
-                        rightCol()
-                        Spacer(Modifier.height(bottomSpacerHeight))
-                    }
+                    Spacer(Modifier.height(topInset))
+                    controls()
+                    Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
+                }
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().verticalScroll(pebblesScroll),
+                    verticalArrangement = Arrangement.spacedBy(GapGroup),
+                ) {
+                    Spacer(Modifier.height(topInset))
+                    pebbles()
+                    Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
                 }
             }
         }
