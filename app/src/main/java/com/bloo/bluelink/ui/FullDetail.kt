@@ -113,6 +113,12 @@ internal fun ExpandedCar(
      * `onSwipeCar`).
      */
     onSwipeCar: (Int) -> Unit = {},
+    /**
+     * 0 = the pebbles sit UNDER the hero (the collapsed single-column look), 1 = BESIDE it (the
+     * expanded two-column look). Animated by the caller so expanding/collapsing is an in-place
+     * reflow of the same content, not a screen change.
+     */
+    expandedT: Float = 1f,
     /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
     hazeState: HazeState? = null,
 ) {
@@ -152,35 +158,24 @@ internal fun ExpandedCar(
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }) {
-        // Plain, centred two columns: the hero + controls column on the START side (left in LTR)
-        // always, and the standard pebble cards on the other. No flip pager any more -- the columns
-        // never swap sides. Horizontal swipes belong to the car pager one level up (and the hero and
-        // chip row carry carSwipe), so paging back and forth changes car from anywhere in the view.
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Row(
+        // One scrolling page whose two blocks reflow by [expandedT]: the pebble list sits UNDER the
+        // hero while collapsed and slides up BESIDE it while expanded. Same content either way, so
+        // expanding/collapsing is an in-place animation, not a screen swap.
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Column(
                 Modifier
-                    .fillMaxHeight()
+                    .fillMaxSize()
                     .widthIn(max = 960.dp)
-                    .fillMaxWidth()
+                    .verticalScroll(pebblesScroll)
                     .padding(horizontal = ScreenGutter),
-                horizontalArrangement = Arrangement.spacedBy(GapSection),
             ) {
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().verticalScroll(controlsScroll),
-                    verticalArrangement = Arrangement.spacedBy(GapGroup),
-                ) {
-                    Spacer(Modifier.height(topInset))
-                    controls()
-                    Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
-                }
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().verticalScroll(pebblesScroll),
-                    verticalArrangement = Arrangement.spacedBy(GapGroup),
-                ) {
-                    Spacer(Modifier.height(topInset))
-                    pebbles()
-                    Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
-                }
+                Spacer(Modifier.height(topInset))
+                ReflowPair(
+                    expandedT = expandedT,
+                    lead = { Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) { controls() } },
+                    trail = { Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) { pebbles() } },
+                )
+                Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
             }
         }
     }

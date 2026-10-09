@@ -127,6 +127,14 @@ internal fun GarageScreen(
 
     BackHandler(enabled = expandedIdx != null) { vm.collapse() }
 
+    // 0 collapsed, 1 expanded: the pebble list's own reflow (under the hero -> beside it) runs on
+    // this, so expanding is an in-place animation of the same content rather than a screen swap.
+    val expandedT by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (expandedIdx != null) 1f else 0f,
+        animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow),
+        label = "expandT",
+    )
+
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
     BackdropHost {
         AnimatedContent(
@@ -139,7 +147,7 @@ internal fun GarageScreen(
             label = "expand",
         ) { isExpanded ->
             if (isExpanded) {
-                ExpandedGaragePage(vehicles, count, expandedIdx, state, vm, hazeState, appearance.columnsFlipped, garageScope)
+                ExpandedGaragePage(vehicles, count, expandedIdx, state, vm, hazeState, appearance.columnsFlipped, garageScope, expandedT)
             } else {
                 CollapsedGaragePager(vehicles, count, slots, perPage, canExpand, currentIndex, windowInfo.containerSize.width, state, vm, hazeState)
             }

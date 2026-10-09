@@ -41,6 +41,7 @@ internal fun ExpandedGaragePage(
     hazeState: HazeState,
     columnsFlipped: Boolean,
     garageScope: CoroutineScope,
+    expandedT: Float,
 ) {
         // Cars, then Settings as the final page, cycling forever -- the same shape as the collapsed
         // pager, so Settings is always one swipe past the last car in full screen too.
@@ -88,6 +89,7 @@ internal fun ExpandedGaragePage(
                             flipped = columnsFlipped,
                             onCollapse = { vm.collapse() },
                             hazeState = hazeState,
+                            expandedT = expandedT,
                             // A horizontal swipe on the hero card steps to the neighbouring car too.
                             onSwipeCar = { dir ->
                                 garageScope.launch {
