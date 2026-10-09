@@ -159,7 +159,6 @@ fun AnimatedSlider(
 
     Box(
         Modifier
-            .blockPageSwipe()
             .fillMaxWidth()
             .height(thumbH)
             // No motion blur: a blurred render target reads as the slider going low-resolution.

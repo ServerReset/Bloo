@@ -191,7 +191,7 @@ fun MorphSegmented(
 
     val gap = 4.dp
     Box(
-        modifier = modifier.blockPageSwipe().fillMaxWidth().clip(trackShape).background(containerColor)
+        modifier = modifier.fillMaxWidth().clip(trackShape).background(containerColor)
             .then(if (borderColor != null) Modifier.border(BorderStroke(1.dp, borderColor), trackShape) else Modifier),
     ) {
         val gapPx = with(androidx.compose.ui.platform.LocalDensity.current) { gap.toPx() }
