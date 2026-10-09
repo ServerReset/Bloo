@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -86,7 +87,24 @@ internal fun HotspotSlot(
             SinglePebble(primaryPebble, v, stateSource, vm, Modifier)
         }
 
-        // SECONDARY SLOT (Bottom) - User-selectable
+        // SECONDARY SLOT (Bottom) - User-selectable.
+        //
+        // The drop zone is the WHOLE secondary slot, so its geometry is registered here whether the
+        // slot is empty or already holds a pin (dropping over a pin replaces it), and the hover glow
+        // covers exactly the slot rather than only the empty placeholder.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                // A glow ring over the whole slot while a dragged pebble hovers it, so the drop
+                // target reads clearly even when the slot already holds a pin.
+                .then(
+                    if (hovered) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(PebbleCornerCollapsed))
+                    else Modifier,
+                )
+                .onGloballyPositioned {
+                    hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
+                },
+        ) {
         if (secondaryPebble != null) {
             // Secondary slot is occupied - show the pebble with removal option
             var lifted by remember(secondaryPebble) { mutableStateOf(false) }
@@ -145,11 +163,7 @@ internal fun HotspotSlot(
             // just that drop target's resting/hover affordance.
             if (unpinned.isNotEmpty()) {
                 PopVisible(visible = true, sizeAnimated = true) {
-                Box(
-                    Modifier.onGloballyPositioned {
-                        hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
-                    },
-                ) {
+                Box(Modifier.fillMaxWidth()) {
                     // Animated, not snapped: the zone glows as the dragged pebble comes over it.
                     val container by androidx.compose.animation.animateColorAsState(
                         if (hovered) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
@@ -184,6 +198,7 @@ internal fun HotspotSlot(
                 }
                 }
             }
+        }
         }
     }
 }
