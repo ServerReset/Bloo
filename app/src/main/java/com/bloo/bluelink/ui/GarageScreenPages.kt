@@ -65,7 +65,7 @@ internal fun CollapsedGaragePager(
         val wrap = rememberWrapPager(total, initialItem)
         val pager = wrap.pager
         fun realItem(virtualPage: Int) = wrap.real(virtualPage)
-        LaunchedEffect(pager, total, perPage) {
+        LaunchedEffect(pager, total, perPage, expandedIdx) {
             snapshotFlow { pager.settledPage }.collect { page ->
                 // Same fade/scale transition the expanded single-car pager above uses (see its own
                 // comment for why: the continuous offset is read only inside graphicsLayer{} below,
@@ -73,7 +73,11 @@ internal fun CollapsedGaragePager(
                 val real = realItem(page)
                 // Settings or the zero-car status slot is not a car selection; currentIndex keeps
                 // its car.
-                if (real < count) vm.selectIndex(real)
+                if (real < count) {
+                    vm.selectIndex(real)
+                    // In full screen, paging to another car keeps that car the expanded one.
+                    if (expandedIdx != null) vm.expand(real)
+                }
                 // Settings counts as "on screen" if it sits in ANY of the visible columns, not just
                 // the first: on a multi-column layout the search bar expands whenever Settings is
                 // showing.
@@ -125,7 +129,7 @@ internal fun CollapsedGaragePager(
                 state = pager,
                 modifier = Modifier.fillMaxSize().hazeSource(hazeState)
                     .onSizeChanged { boxWidthPx = it.width },
-                userScrollEnabled = expandedIdx == null,
+                userScrollEnabled = true,
                 pageSize = androidx.compose.foundation.pager.PageSize.Fixed(pageWidth),
                 // Never a flat 1: perPage + 2*beyond pages are composed at once, and if that
                 // exceeds `total` two virtual pages resolve to the same real item (e.g. Settings
@@ -158,21 +162,25 @@ internal fun CollapsedGaragePager(
                     } else if (count == 0) {
                         // No cars: the status card takes the one other slot (Guard.kt).
                         GarageStatusCard(state, vm, hazeState = hazeState)
-                    } else if (real == expandedIdx) {
-                        // The expanded car: the SAME page, reflowing its pebbles from under the hero
-                        // to beside it as expandedT runs, while it grows to take the whole width.
+                    } else if (canExpand) {
+                        // Wide (tablet): EVERY car page is the same two-column content, reflowing by
+                        // expandedT. The hero is always photo-open with a single trailing button: "go
+                        // full screen" while one column, "leave full screen" once expanded. Paging
+                        // between cars keeps working in either state.
                         ExpandedCar(
                             vehicles[real], state, vm,
                             flipped = false,
+                            onExpand = { vm.expand(real) },
                             onCollapse = { vm.collapse() },
                             expandedT = expandedT,
+                            forceHero = true,
                             hazeState = hazeState,
                         )
                     } else {
                         val gv = vehicles[real]
                         VehicleDetailContent(
                             gv, state, vm,
-                            onExpand = if (canExpand) ({ vm.expand(real) }) else null,
+                            onExpand = null,
                             hazeState = hazeState,
                         )
                     }

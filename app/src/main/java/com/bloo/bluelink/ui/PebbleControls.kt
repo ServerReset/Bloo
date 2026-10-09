@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -71,7 +72,13 @@ internal fun CriticalContent(
      * cars" gesture.
      */
     modifier: Modifier = Modifier,
+    /** Fires the hero's one trailing button while collapsed ("go full screen"). */
+    onExpand: (() -> Unit)? = null,
     onCollapse: (() -> Unit)? = null,
+    /** True once expanded, so the trailing button becomes "leave full screen". */
+    expanded: Boolean = false,
+    /** Force the photo open and drop the hero's own chevron (the wide grid always shows the photo). */
+    forceHero: Boolean = false,
 ) {
     // Narrow derived reads, one per thing the hero draws, so unrelated UiState emissions don't
     // recompose it.
@@ -90,16 +97,17 @@ internal fun CriticalContent(
         v, status, imageUrl, hasBattery, hasFuel, vm,
         modifier = modifier,
         drivingLabel = drivingLabel, metric = metric, photoExpanded = photoExpanded,
-        // Full screen always shows the car photo; the user's own choice is remembered and restored
-        // when the phone collapses back.
-        forcedExpanded = true,
-        expandAction = onCollapse?.let {
-            // The full-screen toggle replaces the hero's own expand/collapse chevron here.
+        // The wide view always shows the car photo; the user's own choice is remembered and restored
+        // on the phone.
+        forcedExpanded = forceHero,
+        // ONE trailing button: "go full screen" while collapsed, "leave full screen" once expanded.
+        // The hero's own expand/collapse chevron is replaced by it.
+        expandAction = (if (expanded) onCollapse else onExpand)?.let { action ->
             PebbleHeaderAction(
                 label = "",
-                icon = Icons.Filled.FullscreenExit,
-                contentDescription = "Back to all cars",
-                onClick = it,
+                icon = if (expanded) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                contentDescription = if (expanded) "Leave full screen" else "Go full screen",
+                onClick = action,
             )
         },
     )

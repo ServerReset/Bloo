@@ -107,6 +107,10 @@ internal fun ExpandedCar(
     vm: AppViewModel,
     flipped: Boolean,
     onCollapse: () -> Unit,
+    /** The hero's single trailing button shows "go full screen" while collapsed; this fires. */
+    onExpand: (() -> Unit)? = null,
+    /** Force the hero photo open and drop its own chevron (the wide grid always shows the photo). */
+    forceHero: Boolean = false,
     /**
      * Switch to the neighbouring car, -1 = previous / +1 = next -- two-finger-free car swapping
      * driven by a horizontal swipe on the hero card itself (see [CriticalContent]'s own
@@ -139,7 +143,6 @@ internal fun ExpandedCar(
     // (left/right) that currently is: the leftScroll/rightScroll pairing below always keeps this
     // same ScrollState paired with the same content across a flip -- which is what makes it the
     // right thing for the badge's own tap-to-scroll-to-top.
-    val controlsScroll = rememberScrollState()
     val pebblesScroll = rememberScrollState()
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -149,7 +152,13 @@ internal fun ExpandedCar(
         // is what makes switching cars register reliably -- the old manual threshold handler used to
         // consume some drags and miss others.
         CarHeaderRow(v, state, hazeState = hazeState)
-        CriticalContent(v, state, vm, onCollapse = onCollapse)
+        CriticalContent(
+            v, state, vm,
+            onExpand = onExpand,
+            onCollapse = onCollapse,
+            expanded = expandedT >= 0.5f,
+            forceHero = forceHero,
+        )
         HotspotSlot(v, hotspots, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
