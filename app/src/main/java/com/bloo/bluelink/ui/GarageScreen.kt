@@ -5,8 +5,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -140,9 +138,11 @@ internal fun GarageScreen(
         AnimatedContent(
             targetState = expandedIdx != null,
             transitionSpec = {
+                // A plain cross-fade, no scale: the reflow of the pebbles (under the hero -> beside
+                // it) is the motion that carries the expand, so the screen itself must not also
+                // "arrive" as a new surface.
                 val spec = spring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
-                (fadeIn(spec) + scaleIn(spec, initialScale = 0.94f)) togetherWith
-                    (fadeOut(spec) + scaleOut(spec, targetScale = 0.94f))
+                fadeIn(spec) togetherWith fadeOut(spec)
             },
             label = "expand",
         ) { isExpanded ->
