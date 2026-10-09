@@ -1,17 +1,21 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Watch
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -33,8 +37,11 @@ private enum class WatchSetupStep { Prepare, Pair, Install, Done }
 
 /**
  * "Set up watch". The watch app is not on Google Play and never will be, so the first install goes
- * over the watch's own Wireless debugging: the phone pairs with it, downloads the watch APK from
- * the project's builds, and sideloads it ([WatchAdbInstaller]). Nothing is typed into a computer.
+ * over the watch's own Wireless debugging: the phone pairs with it, streams the watch APK from the
+ * project's builds, and sideloads it ([WatchAdbInstaller]). Nothing is typed into a computer.
+ *
+ * The APK is prefetched in the background the moment the flow opens, so by the time pair and connect
+ * are done the push is quick. The bytes are dropped when the dialog leaves.
  */
 @Composable
 internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
@@ -51,9 +58,29 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
     LaunchedEffect(Unit) {
         installer = withContext(Dispatchers.Default) { runCatching { WatchAdbInstaller() }.getOrNull() }
     }
+
+    // Prefetched watch APK: downloaded in the background while the user is still pairing.
+    var apk by remember { mutableStateOf<ByteArray?>(null) }
+    var downloadProgress by remember { mutableFloatStateOf(0f) }
+    var downloadError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(installer, apkUrl) {
+        val held = installer ?: return@LaunchedEffect
+        val url = apkUrl ?: return@LaunchedEffect
+        if (apk != null) return@LaunchedEffect
+        downloadError = null
+        held.download(url) { downloadProgress = it }
+            .onSuccess { apk = it }
+            .onFailure { downloadError = it.message }
+    }
+
     DisposableEffect(installer) {
         val held = installer
-        onDispose { if (held != null) Thread { runCatching { held.close() } }.start() }
+        onDispose {
+            if (held != null) Thread { runCatching { held.close() } }.start()
+            // Drop the prefetched APK with the dialog: nothing keeps several MB of it resident after
+            // the install, success or not.
+            apk = null
+        }
     }
 
     var step by remember { mutableStateOf(WatchSetupStep.Prepare) }
@@ -64,6 +91,14 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     var failed by remember { mutableStateOf(false) }
+    var installProgress by remember { mutableFloatStateOf(0f) }
+
+    // The "have you done this" checklist on the first step; Start stays disabled until all are ticked,
+    // so the user is not dropped into a pair screen unprepared.
+    var checkedWifi by remember { mutableStateOf(false) }
+    var checkedDebug by remember { mutableStateOf(false) }
+    var checkedPair by remember { mutableStateOf(false) }
+    val checklistReady = checkedWifi && checkedDebug && checkedPair
 
     fun report(result: Result<Unit>, ok: () -> Unit) {
         busy = false
@@ -83,34 +118,61 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                         if (watch != null) {
                             "${watch?.name?.ifBlank { "Your watch" }} is already connected to $phoneName. Bloo can send the latest watch app straight to it."
                         } else {
-                            "Bloo for Wear isn't on Google Play. $phoneName installs it over the watch's Wireless debugging instead. On the watch:"
+                            "Bloo for Wear isn't on Google Play. $phoneName installs it over the watch's Wireless debugging instead. It takes a few minutes; you can leave this open."
                         },
                     )
                     if (watch == null) {
-                        BodyMediumText("1. Join the same Wi-Fi as this phone.")
-                        BodyMediumText("2. Settings → System → About → Versions, tap Build number seven times.")
-                        BodyMediumText("3. Settings → Developer options → turn on Wireless debugging, then tap Pair new device.")
+                        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                            BodyMediumText("On the watch, tick each of these:")
+                            ToggleRow("It's on the same Wi-Fi as this phone", checkedWifi) { checkedWifi = it }
+                            ToggleRow("Developer options are on (About → tap Build number 7×)", checkedDebug) { checkedDebug = it }
+                            ToggleRow("Wireless debugging is ON", checkedPair) { checkedPair = it }
+                        }
                     }
                 }
                 WatchSetupStep.Pair -> {
-                    BodyMediumText("Type in what the watch's \"Pair new device\" screen shows.")
+                    BodyMediumText("Open \"Pair new device\" on the watch and type in what it shows.")
                     SetupField(host, { host = it }, "Watch IP address", KeyboardType.Uri)
                     Row(horizontalArrangement = Arrangement.spacedBy(GapRow)) {
                         SetupField(pairPort, { pairPort = it.filter(Char::isDigit) }, "Pairing port", KeyboardType.Number, Modifier.weight(1f))
-                        SetupField(code, { code = it.filter(Char::isDigit).take(6) }, "Pairing code", KeyboardType.Number, Modifier.weight(1f))
+                        SetupField(code, { code = it.filter(Char::isDigit).take(6) }, "Wi-Fi pairing code", KeyboardType.Number, Modifier.weight(1f))
                     }
-                }
-                WatchSetupStep.Install -> {
-                    BodyMediumText("Paired. Back on the Wireless debugging screen, enter the port shown under the IP address (it is NOT the pairing port).")
-                    SetupField(connectPort, { connectPort = it.filter(Char::isDigit) }, "Connection port", KeyboardType.Number)
                     BodySmallText(
-                        "If connecting fails: keep the Wireless debugging screen open (the port changes " +
-                            "when you leave it), and make sure the watch and phone are on the same Wi‑Fi. A " +
-                            "watch on its own mobile/Bluetooth network can't be reached this way.",
+                        "That code is six digits. The pairing port is the one NEXT TO it, not the port on " +
+                            "the Wireless debugging screen behind it.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                WatchSetupStep.Done -> BodyMediumText("Bloo is installed on the watch. Open it there and it will connect to $phoneName. You can turn Wireless debugging off again.")
+                WatchSetupStep.Install -> {
+                    BodyMediumText("Back on the watch's main Wireless debugging screen, type the port shown under the IP address (NOT the pairing port).")
+                    SetupField(connectPort, { connectPort = it.filter(Char::isDigit) }, "Connection port", KeyboardType.Number)
+                    if (downloadError != null) {
+                        BodySmallText("Couldn't fetch the watch app: $downloadError", color = MaterialTheme.colorScheme.error)
+                    } else if (busy) {
+                        // The install itself streams several MB over ADB, which is the slow part; show
+                        // a bar so it does not look hung.
+                        LinearProgressIndicator(
+                            progress = { if (installProgress in 0.01f..0.99f) installProgress else 1f },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else if (apk == null) {
+                        BodySmallText("Fetching the watch app… ${(downloadProgress * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        LinearProgressIndicator(progress = { downloadProgress }, modifier = Modifier.fillMaxWidth())
+                    }
+                    BodySmallText(
+                        "Keep the watch's Wireless debugging screen open the whole time (the port changes " +
+                            "when you leave it), and stay on the same Wi-Fi.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                WatchSetupStep.Done -> {
+                    BodyMediumText("Bloo is installed on the watch. Open it there and it will connect to $phoneName.")
+                    // The security nudge the flow was missing: turn the debug port back off.
+                    BodySmallText(
+                        "Now turn Wireless debugging OFF on the watch (Developer options), so its debug port is not left open.",
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
             status?.let {
                 Text(
@@ -135,7 +197,13 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                         emphasis = ButtonEmphasis.Confirm,
                     )
                 } else if (watch == null) {
-                    MorphActionButton("Wireless debugging is on", Icons.Filled.Watch, { step = WatchSetupStep.Pair }, Modifier.fillMaxWidth())
+                    MorphActionButton(
+                        label = "Wireless debugging is on",
+                        icon = Icons.Filled.Watch,
+                        onClick = { step = WatchSetupStep.Pair },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = checklistReady,
+                    )
                 }
                 WatchSetupStep.Pair -> MorphActionButton(
                     label = "Pair",
@@ -157,27 +225,24 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                 WatchSetupStep.Install -> MorphActionButton(
                     label = "Install Bloo",
                     icon = Icons.Filled.Watch,
-                    enabled = ready && connectPort.isNotBlank() && apkUrl != null,
+                    enabled = ready && connectPort.isNotBlank() && apk != null,
                     pending = busy,
                     onClick = {
                         val held = installer ?: return@MorphActionButton
-                        val url = apkUrl ?: return@MorphActionButton
+                        val bytes = apk ?: return@MorphActionButton
                         busy = true
                         failed = false
+                        installProgress = 0.15f
                         scope.launch {
                             status = "Connecting…"
                             val connected = held.connectTo(host, connectPort.toInt()).let { primary ->
-                                // The port under "Pair new device" is NOT the connection port, but it
-                                // is the one people paste here, and some watches accept it anyway.
-                                // Try it before failing so that mix-up does not dead-end the install.
                                 if (primary.isSuccess || pairPort.isBlank() || pairPort == connectPort) primary
                                 else held.connectTo(host, pairPort.toInt())
                             }
                             if (connected.isFailure) return@launch report(connected) {}
-                            status = "Downloading the watch app…"
-                            val apk = held.download(url).getOrElse { return@launch report(Result.failure(it)) {} }
                             status = "Installing on the watch…"
-                            report(held.install(apk)) { step = WatchSetupStep.Done; status = null }
+                            installProgress = 0.55f
+                            report(held.install(bytes)) { step = WatchSetupStep.Done; status = null; apk = null }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -185,7 +250,11 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                 )
                 WatchSetupStep.Done -> Unit
             }
-            MorphTextButton(if (step == WatchSetupStep.Done) "Done" else "Close", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+            SafeMorphTextButton(
+                text = if (step == WatchSetupStep.Done) "Done" else "Close",
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+            )
         },
     )
 }

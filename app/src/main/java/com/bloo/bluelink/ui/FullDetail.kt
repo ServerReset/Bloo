@@ -5,7 +5,6 @@ package com.bloo.bluelink.ui
  * car), [ExpandedCar] (the wide dual-column detail), and their shared [CarHeaderRow] fact-chip row.
  */
 
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,33 +40,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import dev.chrisbanes.haze.HazeState
-import kotlin.math.abs
-
-/**
- * Horizontal-swipe-to-switch-cars: once the drag passes a sixth of the node's own width it fires
- * [onSwipeCar] (+1 for a left drag = next car, -1 for a right drag = previous) and re-arms.
- * [ExpandedCar] hangs this on the two non-column surfaces of its page -- the hero card and the
- * header chips row -- so a swipe on the card or on the background changes car, exactly as asked,
- * while every other horizontal drag still belongs to the column pager.
- */
-internal fun Modifier.carSwipe(onSwipeCar: (Int) -> Unit): Modifier = pointerInput(onSwipeCar) {
-    var accum = 0f
-    detectHorizontalDragGestures(
-        onDragEnd = { accum = 0f },
-        onDragCancel = { accum = 0f },
-    ) { change, dragAmount ->
-        change.consume()
-        accum += dragAmount
-        if (abs(accum) > size.width / 6f) {
-            onSwipeCar(if (accum < 0f) 1 else -1)
-            accum = 0f
-        }
-    }
-}
 
 // --- Full detail ----------------------------------------------------------
 
@@ -163,13 +138,12 @@ internal fun ExpandedCar(
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val controls: @Composable ColumnScope.() -> Unit = {
-        // The header chips row is chrome, not a column card, so it reads as "background" -- swiping
-        // it switches cars (same modifier the hero card itself carries), rather than scrolling the
-        // column pager like any card below it would.
-        Box(Modifier.carSwipe(onSwipeCar)) {
-            CarHeaderRow(v, state, hazeState = hazeState)
-        }
-        CriticalContent(v, state, vm, onCollapse = onCollapse, modifier = Modifier.carSwipe(onSwipeCar))
+        // No bespoke swipe handler here any more: the car pager one level up owns every horizontal
+        // swipe (the columns scroll vertically only, so a horizontal drag falls through to it). This
+        // is what makes switching cars register reliably -- the old manual threshold handler used to
+        // consume some drags and miss others.
+        CarHeaderRow(v, state, hazeState = hazeState)
+        CriticalContent(v, state, vm, onCollapse = onCollapse)
         HotspotSlot(v, hotspots, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {

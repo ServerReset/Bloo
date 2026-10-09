@@ -80,14 +80,30 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
         )
     }
 
-    suspend fun download(url: String): Result<ByteArray> = withContext(Dispatchers.IO) {
+    suspend fun download(url: String, onProgress: (Float) -> Unit = {}): Result<ByteArray> = withContext(Dispatchers.IO) {
         runCatching {
             // The app's one shared OkHttp stack (ApiHttp), not a throwaway client per call -- same
             // connection pooling and timeouts every other network call uses.
             com.bloo.bluelink.data.ApiHttp.client.newCall(Request.Builder().url(url).get().build())
                 .execute().use { resp ->
                     check(resp.isSuccessful) { "Download failed (HTTP ${resp.code})" }
-                    resp.body.bytes()
+                    val body = resp.body ?: error("Download failed (empty body)")
+                    val total = body.contentLength()
+                    // Stream to a buffer so progress can be reported; `body.bytes()` gives no ticks and
+                    // a multi-MB watch APK over Wi-Fi is slow enough that a frozen bar looks hung.
+                    val source = body.source()
+                    val buffer = okio.Buffer()
+                    var read = 0L
+                    val chunk = okio.Buffer()
+                    while (true) {
+                        val n = source.read(chunk, 64 * 1024)
+                        if (n == -1L) break
+                        read += n
+                        buffer.write(chunk, n)
+                        if (total > 0L) onProgress((read.toFloat() / total).coerceIn(0f, 1f))
+                    }
+                    onProgress(1f)
+                    buffer.readByteArray()
                 }
         }
     }
