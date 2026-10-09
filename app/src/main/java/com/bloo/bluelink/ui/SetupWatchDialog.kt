@@ -114,18 +114,18 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
         text = {
             when (step) {
                 WatchSetupStep.Prepare -> {
-                    BodyMediumText(
-                        if (watch != null) {
-                            "${watch?.name?.ifBlank { "Your watch" }} is already connected to $phoneName. Bloo can send the latest watch app straight to it."
-                        } else {
-                            "Bloo for Wear isn't on Google Play. $phoneName installs it over the watch's Wireless debugging instead. It takes a few minutes; you can leave this open."
-                        },
-                    )
-                    if (watch == null) {
+                    if (watch != null) {
+                        BodyMediumText("${watch?.name?.ifBlank { "Your watch" }} is already connected to $phoneName. Bloo can send the latest watch app straight to it.")
+                    } else {
+                        BodyMediumText("Bloo for Wear isn't on Google Play, so $phoneName installs it over the watch's own Wireless debugging. Do this ON THE WATCH:")
+                        BodyMediumText("1. Swipe down from the watch face → tap the gear (Settings).")
+                        BodyMediumText("2. Settings → System → About → tap \"Build number\" 7 times, until it says you're a developer.")
+                        BodyMediumText("3. Go back → Developer options → turn on \"Wireless debugging\".")
+                        BodyMediumText("4. Check the watch is on the SAME Wi-Fi as this phone (Settings → Connectivity → Wi-Fi).")
+                        BodyMediumText("Tick all three below when they're done:")
                         Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                            BodyMediumText("On the watch, tick each of these:")
-                            ToggleRow("It's on the same Wi-Fi as this phone", checkedWifi) { checkedWifi = it }
-                            ToggleRow("Developer options are on (About → tap Build number 7×)", checkedDebug) { checkedDebug = it }
+                            ToggleRow("Same Wi-Fi as the phone", checkedWifi) { checkedWifi = it }
+                            ToggleRow("Developer options are on", checkedDebug) { checkedDebug = it }
                             ToggleRow("Wireless debugging is ON", checkedPair) { checkedPair = it }
                         }
                     }

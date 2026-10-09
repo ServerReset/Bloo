@@ -103,7 +103,15 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
                         if (total > 0L) onProgress((read.toFloat() / total).coerceIn(0f, 1f))
                     }
                     onProgress(1f)
-                    buffer.readByteArray()
+                    val bytes = buffer.readByteArray()
+                    // A ZIP/APK starts with "PK\u0003\u0004". If the asset URL served an HTML error or
+                    // login page (which OkHttp happily returns as 200), installing those bytes is what
+                    // produced INSTALL_PARSE_FAILED_NO_CERTIFICATES on the watch -- fail clearly here
+                    // instead.
+                    check(
+                        bytes.size >= 4 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte(),
+                    ) { "The download wasn't a valid watch app (got ${bytes.size} bytes)" }
+                    bytes
                 }
         }
     }
