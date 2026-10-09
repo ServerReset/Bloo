@@ -94,16 +94,33 @@ internal fun Modifier.entrance(key: String): Modifier {
  * away), read only in the draw phase so a drag never recomposes. [strength] scales the whole
  * effect: the onboarding deck uses 1, ordinary paging a gentler fraction.
  */
+/**
+ * The app's page-turn: a page shrinks, leans away, drops and dims as it leaves the centre of a
+ * pager. [offset] is the page's distance from its OWN resting slot as a fraction of a page
+ * (-0.5..0.5), read only in the draw phase so a drag never recomposes. Taking the FRACTIONAL distance
+ * (not the whole-page distance) is what lets this run on grids too: every page is perfectly flat at
+ * rest, including the neighbours that are fully visible in a multi-column layout. [strength] scales
+ * the whole effect.
+ */
 internal fun Modifier.pageTurn(offset: () -> Float, strength: Float = 1f): Modifier = graphicsLayer {
-    val o = offset()
-    val away = kotlin.math.abs(o).coerceIn(0f, 1f)
-    // The leaving page leans away, drops a little and dims; the arriving one leans back in.
-    val scale = 1f - 0.06f * strength * away
+    val o = offset().coerceIn(-0.5f, 0.5f)
+    val away = (kotlin.math.abs(o) * 2f).coerceIn(0f, 1f)
+    val scale = 1f - 0.09f * strength * away
     scaleX = scale
     scaleY = scale
     alpha = 1f - 0.55f * strength * away
-    rotationY = o * 22f * strength
-    translationY = away * 10.dp.toPx() * strength
+    rotationY = o * 2f * 26f * strength
+    translationY = away * 12.dp.toPx() * strength
     // A distant camera keeps the tilt a clean foreshortening with no clipped top/bottom corners.
-    cameraDistance = 420.dp.toPx()
+    cameraDistance = 360.dp.toPx()
+}
+
+/**
+ * A pager page's distance from its own resting slot, as a fraction of a page (-0.5..0.5). [raw] is
+ * `currentPage - page + offsetFraction`; taking the fractional part is what makes a page flat at rest
+ * (see [pageTurn]).
+ */
+internal fun pageOffsetFraction(currentPage: Int, page: Int, pageOffsetFraction: Float): Float {
+    val raw = (currentPage - page) + pageOffsetFraction
+    return raw - kotlin.math.round(raw).toFloat()
 }

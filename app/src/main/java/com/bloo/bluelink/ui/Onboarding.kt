@@ -370,7 +370,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
                             .pageTurn(
-                                offset = { (deck.currentPage - idx) + deck.currentPageOffsetFraction },
+                                offset = { pageOffsetFraction(deck.currentPage, idx, deck.currentPageOffsetFraction) },
                                 strength = 0.7f,
                             )
                             .padding(horizontal = GapPage, vertical = GapGroup),

@@ -73,7 +73,7 @@ private val SpinnerSize = 44.dp
 private val RestBelowStatusBar = 12.dp
 
 /** How much further (in disc-travel fractions) a pull past the arm point keeps going, resisted. */
-private const val OverPullTravel = 0.18f
+private const val OverPullTravel = 0.35f
 
 /** The single floating indicator. */
 @Composable
@@ -85,6 +85,12 @@ internal fun PullRefreshIndicatorHost(
     // Held once the pull is released into a refresh (either the real flag or the synchronous
     // request), driven by the finger otherwise.
     val active = state.refreshing || state.requested
+    // Past the arm point the pull keeps travelling further, but resisted (a rubber band), so the disc
+    // can be pulled BELOW its resting spot and then springs back up onto it on release.
+    val pullRaw = state.pull.value
+    val raw = pullRaw.coerceIn(0f, 1f)
+    val over = (pullRaw - 1f).coerceAtLeast(0f)
+    val finger = raw + over / (1f + over) * OverPullTravel
     // The disc is driven DIRECTLY by the finger while pulling (1:1, no spring lag), and only
     // springs for the refreshing endpoint -- a pull that trails the finger on a spring reads as
     // disconnected.
@@ -95,10 +101,12 @@ internal fun PullRefreshIndicatorHost(
     LaunchedEffect(active) {
         if (active) {
             retracting = false
-            // Continue from wherever the finger left the disc, so it never jumps back to the top
-            // and re-drops.
-            if (refreshSpring.value < 0.01f) refreshSpring.snapTo(state.pull.value.coerceIn(0f, 1f))
-            refreshSpring.animateTo(1f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium))
+            // Continue from wherever the finger left the disc -- INCLUDING an over-pull below the
+            // resting spot -- so the spring visibly bounces up onto 1 instead of easing flat.
+            if (refreshSpring.value < 0.01f) refreshSpring.snapTo(finger)
+            // Bouncy: an over-pull (dragged below the resting spot) springs back up and settles,
+            // rather than easing flat.
+            refreshSpring.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow))
         } else if (refreshSpring.value > 0.01f) {
             retracting = true
             refreshSpring.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
@@ -125,12 +133,6 @@ internal fun PullRefreshIndicatorHost(
             armed = nowArmed
         }
     }
-    // Past the arm point the pull keeps travelling a little, but resisted (a rubber band), so a
-    // deliberate over-pull still reads as doing something instead of freezing the disc at rest.
-    val pullRaw = state.pull.value
-    val raw = pullRaw.coerceIn(0f, 1f)
-    val over = (pullRaw - 1f).coerceAtLeast(0f)
-    val finger = raw + over / (1f + over) * OverPullTravel
     // While a refresh is in flight (or the disc is springing away) the spring owns the disc;
     // otherwise it tracks the finger 1:1.
     val t = if (active || retracting) refreshSpring.value else finger

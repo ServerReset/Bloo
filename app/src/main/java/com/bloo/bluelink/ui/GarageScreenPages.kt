@@ -67,8 +67,8 @@ internal fun ExpandedGaragePage(
                 // recompose the page.
                 Box(
                     Modifier.fillMaxSize().pageTurn(
-                        offset = { (exPager.currentPage - page) + exPager.currentPageOffsetFraction },
-                        strength = 0.6f,
+                        offset = { pageOffsetFraction(exPager.currentPage, page, exPager.currentPageOffsetFraction) },
+                        strength = 0.75f,
                     ),
                 ) {
                     val pv = vehicles[exWrap.real(page)]
@@ -199,10 +199,10 @@ internal fun CollapsedGaragePager(
                         // as it leaves the centre. Read in the draw phase, so a drag never
                         // recomposes the page.
                         .pageTurn(
-                            offset = { (pager.currentPage - page) + pager.currentPageOffsetFraction },
-                            // Only when one car fills the screen: with several columns in view the
-                            // tilt would leave a resting neighbour leaning at an angle.
-                            strength = if (perPage <= 1) 0.5f else 0f,
+                            offset = { pageOffsetFraction(pager.currentPage, page, pager.currentPageOffsetFraction) },
+                            // Full strength for every layout now: the offset is the FRACTIONAL
+                            // distance, so a fully visible neighbour rests flat instead of leaning.
+                            strength = 0.75f,
                         ),
                 ) {
                     if (real == slots) {

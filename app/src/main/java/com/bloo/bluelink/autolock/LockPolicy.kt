@@ -12,10 +12,13 @@ sealed interface LockDecision {
 object LockPolicy {
     fun decide(status: VehicleStatus): LockDecision = when {
         status.doorLock == true -> LockDecision.Skip("Already locked")
-        status.doorLock == null -> LockDecision.Skip("Lock state unknown")
         status.engine == true -> LockDecision.Skip("Engine running")
         status.doorOpen?.anyOpen == true -> LockDecision.Skip("A door is open")
         status.windowOpen?.anyOpen == true -> LockDecision.Skip("A window is open")
+        // doorLock == null (unknown) still locks. Locking an already-locked car is a harmless no-op,
+        // and some head units -- notably ccNC (the newer Hyundai/Genesis/Kia platform) -- don't report
+        // a lock state in the status payload at all, so requiring one meant AutoLock silently never
+        // fired on those cars while working fine on Gen5W.
         else -> LockDecision.Lock
     }
 }
