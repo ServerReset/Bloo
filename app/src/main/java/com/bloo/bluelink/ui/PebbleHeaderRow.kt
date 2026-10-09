@@ -41,6 +41,14 @@ import kotlin.math.floor
 import kotlin.math.max
 
 /**
+ * Minimum width the header leaves for the title before the action button may take the rest. Zero on
+ * purpose: the title column is weighted and truncates, so it already yields to the button, and any
+ * fixed floor here (this was 140dp) subtracts from a narrow card's button cap and forces icon-only
+ * even when there is obvious room.
+ */
+private val HeaderActionTitleFloor = 0.dp
+
+/**
  * The pebble's header row: glyph, title, summary, and at the far end the split action button or the
  * chevron.
  */
@@ -67,11 +75,13 @@ internal fun PebbleHeaderRow(
     val haptics = LocalHaptics.current
     val density = LocalDensity.current
     // Header: tap anywhere to toggle, long-press to drag-reorder; the action button and chevron
-    // handle their own clicks. headerActionMaxWidth reserves room for the icon, gaps, padding and a
-    // 140dp title floor before SplitExpandButton gets the rest, so the button compacts (and the
-    // text keeps priority) when the title and status compete.
+    // handle their own clicks. headerActionMaxWidth reserves room for the icon, gaps and a small
+    // title floor before SplitExpandButton gets the rest. The floor is deliberately small because
+    // the title column is WEIGHTED: it already takes whatever the button leaves, so a large fixed
+    // floor (this was 140dp) left the button a near-zero cap on a narrow card and forced it to
+    // icon-only even with obvious room beside a short title like "Charge".
     val headerActionMaxWidth = (
-        rowWidthDp - 16.dp - 20.dp - ButtonIconGap - 10.dp - 12.dp - 140.dp
+        rowWidthDp - 16.dp - 20.dp - ButtonIconGap - 10.dp - 12.dp - HeaderActionTitleFloor
         ).coerceAtLeast(0.dp)
     Row(
         Modifier
