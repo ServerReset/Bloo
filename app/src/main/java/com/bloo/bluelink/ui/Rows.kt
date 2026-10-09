@@ -74,7 +74,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.max
-import com.bloo.uicommon.blockPageSwipe
 
 /**
  * Crash-free crop: pinch-zoom + drag the picked image inside a 16:9 frame, then export the framed
@@ -349,7 +348,9 @@ internal fun SettingsCaption(
 @Composable
 private fun Modifier.hapticToggleable(checked: Boolean, onChange: (Boolean) -> Unit): Modifier {
     val haptics = LocalHaptics.current
-    return blockPageSwipe().toggleable(
+    // No blockPageSwipe: a sideways drag from a toggle swipes the page (a real tap is inside the
+    // touch slop, so the toggle still wins).
+    return toggleable(
         value = checked,
         interactionSource = remember { MutableInteractionSource() },
         indication = null,

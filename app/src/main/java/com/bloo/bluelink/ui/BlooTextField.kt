@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.blockPageSwipe
 
 /**
  * The app's one text field. Anything else is the stock [OutlinedTextField]'s, and a caller that
@@ -43,7 +42,7 @@ internal fun BlooTextField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier.blockPageSwipe(),
+        modifier = modifier,
         label = label,
         placeholder = placeholder,
         leadingIcon = leadingIcon,

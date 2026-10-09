@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.blockPageSwipe
 
 /**
  * Small shared composables built on UiTokens: text styles, icon badges, dividers, and
@@ -201,7 +200,9 @@ internal fun Modifier.noRippleClickable(onClickLabel: String? = null, onClick: (
 
 /**
  * Tappable modifier for non-[MorphButton] controls: [noRippleClickable] plus the shared click
- * haptic.
+ * haptic. Deliberately does NOT block the page swipe: a finger that lands here and then moves
+ * sideways is swiping the page, not tapping the control, and the only way to tell those apart is to
+ * let the drag reach the pager. A real tap never exceeds the touch slop, so the tap still wins.
  */
 @Composable
 internal fun Modifier.hapticClickable(
@@ -210,6 +211,5 @@ internal fun Modifier.hapticClickable(
 ): Modifier {
     val haptics = LocalHaptics.current
     val source = remember { MutableInteractionSource() }
-    return blockPageSwipe()
-        .clickable(interactionSource = source, indication = null, onClickLabel = onClickLabel) { haptics?.click(); onClick() }
+    return clickable(interactionSource = source, indication = null, onClickLabel = onClickLabel) { haptics?.click(); onClick() }
 }
