@@ -141,7 +141,10 @@ class EuApi(private val brand: Brand) {
     /** [apiHeaders] plus the bearer access token, device id and CCS2-support flag. */
     internal fun Request.Builder.authHeaders(session: EuSession, ccs2: Int): Request.Builder =
         apiHeaders()
-            .header("Authorization", "Bearer ${session.accessToken}")
+            // Strip any prefix a stored session may still carry from the old CCI bug, so an existing
+            // login is corrected on its first call instead of needing a re-login ("Bearer Bearer ..."
+            // is rejected with a 403).
+            .header("Authorization", "Bearer " + session.accessToken.removePrefix("Bearer ").trim())
             .header("ccsp-device-id", session.deviceId)
             .header("Ccuccs2protocolsupport", ccs2.toString())
 
@@ -207,7 +210,10 @@ class EuApi(private val brand: Brand) {
             .toString().toRequestBody(jsonMedia)
         val req = Request.Builder().url(userApi + "pin?token=")
             .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer ${session.accessToken}")
+            // Strip any prefix a stored session may still carry from the old CCI bug, so an existing
+            // login is corrected on its first call instead of needing a re-login ("Bearer Bearer ..."
+            // is rejected with a 403).
+            .header("Authorization", "Bearer " + session.accessToken.removePrefix("Bearer ").trim())
             .header("Host", host)
             .header("Accept-Encoding", "gzip")
             .header("User-Agent", USER_AGENT_OKHTTP)

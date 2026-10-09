@@ -41,6 +41,11 @@ class EuApiTest {
         )
         val header = with(api) { Request.Builder().url("https://example.com/").authHeaders(session, 0) }.build().header("Authorization")
         assertEquals("Bearer ccs-access-token", header)
+        // A session saved before the fix carries the prefix too; the header must correct it rather
+        // than emit "Bearer Bearer ..." and force a re-login.
+        val legacy = session.copy(accessToken = "Bearer ccs-access-token")
+        val legacyHeader = with(api) { Request.Builder().url("https://example.com/").authHeaders(legacy, 0) }.build().header("Authorization")
+        assertEquals("Bearer ccs-access-token", legacyHeader)
     }
 
     // ---- plug detection: ConnectorFastening.State, not ChargingDoor.State ----
