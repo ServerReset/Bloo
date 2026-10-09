@@ -91,7 +91,7 @@ internal fun ChargeSegmentBar(
     var limitSeen by remember { mutableStateOf(false) }
     // Read here, at composable scope, not inline inside the LaunchedEffect below --
     // lowPowerAwareSpring is itself @Composable, so it can't be called from a suspend lambda.
-    val limitSpring = lowPowerAwareSpring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow)
+    val limitSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
     LaunchedEffect(limit) {
         val target = (limit ?: return@LaunchedEffect) / 100f
         if (limitSeen) {

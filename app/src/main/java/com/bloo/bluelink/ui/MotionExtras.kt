@@ -97,12 +97,13 @@ internal fun Modifier.entrance(key: String): Modifier {
 internal fun Modifier.pageTurn(offset: () -> Float, strength: Float = 1f): Modifier = graphicsLayer {
     val o = offset()
     val away = kotlin.math.abs(o).coerceIn(0f, 1f)
-    val scale = 1f - 0.10f * strength * away
+    // The leaving page leans away, drops a little and dims; the arriving one leans back in.
+    val scale = 1f - 0.06f * strength * away
     scaleX = scale
     scaleY = scale
-    alpha = 1f - 0.45f * strength * away
-    rotationY = o * 20f * strength
-    // A very distant camera keeps the projection near-orthographic: the page still turns (its far
-    // edge narrows and dims), but its corners no longer swing off the top and bottom of the screen.
-    cameraDistance = 800.dp.toPx()
+    alpha = 1f - 0.55f * strength * away
+    rotationY = o * 22f * strength
+    translationY = away * 10.dp.toPx() * strength
+    // A distant camera keeps the tilt a clean foreshortening with no clipped top/bottom corners.
+    cameraDistance = 420.dp.toPx()
 }

@@ -135,7 +135,12 @@ internal fun chargeReadoutOf(
 internal fun animatedChargeFrac(target: Float): Float {
     val frac by animateFloatAsState(
         targetValue = target,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        // Critically damped. This was SoftDamping (0.82) at low stiffness, which is UNDERdamped, so
+        // the fill visibly overshot the real charge and bounced back before settling.
+        animationSpec = lowPowerAwareSpring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
         label = "chargeFill",
     )
     return frac
