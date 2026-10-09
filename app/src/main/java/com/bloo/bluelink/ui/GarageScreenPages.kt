@@ -42,12 +42,17 @@ internal fun ExpandedGaragePage(
     columnsFlipped: Boolean,
     garageScope: CoroutineScope,
 ) {
+        // Cars, then Settings as the final page, cycling forever -- the same shape as the collapsed
+        // pager, so Settings is always one swipe past the last car in full screen too.
+        val total = count + 1
         // Full-screen car; infinite wrap-around via a huge virtual range mapped back with modulo.
-        val exWrap = rememberWrapPager(count, (expandedIdx ?: 0).coerceIn(0, count - 1))
+        val exWrap = rememberWrapPager(total, (expandedIdx ?: 0).coerceIn(0, count - 1))
         val exPager = exWrap.pager
-        LaunchedEffect(exPager) {
-            snapshotFlow { exPager.settledPage }.collect {
-                vm.expand(exWrap.real(it))
+        LaunchedEffect(exPager, total) {
+            snapshotFlow { exPager.settledPage }.collect { page ->
+                val real = exWrap.real(page)
+                // The Settings page has no car index to expand to; the expanded car just stays put.
+                if (real < count) vm.expand(real)
                 exWrap.recenterIfNearEdge()
             }
         }
@@ -59,10 +64,11 @@ internal fun ExpandedGaragePage(
                 // resolving to one car crash. count + wrap means pages composed = 1 + 2 * beyond <=
                 // count.
                 userScrollEnabled = true,
-                beyondViewportPageCount = ((count - 1) / 2).coerceIn(0, 1),
+                beyondViewportPageCount = ((total - 1) / 2).coerceIn(0, 1),
                 pageSize = androidx.compose.foundation.pager.PageSize.Fill,
                 key = { page -> page },
             ) { page ->
+                val real = exWrap.real(page)
                 // Pager offset is read only in graphicsLayer{} (draw phase) so drags never
                 // recompose the page.
                 Box(
@@ -71,23 +77,27 @@ internal fun ExpandedGaragePage(
                         strength = 0.75f,
                     ),
                 ) {
-                    val pv = vehicles[exWrap.real(page)]
-                    ExpandedCar(
-                        pv,
-                        state,
-                        vm,
-                        flipped = columnsFlipped,
-                        onCollapse = { vm.collapse() },
-                        hazeState = hazeState,
-                        // A horizontal swipe on the hero card steps to the neighbouring car too.
-                        onSwipeCar = { dir ->
-                            garageScope.launch {
-                                exPager.animateScrollToPage(
-                                    (exPager.currentPage + dir).coerceIn(0, exPager.pageCount - 1),
-                                )
-                            }
-                        },
-                    )
+                    if (real >= count) {
+                        SettingsScreen(vm)
+                    } else {
+                        val pv = vehicles[real]
+                        ExpandedCar(
+                            pv,
+                            state,
+                            vm,
+                            flipped = columnsFlipped,
+                            onCollapse = { vm.collapse() },
+                            hazeState = hazeState,
+                            // A horizontal swipe on the hero card steps to the neighbouring car too.
+                            onSwipeCar = { dir ->
+                                garageScope.launch {
+                                    exPager.animateScrollToPage(
+                                        (exPager.currentPage + dir).coerceIn(0, exPager.pageCount - 1),
+                                    )
+                                }
+                            },
+                        )
+                    }
                 }
             }
             // Stays active mid-drag so it never disappears while swiping.
