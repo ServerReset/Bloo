@@ -190,7 +190,16 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
                 drivingLabel = heroState.drivingLabel(v), metric = metric,
                 photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
                 expandAction = onExpand?.let {
-                    PebbleHeaderAction(label = "Expand to full screen", icon = Icons.Filled.Fullscreen, onClick = it)
+                    // Icon-only, like the collapse action on the dual-column view: the label here is
+                    // a whole sentence ("Expand to full screen"), so a visible label both reads
+                    // wrong and made the button overlap the title. contentDescription carries it to
+                    // TalkBack.
+                    PebbleHeaderAction(
+                        label = "",
+                        icon = Icons.Filled.Fullscreen,
+                        contentDescription = "Expand to full screen",
+                        onClick = it,
+                    )
                 },
             )
         }
