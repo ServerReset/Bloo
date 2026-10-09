@@ -164,14 +164,20 @@ internal fun HotspotSlot(
             if (unpinned.isNotEmpty()) {
                 PopVisible(visible = true, sizeAnimated = true) {
                 Box(Modifier.fillMaxWidth()) {
-                    // Animated, not snapped: the zone glows as the dragged pebble comes over it.
+                    // Animated, not snapped: the zone glows as the dragged pebble comes over it. At
+                    // rest it is a faint dashed-looking outline, not a solid fill, so it reads as an
+                    // empty slot rather than another card.
                     val container by androidx.compose.animation.animateColorAsState(
-                        if (hovered) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                        if (hovered) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
                         label = "hotspotFill",
                     )
                     val contentTone by androidx.compose.animation.animateColorAsState(
                         if (hovered) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                         label = "hotspotTone",
+                    )
+                    val outline by androidx.compose.animation.animateColorAsState(
+                        if (hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        label = "hotspotOutline",
                     )
                     val highlight by animateFloatAsState(if (hovered) 1f else 0f, label = "hotspotLift")
                     Surface(
@@ -183,6 +189,7 @@ internal fun HotspotSlot(
                         shape = RoundedCornerShape(PebbleCornerCollapsed),
                         color = container,
                         contentColor = contentTone,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, outline),
                     ) {
                         Box(
                             Modifier.fillMaxWidth().padding(vertical = GapPage, horizontal = GapGroup),

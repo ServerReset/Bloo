@@ -159,7 +159,11 @@ internal fun ExpandedCar(
             expanded = expandedT >= 0.5f,
             forceHero = forceHero,
         )
-        HotspotSlot(v, hotspots, state, vm)
+        // The hot-seat pin slot belongs to the full-screen view only: in the collapsed grid every car
+        // is a single narrow column, and a drop target there reads as clutter.
+        if (expandedT >= 0.5f) {
+            HotspotSlot(v, hotspots, state, vm)
+        }
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
         // Pinned pebbles in the hotspot are excluded from the reorderable list
