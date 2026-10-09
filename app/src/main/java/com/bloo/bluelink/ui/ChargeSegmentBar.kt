@@ -61,13 +61,20 @@ internal fun ChargeSegmentBar(
 ) {
     val scheme = MaterialTheme.colorScheme
     val limit = limitPct?.takeIf { it in 1..99 }
-    val trackColor = if (collapsed) heroOnPhoto().copy(alpha = 0.28f) else scheme.onSurface.copy(alpha = 0.16f)
+    // The trailing track has to read against whatever is ACTUALLY behind the bar, and that flips with
+    // the state:
+    //  - collapsed, the card is its plain surface (no photo), so the track is the surface's own
+    //    content tone -- dark on a light card, light on a dark one;
+    //  - expanded, the bar sits on the photo and its scrim, and the scrim is the theme's OPPOSITE
+    //    tone (black in light, white in dark), so the track is the on-photo colour.
+    // These two were swapped, which left the track nearly invisible in every combination.
+    val trackColor = if (collapsed) scheme.onSurface.copy(alpha = 0.20f) else heroOnPhoto().copy(alpha = 0.30f)
     // The past-the-limit zone. The trailing (dimmed) segments FLIP between collapsed and expanded,
     // on top of the theme's own inversion.
     val darkCardBehind = appIsDarkTheme() == collapsed
     val heavyScrim = darkCardBehind
     val farBackdropColor = if (heavyScrim) Color.White.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.24f)
-    val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else scheme.onSurface.copy(alpha = 0.14f)
+    val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else Color.Black.copy(alpha = 0.14f)
     // Springing both gradient stops gives that moment an actual transition instead of a colour
     // popping mid-draw.
     val fillDark by androidx.compose.animation.animateColorAsState(
