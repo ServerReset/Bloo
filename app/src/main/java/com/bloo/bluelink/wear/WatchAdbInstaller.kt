@@ -95,8 +95,12 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
     /** Stream [apk] into the package installer on the connected watch, then open the app. */
     suspend fun install(apk: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
+            // The output side MUST be closed (`use`), not merely flushed: `cmd package install -S`
+            // reads exactly the stated byte count off the stream, and leaving it open truncated the
+            // APK -- which surfaced as INSTALL_PARSE_FAILED_NO_CERTIFICATES ("null array" reading the
+            // certs of a half-written base.apk) rather than as a short write.
             val reply = openStream("exec:cmd package install -r -S ${apk.size}").use { stream ->
-                stream.openOutputStream().apply { write(apk); flush() }
+                stream.openOutputStream().use { it.write(apk) }
                 stream.openInputStream().bufferedReader().readText()
             }
             check(reply.contains("Success")) { reply.trim().ifBlank { "The watch didn't accept the install" } }
