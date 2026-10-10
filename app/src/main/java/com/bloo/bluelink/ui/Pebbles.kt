@@ -96,6 +96,9 @@ internal fun PebbleList(
     ReorderColumn(
         items = sections,
         keyOf = { it },
+        // Only the full-screen view lets a pebble be carried sideways (to the hot seat); in the
+        // grid/single column it reorders vertically only.
+        allowHorizontalDrag = pinHotspot,
         onReorder = { newVisible ->
             // Merge the reordered visible items back into the full section order so excluded ones
             // (the pinned hot-spot pebbles, summary, hidden) keep their slots instead of being

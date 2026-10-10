@@ -159,6 +159,8 @@ private fun PinnedPebble(
         spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
         label = "pickScale",
     )
+    // Fades out as the pebble flies back toward the stack on unpin.
+    val exitAlpha = remember(secondaryPebble) { Animatable(1f) }
     fun release() {
         dragging = false
         val dx = dragX.floatValue
@@ -168,6 +170,9 @@ private fun PinnedPebble(
             settleY.snapTo(dy)
             if (dx > unpinPx) {
                 haptics?.heavy()
+                // Fly the rest of the way out to the right (toward the stack), fading, then unpin.
+                launch { exitAlpha.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) }
+                settleX.animateTo(dx + unpinPx, spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow))
                 // Toggle: the same section is already the secondary pin, so this unpins it.
                 vm.setHotspot(v, secondaryPebble)
             } else {
@@ -187,6 +192,7 @@ private fun PinnedPebble(
                 translationY = y
                 scaleX = pickScale
                 scaleY = pickScale
+                alpha = exitAlpha.value
             }
             .pointerInput(secondaryPebble) {
                 detectDragGesturesAfterLongPress(

@@ -73,6 +73,13 @@ fun <T> ReorderColumn(
     onReorder: (List<T>) -> Unit,
     modifier: Modifier = Modifier,
     spacing: Dp = 12.dp,
+    /**
+     * Whether the dragged item may follow the finger sideways as well as up/down. False in the
+     * single-column/grid views, where a pebble only reorders vertically (a sideways drift there read
+     * as the whole column lurching); true in the full-screen view, where a pebble is carried across
+     * to the hot seat.
+     */
+    allowHorizontalDrag: Boolean = false,
     onDragMove: ((key: Any, windowPointer: Offset) -> Unit)? = null,
     onDragRelease: ((key: Any) -> Boolean)? = null,
     /** Window-coords target to fly the released item to when [onDragRelease] handled it. */
@@ -97,6 +104,7 @@ fun <T> ReorderColumn(
     val dragReleaseTargetNow by rememberUpdatedState(dragReleaseTarget)
     val onDragReleaseCommitNow by rememberUpdatedState(onDragReleaseCommit)
     val onDragCancelNow by rememberUpdatedState(onDragCancel)
+    val allowHorizontalNow by rememberUpdatedState(allowHorizontalDrag)
     val scope = rememberCoroutineScope()
     var order by remember { mutableStateOf(items) }
     var draggingKey by remember { mutableStateOf<Any?>(null) }
@@ -216,7 +224,7 @@ fun <T> ReorderColumn(
                         onDrag = { change, dragAmount ->
                             change.consume()
                             offsetY += dragAmount.y
-                            offsetX += dragAmount.x
+                            if (allowHorizontalNow) offsetX += dragAmount.x
                             handleCoords.value?.takeIf { it.isAttached }?.let {
                                 onDragMoveNow?.invoke(k, it.localToWindow(change.position))
                             }
