@@ -5,6 +5,12 @@ package com.bloo.bluelink.ui
  * car), [ExpandedCar] (the wide dual-column detail), and their shared [CarHeaderRow] fact-chip row.
  */
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -140,6 +146,9 @@ internal fun ExpandedCar(
     val pebblesScroll = rememberScrollState()
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // Full screen (two columns): the hot seat is shown and its pinned pebbles are pulled out of the
+    // stack. Collapsed (one column): it is hidden and they go back into the stack.
+    val expanded = expandedT >= 0.5f
     val controls: @Composable ColumnScope.() -> Unit = {
         // No bespoke swipe handler here any more: the car pager one level up owns every horizontal
         // swipe (the columns scroll vertically only, so a horizontal drag falls through to it). This
@@ -150,17 +159,24 @@ internal fun ExpandedCar(
             v, state, vm,
             onExpand = onExpand,
             onCollapse = onCollapse,
-            expanded = expandedT >= 0.5f,
+            expanded = expanded,
             forceHero = forceHero,
         )
-        // The hot seat is always present, so its pinned tiles never vanish when the car collapses
-        // back to the grid. Only the empty "drag a pebble here" affordance is full-screen-only (a
-        // per-car drop target in the grid reads as clutter).
-        HotspotSlot(v, hotspots, state, vm, expanded = expandedT >= 0.5f)
+        // The hot seat lives only in the full-screen two-column view. When the car collapses back to
+        // one column it slides away and its pinned pebbles return to their normal places in the stack
+        // below (see the `pebbles` block's `pinHotspot`), so nothing is ever lost.
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn(tween(MotionShort)) + slideInHorizontally(tween(MotionShort)) { it / 3 },
+            exit = fadeOut(tween(MotionShort)) + slideOutHorizontally(tween(MotionShort)) { it / 3 },
+        ) {
+            HotspotSlot(v, hotspots, state, vm)
+        }
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
-        // Pinned pebbles in the hotspot are excluded from the reorderable list
-        PebbleList(v, state, vm, exclude = setOf("summary"))
+        // Pinned pebbles are pulled out of the stack only while the hot seat renders them (full
+        // screen); collapsed, they are ordinary members of the list again.
+        PebbleList(v, state, vm, exclude = setOf("summary"), pinHotspot = expanded)
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }) {
