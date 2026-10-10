@@ -16,7 +16,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -156,15 +158,20 @@ internal fun HotspotSlot(
         ) {
             val section = secondaryPebble ?: leavingSecondary
             if (section != null) {
-                PinnedPebble(
-                    v, stateSource, vm, section, hotDrag,
-                    interactive = secondaryPebble != null,
-                    onUnpinStart = { unpinning = true },
-                    onUnpinCommit = {
-                        vm.setHotspot(v, section)
-                        unpinning = false
-                    },
-                )
+                Column {
+                    // The same gap the stack uses between pebbles, so the hot seat reads as the same
+                    // column of pebbles -- not two cards jammed together.
+                    Spacer(Modifier.height(GapGroup))
+                    PinnedPebble(
+                        v, stateSource, vm, section, hotDrag,
+                        interactive = secondaryPebble != null,
+                        onUnpinStart = { unpinning = true },
+                        onUnpinCommit = {
+                            vm.setHotspot(v, section)
+                            unpinning = false
+                        },
+                    )
+                }
             }
         }
 
@@ -188,7 +195,11 @@ internal fun HotspotSlot(
                 animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium),
             ),
         ) {
-            EmptyDropZone(hotDrag, hovered)
+            Column {
+                // Same gap as the stack; part of the zone, so it retreats with it.
+                Spacer(Modifier.height(GapGroup))
+                EmptyDropZone(hotDrag, hovered)
+            }
         }
     }
 }
