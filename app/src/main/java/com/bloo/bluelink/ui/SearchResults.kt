@@ -219,20 +219,9 @@ internal fun SettingsSearchResults(
     val resolvedCommand = command
     if (resolvedCommand != null) {
         val ctx = LocalContext.current
-        // Whole-word, longest-match car resolution, not a bare substring test ("Ioniq" must not
-        // match inside "Ioniq 5"). Ties at the longest length are ambiguous: refuse and ask which
-        // car.
+        // Which car the command names (whole-word, longest match; see resolveCommandTarget).
         val targetVehicle = remember(submittedQuery, state.vehicles) {
-            val q = submittedQuery.lowercase()
-            val nameMatches = state.vehicles.filter { v ->
-                v.name.isNotBlank() &&
-                    Regex("\\b" + Regex.escape(v.name.lowercase()) + "\\b").containsMatchIn(q)
-            }
-            val longestMatchLen = nameMatches.maxOfOrNull { it.name.length }
-            val namedVehicle = nameMatches.filter { it.name.length == longestMatchLen }.singleOrNull()
-            // Fall back to "the one car" only when NO name matched; an ambiguous match must not
-            // pick one.
-            namedVehicle ?: if (nameMatches.isEmpty()) state.vehicles.singleOrNull() else null
+            resolveCommandTarget(submittedQuery, state.vehicles)
         }
         var actionResult by remember(submittedQuery) { mutableStateOf<String?>(null) }
         var actionRunning by remember(submittedQuery) { mutableStateOf(false) }

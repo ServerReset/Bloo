@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
+import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.degLabel
 import kotlin.math.max
@@ -208,4 +209,22 @@ What is the user most likely trying to do? Answer with ONLY the command name (e.
         // Fall back to the original parse result.
         null
     }
+}
+
+/**
+ * Which car a recognised command's text refers to: the one whose name whole-word matches the query,
+ * honoured by longest name so a car called "Ioniq 5" wins over one merely called "Ioniq". Ties at
+ * the longest length are ambiguous and refuse. When no name matches, the sole vehicle if there is
+ * exactly one; otherwise null so the caller asks which car. Pure, so it can be unit-tested.
+ */
+internal fun resolveCommandTarget(query: String, vehicles: List<Vehicle>): Vehicle? {
+    val q = query.lowercase()
+    val nameMatches = vehicles.filter { v ->
+        v.name.isNotBlank() &&
+            Regex("\\b" + Regex.escape(v.name.lowercase()) + "\\b").containsMatchIn(q)
+    }
+    val longestMatchLen = nameMatches.maxOfOrNull { it.name.length }
+    val namedVehicle = nameMatches.filter { it.name.length == longestMatchLen }.singleOrNull()
+    // Fall back to "the one car" only when NO name matched; an ambiguous match must not pick one.
+    return namedVehicle ?: if (nameMatches.isEmpty()) vehicles.singleOrNull() else null
 }
