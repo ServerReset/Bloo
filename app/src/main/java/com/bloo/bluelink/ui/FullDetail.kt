@@ -34,8 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import dev.chrisbanes.haze.HazeState
@@ -155,21 +153,14 @@ internal fun ExpandedCar(
             expanded = expandedT >= 0.5f,
             forceHero = forceHero,
         )
-        // The hot-seat pin slot belongs to the full-screen view only: in the collapsed grid every car
-        // is a single narrow column, and a drop target there reads as clutter.
-        if (expandedT >= 0.5f) {
-            HotspotSlot(v, hotspots, state, vm)
-        }
+        // The hot seat is always present, so its pinned tiles never vanish when the car collapses
+        // back to the grid. Only the empty "drag a pebble here" affordance is full-screen-only (a
+        // per-car drop target in the grid reads as clutter).
+        HotspotSlot(v, hotspots, state, vm, expanded = expandedT >= 0.5f)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
         // Pinned pebbles in the hotspot are excluded from the reorderable list
         PebbleList(v, state, vm, exclude = setOf("summary"))
-    }
-    // One block's own width: half the widest the content ever gets (the expanded two columns), held
-    // CONSTANT through the animation so the reflow only ever moves the blocks, never re-wraps them.
-    val blockWidth = with(LocalDensity.current) {
-        val full = minOf(LocalWindowInfo.current.containerSize.width.toDp() - ScreenGutter * 2, 960.dp)
-        ((full - GapSection) / 2).coerceAtLeast(1.dp)
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }) {
@@ -187,7 +178,6 @@ internal fun ExpandedCar(
                 Spacer(Modifier.height(topInset))
                 ReflowPair(
                     expandedT = expandedT,
-                    blockWidth = blockWidth,
                     lead = { Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) { controls() } },
                     trail = { Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) { pebbles() } },
                 )

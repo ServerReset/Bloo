@@ -1,7 +1,10 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.border
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -31,18 +35,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.uicommon.ReorderColumn
 import kotlin.math.abs
 
-/** The dual-column "hot spot": slots under the car-info column for pinned pebbles. */
+/**
+ * The car-info column's "hot seat": the one or two pebbles pinned under the hero.
+ *
+ * Always rendered, so its pinned pebbles never vanish when a wide car collapses back to one column;
+ * only the empty "drag a pebble here" affordance is full-screen-only ([expanded]), since a per-car
+ * drop target in the grid would read as clutter.
+ *
+ * The whole seat is spring-driven: it leans 1.5% toward the finger while a dragged pebble hovers it,
+ * the drop zone's fill/outline/tone cross-fade, and a pebble pinned or unpinned pops in/out on the
+ * shared bounce spring.
+ */
 @Composable
 internal fun HotspotSlot(
     v: Vehicle,
@@ -50,162 +62,166 @@ internal fun HotspotSlot(
     /** State SOURCE. Reading it here confines that to this slot. */
     stateSource: State<UiState>,
     vm: AppViewModel,
+    /** Full-screen view: show the empty drop-zone affordance when the second slot is free. */
+    expanded: Boolean = true,
 ) {
-    // Derived, not `val state = stateSource.value`: same reason as PebbleList's own — a body read
-    // subscribes this whole dual-column view to every UiState emission. The list compare below then
-    // makes an unrelated emission free.
+    // Derived, not `val state = stateSource.value`: a body read subscribes this whole dual-column
+    // view to every UiState emission. The list compare below then makes an unrelated emission free.
     val allAvailable by remember(v.vin) {
         derivedStateOf {
             val state = stateSource.value
-            state.sectionsFor(v).filter {
-                it != "summary" && state.isSectionAvailable(v, it)
-            }
+            state.sectionsFor(v).filter { it != "summary" && state.isSectionAvailable(v, it) }
         }
     }
-    val haptics = LocalHaptics.current
     val hotDrag = LocalHotSeatDrag.current
     val hovered = hotDrag?.overSlot == true
+    val dragging = hotDrag?.section != null
+    val haptics = LocalHaptics.current
+    // A soft tick the moment the dragged pebble first crosses into the drop zone.
+    LaunchedEffect(hovered) { if (hovered) haptics?.tick() }
 
-    // Primary slot pebble (defaults to "controls" with lights/horn)
+    // Primary slot pebble (defaults to "controls" with lights/horn); permanently pinned.
     val primaryPebble = hotspots.firstOrNull() ?: "controls"
-
-    // Secondary slot pebble (if any)
+    // Secondary slot pebble (if any).
     val secondaryPebble = hotspots.getOrNull(1)
-
-    // Available pebbles not yet pinned
+    // Available pebbles not yet pinned.
     val unpinned = remember(primaryPebble, secondaryPebble, allAvailable) {
         allAvailable.filter { it != primaryPebble && it != secondaryPebble }
     }
 
-    // 12dp between the two slots, the SAME gap every other pair of pebbles in this view sits at
-    // (ReorderColumn's own default spacing for the pebble list, and ExpandedCar's
-    // `spacedBy(GapGroup)` for the column this slot lives in).
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-        // PRIMARY SLOT (Top) - Always "controls" (lights/horn), permanently pinned No removal
-        // option - this slot is hardcoded and locked
+    // The seat leans toward the finger while a pebble is over it, then springs back.
+    val seatScale by animateFloatAsState(
+        targetValue = if (hovered) 1.015f else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
+        label = "hotSeatScale",
+    )
+    Column(
+        Modifier.fillMaxWidth().graphicsLayer { scaleX = seatScale; scaleY = seatScale },
+        verticalArrangement = Arrangement.spacedBy(GapGroup),
+    ) {
+        // PRIMARY SLOT: always "controls" (lights/horn), hardcoded, no removal.
         CompositionLocalProvider(LocalForceExpanded provides true) {
             SinglePebble(primaryPebble, v, stateSource, vm, Modifier)
         }
 
-        // SECONDARY SLOT (Bottom) - User-selectable.
-        //
-        // The drop zone is the WHOLE secondary slot, so its geometry is registered here whether the
-        // slot is empty or already holds a pin (dropping over a pin replaces it), and the hover glow
-        // covers exactly the slot rather than only the empty placeholder.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                // A glow ring over the whole slot while a dragged pebble hovers it, so the drop
-                // target reads clearly even when the slot already holds a pin.
-                .then(
-                    if (hovered) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(PebbleCornerCollapsed))
-                    else Modifier,
-                )
-                .onGloballyPositioned {
-                    hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
-                },
-        ) {
-        if (secondaryPebble != null) {
-            // Secondary slot is occupied - show the pebble with removal option
-            var lifted by remember(secondaryPebble) { mutableStateOf(false) }
-            var dragY by remember(secondaryPebble) { mutableFloatStateOf(0f) }
-            val lift by animateFloatAsState(if (lifted) 1.03f else 1f, label = "unpinLift")
+        val showSecondary = secondaryPebble != null || (unpinned.isNotEmpty() && (expanded || dragging))
+        if (showSecondary) {
+            HotSeatSecondary(v, stateSource, vm, hotDrag, hovered, secondaryPebble)
+        }
+    }
+}
 
+/** The second hot-seat slot: a pinned pebble (removable) or, in full screen, the empty drop zone. */
+@Composable
+private fun HotSeatSecondary(
+    v: Vehicle,
+    stateSource: State<UiState>,
+    vm: AppViewModel,
+    hotDrag: HotSeatDrag?,
+    hovered: Boolean,
+    secondaryPebble: String?,
+) {
+    val haptics = LocalHaptics.current
+    // The drop-zone colours, shared by the empty affordance and the hover glow so a pebble dropped
+    // over an existing pin reads the same as one dropped into an empty slot.
+    val fill by animateColorAsState(
+        if (hovered) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        label = "hotseatFill",
+    )
+    val tone by animateColorAsState(
+        if (hovered) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "hotseatTone",
+    )
+    val outline by animateColorAsState(
+        if (hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+        label = "hotseatOutline",
+    )
+    val lift by animateFloatAsState(if (hovered) 1f else 0f, label = "hotseatLift")
+
+    Box(
+        Modifier.fillMaxWidth().onGloballyPositioned {
+            hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
+        },
+    ) {
+        if (secondaryPebble != null) {
+            // Occupied: show the pebble with a long-press-drag-to-unpin affordance.
+            var pulled by remember(secondaryPebble) { mutableStateOf(false) }
+            var dragDistance by remember(secondaryPebble) { mutableFloatStateOf(0f) }
+            val pullScale by animateFloatAsState(
+                if (pulled) 1.04f else 1f,
+                spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
+                label = "unpinPull",
+            )
             PopVisible(visible = true, sizeAnimated = true) {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = GapRow),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Filled.PushPin,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp),
-                        tint = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(GapRow))
-                    Text(
-                        if (lifted) "Release to unpin" else sectionLabel(secondaryPebble),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    MorphTextButton("Remove", onClick = { vm.setHotspot(v, secondaryPebble) }, emphasis = ButtonEmphasis.Deny)
-                }
-                CompositionLocalProvider(LocalForceExpanded provides true) {
-                    Box(
-                        Modifier
-                            .graphicsLayer { scaleX = lift; scaleY = lift }
-                            .pointerInput(secondaryPebble) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = { dragY = 0f; lifted = true; haptics?.tick() },
-                                    onDrag = { change, amt -> change.consume(); dragY += abs(amt.x) + abs(amt.y) },
-                                    onDragEnd = {
-                                        lifted = false
-                                        if (dragY > 56f) { haptics?.heavy(); vm.setHotspot(v, secondaryPebble) }
-                                    },
-                                    onDragCancel = { lifted = false },
-                                )
-                            },
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = GapRow),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        SinglePebble(secondaryPebble, v, stateSource, vm, Modifier)
+                        Icon(
+                            Icons.Filled.PushPin,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = if (pulled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.width(GapRow))
+                        Text(
+                            if (pulled) "Release to unpin" else sectionLabel(secondaryPebble),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (pulled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        MorphTextButton("Remove", onClick = { vm.setHotspot(v, secondaryPebble) }, emphasis = ButtonEmphasis.Deny)
                     }
-                }
-            }
-            }
-        } else {
-            // Secondary slot is empty. Dragging a pebble here -- from the reorderable list in the
-            // other column -- is what pins it (see PebbleList's onDragRelease); this surface is
-            // just that drop target's resting/hover affordance.
-            if (unpinned.isNotEmpty()) {
-                PopVisible(visible = true, sizeAnimated = true) {
-                Box(Modifier.fillMaxWidth()) {
-                    // Animated, not snapped: the zone glows as the dragged pebble comes over it. At
-                    // rest it is a faint dashed-looking outline, not a solid fill, so it reads as an
-                    // empty slot rather than another card.
-                    val container by androidx.compose.animation.animateColorAsState(
-                        if (hovered) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
-                        label = "hotspotFill",
-                    )
-                    val contentTone by androidx.compose.animation.animateColorAsState(
-                        if (hovered) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                        label = "hotspotTone",
-                    )
-                    val outline by androidx.compose.animation.animateColorAsState(
-                        if (hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                        label = "hotspotOutline",
-                    )
-                    val highlight by animateFloatAsState(if (hovered) 1f else 0f, label = "hotspotLift")
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().graphicsLayer {
-                            val s = 1f + 0.02f * highlight
-                            scaleX = s
-                            scaleY = s
-                        },
-                        shape = RoundedCornerShape(PebbleCornerCollapsed),
-                        color = container,
-                        contentColor = contentTone,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, outline),
-                    ) {
+                    CompositionLocalProvider(LocalForceExpanded provides true) {
                         Box(
-                            Modifier.fillMaxWidth().padding(vertical = GapPage, horizontal = GapGroup),
-                            contentAlignment = Alignment.Center,
+                            Modifier
+                                .graphicsLayer { scaleX = pullScale; scaleY = pullScale }
+                                .pointerInput(secondaryPebble) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = { dragDistance = 0f; pulled = true; haptics?.tick() },
+                                        onDrag = { change, amt -> change.consume(); dragDistance += abs(amt.x) + abs(amt.y) },
+                                        onDragEnd = {
+                                            pulled = false
+                                            if (dragDistance > 56f) { haptics?.heavy(); vm.setHotspot(v, secondaryPebble) }
+                                        },
+                                        onDragCancel = { pulled = false },
+                                    )
+                                },
                         ) {
-                            MorphButtonLabel(
-                                Icons.Filled.PushPin,
-                                if (hovered) "Release to pin" else "Drag a pebble here",
-                                pending = false,
-                            )
+                            SinglePebble(secondaryPebble, v, stateSource, vm, Modifier)
                         }
                     }
                 }
+            }
+        } else {
+            // Empty (full screen only): the drop target's resting / hover affordance.
+            PopVisible(visible = true, sizeAnimated = true) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().graphicsLayer {
+                        val s = 1f + 0.025f * lift
+                        scaleX = s
+                        scaleY = s
+                    },
+                    shape = RoundedCornerShape(PebbleCornerCollapsed),
+                    color = fill,
+                    contentColor = tone,
+                    border = BorderStroke(1.dp, outline),
+                ) {
+                    Box(
+                        Modifier.fillMaxWidth().padding(vertical = GapPage, horizontal = GapGroup),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        MorphButtonLabel(
+                            Icons.Filled.PushPin,
+                            if (hovered) "Release to pin" else "Drag a pebble here",
+                            pending = false,
+                        )
+                    }
                 }
             }
-        }
         }
     }
 }
