@@ -2,8 +2,6 @@ package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.rethrowIfCancellation
 import androidx.compose.foundation.layout.only
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.Vehicle

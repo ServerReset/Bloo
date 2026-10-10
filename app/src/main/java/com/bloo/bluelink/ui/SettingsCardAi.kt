@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.setAiEnabled
 

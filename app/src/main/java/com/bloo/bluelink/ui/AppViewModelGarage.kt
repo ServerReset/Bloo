@@ -16,7 +16,6 @@ import com.bloo.bluelink.data.defaultClimatePreset
 import com.bloo.bluelink.data.isCarConfigured
 import com.bloo.bluelink.data.lastVehicleVin
 import com.bloo.bluelink.data.onboardingSeen
-import com.bloo.bluelink.data.powertrain
 import com.bloo.bluelink.data.snapshot
 import com.bloo.bluelink.data.vehicleOrder
 
