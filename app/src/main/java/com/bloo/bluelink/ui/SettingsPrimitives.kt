@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,11 +36,19 @@ internal fun Modifier.outlinedPanel(padding: Dp = 12.dp): Modifier =
         .border(1.dp, hairlineColor(), StandardShape)
         .padding(padding)
 
-/** A titled sub-group inside a settings card: a heading, then its controls, in an outlined box. */
+/**
+ * A titled sub-group inside a settings card: a heading, then its controls, on its own filled card.
+ * A filled card (a tonal fill plus the shared frosted rim), not a bare outlined box, so the groups
+ * read as cards sitting inside the card's box rather than boxes nested in a box.
+ */
 @Composable
 internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        Modifier.fillMaxWidth().outlinedPanel(),
+        Modifier.fillMaxWidth()
+            .clip(StandardShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.30f), StandardShape)
+            .glassRim(StandardShape)
+            .padding(GapSection),
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         Text(
