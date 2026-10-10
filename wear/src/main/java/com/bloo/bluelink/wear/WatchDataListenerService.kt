@@ -50,7 +50,7 @@ class WatchDataListenerService : WearableListenerService() {
     private suspend fun installPushedApk(asset: com.google.android.gms.wearable.Asset) {
         val bytes = runCatching {
             com.google.android.gms.wearable.Wearable.getDataClient(applicationContext)
-                .getFdForAsset(asset).await().inputStream?.use { it.readBytes() }
+                .getFdForAsset(asset).await().inputStream.use { it.readBytes() }
         }.getOrNull() ?: return
         val file = WearDataLayerSync.writePushedApk(applicationContext, bytes) ?: return
         installDownloadedApk(applicationContext, file)

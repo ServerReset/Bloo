@@ -66,7 +66,7 @@ object ResponseFraming {
  */
 fun okhttp3.Response.bodyWithSlowReadLog(): String {
     val startedAt = System.currentTimeMillis()
-    val text = body?.string().orEmpty()
+    val text = body.string()
     val bodyReadMs = System.currentTimeMillis() - startedAt
     if (bodyReadMs > 500) {
         AppLog.log(

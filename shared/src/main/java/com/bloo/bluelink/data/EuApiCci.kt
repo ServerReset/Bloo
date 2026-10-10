@@ -47,7 +47,7 @@ internal suspend fun EuApi.loginCci(
         "?response_type=code&client_id=$oneAppClientId&redirect_uri=$oneAppRedirectUri" +
         "&lang=en&state=ccsp&country=${euLoginCountry()}"
     follow.newCall(idp(authorizeUrl).get().build()).execute().use { resp ->
-        val body = runCatching { resp.body?.string().orEmpty() }.getOrDefault("")
+        val body = runCatching { resp.body.string() }.getOrDefault("")
         if (body.contains("abusing", ignoreCase = true)) {
             throw BlueLinkException(
                 "Europe sign-in was blocked by Hyundai's WAF. This is a server-side block, " +

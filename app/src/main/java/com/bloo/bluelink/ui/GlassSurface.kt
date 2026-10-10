@@ -81,7 +81,7 @@ internal fun GlassSurface(
                 .then(
                     when {
                         !canBlur -> Modifier
-                        liquid && hazeState != null -> Modifier.appGlassEffect(hazeState, shape, clear)
+                        liquid -> Modifier.appGlassEffect(hazeState, shape, clear)
                         else -> Modifier.hazeWhenAble(hazeState)
                     },
                 )

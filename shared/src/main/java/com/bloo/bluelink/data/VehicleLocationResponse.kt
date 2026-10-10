@@ -83,7 +83,7 @@ fun VehicleStatus?.toGeoLocation(): GeoLocation? {
     val lat = c.lat
     val lon = c.lon
     return if (lat != null && lon != null) {
-        GeoLocation(lat, lon, this.vehicleLocation?.speed?.value)
+        GeoLocation(lat, lon, this.vehicleLocation.speed?.value)
     } else {
         null
     }

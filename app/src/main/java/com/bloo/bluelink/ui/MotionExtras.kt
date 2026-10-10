@@ -116,5 +116,5 @@ internal fun Modifier.pageTurn(offset: () -> Float, strength: Float = 1f): Modif
  */
 internal fun pageOffsetFraction(currentPage: Int, page: Int, pageOffsetFraction: Float): Float {
     val raw = (currentPage - page) + pageOffsetFraction
-    return raw - kotlin.math.round(raw).toFloat()
+    return raw - kotlin.math.round(raw)
 }

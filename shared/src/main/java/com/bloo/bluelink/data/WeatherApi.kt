@@ -208,7 +208,7 @@ object WeatherApi {
             // early return@use null exits below.
             client.newCall(request).execute().use { resp ->
                 if (!resp.isSuccessful) return@use null
-                val body = resp.body?.string() ?: return@use null
+                val body = resp.body.string()
                 val parsed = json.decodeFromString(Response.serializer(), body)
                 val c = parsed.current ?: return@use null
                 val temp = c.temperature ?: return@use null

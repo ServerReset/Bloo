@@ -87,7 +87,7 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
             com.bloo.bluelink.data.ApiHttp.client.newCall(Request.Builder().url(url).get().build())
                 .execute().use { resp ->
                     check(resp.isSuccessful) { "Download failed (HTTP ${resp.code})" }
-                    val body = resp.body ?: error("Download failed (empty body)")
+                    val body = resp.body
                     val total = body.contentLength()
                     // Stream to a buffer so progress can be reported; `body.bytes()` gives no ticks and
                     // a multi-MB watch APK over Wi-Fi is slow enough that a frozen bar looks hung.

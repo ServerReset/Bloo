@@ -85,7 +85,7 @@ internal fun StatusBarScrim(hazeState: HazeState? = null) {
                         val h = constraints.maxHeight + overscan
                         val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(w, h))
                         layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-overscan, 0) }
-                    }.clip(shape).appGlassEffect(hazeState!!, shape, clear = true)
+                    }.clip(shape).appGlassEffect(hazeState, shape, clear = true)
                 } else {
                     val tint = glassTint(false)
                     Modifier.background(Brush.verticalGradient(listOf(tint.copy(alpha = tint.alpha * 0.5f), Color.Transparent)))

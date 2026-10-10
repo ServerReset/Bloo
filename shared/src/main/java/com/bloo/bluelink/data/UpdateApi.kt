@@ -118,7 +118,7 @@ object UpdateApi {
                 .build()
             client.newCall(request).execute().use { resp ->
                 if (!resp.isSuccessful) return@use null
-                val body = resp.body?.string() ?: return@use null
+                val body = resp.body.string()
                 val releases = json.decodeFromString(ListSerializer(ReleaseResponse.serializer()), body)
                 // "build-<N>" tags from the rolling per-push release; skips drafts and anything
                 // from the separate tagged "vN" release job, which doesn't follow this naming
@@ -173,7 +173,7 @@ object UpdateApi {
                 val request = Request.Builder().url(url).get().build()
                 downloadClient.newCall(request).execute().use { resp ->
                     if (!resp.isSuccessful) return@use false
-                    val responseBody = resp.body ?: return@use false
+                    val responseBody = resp.body
                     val total = responseBody.contentLength()
                     destination.parentFile?.mkdirs()
                     // Write to a temp file first -- a failed/cancelled download overwriting the

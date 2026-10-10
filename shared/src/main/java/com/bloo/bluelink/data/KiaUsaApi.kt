@@ -119,7 +119,7 @@ class KiaUsaApi {
             .apply { rmtoken?.let { header("rmtoken", it) } }
             .build()
         raw(req).use { resp ->
-            val text = resp.body?.string().orEmpty()
+            val text = resp.body.string()
             val sid = resp.header("sid")
             if (sid != null) {
                 // Prefer a freshly-issued rmtoken if the server sent one on this

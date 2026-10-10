@@ -44,7 +44,7 @@ suspend fun KiaUsaApi.verifyOtpAndComplete(
     // re-auth handling).
     val (finalSid, finalRmtoken) = raw(finishReq).use { resp ->
         val sid = resp.header("sid")
-            ?: throw BlueLinkException(friendly(resp.code, resp.body?.string().orEmpty()), code = resp.code)
+            ?: throw BlueLinkException(friendly(resp.code, resp.body.string()), code = resp.code)
         sid to (resp.header("rmtoken") ?: rmtoken)
     }
     KiaSession(finalSid, finalRmtoken, deviceId, pin)

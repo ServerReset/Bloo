@@ -121,7 +121,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                         okhttp3.Request.Builder().url(url).get().build(),
                     ).execute().use { resp ->
                         if (!resp.isSuccessful) error("HTTP ${resp.code}")
-                        resp.body?.bytes() ?: error("empty body")
+                        resp.body.bytes()
                     }
                     val asset = com.google.android.gms.wearable.Asset.createFromBytes(bytes)
                     val req = PutDataMapRequest.create(WatchSyncProtocol.PATH_WATCH_APK).apply {

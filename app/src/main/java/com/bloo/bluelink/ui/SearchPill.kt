@@ -146,7 +146,7 @@ internal fun SearchPill(
                 .glassEdge(pillShape, shadow = !expanded)
                 // appHazeEffect clipped to pillShape explicitly: this chain runs before Surface's
                 // own shape clip, so an unclipped blur would poke past the rounded outline.
-                .then(if (canBlur && hazeState != null) Modifier.clip(pillShape).appGlassEffect(hazeState, pillShape) else Modifier)
+                .then(if (canBlur) Modifier.clip(pillShape).appGlassEffect(hazeState, pillShape) else Modifier)
                 .then(
                     if (onDrag != null) {
                         // Callbacks read via rememberUpdatedState: pointerInput(key) keeps the

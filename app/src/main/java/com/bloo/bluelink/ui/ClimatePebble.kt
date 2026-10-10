@@ -231,12 +231,12 @@ internal fun ClimatePebble(
                     style = MaterialTheme.typography.bodySmall,
                     color = mutedContentColor(),
                 )
-                status?.airTemp?.let { t ->
+                status.airTemp?.let { t ->
                     t.value?.let { StatusRow("Set to", degLabel(it, fahrenheit, t.unit)) }
                 }
-                status?.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
-                status?.steerWheelHeat?.let { StatusRow("Steering wheel heat", onOff(it)) }
-                status?.seatHeaterVentState?.let { s ->
+                status.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
+                status.steerWheelHeat?.let { StatusRow("Steering wheel heat", onOff(it)) }
+                status.seatHeaterVentState?.let { s ->
                     s.flSeatHeatState?.takeIf { it != 0 }?.let { StatusRow("Driver seat", onOff(it)) }
                     s.frSeatHeatState?.takeIf { it != 0 }?.let { StatusRow("Passenger seat", onOff(it)) }
                 }
