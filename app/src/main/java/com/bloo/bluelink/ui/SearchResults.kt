@@ -6,7 +6,6 @@ import com.bloo.bluelink.rethrowIfCancellation
  * the per-result pop-in helper.
  */
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,14 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,18 +25,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.brand
-import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.VehicleCommandRunner
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.settingsMode
 
@@ -218,158 +205,18 @@ internal fun SettingsSearchResults(
     }
     val resolvedCommand = command
     if (resolvedCommand != null) {
-        val ctx = LocalContext.current
-        // Which car the command names (whole-word, longest match; see resolveCommandTarget).
-        val targetVehicle = remember(submittedQuery, state.vehicles) {
-            resolveCommandTarget(submittedQuery, state.vehicles)
-        }
-        var actionResult by remember(submittedQuery) { mutableStateOf<String?>(null) }
-        var actionRunning by remember(submittedQuery) { mutableStateOf(false) }
-        var commandExecuted by remember(submittedQuery) { mutableStateOf(false) }
-        LaunchedEffect(submittedQuery) {
-            if (targetVehicle != null && !commandExecuted) {
-                if (resolvedCommand.cmd == "open_app") {
-                    // Not a car command: launches the OEM companion app (as OwnerLinks does).
-                    val links = targetVehicle.brand.links
-                    openApp(ctx, listOf(links.appPackage), links.playStoreUrl)
-                    actionResult = "Opening ${links.appName}"
-                    commandExecuted = true
-                } else {
-                    actionRunning = true
-                    val result = runCatching { VehicleCommandRunner.run(ctx, targetVehicle.vin, resolvedCommand.cmd, resolvedCommand.climateTarget) }.getOrNull()
-                    actionResult = result?.message ?: "Command failed"
-                    actionRunning = false
-                    vm.refreshStatus(targetVehicle)
-                    commandExecuted = true
-                }
-
-                // Track this command as recently used
-                try {
-                    RecentCommandsTracker(ctx).recordUsage(resolvedCommand.cmd)
-                } catch (e: Exception) {
-                    // Silently fail - tracking is not critical
-                }
-            }
-        }
-        GlassSurface(
-            shape = resultCardShape,
-            modifier = Modifier.fillMaxWidth(),
-            hazeState = hazeState,
-        ) {
-            Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(GapRow))
-                    TitleSmallText("Action")
-                }
-                Text(
-                    when {
-                        targetVehicle == null -> {
-                            val example = state.vehicles.firstOrNull()?.name ?: "car"
-                            "Which car? Mention its name, e.g. \"${resolvedCommand.label} my $example\"."
-                        }
-                        actionRunning -> "${resolvedCommand.label} ${targetVehicle.name}…"
-                        actionResult != null -> actionResult ?: "${resolvedCommand.label} ${targetVehicle.name}"
-                        else -> "${resolvedCommand.label} ${targetVehicle.name}"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
+        CommandActionResult(resolvedCommand, submittedQuery, state, vm, hazeState)
     }
 
     // Free-form command via the AI when the deterministic parser did not recognise the phrasing.
     if (command == null && state.aiEnabled && submittedQuery.isNotBlank()) {
-        val ctx = LocalContext.current
-        var proposal by remember(submittedQuery) { mutableStateOf<Pair<String, String>?>(null) }
-        var thinking by remember(submittedQuery) { mutableStateOf(true) }
-        var ran by remember(submittedQuery) { mutableStateOf<String?>(null) }
-        var running by remember(submittedQuery) { mutableStateOf(false) }
-        LaunchedEffect(submittedQuery) {
-            proposal = vm.aiResolveCommand(submittedQuery)
-            thinking = false
-        }
-        val p = proposal
-        if (p != null) {
-            val car = state.vehicles.firstOrNull { it.vin == p.second }
-            GlassSurface(
-                shape = resultCardShape,
-                modifier = Modifier.fillMaxWidth(),
-                hazeState = hazeState,
-            ) {
-                Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(GapRow))
-                        TitleSmallText("Did you mean?")
-                    }
-                    Text(
-                        ran ?: "${aiCommandLabel(p.first)} ${car?.name ?: "your car"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    if (ran == null && car != null) {
-                        val scope = rememberCoroutineScope()
-                        // MorphTextButton, not a bare Button: this was the one plain Material
-                        // button left in the app, so it was the only standard button that neither
-                        // morphed on press nor fired the click haptic every other button gives.
-                        SafeMorphTextButton(
-                            text = if (running) "Working…" else "Run it",
-                            onClick = {
-                                running = true
-                                scope.launch {
-                                    val r = runCatching {
-                                        VehicleCommandRunner.run(ctx, car.vin, p.first, "default")
-                                    }.getOrNull()
-                                    ran = r?.message ?: "Command failed"
-                                    running = false
-                                    vm.refreshStatus(car)
-                                }
-                            },
-                            enabled = !running,
-                            emphasis = ButtonEmphasis.Confirm,
-                        )
-                    }
-                }
-            }
-        }
+        AiCommandProposal(submittedQuery, state, vm, hazeState)
     }
 
     // On-device AI reply (when enabled): a plain-language answer, a complement to structured
     // matches. Gated on submittedQuery, not the live query: it fires a real AI request and must
     // wait for a deliberate submit.
     if (state.aiEnabled) {
-        LaunchedEffect(submittedQuery) {
-            if (submittedQuery.isNotBlank()) {
-                vm.askAi(submittedQuery)
-            } else {
-                vm.clearAiReply()
-            }
-        }
-        val thinking = "search" in state.aiBusy
-        val reply = state.aiSearchReply
-        AnimatedVisibility(
-            visible = thinking || reply != null,
-            enter = expandEnterSized(Alignment.Bottom),
-            exit = expandExitSized(Alignment.Bottom),
-        ) {
-            GlassSurface(
-                shape = resultCardShape,
-                modifier = Modifier.fillMaxWidth(),
-                hazeState = hazeState,
-            ) {
-                Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(GapRow))
-                        TitleSmallText("AI answer")
-                    }
-                    if (reply != null) {
-                        Text(reply, style = MaterialTheme.typography.bodyMedium)
-                    } else {
-                        Text("Thinking…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
+        AiAnswer(state, vm, submittedQuery, hazeState)
     }
 }
