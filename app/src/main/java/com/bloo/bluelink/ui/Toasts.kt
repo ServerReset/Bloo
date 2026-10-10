@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
@@ -31,10 +29,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -47,7 +43,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -60,12 +55,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val MaxToasts = 4
@@ -419,92 +412,5 @@ private fun CopyButton(toast: Toast, accent: Color, onCopy: (String) -> Unit) {
     ) {
         if (copied) Icon(AppIcons.Check, contentDescription = "Copied", tint = accent)
         else Icon(Icons.Filled.ContentCopy, contentDescription = "Copy message")
-    }
-}
-
-/**
- * Horizontal swipe-to-dismiss for a toast: it follows the finger and fades, then flies off past
- * [DismissDistance] or springs back. The finger's position is a plain float written straight from the gesture (no
- * coroutine per delta); the Animatable only runs the fly-off or spring-back once the finger lifts.
- */
-@Composable
-private fun rememberSwipeToDismiss(key: Any, onDismiss: () -> Unit): Modifier {
-    var dragging by remember(key) { mutableStateOf(false) }
-    val dragPx = remember(key) { mutableFloatStateOf(0f) }
-    val settle = remember(key) { Animatable(0f) }
-    val scope = rememberCoroutineScope()
-    val dismissPx = with(LocalDensity.current) { DismissDistance.toPx() }
-    val offsetX by remember { derivedStateOf { if (dragging) dragPx.floatValue else settle.value } }
-    fun release(flyOff: Boolean) {
-        dragging = false
-        val released = dragPx.floatValue
-        scope.launch {
-            settle.snapTo(released)
-            if (flyOff && abs(released) > dismissPx) {
-                settle.animateTo(if (released > 0) dismissPx * 4 else -dismissPx * 4)
-                onDismiss()
-            } else {
-                settle.animateTo(0f)
-            }
-        }
-    }
-    return Modifier
-        .offset { IntOffset(offsetX.roundToInt(), 0) }
-        .graphicsLayer { alpha = (1f - abs(offsetX) / (dismissPx * 2.2f)).coerceIn(0f, 1f) }
-        .pointerInput(key) {
-            detectHorizontalDragGestures(
-                onDragStart = { dragging = true; dragPx.floatValue = settle.value },
-                onHorizontalDrag = { change, amount -> change.consume(); dragPx.floatValue += amount },
-                onDragEnd = { release(flyOff = true) },
-                onDragCancel = { release(flyOff = false) },
-            )
-        }
-}
-
-private val DismissDistance = 110.dp
-
-/** The newest toast's inset and the stack's lift, from where the search element is. */
-internal data class ToastClearance(val startInsetPx: Float, val endInsetPx: Float, val bottomLiftPx: Float)
-
-/**
- * Where the stack goes around the search element. A search docked to a side lets the NEWEST toast slot
- * beside it (inset on that side) as long as at least [minToastWidthPx] -- the newest message's own
- * natural width -- is left for the toast; a centred search, or one docked so close to the middle that
- * the toast would be squeezed, lifts the whole stack above it instead.
- *
- * The lift is measured against the stack's OWN content bottom: the toast column sits at the search's
- * inset (`max(nav, ime)`) plus [baseEdgePx], so the newest toast's bottom lines up exactly with the
- * search bar's bottom when it slots beside it.
- */
-internal fun toastClearance(
-    searchRect: Rect?,
-    windowWidthPx: Float,
-    windowHeightPx: Float,
-    imeBottomPx: Float,
-    navBottomPx: Float,
-    baseEdgePx: Float,
-    gapPx: Float,
-    minToastWidthPx: Float = 0f,
-): ToastClearance {
-    if (searchRect == null || windowWidthPx <= 0f) return ToastClearance(0f, 0f, 0f)
-    // The toast column's own bottom inset, the same `nav union ime` the search element uses.
-    val contentBottom = windowHeightPx - maxOf(imeBottomPx, navBottomPx) - baseEdgePx
-    val lift = ToastClearance(
-        startInsetPx = 0f,
-        endInsetPx = 0f,
-        // From the search's top up to the toast content's bottom, plus one gap of breathing room.
-        bottomLiftPx = (contentBottom - searchRect.top + gapPx).coerceAtLeast(0f),
-    )
-    val contentWidth = windowWidthPx - 2 * baseEdgePx
-    return when (SearchDock.fromFrac(((searchRect.left + searchRect.right) / 2f) / windowWidthPx)) {
-        SearchDock.LEFT -> {
-            val inset = (searchRect.right + gapPx - baseEdgePx).coerceAtLeast(0f)
-            if (contentWidth - inset < minToastWidthPx) lift else ToastClearance(inset, 0f, 0f)
-        }
-        SearchDock.RIGHT -> {
-            val inset = ((windowWidthPx - baseEdgePx) - (searchRect.left - gapPx)).coerceAtLeast(0f)
-            if (contentWidth - inset < minToastWidthPx) lift else ToastClearance(0f, inset, 0f)
-        }
-        SearchDock.CENTER -> lift
     }
 }
