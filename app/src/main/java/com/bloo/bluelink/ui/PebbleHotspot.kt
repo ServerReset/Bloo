@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -54,6 +55,12 @@ private val UnpinTravel = 88.dp
 
 /** How long a collapsed pin stays collapsed in the hot seat before it opens as a reveal. */
 private const val PinRevealDelayMs = 220L
+
+/**
+ * The spring an unpinned pebble flies back into its stack slot on. Mirrors the ReorderColumn's own
+ * drop-flight spec, so pinning and unpinning are the same motion in opposite directions.
+ */
+private val UnpinFlightSpec = spring<Float>(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
 
 /**
  * The car-info column's "hot seat": the one or two pebbles pinned under the hero. It is shown only
@@ -129,21 +136,35 @@ internal fun HotspotSlot(
             }
         }
 
-        // SECONDARY SLOT: kept rendered through its exit so unpinning has a node to fade away in
-        // place (rather than vanishing on the same frame the stack row returns).
+        // SECONDARY SLOT: kept rendered through its unpin FLIGHT (and the exit that follows it), so
+        // the pebble visibly travels back to its stack slot instead of fading away in free space.
         var leavingSecondary by remember { mutableStateOf<String?>(null) }
-        LaunchedEffect(secondaryPebble) { if (secondaryPebble != null) leavingSecondary = secondaryPebble }
+        var unpinning by remember { mutableStateOf(false) }
+        LaunchedEffect(secondaryPebble) {
+            if (secondaryPebble != null) {
+                leavingSecondary = secondaryPebble
+                unpinning = false
+            }
+        }
         AnimatedVisibility(
-            visible = secondaryPebble != null,
+            visible = secondaryPebble != null || unpinning,
             // The dropped pebble has ALREADY flown here (see ReorderColumn's onDragEnd), so it must
             // appear INSTANTLY, exactly where it landed -- an entrance animation would fight the
-            // flight. The exit (on unpin) fades and shrinks it away.
+            // flight. The exit runs only once an unpin flight has landed back in the stack.
             enter = EnterTransition.None,
             exit = fadeOut(tween(MotionShort)) + scaleOut(targetScale = 0.97f),
         ) {
             val section = secondaryPebble ?: leavingSecondary
             if (section != null) {
-                PinnedPebble(v, stateSource, vm, section, hotDrag, interactive = secondaryPebble != null)
+                PinnedPebble(
+                    v, stateSource, vm, section, hotDrag,
+                    interactive = secondaryPebble != null,
+                    onUnpinStart = { unpinning = true },
+                    onUnpinCommit = {
+                        vm.setHotspot(v, section)
+                        unpinning = false
+                    },
+                )
             }
         }
 
@@ -206,6 +227,10 @@ private fun PinnedPebble(
     secondaryPebble: String,
     hotDrag: HotSeatDrag?,
     interactive: Boolean = true,
+    /** Called the moment an unpin starts, to keep this node rendered for its flight home. */
+    onUnpinStart: () -> Unit = {},
+    /** Called once the flight home has landed, to actually commit the unpin. */
+    onUnpinCommit: () -> Unit = {},
 ) {
     val haptics = LocalHaptics.current
     val scope = rememberCoroutineScope()
@@ -233,15 +258,27 @@ private fun PinnedPebble(
         dragging = false
         val dx = dragX.floatValue
         val dy = dragY.floatValue
-        scope.launch {
-            settleX.snapTo(dx)
-            settleY.snapTo(dy)
-            if (dx > unpinPx) {
-                haptics?.heavy()
-                // Toggle: the same section is already the secondary pin, so this unpins it. It fades
-                // away here while the stack row fades back in, i.e. it returns to the stack.
-                vm.setHotspot(v, secondaryPebble)
-            } else {
+        if (dx > unpinPx) {
+            haptics?.heavy()
+            // Keep this node rendered for the flight, fly it to its STACK slot, and only THEN commit
+            // the unpin. That way it travels back to the right place instead of fading where it was
+            // dropped. The target is the row's own slot, registered even while it is collapsed.
+            onUnpinStart()
+            val from = hotDrag?.slotTopLeft
+            val to = hotDrag?.stackSlot?.get(secondaryPebble)
+            scope.launch {
+                settleX.snapTo(dx)
+                settleY.snapTo(dy)
+                if (from != null && to != null) {
+                    launch { settleX.animateTo(to.x - from.x, UnpinFlightSpec) }
+                    settleY.animateTo(to.y - from.y, UnpinFlightSpec)
+                }
+                onUnpinCommit()
+            }
+        } else {
+            scope.launch {
+                settleX.snapTo(dx)
+                settleY.snapTo(dy)
                 launch { settleX.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) }
                 settleY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
             }
@@ -258,6 +295,9 @@ private fun PinnedPebble(
                 translationY = y
                 scaleX = pickScale
                 scaleY = pickScale
+                // Scale about the TOP-LEFT so the pick-up lift easing back during the unpin flight
+                // cannot shift the corner we aim at the stack slot.
+                transformOrigin = TransformOrigin(0f, 0f)
             }
             .pointerInput(secondaryPebble, interactive) {
                 // Not interactive while it is animating out (unpinned): it must not react to touch.

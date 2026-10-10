@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -117,6 +118,12 @@ internal class HotSeatDrag {
     var slotSize by mutableStateOf(IntSize.Zero)
     /** The key released over the slot, awaiting its fly-in before the pin commits. */
     var pendingPin by mutableStateOf<String?>(null)
+    /**
+     * Window top-left of each section's slot in the reorderable STACK, keyed by section. Registered
+     * by every row (even a pinned one, collapsed to zero height), so an unpinned hot-seat pebble has
+     * a live target to fly back to -- the mirror of [slotTopLeft] for the pin direction.
+     */
+    val stackSlot = mutableStateMapOf<String, Offset>()
     val overSlot: Boolean
         get() = section != null && slotSize.width > 0 &&
             pointer.x in slotTopLeft.x..(slotTopLeft.x + slotSize.width) &&

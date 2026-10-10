@@ -25,7 +25,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.ReorderColumn
@@ -144,27 +146,34 @@ internal fun PebbleList(
         staggerInOnColdStart = true,
         introKey = v.vin,
     ) { section, itemDragHandle, _ ->
-        // A pinned pebble stays in the list but collapsed to zero (see the list's own layout, which
-        // adds no gap around a zero-height row); the hot seat renders it.
-        AnimatedVisibility(
-            visible = section !in pinned,
-            // Fade the row back in when a pinned pebble RETURNS (unpin). On PIN the row must vanish
-            // INSTANTLY (exit = None): the dropped node has just FLOWN to the hot seat, so a fade-out
-            // here would draw a second copy behind the flight -- the ghost that hung in free space.
-            enter = fadeIn(tween(MotionShort)),
-            exit = ExitTransition.None,
+        // Register this row's slot in the STACK for the hot seat. The wrapper is composed for every
+        // row (the AnimatedVisibility inside may render nothing), so a pinned row's slot stays live
+        // even collapsed to zero -- the unpin flight targets exactly this point.
+        Box(
+            Modifier.onGloballyPositioned { coords ->
+                hotDrag?.let { d -> d.stackSlot[section] = coords.localToWindow(Offset.Zero) }
+            },
         ) {
-            val ready by remember(section) {
-                derivedStateOf { section in eager || section in filledSections }
-            }
-            if (ready) {
-                SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
-            } else {
-                // Below the fold, so this transient state is never seen or interacted with.
-                // heightIn(min), not a fixed height: a pebble header carries a title plus an optional
-                // summary line, and at a large accessibility font that stacked text is taller than
-                // ControlHeight -- a hard height clipped it.
-                Box(Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).then(itemDragHandle))
+            AnimatedVisibility(
+                visible = section !in pinned,
+                // Fade the row back in when a pinned pebble RETURNS (unpin). On PIN the row must
+                // vanish INSTANTLY (exit = None): the dropped node has just FLOWN to the hot seat, so
+                // a fade-out here would draw a second copy behind the flight.
+                enter = fadeIn(tween(MotionShort)),
+                exit = ExitTransition.None,
+            ) {
+                val ready by remember(section) {
+                    derivedStateOf { section in eager || section in filledSections }
+                }
+                if (ready) {
+                    SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
+                } else {
+                    // Below the fold, so this transient state is never seen or interacted with.
+                    // heightIn(min), not a fixed height: a pebble header carries a title plus an
+                    // optional summary line, and at a large accessibility font that stacked text is
+                    // taller than ControlHeight -- a hard height clipped it.
+                    Box(Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).then(itemDragHandle))
+                }
             }
         }
     }
