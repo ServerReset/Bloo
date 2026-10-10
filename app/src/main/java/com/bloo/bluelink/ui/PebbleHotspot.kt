@@ -7,7 +7,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -154,8 +153,17 @@ internal fun HotspotSlot(
         // so its exit starts the moment the collapse does.
         AnimatedVisibility(
             visible = expanded && secondaryPebble == null && unpinned.isNotEmpty(),
-            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(MotionShort)) + fadeOut(tween(MotionShort)),
+            // Grows out from behind the control pebble (from the top, drawn behind it), then BOUNCES
+            // out: the height spring is under-damped, so it overshoots past its resting height and
+            // settles back.
+            enter = expandVertically(
+                expandFrom = Alignment.Top,
+                animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow),
+            ),
+            exit = shrinkVertically(
+                shrinkTowards = Alignment.Top,
+                animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium),
+            ),
         ) {
             EmptyDropZone(hotDrag, hovered)
         }
