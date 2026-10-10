@@ -7,6 +7,12 @@ import com.bloo.bluelink.autolock.AutoLockConfig
 import kotlinx.coroutines.flow.first
 
 // --- AutoLock: per-car config, the "cars with AutoLock" registry, and sign-out cleanup ---
+//
+// Ported from the i5-AutoLock reference app (github.com/Vel-San/i5-AutoLock): locks a car
+// automatically when the phone disconnects from its paired Bluetooth device (the head unit),
+// confirmed by Activity Recognition (driving -> walking), after a cancellable grace period, and
+// only when the car's own status says it's safe to (unlocked, engine off, doors/windows closed). See
+// app/.../autolock/ for the state machine, policy and detection plumbing.
 
 suspend fun SettingsStore.autoLockConfig(vin: String): AutoLockConfig =
 
