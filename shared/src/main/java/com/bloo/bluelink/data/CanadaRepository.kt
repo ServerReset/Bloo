@@ -47,16 +47,7 @@ class CanadaRepository(
     }
 
     private suspend fun save(session: CanadaSession, username: String, pin: String) {
-        store.save(
-            SessionStore.Session.of(
-                accessToken = session.accessToken,
-                refreshToken = session.refreshToken,
-                deviceId = session.deviceId,
-                username = username,
-                pin = pin,
-                brand = brand,
-            ),
-        )
+        store.saveLogin(session.accessToken, session.refreshToken, session.deviceId, username, pin, brand)
     }
 
     override suspend fun logout() {

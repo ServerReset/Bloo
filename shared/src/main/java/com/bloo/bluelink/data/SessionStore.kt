@@ -94,6 +94,28 @@ class SessionStore(private val context: Context) {
     }
 
     /**
+     * Persist a just-established login from its raw fields -- the shared path the Canada and EU
+     * repositories both take, since their session types expose the same token trio.
+     */
+    suspend fun saveLogin(
+        accessToken: String,
+        refreshToken: String?,
+        deviceId: String?,
+        username: String,
+        pin: String,
+        brand: Brand,
+    ) = save(
+        Session.of(
+            accessToken = accessToken,
+            refreshToken = refreshToken,
+            deviceId = deviceId,
+            username = username,
+            pin = pin,
+            brand = brand,
+        ),
+    )
+
+    /**
      * Reads back one brand's session. Returns null (meaning "not logged in for this brand") if any
      * of the three required fields — access token, username, pin — is missing, rather than
      * returning a half-populated [Session].
