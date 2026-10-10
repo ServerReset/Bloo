@@ -9,22 +9,21 @@ import kotlin.math.roundToInt
 
 /**
  * The garage's in-place expand/collapse reflow. Two content blocks -- a "lead" block (header, hero,
- * controls, the hot-seat slot) and a "trail" block (the reorderable pebble list) -- are laid out by a
- * single animated fraction [expandedT]:
+ * controls, the hot-seat slot) and a "trail" block (the reorderable pebble list) -- are positioned by
+ * a single animated fraction [expandedT]:
  *
- *  - 0 (collapsed): one full-width column -- trail directly UNDER lead.
- *  - 1 (expanded): two half-width columns -- trail BESIDE lead.
+ *  - 0 (collapsed): [trail] sits UNDER [lead].
+ *  - 1 (expanded): [trail] sits BESIDE [lead].
  *
- * Everything in between is a real layout position, so expanding slides the pebbles up and out to the
- * side and collapsing pulls them back underneath, instead of swapping to a different screen. The
- * caller owns the scrolling (this only positions the two blocks).
+ * Both blocks are measured at the fixed [blockWidth] the whole time, so nothing re-wraps mid-flight;
+ * only their positions animate. The caller owns the scrolling (this only positions the two blocks).
  */
 @Composable
 internal fun ReflowPair(
     expandedT: Float,
+    blockWidth: Dp,
     modifier: Modifier = Modifier,
     gap: Dp = GapSection,
-    maxContentWidth: Dp = 960.dp,
     lead: @Composable () -> Unit,
     trail: @Composable () -> Unit,
 ) {
@@ -37,25 +36,17 @@ internal fun ReflowPair(
     ) { measurables, constraints ->
         val t = expandedT.coerceIn(0f, 1f)
         val gapPx = gap.roundToPx()
-        // Never wider than the container; the grid already caps itself, this is just the max width the
-        // two columns share when expanded.
-        val content = minOf(constraints.maxWidth, maxContentWidth.roundToPx())
-        val full = content
-        val half = ((content - gapPx) / 2f).roundToInt()
-        val leadW = (full + (half - full) * t).roundToInt()
-        val trailW = (full + (half - full) * t).roundToInt()
-        val leadPlaceable = measurables[0].measure(
-            constraints.copy(minWidth = leadW, maxWidth = leadW, minHeight = 0),
-        )
-        val trailPlaceable = measurables[1].measure(
-            constraints.copy(minWidth = trailW, maxWidth = trailW, minHeight = 0),
-        )
+        // A constant width for both blocks, so the animation never re-lays-out their contents.
+        val w = blockWidth.roundToPx().coerceAtMost(constraints.maxWidth).coerceAtLeast(0)
+        val blockConstraints = constraints.copy(minWidth = w, maxWidth = w, minHeight = 0)
+        val leadPlaceable = measurables[0].measure(blockConstraints)
+        val trailPlaceable = measurables[1].measure(blockConstraints)
         // Under lead when collapsed, even with it when expanded.
         val stackedY = leadPlaceable.height + gapPx
         val y = (stackedY + (0f - stackedY) * t).roundToInt()
-        val x = (0f + ((leadW + gapPx) - 0f) * t).roundToInt()
+        val x = (0f + ((w + gapPx) - 0f) * t).roundToInt()
         val height = maxOf(leadPlaceable.height, y + trailPlaceable.height)
-        layout(content, height) {
+        layout(constraints.maxWidth, height) {
             leadPlaceable.place(0, 0)
             trailPlaceable.place(x, y)
         }

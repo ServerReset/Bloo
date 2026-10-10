@@ -40,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import dev.chrisbanes.haze.HazeState
@@ -169,6 +171,12 @@ internal fun ExpandedCar(
         // Pinned pebbles in the hotspot are excluded from the reorderable list
         PebbleList(v, state, vm, exclude = setOf("summary"))
     }
+    // One block's own width: half the widest the content ever gets (the expanded two columns), held
+    // CONSTANT through the animation so the reflow only ever moves the blocks, never re-wraps them.
+    val blockWidth = with(LocalDensity.current) {
+        val full = minOf(LocalWindowInfo.current.containerSize.width.toDp() - ScreenGutter * 2, 960.dp)
+        ((full - GapSection) / 2).coerceAtLeast(1.dp)
+    }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }) {
         // One scrolling page whose two blocks reflow by [expandedT]: the pebble list sits UNDER the
@@ -185,6 +193,7 @@ internal fun ExpandedCar(
                 Spacer(Modifier.height(topInset))
                 ReflowPair(
                     expandedT = expandedT,
+                    blockWidth = blockWidth,
                     lead = { Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) { controls() } },
                     trail = { Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) { pebbles() } },
                 )
