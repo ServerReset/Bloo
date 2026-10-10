@@ -259,12 +259,6 @@ internal fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): 
 internal class ParsedVehicleCommand(val cmd: String, val climateTarget: String = "default", val label: String)
 
 /**
- * Recognises a small, deliberately-conservative set of command phrasings -- lock/unlock,
- * start/stop/smart climate, start/stop charging -- rather than attempting general natural-language
- * command parsing. Order matters: "unlock" is checked before the bare "lock" pattern so "unlock"
- * doesn't also match as "lock".
- */
-/**
  * The temperature asked for, in Fahrenheit, or null if the query names none. Superlatives resolve
  * to the ends of [CLIMATE_TEMP_RANGE_F].
  */

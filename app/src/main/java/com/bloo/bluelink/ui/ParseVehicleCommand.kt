@@ -10,6 +10,12 @@ import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.degLabel
 import kotlin.math.max
 
+/**
+ * Recognises a small, deliberately-conservative set of command phrasings -- lock/unlock,
+ * start/stop/smart climate, start/stop charging -- rather than attempting general natural-language
+ * command parsing. Order matters: "unlock" is checked before the bare "lock" pattern so "unlock"
+ * doesn't also match as "lock".
+ */
 internal fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedVehicleCommand? {
     val q = query.lowercase()
     // Only meaningful for a climate START, and only when the phrasing is not already asking for
