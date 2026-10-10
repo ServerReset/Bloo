@@ -197,6 +197,10 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
      * with under 1% of a 512MB (largeHeap) heap free *after* a GC -- i.e. genuinely retained, not
      * just garbage waiting for the next collection.
      */
+    // TRIM_MEMORY_RUNNING_* are the levels onTrimMemory actually reports; the typed Coil
+    // imageLoader access is still behind the experimental marker.
+    @Suppress("DEPRECATION")
+    @kotlin.OptIn(coil.annotation.ExperimentalCoilApi::class)
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         // The system calls this on the MAIN thread. memoryCache.clear() is an in-memory bookkeeping

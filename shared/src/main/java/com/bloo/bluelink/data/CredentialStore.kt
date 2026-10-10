@@ -168,7 +168,15 @@ class CredentialStore(context: Context) {
                 cachedPrefs ?: buildPrefs(context).also { cachedPrefs = it }
             }
 
-        /** The (relatively expensive) master-key generation/lookup + setup itself. */
+        /**
+         * The (relatively expensive) master-key generation/lookup + setup itself.
+         *
+         * @Suppress("DEPRECATION"): androidx.security's EncryptedSharedPreferences/MasterKey are
+         * deprecated as a library, with no drop-in replacement; Bloo relies on them for at-rest
+         * credential encryption, so these warnings are expected. Migrating would mean a bespoke
+         * keystore + AES-GCM implementation.
+         */
+        @Suppress("DEPRECATION")
         fun buildPrefs(context: Context): SharedPreferences {
             val masterKey = MasterKey.Builder(context)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)

@@ -51,6 +51,8 @@ class AutoLockService : Service() {
         super.onCreate()
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
+                // The generic getParcelableExtra; its typed overload only exists from API 33.
+                @Suppress("DEPRECATION")
                 val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
                     ?: return
                 val address = runCatching { device.address }.getOrNull() ?: return
