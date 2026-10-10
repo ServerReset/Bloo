@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.chargerLabel
 import com.bloo.bluelink.data.DEFAULT_AC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.DEFAULT_DC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.Vehicle
@@ -160,15 +161,3 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     }
 }
 
-internal fun chargerLabel(plugin: Int?): String? = com.bloo.bluelink.data.chargerLabel(plugin)
-
-internal fun fmtMinutes(min: Int) = com.bloo.bluelink.data.fmtMinutes(min)
-
-/**
- * A climate setpoint rendered in the user's chosen unit. Non-numeric values pass through with a
- * bare degree sign. [sourceUnit] is the API's own unit code for this value -- 0 Celsius, 1
- * Fahrenheit. That is exactly what happened -- the four setpoint call sites were updated to pass
- * the unit and failed to compile against this wrapper.
- */
-internal fun degLabel(valueF: String, fahrenheit: Boolean, sourceUnit: Int? = null): String =
-    com.bloo.bluelink.data.degLabel(valueF, fahrenheit, sourceUnit)

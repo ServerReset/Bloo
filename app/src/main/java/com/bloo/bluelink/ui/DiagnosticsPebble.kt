@@ -33,6 +33,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.fmtMinutes
+import com.bloo.bluelink.data.degLabel
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.rangeMiFor

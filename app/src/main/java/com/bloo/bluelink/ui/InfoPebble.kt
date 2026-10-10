@@ -34,6 +34,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.Brand
+import com.bloo.bluelink.data.chargerLabel
+import com.bloo.bluelink.data.fmtMinutes
+import com.bloo.bluelink.data.degLabel
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus

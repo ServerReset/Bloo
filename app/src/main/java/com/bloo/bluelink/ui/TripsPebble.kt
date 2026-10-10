@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.fmtMinutes
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.formatSpeed
