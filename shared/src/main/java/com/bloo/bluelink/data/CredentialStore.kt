@@ -140,12 +140,6 @@ class CredentialStore(context: Context) {
             .apply()
     }
 
-    /** Wipes the entire encrypted prefs file — all brands, all accounts. */
-    fun clearAll() {
-        prefs.edit().clear().apply()
-        cachedAccounts = null
-    }
-
     // Falls back to emptySet() because getStringSet can return null if the key was never written.
     private fun brandSet(): Set<String> = prefs.getStringSet(KEY_BRANDS, emptySet()) ?: emptySet()
 

@@ -152,9 +152,4 @@ class SessionStore(private val context: Context) {
             if (set.isEmpty()) p.remove(brandsKey) else p[brandsKey] = set.joinToString(",")
         }
     }
-
-    /** Wipes the entire session DataStore — every brand signed out. */
-    suspend fun clearAll() {
-        context.dataStore.edit { it.clear() }
-    }
 }
