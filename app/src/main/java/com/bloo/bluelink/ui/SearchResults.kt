@@ -6,7 +6,6 @@ import com.bloo.bluelink.rethrowIfCancellation
  * the per-result pop-in helper.
  */
 
-import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -39,8 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.autolock.AutoLockConfig
-import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.SettingsStore
@@ -48,8 +45,6 @@ import com.bloo.bluelink.data.VehicleCommandRunner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.aiEnabled
-import com.bloo.bluelink.data.autoLockConfig
-import com.bloo.bluelink.data.setAutoLockConfig
 import com.bloo.bluelink.data.settingsMode
 
 internal const val SEARCH_RESULT_STAGGER_MS = 35L
@@ -388,46 +383,4 @@ internal fun SettingsSearchResults(
             }
         }
     }
-}
-
-/** One AutoLock toggle, as a search result. */
-@Composable
-internal fun AutoLockSearchToggle(
-    v: Vehicle,
-    vm: AppViewModel,
-    label: String,
-    checked: (AutoLockConfig) -> Boolean,
-    update: (AutoLockConfig, Boolean) -> AutoLockConfig,
-) {
-    var config by remember(v.vin) { mutableStateOf<AutoLockConfig?>(null) }
-    LaunchedEffect(v.vin) { config = vm.autoLockConfig(v.vin) }
-    val current = config ?: return
-    ToggleRow(label, checked(current)) { value ->
-        val updated = update(current, value)
-        config = updated
-        vm.setAutoLockConfig(v.vin, updated)
-    }
-}
-
-/**
- * AutoLock's grace period as a search result: the same slider the AutoLock card shows, loaded and
- * saved the same way.
- */
-@Composable
-internal fun AutoLockGraceSearchRow(v: Vehicle, vm: AppViewModel) {
-    var config by remember(v.vin) { mutableStateOf<AutoLockConfig?>(null) }
-    LaunchedEffect(v.vin) { config = vm.autoLockConfig(v.vin) }
-    val current = config ?: return
-    StepRow("Grace period", "${current.graceSeconds}s")
-    AnimatedSlider(
-        value = current.graceSeconds.toFloat(),
-        onValueChange = { config = current.copy(graceSeconds = it.roundToInt()) },
-        onValueSettled = {
-            val updated = current.copy(graceSeconds = it.roundToInt())
-            config = updated
-            vm.setAutoLockConfig(v.vin, updated)
-        },
-        valueRange = 10f..120f,
-        steps = 10,
-    )
 }
