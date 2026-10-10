@@ -2,6 +2,7 @@ package com.bloo.bluelink.data
 
 import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.contentOrNull
 import okhttp3.MediaType.Companion.toMediaType
@@ -9,7 +10,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
-import kotlinx.coroutines.delay
 
 /**
  * Thin client over the real Hyundai Blue Link US telematics API. Base URL, credentials, paths and
@@ -397,4 +397,3 @@ private fun VehicleDetails.toVehicle(brand: Brand): Vehicle = Vehicle(
     isEv = evStatus.equals("E", ignoreCase = true),
     odometer = odometer,
 )
-

@@ -1,9 +1,8 @@
 package com.bloo.bluelink.wear
 
-import com.bloo.bluelink.data.BlooJson
-import com.bloo.bluelink.ioScope
 import android.content.Context
 import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.BlooJson
 import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.SettingsStore
@@ -12,11 +11,13 @@ import com.bloo.bluelink.data.WatchCommandRequest
 import com.bloo.bluelink.data.WatchCommandResult
 import com.bloo.bluelink.data.WatchNotifyPrefs
 import com.bloo.bluelink.data.WatchSyncPayload
+import com.bloo.bluelink.data.WatchSyncProtocol
 import com.bloo.bluelink.data.notificationPrefs
 import com.bloo.bluelink.data.setNotifyChargeComplete
 import com.bloo.bluelink.data.setNotifyCharging
 import com.bloo.bluelink.data.setNotifyWatchLowBattery
-import com.bloo.bluelink.data.WatchSyncProtocol
+import com.bloo.bluelink.data.watchLockTiming
+import com.bloo.bluelink.ioScope
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
@@ -26,7 +27,6 @@ import com.google.android.gms.wearable.WearableListenerService
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.serialization.json.Json
-import com.bloo.bluelink.data.watchLockTiming
 
 /**
  * Phone side of the watch sync. The watch is an AUXILIARY surface: it never talks to the

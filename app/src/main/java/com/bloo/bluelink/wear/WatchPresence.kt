@@ -1,11 +1,10 @@
 package com.bloo.bluelink.wear
 
-import com.bloo.bluelink.ioScope
-import androidx.core.content.edit
-
 import android.content.Context
+import androidx.core.content.edit
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WatchSyncProtocol
+import com.bloo.bluelink.ioScope
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

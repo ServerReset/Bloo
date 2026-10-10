@@ -13,13 +13,13 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.Process
-import rikka.shizuku.Shizuku
-import rikka.shizuku.ShizukuBinderWrapper
-import rikka.shizuku.SystemServiceHelper
 import java.io.File
 import java.io.FileInputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import rikka.shizuku.Shizuku
+import rikka.shizuku.ShizukuBinderWrapper
+import rikka.shizuku.SystemServiceHelper
 
 /**
  * Optional silent APK install via Shizuku (local ADB / root), used by the self-update

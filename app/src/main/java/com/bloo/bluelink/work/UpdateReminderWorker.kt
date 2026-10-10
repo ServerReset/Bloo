@@ -6,9 +6,9 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.Notifications
+import com.bloo.bluelink.data.UpdateStore
 import com.bloo.bluelink.update.UpdateCheckResult
 import com.bloo.bluelink.update.UpdateChecker
-import com.bloo.bluelink.data.UpdateStore
 import java.util.concurrent.TimeUnit
 
 /**

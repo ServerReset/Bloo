@@ -1,4 +1,3 @@
-
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.AnimatedContent
@@ -24,11 +23,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-// `motionScheme` is a MaterialTheme member, so it needs no import.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-// Explicit import required: State<T>'s `by` delegate resolves to this file-scope operator
-// extension.
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Measured

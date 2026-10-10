@@ -13,11 +13,9 @@ import kotlinx.coroutines.flow.first
 
 suspend fun SettingsStore.licensePlate(vin: String): String = licensePlate(vin, context.settingsDataStore.data.first())
 
-
 fun SettingsStore.licensePlate(vin: String, p: Preferences): String =
 
     p[stringPreferencesKey("plate_$vin")] ?: ""
-
 
 suspend fun SettingsStore.setLicensePlate(vin: String, value: String) {
     editTracked {
@@ -26,14 +24,11 @@ suspend fun SettingsStore.setLicensePlate(vin: String, value: String) {
     }
 }
 
-
 suspend fun SettingsStore.lastServiceMiles(vin: String): Int? = lastServiceMiles(vin, context.settingsDataStore.data.first())
-
 
 fun SettingsStore.lastServiceMiles(vin: String, p: Preferences): Int? =
 
     p[stringPreferencesKey("svc_last_$vin")]?.toIntOrNull()
-
 
 suspend fun SettingsStore.setLastServiceMiles(vin: String, value: Int?) {
     editTracked {
@@ -42,14 +37,11 @@ suspend fun SettingsStore.setLastServiceMiles(vin: String, value: Int?) {
     }
 }
 
-
 suspend fun SettingsStore.serviceIntervalMiles(vin: String): Int? = serviceIntervalMiles(vin, context.settingsDataStore.data.first())
-
 
 fun SettingsStore.serviceIntervalMiles(vin: String, p: Preferences): Int? =
 
     p[stringPreferencesKey("svc_interval_$vin")]?.toIntOrNull()
-
 
 suspend fun SettingsStore.setServiceIntervalMiles(vin: String, value: Int?) {
     editTracked {
@@ -58,31 +50,24 @@ suspend fun SettingsStore.setServiceIntervalMiles(vin: String, value: Int?) {
     }
 }
 
-
 suspend fun SettingsStore.lastVehicleVin(): String? = lastVehicleVin(context.settingsDataStore.data.first())
 
-
 fun SettingsStore.lastVehicleVin(p: Preferences): String? = p[SettingsStore.Keys.LAST_VIN]
-
 
 suspend fun SettingsStore.setLastVehicleVin(vin: String) {
     editTracked { it[SettingsStore.Keys.LAST_VIN] = vin }
 }
 
-
 /** User-defined display order of vehicles (by VIN). */
 suspend fun SettingsStore.vehicleOrder(): List<String> = vehicleOrder(context.settingsDataStore.data.first())
-
 
 fun SettingsStore.vehicleOrder(p: Preferences): List<String> =
 
     p[SettingsStore.Keys.ORDER]?.split("\n")?.filter { it.isNotBlank() } ?: emptyList()
 
-
 suspend fun SettingsStore.setVehicleOrder(order: List<String>) {
     editTracked { it[SettingsStore.Keys.ORDER] = order.joinToString("\n") }
 }
-
 
 /**
  * Force the settings DataStore's first load now.
@@ -96,7 +81,6 @@ suspend fun SettingsStore.setVehicleOrder(order: List<String>) {
 suspend fun SettingsStore.warmUp() {
     runCatching { context.settingsDataStore.data.first() }
 }
-
 
 /**
  * ONE Preferences snapshot, for a caller about to read many keys at once.
@@ -119,15 +103,12 @@ suspend fun SettingsStore.snapshot(): Preferences {
     return prefs
 }
 
-
 /** Optional user-set photo URL per vehicle (empty = use the default gradient). */
 suspend fun SettingsStore.imageUrl(vin: String): String? = imageUrl(vin, context.settingsDataStore.data.first())
-
 
 fun SettingsStore.imageUrl(vin: String, p: Preferences): String? =
 
     p[stringPreferencesKey("img_$vin")]?.takeIf { it.isNotBlank() }
-
 
 suspend fun SettingsStore.setImageUrl(vin: String, url: String) {
     editTracked {
@@ -135,7 +116,6 @@ suspend fun SettingsStore.setImageUrl(vin: String, url: String) {
         if (url.isBlank()) it.remove(key) else it[key] = url.trim()
     }
 }
-
 
 /**
  * Reads the per-seat heat/cool capability flags for [vin], each stored under
@@ -148,7 +128,6 @@ suspend fun SettingsStore.setImageUrl(vin: String, url: String) {
 suspend fun SettingsStore.seatConfig(vin: String): SeatConfig =
 
     seatConfig(vin, context.settingsDataStore.data.first())
-
 
 /**
  * Reads THIRTEEN keys plus an older grouped-flag format, which is exactly why it takes a
@@ -175,41 +154,31 @@ fun SettingsStore.seatConfig(vin: String, p: Preferences): SeatConfig {
     )
 }
 
-
 /** [field] is one of dh/dc/ph/pc/rlh/rlc/rrh/rrc. */
 suspend fun SettingsStore.setSeatFlag(vin: String, field: String, value: Boolean) {
     editTracked { it[booleanPreferencesKey("seat_${field}_$vin")] = value }
 }
 
-
 suspend fun SettingsStore.onboardingSeen(): Boolean = onboardingSeen(context.settingsDataStore.data.first())
 
-
 fun SettingsStore.onboardingSeen(p: Preferences): Boolean = p[booleanPreferencesKey("onboarding_seen")] ?: false
-
 
 suspend fun SettingsStore.setOnboardingSeen() {
     editTracked { it[booleanPreferencesKey("onboarding_seen")] = true }
 }
-
 
 /** True once a car has been through the feature-setup wizard. */
 suspend fun SettingsStore.isCarConfigured(vin: String): Boolean =
 
     isCarConfigured(vin, context.settingsDataStore.data.first())
 
-
 fun SettingsStore.isCarConfigured(vin: String, p: Preferences): Boolean =
 
     p[booleanPreferencesKey("car_configured_$vin")] ?: false
 
-
 suspend fun SettingsStore.setCarConfigured(vin: String) {
     editTracked { it[booleanPreferencesKey("car_configured_$vin")] = true }
 }
-
-
-
 
 /**
  * The order in which detail-pebble sections should render for [vin],
@@ -234,7 +203,6 @@ suspend fun SettingsStore.sectionOrder(vin: String): List<String> =
 
     sectionOrder(vin, context.settingsDataStore.data.first())
 
-
 fun SettingsStore.sectionOrder(vin: String, p: Preferences): List<String> {
     val saved = p[stringPreferencesKey("sections_$vin")]
         ?.split(",")?.filter { it.isNotBlank() }
@@ -257,11 +225,9 @@ fun SettingsStore.sectionOrder(vin: String, p: Preferences): List<String> {
     return result
 }
 
-
 suspend fun SettingsStore.setSectionOrder(vin: String, order: List<String>) {
     editTracked { it[stringPreferencesKey("sections_$vin")] = order.joinToString(",") }
 }
-
 
 /** Shared helper: reads [key] as a comma-separated string and splits it back
  *  into a Set, dropping empty segments (so a stored empty string decodes to
@@ -273,14 +239,11 @@ private fun SettingsStore.csv(p: androidx.datastore.preferences.core.Preferences
 
     p[stringPreferencesKey(key)]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
-
 suspend fun SettingsStore.collapsedSections(vin: String): Set<String> = collapsedSections(vin, context.settingsDataStore.data.first())
-
 
 fun SettingsStore.collapsedSections(vin: String, p: Preferences): Set<String> =
 
     csv(p, "collapsed_$vin")
-
 
 /** Toggles [section] in or out of [vin]'s collapsed set: reads the current
  *  CSV-encoded set, adds or removes the section, then re-encodes and writes
@@ -296,26 +259,21 @@ suspend fun SettingsStore.setSectionCollapsed(vin: String, section: String, coll
     }
 }
 
-
 suspend fun SettingsStore.aiEnabled(): Boolean =
 
     context.settingsDataStore.data.first()[booleanPreferencesKey("ai_enabled")] ?: false
-
 
 suspend fun SettingsStore.setAiEnabled(value: Boolean) {
     editTracked { it[booleanPreferencesKey("ai_enabled")] = value }
 }
 
-
 /** The single pebble pinned to the hotspot's secondary slot for [vin], or null if none
  *  selected. The primary slot ("controls") is hardcoded and never persisted here. */
 suspend fun SettingsStore.hotspots(vin: String): String? = hotspots(vin, context.settingsDataStore.data.first())
 
-
 fun SettingsStore.hotspots(vin: String, p: Preferences): String? {
     return p[stringPreferencesKey("hotspots_$vin")]?.takeIf { it.isNotBlank() }
 }
-
 
 suspend fun SettingsStore.setHotspots(vin: String, section: String?) {
     editTracked {
@@ -324,38 +282,31 @@ suspend fun SettingsStore.setHotspots(vin: String, section: String?) {
     }
 }
 
-
 /** Null means "not confirmed by the user yet" — the US Hyundai/Genesis API
  *  only distinguishes EV vs. gas, so the app asks the user to disambiguate
  *  hybrid/PHEV during car setup and stores their answer here; callers fall
  *  back to whatever the API-derived guess was when this is null. */
 suspend fun SettingsStore.powertrain(vin: String): Powertrain? = powertrain(vin, context.settingsDataStore.data.first())
 
-
 fun SettingsStore.powertrain(vin: String, p: Preferences): Powertrain? =
 
     p[stringPreferencesKey("ptrain_$vin")]
         ?.let { runCatching { Powertrain.valueOf(it) }.getOrNull() }
 
-
 suspend fun SettingsStore.setPowertrain(vin: String, value: Powertrain) {
     editTracked { it[stringPreferencesKey("ptrain_$vin")] = value.name }
 }
 
-
 suspend fun SettingsStore.platform(vin: String): VehiclePlatform? = platform(vin, context.settingsDataStore.data.first())
-
 
 fun SettingsStore.platform(vin: String, p: Preferences): VehiclePlatform? =
 
     p[stringPreferencesKey("platform_$vin")]
         ?.let { runCatching { VehiclePlatform.valueOf(it) }.getOrNull() }
 
-
 suspend fun SettingsStore.setPlatform(vin: String, value: VehiclePlatform) {
     editTracked { it[stringPreferencesKey("platform_$vin")] = value.name }
 }
-
 
 // Remaining global appearance setters (theme/font/dynamic-color/palette):
 // each stores its enum's name() (or, for dynamicColor, a "true"/"false"
@@ -365,11 +316,9 @@ suspend fun SettingsStore.setThemeMode(mode: ThemeMode) {
     editTracked { it[SettingsStore.Keys.THEME] = mode.name }
 }
 
-
 suspend fun SettingsStore.setFontChoice(choice: FontChoice) {
     editTracked { it[SettingsStore.Keys.FONT] = choice.name }
 }
-
 
 suspend fun SettingsStore.setDynamicColor(enabled: Boolean) {
     editTracked { it[SettingsStore.Keys.DYNAMIC] = enabled.toString() }

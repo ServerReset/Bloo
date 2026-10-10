@@ -5,21 +5,22 @@ package com.bloo.bluelink.ui
  * ([WEATHER_TTL_MS]), and weather-location persistence in [SettingsStore]. [AppViewModel] keeps
  * thin forwarders.
  */
+
 import android.app.Application
 import android.location.Geocoder
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.WeatherApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.util.Locale
 import com.bloo.bluelink.data.setWeatherFromDeviceLocation
 import com.bloo.bluelink.data.setWeatherLocation
+import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal class WeatherController(
     private val app: Application,

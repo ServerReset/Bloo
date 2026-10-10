@@ -1,23 +1,23 @@
 package com.bloo.bluelink.wear
 
-import com.bloo.bluelink.data.BlooJson
-import com.bloo.bluelink.ioScope
 import android.content.Context
+import com.bloo.bluelink.data.BlooJson
 import com.bloo.bluelink.data.PinRecord
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WatchCommandRequest
 import com.bloo.bluelink.data.WatchSyncPayload
 import com.bloo.bluelink.data.WatchSyncProtocol
+import com.bloo.bluelink.ioScope
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.util.UUID
 
 /**
  * The watch's window onto the phone: cars, lock timing and the PIN record are pushed from the

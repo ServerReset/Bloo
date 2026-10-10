@@ -1,9 +1,9 @@
 package com.bloo.bluelink.wear
 
-import com.bloo.bluelink.ioScope
 import android.content.Context
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.ioScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 

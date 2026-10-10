@@ -7,12 +7,11 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Thermostat
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,27 +22,28 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.bloo.bluelink.data.ambientFahrenheit
-import com.bloo.bluelink.data.degLabel
+import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
+import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
-import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
-import com.bloo.bluelink.data.WheelHeatLevel
-import com.bloo.bluelink.data.smartClimateTargetF
+import com.bloo.bluelink.data.TempValue
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
-import com.bloo.bluelink.data.isGen5W
-import com.bloo.bluelink.data.smartClimateIsCooling
-import kotlinx.coroutines.flow.first
-import kotlin.math.roundToInt
+import com.bloo.bluelink.data.WheelHeatLevel
+import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.climatePresets
+import com.bloo.bluelink.data.degLabel
 import com.bloo.bluelink.data.deleteClimatePreset
+import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.saveClimatePreset
 import com.bloo.bluelink.data.settingsMode
-import com.bloo.bluelink.data.TempValue
+import com.bloo.bluelink.data.smartClimateIsCooling
+import com.bloo.bluelink.data.smartClimateTargetF
+import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.first
 
 // --- Climate --------------------------------------------------------------
 

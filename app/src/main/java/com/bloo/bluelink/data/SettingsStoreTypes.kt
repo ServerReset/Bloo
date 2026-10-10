@@ -8,7 +8,6 @@ import kotlinx.coroutines.sync.Mutex
 // (which crashed the app on launch, since `appearance` is collected eagerly).
 internal val Context.settingsDataStore by safePreferencesDataStore("bloo_settings")
 
-
 // Process-wide serialization for performMainToMainSync(): the periodic worker and the
 // auto-sync-on-refresh collector can both fire at nearly the same moment, and
 // SettingsStore is instantiated fresh at each call
@@ -16,12 +15,10 @@ internal val Context.settingsDataStore by safePreferencesDataStore("bloo_setting
 // this lives at module scope instead, same pattern as BlueLinkGate.statusMutex.
 internal val mainToMainSyncMutex = Mutex()
 
-
 // A stalled SAF/DocumentsProvider call previously had no bound and could hold
 // mainToMainSyncMutex indefinitely; each Drive I/O step in performMainToMainSync() is
 // capped at this long instead.
 internal const val DRIVE_IO_TIMEOUT_MS = 20_000L
-
 
 /**
  * Which seat heat/cool functions a specific car actually has (user-configured).
@@ -48,10 +45,8 @@ data class SeatConfig(
             rearLeftHeat || rearLeftCool || rearRightHeat || rearRightCool
 }
 
-
 /** User-confirmed powertrain (the US API only exposes EV vs gas). */
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
-
 
 /**
  * The ONE powertrain resolution rule, used by every surface in the app that
@@ -71,7 +66,6 @@ fun resolvePowertrain(v: Vehicle, override: Powertrain?): Powertrain =
 
     override ?: if (v.isEv) Powertrain.EV else Powertrain.GAS
 
-
 /**
  * User-confirmed head-unit generation for a Hyundai/Genesis US vehicle --
  * the same GEN5W/ccNC split [com.bloo.bluelink.data.isGen5W] already infers
@@ -83,7 +77,6 @@ fun resolvePowertrain(v: Vehicle, override: Powertrain?): Powertrain =
  * confirm for that same population.
  */
 enum class VehiclePlatform { GEN5W, CCNC }
-
 
 /** When the biometric app-lock re-engages after the app leaves the foreground. */
 enum class LockTiming(val label: String) {
@@ -98,7 +91,6 @@ enum class LockTiming(val label: String) {
     IMMEDIATE("Immediate"),
 }
 
-
 /**
  * The wire-key form of a [LockTiming], matching the string vocabulary [shouldRelockAfter]
  * switches on. NOT the enum's persistence format -- LockTiming persists via `.name` -- purely
@@ -112,7 +104,6 @@ val LockTiming.wireKey: String
         LockTiming.IMMEDIATE -> "immediate"
     }
 
-
 /** Reorderable detail sections (pebbles), in their default order. */
 // "climate" ahead of "ai": pre-heating/cooling the car before walking out to
 // it is the single most common "glance and go" action this app exists for,
@@ -120,7 +111,6 @@ val LockTiming.wireKey: String
 // a "Summarize" button ahead of every actual control for anyone who hasn't
 // customized their section order.
 val DEFAULT_SECTIONS = listOf("summary", "update", "controls", "charge", "climate", "ai", "info", "location", "trips", "diagnostics")
-
 
 /**
  * Collapse key for the hero card's photo, so it rides the same per-car

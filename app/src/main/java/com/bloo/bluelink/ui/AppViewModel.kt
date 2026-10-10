@@ -6,33 +6,33 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
-import com.bloo.bluelink.data.CredentialStore
-import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.CanadaAuth
 import com.bloo.bluelink.data.CanadaRepository
+import com.bloo.bluelink.data.CredentialStore
+import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.KiaAuth
 import com.bloo.bluelink.data.KiaRepository
-import com.bloo.bluelink.data.VehicleRepository
-import com.bloo.bluelink.data.StatusCache
-import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.Weather
+import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.setSettingsMode
+import com.bloo.bluelink.data.snapshot
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import com.bloo.bluelink.data.setSettingsMode
-import com.bloo.bluelink.data.snapshot
 
 /**
  * A pending Kia one-time-code challenge shown over the login form. [sentTo] is the destination the

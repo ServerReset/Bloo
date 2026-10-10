@@ -1,5 +1,6 @@
 package com.bloo.bluelink
 
+import android.content.ClipData
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -38,11 +39,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.bloo.bluelink.data.UpdateApi
 import com.bloo.bluelink.data.installDownloadedApk
 import com.bloo.bluelink.ui.GapSection
@@ -51,12 +53,10 @@ import com.bloo.bluelink.ui.SettingsGroup
 import com.bloo.bluelink.update.ShizukuInstaller
 import com.bloo.bluelink.update.UpdateCheckResult
 import com.bloo.bluelink.update.UpdateChecker
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import android.content.ClipData
-import androidx.core.net.toUri
 
 /**
  * Shown instead of silently restarting into [MainActivity] after an uncaught

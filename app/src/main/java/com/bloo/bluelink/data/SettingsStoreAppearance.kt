@@ -1,7 +1,5 @@
 package com.bloo.bluelink.data
 
-
-
 // --- Appearance and display preference setters (extracted from SettingsStore) --
 
 suspend fun SettingsStore.setHapticsEnabled(value: Boolean) {

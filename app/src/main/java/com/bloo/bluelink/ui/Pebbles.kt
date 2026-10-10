@@ -1,31 +1,31 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.Vehicle
-import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.ReorderColumn
-import androidx.compose.runtime.mutableStateSetOf
-import androidx.compose.runtime.derivedStateOf
+import kotlinx.coroutines.flow.first
 
 /** A friendly label for a pebble/section id. */
 internal fun sectionLabel(section: String): String = when (section) {

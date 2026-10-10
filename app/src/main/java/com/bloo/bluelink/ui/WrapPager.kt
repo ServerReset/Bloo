@@ -15,7 +15,6 @@ private const val WRAP_MULTIPLIER = 80
  */
 private const val RECENTER_MARGIN_CYCLES = 10
 
-
 /** Pure wrap arithmetic: the real item index a virtual page maps to. */
 internal fun wrapRealIndex(page: Int, realCount: Int): Int =
     if (realCount <= 1) 0 else ((page % realCount) + realCount) % realCount
@@ -82,4 +81,3 @@ internal fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0): WrapP
     val pager = rememberPagerState(initialPage = start) { virtualCount }
     return remember(pager, realCount) { WrapPagerState(pager, realCount) }
 }
-

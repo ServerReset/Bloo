@@ -1,5 +1,6 @@
 package com.bloo.bluelink.data
 
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
@@ -9,7 +10,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.Locale
 
 /**
  * The EU service's bigger operations -- sign-in, the vehicle list, climate and charge commands, and

@@ -5,11 +5,11 @@ import com.bloo.bluelink.data.UpdateApi
 import com.bloo.bluelink.data.UpdateGate
 import com.bloo.bluelink.data.WorkflowRun
 import com.bloo.bluelink.data.installDownloadedApk
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * The watch checks GitHub for its OWN updates, over its own internet connection.

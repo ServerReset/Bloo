@@ -225,4 +225,3 @@ private fun naturalToastWidthPx(
     ).size.width
     return (chromePx + textPx).coerceIn(minPx, maxPx)
 }
-

@@ -3,12 +3,10 @@ package com.bloo.bluelink.ui
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.SettingsStore
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.setDoorOpenMinutes
+import com.bloo.bluelink.data.setNotifyAutoLock
 import com.bloo.bluelink.data.setNotifyCarStarted
 import com.bloo.bluelink.data.setNotifyChargeComplete
-import com.bloo.bluelink.data.setNotifyAutoLock
 import com.bloo.bluelink.data.setNotifyCharging
 import com.bloo.bluelink.data.setNotifyDoor
 import com.bloo.bluelink.data.setNotifyRunning
@@ -17,6 +15,8 @@ import com.bloo.bluelink.data.setNotifyUnlocked
 import com.bloo.bluelink.data.setNotifyWatchLowBattery
 import com.bloo.bluelink.data.setRunningMinutes
 import com.bloo.bluelink.data.setUnlockedMinutes
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 // --- Notification preference setters (extracted from AppViewModel) --
 

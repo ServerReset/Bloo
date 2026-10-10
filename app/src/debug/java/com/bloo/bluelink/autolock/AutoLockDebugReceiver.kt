@@ -7,12 +7,12 @@ import android.util.Log
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.autoLockConfig
+import com.bloo.bluelink.data.setAutoLockConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import com.bloo.bluelink.data.autoLockConfig
-import com.bloo.bluelink.data.setAutoLockConfig
 
 /**
  * DEBUG-ONLY AutoLock trigger (lives in the debug source set, so it is absent from a release

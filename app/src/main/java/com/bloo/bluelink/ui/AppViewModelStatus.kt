@@ -1,20 +1,20 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.bluelink.rethrowIfCancellation
 import android.location.Geocoder
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.liveChargeDismissed
+import com.bloo.bluelink.data.notificationPrefs
+import com.bloo.bluelink.data.setLiveChargeDismissed
 import com.bloo.bluelink.data.toGeoLocation
+import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
-import com.bloo.bluelink.data.liveChargeDismissed
-import com.bloo.bluelink.data.notificationPrefs
-import com.bloo.bluelink.data.setLiveChargeDismissed
 
 // --- Per-car status loading and the live-charge bar (extracted from AppViewModel) --
 

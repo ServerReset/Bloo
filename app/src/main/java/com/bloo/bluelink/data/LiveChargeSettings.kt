@@ -1,12 +1,11 @@
 package com.bloo.bluelink.data
 
-import com.bloo.bluelink.ui.tryStart
-
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import androidx.core.net.toUri
+import com.bloo.bluelink.ui.tryStart
 
 /**
  * The system-settings side of live charging -- the Live Update settings, developer options and the

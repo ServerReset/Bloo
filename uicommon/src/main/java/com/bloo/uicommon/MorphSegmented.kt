@@ -57,8 +57,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 /** One option in a [MorphSegmented] control. [icon] is optional. */
 data class SegmentOption(val key: String, val label: String, val icon: ImageVector? = null)

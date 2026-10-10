@@ -4,11 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.bloo.bluelink.MainActivity
+import com.bloo.bluelink.data.allAutoLockConfigs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import com.bloo.bluelink.data.allAutoLockConfigs
 
 /** Relaunches [MainActivity] once an in-place app update finishes installing. */
 class AutoLockBootReceiver : BroadcastReceiver() {

@@ -99,7 +99,6 @@ object SyncMerge {
     const val KIND_PHONE = "phone"
     const val KIND_WATCH = "watch"
 
-
     /** Registry entries unseen for this long are pruned on merge. */
     const val DEVICE_RETENTION_MS = 90L * 24 * 60 * 60 * 1000
 

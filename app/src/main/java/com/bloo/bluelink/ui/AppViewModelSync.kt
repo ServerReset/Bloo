@@ -2,17 +2,12 @@ package com.bloo.bluelink.ui
 
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import com.bloo.bluelink.data.resetSyncStateForNewFile
-import com.bloo.bluelink.data.performMainToMainSync
-import com.bloo.bluelink.data.testSyncRoundTrip
 import com.bloo.bluelink.data.exportSettingsJson
 import com.bloo.bluelink.data.importSettingsJson
+import com.bloo.bluelink.data.performMainToMainSync
 import com.bloo.bluelink.data.removeSyncedDevice
 import com.bloo.bluelink.data.requestPullFromPrimary
+import com.bloo.bluelink.data.resetSyncStateForNewFile
 import com.bloo.bluelink.data.setLastSyncError
 import com.bloo.bluelink.data.setPrimaryDevice
 import com.bloo.bluelink.data.setSyncDeviceName
@@ -21,6 +16,11 @@ import com.bloo.bluelink.data.setSyncWifiOnly
 import com.bloo.bluelink.data.setWatchLockTiming
 import com.bloo.bluelink.data.syncFileFingerprint
 import com.bloo.bluelink.data.syncUri
+import com.bloo.bluelink.data.testSyncRoundTrip
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // --- Settings export/import and Drive auto-sync (extracted from AppViewModel) --
 

@@ -14,12 +14,12 @@ import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.WatchCredentialTransfer
 import com.bloo.bluelink.data.WatchSyncProtocol
 import com.google.android.gms.wearable.Wearable
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.tasks.await
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.PrivateKey
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.tasks.await
 
 /**
  * The watch end of "sign the watch in so it works on its own".

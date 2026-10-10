@@ -1,5 +1,8 @@
 package com.bloo.bluelink.data
 
+import java.util.Base64
+import java.util.Locale
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -13,9 +16,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.Base64
-import java.util.Locale
-import java.util.UUID
 
 /**
  * A signed-in Hyundai/Genesis/Kia Canada session. [pin] is the account's service PIN (needed to

@@ -31,4 +31,3 @@ sealed interface DetectionEvent {
     data object WalkingConfirmed : DetectionEvent
     data object UserCancelled : DetectionEvent
 }
-

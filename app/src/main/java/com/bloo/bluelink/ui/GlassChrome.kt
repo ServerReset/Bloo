@@ -10,13 +10,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.ambientRing as sharedAmbientRing
 import com.bloo.uicommon.dropShadow
+import com.bloo.uicommon.frostedRim as sharedFrostedRim
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.hazeBlur
-import com.bloo.uicommon.frostedRim as sharedFrostedRim
-import com.bloo.uicommon.ambientRing as sharedAmbientRing
 
 /**
  * Unified glass system: every floating surface takes its tint, blur, rim and shadow from here.

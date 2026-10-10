@@ -5,9 +5,8 @@ package com.bloo.bluelink.ui
 import androidx.compose.foundation.layout.only
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.LocalGasStation
-import androidx.compose.ui.semantics.onClick
+import androidx.compose.material.icons.filled.Power
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,13 +15,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.Brand
-import com.bloo.bluelink.data.brand
-import com.bloo.bluelink.data.chargerLabel
 import com.bloo.bluelink.data.DEFAULT_AC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.DEFAULT_DC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.chargerLabel
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.isPluggedOrCharging
 
@@ -160,4 +160,3 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         }
     }
 }
-

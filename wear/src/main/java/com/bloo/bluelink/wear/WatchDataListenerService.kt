@@ -1,8 +1,8 @@
 package com.bloo.bluelink.wear
 
-import com.bloo.bluelink.ioScope
 import com.bloo.bluelink.data.WatchSyncProtocol
 import com.bloo.bluelink.data.installDownloadedApk
+import com.bloo.bluelink.ioScope
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem

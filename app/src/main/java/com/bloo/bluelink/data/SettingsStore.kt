@@ -1,7 +1,8 @@
 package com.bloo.bluelink.data
 
-import androidx.compose.runtime.Immutable
 import android.content.Context
+import androidx.compose.runtime.Immutable
+import androidx.core.graphics.scale
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -10,12 +11,11 @@ import com.bloo.bluelink.ui.CustomPaletteData
 import com.bloo.bluelink.ui.FontChoice
 import com.bloo.bluelink.ui.ThemeMode
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
-import androidx.core.graphics.scale
 
 /**
  * App appearance preferences, kept separate from the session so sign-out keeps them. A thin typed

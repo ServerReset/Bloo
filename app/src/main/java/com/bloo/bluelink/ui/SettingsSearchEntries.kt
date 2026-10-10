@@ -5,8 +5,8 @@ package com.bloo.bluelink.ui
  * and the per-result pop-in helper. Peeled out of SettingsSearch.kt into its own file.
  */
 
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -19,15 +19,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.autolock.AutoLockConfig
 import com.bloo.bluelink.data.Powertrain
-import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.coordString
-import com.bloo.bluelink.data.rangeMiFor
-import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.displayChargeLimit
-import com.bloo.bluelink.data.parseOdometerMiles
+import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.lastServiceMiles
+import com.bloo.bluelink.data.parseOdometerMiles
 import com.bloo.bluelink.data.platform
+import com.bloo.bluelink.data.platformOverridable
+import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.setLastServiceMiles
 import com.bloo.bluelink.data.setLicensePlate

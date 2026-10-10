@@ -1,16 +1,16 @@
 package com.bloo.bluelink.data
 
-import kotlinx.serialization.json.JsonObject
 import com.bloo.bluelink.data.EuApi.Companion.sharedClient
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import kotlinx.serialization.json.JsonObject
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.FormBody
 import okhttp3.HttpUrl
-import java.time.OffsetDateTime
-import java.time.ZoneId
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 
 /** Hyundai EU's OneApp/CCI sign-in, the flow that replaces the legacy IDPConnect one. */
 private const val MOZILLA_UA =

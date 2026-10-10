@@ -1,6 +1,5 @@
 package com.bloo.bluelink.wear
 
-import com.bloo.bluelink.ioScope
 import android.Manifest
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -14,6 +13,7 @@ import androidx.core.content.edit
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.ensureNotificationChannel
+import com.bloo.bluelink.ioScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 

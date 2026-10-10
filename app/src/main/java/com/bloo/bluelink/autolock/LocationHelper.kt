@@ -1,17 +1,17 @@
 package com.bloo.bluelink.autolock
 
 import android.content.Context
+import com.bloo.bluelink.ui.hasLocationPermission
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import kotlin.coroutines.resume
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
-import com.bloo.bluelink.ui.hasLocationPermission
 
 /**
  * A single best-effort current-location read (the phone's own last-known position), and a

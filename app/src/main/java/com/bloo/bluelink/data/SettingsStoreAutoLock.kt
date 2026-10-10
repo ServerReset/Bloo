@@ -18,7 +18,6 @@ suspend fun SettingsStore.autoLockConfig(vin: String): AutoLockConfig =
 
     autoLockConfig(vin, context.settingsDataStore.data.first())
 
-
 /**
  * [Preferences]-taking overload, same reason as [seatConfig]/[isCarConfigured]: the
  * Bluetooth receiver checks EVERY registered VIN on every single connect/disconnect
@@ -39,7 +38,6 @@ fun SettingsStore.autoLockConfig(vin: String, p: Preferences): AutoLockConfig {
         dryRun = b("autolock_dry_run_$vin", true),
     )
 }
-
 
 /** Every DataStore key one car's [AutoLockConfig] occupies -- named once so
  *  [setAutoLockConfig] (which writes them) and [clearAllAutoLockConfigs] (which removes
@@ -65,7 +63,6 @@ private fun SettingsStore.autoLockKeys(vin: String) = listOf(
     booleanPreferencesKey("autolock_dry_run_$vin"),
 )
 
-
 suspend fun SettingsStore.setAutoLockConfig(vin: String, config: AutoLockConfig) {
     editTracked {
         it[booleanPreferencesKey("autolock_enabled_$vin")] = config.enabled
@@ -88,7 +85,6 @@ suspend fun SettingsStore.setAutoLockConfig(vin: String, config: AutoLockConfig)
     }
 }
 
-
 /** Every VIN that has ever had AutoLock enabled -- see [setAutoLockConfig]'s registry
  *  note. Used by [com.bloo.bluelink.autolock.AutoLockBluetoothReceiver] to find which
  *  car(s), if any, a disconnected Bluetooth device belongs to. */
@@ -96,11 +92,9 @@ suspend fun SettingsStore.autoLockConfiguredVins(): List<String> =
 
     autoLockConfiguredVins(context.settingsDataStore.data.first())
 
-
 fun SettingsStore.autoLockConfiguredVins(p: Preferences): List<String> =
 
     (p[stringPreferencesKey("autolock_vins")] ?: "").split(',').filter { it.isNotBlank() }
-
 
 /** Forgets AutoLock entirely for every currently-registered car -- called on a full
  *  sign-out (see [com.bloo.bluelink.ui.AppViewModel.logout]) alongside the other
@@ -123,7 +117,6 @@ suspend fun SettingsStore.clearAllAutoLockConfigs() {
         vins.forEach { vin -> autoLockKeys(vin).forEach { key -> it.remove(key as Preferences.Key<Any>) } }
     }
 }
-
 
 /** One DataStore read for every registered car's full [AutoLockConfig] -- what the
  *  Bluetooth receiver actually wants (a device MAC or a VIN comes in, every configured

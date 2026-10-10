@@ -3,11 +3,12 @@ package com.bloo.bluelink.ui
 /**
  * Extractable from AppViewModel.kt because they are pure functions of (Vehicle, status, UiState).
  */
-import com.bloo.bluelink.data.rangeMiFor
+
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
-import kotlinx.coroutines.flow.first
+import com.bloo.bluelink.data.rangeMiFor
 import java.util.Locale
+import kotlinx.coroutines.flow.first
 
 internal fun summaryPrompt(v: Vehicle, status: VehicleStatus?, state: UiState): String =
     "${v.name} vehicle status:\n" + carText(v, status, state)

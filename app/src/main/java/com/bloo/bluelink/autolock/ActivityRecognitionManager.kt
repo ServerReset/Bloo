@@ -6,11 +6,11 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.bloo.bluelink.ui.hasPermission
 import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.ActivityTransitionRequest
 import com.google.android.gms.location.DetectedActivity
-import com.bloo.bluelink.ui.hasPermission
 
 /**
  * Registers Activity Recognition transition updates so a driving -> walking transition can

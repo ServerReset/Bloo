@@ -3,14 +3,17 @@ package com.bloo.bluelink.autolock
 import android.content.Context
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkGate
+import com.bloo.bluelink.data.CarAction
+import com.bloo.bluelink.data.CarCommand
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
-import com.bloo.bluelink.data.CarAction
-import com.bloo.bluelink.data.CarCommand
+import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.carContext
+import com.bloo.bluelink.data.clearAllAutoLockConfigs
+import com.bloo.bluelink.data.notificationPrefs
 import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.runCarCommand
 import kotlinx.coroutines.CancellationException
@@ -29,9 +32,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import com.bloo.bluelink.data.autoLockConfig
-import com.bloo.bluelink.data.clearAllAutoLockConfigs
-import com.bloo.bluelink.data.notificationPrefs
 
 /** Snapshot the UI/notification observe for one car's in-flight (or last) evaluation. */
 data class AutoLockEvalState(

@@ -10,7 +10,6 @@ import kotlin.math.roundToInt
  */
 data class GeocodedPlace(val full: String, val compact: String)
 
-
 /** "123 Main St, San Jose" from a reverse-geocode result (house number + street + locality).
  *  Falls back to "Springfield, IL" without street detail, then to the raw first address line. */
 fun formatPlaceName(a: android.location.Address): GeocodedPlace? {
@@ -29,18 +28,14 @@ fun formatPlaceName(a: android.location.Address): GeocodedPlace? {
     return GeocodedPlace(full, compact)
 }
 
-
 /** "1h 20m" / "45 min" duration formatter. */
 fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
-
 
 /** °C -> whole-degree °F (rounded), the [ambientF] input for smart-climate calculations. */
 fun ambientFahrenheit(tempC: Double): Int = (tempC * 9.0 / 5.0 + 32.0).roundToInt()
 
-
 /** The Fahrenheit range every supported car's climate target can be set to. */
 val CLIMATE_TEMP_RANGE_F = 62..82
-
 
 /**
  * A one-tap "smart" target for the outside [ambientF], clamped into [CLIMATE_TEMP_RANGE_F].
@@ -58,10 +53,8 @@ fun smartClimateTargetF(ambientF: Int): Int {
     }
 }
 
-
 /** Whether [smartClimateTargetF] cools (70F and up) rather than heats for [ambientF]. */
 fun smartClimateIsCooling(ambientF: Int): Boolean = ambientF >= 70
-
 
 /**
  * The valid range (in minutes) for a SINGLE remote-start climate command's duration -- the vendor
@@ -70,11 +63,9 @@ fun smartClimateIsCooling(ambientF: Int): Boolean = ambientF >= 70
  */
 val CLIMATE_DURATION_RANGE: IntRange = 1..10
 
-
 /** UI range for the "Run time" picker. Wider than [CLIMATE_DURATION_RANGE]: longer runs are
  *  chained into multiple commands (see [climateChunks], ClimateExtendWorker). */
 val CLIMATE_EXTENDED_DURATION_RANGE: IntRange = 1..20
-
 
 /**
  * Splits a total climate-run [minutes] into per-command durations within [CLIMATE_DURATION_RANGE]
@@ -92,10 +83,8 @@ fun climateChunks(minutes: Int): List<Int> {
     return chunks
 }
 
-
 /** Valid range for a car's AC/DC charge-limit percentage sliders. */
 val CHARGE_LIMIT_RANGE = 50..100
-
 
 /**
  * How long a vehicle's cached status is trusted before it's treated as stale (worth nudging the
@@ -104,10 +93,8 @@ val CHARGE_LIMIT_RANGE = 50..100
  */
 val STALE_STATUS_MS = 15L * 60 * 1000L
 
-
 /** How long an available update is snoozed after "Remind me" / "Not now". */
 val UPDATE_SNOOZE_MS = 3L * 24 * 60 * 60 * 1000L
-
 
 /**
  * Whether [stamp] is within [windowMs] before [now] -- use for "skip if recent" throttles.
@@ -119,18 +106,15 @@ fun withinWindow(now: Long, stamp: Long, windowMs: Long): Boolean =
 
     (now - stamp) in 0 until windowMs
 
-
 /** The climate request used when nothing else is configured: just "turn it on". */
 const val DEFAULT_CLIMATE_TEMP_F = 72
 
 const val DEFAULT_CLIMATE_DURATION_MIN = 10
 
-
 /** Charge-limit targets used until a car's real targets load: 80% AC, 90% DC. Both are sent together. */
 const val DEFAULT_AC_CHARGE_LIMIT_PCT = 80
 
 const val DEFAULT_DC_CHARGE_LIMIT_PCT = 90
-
 
 /** Charger-plug type label for [EvStatus.batteryPlugin]. */
 fun chargerLabel(plugin: Int?): String? = when (plugin) {
@@ -138,7 +122,6 @@ fun chargerLabel(plugin: Int?): String? = when (plugin) {
     2 -> "AC (level 2)"
     else -> null
 }
-
 
 // Per-thread formatters for tripDate (rendered per list row; SimpleDateFormat is costly to build).
 // ThreadLocal because SimpleDateFormat is not thread-safe; not java.time because its strict
@@ -158,7 +141,6 @@ private val tripParsers = ThreadLocal.withInitial {
     )
 }
 
-
 /** "2026-06-01 18:22:31.0" / "2026-06-01T18:22:31" -> "Mon Jun 1 · 6:22 PM" (falls back to trimmed raw text).
  *  The feed uses both 'T' and space separators. */
 fun tripDate(raw: String?, includeWeekday: Boolean = true): String {
@@ -175,7 +157,6 @@ fun tripDate(raw: String?, includeWeekday: Boolean = true): String {
     return trimmed.take(16).replace('T', ' ')
 }
 
-
 /** Mask an email for diagnostics: "j***@gmail.com". */
 fun maskEmail(email: String): String {
     val at = email.indexOf('@')
@@ -184,7 +165,6 @@ fun maskEmail(email: String): String {
     // First character of the local part plus the domain.
     return "${email.first()}***${email.substring(at)}"
 }
-
 
 /**
  * Current GMT offset in whole hours (e.g. -5 EST, -4 EDT) -- both brand API clients send this as an
@@ -196,7 +176,6 @@ fun gmtOffsetHours(): String {
     val offsetMs = TimeZone.getDefault().getOffset(System.currentTimeMillis())
     return (offsetMs / 3_600_000).toString()
 }
-
 
 /** "just now" / "x min ago" / "x hr ago" for a wall-clock timestamp in ms. */
 fun relativeLabel(ms: Long?): String {
@@ -213,7 +192,6 @@ fun relativeLabel(ms: Long?): String {
         else -> "${d / 86_400_000} day${if (d / 86_400_000 != 1L) "s" else ""} ago"
     }
 }
-
 
 /**
  * A climate setpoint (the API reports it as a °F string) rendered in the user's
@@ -243,12 +221,10 @@ fun degLabel(valueF: String, fahrenheit: Boolean, sourceUnit: Int? = null): Stri
     return "${converted.roundToInt()}°${if (fahrenheit) "F" else "C"}"
 }
 
-
 /** "22.5" stays "22.5"; "22.0" becomes "22". */
 private fun trimTrailingZero(v: Double): String =
 
     if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()
-
 
 /**
  * A °F reading as a whole number in the user's chosen unit, rounded (not truncated, which
@@ -257,7 +233,6 @@ private fun trimTrailingZero(v: Double): String =
 fun degValue(valueF: Double, fahrenheit: Boolean): Int =
 
     if (fahrenheit) valueF.roundToInt() else ((valueF - 32) * 5 / 9.0).roundToInt()
-
 
 /**
  * Whether temperatures render in Fahrenheit, from a unit-system string. Imperial is the

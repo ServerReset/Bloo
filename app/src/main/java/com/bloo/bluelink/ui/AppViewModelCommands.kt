@@ -1,19 +1,19 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.bluelink.rethrowIfCancellation
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.ReservChargeInfos
 import com.bloo.bluelink.data.TargetSOC
-import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.data.saveClimate
 import com.bloo.bluelink.data.toGeoLocation
+import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
-import com.bloo.bluelink.data.saveClimate
 
 // --- Live device location + remote vehicle commands (extracted from AppViewModel) --
 //

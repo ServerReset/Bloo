@@ -1,28 +1,26 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.only
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.ui.semantics.onClick
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.data.setFontChoice
-import com.bloo.bluelink.data.unitSystem
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.background
-import androidx.compose.material.icons.filled.Vibration
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
+import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.deleteCustomPalette
 import com.bloo.bluelink.data.saveCustomPalette
 import com.bloo.bluelink.data.setActiveCustomPaletteId
@@ -30,9 +28,11 @@ import com.bloo.bluelink.data.setAuroraBackground
 import com.bloo.bluelink.data.setAuroraMotion
 import com.bloo.bluelink.data.setColorPalette
 import com.bloo.bluelink.data.setDynamicColor
+import com.bloo.bluelink.data.setFontChoice
 import com.bloo.bluelink.data.setHapticsEnabled
 import com.bloo.bluelink.data.setPebbleOutline
 import com.bloo.bluelink.data.setThemeMode
+import com.bloo.bluelink.data.unitSystem
 
 /**
  * The "Visuals" card: theme and colour, font, units, text scale, the search bubble, and the welcome

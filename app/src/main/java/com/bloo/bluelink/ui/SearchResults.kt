@@ -1,18 +1,16 @@
-package com.bloo.bluelink.ui
-
-import com.bloo.bluelink.rethrowIfCancellation
 /**
  * Search results surface: the ranked settings/car-data result list, its stagger timing constant and
  * the per-result pop-in helper.
  */
+package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,9 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.VehicleCommandRunner
-import kotlinx.coroutines.delay
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.settingsMode
+import com.bloo.bluelink.rethrowIfCancellation
+import kotlinx.coroutines.delay
 
 internal const val SEARCH_RESULT_STAGGER_MS = 35L
 

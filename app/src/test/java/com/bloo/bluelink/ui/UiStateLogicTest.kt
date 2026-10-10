@@ -1,14 +1,14 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.bluelink.data.SeatConfig
+import com.bloo.bluelink.data.Brand
+import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.Powertrain
+import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehiclePlatform
+import com.bloo.bluelink.data.WorkflowRun
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.platformOverridable
-import com.bloo.bluelink.data.Brand
-import com.bloo.bluelink.data.WorkflowRun
-import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

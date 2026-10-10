@@ -1,8 +1,8 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.VehicleCommandRunner
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

@@ -2,18 +2,11 @@ package com.bloo.bluelink.ui
 
 import android.app.Application
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import com.bloo.bluelink.data.migrateSchema
 import com.bloo.bluelink.data.dirtyKeysFlow
-import com.bloo.bluelink.data.pruneOrphanPhotos
 import com.bloo.bluelink.data.lastSyncError
 import com.bloo.bluelink.data.lastSyncMs
+import com.bloo.bluelink.data.migrateSchema
+import com.bloo.bluelink.data.pruneOrphanPhotos
 import com.bloo.bluelink.data.setLastSyncError
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.bluelink.data.snapshot
@@ -25,6 +18,13 @@ import com.bloo.bluelink.data.syncUri
 import com.bloo.bluelink.data.syncWifiOnly
 import com.bloo.bluelink.data.syncedDevices
 import com.bloo.bluelink.data.watchLockTiming
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 // --- Cold-start Drive sync bootstrap (extracted from AppViewModel) --
 

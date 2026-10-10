@@ -31,4 +31,3 @@ fun rememberConfirmArm(resetMillis: Long = 4000L): ConfirmArm {
     }
     return ConfirmArm(armed = armed, arm = { armed = true })
 }
-

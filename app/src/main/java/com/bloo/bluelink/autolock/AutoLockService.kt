@@ -12,8 +12,9 @@ import android.os.IBinder
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import com.bloo.bluelink.data.AppLog
-import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.allAutoLockConfigs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,7 +22,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.bloo.bluelink.data.allAutoLockConfigs
 
 /**
  * Short-lived foreground service that runs while one or more AutoLock evaluations are in
@@ -82,7 +82,6 @@ class AutoLockService : Service() {
         )
         watcher = receiver
     }
-
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_START_WATCH) {

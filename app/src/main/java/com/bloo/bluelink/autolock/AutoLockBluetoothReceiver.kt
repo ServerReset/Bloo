@@ -5,11 +5,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.allAutoLockConfigs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import com.bloo.bluelink.data.allAutoLockConfigs
 
 /**
  * The "left the car" trigger: fires when the phone disconnects from a car's paired Bluetooth device

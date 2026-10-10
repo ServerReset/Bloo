@@ -12,6 +12,8 @@ import com.bloo.bluelink.data.PinRecord
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.setBiometricLock
+import com.bloo.bluelink.data.setLockTiming
 import com.bloo.bluelink.data.shouldRelockAfter
 import com.bloo.bluelink.data.wireKey
 import kotlinx.coroutines.Dispatchers
@@ -20,8 +22,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.bloo.bluelink.data.setBiometricLock
-import com.bloo.bluelink.data.setLockTiming
 
 // --- App PIN, lock timing, and biometric lock (extracted from AppViewModel) --
 

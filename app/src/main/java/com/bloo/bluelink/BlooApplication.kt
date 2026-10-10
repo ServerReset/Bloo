@@ -9,12 +9,12 @@ import androidx.work.Configuration
 import coil.imageLoader
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.StartupTrace
+import com.bloo.bluelink.data.snapshot
+import com.bloo.bluelink.data.warmUp
 import com.bloo.bluelink.ui.BatterySaverState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.bloo.bluelink.data.snapshot
-import com.bloo.bluelink.data.warmUp
 
 /**
  * Installs a process-wide uncaught exception handler first thing, handing a crash off to

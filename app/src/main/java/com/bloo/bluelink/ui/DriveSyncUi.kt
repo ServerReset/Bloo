@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,18 +19,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import com.bloo.uicommon.ReorderColumn
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.removeSyncedDevice
 import com.bloo.bluelink.data.setPrimaryDevice
 import com.bloo.bluelink.data.setWatchLockTiming
 import com.bloo.bluelink.data.syncDeviceName
 import com.bloo.bluelink.data.watchLockTiming
+import com.bloo.uicommon.ReorderColumn
+import kotlinx.coroutines.delay
 
 /**
  * Multi-device Drive sync UI: the device list/reorder section, per-device row, and the setup dialog

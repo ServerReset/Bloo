@@ -9,10 +9,10 @@ import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.links
+import com.bloo.bluelink.data.setEnabledShortcuts
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import com.bloo.bluelink.data.setEnabledShortcuts
 
 // --- App-icon shortcuts and OEM app launch (extracted from AppViewModel) --
 

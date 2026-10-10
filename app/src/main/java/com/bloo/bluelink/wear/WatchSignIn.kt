@@ -1,6 +1,5 @@
 package com.bloo.bluelink.wear
 
-import com.bloo.bluelink.ioScope
 import android.content.Context
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
@@ -9,6 +8,7 @@ import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.WatchCredentialBundle
 import com.bloo.bluelink.data.WatchCredentialTransfer
 import com.bloo.bluelink.data.WatchSyncProtocol
+import com.bloo.bluelink.ioScope
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow

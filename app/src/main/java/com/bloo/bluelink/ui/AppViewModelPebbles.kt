@@ -1,22 +1,22 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.bluelink.rethrowIfCancellation
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.CarAlerts
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.data.setDefaultClimatePreset
+import com.bloo.bluelink.data.setLastVehicleVin
+import com.bloo.bluelink.data.setSectionCollapsed
+import com.bloo.bluelink.data.setVehicleOrder
+import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
-import com.bloo.bluelink.data.setDefaultClimatePreset
-import com.bloo.bluelink.data.setLastVehicleVin
-import com.bloo.bluelink.data.setSectionCollapsed
-import com.bloo.bluelink.data.setVehicleOrder
 
 /**
  * AppViewModel's car selection, pebble and trip actions, as extensions of [AppViewModel], kept out

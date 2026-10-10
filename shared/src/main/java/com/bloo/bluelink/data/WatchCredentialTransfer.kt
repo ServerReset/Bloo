@@ -1,20 +1,20 @@
 package com.bloo.bluelink.data
 
-import kotlinx.serialization.Serializable
 import java.nio.ByteBuffer
+import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.SecureRandom
-import java.security.KeyFactory
+import java.security.spec.MGF1ParameterSpec
 import java.security.spec.X509EncodedKeySpec
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
-import java.security.spec.MGF1ParameterSpec
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.OAEPParameterSpec
 import javax.crypto.spec.PSource
 import javax.crypto.spec.SecretKeySpec
+import kotlinx.serialization.Serializable
 
 /**
  * Everything the watch needs to run the car on its own: each signed-in account's credentials (so it

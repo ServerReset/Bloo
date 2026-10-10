@@ -5,16 +5,17 @@ package com.bloo.bluelink.ui
  * [VehicleSnapshot] form -- extracted from AppViewModel.kt so the mapping rules are pinnable on the
  * JVM and stable for every consumer.
  */
-import com.bloo.bluelink.data.percentFor
-import com.bloo.bluelink.data.rangeMiFor
-import com.bloo.bluelink.data.toGeoLocation
-import com.bloo.bluelink.data.VehiclePlatform
-import com.bloo.bluelink.data.isGen5W
-import com.bloo.bluelink.data.platformOverridable
+
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.displayChargeLimit
+import com.bloo.bluelink.data.isGen5W
+import com.bloo.bluelink.data.percentFor
+import com.bloo.bluelink.data.platformOverridable
+import com.bloo.bluelink.data.rangeMiFor
+import com.bloo.bluelink.data.toGeoLocation
 
     internal fun snapshotOf(v: Vehicle, status: VehicleStatus?, state: UiState): VehicleSnapshot {
         // Use the effective powertrain (a PHEV reads battery %, not fuel %).

@@ -7,18 +7,18 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.AppLog
-import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.BlueLinkGate
+import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleStatus
-import com.bloo.bluelink.data.repositoryFor
-import kotlinx.coroutines.sync.withLock
-import java.util.concurrent.TimeUnit
 import com.bloo.bluelink.data.notificationPrefs
+import com.bloo.bluelink.data.repositoryFor
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Keeps [LiveCharge]'s notification moving while a car keeps charging.

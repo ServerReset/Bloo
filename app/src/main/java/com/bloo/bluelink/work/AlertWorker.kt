@@ -11,15 +11,15 @@ import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.CarAlerts
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.LiveCharge
-import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleStatus
-import kotlinx.coroutines.sync.withLock
-import java.util.concurrent.TimeUnit
 import com.bloo.bluelink.data.notificationPrefs
+import com.bloo.bluelink.data.repositoryFor
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Periodically refreshes each signed-in car's status in the background and posts

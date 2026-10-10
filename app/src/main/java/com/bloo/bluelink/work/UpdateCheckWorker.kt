@@ -7,8 +7,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.UpdateStore
-import com.bloo.bluelink.update.UpdateChecker
 import com.bloo.bluelink.update.UpdateCheckResult
+import com.bloo.bluelink.update.UpdateChecker
 import java.util.concurrent.TimeUnit
 
 /**

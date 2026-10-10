@@ -8,10 +8,10 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
-import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.CarCommand
 import com.bloo.bluelink.data.CarCommandRunner
+import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
 import java.util.concurrent.TimeUnit
 
 /**

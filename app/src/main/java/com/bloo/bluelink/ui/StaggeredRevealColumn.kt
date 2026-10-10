@@ -1,4 +1,3 @@
-
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.EnterExitState
@@ -10,11 +9,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.size
-// No `motionScheme` import: it is a member of MaterialTheme.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-// State<T>'s `by` delegate resolves to this file-scope operator extension, which needs the explicit
-// import.
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin

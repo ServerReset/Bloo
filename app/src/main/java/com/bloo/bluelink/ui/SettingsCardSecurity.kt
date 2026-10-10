@@ -1,23 +1,23 @@
 package com.bloo.bluelink.ui
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
-import androidx.compose.ui.semantics.onClick
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.bloo.bluelink.data.SettingsStore
-import kotlinx.coroutines.launch
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.runtime.key
-import android.content.Context
-import androidx.compose.material.icons.filled.LockReset
+import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.LockTiming
+import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.setBiometricLock
 import com.bloo.bluelink.data.setLockTiming
+import kotlinx.coroutines.launch
 
 /** The "Security" card: the app lock and the PIN that backs it up. */
 @Composable

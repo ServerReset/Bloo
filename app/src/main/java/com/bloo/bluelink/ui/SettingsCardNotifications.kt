@@ -12,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -22,11 +21,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.autolock.AutoLockNotification
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.data.openLiveUpdateSettings
 import com.bloo.bluelink.data.isBackgroundUnrestricted
+import com.bloo.bluelink.data.openLiveUpdateSettings
 import com.bloo.bluelink.data.requestBackgroundUnrestricted
 
 /**

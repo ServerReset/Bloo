@@ -1,12 +1,12 @@
 package com.bloo.bluelink.data
 
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import okhttp3.Request
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 /**
  * Pure-JVM coverage for [EuApi.normalizeBattery12V], the 12V-reading filter added

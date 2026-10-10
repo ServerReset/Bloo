@@ -1,9 +1,9 @@
 package com.bloo.bluelink.data
 
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import java.util.concurrent.TimeUnit
 
 /** The one HTTP stack and JSON parser every brand API client shares. */
 object ApiHttp {

@@ -10,12 +10,12 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,8 +36,8 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.VehicleSnapshot
-import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.WatchPinPolicy
+import com.bloo.bluelink.data.supportsHornLights
 import kotlinx.coroutines.launch
 
 /**

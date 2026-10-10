@@ -1,6 +1,5 @@
 package com.bloo.bluelink.wear
 
-import com.bloo.bluelink.ioScope
 import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
@@ -16,6 +15,7 @@ import androidx.wear.tiles.TileService
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.ioScope
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.launch
 

@@ -3,8 +3,8 @@ package com.bloo.bluelink.ui
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehiclePlatform
-import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.VehicleStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

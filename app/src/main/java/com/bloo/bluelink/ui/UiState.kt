@@ -5,23 +5,24 @@ package com.bloo.bluelink.ui
  * that answer "what shows for this car". Plain Kotlin over plain data (no Android, no coroutines)
  * so it runs as JVM unit tests.
  */
+
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.CredentialStore
-import com.bloo.bluelink.data.PinLockout
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
+import com.bloo.bluelink.data.PinLockout
 import com.bloo.bluelink.data.Powertrain
-import com.bloo.bluelink.data.VehiclePlatform
-import com.bloo.bluelink.data.isGen5W
-import com.bloo.bluelink.data.platformOverridable
-import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.Weather
+import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.isGen5W
+import com.bloo.bluelink.data.platformOverridable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 

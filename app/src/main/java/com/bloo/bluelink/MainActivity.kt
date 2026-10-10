@@ -15,15 +15,19 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.core.content.ContextCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import com.bloo.bluelink.data.StartupTrace
+import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.ui.AppViewModel
-import com.bloo.bluelink.ui.maybeRelock
-import com.bloo.bluelink.ui.ensureAutoLockWatcher
-import com.bloo.bluelink.ui.handleShortcut
-import com.bloo.bluelink.ui.onShizukuPermissionResult
 import com.bloo.bluelink.ui.BlooApp
 import com.bloo.bluelink.ui.BlooTheme
+import com.bloo.bluelink.ui.ensureAutoLockWatcher
+import com.bloo.bluelink.ui.handleShortcut
+import com.bloo.bluelink.ui.maybeRelock
+import com.bloo.bluelink.ui.onShizukuPermissionResult
 import com.bloo.bluelink.ui.refreshShizukuAvailable
 import com.bloo.bluelink.work.AlertWorker
 import com.bloo.bluelink.work.MainToMainSyncWorker
@@ -32,10 +36,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
-import androidx.core.content.ContextCompat
-import androidx.core.content.pm.ShortcutManagerCompat
-import com.bloo.bluelink.data.brand
-import com.bloo.bluelink.data.StartupTrace
 
 /**
  * The app's single Activity: hosts the Compose UI tree ([BlooApp]) and owns the process-wide setup

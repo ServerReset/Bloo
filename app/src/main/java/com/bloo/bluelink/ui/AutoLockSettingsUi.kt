@@ -1,4 +1,3 @@
-
 package com.bloo.bluelink.ui
 
 import android.Manifest
@@ -16,7 +15,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,12 +23,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.autolock.AutoLockConfig
 import com.bloo.bluelink.autolock.DetectionState
 import com.bloo.bluelink.data.Vehicle
-import kotlin.math.roundToInt
 import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.setAutoLockConfig
+import kotlin.math.roundToInt
 
 /** AutoLock's per-car Settings section, inside [CarSettingsCard]. */
 @Composable

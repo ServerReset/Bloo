@@ -1,12 +1,12 @@
 package com.bloo.bluelink.data
 
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import kotlin.math.roundToInt
 
 /**
  * Current conditions for a single point, normalised from the Open-Meteo response. Temperatures are

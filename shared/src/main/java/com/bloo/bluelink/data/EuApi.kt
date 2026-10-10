@@ -1,5 +1,11 @@
 package com.bloo.bluelink.data
 
+import java.math.BigInteger
+import java.security.KeyFactory
+import java.security.spec.RSAPublicKeySpec
+import java.util.Base64
+import java.util.UUID
+import javax.crypto.Cipher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -12,12 +18,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.math.BigInteger
-import java.security.KeyFactory
-import java.security.spec.RSAPublicKeySpec
-import java.util.Base64
-import java.util.UUID
-import javax.crypto.Cipher
 
 /**
  * A signed-in Hyundai Bluelink Europe (CCAPI / "CCS2") session. [deviceId] is the `ccsp-device-id`

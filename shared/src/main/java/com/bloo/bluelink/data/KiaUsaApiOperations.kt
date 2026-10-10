@@ -1,5 +1,6 @@
 package com.bloo.bluelink.data
 
+import com.bloo.bluelink.data.KiaUsaApi.Companion.API
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
@@ -7,7 +8,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import com.bloo.bluelink.data.KiaUsaApi.Companion.API
 
 /** The Kia US API's bigger operations, as extensions of [KiaUsaApi], kept out of the class so it stays readable. */
 
