@@ -162,22 +162,10 @@ fun ExpressiveButtonGroup(
                     continue
                 }
 
-                // Per-seam reserve: each member's half of a seam is sized off its own content, and
-                // a member's total is the sum of its halves across the seams it borders.
-                fun seamReserve(basis: IntArray): IntArray {
-                    val out = IntArray(n)
-                    for (k in 0 until memberIdx.size - 1) {
-                        val a = memberIdx[k]; val b = memberIdx[k + 1]
-                        out[a] += ((ExpressivePressGrowth * basis[a]) / 2f).roundToInt()
-                        out[b] += ((ExpressivePressGrowth * basis[b]) / 2f).roundToInt()
-                    }
-                    return out
-                }
-
                 val room = if (constraints.hasBoundedWidth) {
                     (constraints.maxWidth - gapsHere - nonMemberWidth).coerceAtLeast(0)
                 } else {
-                    val r = seamReserve(full)
+                    val r = seamPressReserve(memberIdx, full)
                     memberIdx.sumOf { full[it] + r[it] }
                 }
 
@@ -197,7 +185,7 @@ fun ExpressiveButtonGroup(
                 }
                 // Resting width for the winning basis: content (or glyph) plus its seams' reserve.
                 // Named apart from the later `reserve` local to avoid shadowing.
-                val memberReserve = seamReserve(basis)
+                val memberReserve = seamPressReserve(memberIdx, basis)
                 val natLine = IntArray(n) { if (member[it]) basis[it] + memberReserve[it] else full[it] }
                 val naturalTotal = memberIdx.sumOf { natLine[it] }
 
@@ -253,58 +241,10 @@ fun ExpressiveButtonGroup(
                     }
                 }
 
-                // INVARIANT: a line's total member width never changes. A pressed member draws only
-                // on the seams it shares with real neighbours; each seam delta is zero-sum, so the
-                // total holds and a squeezed member's far edge stays put.
-                val exact = DoubleArray(n)
-                for (i in memberIdx) exact[i] = base[i]
-                for (k in 0 until memberIdx.size - 1) {
-                    val a = memberIdx[k]; val b = memberIdx[k + 1]
-                    // Bilateral, not a shared pooled seam: each side can only ever GIVE what it
-                    // holds as its OWN half of this seam's reserve (see seamReserve's own doc for
-                    // why that half is sized off its own content, not its neighbour's).
-                    val bHalf = (ExpressivePressGrowth * basis[b]) / 2.0
-                    val aHalf = (ExpressivePressGrowth * basis[a]) / 2.0
-                    // Each side's gain is capped by the smaller of the two halves, so a small
-                    // chevron beside a large action cannot balloon to the action's scale.
-                    val seamCapacity = minOf(aHalf, bHalf)
-                    // A press takes only a neighbour's slack above its content need, never the
-                    // content, so the floor below never fires and nothing overflows.
-                    val bSlack = (base[b] - basis[b]).coerceAtLeast(0.0)
-                    val aSlack = (base[a] - basis[a]).coerceAtLeast(0.0)
-                    val delta = press[a] * minOf(seamCapacity, bSlack) - press[b] * minOf(seamCapacity, aSlack)
-                    exact[a] += delta
-                    exact[b] -= delta
-                }
-                // Defensive floor only -- content itself never shrinks below what it needs, even in
-                // the two-sided-press edge case above. Left uncorrected on the other side of that
-                // same rare case; a pixel of slack in the line's own total there is a far smaller
-                // cost than a truncated label.
-                for (i in memberIdx) {
-                    exact[i] = exact[i].coerceAtLeast(basis[i].toDouble())
-                }
-                // FINAL GUARANTEE: the line's placed width never exceeds its budget, whatever the
-                // equal-share or the floor above produced. Claw any excess back from the members
-                // with slack first, then proportionally, so the last member can never be pushed
-                // past the edge of the row and off-screen.
-                val exactSum = memberIdx.sumOf { exact[it] }
-                if (exactSum > total && total > 0) {
-                    var excess = exactSum - total
-                    val slack = memberIdx.map { (exact[it] - basis[it]).coerceAtLeast(0.0) }
-                    val slackTotal = slack.sum()
-                    if (slackTotal > 0.0) {
-                        val take = minOf(excess, slackTotal)
-                        memberIdx.forEachIndexed { k, i -> exact[i] -= take * slack[k] / slackTotal }
-                        excess -= take
-                    }
-                    if (excess > 0.0) {
-                        val sum = memberIdx.sumOf { exact[it] }
-                        if (sum > 0.0) {
-                            val scale = (sum - excess) / sum
-                            for (i in memberIdx) exact[i] *= scale
-                        }
-                    }
-                }
+                // Press redistribution (zero-sum across seams) plus the floor and the
+                // never-exceed-the-budget guarantee, all as pure math (see ExpressiveButtonGroupMath).
+                val exact = redistributeForPress(memberIdx, base, basis, press)
+                clampLineToBudget(memberIdx, exact, basis, total)
 
                 // A LONE button on a line has no neighbour to take press width from, so the seam
                 // redistribution above left it unchanged and its press would be a corner-only
@@ -321,22 +261,7 @@ fun ExpressiveButtonGroup(
                     }
                 }
 
-                // Largest-remainder rounding so integer widths sum to `total` exactly (no pixel
-                // breathing).
-                val target = IntArray(n)
-                for (i in memberIdx) target[i] = exact[i].toInt()
-                var remainder = total - memberIdx.sumOf { target[it] }
-                if (remainder > 0) {
-                    val order = memberIdx.sortedByDescending { exact[it] - exact[it].toInt() }
-                    // Bounded by construction, not by trusting the arithmetic: truncation can only
-                    // leave a remainder >= 0 smaller than the member count. But this runs inside a
-                    // measure pass, and a measure pass that can spin is a frozen app rather than a
-                    // wrong pixel.
-                    var k = 0
-                    while (remainder > 0 && k < order.size) {
-                        target[order[k]]++; remainder--; k++
-                    }
-                }
+                val target = largestRemainderWidths(memberIdx, exact, total)
                 for (i in memberIdx) {
                     val w = target[i].coerceIn(0, maxW)
                     out[i] = measurables[i].measure(childConstraints.copy(minWidth = w, maxWidth = w))
