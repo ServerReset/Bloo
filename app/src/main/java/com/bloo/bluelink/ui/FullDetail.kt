@@ -5,10 +5,6 @@ package com.bloo.bluelink.ui
  * car), [ExpandedCar] (the wide dual-column detail), and their shared [CarHeaderRow] fact-chip row.
  */
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,10 +34,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import dev.chrisbanes.haze.HazeState
+import kotlin.math.roundToInt
 
 // --- Full detail ----------------------------------------------------------
 
@@ -155,6 +154,11 @@ internal fun ExpandedCar(
     // stack. Collapsed (one column): it is hidden and they go back into the stack. Derived, so this
     // recomposes only when the boolean flips (at the midpoint), not on every animation frame.
     val expanded by remember { derivedStateOf { expandedT.value >= 0.5f } }
+    // Composed the moment the expand STARTS, not at the 0.5 flip: the seat (a full controls pebble)
+    // is the heaviest thing that flip used to add, and composing it mid-animation was a visible
+    // hitch. It stays collapsed and transparent until the midpoint (see [hotSeatReveal]), so the
+    // visual timing is unchanged -- only the composition moves off the flip.
+    val hotSeatPresent by remember { derivedStateOf { expandedT.value > 0.001f } }
     // One column wide, held constant through the animation (see ReflowPair's own doc): the page
     // grows to two columns but each block stays a single column's width, so nothing re-wraps.
     val blockWidth = (minOf(pageColumnWidth, 960.dp) - ScreenGutter * 2).coerceAtLeast(1.dp)
@@ -189,13 +193,12 @@ internal fun ExpandedCar(
                                 forceHero = forceHero,
                             )
                             // The hot seat lives only in the full-screen two-column view; collapsed,
-                            // its pinned pebbles are ordinary members of the stack below.
-                            AnimatedVisibility(
-                                visible = expanded,
-                                enter = fadeIn(tween(MotionShort)),
-                                exit = fadeOut(tween(MotionShort)),
-                            ) {
-                                HotspotSlot(v, hotspots, state, vm, expanded)
+                            // its pinned pebbles are ordinary members of the stack below. Its reveal
+                            // rides the reflow fraction itself (measure/draw only, never recomposed).
+                            if (hotSeatPresent) {
+                                Box(Modifier.hotSeatReveal { expandedT.value }) {
+                                    HotspotSlot(v, hotspots, state, vm, expanded)
+                                }
                             }
                         }
                     },
@@ -214,6 +217,33 @@ internal fun ExpandedCar(
         }
     }
     }
+}
+
+/**
+ * Reveals the hot seat as the reflow proceeds: it stays collapsed (zero height, transparent) until
+ * the reflow's midpoint, then grows and fades in. The fraction is read only in the measure and draw
+ * phases, so an expand never recomposes the seat. Because its HEIGHT ramps with the same fraction,
+ * the lead block's height (and so where the trail stacks under it) changes smoothly too, instead of
+ * jumping the moment the seat appears.
+ */
+private fun Modifier.hotSeatReveal(t: () -> Float): Modifier = this
+    .graphicsLayer {
+        val f = hotSeatFraction(t())
+        alpha = f
+        clip = true
+    }
+    .layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val f = hotSeatFraction(t())
+        layout(placeable.width, (placeable.height * f).roundToInt().coerceAtLeast(0)) {
+            placeable.place(0, 0)
+        }
+    }
+
+/** 0 until the reflow's midpoint, then a smoothstep up to 1 at the end. */
+private fun hotSeatFraction(t: Float): Float {
+    val x = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f)
+    return x * x * (3f - 2f * x)
 }
 
 /**
