@@ -1,10 +1,17 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +75,8 @@ internal fun HotspotSlot(
     /** State SOURCE. Reading it here confines that to this slot. */
     stateSource: State<UiState>,
     vm: AppViewModel,
+    sharedScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     // Derived, not `val state = stateSource.value`: a body read subscribes this whole dual-column
     // view to every UiState emission. The list compare below then makes an unrelated emission free.
@@ -99,12 +108,40 @@ internal fun HotspotSlot(
         Modifier.fillMaxWidth().graphicsLayer { scaleX = seatScale; scaleY = seatScale },
         verticalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
-        // PRIMARY SLOT: always "controls" (lights/horn), hardcoded, no removal.
-        RevealPebble(primaryPebble, v, stateSource, vm)
+        // PRIMARY SLOT: always "controls" (lights/horn), hardcoded, no removal. It is the matching
+        // shared node for the "controls" row hidden in the stack.
+        Box(
+            with(sharedScope) {
+                Modifier.sharedElement(rememberSharedContentState("pin:${v.vin}:$primaryPebble"), animatedVisibilityScope)
+            },
+        ) {
+            RevealPebble(primaryPebble, v, stateSource, vm)
+        }
 
-        if (secondaryPebble != null) {
-            PinnedPebble(v, stateSource, vm, secondaryPebble, hotDrag)
-        } else if (unpinned.isNotEmpty()) {
+        // SECONDARY SLOT: kept rendered through its exit so the shared element has a node to animate
+        // back to the stack when it is unpinned.
+        var leavingSecondary by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(secondaryPebble) { if (secondaryPebble != null) leavingSecondary = secondaryPebble }
+        AnimatedVisibility(
+            visible = secondaryPebble != null,
+            enter = fadeIn() + scaleIn(initialScale = 0.97f),
+            exit = fadeOut() + scaleOut(targetScale = 0.97f),
+        ) {
+            val section = secondaryPebble ?: leavingSecondary
+            if (section != null) {
+                Box(
+                    with(sharedScope) {
+                        Modifier.sharedElement(
+                            rememberSharedContentState("pin:${v.vin}:$section"),
+                            this@AnimatedVisibility,
+                        )
+                    },
+                ) {
+                    PinnedPebble(v, stateSource, vm, section, hotDrag, interactive = secondaryPebble != null)
+                }
+            }
+        }
+        if (secondaryPebble == null && unpinned.isNotEmpty()) {
             EmptyDropZone(hotDrag, hovered)
         }
     }
@@ -143,6 +180,7 @@ private fun PinnedPebble(
     vm: AppViewModel,
     secondaryPebble: String,
     hotDrag: HotSeatDrag?,
+    interactive: Boolean = true,
 ) {
     val haptics = LocalHaptics.current
     val scope = rememberCoroutineScope()
@@ -194,7 +232,9 @@ private fun PinnedPebble(
                 scaleY = pickScale
                 alpha = exitAlpha.value
             }
-            .pointerInput(secondaryPebble) {
+            .pointerInput(secondaryPebble, interactive) {
+                // Not interactive while it is animating out (unpinned): it must not react to touch.
+                if (!interactive) return@pointerInput
                 detectDragGesturesAfterLongPress(
                     onDragStart = {
                         dragging = true

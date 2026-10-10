@@ -10,9 +10,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
@@ -35,6 +33,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
@@ -43,6 +42,7 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -124,7 +124,9 @@ fun <T> ReorderColumn(
     // An Animatable and a LaunchedEffect that could only ever do nothing, described by a comment
     // ("shows the 'weight' of the move") for an effect no user has seen.
 
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing)) {
+    Layout(
+        modifier = modifier,
+        content = {
         order.forEachIndexed { index, item ->
             val k = keyOf(item)
             // Identity key so Compose moves the existing node when the order changes (instead of
@@ -230,17 +232,33 @@ fun <T> ReorderColumn(
                             }
                             val cur = order.indexOfFirst { keyOfNow(it) == k }
                             if (cur >= 0) {
+                                // Skip over any zero-height (collapsed) entries: they add no height, so
+                                // the dragged item moves past them for free and never gets blocked.
                                 if (offsetY > 0 && cur < order.lastIndex) {
-                                    val nextH = heights[keyOfNow(order[cur + 1])] ?: 0
-                                    if (nextH > 0 && offsetY > nextH / 2f) {
-                                        order = order.toMutableList().also { it.add(cur + 1, it.removeAt(cur)) }
-                                        offsetY -= nextH
+                                    var n = cur + 1
+                                    var acc = 0
+                                    while (n <= order.lastIndex) {
+                                        val h = heights[keyOfNow(order[n])] ?: 0
+                                        acc += h
+                                        if (h > 0) break
+                                        n++
+                                    }
+                                    if (n <= order.lastIndex && acc > 0 && offsetY > acc / 2f) {
+                                        order = order.toMutableList().also { it.add(n, it.removeAt(cur)) }
+                                        offsetY -= acc
                                     }
                                 } else if (offsetY < 0 && cur > 0) {
-                                    val prevH = heights[keyOfNow(order[cur - 1])] ?: 0
-                                    if (prevH > 0 && -offsetY > prevH / 2f) {
-                                        order = order.toMutableList().also { it.add(cur - 1, it.removeAt(cur)) }
-                                        offsetY += prevH
+                                    var n = cur - 1
+                                    var acc = 0
+                                    while (n >= 0) {
+                                        val h = heights[keyOfNow(order[n])] ?: 0
+                                        acc += h
+                                        if (h > 0) break
+                                        n--
+                                    }
+                                    if (n >= 0 && acc > 0 && -offsetY > acc / 2f) {
+                                        order = order.toMutableList().also { it.add(n, it.removeAt(cur)) }
+                                        offsetY += acc
                                     }
                                 }
                             }
@@ -251,6 +269,27 @@ fun <T> ReorderColumn(
                     content(item, handle, dragging)
                 }
             }
+        }
+        },
+    ) { measurables, constraints ->
+        // Stack the items, adding the gap only BETWEEN items that actually have height -- so an item
+        // collapsed to zero (a pinned pebble hidden in the stack, or one animating out) contributes
+        // no gap and effectively vanishes.
+        val gap = spacing.roundToPx()
+        val childConstraints = constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
+        val placeables = measurables.map { it.measure(childConstraints) }
+        val pos = IntArray(placeables.size)
+        var total = 0
+        placeables.forEachIndexed { i, p ->
+            if (total > 0 && p.height > 0) total += gap
+            pos[i] = total
+            total += p.height
+        }
+        // The dragged item is placed last so it draws on top of its neighbours.
+        val dragIdx = order.indexOfFirst { keyOfNow(it) == draggingKey }
+        layout(constraints.maxWidth, total) {
+            placeables.forEachIndexed { i, p -> if (i != dragIdx) p.place(0, pos[i]) }
+            if (dragIdx in placeables.indices) placeables[dragIdx].place(0, pos[dragIdx])
         }
     }
 }

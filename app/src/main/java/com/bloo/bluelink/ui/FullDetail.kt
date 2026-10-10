@@ -6,6 +6,7 @@ package com.bloo.bluelink.ui
  */
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,7 +16,6 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -158,37 +158,13 @@ internal fun ExpandedCar(
     // One column wide, held constant through the animation (see ReflowPair's own doc): the page
     // grows to two columns but each block stays a single column's width, so nothing re-wraps.
     val blockWidth = (minOf(pageColumnWidth, 960.dp) - ScreenGutter * 2).coerceAtLeast(1.dp)
-    val controls: @Composable ColumnScope.() -> Unit = {
-        // No bespoke swipe handler here any more: the car pager one level up owns every horizontal
-        // swipe (the columns scroll vertically only, so a horizontal drag falls through to it). This
-        // is what makes switching cars register reliably -- the old manual threshold handler used to
-        // consume some drags and miss others.
-        CarHeaderRow(v, state, hazeState = hazeState)
-        CriticalContent(
-            v, state, vm,
-            onExpand = onExpand,
-            onCollapse = onCollapse,
-            expanded = expanded,
-            forceHero = forceHero,
-        )
-        // The hot seat lives only in the full-screen two-column view. When the car collapses back to
-        // one column it slides away and its pinned pebbles return to their normal places in the stack
-        // below (see the `pebbles` block's `pinHotspot`), so nothing is ever lost.
-        AnimatedVisibility(
-            visible = expanded,
-            enter = fadeIn(tween(MotionShort)) + slideInHorizontally(tween(MotionShort)) { it / 3 },
-            exit = fadeOut(tween(MotionShort)) + slideOutHorizontally(tween(MotionShort)) { it / 3 },
-        ) {
-            HotspotSlot(v, hotspots, state, vm)
-        }
-    }
-    val pebbles: @Composable ColumnScope.() -> Unit = {
-        // Pinned pebbles are pulled out of the stack only while the hot seat renders them (full
-        // screen); collapsed, they are ordinary members of the list again.
-        PebbleList(v, state, vm, exclude = setOf("summary"), pinHotspot = expanded)
-    }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }) {
+        // Shared-element host: a pinned pebble is the SAME node in the stack (hidden, collapsed to
+        // zero) and in the hot seat, so pinning/unpinning slides it between the two instead of
+        // swapping one composable for another.
+        SharedTransitionLayout {
+        val sharedScope = this
         // One scrolling page whose two blocks reflow by [expandedT]: the pebble list sits UNDER the
         // hero while collapsed and slides up BESIDE it while expanded. Same content either way, so
         // expanding/collapsing is an in-place animation, not a screen swap.
@@ -204,11 +180,44 @@ internal fun ExpandedCar(
                 ReflowPair(
                     expandedT = expandedT,
                     blockWidth = blockWidth,
-                    lead = { Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) { controls() } },
-                    trail = { Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) { pebbles() } },
+                    lead = {
+                        Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+                            // No bespoke swipe handler here any more: the car pager one level up owns
+                            // every horizontal swipe (the columns scroll vertically only, so a
+                            // horizontal drag falls through to it).
+                            CarHeaderRow(v, state, hazeState = hazeState)
+                            CriticalContent(
+                                v, state, vm,
+                                onExpand = onExpand,
+                                onCollapse = onCollapse,
+                                expanded = expanded,
+                                forceHero = forceHero,
+                            )
+                            // The hot seat lives only in the full-screen two-column view; collapsed,
+                            // its pinned pebbles are ordinary members of the stack below.
+                            AnimatedVisibility(
+                                visible = expanded,
+                                enter = fadeIn(tween(MotionShort)) + slideInHorizontally(tween(MotionShort)) { it / 3 },
+                                exit = fadeOut(tween(MotionShort)) + slideOutHorizontally(tween(MotionShort)) { it / 3 },
+                            ) {
+                                HotspotSlot(v, hotspots, state, vm, sharedScope, this)
+                            }
+                        }
+                    },
+                    trail = {
+                        Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+                            PebbleList(
+                                v, state, vm,
+                                exclude = setOf("summary"),
+                                pinHotspot = expanded,
+                                sharedScope = sharedScope,
+                            )
+                        }
+                    },
                 )
                 Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
             }
+        }
         }
     }
     }

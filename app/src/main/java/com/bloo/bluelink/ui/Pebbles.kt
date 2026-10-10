@@ -1,5 +1,11 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,24 +65,26 @@ internal fun PebbleList(
     pinHotspot: Boolean = true,
     /** Forwarded to the "summary" hero pebble only; see [HeroHeader]'s `expandAction`. */
     onExpand: (() -> Unit)? = null,
+    /**
+     * When non-null, a pinned pebble is a shared element: it stays in this list collapsed to zero
+     * height and the hot seat renders the matching shared node, so it slides between the two.
+     */
+    sharedScope: SharedTransitionScope? = null,
 ) {
     // One derived computation, not `state.value` read in this body: that would subscribe the whole
     // stack to every UiState emission. As derived state it only invalidates when the resulting LIST
     // differs.
     val allSections by remember(v.vin) { derivedStateOf { state.value.sectionsFor(v) } }
-    val sections by remember(v.vin, exclude, pinHotspot) {
+    val sections by remember(v.vin, exclude) {
         derivedStateOf {
             val sel = state.value
-            val hasBattery = sel.hasBattery(v)
-            // Exclude any pebbles pinned to the hotspot (both primary and secondary slots) -- but
-            // only when the caller is actually rendering them separately. See [pinHotspot]'s own
-            // doc.
-            val pinnedPebbles = if (pinHotspot) sel.hotspotFor(v.vin) else emptyList()
-            val allExclude = exclude + pinnedPebbles
-            allSections.filter {
-                it !in allExclude && sel.isSectionAvailable(v, it)
-            }
+            allSections.filter { it !in exclude && sel.isSectionAvailable(v, it) }
         }
+    }
+    // Pinned pebbles stay in the list (so they can be shared elements) but are collapsed to zero
+    // height here; the hot seat renders the matching node.
+    val pinned by remember(v.vin, pinHotspot) {
+        derivedStateOf { if (pinHotspot) state.value.hotspotFor(v.vin).toSet() else emptySet() }
     }
     val hotDrag = LocalHotSeatDrag.current
     val haptics = LocalHaptics.current
@@ -140,18 +148,35 @@ internal fun PebbleList(
         staggerInOnColdStart = true,
         introKey = v.vin,
     ) { section, itemDragHandle, _ ->
-        // Each item watches only its own readiness, so filling one pebble composes one pebble.
-        val ready by remember(section) {
-            derivedStateOf { section in eager || section in filledSections }
-        }
-        if (ready) {
-            SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
-        } else {
-            // Below the fold, so this transient state is never seen or interacted with.
-            // heightIn(min), not a fixed height: a pebble header carries a title plus an optional
-            // summary line, and at a large accessibility font that stacked text is taller than
-            // ControlHeight -- a hard height clipped it.
-            Box(Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).then(itemDragHandle))
+        // A pinned pebble stays in the list but collapsed to zero (see the list's own layout, which
+        // adds no gap around a zero-height row); the hot seat renders the matching shared node.
+        AnimatedVisibility(
+            visible = section !in pinned,
+            enter = fadeIn() + scaleIn(initialScale = 0.97f),
+            exit = fadeOut() + scaleOut(targetScale = 0.97f),
+        ) {
+            val ready by remember(section) {
+                derivedStateOf { section in eager || section in filledSections }
+            }
+            val shared = if (sharedScope != null) {
+                with(sharedScope) {
+                    Modifier.sharedElement(
+                        rememberSharedContentState(key = "pin:${v.vin}:$section"),
+                        animatedVisibilityScope = this@AnimatedVisibility,
+                    )
+                }
+            } else {
+                Modifier
+            }
+            if (ready) {
+                SinglePebble(section, v, state, vm, itemDragHandle.then(shared), onExpand = onExpand)
+            } else {
+                // Below the fold, so this transient state is never seen or interacted with.
+                // heightIn(min), not a fixed height: a pebble header carries a title plus an optional
+                // summary line, and at a large accessibility font that stacked text is taller than
+                // ControlHeight -- a hard height clipped it.
+                Box(Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).then(itemDragHandle).then(shared))
+            }
         }
     }
 }
