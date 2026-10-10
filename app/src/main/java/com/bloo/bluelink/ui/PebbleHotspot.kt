@@ -7,10 +7,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -20,7 +17,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
@@ -46,11 +45,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /** How far right the pinned pebble must be dragged before releasing unpins it. */
 private val UnpinTravel = 88.dp
@@ -65,18 +66,22 @@ private const val PinRevealDelayMs = 220L
 private val UnpinFlightSpec = spring<Float>(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
 
 /**
- * The car-info column's "hot seat": the one or two pebbles pinned under the hero. It is shown only
- * in the full-screen two-column view (the caller gates it on the expand fraction); collapsed, the
- * pebbles are ordinary members of the reorderable stack.
+ * The car-info column's "hot seat": the controls pebble pinned under the hero, plus the empty slot a
+ * second pebble can be dragged into.
  *
- * There is no remove button: a pinned pebble is unpinned by picking it up (long-press) and dragging
- * it back to the right, toward the stack. While a pebble is dragged over the seat from the stack the
- * seat leans toward the finger, a soft tick fires on entry, and the empty drop zone cross-fades its
- * fill/outline/tone.
+ * The pinned pebbles themselves are NOT drawn here. The pebble column draws OVER the hero column, so a
+ * pebble living here would slide behind the stack the moment it was dragged out and then reappear.
+ * Instead the second slot reserves its space and reports its position, and [HotSeatOverlay] (a layer
+ * above BOTH columns) draws the one pinned pebble into it. That keeps the pinned pebble a single node
+ * that is never duplicated and never occluded.
  *
- * A pinned pebble keeps its OWN collapsed/expanded state: one that was collapsed lands here
- * collapsed, opens a beat later as a small reveal and stays open; unpinned back into the stack, it is
- * still collapsed, exactly as it was (pinning never touches the stored state).
+ * There is no remove button: a pinned pebble is unpinned by picking it up (long-press) and dragging it
+ * back to the right, toward the stack. While a pebble is dragged over the seat from the stack the seat
+ * leans toward the finger, a soft tick fires on entry, and the empty drop zone fills in.
+ *
+ * A pinned pebble keeps its OWN collapsed/expanded state: one that was collapsed lands here collapsed,
+ * opens a beat later as a small reveal, and stays open; unpinned back into the stack it collapses again
+ * on the way out, exactly as it was (pinning never touches the stored state).
  */
 @Composable
 internal fun HotspotSlot(
@@ -121,101 +126,89 @@ internal fun HotspotSlot(
         animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
         label = "hotSeatScale",
     )
-    // No `spacedBy`: a hidden slot (the empty drop zone, or a leaving pin) must leave NOTHING behind,
-    // and `spacedBy` still inserts a gap around a zero-height child -- which was the phantom gap that
-    // snapped away when the car collapsed back to one column. The drop zone therefore also sits
-    // directly under the control pebble, so it grows out from behind it.
+    // No `spacedBy`: a hidden slot must leave NOTHING behind, and `spacedBy` still inserts a gap
+    // around a zero-height child -- which was the phantom gap that snapped away when the car
+    // collapsed back to one column. Each slot's gap therefore lives INSIDE its own content, so it
+    // appears and retreats with the slot.
     Column(
         Modifier.fillMaxWidth().graphicsLayer { scaleX = seatScale; scaleY = seatScale },
     ) {
-        // PRIMARY SLOT: always "controls" (lights/horn), hardcoded, no removal. Force-expanded, no
-        // reveal, and NOT a shared element -- sharing it across the reflowing stack jittered it, and
-        // it is always present anyway. Drawn above the drop zone (zIndex) so that one slides out from
-        // behind it.
+        // PRIMARY SLOT: always "controls" (lights/horn), hardcoded, no removal. Force-expanded.
+        // Drawn above the second slot (zIndex) so the drop zone slides out from behind it.
         Box(Modifier.zIndex(1f)) {
             CompositionLocalProvider(LocalForceExpanded provides true) {
                 SinglePebble(primaryPebble, v, stateSource, vm, Modifier)
             }
         }
 
-        // SECONDARY SLOT: kept rendered through its unpin FLIGHT (and the exit that follows it), so
-        // the pebble visibly travels back to its stack slot instead of fading away in free space.
-        var leavingSecondary by remember { mutableStateOf<String?>(null) }
-        var unpinning by remember { mutableStateOf(false) }
-        LaunchedEffect(secondaryPebble) {
-            if (secondaryPebble != null) {
-                leavingSecondary = secondaryPebble
-                unpinning = false
-            }
-        }
+        // SECOND SLOT: a reservation. It holds the space a second pinned pebble occupies and reports
+        // that space's position, so the drop target is right and HotSeatOverlay knows where to draw.
+        // The reservation itself stays put while the seat is expanded (a pin in flight needs a stable
+        // target); only the drop-zone CONTENT retreats, and on the same beat as the flight.
         AnimatedVisibility(
-            visible = secondaryPebble != null || unpinning,
-            // The dropped pebble has ALREADY flown here (see ReorderColumn's onDragEnd), so it must
-            // appear INSTANTLY, exactly where it landed -- an entrance animation would fight the
-            // flight. The exit runs only once an unpin flight has landed back in the stack.
+            visible = expanded && (secondaryPebble != null || unpinned.isNotEmpty()),
             enter = EnterTransition.None,
-            exit = fadeOut(tween(MotionShort)) + scaleOut(targetScale = 0.97f),
-        ) {
-            val section = secondaryPebble ?: leavingSecondary
-            if (section != null) {
-                Column {
-                    // The same gap the stack uses between pebbles, so the hot seat reads as the same
-                    // column of pebbles -- not two cards jammed together.
-                    Spacer(Modifier.height(GapGroup))
-                    PinnedPebble(
-                        v, stateSource, vm, section, hotDrag,
-                        interactive = secondaryPebble != null,
-                        onUnpinStart = { unpinning = true },
-                        onUnpinCommit = {
-                            vm.setHotspot(v, section)
-                            unpinning = false
-                        },
-                    )
-                }
-            }
-        }
-
-        // EMPTY SECOND SLOT ("drag a pebble here"): the FIRST thing to go when collapsing. It grows
-        // out from behind the control pebble (anchored at the top, drawn behind it) and retreats back
-        // behind it, on its own, so it never holds up the rest of the collapse. Gated on [expanded]
-        // so its exit starts the moment the collapse does -- and on `pendingPin == null` so that a
-        // dropped pebble's flight and this zone's retreat are the SAME beat: the zone is already
-        // leaving as the pebble arrives, instead of lingering under it once it has landed.
-        AnimatedVisibility(
-            visible = expanded && secondaryPebble == null && unpinned.isNotEmpty() && hotDrag?.pendingPin == null,
-            // Grows out from behind the control pebble (from the top, drawn behind it), then BOUNCES
-            // out: the height spring is under-damped, so it overshoots past its resting height and
-            // settles back.
-            enter = expandVertically(
-                expandFrom = Alignment.Top,
-                animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow),
-            ),
             exit = shrinkVertically(
                 shrinkTowards = Alignment.Top,
                 animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium),
             ),
         ) {
             Column {
-                // Same gap as the stack; part of the zone, so it retreats with it.
+                // The same gap the stack uses between pebbles, so the hot seat reads as the same
+                // column of pebbles -- not two cards jammed together.
                 Spacer(Modifier.height(GapGroup))
-                EmptyDropZone(hotDrag, hovered)
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = PebbleHeaderHeight)
+                        .onGloballyPositioned {
+                            hotDrag?.let { d ->
+                                d.slotTopLeft = it.localToWindow(Offset.Zero)
+                                d.slotSize = it.size
+                            }
+                        },
+                ) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        // Retreats the moment a released pebble starts its flight in (pendingPin), so
+                        // the zone is already leaving as the pebble arrives rather than lingering under
+                        // it once it has landed.
+                        visible = secondaryPebble == null && hotDrag?.pendingPin == null,
+                        enter = expandVertically(
+                            expandFrom = Alignment.Top,
+                            animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow),
+                        ),
+                        exit = shrinkVertically(
+                            shrinkTowards = Alignment.Top,
+                            animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium),
+                        ),
+                    ) {
+                        EmptyDropZone(hovered)
+                    }
+                }
             }
         }
     }
 }
 
 /**
- * Renders a pinned pebble while respecting its own state: it is drawn in whatever state it already
- * has, and a collapsed one opens a beat after it lands (a small reveal), then stays open. The stored
- * state is never modified, so unpinning returns it to the stack exactly as it was.
+ * The one pinned (secondary) pebble, drawn in a layer ABOVE both columns by [HotSeatOverlay]. It is
+ * the only node for that pebble, so it is never duplicated and never slides behind the stack while it
+ * is dragged out. Long-press and drag it right to unpin: it collapses back to the state it came from,
+ * flies to its own slot in the stack, and only then commits the unpin.
  */
 @Composable
-private fun RevealPebble(
-    section: String,
+internal fun PinnedPebble(
     v: Vehicle,
     stateSource: State<UiState>,
     vm: AppViewModel,
+    section: String,
+    hotDrag: HotSeatDrag?,
 ) {
+    val haptics = LocalHaptics.current
+    val scope = rememberCoroutineScope()
+    val unpinPx = with(LocalDensity.current) { UnpinTravel.toPx() }
+    // The stored state never changes: a collapsed pebble opens a beat after it lands, and collapses
+    // again on the way home.
     val initiallyExpanded = remember(v.vin, section) { stateSource.value.isPebbleExpanded(v.vin, section) }
     var revealed by remember(v.vin, section) { mutableStateOf(initiallyExpanded) }
     LaunchedEffect(v.vin, section) {
@@ -224,33 +217,11 @@ private fun RevealPebble(
             revealed = true
         }
     }
-    CompositionLocalProvider(LocalForceExpanded provides revealed) {
-        SinglePebble(section, v, stateSource, vm, Modifier)
-    }
-}
-
-/** The pinned secondary pebble: pick it up and drag it right to unpin. */
-@Composable
-private fun PinnedPebble(
-    v: Vehicle,
-    stateSource: State<UiState>,
-    vm: AppViewModel,
-    secondaryPebble: String,
-    hotDrag: HotSeatDrag?,
-    interactive: Boolean = true,
-    /** Called the moment an unpin starts, to keep this node rendered for its flight home. */
-    onUnpinStart: () -> Unit = {},
-    /** Called once the flight home has landed, to actually commit the unpin. */
-    onUnpinCommit: () -> Unit = {},
-) {
-    val haptics = LocalHaptics.current
-    val scope = rememberCoroutineScope()
-    val unpinPx = with(LocalDensity.current) { UnpinTravel.toPx() }
-    var dragging by remember(secondaryPebble) { mutableStateOf(false) }
-    val dragX = remember(secondaryPebble) { mutableFloatStateOf(0f) }
-    val dragY = remember(secondaryPebble) { mutableFloatStateOf(0f) }
-    val settleX = remember(secondaryPebble) { Animatable(0f) }
-    val settleY = remember(secondaryPebble) { Animatable(0f) }
+    var dragging by remember(section) { mutableStateOf(false) }
+    val dragX = remember(section) { mutableFloatStateOf(0f) }
+    val dragY = remember(section) { mutableFloatStateOf(0f) }
+    val settleX = remember(section) { Animatable(0f) }
+    val settleY = remember(section) { Animatable(0f) }
     val x by remember { derivedStateOf { if (dragging) dragX.floatValue else settleX.value } }
     val y by remember { derivedStateOf { if (dragging) dragY.floatValue else settleY.value } }
     // Grows a little as you pick it up, and more once you have dragged it far enough that releasing
@@ -271,12 +242,12 @@ private fun PinnedPebble(
         val dy = dragY.floatValue
         if (dx > unpinPx) {
             haptics?.heavy()
-            // Keep this node rendered for the flight, fly it to its STACK slot, and only THEN commit
-            // the unpin. That way it travels back to the right place instead of fading where it was
-            // dropped. The target is the row's own slot, registered even while it is collapsed.
-            onUnpinStart()
+            // Collapse back to the state it came from, fly to its own slot in the stack, and only
+            // THEN commit the unpin -- so it travels to the right place instead of fading where it
+            // was dropped. The target is the row's slot, registered even while it is collapsed.
+            if (!initiallyExpanded) revealed = false
             val from = hotDrag?.slotTopLeft
-            val to = hotDrag?.stackSlot?.get(secondaryPebble)
+            val to = hotDrag?.stackSlot?.get(section)
             scope.launch {
                 settleX.snapTo(dx)
                 settleY.snapTo(dy)
@@ -284,7 +255,7 @@ private fun PinnedPebble(
                     launch { settleX.animateTo(to.x - from.x, UnpinFlightSpec) }
                     settleY.animateTo(to.y - from.y, UnpinFlightSpec)
                 }
-                onUnpinCommit()
+                vm.setHotspot(v, section)
             }
         } else {
             scope.launch {
@@ -298,9 +269,6 @@ private fun PinnedPebble(
     Box(
         Modifier
             .fillMaxWidth()
-            .onGloballyPositioned {
-                hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
-            }
             .graphicsLayer {
                 translationX = x
                 translationY = y
@@ -310,9 +278,7 @@ private fun PinnedPebble(
                 // cannot shift the corner we aim at the stack slot.
                 transformOrigin = TransformOrigin(0f, 0f)
             }
-            .pointerInput(secondaryPebble, interactive) {
-                // Not interactive while it is animating out (unpinned): it must not react to touch.
-                if (!interactive) return@pointerInput
+            .pointerInput(section) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = {
                         dragging = true
@@ -330,15 +296,49 @@ private fun PinnedPebble(
                 )
             },
     ) {
-        // No entrance animation: a dropped pebble has already flown here (see ReorderColumn's
-        // onDragEnd), so this must appear exactly where it landed.
-        RevealPebble(secondaryPebble, v, stateSource, vm)
+        CompositionLocalProvider(LocalForceExpanded provides revealed) {
+            SinglePebble(section, v, stateSource, vm, Modifier)
+        }
+    }
+}
+
+/**
+ * The pinned (secondary) pebble's layer: a child of the full-screen page's own Box, drawn AFTER the
+ * scrolling content, so it sits above BOTH columns. It converts the hot-seat slot's window position
+ * into this layer's coordinates and draws [PinnedPebble] into it. Nothing is drawn here when there is
+ * no second pin.
+ */
+@Composable
+internal fun HotSeatOverlay(
+    v: Vehicle,
+    stateSource: State<UiState>,
+    vm: AppViewModel,
+    hotspots: List<String>,
+    hotDrag: HotSeatDrag,
+    /** This layer's own origin in window coords, to convert the slot's window position. */
+    origin: Offset,
+    /** Placement in the page Box (TopStart), so the offset below is measured from the page origin. */
+    modifier: Modifier = Modifier,
+) {
+    val secondary = hotspots.getOrNull(1) ?: return
+    if (hotDrag.slotSize.width == 0) return
+    Box(
+        modifier
+            .offset {
+                IntOffset(
+                    (hotDrag.slotTopLeft.x - origin.x).roundToInt(),
+                    (hotDrag.slotTopLeft.y - origin.y).roundToInt(),
+                )
+            }
+            .width(with(LocalDensity.current) { hotDrag.slotSize.width.toDp() }),
+    ) {
+        PinnedPebble(v, stateSource, vm, secondary, hotDrag)
     }
 }
 
 /** The empty second slot: the drop target's resting / hover affordance. */
 @Composable
-private fun EmptyDropZone(hotDrag: HotSeatDrag?, hovered: Boolean) {
+private fun EmptyDropZone(hovered: Boolean) {
     val fill by animateColorAsState(
         if (hovered) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
         label = "hotseatFill",
@@ -352,32 +352,26 @@ private fun EmptyDropZone(hotDrag: HotSeatDrag?, hovered: Boolean) {
         label = "hotseatOutline",
     )
     val lift by animateFloatAsState(if (hovered) 1f else 0f, label = "hotseatLift")
-    Box(
-        Modifier.fillMaxWidth().onGloballyPositioned {
-            hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
+    Surface(
+        modifier = Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).graphicsLayer {
+            val s = 1f + 0.025f * lift
+            scaleX = s
+            scaleY = s
         },
+        shape = RoundedCornerShape(PebbleCornerCollapsed),
+        color = fill,
+        contentColor = tone,
+        border = BorderStroke(1.dp, outline),
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).graphicsLayer {
-                val s = 1f + 0.025f * lift
-                scaleX = s
-                scaleY = s
-            },
-            shape = RoundedCornerShape(PebbleCornerCollapsed),
-            color = fill,
-            contentColor = tone,
-            border = BorderStroke(1.dp, outline),
+        Box(
+            Modifier.fillMaxWidth().padding(vertical = GapPage, horizontal = GapGroup),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                Modifier.fillMaxWidth().padding(vertical = GapPage, horizontal = GapGroup),
-                contentAlignment = Alignment.Center,
-            ) {
-                MorphButtonLabel(
-                    Icons.Filled.PushPin,
-                    if (hovered) "Release to pin" else "Drag a pebble here",
-                    pending = false,
-                )
-            }
+            MorphButtonLabel(
+                Icons.Filled.PushPin,
+                if (hovered) "Release to pin" else "Drag a pebble here",
+                pending = false,
+            )
         }
     }
 }

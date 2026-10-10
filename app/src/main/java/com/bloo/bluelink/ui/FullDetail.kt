@@ -30,12 +30,15 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
@@ -167,7 +170,11 @@ internal fun ExpandedCar(
         // One scrolling page whose two blocks reflow by [expandedT]: the pebble list sits UNDER the
         // hero while collapsed and slides up BESIDE it while expanded. Same content either way, so
         // expanding/collapsing is an in-place animation, not a screen swap.
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        var pageOrigin by remember { mutableStateOf(Offset.Zero) }
+        Box(
+            Modifier.fillMaxSize().onGloballyPositioned { pageOrigin = it.localToWindow(Offset.Zero) },
+            contentAlignment = Alignment.TopCenter,
+        ) {
             Column(
                 Modifier
                     .fillMaxSize()
@@ -213,6 +220,15 @@ internal fun ExpandedCar(
                     },
                 )
                 Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
+            }
+            // The pinned pebble's own layer, drawn AFTER the scrolling content so it sits above BOTH
+            // columns. A pebble rendered inside the hero column would slide behind the stack the
+            // moment it was dragged out; this one never does, and it is the only node for that pebble.
+            if (expanded) {
+                HotSeatOverlay(
+                    v, state, vm, hotspots, hotDrag, pageOrigin,
+                    modifier = Modifier.align(Alignment.TopStart),
+                )
             }
         }
     }
