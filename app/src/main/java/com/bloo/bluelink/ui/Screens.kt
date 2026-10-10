@@ -17,15 +17,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.LocalRippleConfiguration
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -45,8 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboard
@@ -157,8 +152,6 @@ fun BlooApp(vm: AppViewModel) {
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
         LocalAppearance provides appearance,
     ) {
-    // A soft full-bleed gradient behind the transparent system bars.
-    val scheme = MaterialTheme.colorScheme
     // Biometric lock overlay: blur the whole app behind it and fade the blur away once unlocked.
     // Hoisted into their own small composables below so only those tiny scopes recompose per frame;
     // everything else just gets redrawn under the blurred/faded layer.
@@ -179,40 +172,8 @@ fun BlooApp(vm: AppViewModel) {
     }
     LockBlurLayer(locked = locked && contentSettled) {
     Box(Modifier.fillMaxSize()) {
-    // The app's backdrop: a Haze source every glass card blurs. A sibling under everything, since a
-    // card can't blur its own parent.
-    Box(
-        Modifier
-            .matchParentSize()
-            .hazeSource(backdropHaze)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        scheme.surfaceContainerHigh,
-                        scheme.surface,
-                        scheme.surfaceContainerLow,
-                    ),
-                ),
-            )
-            // Ambient colour under the glass: two soft glows of the theme's own colours, so cards
-            // have something to blur and refract even when the aurora is off.
-            .drawBehind {
-                drawRect(
-                    Brush.radialGradient(
-                        listOf(scheme.primary.copy(alpha = 0.22f), Color.Transparent),
-                        center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.2f),
-                        radius = size.width * 0.9f,
-                    ),
-                )
-                drawRect(
-                    Brush.radialGradient(
-                        listOf(scheme.tertiary.copy(alpha = 0.18f), Color.Transparent),
-                        center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.75f),
-                        radius = size.width * 0.9f,
-                    ),
-                )
-            },
-    )
+    // The app's backdrop: the Haze source every glass card blurs (a sibling under everything).
+    AppBackdrop(backdropHaze, Modifier.matchParentSize())
     Scaffold(
         containerColor = Color.Transparent,
         // Toasts render in ToastHost below, above search, not in the Scaffold's snackbar.
