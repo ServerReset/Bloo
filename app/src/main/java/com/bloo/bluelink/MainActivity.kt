@@ -25,6 +25,7 @@ import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
 import com.bloo.bluelink.ui.BlooTheme
 import com.bloo.bluelink.ui.ensureAutoLockWatcher
+import com.bloo.bluelink.ui.ensureLiveDeviceLocation
 import com.bloo.bluelink.ui.handleShortcut
 import com.bloo.bluelink.ui.maybeRelock
 import com.bloo.bluelink.ui.onShizukuPermissionResult
@@ -198,6 +199,9 @@ class MainActivity : FragmentActivity() {
         // again only refreshes its foreground notification and receiver, it does not start a car
         // evaluation.
         viewModel.ensureAutoLockWatcher()
+        // Recover the device-location collector after a permission granted from system settings
+        // (the app's own dialog restarts it directly). Idempotent when the collector is healthy.
+        viewModel.ensureLiveDeviceLocation()
         // Cold start is handled by the ViewModel; only re-evaluate on warm resumes.
         if (!firstStart) {
             viewModel.maybeRelock(backgroundedAt, screenOffAt > backgroundedAt)

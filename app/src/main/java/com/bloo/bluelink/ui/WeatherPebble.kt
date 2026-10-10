@@ -41,10 +41,14 @@ import kotlinx.coroutines.launch
 
 /**
  * Asks for the phone's position so the map can draw "you are here". [ask] always asks; [askOnce]
- * asks at most once per app run (for a map opening with no fix). A grant starts the live
- * subscription immediately.
+ * asks at most once per app run (for a map opening with no fix); [refresh] grabs a fresh fix if
+ * permission is already granted. A grant starts the live subscription immediately.
  */
-internal class DeviceLocationRequest(val ask: () -> Unit, val askOnce: () -> Unit)
+internal class DeviceLocationRequest(
+    val ask: () -> Unit,
+    val askOnce: () -> Unit,
+    val refresh: () -> Unit,
+)
 
 private var askedForDeviceLocationThisRun = false
 
@@ -61,20 +65,23 @@ internal fun rememberDeviceLocationRequest(vm: AppViewModel): DeviceLocationRequ
     }
     return remember(vm) {
         val ask = {
-            val granted = context.hasLocationPermission()
-            if (granted) {
-                vm.beginLiveDeviceLocation()
+            if (context.hasLocationPermission()) {
+                vm.ensureLiveDeviceLocation()
                 vm.refreshDeviceLocation()
             } else {
                 launcher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
             }
         }
-        DeviceLocationRequest(ask = ask, askOnce = {
-            if (!askedForDeviceLocationThisRun) {
-                askedForDeviceLocationThisRun = true
-                ask()
-            }
-        })
+        DeviceLocationRequest(
+            ask = ask,
+            askOnce = {
+                if (!askedForDeviceLocationThisRun) {
+                    askedForDeviceLocationThisRun = true
+                    ask()
+                }
+            },
+            refresh = { if (context.hasLocationPermission()) vm.refreshDeviceLocation() },
+        )
     }
 }
 

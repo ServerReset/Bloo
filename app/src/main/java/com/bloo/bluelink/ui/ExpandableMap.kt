@@ -80,9 +80,14 @@ internal fun ExpandableMapLayer(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val mapHazeState = remember { HazeState() }
-    // Opening the map with no phone fix yet asks for location (once per run), so the dot just
-    // appears.
-    LaunchedEffect(isExpanded) { if (isExpanded && deviceLocation == null) deviceRequest?.askOnce?.invoke() }
+    // Opening the map asks for location once per run if there's no fix yet, AND always grabs a
+    // fresh fix so the "you are here" dot is current rather than whatever was last seen.
+    LaunchedEffect(isExpanded) {
+        if (isExpanded) {
+            deviceRequest?.askOnce?.invoke()
+            deviceRequest?.refresh?.invoke()
+        }
+    }
     val showMe = rememberShowMyLocation(location, deviceLocation, mapState, deviceRequest)
 
     // Animate from pebble size to full screen.

@@ -26,6 +26,13 @@ internal const val MIN_DEVICE_LOCATION_INTERVAL_MS = 5000L
  */
 internal const val MIN_DEVICE_LOCATION_MOVE_METERS = 15f
 
+/**
+ * How often the live device-location collector re-resolves the phone's place name (reverse geocode).
+ * The fix can update every few seconds; the label does not need to, so geocoding every fix would be
+ * wasted network/CPU.
+ */
+internal const val DEVICE_GEOCODE_INTERVAL_MS = 60_000L
+
 // Debounce window for the auto-push-on-change collector: a burst of edits (e.g. dragging pebbles,
 // sliding a value) coalesces into one Drive write this long after the LAST change.
 internal const val AUTO_PUSH_DEBOUNCE_MS = 2000L

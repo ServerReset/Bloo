@@ -22,11 +22,11 @@ import kotlinx.coroutines.sync.withLock
 // See runCommand for pending/optimistic/statusMutex/rollback behaviour.
 
 /**
- * Starts a continuous [UiState.deviceLocation] subscription
- * ([com.bloo.bluelink.autolock.LocationHelper.liveUpdates]) for the app's lifetime; called once
- * from [loadGarageInner], with no matching stop. [restart] replaces an "active" job: liveUpdates
- * emits nothing without permission but never completes, so a job started before the grant would
- * otherwise never be replaced. [rememberLocateAction] passes true after a grant.
+ * Starts the continuous [UiState.deviceLocation] subscription
+ * ([com.bloo.bluelink.autolock.LocationHelper.liveUpdates]). [restart] replaces an already-running
+ * one. The flow CLOSES with no location permission, so a permission-less start leaves a COMPLETED
+ * job behind rather than a dead-but-"active" one -- [ensureLiveDeviceLocation] can then start a
+ * working one the instant permission is granted.
  */
 fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
     if (!restart && liveLocationJob?.isActive == true) return
@@ -36,10 +36,10 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
         // traced back to this collector publishing every raw fused-location callback verbatim,
         // which a burst of near-identical fixes (GPS jitter, or the provider "catching up" right
         // after its first-ever fix) turned into hundreds of genuinely distinct GeoLocation values
-        // in under a second, each one recomposing LocationPebble (and, on a real report, its whole
-        // host page) via its own stateSlice.
+        // in under a second.
         var lastPublished: android.location.Location? = null
         var lastPublishedAtMs = 0L
+        var lastGeocodedAtMs = 0L
         com.bloo.bluelink.autolock.LocationHelper.liveUpdates(getApplication()).collect { loc ->
             val now = System.currentTimeMillis()
             val last = lastPublished
@@ -54,8 +54,34 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
             // Keep the weather card's "where you are" block tracking the live fix too, so its
             // car-vs-you merge decision uses the current position, not a one-shot reading.
             weather.loadPhoneWeather()
+            // Reverse-geocode the place name at most every DEVICE_GEOCODE_INTERVAL_MS (and always
+            // until we have one at all), so the location label stays current without a geocode on
+            // every fix.
+            if (_state.value.devicePlace == null || now - lastGeocodedAtMs >= DEVICE_GEOCODE_INTERVAL_MS) {
+                lastGeocodedAtMs = now
+                reverseGeocode(loc.toDeviceGeoLocation())?.let { place ->
+                    _state.update { it.copy(devicePlace = place.full) }
+                }
+            }
         }
     }
+}
+
+/**
+ * Makes sure the live device-location collector is actually running: starts it when it isn't, and
+ * does nothing when it already is. Called on every foreground, so a location permission granted from
+ * system settings (rather than through the app's own dialog) is picked up without a cold restart.
+ */
+fun AppViewModel.ensureLiveDeviceLocation() {
+    val app = getApplication<android.app.Application>()
+    if (!app.hasLocationPermission()) {
+        // Permission revoked: drop the collector so a later grant starts a fresh, working one.
+        liveLocationJob?.cancel()
+        liveLocationJob = null
+        return
+    }
+    if (liveLocationJob?.isActive == true) return
+    beginLiveDeviceLocation(restart = true)
 }
 
 fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
