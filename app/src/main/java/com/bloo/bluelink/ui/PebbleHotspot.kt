@@ -1,16 +1,15 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
@@ -18,6 +17,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -76,7 +76,6 @@ internal fun HotspotSlot(
     /** State SOURCE. Reading it here confines that to this slot. */
     stateSource: State<UiState>,
     vm: AppViewModel,
-    sharedScope: SharedTransitionScope,
     /** False while the full-screen view is collapsing: drives the empty drop zone's own exit. */
     expanded: Boolean,
 ) {
@@ -89,7 +88,14 @@ internal fun HotspotSlot(
         }
     }
     val hotDrag = LocalHotSeatDrag.current
-    val hovered = hotDrag?.overSlot == true
+    // Derived, so the per-move pointer updates during a drag recompute this cheaply but only
+    // RECOMPOSE the seat when the boolean actually flips -- reading `overSlot` directly in the body
+    // would re-run the whole seat (control pebble included) on every pointer event.
+    val hovered by remember(hotDrag) { derivedStateOf { hotDrag?.overSlot == true } }
+    // A soft tick the moment a dragged pebble first crosses into the seat, so the drop is felt as
+    // well as seen (the seat leans and the empty zone fills in the same beat).
+    val haptics = LocalHaptics.current
+    LaunchedEffect(hovered) { if (hovered) haptics?.tick() }
 
     // Primary slot pebble (defaults to "controls" with lights/horn); permanently pinned.
     val primaryPebble = hotspots.firstOrNull() ?: "controls"
@@ -123,36 +129,32 @@ internal fun HotspotSlot(
             }
         }
 
-        // SECONDARY SLOT: kept rendered through its exit so the shared element has a node to animate
-        // back to the stack when it is unpinned.
+        // SECONDARY SLOT: kept rendered through its exit so unpinning has a node to fade away in
+        // place (rather than vanishing on the same frame the stack row returns).
         var leavingSecondary by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(secondaryPebble) { if (secondaryPebble != null) leavingSecondary = secondaryPebble }
         AnimatedVisibility(
             visible = secondaryPebble != null,
-            enter = fadeIn() + scaleIn(initialScale = 0.97f),
-            exit = fadeOut() + scaleOut(targetScale = 0.97f),
+            // The dropped pebble has ALREADY flown here (see ReorderColumn's onDragEnd), so it must
+            // appear INSTANTLY, exactly where it landed -- an entrance animation would fight the
+            // flight. The exit (on unpin) fades and shrinks it away.
+            enter = EnterTransition.None,
+            exit = fadeOut(tween(MotionShort)) + scaleOut(targetScale = 0.97f),
         ) {
             val section = secondaryPebble ?: leavingSecondary
             if (section != null) {
-                Box(
-                    with(sharedScope) {
-                        Modifier.sharedElement(
-                            rememberSharedContentState("pin:${v.vin}:$section"),
-                            this@AnimatedVisibility,
-                        )
-                    },
-                ) {
-                    PinnedPebble(v, stateSource, vm, section, hotDrag, interactive = secondaryPebble != null)
-                }
+                PinnedPebble(v, stateSource, vm, section, hotDrag, interactive = secondaryPebble != null)
             }
         }
 
         // EMPTY SECOND SLOT ("drag a pebble here"): the FIRST thing to go when collapsing. It grows
         // out from behind the control pebble (anchored at the top, drawn behind it) and retreats back
         // behind it, on its own, so it never holds up the rest of the collapse. Gated on [expanded]
-        // so its exit starts the moment the collapse does.
+        // so its exit starts the moment the collapse does -- and on `pendingPin == null` so that a
+        // dropped pebble's flight and this zone's retreat are the SAME beat: the zone is already
+        // leaving as the pebble arrives, instead of lingering under it once it has landed.
         AnimatedVisibility(
-            visible = expanded && secondaryPebble == null && unpinned.isNotEmpty(),
+            visible = expanded && secondaryPebble == null && unpinned.isNotEmpty() && hotDrag?.pendingPin == null,
             // Grows out from behind the control pebble (from the top, drawn behind it), then BOUNCES
             // out: the height spring is under-damped, so it overshoots past its resting height and
             // settles back.
@@ -236,8 +238,8 @@ private fun PinnedPebble(
             settleY.snapTo(dy)
             if (dx > unpinPx) {
                 haptics?.heavy()
-                // Toggle: the same section is already the secondary pin, so this unpins it. The
-                // shared element carries the node back into the stack.
+                // Toggle: the same section is already the secondary pin, so this unpins it. It fades
+                // away here while the stack row fades back in, i.e. it returns to the stack.
                 vm.setHotspot(v, secondaryPebble)
             } else {
                 launch { settleX.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) }
@@ -305,7 +307,7 @@ private fun EmptyDropZone(hotDrag: HotSeatDrag?, hovered: Boolean) {
         },
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth().graphicsLayer {
+            modifier = Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).graphicsLayer {
                 val s = 1f + 0.025f * lift
                 scaleX = s
                 scaleY = s

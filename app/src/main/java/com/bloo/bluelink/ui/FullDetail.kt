@@ -6,7 +6,6 @@ package com.bloo.bluelink.ui
  */
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -161,11 +160,6 @@ internal fun ExpandedCar(
     val blockWidth = (minOf(pageColumnWidth, 960.dp) - ScreenGutter * 2).coerceAtLeast(1.dp)
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }) {
-        // Shared-element host: a pinned pebble is the SAME node in the stack (hidden, collapsed to
-        // zero) and in the hot seat, so pinning/unpinning slides it between the two instead of
-        // swapping one composable for another.
-        SharedTransitionLayout {
-        val sharedScope = this
         // One scrolling page whose two blocks reflow by [expandedT]: the pebble list sits UNDER the
         // hero while collapsed and slides up BESIDE it while expanded. Same content either way, so
         // expanding/collapsing is an in-place animation, not a screen swap.
@@ -201,7 +195,7 @@ internal fun ExpandedCar(
                                 enter = fadeIn(tween(MotionShort)),
                                 exit = fadeOut(tween(MotionShort)),
                             ) {
-                                HotspotSlot(v, hotspots, state, vm, sharedScope, expanded)
+                                HotspotSlot(v, hotspots, state, vm, expanded)
                             }
                         }
                     },
@@ -211,14 +205,12 @@ internal fun ExpandedCar(
                                 v, state, vm,
                                 exclude = setOf("summary"),
                                 pinHotspot = expanded,
-                                sharedScope = sharedScope,
                             )
                         }
                     },
                 )
                 Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
             }
-        }
         }
     }
     }

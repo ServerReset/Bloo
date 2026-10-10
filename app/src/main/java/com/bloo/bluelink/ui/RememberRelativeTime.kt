@@ -115,6 +115,8 @@ internal class HotSeatDrag {
     var pointer by mutableStateOf(Offset.Zero)
     var slotTopLeft by mutableStateOf(Offset.Zero)
     var slotSize by mutableStateOf(IntSize.Zero)
+    /** The key released over the slot, awaiting its fly-in before the pin commits. */
+    var pendingPin by mutableStateOf<String?>(null)
     val overSlot: Boolean
         get() = section != null && slotSize.width > 0 &&
             pointer.x in slotTopLeft.x..(slotTopLeft.x + slotSize.width) &&

@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -118,6 +120,9 @@ fun <T> ReorderColumn(
     val playIntro = remember(introKey) {
         staggerInOnColdStart && coldStartIntroPlayed.add(introKey)
     }
+    // Set while a released item is FLYING to a drop target: its pick-up lift eases back to 1.0 during
+    // the flight, so the element that lands matches the one the caller then draws in place (no pop).
+    var flyingKey by remember { mutableStateOf<Any?>(null) }
 
     // Sync with upstream changes only while not actively dragging.
     LaunchedEffect(items) { if (draggingKey == null) order = items }
@@ -133,10 +138,18 @@ fun <T> ReorderColumn(
             // reusing nodes by slot, which looks janky).
             key(k) {
                 val dragging = draggingKey == k
+                val lifted = dragging && flyingKey != k
+                val flying = dragging && flyingKey == k
                 val lift by animateFloatAsState(
-                    targetValue = if (dragging) 1.08f else 1f,
-                    animationSpec = if (dragging) spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium)
-                                   else spring(dampingRatio = 0.3f, stiffness = Spring.StiffnessMediumLow),
+                    targetValue = if (lifted) 1.08f else 1f,
+                    animationSpec = when {
+                        // Picking up / putting back down: a small springy pop.
+                        lifted -> spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium)
+                        // FLYING to the drop target: ease the lift straight down to 1.0 with NO
+                        // overshoot, so the pebble the caller then draws in place lines up exactly.
+                        flying -> spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow)
+                        else -> spring(dampingRatio = 0.3f, stiffness = Spring.StiffnessMediumLow)
+                    },
                     label = "lift"
                 )
                 // Quick top-to-bottom lockstep reveal, once, on a fresh launch.
@@ -161,6 +174,10 @@ fun <T> ReorderColumn(
                             translationY = if (dragging) offsetY else (1f - intro.value) * 28.dp.toPx()
                             scaleX = lift
                             scaleY = lift
+                            // Scale about the TOP-LEFT, not the centre: the release flight aims the
+                            // item's top-left at the drop target, and a centre pivot would move that
+                            // corner as the lift eases back during the flight (landing a few dp off).
+                            transformOrigin = TransformOrigin(0f, 0f)
                             alpha = intro.value
                         }
                         .onSizeChanged { heights[k] = it.height },
@@ -202,15 +219,28 @@ fun <T> ReorderColumn(
                                 // Fly the SAME element to the drop target, then commit: the caller's
                                 // posted pin then appears exactly where this one landed, so the drop
                                 // reads as one element moving rather than a pop.
-                                val dx = target.x - itemWin.x
-                                val dy = target.y - itemWin.y
+                                // itemWin is the item's CURRENT drawn top-left, which already includes
+                                // the drag translation, so the flight must END at start + (target -
+                                // itemWin) -- NOT at (target - itemWin), which would be short by the
+                                // whole drag offset and strand the pebble near the finger. The item
+                                // scales from its TOP-LEFT (see its graphicsLayer), so the lift easing
+                                // back during the flight cannot shift that corner either.
+                                val endX = offsetX + (target.x - itemWin.x)
+                                val endY = offsetY + (target.y - itemWin.y)
+                                flyingKey = k
                                 scope.launch {
                                     val ax = Animatable(offsetX)
                                     val ay = Animatable(offsetY)
-                                    launch { ax.animateTo(dx, DragFlightSpec) { offsetX = value } }
-                                    ay.animateTo(dy, DragFlightSpec) { offsetY = value }
+                                    // Await BOTH axes before committing: they run together, but a
+                                    // shorter axis would otherwise settle early and let the pin land
+                                    // a frame before the flight has actually finished.
+                                    coroutineScope {
+                                        launch { ax.animateTo(endX, DragFlightSpec) { offsetX = value } }
+                                        launch { ay.animateTo(endY, DragFlightSpec) { offsetY = value } }
+                                    }
                                     onDragReleaseCommitNow?.invoke(k)
                                     draggingKey = null
+                                    flyingKey = null
                                     offsetX = 0f
                                     offsetY = 0f
                                 }

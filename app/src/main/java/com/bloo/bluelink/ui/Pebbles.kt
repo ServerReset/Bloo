@@ -1,10 +1,9 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -64,11 +63,6 @@ internal fun PebbleList(
     pinHotspot: Boolean = true,
     /** Forwarded to the "summary" hero pebble only; see [HeroHeader]'s `expandAction`. */
     onExpand: (() -> Unit)? = null,
-    /**
-     * When non-null, a pinned pebble is a shared element: it stays in this list collapsed to zero
-     * height and the hot seat renders the matching shared node, so it slides between the two.
-     */
-    sharedScope: SharedTransitionScope? = null,
 ) {
     // One derived computation, not `state.value` read in this body: that would subscribe the whole
     // stack to every UiState emission. As derived state it only invalidates when the resulting LIST
@@ -80,12 +74,13 @@ internal fun PebbleList(
             allSections.filter { it !in exclude && sel.isSectionAvailable(v, it) }
         }
     }
-    // Pinned pebbles stay in the list (so they can be shared elements) but are collapsed to zero
-    // height here; the hot seat renders the matching node.
+    // Pinned pebbles stay in the list but are collapsed to zero height here (the list's own layout
+    // adds no gap around a zero-height row); the hot seat renders them. Keeping them in the list is
+    // what lets the RELEASE fly the dragged node into the slot before the pin commits.
     val pinned by remember(v.vin, pinHotspot) {
         derivedStateOf { if (pinHotspot) state.value.hotspotFor(v.vin).toSet() else emptySet() }
     }
-    val hotDrag = LocalHotSeatDrag.current
+    val hotDrag = if (pinHotspot) LocalHotSeatDrag.current else null
     val haptics = LocalHaptics.current
     // PERF: each car-pager page composes this whole pebble stack. Composing all 8-10 pebbles
     // eagerly (incl. ClimatePebble/ChargePebble's top-level effects, which run BEFORE their
@@ -126,45 +121,50 @@ internal fun PebbleList(
             { key ->
                 val pin = d.overSlot
                 d.section = null
-                if (pin) { haptics?.heavy(); vm.setHotspot(v, key as String); true } else false
+                // Handled means "pin": record which key, so the fly-in target and the commit know. The
+                // pin is committed only once the node has FLOWN into the slot (onDragReleaseCommit),
+                // never at the drop point -- where it would hang in free space.
+                d.pendingPin = if (pin) key as String else null
+                pin
+            }
+        },
+        dragReleaseTarget = hotDrag?.let { d -> { _ -> if (d.pendingPin != null) d.slotTopLeft else null } },
+        onDragReleaseCommit = hotDrag?.let { d ->
+            { _ ->
+                d.pendingPin?.let { pinned ->
+                    haptics?.heavy()
+                    vm.setHotspot(v, pinned)
+                }
+                d.pendingPin = null
             }
         },
         onDragCancel = hotDrag?.let { d ->
-            { _ -> d.section = null }
+            { _ -> d.section = null; d.pendingPin = null }
         },
         staggerInOnColdStart = true,
         introKey = v.vin,
     ) { section, itemDragHandle, _ ->
         // A pinned pebble stays in the list but collapsed to zero (see the list's own layout, which
-        // adds no gap around a zero-height row); the hot seat renders the matching shared node.
+        // adds no gap around a zero-height row); the hot seat renders it.
         AnimatedVisibility(
             visible = section !in pinned,
-            // Fade, not scale: the pinned node also appears in the hot seat at the same moment, so a
-            // scaling row read as the pebble twitching twice.
+            // Fade the row back in when a pinned pebble RETURNS (unpin). On PIN the row must vanish
+            // INSTANTLY (exit = None): the dropped node has just FLOWN to the hot seat, so a fade-out
+            // here would draw a second copy behind the flight -- the ghost that hung in free space.
             enter = fadeIn(tween(MotionShort)),
-            exit = fadeOut(tween(MotionShort)),
+            exit = ExitTransition.None,
         ) {
             val ready by remember(section) {
                 derivedStateOf { section in eager || section in filledSections }
             }
-            val shared = if (sharedScope != null) {
-                with(sharedScope) {
-                    Modifier.sharedElement(
-                        rememberSharedContentState(key = "pin:${v.vin}:$section"),
-                        animatedVisibilityScope = this@AnimatedVisibility,
-                    )
-                }
-            } else {
-                Modifier
-            }
             if (ready) {
-                SinglePebble(section, v, state, vm, itemDragHandle.then(shared), onExpand = onExpand)
+                SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
             } else {
                 // Below the fold, so this transient state is never seen or interacted with.
                 // heightIn(min), not a fixed height: a pebble header carries a title plus an optional
                 // summary line, and at a large accessibility font that stacked text is taller than
                 // ControlHeight -- a hard height clipped it.
-                Box(Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).then(itemDragHandle).then(shared))
+                Box(Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).then(itemDragHandle))
             }
         }
     }
