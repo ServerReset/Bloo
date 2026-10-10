@@ -7,7 +7,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.BorderStroke
@@ -24,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -42,10 +42,14 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** How far right the pinned pebble must be dragged before releasing unpins it. */
 private val UnpinTravel = 88.dp
+
+/** How long a collapsed pin stays collapsed in the hot seat before it opens as a reveal. */
+private const val PinRevealDelayMs = 220L
 
 /**
  * The car-info column's "hot seat": the one or two pebbles pinned under the hero. It is shown only
@@ -56,6 +60,10 @@ private val UnpinTravel = 88.dp
  * it back to the right, toward the stack. While a pebble is dragged over the seat from the stack the
  * seat leans toward the finger, a soft tick fires on entry, and the empty drop zone cross-fades its
  * fill/outline/tone.
+ *
+ * A pinned pebble keeps its OWN collapsed/expanded state: one that was collapsed lands here
+ * collapsed, opens a beat later as a small reveal and stays open; unpinned back into the stack, it is
+ * still collapsed, exactly as it was (pinning never touches the stored state).
  */
 @Composable
 internal fun HotspotSlot(
@@ -96,15 +104,38 @@ internal fun HotspotSlot(
         verticalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
         // PRIMARY SLOT: always "controls" (lights/horn), hardcoded, no removal.
-        CompositionLocalProvider(LocalForceExpanded provides true) {
-            SinglePebble(primaryPebble, v, stateSource, vm, Modifier)
-        }
+        RevealPebble(primaryPebble, v, stateSource, vm)
 
         if (secondaryPebble != null) {
-            PinnedPebble(v, stateSource, vm, secondaryPebble, hotDrag, hovered)
+            PinnedPebble(v, stateSource, vm, secondaryPebble, hotDrag)
         } else if (unpinned.isNotEmpty()) {
             EmptyDropZone(hotDrag, hovered)
         }
+    }
+}
+
+/**
+ * Renders a pinned pebble while respecting its own state: it is drawn in whatever state it already
+ * has, and a collapsed one opens a beat after it lands (a small reveal), then stays open. The stored
+ * state is never modified, so unpinning returns it to the stack exactly as it was.
+ */
+@Composable
+private fun RevealPebble(
+    section: String,
+    v: Vehicle,
+    stateSource: State<UiState>,
+    vm: AppViewModel,
+) {
+    val initiallyExpanded = remember(v.vin, section) { stateSource.value.isPebbleExpanded(v.vin, section) }
+    var revealed by remember(v.vin, section) { mutableStateOf(initiallyExpanded) }
+    LaunchedEffect(v.vin, section) {
+        if (!initiallyExpanded) {
+            delay(PinRevealDelayMs)
+            revealed = true
+        }
+    }
+    CompositionLocalProvider(LocalForceExpanded provides revealed) {
+        SinglePebble(section, v, stateSource, vm, Modifier)
     }
 }
 
@@ -116,7 +147,6 @@ private fun PinnedPebble(
     vm: AppViewModel,
     secondaryPebble: String,
     hotDrag: HotSeatDrag?,
-    hovered: Boolean,
 ) {
     val haptics = LocalHaptics.current
     val scope = rememberCoroutineScope()
@@ -180,15 +210,11 @@ private fun PinnedPebble(
                 )
             },
     ) {
-        CompositionLocalProvider(LocalForceExpanded provides true) {
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn(tween(MotionShort)) +
-                    slideInHorizontally(tween(MotionShort)) { it } +
-                    expandVertically(tween(MotionShort)),
-            ) {
-                SinglePebble(secondaryPebble, v, stateSource, vm, Modifier)
-            }
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn(tween(MotionShort)) + slideInHorizontally(tween(MotionShort)) { it },
+        ) {
+            RevealPebble(secondaryPebble, v, stateSource, vm)
         }
     }
 }
