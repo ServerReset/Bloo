@@ -104,8 +104,8 @@ internal fun HotspotSlot(
             SinglePebble(primaryPebble, v, stateSource, vm, Modifier)
         }
 
-        val showSecondary = secondaryPebble != null || (unpinned.isNotEmpty() && (expanded || dragging))
-        if (showSecondary) {
+        val showDropZone = unpinned.isNotEmpty() && (expanded || dragging)
+        if (secondaryPebble != null || showDropZone) {
             HotSeatSecondary(v, stateSource, vm, hotDrag, hovered, secondaryPebble)
         }
     }
@@ -197,7 +197,8 @@ private fun HotSeatSecondary(
                 }
             }
         } else {
-            // Empty (full screen only): the drop target's resting / hover affordance.
+            // Empty: the drop target's resting / hover affordance, shown in full screen or while a
+            // pebble is being dragged anywhere (so pinning works in the grid too).
             PopVisible(visible = true, sizeAnimated = true) {
                 Surface(
                     modifier = Modifier.fillMaxWidth().graphicsLayer {
