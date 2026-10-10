@@ -108,10 +108,9 @@ class PhoneWatchSyncService : WearableListenerService() {
         private const val KEY_PAYLOAD = "payload"
 
         /**
-         * Advertise a newer WATCH build to any paired watch. A no-op when no watch is paired, so
-         * the update check never pays for a push nobody will read. [run] is the phone's newest
-         * [com.bloo.bluelink.data.WorkflowRun]; its watch asset URL is what the watch offers to
-         * download.
+         * Download the watch APK at [url] on a background thread and push it to any paired watch as
+         * a Data Layer asset, so the watch can offer to install the new build. A no-op when no watch
+         * is paired (the push simply goes nowhere).
          */
         fun pushWatchApk(context: Context, url: String) {
             val app = context.applicationContext

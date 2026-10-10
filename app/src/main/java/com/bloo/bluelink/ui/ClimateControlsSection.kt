@@ -1,9 +1,6 @@
 package com.bloo.bluelink.ui
 
-/**
- * Climate controls: ClimatePebble, SeatControl, seatTint, preset section, PresetPill,
- * ChargeLimitPill -- extracted from Pebbles.kt.
- */
+/** The climate pebble's controls section: [ClimateControlsSection]. */
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility

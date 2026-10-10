@@ -1,8 +1,8 @@
 package com.bloo.bluelink.ui
 
 /**
- * Climate controls: ClimatePebble, SeatControl, seatTint, preset section, PresetPill,
- * ChargeLimitPill.
+ * Shared climate controls: [SeatControl], [WheelHeatControl], the seat/wheel tints, the preset
+ * section and [ChargeLimitPill].
  */
 
 import androidx.compose.animation.AnimatedVisibility

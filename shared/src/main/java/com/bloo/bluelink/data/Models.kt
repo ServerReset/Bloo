@@ -262,11 +262,7 @@ data class RemainTime2(
     val etc3: TimeValue? = null,
 )
 
-/**
- * Distance-to-empty: a numeric [value] plus a [unit] code (the API's own unit enum, not resolved
- * here — callers that care about miles vs km read this in conjunction with the user's own unit
- * preference).
- */
+/** A remaining time reported by the API: [value] in minutes, [unit] the API's own unit code. */
 @Serializable
 data class TimeValue(
     val value: Double? = null,
@@ -274,8 +270,8 @@ data class TimeValue(
 )
 
 /**
- * A climate setpoint as the API reports it: [value] is a numeric string (not a Double) because the
- * API itself sends it quoted; [unit] again is the API's own unit code.
+ * The reserved/charge-target info from the EV status: the AC/DC target state-of-charge entries,
+ * looked up by plug type via [level].
  */
 @Serializable
 data class ReservChargeInfos(
