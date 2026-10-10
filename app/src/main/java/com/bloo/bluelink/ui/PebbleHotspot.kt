@@ -215,8 +215,15 @@ private fun PinnedPebble(
     val settleY = remember(secondaryPebble) { Animatable(0f) }
     val x by remember { derivedStateOf { if (dragging) dragX.floatValue else settleX.value } }
     val y by remember { derivedStateOf { if (dragging) dragY.floatValue else settleY.value } }
+    // Grows a little as you pick it up, and more once you have dragged it far enough that releasing
+    // WILL unpin it -- so the drop is not a surprise.
+    val pastUnpin = dragging && x > unpinPx
     val pickScale by animateFloatAsState(
-        if (dragging) 1.04f else 1f,
+        when {
+            !dragging -> 1f
+            pastUnpin -> 1.08f
+            else -> 1.04f
+        },
         spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
         label = "pickScale",
     )
