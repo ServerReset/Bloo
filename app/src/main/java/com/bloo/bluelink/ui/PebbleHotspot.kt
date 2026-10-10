@@ -1,14 +1,10 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -210,12 +206,9 @@ private fun PinnedPebble(
                 )
             },
     ) {
-        AnimatedVisibility(
-            visible = true,
-            enter = fadeIn(tween(MotionShort)) + slideInHorizontally(tween(MotionShort)) { it },
-        ) {
-            RevealPebble(secondaryPebble, v, stateSource, vm)
-        }
+        // No entrance animation: a dropped pebble has already flown here (see ReorderColumn's
+        // onDragEnd), so this must appear exactly where it landed.
+        RevealPebble(secondaryPebble, v, stateSource, vm)
     }
 }
 

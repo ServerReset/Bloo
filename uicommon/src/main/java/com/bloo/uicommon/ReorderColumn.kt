@@ -63,6 +63,9 @@ val coldStartIntroPlayed = mutableSetOf<Any>()
 /** True while ANY [ReorderColumn] item is being dragged (the "floating pebble" state). */
 val LocalReorderActive = staticCompositionLocalOf { false }
 
+/** The spring a released pebble flies into its drop target on (see [ReorderColumn]'s onDragEnd). */
+private val DragFlightSpec = spring<Float>(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+
 @Composable
 fun <T> ReorderColumn(
     items: List<T>,
@@ -72,6 +75,12 @@ fun <T> ReorderColumn(
     spacing: Dp = 12.dp,
     onDragMove: ((key: Any, windowPointer: Offset) -> Unit)? = null,
     onDragRelease: ((key: Any) -> Boolean)? = null,
+    /** Window-coords target to fly the released item to when [onDragRelease] handled it. */
+    dragReleaseTarget: ((key: Any) -> Offset?)? = null,
+    /** Called once the released item has flown to its target (or at once when there is none). */
+    onDragReleaseCommit: ((key: Any) -> Unit)? = null,
+    /** Drag cancelled (not a drop): the caller should clear any in-flight drop-hover state. */
+    onDragCancel: ((key: Any) -> Unit)? = null,
     staggerInOnColdStart: Boolean = false,
     // Identity for the "already played" check above -- distinct per logical column (e.g. each car's
     // VIN), so one column consuming the intro can't rob another (possibly still
@@ -85,6 +94,10 @@ fun <T> ReorderColumn(
     val onReorderNow by rememberUpdatedState(onReorder)
     val onDragMoveNow by rememberUpdatedState(onDragMove)
     val onDragReleaseNow by rememberUpdatedState(onDragRelease)
+    val dragReleaseTargetNow by rememberUpdatedState(dragReleaseTarget)
+    val onDragReleaseCommitNow by rememberUpdatedState(onDragReleaseCommit)
+    val onDragCancelNow by rememberUpdatedState(onDragCancel)
+    val scope = rememberCoroutineScope()
     var order by remember { mutableStateOf(items) }
     var draggingKey by remember { mutableStateOf<Any?>(null) }
     val reorderActive = draggingKey != null
@@ -173,10 +186,33 @@ fun <T> ReorderColumn(
                         onDragStart = { draggingKey = k; offsetY = 0f; offsetX = 0f },
                         onDragEnd = {
                             val handled = onDragReleaseNow?.invoke(k) ?: false
-                            draggingKey = null; offsetY = 0f; offsetX = 0f
-                            if (!handled) onReorderNow(order)
+                            val target = if (handled) dragReleaseTargetNow?.invoke(k) else null
+                            val itemWin = handleCoords.value?.takeIf { it.isAttached }?.localToWindow(Offset.Zero)
+                            if (handled && target != null && itemWin != null) {
+                                // Fly the SAME element to the drop target, then commit: the caller's
+                                // posted pin then appears exactly where this one landed, so the drop
+                                // reads as one element moving rather than a pop.
+                                val dx = target.x - itemWin.x
+                                val dy = target.y - itemWin.y
+                                scope.launch {
+                                    val ax = Animatable(offsetX)
+                                    val ay = Animatable(offsetY)
+                                    launch { ax.animateTo(dx, DragFlightSpec) { offsetX = value } }
+                                    ay.animateTo(dy, DragFlightSpec) { offsetY = value }
+                                    onDragReleaseCommitNow?.invoke(k)
+                                    draggingKey = null
+                                    offsetX = 0f
+                                    offsetY = 0f
+                                }
+                            } else {
+                                draggingKey = null; offsetY = 0f; offsetX = 0f
+                                if (handled) onDragReleaseCommitNow?.invoke(k) else onReorderNow(order)
+                            }
                         },
-                        onDragCancel = { onDragReleaseNow?.invoke(k); draggingKey = null; offsetY = 0f; offsetX = 0f },
+                        onDragCancel = {
+                            onDragCancelNow?.invoke(k)
+                            draggingKey = null; offsetY = 0f; offsetX = 0f
+                        },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             offsetY += dragAmount.y

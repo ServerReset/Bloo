@@ -116,8 +116,23 @@ internal fun PebbleList(
             { key ->
                 val pin = d.overSlot
                 d.section = null
-                if (pin) { haptics?.heavy(); vm.setHotspot(v, key as String); true } else false
+                // Handled means "pin": record which key, so the fly-in target and the commit know.
+                d.pendingPin = if (pin) key as String else null
+                pin
             }
+        },
+        dragReleaseTarget = hotDrag?.let { d -> { _ -> if (d.pendingPin != null) d.slotTopLeft else null } },
+        onDragReleaseCommit = hotDrag?.let { d ->
+            { _ ->
+                d.pendingPin?.let { pinned ->
+                    haptics?.heavy()
+                    vm.setHotspot(v, pinned)
+                }
+                d.pendingPin = null
+            }
+        },
+        onDragCancel = hotDrag?.let { d ->
+            { _ -> d.section = null; d.pendingPin = null }
         },
         staggerInOnColdStart = true,
         introKey = v.vin,

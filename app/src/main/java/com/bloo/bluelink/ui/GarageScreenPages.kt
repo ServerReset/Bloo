@@ -167,6 +167,7 @@ internal fun CollapsedGaragePager(
                         ExpandedCar(
                             vehicles[real], state, vm,
                             flipped = false,
+                            pageColumnWidth = columnWidth,
                             onExpand = { vm.expand(real) },
                             onCollapse = { vm.collapse() },
                             expandedT = expandedT,

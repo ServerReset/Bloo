@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import dev.chrisbanes.haze.HazeState
@@ -106,6 +107,11 @@ internal fun ExpandedCar(
     state: State<UiState>,
     vm: AppViewModel,
     flipped: Boolean,
+    /**
+     * Width of ONE column -- the collapsed page's width. The reflow holds this constant so the
+     * blocks never re-wrap as the page grows to two columns.
+     */
+    pageColumnWidth: Dp,
     onCollapse: () -> Unit,
     /** The hero's single trailing button shows "go full screen" while collapsed; this fires. */
     onExpand: (() -> Unit)? = null,
@@ -149,6 +155,9 @@ internal fun ExpandedCar(
     // Full screen (two columns): the hot seat is shown and its pinned pebbles are pulled out of the
     // stack. Collapsed (one column): it is hidden and they go back into the stack.
     val expanded = expandedT >= 0.5f
+    // One column wide, held constant through the animation (see ReflowPair's own doc): the page
+    // grows to two columns but each block stays a single column's width, so nothing re-wraps.
+    val blockWidth = (minOf(pageColumnWidth, 960.dp) - ScreenGutter * 2).coerceAtLeast(1.dp)
     val controls: @Composable ColumnScope.() -> Unit = {
         // No bespoke swipe handler here any more: the car pager one level up owns every horizontal
         // swipe (the columns scroll vertically only, so a horizontal drag falls through to it). This
@@ -194,6 +203,7 @@ internal fun ExpandedCar(
                 Spacer(Modifier.height(topInset))
                 ReflowPair(
                     expandedT = expandedT,
+                    blockWidth = blockWidth,
                     lead = { Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) { controls() } },
                     trail = { Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) { pebbles() } },
                 )
