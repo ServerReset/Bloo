@@ -342,13 +342,22 @@ internal fun CarMap(
                 Modifier
                     .align(Alignment.Center)
                     .offset { IntOffset(dx.roundToInt(), dy.roundToInt()) }
-                    .size(16.dp)
-                    .background(Color.White, CircleShape)
-                    .padding(3.dp)
-                    .background(deviceLocationColor, CircleShape)
+                    .size(30.dp)
                     // The dot carries no text, so TalkBack would skip it entirely; name it.
                     .semantics { contentDescription = "Your location" },
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                // A soft halo (clearer than a bare dot, and it survives a busy/satellite tile) under a
+                // white ring and the accent dot.
+                Box(Modifier.size(30.dp).background(deviceLocationColor.copy(alpha = 0.22f), CircleShape))
+                Box(
+                    Modifier
+                        .size(16.dp)
+                        .background(Color.White, CircleShape)
+                        .padding(3.dp)
+                        .background(deviceLocationColor, CircleShape),
+                )
+            }
         }
         } // close the scaled layer
         // Off-screen device indicator: when the phone is farther than the map shows, its dot is
@@ -362,14 +371,12 @@ internal fun CarMap(
             val sx = (((MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx).toFloat() + state.panX) * sc
             val sy = (((MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx).toFloat() + state.panY) * sc
             val marginPx = with(density) { 22.dp.toPx() }
-            if (kotlin.math.abs(sx) > halfW - marginPx || kotlin.math.abs(sy) > halfH - marginPx) {
-                val kx = if (sx != 0f) (halfW - marginPx) / kotlin.math.abs(sx) else Float.MAX_VALUE
-                val ky = if (sy != 0f) (halfH - marginPx) / kotlin.math.abs(sy) else Float.MAX_VALUE
-                val k = kotlin.math.min(kx, ky).coerceIn(0f, 1f)
+            if (markerOffBox(sx, sy, halfW, halfH, marginPx)) {
+                val (ex, ey) = clampMarkerToEdge(sx, sy, halfW, halfH, marginPx)
                 Box(
                     Modifier
                         .align(Alignment.Center)
-                        .offset { IntOffset((sx * k).roundToInt(), (sy * k).roundToInt()) }
+                        .offset { IntOffset(ex.roundToInt(), ey.roundToInt()) }
                         .size(30.dp)
                         .background(deviceLocationColor, CircleShape)
                         .clickable {
