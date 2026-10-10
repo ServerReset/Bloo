@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -349,6 +351,42 @@ internal fun CarMap(
             )
         }
         } // close the scaled layer
+        // Off-screen device indicator: when the phone is farther than the map shows, its dot is
+        // clipped away entirely. Draw a marker clamped to the box edge pointing toward it, which
+        // centres the map on it when tapped -- so "my location" is never simply nowhere.
+        val dev = deviceLocation
+        if (dev != null && wPx > 0f && hPx > 0f) {
+            val halfW = wPx / 2f
+            val halfH = hPx / 2f
+            val sc = state.scale
+            val sx = (((MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx).toFloat() + state.panX) * sc
+            val sy = (((MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx).toFloat() + state.panY) * sc
+            val marginPx = with(density) { 22.dp.toPx() }
+            if (kotlin.math.abs(sx) > halfW - marginPx || kotlin.math.abs(sy) > halfH - marginPx) {
+                val kx = if (sx != 0f) (halfW - marginPx) / kotlin.math.abs(sx) else Float.MAX_VALUE
+                val ky = if (sy != 0f) (halfH - marginPx) / kotlin.math.abs(sy) else Float.MAX_VALUE
+                val k = kotlin.math.min(kx, ky).coerceIn(0f, 1f)
+                Box(
+                    Modifier
+                        .align(Alignment.Center)
+                        .offset { IntOffset((sx * k).roundToInt(), (sy * k).roundToInt()) }
+                        .size(30.dp)
+                        .background(deviceLocationColor, CircleShape)
+                        .clickable {
+                            state.showDevice(location.latitude, location.longitude, dev.latitude, dev.longitude)
+                        }
+                        .semantics { contentDescription = "Your location is off screen. Tap to centre on it" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.MyLocation,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
         // Expand/Open-in-Maps render as a MapFeatureRow in the caller, not over the map.
     }
 }

@@ -10,8 +10,6 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -200,8 +198,8 @@ internal fun ExpandedCar(
                             // its pinned pebbles are ordinary members of the stack below.
                             AnimatedVisibility(
                                 visible = expanded,
-                                enter = fadeIn(tween(MotionShort)) + slideInHorizontally(tween(MotionShort)) { it / 3 },
-                                exit = fadeOut(tween(MotionShort)) + slideOutHorizontally(tween(MotionShort)) { it / 3 },
+                                enter = fadeIn(tween(MotionShort)),
+                                exit = fadeOut(tween(MotionShort)),
                             ) {
                                 HotspotSlot(v, hotspots, state, vm, sharedScope, expanded)
                             }

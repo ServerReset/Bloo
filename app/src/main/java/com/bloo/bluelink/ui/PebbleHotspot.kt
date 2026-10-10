@@ -16,7 +16,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -108,9 +107,12 @@ internal fun HotspotSlot(
         animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
         label = "hotSeatScale",
     )
+    // No `spacedBy`: a hidden slot (the empty drop zone, or a leaving pin) must leave NOTHING behind,
+    // and `spacedBy` still inserts a gap around a zero-height child -- which was the phantom gap that
+    // snapped away when the car collapsed back to one column. The drop zone therefore also sits
+    // directly under the control pebble, so it grows out from behind it.
     Column(
         Modifier.fillMaxWidth().graphicsLayer { scaleX = seatScale; scaleY = seatScale },
-        verticalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
         // PRIMARY SLOT: always "controls" (lights/horn), hardcoded, no removal. Force-expanded, no
         // reveal, and NOT a shared element -- sharing it across the reflowing stack jittered it, and

@@ -2,10 +2,9 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -140,8 +139,10 @@ internal fun PebbleList(
         // adds no gap around a zero-height row); the hot seat renders the matching shared node.
         AnimatedVisibility(
             visible = section !in pinned,
-            enter = fadeIn() + scaleIn(initialScale = 0.97f),
-            exit = fadeOut() + scaleOut(targetScale = 0.97f),
+            // Fade, not scale: the pinned node also appears in the hot seat at the same moment, so a
+            // scaling row read as the pebble twitching twice.
+            enter = fadeIn(tween(MotionShort)),
+            exit = fadeOut(tween(MotionShort)),
         ) {
             val ready by remember(section) {
                 derivedStateOf { section in eager || section in filledSections }
