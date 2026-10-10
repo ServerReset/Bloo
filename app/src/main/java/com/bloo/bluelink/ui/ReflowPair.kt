@@ -18,10 +18,13 @@ import kotlin.math.roundToInt
  * page is showing one column (collapsed) or two (expanded) -- so nothing ever re-wraps as the page
  * grows; only their POSITIONS animate. The caller owns the scrolling (this positions the two
  * blocks).
+ *
+ * [expandedT] is a SUPPLIER, read only here in the measure phase, never in composition: that is what
+ * keeps a running expand/collapse from recomposing the whole car every frame (it only re-lays-out).
  */
 @Composable
 internal fun ReflowPair(
-    expandedT: Float,
+    expandedT: () -> Float,
     blockWidth: Dp,
     modifier: Modifier = Modifier,
     gap: Dp = GapSection,
@@ -35,7 +38,7 @@ internal fun ReflowPair(
             trail()
         },
     ) { measurables, constraints ->
-        val t = expandedT.coerceIn(0f, 1f)
+        val t = expandedT().coerceIn(0f, 1f)
         val gapPx = gap.roundToPx()
         val w = blockWidth.roundToPx().coerceIn(0, constraints.maxWidth)
         val blockConstraints = constraints.copy(minWidth = w, maxWidth = w, minHeight = 0)

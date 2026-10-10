@@ -36,6 +36,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -125,10 +126,11 @@ internal fun ExpandedCar(
     onSwipeCar: (Int) -> Unit = {},
     /**
      * 0 = the pebbles sit UNDER the hero (the collapsed single-column look), 1 = BESIDE it (the
-     * expanded two-column look). Animated by the caller so expanding/collapsing is an in-place
-     * reflow of the same content, not a screen change.
+     * expanded two-column look). A STATE, not a plain float: it is read only where it flips
+     * ([expanded]) and in the reflow's measure phase, so a running animation never recomposes the
+     * car every frame.
      */
-    expandedT: Float = 1f,
+    expandedT: State<Float> = remember { mutableFloatStateOf(1f) },
     /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
     hazeState: HazeState? = null,
 ) {
@@ -153,8 +155,9 @@ internal fun ExpandedCar(
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     // Full screen (two columns): the hot seat is shown and its pinned pebbles are pulled out of the
-    // stack. Collapsed (one column): it is hidden and they go back into the stack.
-    val expanded = expandedT >= 0.5f
+    // stack. Collapsed (one column): it is hidden and they go back into the stack. Derived, so this
+    // recomposes only when the boolean flips (at the midpoint), not on every animation frame.
+    val expanded by remember { derivedStateOf { expandedT.value >= 0.5f } }
     // One column wide, held constant through the animation (see ReflowPair's own doc): the page
     // grows to two columns but each block stays a single column's width, so nothing re-wraps.
     val blockWidth = (minOf(pageColumnWidth, 960.dp) - ScreenGutter * 2).coerceAtLeast(1.dp)
@@ -178,7 +181,7 @@ internal fun ExpandedCar(
             ) {
                 Spacer(Modifier.height(topInset))
                 ReflowPair(
-                    expandedT = expandedT,
+                    expandedT = { expandedT.value },
                     blockWidth = blockWidth,
                     lead = {
                         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {

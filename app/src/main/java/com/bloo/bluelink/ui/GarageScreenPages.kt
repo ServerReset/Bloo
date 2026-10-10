@@ -46,8 +46,8 @@ internal fun CollapsedGaragePager(
     hazeState: HazeState,
     /** The car currently expanded to full width, or null. */
     expandedIdx: Int? = null,
-    /** 0 collapsed, 1 expanded: drives the focused page's own reflow. */
-    expandedT: Float = 0f,
+    /** 0 collapsed, 1 expanded: drives the focused page's own reflow. A State, read only in measure. */
+    expandedT: State<Float>,
 ) {
         // Settings is appended as one more ITEM to the sequence this pager cycles through (index
         // `slots`, right after the last real page), always rendered at exactly one car-column's
@@ -118,16 +118,26 @@ internal fun CollapsedGaragePager(
         Box(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
             val columnWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).coerceAtLeast(1).toDp() }
-            val fullWidth = with(density) { boxWidthPx.coerceAtLeast(1).toDp() }
             // The focused page grows from one column to the whole width as it expands; every other
-            // column is pushed off the side by the same amount.
-            val pageWidth = androidx.compose.ui.unit.lerp(columnWidth, fullWidth, expandedT)
+            // column is pushed off the side by the same amount. A CUSTOM PageSize reads the animated
+            // fraction in the MEASURE phase (never in composition), so an expand/collapse re-lays-out
+            // the pager instead of recomposing it -- and every page -- on every frame.
+            val dynamicPageSize = remember(perPage) {
+                object : androidx.compose.foundation.pager.PageSize {
+                    override fun androidx.compose.ui.unit.Density.calculateMainAxisPageSize(availableSpace: Int, pageSpacing: Int): Int {
+                        val column = ((availableSpace + perPage - 1) / perPage).coerceAtLeast(1)
+                        val full = availableSpace.coerceAtLeast(1)
+                        val t = expandedT.value.coerceIn(0f, 1f)
+                        return (column + (full - column) * t).toInt().coerceIn(1, full)
+                    }
+                }
+            }
             HorizontalPager(
                 state = pager,
                 modifier = Modifier.fillMaxSize().hazeSource(hazeState)
                     .onSizeChanged { boxWidthPx = it.width },
                 userScrollEnabled = true,
-                pageSize = androidx.compose.foundation.pager.PageSize.Fixed(pageWidth),
+                pageSize = dynamicPageSize,
                 // Never a flat 1: perPage + 2*beyond pages are composed at once, and if that
                 // exceeds `total` two virtual pages resolve to the same real item (e.g. Settings
                 // mounted twice) and corrupt its state, crashing.

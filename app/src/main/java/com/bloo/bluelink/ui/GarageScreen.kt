@@ -119,8 +119,9 @@ internal fun GarageScreen(
 
     // 0 collapsed, 1 expanded: the pebble list's own reflow (under the hero -> beside it) runs on
     // this, so expanding is an in-place animation of the same content rather than a screen swap. A
-    // slightly under-damped spring gives the width/position change a small settling bounce.
-    val expandedT by androidx.compose.animation.core.animateFloatAsState(
+    // slightly under-damped spring gives the width/position change a small settling bounce. Kept as a
+    // STATE (not read via `by`): reading it here would recompose this whole screen every frame.
+    val expandedT = androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (expandedIdx != null) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow),
         label = "expandT",
