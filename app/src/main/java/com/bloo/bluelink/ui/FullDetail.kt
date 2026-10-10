@@ -203,7 +203,7 @@ internal fun ExpandedCar(
                                 enter = fadeIn(tween(MotionShort)) + slideInHorizontally(tween(MotionShort)) { it / 3 },
                                 exit = fadeOut(tween(MotionShort)) + slideOutHorizontally(tween(MotionShort)) { it / 3 },
                             ) {
-                                HotspotSlot(v, hotspots, state, vm, sharedScope, this)
+                                HotspotSlot(v, hotspots, state, vm, sharedScope, expanded)
                             }
                         }
                     },

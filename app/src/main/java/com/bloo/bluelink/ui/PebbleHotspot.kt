@@ -1,17 +1,19 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +46,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -76,7 +79,8 @@ internal fun HotspotSlot(
     stateSource: State<UiState>,
     vm: AppViewModel,
     sharedScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope,
+    /** False while the full-screen view is collapsing: drives the empty drop zone's own exit. */
+    expanded: Boolean,
 ) {
     // Derived, not `val state = stateSource.value`: a body read subscribes this whole dual-column
     // view to every UiState emission. The list compare below then makes an unrelated emission free.
@@ -108,14 +112,14 @@ internal fun HotspotSlot(
         Modifier.fillMaxWidth().graphicsLayer { scaleX = seatScale; scaleY = seatScale },
         verticalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
-        // PRIMARY SLOT: always "controls" (lights/horn), hardcoded, no removal. It is the matching
-        // shared node for the "controls" row hidden in the stack.
-        Box(
-            with(sharedScope) {
-                Modifier.sharedElement(rememberSharedContentState("pin:${v.vin}:$primaryPebble"), animatedVisibilityScope)
-            },
-        ) {
-            RevealPebble(primaryPebble, v, stateSource, vm)
+        // PRIMARY SLOT: always "controls" (lights/horn), hardcoded, no removal. Force-expanded, no
+        // reveal, and NOT a shared element -- sharing it across the reflowing stack jittered it, and
+        // it is always present anyway. Drawn above the drop zone (zIndex) so that one slides out from
+        // behind it.
+        Box(Modifier.zIndex(1f)) {
+            CompositionLocalProvider(LocalForceExpanded provides true) {
+                SinglePebble(primaryPebble, v, stateSource, vm, Modifier)
+            }
         }
 
         // SECONDARY SLOT: kept rendered through its exit so the shared element has a node to animate
@@ -141,7 +145,16 @@ internal fun HotspotSlot(
                 }
             }
         }
-        if (secondaryPebble == null && unpinned.isNotEmpty()) {
+
+        // EMPTY SECOND SLOT ("drag a pebble here"): the FIRST thing to go when collapsing. It grows
+        // out from behind the control pebble (anchored at the top, drawn behind it) and retreats back
+        // behind it, on its own, so it never holds up the rest of the collapse. Gated on [expanded]
+        // so its exit starts the moment the collapse does.
+        AnimatedVisibility(
+            visible = expanded && secondaryPebble == null && unpinned.isNotEmpty(),
+            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(MotionShort)) + fadeOut(tween(MotionShort)),
+        ) {
             EmptyDropZone(hotDrag, hovered)
         }
     }
