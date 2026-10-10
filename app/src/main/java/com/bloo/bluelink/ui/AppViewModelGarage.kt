@@ -232,11 +232,6 @@ suspend fun AppViewModel.loadGarageInner() {
 }
 
 /**
- * Re-reads this device's local per-car config (seat capability, powertrain, photo, license plate,
- * service intervals, pebble order) for the currently loaded vehicles and folds it straight into
- * state -- the same local reads [loadGarageInner] already does once at startup, no network call.
- */
-/**
  * Decides which screen a signed-in session with [vehicles] already loaded lands on, from a fresh
  * [prefs] snapshot. [firstRunScreen] for a first-run device, [Screen.CarSetup] for any vehicle it
  * does not cover, else the garage.

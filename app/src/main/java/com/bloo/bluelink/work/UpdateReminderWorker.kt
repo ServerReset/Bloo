@@ -64,11 +64,11 @@ class UpdateReminderWorker(context: Context, params: WorkerParameters) : Corouti
         // "update available" notification don't replace each other.
         private const val NOTIF_ID = 90211
 
-        /** Schedule the 1-day "Remind me" follow-up. REPLACE so re-tapping resets
-         *  the timer rather than queuing a second reminder. */
         /** Bounded retries, so a persistently offline phone stops rather than retrying forever. */
         private const val MAX_ATTEMPTS = 5
 
+        /** Schedule the 1-day "Remind me" follow-up. REPLACE so re-tapping resets
+         *  the timer rather than queuing a second reminder. */
         fun schedule(context: Context) {
             val request = OneTimeWorkRequestBuilder<UpdateReminderWorker>()
                 .setInitialDelay(1, TimeUnit.DAYS)

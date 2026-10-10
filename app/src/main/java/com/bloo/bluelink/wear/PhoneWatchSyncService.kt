@@ -108,16 +108,6 @@ class PhoneWatchSyncService : WearableListenerService() {
         private const val KEY_PAYLOAD = "payload"
 
         /**
-         * Push the current snapshot + lock config to every paired watch, now. Called from the
-         * phone app whenever it writes the snapshot so the watch stays live; a no-op (and
-         * cheap) when no watch is paired. Runs off the caller's thread via the Data Layer's own
-         * executor, so it never blocks a phone UI frame.
-         *
-         * [watchUpdateRunNumber]/[watchUpdateApkUrl]/[watchUpdateNotes] advertise a newer WATCH
-         * build for the watch to offer installing; null (the default) means "nothing to
-         * advertise" and the watch shows no update affordance.
-         */
-        /**
          * Advertise a newer WATCH build to any paired watch. A no-op when no watch is paired, so
          * the update check never pays for a push nobody will read. [run] is the phone's newest
          * [com.bloo.bluelink.data.WorkflowRun]; its watch asset URL is what the watch offers to
@@ -144,6 +134,16 @@ class PhoneWatchSyncService : WearableListenerService() {
             }
         }
 
+        /**
+         * Push the current snapshot + lock config to every paired watch, now. Called from the
+         * phone app whenever it writes the snapshot so the watch stays live; a no-op (and
+         * cheap) when no watch is paired. Runs off the caller's thread via the Data Layer's own
+         * executor, so it never blocks a phone UI frame.
+         *
+         * [watchUpdateRunNumber]/[watchUpdateApkUrl]/[watchUpdateNotes] advertise a newer WATCH
+         * build for the watch to offer installing; null (the default) means "nothing to
+         * advertise" and the watch shows no update affordance.
+         */
         fun pushNow(
             context: Context,
             watchUpdateRunNumber: Int? = null,

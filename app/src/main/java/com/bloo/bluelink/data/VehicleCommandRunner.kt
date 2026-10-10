@@ -104,11 +104,6 @@ object VehicleCommandRunner {
     }
 
     /**
-     * Start/stop climate; when starting, resolve the caller's chosen target. Called from inside
-     * [run]'s [BlueLinkGate.statusMutex] critical section, so this itself does not (and must not)
-     * take the lock again. Mechanism: 1.
-     */
-    /**
      * Stop climate AND cancel any pending auto-extend chain. Both of this runner's stop paths
      * ("climate_off" and the "climate" toggle landing on off) go through here so they cannot drift
      * apart.
@@ -119,6 +114,11 @@ object VehicleCommandRunner {
         return "Stopping climate"
     }
 
+    /**
+     * Start/stop climate; when starting, resolve the caller's chosen target. Called from inside
+     * [run]'s [BlueLinkGate.statusMutex] critical section, so this itself does not (and must not)
+     * take the lock again. Mechanism: 1.
+     */
     private suspend fun runClimate(
         ctx: Context,
         repo: VehicleRepository,

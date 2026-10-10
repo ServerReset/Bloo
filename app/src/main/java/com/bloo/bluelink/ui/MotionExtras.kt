@@ -89,12 +89,6 @@ internal fun Modifier.entrance(key: String): Modifier {
 }
 
 /**
- * The app's page-turn: a page shrinks, tilts away and fades as it leaves the centre of a pager.
- * [offset] is that page's signed distance from the centre (0 on it, plus or minus 1 a full page
- * away), read only in the draw phase so a drag never recomposes. [strength] scales the whole
- * effect: the onboarding deck uses 1, ordinary paging a gentler fraction.
- */
-/**
  * The app's page-turn: a page shrinks, leans away, drops and dims as it leaves the centre of a
  * pager. [offset] is the page's distance from its OWN resting slot as a fraction of a page
  * (-0.5..0.5), read only in the draw phase so a drag never recomposes. Taking the FRACTIONAL distance

@@ -84,21 +84,6 @@ suspend fun SettingsStore.setVehicleOrder(order: List<String>) {
 }
 
 
-/** Optional user-set photo URL per vehicle (empty = use the default gradient). */
-/**
- * ONE Preferences snapshot, for a caller about to read many keys at once.
- *
- * Every getter here inlines its own `data.first()`, which after the first read is served
- * from memory but is still a collect-and-cancel round trip on the DataStore actor, and
- * they are sequential suspends. `loadGarageInner` made twelve of them PER CAR -- 36 on a
- * three-car account, on the cold-start critical path, every one returning the identical
- * object -- and `refreshLocalCarConfig` did it again on every settings import.
- *
- * Pair this with the `Preferences`-taking overloads: read once, pass it down. Those
- * overloads exist so the KEY and the DEFAULT stay written exactly once, in the getter --
- * a caller that reached for the raw key itself would be the drift this store exists to
- * prevent.
- */
 /**
  * Force the settings DataStore's first load now.
  *
@@ -113,6 +98,20 @@ suspend fun SettingsStore.warmUp() {
 }
 
 
+/**
+ * ONE Preferences snapshot, for a caller about to read many keys at once.
+ *
+ * Every getter here inlines its own `data.first()`, which after the first read is served
+ * from memory but is still a collect-and-cancel round trip on the DataStore actor, and
+ * they are sequential suspends. `loadGarageInner` made twelve of them PER CAR -- 36 on a
+ * three-car account, on the cold-start critical path, every one returning the identical
+ * object -- and `refreshLocalCarConfig` did it again on every settings import.
+ *
+ * Pair this with the `Preferences`-taking overloads: read once, pass it down. Those
+ * overloads exist so the KEY and the DEFAULT stay written exactly once, in the getter --
+ * a caller that reached for the raw key itself would be the drift this store exists to
+ * prevent.
+ */
 suspend fun SettingsStore.snapshot(): Preferences {
     com.bloo.bluelink.data.StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() begin")
     val prefs = context.settingsDataStore.data.first()
@@ -121,6 +120,7 @@ suspend fun SettingsStore.snapshot(): Preferences {
 }
 
 
+/** Optional user-set photo URL per vehicle (empty = use the default gradient). */
 suspend fun SettingsStore.imageUrl(vin: String): String? = imageUrl(vin, context.settingsDataStore.data.first())
 
 

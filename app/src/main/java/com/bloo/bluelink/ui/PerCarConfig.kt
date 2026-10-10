@@ -73,6 +73,11 @@ internal suspend fun AppViewModel.perCarConfig(
     )
 }
 
+/**
+ * Re-reads this device's local per-car config (seat capability, powertrain, photo, license plate,
+ * service intervals, pebble order) for the currently loaded vehicles and folds it straight into
+ * state -- the same local reads [loadGarageInner] already does once at startup, no network call.
+ */
 internal suspend fun AppViewModel.refreshLocalCarConfig() {
     // One Preferences read for every per-car setting; see SettingsStore.snapshot().
     val prefs = settingsStore.snapshot()

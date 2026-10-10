@@ -181,10 +181,6 @@ internal fun SettingsCaption(
 }
 
 /**
- * A bare toggle (no row or label) for a card whose whole body is one setting; same track and
- * semantics as [ToggleRow].
- */
-/**
  * The `toggleable` (for checked/Role.Switch semantics), no-ripple and toggle-haptics wrapper shared
  * by [InlineToggle] and [ToggleRowControl].
  */
@@ -205,6 +201,10 @@ private fun Modifier.hapticToggleable(checked: Boolean, onChange: (Boolean) -> U
     }
 }
 
+/**
+ * A bare toggle (no row or label) for a card whose whole body is one setting; same track and
+ * semantics as [ToggleRow].
+ */
 @Composable
 internal fun InlineToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
     Box(Modifier.hapticToggleable(checked, onChange)) {

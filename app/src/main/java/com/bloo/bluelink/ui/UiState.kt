@@ -70,12 +70,6 @@ internal val SettingsPseudoVehicle = Vehicle(
  * pebble taking it would be non-skippable and recompose with each parent frame.
  */
 @androidx.compose.runtime.Immutable
-/**
- * What a snackbar message is telling the user: it drives the toast's colour, icon and how long it
- * lingers.
- */
-enum class ToastKind { ERROR, INFO, SUCCESS }
-
 data class UiState(
     // Loading, not Login: see Screen.Loading.
     val screen: Screen = Screen.Loading,

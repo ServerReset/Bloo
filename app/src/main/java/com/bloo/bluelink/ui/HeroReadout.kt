@@ -146,10 +146,6 @@ internal fun animatedChargeFrac(target: Float): Float {
     return frac
 }
 
-/**
- * The hero's readout as one set of components that morphs between collapsed and expanded. [t] is 0
- * collapsed, 1 expanded; type sizes, state-line alpha and gaps all lerp on it.
- */
 /** How far above its resting position the hero photo starts (entrance) or travels to (exit). */
 internal val HeroPhotoSlideDistance = 28.dp
 

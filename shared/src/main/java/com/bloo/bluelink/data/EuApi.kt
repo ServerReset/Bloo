@@ -313,9 +313,9 @@ class EuApi(private val brand: Brand) {
     /**
      * Runs [request] on [httpClient] and returns the parsed JSON body. Throws on non-2xx (401 ->
      * [EuRepository] refreshes + retries) and on an in-band `retCode == "F"` error. The failing
-     * method+path is included in the message.
+     * method+path is included in the message. See [ResponseFraming]: GET-only retry on a fresh
+     * connection for an unframable body.
      */
-    /** See [ResponseFraming]: GET-only retry on a fresh connection for an unframable body. */
     internal fun call(request: Request, httpClient: OkHttpClient = this.client): JsonElement =
         ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it, httpClient) }
 

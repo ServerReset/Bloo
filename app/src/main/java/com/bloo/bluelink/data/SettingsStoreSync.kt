@@ -27,12 +27,6 @@ suspend fun SettingsStore.resetSyncStateForNewFile() {
 }
 
 /**
- * One full bidirectional Drive-sync pass: download the file at [syncUri] (if configured), import it
- * when it's newer than our last sync (by the file's real last-modified time, falling back to a
- * timestamp embedded in the file for providers that don't expose one), then upload our current
- * settings with a fresh timestamp.
- */
-/**
  * The last-modified time a Storage Access Framework document reports, in epoch millis, or null when
  * the URI is not a document URI, the provider returns nothing, or the query throws.
  * performMainToMainSync reads this in two places -- the download gate and the upload's self-write
@@ -48,6 +42,12 @@ private fun SettingsStore.providerLastModifiedMs(parsed: android.net.Uri): Long?
     } else null
 }.getOrNull()
 
+/**
+ * One full bidirectional Drive-sync pass: download the file at [syncUri] (if configured), import it
+ * when it's newer than our last sync (by the file's real last-modified time, falling back to a
+ * timestamp embedded in the file for providers that don't expose one), then upload our current
+ * settings with a fresh timestamp.
+ */
 suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncOutcome = mainToMainSyncMutex.withLock {
     // The periodic worker and the auto-sync-on-refresh collector can both fire within moments of
     // each other with no coordination otherwise -- this mutex makes them run one at a time instead

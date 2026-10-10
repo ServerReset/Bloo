@@ -48,14 +48,6 @@ class StatusCache(private val context: Context) {
     )
 
     /**
-     * Reads the single DataStore entry, decodes it from JSON, and unpacks it into a
-     * [Cached]. Takes only the first emitted value from the DataStore Flow (`.first()`)
-     * since this is a one-shot read, not an ongoing subscription. If the key is absent
-     * (first run) or decoding fails for any reason (corrupt/incompatible JSON), falls
-     * back to an all-empty [CachePayload] via `runCatching { }.getOrNull() ?: CachePayload()`
-     * rather than throwing, so a bad cache never blocks app startup.
-     */
-    /**
      * Force this store's first DataStore read now -- the same file-open + protobuf-parse cost
      * [SettingsStore.warmUp] exists for, moved onto the startup warm-up thread. The cold-start
      * restore runs on its own launch during the first Compose frames, so paying it here takes
@@ -65,6 +57,14 @@ class StatusCache(private val context: Context) {
         runCatching { context.statusCacheStore.data.first() }
     }
 
+    /**
+     * Reads the single DataStore entry, decodes it from JSON, and unpacks it into a
+     * [Cached]. Takes only the first emitted value from the DataStore Flow (`.first()`)
+     * since this is a one-shot read, not an ongoing subscription. If the key is absent
+     * (first run) or decoding fails for any reason (corrupt/incompatible JSON), falls
+     * back to an all-empty [CachePayload] via `runCatching { }.getOrNull() ?: CachePayload()`
+     * rather than throwing, so a bad cache never blocks app startup.
+     */
     suspend fun load(): Cached = withContext(Dispatchers.IO) {
         StartupTrace.markIfStarting("StatusCache.load(): begin")
         // withContext, because the caller is a viewModelScope.launch on Main.immediate: the

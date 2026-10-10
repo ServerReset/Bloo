@@ -13,13 +13,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
+/** Extra room a symbol-only group needs before it goes back to showing its labels. */
+private val CompactHysteresis = 28.dp
+
 /**
  * A row of buttons where the pressed one takes ~15% more width and its neighbours give up exactly
  * that much, so the group's own width never changes and no parent remeasures.
  */
-/** Extra room a symbol-only group needs before it goes back to showing its labels. */
-private val CompactHysteresis = 28.dp
-
 @Composable
 fun ExpressiveButtonGroup(
     modifier: Modifier = Modifier,

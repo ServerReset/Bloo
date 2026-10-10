@@ -147,10 +147,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal val statusMutex = com.bloo.bluelink.data.BlueLinkGate.statusMutex
 
     /**
-     * Status requests currently queued or running, keyed "vin:refresh" (de-dupes; a live
-     * refresh=true isn't dropped behind a background refresh=false fetch for the same car).
-     */
-    /**
      * Which car the pager is on -- its OWN flow, deliberately not a field of [UiState], and this is
      * the swipe fix. UiState is a data class, so its equals covers every field; change one and no
      * reader can skip.
@@ -170,6 +166,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val updateDownloadProgress: StateFlow<Float?> = _updateDownloadProgress.asStateFlow()
 
+    /**
+     * Status requests currently queued or running, keyed "vin:refresh" (de-dupes; a live
+     * refresh=true isn't dropped behind a background refresh=false fetch for the same car).
+     */
     internal val statusInFlight = mutableSetOf<String>()
 
     /**
@@ -187,7 +187,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     internal val driveSyncBootstrapped = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    /** Copy-pasteable activity log shown in Settings. */
     /** Ticks whenever the activity log changes. */
     val logsVersion: StateFlow<Int> = AppLog.version
 
@@ -282,7 +281,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val autoLockState: StateFlow<Map<String, com.bloo.bluelink.autolock.AutoLockEvalState>>
         get() = com.bloo.bluelink.autolock.AutoLockController.state
 
-    /** Toggle a pebble (detail section) open/closed for a car (persisted). */
     /** Collapse keys ("<vin>:<section>") on their own small flow. */
     val collapsedSections: StateFlow<Set<String>> = state
         .map { it.collapsedPebbles }

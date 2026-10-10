@@ -161,10 +161,6 @@ private data class SnapshotPayload(
 private val Context.snapshotDataStore by safePreferencesDataStore("bloo_snapshots")
 
 /**
- * Reads and writes the on-disk [VehicleSnapshot] cache. Mutations are read-modify-write inside
- * DataStore's transactional [edit], so concurrent writers do not stomp on each other.
- */
-/**
  * Apply [updates] onto [existing] by VIN (extracted for JVM testing). Order is the existing
  * list's (user-visible pager order); VINs not in [existing] are ignored, not appended; the last
  * duplicate in [updates] wins.
@@ -178,6 +174,10 @@ internal fun mergeVehicleUpdates(
     return existing.map { byVin[it.vin] ?: it }
 }
 
+/**
+ * Reads and writes the on-disk [VehicleSnapshot] cache. Mutations are read-modify-write inside
+ * DataStore's transactional [edit], so concurrent writers do not stomp on each other.
+ */
 class SnapshotStore(private val context: Context) {
 
     private val json = BlooJson

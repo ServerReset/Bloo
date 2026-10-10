@@ -15,12 +15,10 @@ import com.bloo.bluelink.ui.hasPermission
 
 /** Posts Bloo's local alerts (service due, door left open, car left running). */
 object Notifications {
-    /**
-     * One channel per KIND of notification, so the user can tune (or silence) each
-     * independently in system settings -- a car that keeps nagging about a door is a very
-     * different thing from "your car was started", and Android gives no way to split them
-     * once they share a channel. Every notification this app posts names one of these.
-     */
+    // One channel per KIND of notification, so the user can tune (or silence) each independently in
+    // system settings -- a car that keeps nagging about a door is a very different thing from "your
+    // car was started", and Android gives no way to split them once they share a channel. Every
+    // notification this app posts names one of these.
     /** State alerts: service due, door left open, unlocked/running too long. */
     const val CHANNEL_ALERTS = "bloo_alerts"
     /** Events: the car was started, a charge session completed. */

@@ -143,7 +143,6 @@ internal fun PebbleList(
  */
 internal const val EAGER_PEBBLES = 3
 
-/** Renders one pebble by section name (used by the list and the hot spot). */
 /**
  * A UiState slice whose identity is the fields the row reads. Slices with equal [key] compare
  * equal, so Compose skips a pebble when none of its fields moved.
@@ -170,6 +169,7 @@ internal fun stateSlice(state: State<UiState>, contextKey: Any?, keys: (UiState)
     return slice.state
 }
 
+/** Renders one pebble by section name (used by the list and the hot spot). */
 @Composable
 internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm: AppViewModel, modifier: Modifier, onExpand: (() -> Unit)? = null) {
     // Narrow derived read of this car's status; `state.value` here would subscribe every pebble to

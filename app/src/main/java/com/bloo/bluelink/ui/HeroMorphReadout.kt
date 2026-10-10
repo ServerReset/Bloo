@@ -32,6 +32,10 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+/**
+ * The hero's readout as one set of components that morphs between collapsed and expanded. [t] is 0
+ * collapsed, 1 expanded; type sizes, state-line alpha and gaps all lerp on it.
+ */
 @Composable
 internal fun HeroMorphReadout(
     data: ChargeReadout,

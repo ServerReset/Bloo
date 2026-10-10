@@ -144,9 +144,8 @@ object CarCommandRunner {
      * Refresh one car (blank [vin] → all), folding fresh status into snapshots. [force] true wakes
      * the car for a live pull (on-demand button); false reads the server's last-known status —
      * light enough for frequent background polls that keep the stored snapshots fresh without
-     * draining the car's 12V battery.
+     * draining the car's 12V battery. Most callers legitimately ignore the result.
      */
-    /** Most callers legitimately ignore the result. */
     suspend fun refresh(
         context: Context,
         vin: String,

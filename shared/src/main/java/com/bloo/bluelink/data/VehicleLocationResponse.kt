@@ -158,11 +158,6 @@ data class TripMeasure(
  * watt-hours; times are seconds; speeds are mph. Field paths follow the community
  * hyundai_kia_connect_api.
  */
-/**
- * One recent drive from /ac/v2/ts/alerts/maintenance/evTripDetails (EVs only). Energy figures are
- * watt-hours; times are seconds; speeds are mph. Field paths follow the community
- * hyundai_kia_connect_api.
- */
 @Serializable
 data class EvTrip(
     val startdate: String? = null,
