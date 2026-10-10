@@ -44,5 +44,5 @@ fun ExpressiveButtonRow(
  * to the next when they do not fit. (Connected clusters are for pebble header controls: see [ButtonCluster].)
  */
 @Composable
-fun ActionRow(content: @Composable () -> Unit) =
-    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow, content = content)
+fun ActionRow(modifier: Modifier = Modifier, content: @Composable () -> Unit) =
+    ExpressiveButtonRow(modifier = modifier.fillMaxWidth(), spacing = GapRow, content = content)

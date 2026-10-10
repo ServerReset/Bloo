@@ -58,6 +58,7 @@ fun AnimatedSlider(
     reduceMotion: Boolean,
     onStepTick: () -> Unit,
     onSettle: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -158,7 +159,7 @@ fun AnimatedSlider(
     }
 
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
             .height(thumbH)
             // No motion blur: a blurred render target reads as the slider going low-resolution.

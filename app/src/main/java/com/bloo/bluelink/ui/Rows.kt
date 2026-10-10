@@ -137,6 +137,7 @@ internal fun StepRow(label: String, value: String, valueColor: Color = Color.Uns
 fun ToggleRow(
     label: String,
     checked: Boolean,
+    modifier: Modifier = Modifier,
     /**
      * The explanatory line under the switch. Owning it here gives one style and rhythm, and keeps
      * it outside the toggleable so TalkBack reports a single switch.
@@ -148,10 +149,10 @@ fun ToggleRow(
     // layout it had -- a Column around a single fillMaxWidth Row measures the same, but "the same"
     // is not worth asserting across ~25 call sites for a branch that costs nothing.
     if (description == null) {
-        ToggleRowControl(label, checked, onChange)
+        ToggleRowControl(label, checked, modifier, onChange)
     } else {
-        Column(Modifier.fillMaxWidth()) {
-            ToggleRowControl(label, checked, onChange)
+        Column(modifier.fillMaxWidth()) {
+            ToggleRowControl(label, checked, onChange = onChange)
             SettingsCaption(description)
         }
     }
@@ -206,16 +207,16 @@ private fun Modifier.hapticToggleable(checked: Boolean, onChange: (Boolean) -> U
  * semantics as [ToggleRow].
  */
 @Composable
-internal fun InlineToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
-    Box(Modifier.hapticToggleable(checked, onChange)) {
+internal fun InlineToggle(checked: Boolean, modifier: Modifier = Modifier, onChange: (Boolean) -> Unit) {
+    Box(modifier.hapticToggleable(checked, onChange)) {
         MorphToggleTrack(checked)
     }
 }
 
 @Composable
-private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun ToggleRowControl(label: String, checked: Boolean, modifier: Modifier = Modifier, onChange: (Boolean) -> Unit) {
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             // toggleable gives a Role.Switch + checked node; the track clears its own so TalkBack
             // sees one toggle.

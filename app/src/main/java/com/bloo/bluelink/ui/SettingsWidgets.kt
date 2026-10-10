@@ -145,12 +145,14 @@ val ThemeModeOptions = ThemeMode.entries.map { SegmentOption(it.name, it.name.lo
 @Composable
 fun ThemeModeSegmentedRow(
     appearance: SettingsStore.Appearance,
+    modifier: Modifier = Modifier,
     onSelect: (ThemeMode) -> Unit,
 ) {
     SettingsSegmentedRow(
         label = "Appearance",
         options = ThemeModeOptions,
         selectedKey = appearance.themeMode.name,
+        modifier = modifier,
         onSelect = { onSelect(ThemeMode.valueOf(it)) },
     )
 }
@@ -164,11 +166,12 @@ fun SettingsSegmentedRow(
     label: String,
     options: List<SegmentOption>,
     selectedKey: String,
+    modifier: Modifier = Modifier,
     /** See ToggleRow's `description`. */
     description: String? = null,
     onSelect: (String) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth()) {
+    Column(modifier.fillMaxWidth()) {
         LabelText(label)
         Spacer(Modifier.height(GapRow))
         MorphSegmented(options = options, selectedKey = selectedKey, onSelect = onSelect)

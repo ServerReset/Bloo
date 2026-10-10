@@ -48,8 +48,9 @@ private val UNIT_SUFFIXES = charArrayOf('F', 'C', '°')
 fun WiggleText(
     text: String,
     style: TextStyle,
-    maxLines: Int = 1,
     reduceMotion: Boolean,
+    modifier: Modifier = Modifier,
+    maxLines: Int = 1,
 ) {
     // Fires only when the trimmed text is exactly one of WIGGLE_NUMBERS, optionally
     // followed by a single trailing unit character ("67", "67°", "67F", "42mi").
@@ -71,7 +72,7 @@ fun WiggleText(
         // exceed maxLines (a long status string routed through AnimatedValue,
         // not just short numeric readouts) hard-clipped instead of trailing
         // off with "...", unlike nearly every other truncating Text in the app.
-        BasicText(text, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
+        BasicText(text, modifier = modifier, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
         return
     }
     // A continuously-looping "phase" value that sweeps 0 -> 2π every 620ms and then
@@ -90,7 +91,7 @@ fun WiggleText(
     // scaled relative to the text's own font size so the wiggle looks proportional
     // at any text size rather than a fixed pixel amount.
     val amplitude = with(LocalDensity.current) { (style.fontSize.value * 0.22f).dp.toPx() }
-    Row {
+    Row(modifier) {
         // Each character is its own BasicText with its own graphicsLayer offset, so
         // they can each be displaced independently to form a travelling wave: adding
         // `i * 1.1f` to the shared phase before taking sin() gives every subsequent
@@ -151,13 +152,13 @@ fun WiggleText(
 fun AnimatedValue(
     value: String,
     style: TextStyle,
-    maxLines: Int = 1,
     reduceMotion: Boolean,
     // Needed for callers that must size this within a Row/Column layout (e.g.
     // a label/value row using Modifier.weight on the value cell) -- without
     // this, AnimatedContent's own layout node had no way to receive that
     // modifier, since it's the top-level thing this function emits.
     modifier: Modifier = Modifier,
+    maxLines: Int = 1,
 ) {
     if (reduceMotion || maxLines > 1 || value.length > RollTokenMaxChars ||
         !value.any { it.isDigit() } || value.contains('\n')
