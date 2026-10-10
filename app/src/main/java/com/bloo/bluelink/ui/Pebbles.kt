@@ -79,6 +79,7 @@ internal fun PebbleList(
         }
     }
     val hotDrag = LocalHotSeatDrag.current
+    val haptics = LocalHaptics.current
     // PERF: each car-pager page composes this whole pebble stack. Composing all 8-10 pebbles
     // eagerly (incl. ClimatePebble/ChargePebble's top-level effects, which run BEFORE their
     // Pebble() call regardless of collapsed state) on the fling-settle frame is the biggest
@@ -115,7 +116,7 @@ internal fun PebbleList(
             { key ->
                 val pin = d.overSlot
                 d.section = null
-                if (pin) { vm.setHotspot(v, key as String); true } else false
+                if (pin) { haptics?.heavy(); vm.setHotspot(v, key as String); true } else false
             }
         },
         staggerInOnColdStart = true,
