@@ -1,17 +1,8 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.layout.layout
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.foundation.ScrollState
-import android.content.Context
-import android.content.Intent
-import androidx.browser.customtabs.CustomTabsIntent
-import androidx.core.net.toUri
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,8 +16,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,7 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.HourPoint
 import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.WeatherCode
@@ -353,135 +341,4 @@ internal fun WeatherLocations(
             }
         }
     }
-}
-
-// --- Service & links ------------------------------------------------------
-
-/**
- * The one safe Activity launch. True when something actually launched, so callers that need to know
- * fell-back from served (the update tile's "you must dismiss it yourself" path) can tell the
- * difference; silently ignoring a failed open is how an action button starts reading as dead.
- */
-internal fun Context.tryStart(intent: Intent): Boolean = runCatching {
-    if (this !is android.app.Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    startActivity(intent)
-}.isSuccess
-
-/**
- * The one permission check. Five objects kept a `fun hasPermission(context)` that differed only in
- * the permission string and the OS level where the check stops being needed — and each had to be
- * re-read (or, more often, forgotten) by every new caller.
- */
-@Suppress("ObsoleteSdkInt") // minSdk is a caller-supplied OS level, not a literal
-internal fun Context.hasPermission(permission: String, minSdk: Int = 1): Boolean =
-    android.os.Build.VERSION.SDK_INT < minSdk ||
-        androidx.core.content.ContextCompat.checkSelfPermission(this, permission) ==
-            android.content.pm.PackageManager.PERMISSION_GRANTED
-
-/**
- * The one location-permission check, accepting EITHER accuracy. The map's "you are here" dot and
- * the distance-to-car readout only need an approximate fix, and Android 12+ lets a user grant
- * COARSE without FINE -- a FINE-only test read that as "no permission" and silently hid the dot
- * forever, no matter how many times the map was reopened.
- */
-internal fun Context.hasLocationPermission(): Boolean =
-    hasPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ||
-        hasPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
-
-/**
- * Opens the car's location in the device's default Maps app -- a `geo:` intent rather than
- * hardcoding Google Maps, since the OS resolves it to whatever the user actually has set. Shared by
- * [LocationPebble]'s own "Open in maps" button and [CarMapFullScreenDialog]'s [MapFeature] row so
- * the two never drift on the URI format.
- */
-internal fun openInExternalMaps(context: Context, location: GeoLocation, label: String) {
-    val uri = (
-        "geo:${location.latitude},${location.longitude}" +
-            "?q=${location.latitude},${location.longitude}($label)"
-    ).toUri()
-    context.tryStart(Intent(Intent.ACTION_VIEW, uri))
-}
-
-/**
- * Shares the car's location through the system share sheet -- a Google-Maps link, so any receiving
- * app can resolve it.
- */
-internal fun shareLocation(context: Context, location: GeoLocation, label: String) {
-    val text = "$label: https://maps.google.com/?q=${location.latitude},${location.longitude}"
-    context.tryStart(
-        Intent.createChooser(
-            Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, text)
-            },
-            "Share location",
-        ),
-    )
-}
-
-internal fun openUrl(context: Context, url: String) {
-    val uri = url.toUri()
-    runCatching { CustomTabsIntent.Builder().build().launchUrl(context, uri) }
-        .onFailure { context.tryStart(Intent(Intent.ACTION_VIEW, uri)) }
-}
-
-internal fun openApp(context: Context, packages: List<String>, fallbackUrl: String) {
-    for (p in packages) {
-        context.packageManager.getLaunchIntentForPackage(p)?.let {
-            if (context.tryStart(it)) return
-        }
-    }
-    openUrl(context, fallbackUrl)
-}
-
-internal fun dial(context: Context, number: String) {
-    context.tryStart(Intent(Intent.ACTION_DIAL, "tel:$number".toUri()))
-}
-
-/**
- * How wide the strip's soft edge is: cells blur and fade as they slide into it and sharpen as they
- * leave it.
- */
-private val ScrollEdgeFade = 40.dp
-
-/**
- * A cell of a horizontally scrolling strip that melts into blur as it nears an edge that has more
- * content past it, and comes back into focus as it scrolls toward the middle -- the same soft edge
- * a faded list has, with focus going as well as opacity.
- */
-@Composable
-private fun Modifier.scrollEdgeBlur(scroll: ScrollState, viewportPx: androidx.compose.runtime.State<Int>, blur: Boolean): Modifier {
-    var x by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
-    var w by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val fadePx = with(density) { ScrollEdgeFade.toPx() }
-    val maxBlurPx = with(density) { 3.dp.toPx() }
-    return this
-        .onPlaced { x = it.positionInParent().x; w = it.size.width.toFloat() }
-        .graphicsLayer {
-            val vp = viewportPx.value.toFloat()
-            if (vp <= 0f) return@graphicsLayer
-            val left = x - scroll.value
-            val right = left + w
-            val leftGate = (scroll.value / fadePx).coerceIn(0f, 1f)
-            val rightGate = ((scroll.maxValue - scroll.value) / fadePx).coerceIn(0f, 1f)
-            val intoLeft = ((fadePx - left) / fadePx).coerceIn(0f, 1f) * leftGate
-            val intoRight = ((right - (vp - fadePx)) / fadePx).coerceIn(0f, 1f) * rightGate
-            val t = maxOf(intoLeft, intoRight)
-            alpha = 1f - 0.5f * t
-            renderEffect = if (blur && t > 0.03f) {
-                androidx.compose.ui.graphics.BlurEffect(maxBlurPx * t, maxBlurPx * t, androidx.compose.ui.graphics.TileMode.Decal)
-            } else {
-                null
-            }
-        }
-}
-
-
-/** Lets a child extend [inset] past both sides of the space its parent gives it, so it can reach the parent's own edges. */
-internal fun Modifier.bleedHorizontally(inset: androidx.compose.ui.unit.Dp): Modifier = layout { measurable, constraints ->
-    val extra = inset.roundToPx() * 2
-    val width = constraints.maxWidth + extra
-    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
-    layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
 }

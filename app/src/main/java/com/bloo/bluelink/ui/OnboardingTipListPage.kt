@@ -1,6 +1,8 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -11,8 +13,12 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Powertrain
 
 /**
@@ -64,4 +70,31 @@ internal fun OnboardingFeaturesPage(state: UiState) {
     OnboardingTipListPage(
         tips = tips,
     )
+}
+
+/**
+ * A single "tip" row: a primary-tinted icon beside a bold title and a muted one-line body, with a
+ * hairline edge on the glass card. The welcome, tips and features cards each render a list of
+ * these.
+ */
+@Composable
+internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        shape = StandardShape,
+        color = scheme.surfaceContainerHighest.copy(alpha = 0.30f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, hairlineColor()),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        // Same leading-circle icon badge as search results, the update pebble and the settings hero
+        // stats.
+        IconLeadRow(
+            icon,
+            tint = scheme.primary,
+            title = title,
+            subtitle = body,
+            badgeSize = 28.dp,
+            modifier = Modifier.padding(GapSection),
+        )
+    }
 }

@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Thermostat
@@ -35,10 +34,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.ui.draw.clip
 import androidx.compose.animation.animateContentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,9 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.PinCrypto
 import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.setBiometricLock
 import com.bloo.bluelink.data.setSyncUri
@@ -244,137 +237,6 @@ internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppVie
 }
 
 /**
- * The create-a-PIN mini form (also the base of the Settings PIN dialogs): two matching 4-8 digit
- * fields, Save enabled once valid. The caller decides what [existing] means; this form only reports
- * a valid new PIN.
- */
-@Composable
-internal fun OnboardingPinForm(
-    existing: Boolean,
-    onSet: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val haptics = LocalHaptics.current
-    val scheme = MaterialTheme.colorScheme
-    var pin by remember { mutableStateOf("") }
-    var confirm by remember { mutableStateOf("") }
-    var attempted by remember { mutableStateOf(false) }
-    val valid = pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS &&
-        pin == confirm
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        PinField(
-            value = pin,
-            onValueChange = { pin = it; attempted = false },
-            placeholder = "4–8 digit PIN",
-            isError = attempted && pin.isNotEmpty() && pin.length < PinCrypto.PIN_MIN_DIGITS,
-        )
-        PinField(
-            value = confirm,
-            onValueChange = { confirm = it; attempted = false },
-            placeholder = "Confirm PIN",
-            isError = attempted && confirm.isNotEmpty() && pin != confirm,
-        )
-        if (attempted && (pin.length < PinCrypto.PIN_MIN_DIGITS || pin != confirm)) {
-            Text(
-                "PINs must be 4-8 digits and match.",
-                style = MaterialTheme.typography.bodySmall,
-                color = scheme.error,
-            )
-        }
-        val pinLabel: String = if (existing) "Replace PIN" else "Save PIN"
-        MorphActionButton(
-            label = pinLabel,
-            icon = AppIcons.Lock,
-            onClick = {
-                if (valid) {
-                    haptics?.click()
-                    onSet(pin)
-                    pin = ""
-                    confirm = ""
-                } else {
-                    attempted = true
-                    haptics?.tick()
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = pin.isNotEmpty() && confirm.isNotEmpty(),
-        )
-    }
-}
-
-/**
- * One onboarding Setup card: icon, title and body on a solid surface (not the busy Aurora
- * backdrop).
- */
-@Composable
-internal fun OnboardingSetupCard(
-    icon: ImageVector,
-    title: String,
-    body: String,
-    done: Boolean,
-    /**
-     * Required to leave this card: a "Required" chip until [done], so the user knows why Next is
-     * disabled rather than just finding it greyed out.
-     */
-    required: Boolean = false,
-    /**
-     * The action that gets it done. Shown only until [done]: a finished item says so and gets out
-     * of the way.
-     */
-    content: @Composable () -> Unit,
-) {
-    val scheme = MaterialTheme.colorScheme
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .onboardingPanel(14.dp)
-            .animateContentSize(),
-        verticalArrangement = Arrangement.spacedBy(GapGroup),
-    ) {
-        IconLeadRow(
-            if (done) AppIcons.CheckCircle else icon,
-            tint = if (done) scheme.primary else scheme.onSurfaceVariant,
-            title = title,
-            subtitle = body,
-            trailing = {
-                when {
-                    done -> StatusChip("On", scheme.primary)
-                    required -> StatusChip("Required", scheme.tertiary)
-                }
-            },
-        )
-        if (!done) content()
-    }
-}
-
-/**
- * A single "tip" row: a primary-tinted icon beside a bold title and a muted one-line body, with a
- * hairline edge on the glass card. The welcome, tips and features cards each render a list of
- * these.
- */
-@Composable
-internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
-    val scheme = MaterialTheme.colorScheme
-    Surface(
-        shape = StandardShape,
-        color = scheme.surfaceContainerHighest.copy(alpha = 0.30f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, hairlineColor()),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        // Same leading-circle icon badge as search results, the update pebble and the settings hero
-        // stats.
-        IconLeadRow(
-            icon,
-            tint = scheme.primary,
-            title = title,
-            subtitle = body,
-            badgeSize = 28.dp,
-            modifier = Modifier.padding(GapSection),
-        )
-    }
-}
-
-/**
  * Which alerts to get. The same switches as Settings → Notifications, the ones most people want
  * decided up front.
  */
@@ -452,15 +314,3 @@ internal fun OnboardingPebbleDemo() {
         }
     }
 }
-
-/**
- * A glassy inner panel: a translucent pane with the shared frosted rim, used for the setup and tip
- * sub-cards so they layer as glass over the card's own glass rather than reading as flat outline.
- */
-@Composable
-private fun Modifier.onboardingPanel(padding: androidx.compose.ui.unit.Dp = GapGroup): Modifier =
-    this
-        .clip(StandardShape)
-        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.30f), StandardShape)
-        .glassRim(StandardShape)
-        .padding(padding)
