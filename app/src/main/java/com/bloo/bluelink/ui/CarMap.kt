@@ -1,19 +1,15 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -27,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
@@ -37,7 +32,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -334,65 +328,28 @@ internal fun CarMap(
                     .offset(y = (-20).dp),
             )
         }
-        // Device position, drawn whenever a fix exists, outside the merged branch so it never
-        // vanishes. Its offset comes from its own tile coordinate (tile delta in px plus pan),
-        // since it is not the view centre.
-        devTileOffsetPx?.let { (dx, dy) ->
-            Box(
-                Modifier
-                    .align(Alignment.Center)
-                    .offset { IntOffset(dx.roundToInt(), dy.roundToInt()) }
-                    .size(30.dp)
-                    // The dot carries no text, so TalkBack would skip it entirely; name it.
-                    .semantics { contentDescription = "Your location" },
-                contentAlignment = Alignment.Center,
-            ) {
-                // A soft halo (clearer than a bare dot, and it survives a busy/satellite tile) under a
-                // white ring and the accent dot.
-                Box(Modifier.size(30.dp).background(deviceLocationColor.copy(alpha = 0.22f), CircleShape))
-                Box(
-                    Modifier
-                        .size(16.dp)
-                        .background(Color.White, CircleShape)
-                        .padding(3.dp)
-                        .background(deviceLocationColor, CircleShape),
-                )
-            }
-        }
         } // close the scaled layer
-        // Off-screen device indicator: when the phone is farther than the map shows, its dot is
-        // clipped away entirely. Draw a marker clamped to the box edge pointing toward it, which
-        // centres the map on it when tapped -- so "my location" is never simply nowhere.
+        // The phone's own position, drawn whenever a fix exists: a marker on the map when it is in
+        // view, or one clamped to the box edge pointing toward it when it is farther than the map
+        // shows. OUTSIDE the scaled layer, so it stays a constant size (a marker should not grow when
+        // you pinch). Its screen offset is its tile delta from the car plus the pan, all times scale.
         val dev = deviceLocation
         if (dev != null && wPx > 0f && hPx > 0f) {
-            val halfW = wPx / 2f
-            val halfH = hPx / 2f
-            val sc = state.scale
-            val sx = (((MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx).toFloat() + state.panX) * sc
-            val sy = (((MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx).toFloat() + state.panY) * sc
-            val marginPx = with(density) { 22.dp.toPx() }
-            if (markerOffBox(sx, sy, halfW, halfH, marginPx)) {
-                val (ex, ey) = clampMarkerToEdge(sx, sy, halfW, halfH, marginPx)
-                Box(
-                    Modifier
-                        .align(Alignment.Center)
-                        .offset { IntOffset(ex.roundToInt(), ey.roundToInt()) }
-                        .size(30.dp)
-                        .background(deviceLocationColor, CircleShape)
-                        .clickable {
-                            state.showDevice(location.latitude, location.longitude, dev.latitude, dev.longitude)
-                        }
-                        .semantics { contentDescription = "Your location is off screen. Tap to centre on it" },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.MyLocation,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
+            DeviceMarker(
+                dev = dev,
+                zoom = zoom,
+                xTileF = xTileF,
+                yTileF = yTileF,
+                tilePx = tilePx,
+                panX = state.panX,
+                panY = state.panY,
+                scale = state.scale,
+                halfW = wPx / 2f,
+                halfH = hPx / 2f,
+                marginPx = with(density) { 22.dp.toPx() },
+                color = deviceLocationColor,
+                onCenter = { state.showDevice(location.latitude, location.longitude, dev.latitude, dev.longitude) },
+            )
         }
         // Expand/Open-in-Maps render as a MapFeatureRow in the caller, not over the map.
     }
