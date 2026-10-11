@@ -136,10 +136,15 @@ internal fun SearchLayer(
             enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
             exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
         ) {
+            // Frosts the page rather than blacking it out: a blur plus a faint veil keeps the pebbles at
+            // their own brightness, where a flat 32% black made the page grey and the glass pebbles
+            // look lit by comparison.
+            val frostScrim = hazeState != null && canBlurBackdrops()
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
+                    .then(if (frostScrim) Modifier.appHazeEffect(hazeState!!, cheap = true) else Modifier)
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = if (frostScrim) 0.08f else 0.24f))
                     .noRippleClickable { query = ""; focused = false },
             )
         }
