@@ -154,9 +154,7 @@ class SettingsStore(internal val context: Context) {
     // default when the key is absent or fails to parse, because this flow is collected at launch
     // and must never crash.
     /** Every stored preference by key, live: what search reads so it can show any value in the store. */
-    val allPrefs: Flow<Map<String, Any>> = context.settingsDataStore.data.map { prefs ->
-        prefs.asMap().entries.associate { it.key.name to it.value }
-    }
+    val allPrefs: Flow<Map<String, Any>> = context.settingsDataStore.data.map { it.toNameMap() }
 
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
         Appearance(
@@ -330,3 +328,10 @@ class SettingsStore(internal val context: Context) {
      */
     internal val MIN_ORPHAN_AGE_MS = 10 * 60 * 1000L
 }
+
+/**
+ * The store as `name -> value`: the ONE view of the preferences that both Drive sync's export and
+ * search's live index are built from, so what syncs and what can be found cannot drift apart.
+ */
+internal fun androidx.datastore.preferences.core.Preferences.toNameMap(): Map<String, Any> =
+    asMap().entries.associate { it.key.name to it.value }

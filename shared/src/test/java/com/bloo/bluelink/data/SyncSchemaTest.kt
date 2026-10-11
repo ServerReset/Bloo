@@ -2,6 +2,7 @@ package com.bloo.bluelink.data
 
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SyncSchemaTest {
@@ -103,6 +104,24 @@ class SyncSchemaTest {
             assertFalse(it.searchable, "device-local but searchable: ${it.key}")
             val sample = if (it.scope == SettingsCatalog.Scope.CAR) it.key + "5NMS33AD1KH000000" else it.key
             assertTrue(SyncMerge.isDeviceLocal(sample), sample)
+        }
+    }
+
+    @Test
+    fun everySearchableSettingSurvivesAnExportAndImport() {
+        // One store, two readers: build a store holding every searchable setting (per-car ones for two
+        // cars, one of them lower-case as a stray API might return), send it through the Drive export
+        // and back, and every key must arrive intact -- search and sync see the same data.
+        val vins = listOf("5NMS33AD1KH000000", "kmhl14ja1pa000001")
+        val store = LinkedHashMap<String, Any>()
+        SettingsCatalog.searchable.forEach { f ->
+            val sample: Any = if (f.kind == SettingsCatalog.Kind.TOGGLE) true else "value-${f.key}"
+            if (f.scope == SettingsCatalog.Scope.CAR) vins.forEach { store[f.key + it] = sample } else store[f.key] = sample
+        }
+        val plan = assertNotNull(SyncMerge.parseBackup(SyncMerge.buildExport(prefs = store, dirtyKeys = emptySet())))
+        store.forEach { (key, value) ->
+            val arrived: Any? = plan.boolPuts[key] ?: plan.stringPuts[key]
+            assertTrue(arrived == value, "lost in sync: $key")
         }
     }
 }

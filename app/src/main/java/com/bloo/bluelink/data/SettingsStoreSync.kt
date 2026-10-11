@@ -192,7 +192,7 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
         // written into the file AND, being computed over the exact prefs/photos we upload,
         // guarantees the file's `_hash` matches its own content.
         val prefsSnapshot = context.settingsDataStore.data.first()
-        val prefsMap: Map<String, Any> = prefsSnapshot.asMap().entries.associate { it.key.name to it.value }
+        val prefsMap: Map<String, Any> = prefsSnapshot.toNameMap()
         val photos = SyncPhotos.encode(prefsSnapshot).mapValues { it.value.content }
         // ONE set, used by both the hash and the body -- see portableContentHash's param doc for
         // why passing it to only one of them corrupts the change gate.
