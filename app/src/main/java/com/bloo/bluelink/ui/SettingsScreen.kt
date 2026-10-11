@@ -90,14 +90,6 @@ internal fun SettingsScreen(
     val canBio = remember { vm.canUseBiometrics() }
     // LazyColumn: many heavy collapsible sections, unlike a car page's pebble list.
     val settingsListState = rememberLazyListState()
-    var pickTarget by remember { mutableStateOf<String?>(null) }
-    var cropUri by remember { mutableStateOf<Uri?>(null) }
-    // System photo picker (crash-free), then our own Compose crop step.
-    val photoLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia(),
-    ) { uri ->
-        if (uri != null && pickTarget != null) cropUri = uri
-    }
 
   val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -197,12 +189,7 @@ internal fun SettingsScreen(
             CarsCardContent(
                 state = state,
                 vm = vm,
-                pick = { vin ->
-                    pickTarget = vin
-                    photoLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                },
+                pick = { vin -> vm.requestPhotoPick(vin) },
             )
             }
             if (advTransition1.targetState || !advTransition1.isIdle) item {
@@ -275,16 +262,5 @@ internal fun SettingsScreen(
             onSettingsModeChange = { vm.setSettingsMode(it) },
             hazeState = hazeState,
         )
-        cropUri?.let { uri ->
-            val target = pickTarget
-            if (target != null) {
-                CropScreen(
-                    vin = target,
-                    uriString = uri.toString(),
-                    onCancel = { cropUri = null; pickTarget = null },
-                    onSave = { path -> vm.setVehicleImage(target, path); cropUri = null; pickTarget = null },
-                )
-            }
-        }
   }
 }

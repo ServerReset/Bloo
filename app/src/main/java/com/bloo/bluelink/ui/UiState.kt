@@ -129,6 +129,8 @@ data class UiState(
     /** On-device Gemini Nano availability + opt-in, and produced summaries. */
     val aiSupported: Boolean = false,
     val aiEnabled: Boolean = false,
+    /** The car (VIN) whose photo someone just asked to change; the root photo host consumes it. */
+    val photoPickRequest: String? = null,
     /** Summarize each car on open/refresh without being asked. Off by default; only meaningful when [aiActive]. */
     val aiAutoSummarize: Boolean = false,
     val aiSummaries: Map<String, String> = emptyMap(),

@@ -153,9 +153,9 @@ private fun CarPhotoControl(v: Vehicle, state: UiState, vm: AppViewModel) {
     val hasPhoto = !state.imageUrls[v.vin].isNullOrBlank()
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         StatusRow("Photo", if (hasPhoto) "Custom photo set" else "Using the default")
-        BodySmallText("Choose a new photo from Settings, on the car's card.")
-        if (hasPhoto) {
-            SafeMorphTextButton("Clear photo", onClick = { vm.setVehicleImage(v.vin, "") }, emphasis = ButtonEmphasis.Deny)
+        ExpressiveButtonRow(spacing = GapRow) {
+            MorphTextButton(if (hasPhoto) "Change photo" else "Choose photo", onClick = { vm.requestPhotoPick(v.vin) })
+            if (hasPhoto) MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") }, emphasis = ButtonEmphasis.Deny)
         }
     }
 }

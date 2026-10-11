@@ -255,6 +255,11 @@ private fun dynamicSettingActions(state: UiState, appearance: SettingsStore.Appe
                 sections.filter { !vm._state.value.isPebbleExpanded(v.vin, it) }.forEach { vm.togglePebble(v, it) }
             },
         )
+        add(
+            action("a_photopick$i", "Choose a new photo · ${v.name}", "photo picture image change choose set pick new ${v.name}") {
+                it.requestPhotoPick(v.vin)
+            },
+        )
         if (!state.imageUrls[v.vin].isNullOrBlank()) {
             add(
                 action("a_photo$i", "Clear photo · ${v.name}", "photo picture image remove clear default ${v.name}") {
