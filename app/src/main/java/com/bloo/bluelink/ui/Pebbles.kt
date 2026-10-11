@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -32,20 +31,6 @@ import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.ReorderColumn
 import kotlinx.coroutines.flow.first
-
-/** A friendly label for a pebble/section id. */
-internal fun sectionLabel(section: String): String = when (section) {
-    "charge" -> "Charge / fuel"
-    "climate" -> "Climate"
-    "location" -> "Location"
-    "trips" -> "Trips"
-    "info" -> "Car info"
-    "diagnostics" -> "Diagnostics"
-    "controls" -> "Lock / climate"
-    // "AI" is named here; the generic capitalise would render "Ai".
-    "ai" -> "AI summary"
-    else -> section.replaceFirstChar { it.uppercase() }
-}
 
 /**
  * The reorderable pebble stack for a car. [pinHotspot] defaults to true (exclude "controls" + any
