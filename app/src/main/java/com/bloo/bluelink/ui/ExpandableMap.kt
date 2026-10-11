@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import kotlin.math.roundToInt
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.runtime.DisposableEffect
 import androidx.activity.compose.BackHandler
@@ -158,10 +160,17 @@ internal fun ExpandableMapLayer(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
+                // 85% of the screen, plus however far it has been pulled up: the sheet's top rises with the
+                // finger while its bottom stays pinned to the screen bottom, so the map simply gets
+                // taller instead of lifting off and leaving a gap. Read in the measure phase.
+                .layout { measurable, constraints ->
+                    val base = (constraints.maxHeight * 0.85f).roundToInt()
+                    val h = (base + pull.up.value.roundToInt()).coerceIn(base, constraints.maxHeight)
+                    val p = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
+                    layout(p.width, p.height) { p.place(0, 0) }
+                }
                 .graphicsLayer {
-                    // The whole sheet (map, bar, buttons) rides up with the finger when pulled up.
-                    translationY = (1f - expandFraction.value) * size.height + dragPx.value - pull.up.value
+                    translationY = (1f - expandFraction.value) * size.height + dragPx.value
                 }
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
         ) {
@@ -232,7 +241,11 @@ internal fun ExpandableMapLayer(
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .imePadding()
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+                        .graphicsLayer {
+                            alpha = expandFraction.value.coerceIn(0f, 1f)
+                            // The buttons ride up with the page; the map grows beneath them.
+                            translationY = -minOf(pull.up.value, gapPx)
+                        },
                 ) {
                     MapFeatureRow(
                         features = listOf(
