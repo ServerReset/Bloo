@@ -259,9 +259,13 @@ suspend fun SettingsStore.setSectionCollapsed(vin: String, section: String, coll
     }
 }
 
+/**
+ * On by default: on a device with Gemini Nano the AI features simply work, and on one without it the
+ * setting means nothing (nothing AI is shown -- see UiState.aiActive). A person who turned it off,
+ * here or on another device, has a stored value that wins.
+ */
 suspend fun SettingsStore.aiEnabled(): Boolean =
-
-    context.settingsDataStore.data.first()[booleanPreferencesKey("ai_enabled")] ?: false
+    context.settingsDataStore.data.first()[booleanPreferencesKey("ai_enabled")] ?: true
 
 suspend fun SettingsStore.setAiEnabled(value: Boolean) {
     editTracked { it[booleanPreferencesKey("ai_enabled")] = value }

@@ -103,7 +103,8 @@ internal fun buildSettingsSearchEntries(
         parseOdometerMiles(v.odometer)?.let { odoInt ->
             add("Odometer · ${v.name}", "odometer mileage miles ${v.name}") { StatusRow("Odometer", formatDistance(odoInt, appearance.metricDistance)) }
         }
-        add("VIN · ${v.name}", "vin identification ${v.name} ${v.vin}") {
+        // The last six digits as their own word: that is how a VIN is usually quoted.
+        add("VIN · ${v.name}", "vin identification ${v.name} ${v.vin} ${v.vin.takeLast(6)}") {
             SelectionContainer { StatusRow("VIN", v.vin) }
         }
         // One source of truth for "what range do we show for this powertrain".
