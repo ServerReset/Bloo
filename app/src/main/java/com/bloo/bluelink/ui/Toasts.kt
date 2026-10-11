@@ -47,8 +47,8 @@ private val ToastEdge = 16.dp
 /** The narrowest a toast beside the search may get before it lifts above instead. */
 private val MinBesideWidth = 220.dp
 
-/** The widest a toast gets, however wide the display (matches the search bar's cap). */
-internal val MaxToastWidth = 640.dp
+/** The widest a toast gets, however wide the display (a comfortable reading width). */
+internal val MaxToastWidth = 420.dp
 
 /** The toast card's root, so a test can pin its height to the search element's. */
 internal const val ToastCardTag = "toastCard"
@@ -231,7 +231,6 @@ internal fun ToastHost(
                     hazeState = hazeState,
                     onCopy = onCopy,
                     onExpand = { state.expand(toast) },
-                    dock = anchor.dock,
                     onGone = { state.items.remove(toast) },
                 )
             }
