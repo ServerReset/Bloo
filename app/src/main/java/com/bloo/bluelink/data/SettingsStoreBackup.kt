@@ -25,7 +25,7 @@ suspend fun SettingsStore.exportSettingsJson(): String {
     val prefs = context.settingsDataStore.data.first()
     // Key/tombstone selection and typing live in the pure [SyncMerge.buildExport]; this only snapshots
     // Preferences into a map and base64-encodes photos (needs Bitmap).
-    val prefsMap: Map<String, Any> = prefs.asMap().entries.associate { it.key.name to it.value }
+    val prefsMap: Map<String, Any> = prefs.toNameMap()
     val photos = SyncPhotos.encode(prefs).mapValues { it.value.content }
     // Dirty set read from the snapshot already held.
     return SyncMerge.buildExport(prefsMap, prefs.dirtyKeySet(), photos)

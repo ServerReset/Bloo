@@ -64,7 +64,7 @@ val SettingsStore.dirtyKeysFlow: Flow<Set<String>> get() = context.settingsDataS
         // One name -> value map, not a scan per dirty key. Tombstoned keys are absent from
         // prefs and biometric as null, so a delete and a later restore of the same key are
         // correctly distinct.
-        val byName = prefs.asMap().entries.associate { it.key.name to it.value }
+        val byName = prefs.toNameMap()
         // NUL separator below, and written as the ESCAPE rather than the character.
         keys to keys.sorted().joinToString("\u0000") { "$it=${byName[it]}" }.hashCode()
     }
