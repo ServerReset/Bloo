@@ -106,6 +106,11 @@ internal val ToggleSettings = listOf(
         checked = { a, _, _ -> a.dynamicColor }, onToggle = { vm, v -> vm.setDynamicColor(v) },
     ),
     ToggleSpec(
+        title = "Flip columns", keywords = "layout columns swap sides left right wide screen tablet hot seat pebbles controls",
+        phrases = "put the controls on the other side swap the two columns",
+        checked = { a, _, _ -> a.columnsFlipped }, onToggle = { vm, v -> vm.setColumnsFlipped(v) },
+    ),
+    ToggleSpec(
         title = "Pebble outline", keywords = "border rim card theme appearance",
         checked = { a, _, _ -> a.pebbleOutline }, onToggle = { vm, v -> vm.setPebbleOutline(v) },
     ),

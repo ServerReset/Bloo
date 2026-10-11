@@ -143,7 +143,7 @@ object SettingsCatalog {
         "haptics_enabled", "notify_autolock", "notify_charge_complete", "notify_charging", "notify_door",
         "notify_door_min", "notify_running", "notify_running_min", "notify_service", "notify_start",
         "notify_unlocked", "notify_unlocked_min", "notify_watch_low", "pebble_outline", "theme_mode",
-        "ui_scale", "vibrancy", "enabled_shortcuts",
+        "ui_scale", "vibrancy", "enabled_shortcuts", "color_palette", "columns_flipped", "settings_mode",
         "plate_", "platform_", "ptrain_", "seat_", "svc_last_", "svc_interval_",
         "autolock_enabled_", "autolock_dry_run_", "autolock_grace_",
     )

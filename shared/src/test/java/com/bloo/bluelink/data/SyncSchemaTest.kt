@@ -85,7 +85,24 @@ class SyncSchemaTest {
     @Test
     fun theSettingsWithoutAControlAreTheOnesSearchShowsReadOnly() {
         val readOnly = SettingsCatalog.searchable.filter { !it.control }.map { it.key }
-        assertTrue("columns_flipped" in readOnly && "img_" in readOnly && "vehicle_order" in readOnly)
+        assertTrue("img_" in readOnly && "vehicle_order" in readOnly && "custom_palettes" in readOnly)
+        // These gained real controls in search (and so can be changed by a plain-language request).
+        assertFalse("columns_flipped" in readOnly || "color_palette" in readOnly || "settings_mode" in readOnly)
         assertFalse("haptics_enabled" in readOnly)
+    }
+
+    @Test
+    fun whatSearchShowsIsWhatSyncCarries() {
+        // The one pipeline's invariant: a setting a person can search for is a setting that syncs, and a
+        // device-local one is never offered. Device-local families are exactly the ones that never travel.
+        SettingsCatalog.searchable.forEach {
+            val sample = if (it.scope == SettingsCatalog.Scope.CAR) it.key + "5NMS33AD1KH000000" else it.key
+            assertFalse(SyncMerge.isDeviceLocal(sample), "searchable but device-local: $sample")
+        }
+        SettingsCatalog.families.filter { !it.syncs }.forEach {
+            assertFalse(it.searchable, "device-local but searchable: ${it.key}")
+            val sample = if (it.scope == SettingsCatalog.Scope.CAR) it.key + "5NMS33AD1KH000000" else it.key
+            assertTrue(SyncMerge.isDeviceLocal(sample), sample)
+        }
     }
 }

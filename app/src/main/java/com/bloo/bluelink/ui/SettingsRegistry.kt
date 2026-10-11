@@ -91,6 +91,29 @@ internal val ChoiceSettings: List<SettingSpec> = listOf(
         phrases = "show distances in miles show kilometres",
     ) { a, _, _, vm -> DistanceUnitRow(a, vm) },
     SettingSpec(
+        title = "Simple or advanced settings", kind = SettingKind.Choice,
+        keywords = "simple advanced mode power user more options fewer options settings",
+        phrases = "show me more settings hide the advanced options keep it simple",
+    ) { _, _, s, vm ->
+        SettingsSegmentedRow(
+            label = "Settings",
+            options = listOf(SegmentOption("simple", "Simple", null), SegmentOption("advanced", "Advanced", null)),
+            selectedKey = s.settingsMode,
+            onSelect = { vm.setSettingsMode(it) },
+        )
+    },
+    SettingSpec(
+        title = "Colour palette", kind = SettingKind.Choice,
+        keywords = "color theme palette accent blue violet teal forest amber rose bloo",
+        phrases = "change the accent colour make the app green use a different color",
+    ) { a, _, _, vm ->
+        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+            ColorPalette.entries.forEach { palette ->
+                ChoiceRow(palette.label, a.colorPalette == palette) { vm.setColorPalette(palette) }
+            }
+        }
+    },
+    SettingSpec(
         title = "Font", kind = SettingKind.Choice,
         keywords = "typeface atkinson hyperlegible google sans accessibility low vision text",
         phrases = "change the font easier to read dyslexia friendly",

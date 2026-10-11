@@ -137,8 +137,9 @@ internal fun AiCommandProposal(
 }
 
 /**
- * A plain-language request that names a setting ("stop it vibrating") mapped to one of the app's
- * on/off switches by Gemini Nano. Nothing changes until the person taps Apply.
+ * A plain-language request that names a setting ("stop it vibrating", "use kilometres", "make the
+ * text bigger") mapped to one of the app's settings -- switches, pickers and ranges -- by Gemini
+ * Nano. Nothing changes until the person taps Apply.
  */
 @Composable
 internal fun AiSettingProposal(
@@ -149,18 +150,19 @@ internal fun AiSettingProposal(
     vm: AppViewModel,
     hazeState: dev.chrisbanes.haze.HazeState?,
 ) {
-    val candidates = remember(state.aiSupported, state.aiEnabled, state.aiAutoSummarize, appearance, notif, state.shizukuAvailable) {
-        ToggleSettings.withIndex().filter { (_, spec) -> spec.visible(state) }.map { (i, spec) ->
-            com.bloo.bluelink.data.AiSettingResolver.Candidate("t$i", spec.title, spec.checked(appearance, notif, state), spec.keywords)
-        }
+    val ctx = remember(appearance, notif, state) { SettingContext(appearance, notif, state) }
+    val actions = remember(state.aiSupported, state.aiEnabled, state.settingsMode, state.shizukuAvailable) {
+        availableSettingActions(state)
     }
+    val candidates = remember(actions, ctx) { actions.map { it.candidate(ctx) } }
     var proposal by remember(submittedQuery) { mutableStateOf<com.bloo.bluelink.data.AiSettingResolver.Resolution?>(null) }
     var applied by remember(submittedQuery) { mutableStateOf(false) }
     LaunchedEffect(submittedQuery) { proposal = vm.aiResolveSetting(submittedQuery, candidates) }
     val p = proposal ?: return
-    val index = p.id.removePrefix("t").toIntOrNull() ?: return
-    val spec = ToggleSettings.getOrNull(index) ?: return
-    val current = candidates.firstOrNull { it.id == p.id }?.on
+    val action = actions.firstOrNull { it.id == p.id } ?: return
+    val current = candidates.firstOrNull { it.id == p.id }?.current
+    val already = current == p.value
+    val target = action.describe(p.value)
     GlassSurface(shape = StandardShape, modifier = Modifier.fillMaxWidth(), hazeState = hazeState) {
         Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -169,14 +171,15 @@ internal fun AiSettingProposal(
                 TitleSmallText("Did you mean?")
             }
             Text(
-                "Turn ${spec.title} ${if (p.value) "on" else "off"}" + if (current == p.value) " (already ${if (p.value) "on" else "off"})" else "",
+                (if (action.options.isEmpty() && action.min == null) "Turn ${action.title} $target" else "Set ${action.title} to $target") +
+                    if (already) " (already set)" else "",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (current != p.value) {
+            if (!already) {
                 SafeMorphTextButton(
                     text = if (applied) "Done" else "Apply",
                     onClick = {
-                        spec.onToggle(vm, p.value)
+                        action.write(vm, p.value)
                         applied = true
                     },
                     enabled = !applied,
