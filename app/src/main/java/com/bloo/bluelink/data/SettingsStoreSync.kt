@@ -53,30 +53,26 @@ suspend fun SettingsStore.syncFileChangedRemotely(): Boolean {
     val uri = syncUri() ?: return false
     val parsed = uri.toUri()
     val modified = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { providerLastModifiedMs(parsed) }
-    if (modified != null) return modified > lastSyncMs()
-    // A provider that reports no modified time cannot be checked with a metadata query, so fall back
-    // to reading the file and comparing its content hash with the one this device last synced -- but
-    // only every so often, since that is a real download.
     val now = android.os.SystemClock.elapsedRealtime()
-    if (now - lastContentPeekMs < CONTENT_PEEK_MIN_INTERVAL_MS) return false
-    lastContentPeekMs = now
-    val remote = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        runCatching {
-            kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
-            }
-        }.getOrNull()
-    } ?: return false
-    val json = remote.substringAfter('\n', "").takeIf { it.isNotBlank() } ?: return false
-    val hash = SyncMerge.parseMeta(json)?.hash ?: return false
-    return hash != syncLastHash()
+    val due = modified == null && SyncPoll.contentPeekDue(now, lastContentPeekMs)
+    if (due) lastContentPeekMs = now
+    // The decision itself is SyncPoll.changed (unit-tested); this only supplies the facts. The file is
+    // downloaded only if the provider gave no modified time and a peek is due.
+    val remoteHash = suspend {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                    context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
+                }
+            }.getOrNull()
+        }?.substringAfter('\n', "")?.takeIf { it.isNotBlank() }?.let { SyncMerge.parseMeta(it)?.hash }
+    }
+    val hash = if (due) remoteHash() else null
+    return SyncPoll.changed(modified, lastSyncMs(), due, { hash }, syncLastHash())
 }
 
 /** When [syncFileChangedRemotely] last downloaded the file to compare hashes (providers with no modified time). */
 private var lastContentPeekMs = 0L
-
-/** The least time between those downloads, so a metadata-less provider is polled gently. */
-private const val CONTENT_PEEK_MIN_INTERVAL_MS = 30_000L
 
 /**
  * One full bidirectional Drive-sync pass: download the file at [syncUri] (if configured), import it
