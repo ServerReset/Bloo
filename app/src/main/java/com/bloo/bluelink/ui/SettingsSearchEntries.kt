@@ -186,6 +186,7 @@ internal fun buildSettingsSearchEntries(
     }
     // The rest of the store: every searchable setting the catalog knows that has no control above,
     // read straight from the same preferences Drive sync carries, so what syncs is what can be found.
+    addStructuralEntries(entries, state, appearance, vm)
     addCatalogReadOnlyEntries(entries, state, prefs)
     return entries
 }

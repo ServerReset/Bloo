@@ -111,7 +111,8 @@ object SettingsCatalog {
         car("autolock_dry_run_", Kind.TOGGLE, "AutoLock dry run", "autolock dry run test"),
         car("autolock_grace_", Kind.NUMBER, "AutoLock grace period", "autolock grace seconds countdown"),
         car("autolock_device_addr_", Kind.TEXT),
-        car("autolock_device_name_", Kind.TEXT, "AutoLock Bluetooth device", "autolock bluetooth car device"),
+        // Picked in a dialog from the car's AutoLock card, so it is not offered as a search result of its own.
+        car("autolock_device_name_", Kind.TEXT),
 
         // --- Device-local: never travel ------------------------------------------------------
         local("sync_uri"), local("sync_last_ms"), local("sync_last_error"), local("sync_wifi"),
@@ -144,6 +145,10 @@ object SettingsCatalog {
         "notify_door_min", "notify_running", "notify_running_min", "notify_service", "notify_start",
         "notify_unlocked", "notify_unlocked_min", "notify_watch_low", "pebble_outline", "theme_mode",
         "ui_scale", "vibrancy", "enabled_shortcuts", "color_palette", "columns_flipped", "settings_mode",
+        "vehicle_order", "custom_palettes", "weather_label", "weather_follows_device",
+        "hotspots_", "sections_", "collapsed_", "img_",
+        // Covered by an existing control: the App lock row (timing), the Glass stops (Ultra).
+        "lock_timing", "ultra_glass", "watch_lock_timing",
         "plate_", "platform_", "ptrain_", "seat_", "svc_last_", "svc_interval_",
         "autolock_enabled_", "autolock_dry_run_", "autolock_grace_",
     )

@@ -151,8 +151,8 @@ internal fun AiSettingProposal(
     hazeState: dev.chrisbanes.haze.HazeState?,
 ) {
     val ctx = remember(appearance, notif, state) { SettingContext(appearance, notif, state) }
-    val actions = remember(state.aiSupported, state.aiEnabled, state.settingsMode, state.shizukuAvailable) {
-        availableSettingActions(state)
+    val actions = remember(state.aiSupported, state.aiEnabled, state.settingsMode, state.shizukuAvailable, state.vehicles, appearance.customPalettes) {
+        availableSettingActions(state, appearance)
     }
     val candidates = remember(actions, ctx) { actions.map { it.candidate(ctx) } }
     var proposal by remember(submittedQuery) { mutableStateOf<com.bloo.bluelink.data.AiSettingResolver.Resolution?>(null) }

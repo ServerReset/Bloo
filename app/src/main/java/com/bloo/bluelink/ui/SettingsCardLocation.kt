@@ -29,44 +29,54 @@ import kotlinx.coroutines.launch
 internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     val place = appearance.weatherLabel
     SettingsCard("Location", Icons.Filled.LocationOn, vm, status = place ?: "Device location") {
-        var query by remember { mutableStateOf("") }
-        val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) vm.useDeviceLocationForWeather() else vm.reportError("Location permission denied. Type a place instead")
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-            if (place == null) {
-                BodySmallText("\"My location\" follows your device until you set a place below.")
-            } else {
-                IconLeadRow(
-                    Icons.Filled.LocationOn,
-                    tint = MaterialTheme.colorScheme.primary,
-                    title = place,
-                    subtitle = "Weather and the map use this place",
-                    trailing = { SafeMorphTextButton("Clear", onClick = { vm.clearWeatherLocation() }, fillOnPress = false, emphasis = ButtonEmphasis.Deny) },
-                )
-            }
-            BlooTextField(
-                value = query,
-                onValueChange = { query = it },
-                label = { Text("City or place") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        WeatherPlaceControls(appearance, vm)
+    }
+}
+
+/**
+ * The weather-place controls, defined once for the Location card and for Settings search: the
+ * current place (with Clear), a field to set another, and "My location" to follow the device.
+ */
+@Composable
+internal fun WeatherPlaceControls(appearance: SettingsStore.Appearance, vm: AppViewModel) {
+    val place = appearance.weatherLabel
+    var query by remember { mutableStateOf("") }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) vm.useDeviceLocationForWeather() else vm.reportError("Location permission denied. Type a place instead")
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+        if (place == null) {
+            BodySmallText("\"My location\" follows your device until you set a place below.")
+        } else {
+            IconLeadRow(
+                Icons.Filled.LocationOn,
+                tint = MaterialTheme.colorScheme.primary,
+                title = place,
+                subtitle = "Weather and the map use this place",
+                trailing = { SafeMorphTextButton("Clear", onClick = { vm.clearWeatherLocation() }, fillOnPress = false, emphasis = ButtonEmphasis.Deny) },
             )
-            ActionRow {
-                MorphActionButton(
-                    label = "Set place",
-                    icon = Icons.Filled.Place,
-                    enabled = query.isNotBlank(),
-                    onClick = { vm.setWeatherPlace(query); query = "" },
-                    emphasis = ButtonEmphasis.Confirm,
-                )
-                MorphActionButton(
-                    label = "My location",
-                    icon = Icons.Filled.MyLocation,
-                    onClick = { permission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
-                )
-            }
+        }
+        BlooTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text("City or place") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        )
+        ActionRow {
+            MorphActionButton(
+                label = "Set place",
+                icon = Icons.Filled.Place,
+                enabled = query.isNotBlank(),
+                onClick = { vm.setWeatherPlace(query); query = "" },
+                emphasis = ButtonEmphasis.Confirm,
+            )
+            MorphActionButton(
+                label = "My location",
+                icon = Icons.Filled.MyLocation,
+                onClick = { permission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
+            )
         }
     }
 }

@@ -128,6 +128,14 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         choice(
+            "c_watchlock", "Watch lock timing", "watch wear pin lock ask passcode security open commands",
+            com.bloo.bluelink.data.WatchLockTiming.entries.map { Option(it.wireKey, it.label) },
+            { it.state.watchLockTiming.wireKey },
+            { vm, v -> vm.setWatchLockTiming(com.bloo.bluelink.data.WatchLockTiming.fromWire(v)) },
+        ),
+    )
+    add(
+        choice(
             "c_mode", "Simple or advanced settings", "simple advanced mode power user",
             listOf(Option("simple", "Simple"), Option("advanced", "Advanced")),
             { it.state.settingsMode },
@@ -178,6 +186,41 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
 }
 
+/**
+ * The settings that depend on what this person has: each car's pinned pebble, and their saved
+ * palettes. Built from live state, so a request can name "the Ioniq's pinned pebble" or a palette
+ * they made.
+ */
+private fun dynamicSettingActions(state: UiState, appearance: SettingsStore.Appearance): List<SettingAction> = buildList {
+    state.vehicles.forEachIndexed { i, v ->
+        val pinnable = pinnablePebbles(v, state)
+        if (pinnable.isEmpty()) return@forEachIndexed
+        add(
+            choice(
+                "p$i", "Pinned pebble · ${v.name}", "pin pebble hot seat full screen beside controls ${v.name}",
+                listOf(Option("none", "Nothing pinned")) + pinnable.map { Option(it, sectionLabel(it)) },
+                { c -> c.state.hotspotSections[v.vin] ?: "none" },
+                { vm, value ->
+                    val current = vm._state.value.hotspotSections[v.vin]
+                    // setHotspot toggles: unpin by naming the current one, pin by naming a different one.
+                    if (value == "none") current?.let { vm.setHotspot(v, it) } else if (current != value) vm.setHotspot(v, value)
+                },
+            ),
+        )
+    }
+    if (appearance.customPalettes.isNotEmpty()) {
+        add(
+            choice(
+                "c_custom", "Custom palettes", "color theme palette accent custom saved",
+                listOf(Option("builtin", "Built-in palette")) + appearance.customPalettes.map { Option(it.id, it.name) },
+                { c -> c.appearance.activeCustomPaletteId ?: "builtin" },
+                { vm, value -> vm.setActiveCustomPaletteId(value.takeIf { it != "builtin" }) },
+            ),
+        )
+    }
+}
+
 /** The settings a request may change right now: visible in this mode and on this device. */
-internal fun availableSettingActions(state: UiState): List<SettingAction> =
-    SettingActions.filter { it.visible(state) && isSettingAvailableInMode(it.title, state.settingsMode) }
+internal fun availableSettingActions(state: UiState, appearance: SettingsStore.Appearance): List<SettingAction> =
+    (SettingActions + dynamicSettingActions(state, appearance))
+        .filter { it.visible(state) && isSettingAvailableInMode(it.title, state.settingsMode) }

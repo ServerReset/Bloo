@@ -84,12 +84,12 @@ class SyncSchemaTest {
     }
 
     @Test
-    fun theSettingsWithoutAControlAreTheOnesSearchShowsReadOnly() {
+    fun everySearchableSettingHasARealControl() {
+        // Search used to show some settings as a bare value. Now every one has a control, so a setting
+        // added to the catalog without one fails here until its control exists (see
+        // StructuralSettingsEntries, SettingsRegistry and ToggleSettings in the app).
         val readOnly = SettingsCatalog.searchable.filter { !it.control }.map { it.key }
-        assertTrue("img_" in readOnly && "vehicle_order" in readOnly && "custom_palettes" in readOnly)
-        // These gained real controls in search (and so can be changed by a plain-language request).
-        assertFalse("columns_flipped" in readOnly || "color_palette" in readOnly || "settings_mode" in readOnly)
-        assertFalse("haptics_enabled" in readOnly)
+        assertTrue(readOnly.isEmpty(), "searchable settings with no control: $readOnly")
     }
 
     @Test
