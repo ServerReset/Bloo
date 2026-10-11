@@ -31,11 +31,11 @@ internal val ADVANCED_ONLY_SETTINGS = setOf(
     "Palette override", // Appearance card - custom palette override
     "Custom palette", // Appearance card - custom palette creation
 
-    // Identity & service group (Advanced only) - these have car names appended
+    // Identity paperwork (Advanced only) - these have car names appended. The SERVICE fields are
+    // not here: the car card shows them in Simple mode too (they drive the "service due" alert), so
+    // search must find them there as well, not hide what the card shows.
     "License plate · ", // Prefix for "License plate · <car name>"
     "VIN · ", // Prefix for "VIN · <car name>"
-    "Last service · ", // Prefix for "Last service · <car name>"
-    "Service interval · ", // Prefix for "Service interval · <car name>"
 )
 
 /**
