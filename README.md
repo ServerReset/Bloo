@@ -4,6 +4,15 @@ I wanted an app for my Hyundai that felt like Google built it. So I made one.
 
 Bloo is a third-party Android app for controlling **Hyundai**, **Genesis**, and **Kia** vehicles through their connected-car services (US, Canada, and Hyundai Europe). Built with Jetpack Compose and Material 3 Expressive for phones, foldables, and tablets. No simulated data -- every screen talks to live servers.
 
+## Screenshots
+
+Captured automatically from the **most recent release** on a real emulator, so they never drift from what the app actually looks like (see the `screenshots` job in the build workflow).
+
+| | |
+| --- | --- |
+| ![Welcome](docs/screenshots/01-welcome.png) | ![Welcome, dark](docs/screenshots/02-welcome-dark.png) |
+| Welcome | Welcome (dark) |
+
 ## Supported brands
 
 | Region | Brands | Login |
@@ -48,7 +57,7 @@ Requires Android Studio Meerkat or newer (AGP 9.1, Kotlin 2.2.20). The build nee
 
 ## Installing
 
-Every push publishes a rolling [GitHub Release](../../releases) tagged `build-<run number>` with the phone APK (`Bloo.apk`) attached as a direct download -- a plain public file, no GitHub sign-in and no zip step.
+Every push publishes a rolling [GitHub Release](../../releases) tagged `build-<run number>` with the phone APK (`Bloo.apk`) attached as a direct download -- a plain public file, no GitHub sign-in and no zip step. That build number **is** the app's version: there is no separate 1.0/1.1, so the newest release is always the newest build.
 
 To install:
 

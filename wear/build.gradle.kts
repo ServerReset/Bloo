@@ -14,10 +14,10 @@ android {
         // usable by both, which is why this is not lowered to match them.
         minSdk = 30
         targetSdk = 36
-        // Same as the phone: a plain incrementing number, since Bloo ships from
-        // GitHub releases rather than the Play Store.
-        versionCode = 2
-        versionName = "1.0"
+        // Same as the phone: the version IS the release (the CI run number), no marketing version.
+        val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
+        versionCode = runNumber.coerceAtLeast(1)
+        versionName = if (runNumber > 0) "build $runNumber" else "dev"
         // Same CI run number as the phone, so the watch can tell whether the phone is
         // advertising a newer watch build than the one it is running.
         buildConfigField("int", "BUILD_RUN_NUMBER", System.getenv("GITHUB_RUN_NUMBER") ?: "0")

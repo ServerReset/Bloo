@@ -12,8 +12,14 @@ android {
         applicationId = "com.bloo.bluelink"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0"
+        // Bloo has no marketing version. The version IS the release: every push publishes a new
+        // "build-<run number>" GitHub Release with the APK attached, and the app labels itself with
+        // that same run number (see UpdateApi.buildLabel). versionName mirrors it so Settings > Apps
+        // agrees, and versionCode IS the run number so each build cleanly supersedes the last on
+        // install. A local (unstamped) build falls back to 1 / "dev".
+        val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
+        versionCode = runNumber.coerceAtLeast(1)
+        versionName = if (runNumber > 0) "build $runNumber" else "dev"
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The GitHub Actions run number that produced this APK (0 for a local/dev

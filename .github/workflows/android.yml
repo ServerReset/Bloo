@@ -3,7 +3,6 @@ name: Build Android APK
 on:
   push:
     branches: [ "**" ]
-    tags: [ "v*" ]
   pull_request:
   workflow_dispatch:
 
@@ -11,15 +10,11 @@ permissions:
   contents: write
 
 jobs:
-  # Skipped on a version-tag push: the `release` job below already does a full
-  # build+publish for that case, on the exact same commit. Before this guard,
-  # tagging "vN" fired BOTH jobs -- two complete assembleRelease runs (Android
-  # SDK setup, full Gradle build, R8) back to back on identical source, plus a
-  # confusing rolling "build-N" prerelease published side-by-side with the
-  # real "vN" release nobody asked for. Ordinary branch pushes and PRs are
-  # unaffected; only a tag push skips this job now.
+  # Every branch push builds the APKs and publishes them as the one rolling GitHub Release (see the
+  # "Publish build" step below), tagged by run number. There is no separate marketing-version release
+  # any more: the version IS the build number, so the newest push is always the Latest release and the
+  # in-app updater always has one comparable number to check.
   build:
-    if: "!startsWith(github.ref, 'refs/tags/v')"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -155,41 +150,26 @@ jobs:
 
       # See the comment above "No actions/upload-artifact for the APKs" for why
       # this Release, not an Actions artifact, is the one and only APK-delivery
-      # path. One rolling pre-release per push, tagged by run number so nothing
-      # collides with the tag-triggered release job below.
+      # path. One rolling release per push, tagged by run number. NOT a prerelease: it is the newest
+      # build, so it should be the repo's "Latest release" for the humans arriving at the page (the
+      # in-app updater reads the newest "build-" tag either way).
       - name: Publish build as a GitHub Release (direct APK downloads)
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: "Build #${{ github.run_number }}"
-          prerelease: true
           body_path: release_notes.md
           files: |
             app/build/outputs/apk/release/Bloo.apk
             wear/build/outputs/apk/release/Bloo-watch.apk
 
-  # A separate, manually-tagged Release ("vN") for anyone who wants a stable
-  # build instead of the rolling "build-<run number>" pre-release the build
-  # job above publishes on every push. Only runs on a version tag push, never
-  # on ordinary branch pushes or PRs. The in-app update checker (UpdateApi)
-  # ignores these — it only reads "build-" tagged releases, which exist for
-  # every ordinary push and carry a comparable run number.
-  #
-  # No `needs: build` -- the build job above now explicitly SKIPS on a tag
-  # push (see its own `if`), specifically so a tag doesn't trigger two full
-  # rebuilds of the same commit. A `needs` on a job that never runs on this
-  # trigger would make GitHub Actions skip this one too (a skipped dependency
-  # doesn't satisfy `needs` by default), silently breaking every tagged
-  # release. This job already does its own complete build; it never
-  # depended on the other job's outputs anyway.
   # Runs the app for real: boots an emulator and runs the instrumented tests in
   # app/src/androidTest -- layouts measured, gestures performed, the launch actually happening.
   # Everything in `build` above stops at "it compiles and the JVM tests pass"; this is the job that
   # answers "does it work". Independent of `build` so a UI regression is reported without blocking
   # (or being hidden by) the release path.
   ui-tests:
-    if: "!startsWith(github.ref, 'refs/tags/v')"
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -232,8 +212,11 @@ jobs:
           path: app/build/reports/androidTests/
           if-no-files-found: ignore
 
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
+  # Keeps the README's screenshots current: builds the release APK, installs it on an emulator,
+  # captures the pre-login screens, and commits them to docs/screenshots/. The commit carries
+  # [skip ci] so it does not re-trigger this workflow. The car screens need a signed-in account,
+  # which CI does not have, so those stay out for now.
+  screenshots:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -247,47 +230,39 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # See the build job's own comment on this same removal.
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # release build type also uses the checked-in debug signing config (see
-      # app/build.gradle.kts) so this is a normally-installable signed APK,
-      # not an unsigned one — same key as every debug build, so it installs
-      # over an existing debug install without an uninstall first.
-      - name: Build release APKs
-        run: ./gradlew assembleRelease :wear:assembleRelease --stacktrace
+      - name: Build the release APK
+        run: ./gradlew :app:assembleRelease --stacktrace
 
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Capture screenshots from the APK
+        uses: reactivecircus/android-emulator-runner@v2
         with:
-          files: |
-            app/build/outputs/apk/release/Bloo.apk
-            wear/build/outputs/apk/release/Bloo-watch.apk
-          # A clear, stable body rather than generate_release_notes (which lists merged PRs --
-          # this repo pushes straight to its branch, so it produced an empty "What's Changed").
-          # Both artifacts are named so it is obvious which is for the phone and which for the
-          # watch, and how to install each.
-          body: |
-            ## Bloo ${{ github.ref_name }}
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          script: bash .github/ci-screenshots.sh
 
-            Two apps in this release:
-
-            | File | What it is |
-            | --- | --- |
-            | `Bloo.apk` | The phone app. **Install this first.** |
-            | `Bloo-watch.apk` | The Wear OS companion. Only if you have a paired watch. |
-
-            ### Install — phone
-            1. Download **`Bloo.apk`** from the Assets below.
-            2. Open it from your notification shade or the Downloads app.
-            3. If Android shows **"Blocked by Play Protect"**, tap **"More details"**, then **"Install anyway"**, and confirm with biometrics or your device password.
-
-            ### Install — watch (optional)
-            Pair your watch to the phone first. Bloo then pushes the watch update to it for you: on the watch, open Bloo and tap **Update now**.
-
-            Or sideload `Bloo-watch.apk` manually the same way as the phone (see above).
+      - name: Commit the screenshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots
+          if git diff --cached --quiet; then
+            echo "Screenshots unchanged."
+          else
+            git commit -m "Update screenshots from build #${{ github.run_number }} [skip ci]"
+            git push
+          fi
