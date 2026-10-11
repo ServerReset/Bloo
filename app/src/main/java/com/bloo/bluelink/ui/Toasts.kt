@@ -100,7 +100,7 @@ internal class ToastState {
 
     /**
      * While true no toast's clock runs: the search results are covering the stack, the app is in the
-     * background, or a finger is holding a toast. Set by the host through [setPaused].
+     * background, or a finger is holding a toast. Set by the host through [pauseClocks].
      */
     var paused by mutableStateOf(false)
         private set
