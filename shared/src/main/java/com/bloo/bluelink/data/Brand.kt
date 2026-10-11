@@ -284,19 +284,21 @@ val Brand.links: BrandLinks
             roadsidePhone = "8664445421",
             storeUrl = "https://owners.kia.com/us/en/kiaConnectStore/themes.html",
         )
-        // Europe: pan-European owner portal (country is chosen on the site). No single EU roadside
+        // Europe: the pan-European site root, which redirects to the visitor's country. Deep pages differ
+        // per country (the old fixed /en/... paths 404'd), so every link lands on the root and the
+        // country site takes over. No single EU roadside
         // number (it's per-country), so it's left blank — callers already guard empty phone
         // strings.
         Brand.HYUNDAI_EU -> BrandLinks(
             appPackage = "com.hyundai.bluelink.eu",
             appName = "Bluelink",
-            ownersUrl = "https://www.hyundai.com/eu/en/owners.html",
+            ownersUrl = "https://www.hyundai.com/eu",
             dealerLabel = "Find a dealer",
-            dealerUrl = "https://www.hyundai.com/eu/en/find-a-dealer.html",
-            manualsUrl = "https://www.hyundai.com/eu/en/owners/e-manual.html",
-            serviceScheduleUrl = "https://www.hyundai.com/eu/en/owners/book-a-service.html",
+            dealerUrl = "https://www.hyundai.com/eu",
+            manualsUrl = "https://www.hyundai.com/eu",
+            serviceScheduleUrl = "https://www.hyundai.com/eu",
             roadsidePhone = "",
-            storeUrl = "https://www.hyundai.com/eu/en/owners.html",
+            storeUrl = "https://www.hyundai.com/eu",
         )
     }
 
