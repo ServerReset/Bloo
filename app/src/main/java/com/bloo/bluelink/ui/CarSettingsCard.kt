@@ -142,8 +142,8 @@ internal fun CarSettingsCard(
         AutoLockSettingsGroup(v, vm)
 
         // Service is shown in Simple mode too -- it feeds the "service due" alert -- not just
-        // Advanced. Only the identity paperwork stays advanced.
-        SettingsGroup("Service") {
+        // Advanced. Only the identity paperwork (VIN, plate) stays advanced.
+        SettingsGroup(if (advanced) "Service & identity" else "Service") {
             Row(horizontalArrangement = Arrangement.spacedBy(GapRow)) {
                 MilesField(state.lastServiceMiles[v.vin], "Last service (mi)", Modifier.weight(1f)) {
                     vm.setLastServiceMiles(v.vin, it)
@@ -153,10 +153,8 @@ internal fun CarSettingsCard(
                 }
             }
             BodySmallText("When the car was last serviced, and how often it is due.")
-        }
-
-        if (advanced) {
-            SettingsGroup("Identity") {
+            if (advanced) {
+                SectionDivider(alpha = 0.5f)
                 SelectionContainer { StatusRow("VIN", v.vin) }
                 BlooTextField(
                     value = state.licensePlates[v.vin] ?: "",

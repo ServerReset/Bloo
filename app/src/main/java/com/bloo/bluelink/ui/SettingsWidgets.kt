@@ -192,7 +192,6 @@ fun SettingsSegmentedRow(
 internal fun Modifier.settingsCardSlot(): Modifier =
 
     fillMaxWidth()
-        .padding(bottom = SettingsCardGap)
         .semantics { heading() }
 
 @Composable

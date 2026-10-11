@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -124,6 +126,24 @@ internal fun SettingsScreen(
             modifier = Modifier
                 .widthIn(max = 1100.dp)
                 .fillMaxWidth()
+                // Rows melt away as they slide up under the status bar and the Simple/Advanced tab,
+                // instead of being cut by a hard line. The mask sits OUTSIDE hazeSource, so the glass
+                // header still blurs the full, unfaded content.
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val top = topInset.toPx()
+                    val fade = 44.dp.toPx()
+                    drawRect(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                            0f to androidx.compose.ui.graphics.Color.Transparent,
+                            (top / size.height).coerceIn(0f, 1f) to androidx.compose.ui.graphics.Color.Transparent,
+                            ((top + fade) / size.height).coerceIn(0f, 1f) to androidx.compose.ui.graphics.Color.Black,
+                            1f to androidx.compose.ui.graphics.Color.Black,
+                        ),
+                        blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                    )
+                }
                 .hazeSource(hazeState)
                 // Edge-to-edge disables adjustResize; imePadding shrinks the list so focused fields
                 // scroll into view.

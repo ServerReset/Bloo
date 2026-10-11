@@ -31,11 +31,16 @@ internal fun CarsCardContent(state: UiState, vm: AppViewModel, pick: (String) ->
         // Each car is its OWN top-level pebble, not nested inside a wrapping "Cars" card: reaching a
         // car's settings is a single tap instead of opening a card to find another one, and there is
         // no pebble-inside-a-pebble chrome. The column reorders the cars by drag.
+        androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(GapRow)) {
+        // The reorder gesture is a long-press, so say so (TalkBack users get Move up / Move down).
+        BodySmallText("Hold a car and drag to change their order.")
         ReorderColumn(
             items = state.vehicles,
             keyOf = { it.vin },
             onReorder = { vm.reorderVehicles(it) },
-            spacing = 0.dp,
+            // The same gap the list puts between every other card, so cars sit exactly as far apart
+            // as the rest of Settings -- the slots carry no padding of their own.
+            spacing = GapGroup,
         ) { v, itemDragHandle, dragging ->
             Box(Modifier.settingsCardSlot()) {
                 CarSettingsCard(
@@ -45,6 +50,7 @@ internal fun CarsCardContent(state: UiState, vm: AppViewModel, pick: (String) ->
                     onPickPhoto = { pick(v.vin) },
                 )
             }
+        }
         }
     }
 }

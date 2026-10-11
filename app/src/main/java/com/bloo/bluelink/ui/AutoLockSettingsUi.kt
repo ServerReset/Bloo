@@ -118,11 +118,9 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 current.dryRun,
                 description = "Runs the full flow but never locks the car. Turn off once you trust it.",
             ) { update(current.copy(dryRun = it)) }
-        }
-    }
 
-    if (current.enabled) {
-        SettingsGroup("Test") {
+            // Trying it out lives with the settings it exercises.
+            SectionDivider(alpha = 0.5f)
             SafeMorphTextButton(
                 "Simulate leaving",
                 enabled = current.isUsable,
