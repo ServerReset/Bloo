@@ -37,7 +37,9 @@ class DriveSyncPipelineTest {
 
     @Before
     fun setUp() {
-        file = File(ctx.cacheDir, "drive-sync-test.bloo").apply { delete() }
+        // An empty file, as a Drive document the user just created reads: a missing one is a read error,
+        // and a failed read deliberately blocks the upload half of the pass.
+        file = File(ctx.cacheDir, "drive-sync-test.bloo").apply { delete(); writeText("") }
         store = SettingsStore(ctx)
         runBlocking { store.setSyncUri(Uri.fromFile(file).toString()) }
     }
