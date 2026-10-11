@@ -227,32 +227,16 @@ internal fun PinnedPebble(
     val flight = remember(section) { Animatable(0f) }
     var flightFrom by remember(section) { mutableStateOf(Offset.Zero) }
     var flying by remember(section) { mutableStateOf(false) }
-    val x by remember {
-        derivedStateOf {
-            when {
-                dragging -> dragX.floatValue
-                flying -> {
-                    val to = hotDrag?.stackSlot?.get(section)
-                    val from = hotDrag?.slotTopLeft
-                    if (to != null && from != null) flightFrom.x + (to.x - from.x - flightFrom.x) * flight.value else settleX.value
-                }
-                else -> settleX.value
-            }
-        }
+    // One resolver for both axes: dragging follows the finger, flying lerps to the live slot, else settles.
+    fun axis(drag: Float, settle: Float, from: Float, pick: (Offset) -> Float): Float {
+        if (dragging) return drag
+        val to = hotDrag?.stackSlot?.get(section)
+        val seat = hotDrag?.slotTopLeft
+        if (!flying || to == null || seat == null) return settle
+        return from + (pick(to) - pick(seat) - from) * flight.value
     }
-    val y by remember {
-        derivedStateOf {
-            when {
-                dragging -> dragY.floatValue
-                flying -> {
-                    val to = hotDrag?.stackSlot?.get(section)
-                    val from = hotDrag?.slotTopLeft
-                    if (to != null && from != null) flightFrom.y + (to.y - from.y - flightFrom.y) * flight.value else settleY.value
-                }
-                else -> settleY.value
-            }
-        }
-    }
+    val x by remember { derivedStateOf { axis(dragX.floatValue, settleX.value, flightFrom.x) { it.x } } }
+    val y by remember { derivedStateOf { axis(dragY.floatValue, settleY.value, flightFrom.y) { it.y } } }
     // Grows a little as you pick it up, and more once you have dragged it far enough that releasing
     // WILL unpin it -- so the drop is not a surprise.
     val pastUnpin = dragging && x > unpinPx
