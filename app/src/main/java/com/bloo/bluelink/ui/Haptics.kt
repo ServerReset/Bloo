@@ -99,6 +99,20 @@ class Haptics(context: Context) {
         if (composes) composed { add(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.6f, 0) } else oneShot(12, 110)
     }
 
+    /**
+     * One notch of a rising pull: [level] 0..1 scales the strength, so a run of these under a
+     * finger gets steadily stronger the closer it gets to its limit.
+     */
+    fun ramp(level: Float) {
+        val l = level.coerceIn(0f, 1f)
+        if (composes) composed {
+            add(
+                if (l > 0.7f) VibrationEffect.Composition.PRIMITIVE_CLICK else VibrationEffect.Composition.PRIMITIVE_TICK,
+                0.2f + 0.8f * l, 0,
+            )
+        } else oneShot(8 + (10 * l).toLong(), 40 + (210 * l).toInt())
+    }
+
     /** Weighty confirm — lock/unlock landed, command sent. */
     fun heavy() {
         if (composes) composed {

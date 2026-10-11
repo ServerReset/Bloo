@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.runtime.DisposableEffect
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -105,14 +106,14 @@ internal fun ExpandableMapLayer(
     // CarMapSheetBody's own handle uses (its own `dragPx`; see that doc).
     val dragPx = remember { Animatable(0f) }
     val pull = remember { MapPullState() }
-    val shakeTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "mapTension")
-    val shake = shakeTransition.animateFloat(
-        initialValue = -3f, targetValue = 3f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            androidx.compose.animation.core.tween(45), androidx.compose.animation.core.RepeatMode.Reverse,
-        ),
-        label = "mapTensionShake",
-    )
+    // The gap above the sheet: how far it can rise before it meets the top of the screen.
+    val gapPx = LocalWindowInfo.current.containerSize.height * 0.15f
+    val refreshIndicator = LocalRefreshIndicator.current
+    // Keep the shared indicator spinning for as long as the location request is actually running.
+    DisposableEffect(refreshing) {
+        refreshIndicator?.setRefreshing(pull, refreshing)
+        onDispose { refreshIndicator?.setRefreshing(pull, false) }
+    }
     // Read here, at composable scope, not inline inside the scope.launch{} blocks below --
     // lowPowerAwareSpring is itself @Composable (it reads battery-saver state), so it can't be
     // called from inside a suspend lambda.
@@ -159,7 +160,8 @@ internal fun ExpandableMapLayer(
                 .fillMaxWidth()
                 .fillMaxHeight(0.85f)
                 .graphicsLayer {
-                    translationY = (1f - expandFraction.value) * size.height + dragPx.value
+                    // The whole sheet (map, bar, buttons) rides up with the finger when pulled up.
+                    translationY = (1f - expandFraction.value) * size.height + dragPx.value - pull.up.value
                 }
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
         ) {
@@ -207,17 +209,18 @@ internal fun ExpandableMapLayer(
                     mapHazeState = mapHazeState,
                     // No refresh button: pull the bar up to full tension and let go instead.
                     dragModifier = Modifier.pullToRefreshOrDismiss(
-                        dragPx, pull, scope, density, dragSpring, LocalHaptics.current, ::close, onRefreshLocation,
+                        dragPx, pull, gapPx, scope, density, dragSpring, LocalHaptics.current, ::close,
+                        {
+                            // The disc drops in from the top (as for any pull-to-refresh) and holds
+                            // while the location request is in flight.
+                            refreshIndicator?.requested = true
+                            onRefreshLocation()
+                        },
                     ),
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(start = GapSection, end = GapSection, top = GapSection)
-                        .graphicsLayer {
-                            alpha = expandFraction.value.coerceIn(0f, 1f)
-                            translationY = -pull.up.value
-                            // At full tension the bar trembles; it stops the moment you let go.
-                            translationX = if (pull.armed) shake.value else 0f
-                        },
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
                 )
             }
 

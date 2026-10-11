@@ -255,52 +255,56 @@ internal fun Modifier.pullDownToDismiss(
     )
 }
 
-/**
- * The upward pull on the map's top bar: [up] is the rubber-banded travel in px, [armed] is true once
- * the pull has reached full tension (releasing then refreshes the location).
- */
+/** How far the whole map sheet has been pulled up, in px (see [pullToRefreshOrDismiss]). */
 internal class MapPullState {
     val up = androidx.compose.animation.core.Animatable(0f)
-    var armed by mutableStateOf(false)
 }
 
 /**
- * The map bar's drag: down dismisses (as [pullDownToDismiss]); UP stretches against a rubber band
- * until it hits full tension, which arms a location refresh that fires on release.
+ * The map bar's drag: down dismisses (as [pullDownToDismiss]); UP lifts the whole sheet toward the
+ * top of the screen, ticking harder the closer it gets ([gapPx] is the room above it). Let go near
+ * the top and [refresh] fires; let go earlier and it just settles back.
  */
 internal fun Modifier.pullToRefreshOrDismiss(
     dragPx: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
     pull: MapPullState,
+    gapPx: Float,
     scope: kotlinx.coroutines.CoroutineScope,
     density: androidx.compose.ui.unit.Density,
     spring: androidx.compose.animation.core.AnimationSpec<Float>,
     haptics: Haptics?,
     close: () -> Unit,
     refresh: () -> Unit,
-): Modifier = this.pointerInput(Unit) {
-    val maxPx = with(density) { 64.dp.toPx() }
-    val armPx = with(density) { 120.dp.toPx() }
+): Modifier = this.pointerInput(gapPx) {
+    val overPx = with(density) { 28.dp.toPx() }
+    val notchPx = (gapPx / 14f).coerceAtLeast(1f)
     var raw = 0f
+    var lastNotch = 0
     detectVerticalDragGestures(
         onVerticalDrag = { change, amount ->
             change.consume()
             if (raw > 0f || (amount < 0f && dragPx.value <= 0f)) {
                 raw = (raw - amount).coerceAtLeast(0f)
-                // Resisted: travel approaches maxPx however far the finger goes.
-                scope.launch { pull.up.snapTo(maxPx * raw / (raw + maxPx)) }
-                val nowArmed = raw >= armPx
-                if (nowArmed && !pull.armed) haptics?.heavy()
-                pull.armed = nowArmed
+                // 1:1 up to the top of the screen, then a short rubber band past it.
+                val over = (raw - gapPx).coerceAtLeast(0f)
+                val travel = minOf(raw, gapPx) + overPx * over / (over + overPx)
+                scope.launch { pull.up.snapTo(travel) }
+                val notch = (raw / notchPx).toInt()
+                if (notch > lastNotch) haptics?.ramp(raw / gapPx)
+                lastNotch = notch
             } else {
                 scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
             }
         },
         onDragEnd = {
             if (raw > 0f) {
-                if (pull.armed) refresh()
+                if (raw >= gapPx * 0.8f) {
+                    haptics?.diceRoll()
+                    refresh()
+                }
                 raw = 0f
-                pull.armed = false
-                scope.launch { pull.up.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
+                lastNotch = 0
+                scope.launch { pull.up.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow)) }
             } else {
                 val thresholdPx = with(density) { 96.dp.toPx() }
                 if (dragPx.value > thresholdPx) close() else scope.launch { dragPx.animateTo(0f, spring) }
@@ -308,7 +312,7 @@ internal fun Modifier.pullToRefreshOrDismiss(
         },
         onDragCancel = {
             raw = 0f
-            pull.armed = false
+            lastNotch = 0
             scope.launch { pull.up.animateTo(0f, spring) }
             scope.launch { dragPx.animateTo(0f, spring) }
         },
