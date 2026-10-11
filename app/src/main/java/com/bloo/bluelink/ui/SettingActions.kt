@@ -29,6 +29,8 @@ internal class SettingAction(
     val text: Boolean = false,
     /** A one-shot action (reset, clear, collapse all): a picker with a single "run" option. */
     val isAction: Boolean = false,
+    /** The action needs the location permission first; the card asks for it, then runs [write]. */
+    val needsLocationPermission: Boolean = false,
     val read: (SettingContext) -> String,
     val write: (AppViewModel, String) -> Unit,
 ) {
@@ -267,6 +269,13 @@ private fun dynamicSettingActions(state: UiState, appearance: SettingsStore.Appe
             text = true,
             read = { c -> c.appearance.weatherLabel ?: "none" },
             write = { vm, place -> vm.setWeatherPlace(place) },
+        ),
+    )
+    add(
+        SettingAction(
+            "a_weatherdevice", "Use my location for weather", "weather follow device location gps my location",
+            options = listOf(Option("run", "Use my location for weather")), isAction = true, needsLocationPermission = true,
+            read = { "" }, write = { vm, _ -> vm.useDeviceLocationForWeather() },
         ),
     )
     if (appearance.weatherLabel != null) {

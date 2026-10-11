@@ -163,6 +163,12 @@ internal fun AiSettingProposal(
     val current = candidates.firstOrNull { it.id == p.id }?.current
     val already = !action.isAction && current == p.value
     val target = action.describe(p.value)
+    // Location for weather needs the permission first; the card asks for it, then runs the action.
+    val locationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) { action.write(vm, p.value); applied = true } else vm.reportError("Location permission denied. Type a place instead")
+    }
     GlassSurface(shape = StandardShape, modifier = Modifier.fillMaxWidth(), hazeState = hazeState) {
         Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -183,8 +189,12 @@ internal fun AiSettingProposal(
                 SafeMorphTextButton(
                     text = if (applied) "Done" else if (action.isAction) "Run" else "Apply",
                     onClick = {
-                        action.write(vm, p.value)
-                        applied = true
+                        if (action.needsLocationPermission) {
+                            locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                        } else {
+                            action.write(vm, p.value)
+                            applied = true
+                        }
                     },
                     enabled = !applied,
                     emphasis = ButtonEmphasis.Confirm,
