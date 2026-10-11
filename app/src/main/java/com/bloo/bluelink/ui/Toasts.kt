@@ -167,7 +167,7 @@ internal class ToastState {
      * paused, so a message the user could not see is not spent while they were away from it.
      */
     @Synchronized
-    fun setPaused(value: Boolean) {
+    fun pauseClocks(value: Boolean) {
         if (value == paused) return
         val now = SystemClock.elapsedRealtime()
         if (value) {
@@ -217,9 +217,9 @@ internal fun ToastHost(
     }
     var held by remember { mutableIntStateOf(0) }
     val shouldPause = anchor.searchOpen || !resumed || held > 0
-    LaunchedEffect(shouldPause) { state.setPaused(shouldPause) }
+    LaunchedEffect(shouldPause) { state.pauseClocks(shouldPause) }
     // Leaving the host (a screen swap) must not leave the clocks stopped for good.
-    DisposableEffect(state) { onDispose { state.setPaused(false) } }
+    DisposableEffect(state) { onDispose { state.pauseClocks(false) } }
 
     val visible = state.items
     // The newest toast is the one that shares the search element's own row; the older ones stack
