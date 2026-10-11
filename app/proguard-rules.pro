@@ -86,3 +86,9 @@
 -dontwarn org.bouncycastle.**
 -dontwarn io.github.muntashirakon.adb.**
 
+# --- ML Kit GenAI (on-device Gemini Nano) -----------------------------------------
+# The availability check and inference reach the system AI service through generated binder/AIDL
+# classes and parcelables; a stripped one fails at runtime, silently, as "AI unavailable". Keep the
+# SDK whole and do not fail the build over optional references.
+-keep class com.google.mlkit.genai.** { *; }
+-dontwarn com.google.mlkit.genai.**

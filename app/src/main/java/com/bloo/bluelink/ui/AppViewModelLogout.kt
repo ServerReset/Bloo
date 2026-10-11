@@ -58,6 +58,7 @@ fun AppViewModel.logout(brand: Brand) {
                 aiSupported = keep.aiSupported,
                 aiEnabled = keep.aiEnabled,
                 aiAutoSummarize = keep.aiAutoSummarize,
+                aiAvailability = keep.aiAvailability,
                 shizukuAvailable = keep.shizukuAvailable,
                 settingsMode = keep.settingsMode,
                 syncUri = keep.syncUri,

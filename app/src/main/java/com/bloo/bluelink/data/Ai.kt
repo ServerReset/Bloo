@@ -1,5 +1,8 @@
 package com.bloo.bluelink.data
 
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
 import android.content.Context
 import com.google.android.gms.tasks.Task
 import com.google.common.util.concurrent.ListenableFuture
@@ -30,6 +33,9 @@ class Ai(context: Context) {
     private companion object {
         // ML Kit's ARTICLE summarizer requires at least this many input characters.
         const val MIN_ARTICLE_CHARS = 400
+
+        // How long the availability check may take before it is reported as "no answer".
+        const val PROBE_TIMEOUT_MS = 10_000L
     }
 
     // NOT `by lazy` any more -- a `by lazy` value, once created, is held (and the underlying AICore
@@ -61,13 +67,18 @@ class Ai(context: Context) {
      * success, failure, or cancellation -- so every public entry point below leaves no session open
      * behind it regardless of how it ends.
      */
-    private suspend fun <T> withSummarizer(block: suspend (Summarizer) -> T): T {
+    private suspend fun <T> withSummarizer(block: suspend (Summarizer) -> T): T = lock.withLock {
+        // One caller at a time: they share one client, and whichever finished first used to close it
+        // under the others (a search could start a command guess, a setting guess and an answer at once).
         try {
-            return block(summarizer())
+            block(summarizer())
         } finally {
             releaseSummarizer()
         }
     }
+
+    /** Serialises every use of the shared on-device client. */
+    private val lock = Mutex()
 
     /**
      * What the system says about Gemini Nano summarization here, with the REASON when the check
@@ -75,14 +86,17 @@ class Ai(context: Context) {
      * never as a bare "unsupported". The device's answer ([FeatureStatus]) maps one-to-one.
      */
     suspend fun availability(): AiAvailability = try {
-        withSummarizer { s ->
+        withTimeout(PROBE_TIMEOUT_MS) { withSummarizer { s ->
             when (s.checkFeatureStatus().await()) {
                 FeatureStatus.AVAILABLE -> AiAvailability.Available
                 FeatureStatus.DOWNLOADABLE -> AiAvailability.Downloadable
                 FeatureStatus.DOWNLOADING -> AiAvailability.Downloading
                 else -> AiAvailability.Unavailable
             }
-        }
+        } }
+    } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+        // Not a cancellation of ours: the system never answered, which is a result worth reporting.
+        AiAvailability.Error("no answer from the system AI service within ${PROBE_TIMEOUT_MS / 1000}s")
     } catch (e: kotlinx.coroutines.CancellationException) {
         throw e
     } catch (t: Throwable) {

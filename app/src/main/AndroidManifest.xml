@@ -54,6 +54,9 @@
          Android 11+ hides other packages unless declared here; without these the
          digital-key and wallet apps can't be launched and we'd fall back to URLs. -->
     <queries>
+        <!-- The system AI service the on-device Gemini Nano library talks to: it must be visible to this
+             app (Android 11+ package visibility) for the availability check to reach it. -->
+        <package android:name="com.google.android.aicore" />
         <package android:name="com.stationdm.bluelink" />
         <package android:name="com.stationdm.genesis" />
         <package android:name="com.myuvo.link" />

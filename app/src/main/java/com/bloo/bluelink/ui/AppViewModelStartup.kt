@@ -121,16 +121,25 @@ internal fun AppViewModel.bootstrapColdStart() {
 /** When the AI probe last ran, so coming back to the app does not hammer it. */
 private var lastAiProbeMs = 0L
 
+/** The one probe loop in flight: a new request while it runs would race it and could overwrite its answer. */
+private var aiProbeJob: kotlinx.coroutines.Job? = null
+
 /**
  * Asks the system whether Gemini Nano is usable and records the ANSWER, including the reason when the
  * check fails, in [UiState.aiAvailability] and the log. A result that is not usable is retried a few
  * times with growing waits (the service can still be starting, or the first call can race the
  * foreground), and again whenever the app returns to the foreground. Nothing AI is shown unless the
- * result is usable: [UiState.aiSupported] follows it exactly.
+ * result is usable: [UiState.aiSupported] follows it. One loop at a time; [restart] cancels a running
+ * one (the Debug card's "Check again"). A transient exception never downgrades a model that already
+ * answered "usable" -- only a definite "Unavailable" does.
  */
-internal fun AppViewModel.probeAi() {
+internal fun AppViewModel.probeAi(restart: Boolean = false) {
+    if (aiProbeJob?.isActive == true) {
+        if (!restart) return
+        aiProbeJob?.cancel()
+    }
     lastAiProbeMs = System.currentTimeMillis()
-    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+    aiProbeJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         var attempt = 0
         while (true) {
             val startedAt = System.currentTimeMillis()
@@ -140,9 +149,10 @@ internal fun AppViewModel.probeAi() {
             val enabled = if (result.usable) settingsStore.aiEnabled() else false
             val auto = if (result.usable) settingsStore.aiAutoSummarize() else false
             _state.update {
+                val keep = !result.usable && it.aiSupported && result is com.bloo.bluelink.data.AiAvailability.Error
                 it.copy(
                     aiAvailability = result,
-                    aiSupported = result.usable,
+                    aiSupported = if (keep) true else result.usable,
                     aiEnabled = if (result.usable) enabled else it.aiEnabled,
                     aiAutoSummarize = if (result.usable) auto else it.aiAutoSummarize,
                 )
@@ -161,4 +171,4 @@ internal fun AppViewModel.recheckAiOnForeground() {
 }
 
 /** The Debug card's "Check again": probe now, whatever the last result was. */
-fun AppViewModel.reprobeAi() = probeAi()
+fun AppViewModel.reprobeAi() = probeAi(restart = true)
