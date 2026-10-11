@@ -22,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.data.StartupTrace
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.ui.recheckAiOnForeground
+import com.bloo.bluelink.ui.summarizeMissingOnForeground
 import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
 import com.bloo.bluelink.ui.BlooTheme
@@ -198,6 +199,7 @@ class MainActivity : FragmentActivity() {
         super.onStart()
         viewModel.appForeground.value = true
         viewModel.recheckAiOnForeground()
+        viewModel.summarizeMissingOnForeground()
         // Reattach AutoLock's dynamic Bluetooth watcher for existing installs whose config was
         // already enabled before the watcher existed. This is idempotent: starting the service
         // again only refreshes its foreground notification and receiver, it does not start a car

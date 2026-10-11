@@ -52,6 +52,10 @@ internal fun AppViewModel.autoSummarize(v: Vehicle) {
     val s = _state.value
     // Only when asked for: on-device AI on, AND the automatic option on (off by default).
     if (!s.aiActive || !s.aiAutoSummarize) return
+    // Android only lets the on-device model run while the app is on screen (GenAiException code 30,
+    // "background use blocked"); a summary asked for in the background would just fail. It is written
+    // when the app next comes to the foreground (see summarizeMissingOnForeground).
+    if (!appForeground.value) return
     if (v.vin in s.aiBusy) return
     val status = s.statusFor(v) ?: return
     _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
@@ -68,6 +72,25 @@ internal fun AppViewModel.autoSummarize(v: Vehicle) {
                 },
             )
         }
+    }
+}
+
+/** Writes the automatic summary for every car that has none yet, once the app is on screen. */
+internal fun AppViewModel.summarizeMissingOnForeground() {
+    _state.value.vehicles.filter { it.vin !in _state.value.aiSummaries }.forEach { autoSummarize(it) }
+}
+
+/**
+ * A sentence for why the on-device model could not answer. The exception text is AICore detail, but
+ * two causes are common and have a plain fix: the model only runs while the app is on screen (code 30)
+ * and it can be briefly busy or out of quota (code 9, 27).
+ */
+internal fun aiFailureMessage(e: Throwable, carName: String): String {
+    val text = e.message.orEmpty()
+    return when {
+        "code 30" in text -> "Android only runs the AI while Bloo is on screen. Try again with the app open."
+        "code 9" in text || "code 27" in text -> "The AI is busy right now. Try ${carName} again in a minute."
+        else -> "Couldn't summarize $carName right now."
     }
 }
 
@@ -95,7 +118,7 @@ fun AppViewModel.summarizeCar(v: Vehicle) {
                     // The exception text is AICore implementation detail: log it, show the user a
                     // sentence.
                     AppLog.log("⚠ AI summary: ${e.message}")
-                    st.copy(aiBusy = st.aiBusy - v.vin, message = "Couldn't summarize ${v.name} right now.")
+                    st.copy(aiBusy = st.aiBusy - v.vin, message = aiFailureMessage(e, v.name))
                 },
             )
         }
