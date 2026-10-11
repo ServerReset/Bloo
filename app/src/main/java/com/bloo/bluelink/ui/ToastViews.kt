@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import android.os.SystemClock
@@ -75,6 +76,7 @@ internal fun BoxScope.ToastSlot(
     windowWidthPx: Float,
     hazeState: HazeState,
     onCopy: (String) -> Unit,
+    onExpand: () -> Unit,
     onGone: () -> Unit,
 ) {
     // Its own clock, re-armed whenever the expiry moves (a repeat of the same message).
@@ -124,7 +126,9 @@ internal fun BoxScope.ToastSlot(
     ) {
         // On a wide display the card stops at MaxToastWidth and sits centred in its slot, instead of
         // stretching across the whole screen.
-        Box(Modifier.wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = MaxToastWidth)) {
+        // Beside the search it is as wide as the gap allows; the cap is only for the stack above.
+        val beside = index == 0 && (startInsetPx > 1f || endInsetPx > 1f)
+        Box(Modifier.wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = if (beside) Dp.Infinity else MaxToastWidth)) {
             ToastCard(
                 toast = toast,
                 // Fade the CONTENT, not the glass: the pill stays a solid piece of the bar while it
@@ -133,6 +137,7 @@ internal fun BoxScope.ToastSlot(
                 onDismiss = { toast.leaving = true },
                 hazeState = hazeState,
                 onCopy = onCopy,
+                onExpand = onExpand,
             )
         }
     }
@@ -145,6 +150,7 @@ private fun ToastCard(
     onDismiss: () -> Unit,
     hazeState: HazeState,
     onCopy: (String) -> Unit,
+    onExpand: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
     val (icon, accent) = when (toast.type) {
@@ -156,6 +162,8 @@ private fun ToastCard(
         // A pill, like the search bar it emerges from; mostly clear glass with just enough tint to read.
         shape = CircleShape,
         hazeState = hazeState,
+        // A grouped toast (×N) opens into its individual cards when tapped.
+        onClick = if (toast.count > 1) onExpand else null,
         tint = scheme.surface.copy(alpha = if (canBlurBackdrops()) 0.16f else 0.96f),
         modifier = Modifier
             .fillMaxWidth()

@@ -70,6 +70,8 @@ internal class Toast(val id: Long, val message: String, val type: ToastKind, exp
     var leaving by mutableStateOf(false)
     /** How many times this same message has repeated without leaving, shown as a count. */
     var count by mutableIntStateOf(1)
+    /** False once split out of a group, so a later repeat starts a fresh group instead of rejoining it. */
+    var groupable = true
 }
 
 /** The app's one toast stack, for any composable that needs to tell the user something. */
@@ -95,13 +97,26 @@ internal class ToastState {
         lastExpireAt = expire
         // Identical toasts collapse into one entry wherever it sits in the stack: re-arm it and bump
         // its count instead of pushing a duplicate card.
-        val existing = items.lastOrNull { !it.leaving && it.message == message && it.type == type }
+        val existing = items.lastOrNull { !it.leaving && it.groupable && it.message == message && it.type == type }
         if (existing != null) {
             existing.expireAt = expire
             existing.count += 1
             return
         }
         items += Toast(nextId++, message, type, expire)
+        items.filter { !it.leaving }.dropLast(MaxToasts).forEach { it.leaving = true }
+    }
+
+    /** Tapping a grouped toast splits it back into one card per occurrence (up to [MaxToasts]). */
+    fun expand(toast: Toast) {
+        if (toast.count <= 1 || toast.leaving) return
+        val extra = minOf(toast.count, MaxToasts) - 1
+        toast.count = 1
+        toast.groupable = false
+        val at = items.indexOf(toast) + 1
+        repeat(extra) {
+            items.add(at, Toast(nextId++, toast.message, toast.type, toast.expireAt).also { it.groupable = false })
+        }
         items.filter { !it.leaving }.dropLast(MaxToasts).forEach { it.leaving = true }
     }
 
@@ -150,7 +165,7 @@ internal fun ToastHost(
     val contentWidthPx = window.width.toFloat() - 2 * edgePx
     val minWidthPx = with(density) { MinBesideWidth.toPx() }
     val chromePx = with(density) { ToastChromeWidth.toPx() }
-    val maxWidthPx = minOf(contentWidthPx * 0.92f, with(density) { MaxToastWidth.toPx() })
+    val maxWidthPx = contentWidthPx * 0.92f
 
     // THIS message decides beside vs above: measure its natural width and hand that to the clearance
     // maths instead of one fixed minimum.
@@ -204,6 +219,7 @@ internal fun ToastHost(
                     windowWidthPx = window.width.toFloat(),
                     hazeState = hazeState,
                     onCopy = onCopy,
+                    onExpand = { state.expand(toast) },
                     onGone = { state.items.remove(toast) },
                 )
             }
