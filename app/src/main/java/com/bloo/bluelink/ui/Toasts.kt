@@ -1,5 +1,8 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.layout.layout
 import android.os.SystemClock
@@ -40,6 +43,9 @@ private const val MaxToasts = 4
 
 /** Minimum gap between one toast's expiry and the next, so they leave one after another. */
 private const val ExpiryStaggerMs = 450L
+
+/** How far past its expiry a toast may linger before it is treated as stale (its clock never ran). */
+private const val StaleAfterMs = 3_000L
 
 /** The screen-edge inset the search element and the toast stack share. */
 private val ToastEdge = 16.dp
@@ -91,12 +97,30 @@ internal val LocalToasts = androidx.compose.runtime.staticCompositionLocalOf<Toa
 internal class ToastState {
     val items = mutableStateListOf<Toast>()
     private var nextId = 0L
-    private var lastExpireAt = 0L
 
+    /**
+     * While true no toast's clock runs: the search results are covering the stack, the app is in the
+     * background, or a finger is holding a toast. Set by the host through [setPaused].
+     */
+    var paused by mutableStateOf(false)
+        private set
+    private var pausedAt = 0L
+
+    /** The expiry a new toast gets: its own duration, but never before the last live one plus a stagger. */
+    private fun nextExpiry(now: Long, durationMs: Long): Long {
+        val lastLive = items.filter { !it.leaving }.maxOfOrNull { it.expireAt } ?: 0L
+        return maxOf(now + durationMs, lastLive + ExpiryStaggerMs)
+    }
+
+    @Synchronized
     fun show(message: String, type: ToastKind) {
+        // A blank message is a caller bug, not something to put a pill on screen for.
+        if (message.isBlank()) return
         val now = SystemClock.elapsedRealtime()
-        val expire = maxOf(now + toastDurationMs(message, type), lastExpireAt + ExpiryStaggerMs)
-        lastExpireAt = expire
+        // Toasts that overstayed because no host was mounted to run their clocks (a show before the
+        // UI exists, or a screen swap) are gone, not replayed as a burst later.
+        items.removeAll { !paused && it.expireAt + StaleAfterMs < now }
+        val expire = nextExpiry(now, toastDurationMs(message, type))
         // Identical toasts collapse into one entry wherever it sits in the stack: re-arm it and bump
         // its count instead of pushing a duplicate card.
         val existing = items.lastOrNull { !it.leaving && it.groupable && it.message == message && it.type == type }
@@ -106,24 +130,53 @@ internal class ToastState {
             return
         }
         items += Toast(nextId++, message, type, expire)
-        items.filter { !it.leaving }.dropLast(MaxToasts).forEach { it.leaving = true }
+        trimToLimit()
     }
 
     /** Tapping a grouped toast splits it back into one card per occurrence (up to [MaxToasts]). */
+    @Synchronized
     fun expand(toast: Toast) {
-        if (toast.count <= 1 || toast.leaving) return
+        if (toast.count <= 1 || toast.leaving || toast !in items) return
         val extra = minOf(toast.count, MaxToasts) - 1
         toast.count = 1
         toast.groupable = false
         val at = items.indexOf(toast) + 1
-        repeat(extra) {
-            items.add(at, Toast(nextId++, toast.message, toast.type, toast.expireAt).also { it.groupable = false })
+        // One card per occurrence, each leaving a beat after the one above it like any other stack.
+        repeat(extra) { i ->
+            items.add(at + i, Toast(nextId++, toast.message, toast.type, toast.expireAt + (i + 1) * ExpiryStaggerMs).also { it.groupable = false })
         }
-        items.filter { !it.leaving }.dropLast(MaxToasts).forEach { it.leaving = true }
+        trimToLimit()
     }
 
+    /** Never more than [MaxToasts] live; the oldest are sent out, and any that have finished leaving are dropped. */
+    private fun trimToLimit() {
+        items.filter { !it.leaving }.dropLast(MaxToasts).forEach { it.leaving = true }
+        // Leaving toasts are removed by their own exit animation. A backlog of them (a burst while the
+        // stack is parked or unmounted) would never animate out, so cap that too.
+        val leaving = items.filter { it.leaving }
+        if (leaving.size > MaxToasts) items.removeAll(leaving.dropLast(MaxToasts).toSet())
+    }
+
+    @Synchronized
     fun dismiss(toast: Toast) {
         toast.leaving = true
+    }
+
+    /**
+     * Stops or restarts every toast's clock. On resume each live toast gets back the time it spent
+     * paused, so a message the user could not see is not spent while they were away from it.
+     */
+    @Synchronized
+    fun setPaused(value: Boolean) {
+        if (value == paused) return
+        val now = SystemClock.elapsedRealtime()
+        if (value) {
+            pausedAt = now
+        } else {
+            val spent = now - pausedAt
+            items.forEach { if (!it.leaving) it.expireAt += spent }
+        }
+        paused = value
     }
 }
 
@@ -150,6 +203,23 @@ internal fun ToastHost(
     val measurer = rememberTextMeasurer()
     val textStyle = MaterialTheme.typography.bodyMedium
     val anchor = LocalSearchAnchor.current
+
+    // One clock for the whole stack: it stops while the search results cover it, while the app is
+    // not on screen, and while a finger holds any toast.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var resumed by remember { mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, _ ->
+            resumed = lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    var held by remember { mutableIntStateOf(0) }
+    val shouldPause = anchor.searchOpen || !resumed || held > 0
+    LaunchedEffect(shouldPause) { state.setPaused(shouldPause) }
+    // Leaving the host (a screen swap) must not leave the clocks stopped for good.
+    DisposableEffect(state) { onDispose { state.setPaused(false) } }
 
     val visible = state.items
     // The newest toast is the one that shares the search element's own row; the older ones stack
@@ -231,6 +301,8 @@ internal fun ToastHost(
                     hazeState = hazeState,
                     onCopy = onCopy,
                     onExpand = { state.expand(toast) },
+                    paused = state.paused,
+                    onHold = { down -> held = (held + if (down) 1 else -1).coerceAtLeast(0) },
                     onGone = { state.items.remove(toast) },
                 )
             }

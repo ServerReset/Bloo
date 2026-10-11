@@ -1,5 +1,11 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.DisposableEffect
 import kotlin.math.roundToInt
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.layout.layout
@@ -80,13 +86,22 @@ internal fun BoxScope.ToastSlot(
     hazeState: HazeState,
     onCopy: (String) -> Unit,
     onExpand: () -> Unit,
+    paused: Boolean,
+    onHold: (Boolean) -> Unit,
     onGone: () -> Unit,
 ) {
     // Its own clock, re-armed whenever the expiry moves (a repeat of the same message).
-    LaunchedEffect(toast.id, toast.expireAt) {
+    // Not while paused (search covering the stack, app in the background, a finger on a toast): the
+    // clock restarts from the extended expiry when the pause ends.
+    LaunchedEffect(toast.id, toast.expireAt, paused) {
+        if (paused) return@LaunchedEffect
         delay((toast.expireAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L))
         toast.leaving = true
     }
+    // A finger resting on the toast holds its clock. If the toast is torn down mid-press the hold is
+    // released with it, so a vanished toast can never leave the whole stack paused.
+    var pressing by remember(toast.id) { mutableStateOf(false) }
+    DisposableEffect(toast.id) { onDispose { if (pressing) onHold(false) } }
     // The slot it rests in, animated toward [index]. Starts AT its index (no initial glide).
     val slot = remember(toast.id) { Animatable(index.toFloat()) }
     LaunchedEffect(index) { slot.animateTo(index.toFloat(), ReflowSpring) }
@@ -123,6 +138,17 @@ internal fun BoxScope.ToastSlot(
                     translationX = merge * (searchRect.center.x - windowWidthPx / 2f)
                     val grow = (searchRect.width / toastWidthPx).coerceIn(0.12f, 1f)
                     scaleX = 1f - merge * (1f - grow)
+                }
+            }
+            .pointerInput(toast.id) {
+                // Observes only (Initial pass, never consumes), so the swipe and the buttons still work.
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    pressing = true
+                    onHold(true)
+                    waitForUpOrCancellation(PointerEventPass.Initial)
+                    pressing = false
+                    onHold(false)
                 }
             }
             .then(swipe),
