@@ -21,6 +21,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.data.StartupTrace
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.ui.recheckAiOnForeground
 import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
 import com.bloo.bluelink.ui.BlooTheme
