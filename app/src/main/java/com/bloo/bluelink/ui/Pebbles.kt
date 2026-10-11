@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.animation.expandVertically
@@ -160,7 +162,11 @@ internal fun PebbleList(
                     expandFrom = Alignment.Top,
                     animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium),
                 ),
-                exit = ExitTransition.None,
+                exit = if (hotDrag?.pendingPin == section) {
+                    ExitTransition.None
+                } else {
+                    shrinkVertically(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(MotionFast))
+                },
             ) {
                 val ready by remember(section) {
                     derivedStateOf { section in eager || section in filledSections }

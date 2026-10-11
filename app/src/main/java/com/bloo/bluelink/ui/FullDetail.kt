@@ -227,7 +227,13 @@ internal fun ExpandedCar(
             if (expanded) {
                 HotSeatOverlay(
                     v, state, vm, hotspots, hotDrag, pageOrigin,
-                    modifier = Modifier.align(Alignment.TopStart),
+                    // Arrives LAST: only once the columns have mostly moved, rising a little into
+                    // its seat. Read in the draw phase, so the reflow never recomposes it.
+                    modifier = Modifier.align(Alignment.TopStart).graphicsLayer {
+                        val f = hotSeatArrival(expandedT.value)
+                        alpha = f
+                        translationY = (1f - f) * 16.dp.toPx()
+                    },
                 )
             }
         }
@@ -255,6 +261,12 @@ private fun Modifier.hotSeatReveal(t: () -> Float): Modifier = this
             placeable.place(0, 0)
         }
     }
+
+/** 0 until the reflow is mostly done, then a smoothstep up to 1: the pinned pebble comes in last. */
+private fun hotSeatArrival(t: Float): Float {
+    val x = ((t - 0.75f) / 0.25f).coerceIn(0f, 1f)
+    return x * x * (3f - 2f * x)
+}
 
 /** 0 until the reflow's midpoint, then a smoothstep up to 1 at the end. */
 private fun hotSeatFraction(t: Float): Float {
