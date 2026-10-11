@@ -167,7 +167,8 @@ internal fun Modifier.glassSheen(): Modifier = this.background(
  */
 @Composable
 internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
-    val haze = LocalBackdropHaze.current.takeUnless { LocalPebbleFloating.current }
+    val floating = LocalPebbleFloating.current
+    val haze = LocalBackdropHaze.current.takeUnless { floating }
     val ultra = LocalAppearance.current.ultraGlass
     // Ultra glass uses the liquid-glass effect, which needs a backdrop to refract; otherwise it
     // falls back.
@@ -181,7 +182,8 @@ internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
             .background(tint.copy(alpha = GlassCardTintAlpha))
             .glassSheen()
     } else {
-        this.background(tint.copy(alpha = 0.82f), shape)
+        // Floating (no blur to lean on) is a lighter veil, close to the glass it lands back into.
+        this.background(tint.copy(alpha = if (floating) 0.6f else 0.82f), shape)
     }
 }
 

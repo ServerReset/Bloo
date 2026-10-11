@@ -1,15 +1,18 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -312,7 +314,7 @@ internal fun PinnedPebble(
                 )
             },
     ) {
-        CompositionLocalProvider(LocalForceExpanded provides revealed, LocalPebbleFloating provides (dragging || flying)) {
+        CompositionLocalProvider(LocalForceExpanded provides revealed, LocalPebbleFloating provides dragging) {
             SinglePebble(section, v, stateSource, vm, Modifier)
         }
     }
@@ -352,37 +354,43 @@ internal fun HotSeatOverlay(
     }
 }
 
-/** The empty second slot: the drop target's resting / hover affordance. */
+/** The empty second slot: a dashed outline that wakes up into a soft primary glow while a pebble hovers it. */
 @Composable
 private fun EmptyDropZone(hovered: Boolean) {
-    val fill by animateColorAsState(
-        if (hovered) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-        label = "hotseatFill",
-    )
-    val tone by animateColorAsState(
-        if (hovered) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        label = "hotseatTone",
-    )
-    val outline by animateColorAsState(
-        if (hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-        label = "hotseatOutline",
-    )
-    val lift by animateFloatAsState(if (hovered) 1f else 0f, label = "hotseatLift")
-    Surface(
-        modifier = Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).graphicsLayer {
-            val s = 1f + 0.025f * lift
-            scaleX = s
-            scaleY = s
-        },
-        shape = RoundedCornerShape(PebbleCornerCollapsed),
-        color = fill,
-        contentColor = tone,
-        border = BorderStroke(1.dp, outline),
+    val scheme = MaterialTheme.colorScheme
+    val glow by animateFloatAsState(if (hovered) 1f else 0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow), label = "hotseatGlow")
+    val tone = lerp(scheme.onSurfaceVariant, scheme.primary, glow)
+    val outline = lerp(scheme.outline.copy(alpha = 0.5f), scheme.primary, glow)
+    val fill = scheme.primary.copy(alpha = 0.14f * glow)
+    val shape = RoundedCornerShape(PebbleCornerCollapsed)
+    val dash = with(LocalDensity.current) { floatArrayOf(8.dp.toPx(), 6.dp.toPx()) }
+    val stroke = with(LocalDensity.current) { (1f + glow).dp.toPx() }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = PebbleHeaderHeight)
+            .graphicsLayer {
+                val s = 1f + 0.02f * glow
+                scaleX = s
+                scaleY = s
+            }
+            .clip(shape)
+            .background(fill)
+            .drawBehind {
+                val r = size.height.coerceAtMost(PebbleCornerCollapsed.toPx() * 2) / 2f
+                drawRoundRect(
+                    color = outline,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(r),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = stroke,
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(dash),
+                    ),
+                )
+            }
+            .padding(vertical = GapPage, horizontal = GapGroup),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier.fillMaxWidth().padding(vertical = GapPage, horizontal = GapGroup),
-            contentAlignment = Alignment.Center,
-        ) {
+        CompositionLocalProvider(LocalContentColor provides tone) {
             MorphButtonLabel(
                 Icons.Filled.PushPin,
                 if (hovered) "Release to pin" else "Drag a pebble here",
