@@ -165,5 +165,21 @@ suspend fun AppViewModel.aiResolveCommand(query: String): Pair<String, String>? 
     return action to car.vin
 }
 
+/**
+ * Asks Gemini Nano which of [candidates] a plain-language request is about, and whether it should be
+ * on or off. Only a listed id plus on/off survives [AiSettingResolver.parse]; a hallucination can
+ * only produce null, never touch a setting.
+ */
+internal suspend fun AppViewModel.aiResolveSetting(
+    query: String,
+    candidates: List<com.bloo.bluelink.data.AiSettingResolver.Candidate>,
+): com.bloo.bluelink.data.AiSettingResolver.Resolution? {
+    if (!_state.value.aiActive || query.isBlank() || candidates.isEmpty()) return null
+    val raw = runCatching { ai.summarize(com.bloo.bluelink.data.AiSettingResolver.prompt(query, candidates)) }
+        .onFailure { AppLog.log("⚠ AI setting: ${it.message}") }
+        .getOrNull() ?: return null
+    return com.bloo.bluelink.data.AiSettingResolver.parse(raw, candidates)
+}
+
 /** Dismiss the AI search-answer card. */
 fun AppViewModel.clearAiReply() = _state.update { it.copy(aiSearchReply = null) }

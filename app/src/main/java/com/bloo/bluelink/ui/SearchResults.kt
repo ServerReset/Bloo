@@ -181,6 +181,12 @@ internal fun SettingsSearchResults(
         AiCommandProposal(submittedQuery, state, vm, hazeState)
     }
 
+    // ...and the same for a plain-language SETTING request ("stop it vibrating"): Gemini Nano picks one
+    // of the on/off switches, and it only changes when Apply is tapped.
+    if (command == null && state.aiActive && submittedQuery.isNotBlank()) {
+        AiSettingProposal(submittedQuery, state, appearance, notif, vm, hazeState)
+    }
+
     // On-device AI reply (when enabled): a plain-language answer, a complement to structured
     // matches. Gated on submittedQuery, not the live query: it fires a real AI request and must
     // wait for a deliberate submit.

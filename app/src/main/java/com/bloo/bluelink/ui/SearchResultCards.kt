@@ -137,6 +137,57 @@ internal fun AiCommandProposal(
 }
 
 /**
+ * A plain-language request that names a setting ("stop it vibrating") mapped to one of the app's
+ * on/off switches by Gemini Nano. Nothing changes until the person taps Apply.
+ */
+@Composable
+internal fun AiSettingProposal(
+    submittedQuery: String,
+    state: UiState,
+    appearance: com.bloo.bluelink.data.SettingsStore.Appearance,
+    notif: com.bloo.bluelink.data.SettingsStore.NotificationPrefs,
+    vm: AppViewModel,
+    hazeState: dev.chrisbanes.haze.HazeState?,
+) {
+    val candidates = remember(state.aiSupported, state.aiEnabled, state.aiAutoSummarize, appearance, notif, state.shizukuAvailable) {
+        ToggleSettings.withIndex().filter { (_, spec) -> spec.visible(state) }.map { (i, spec) ->
+            com.bloo.bluelink.data.AiSettingResolver.Candidate("t$i", spec.title, spec.checked(appearance, notif, state), spec.keywords)
+        }
+    }
+    var proposal by remember(submittedQuery) { mutableStateOf<com.bloo.bluelink.data.AiSettingResolver.Resolution?>(null) }
+    var applied by remember(submittedQuery) { mutableStateOf(false) }
+    LaunchedEffect(submittedQuery) { proposal = vm.aiResolveSetting(submittedQuery, candidates) }
+    val p = proposal ?: return
+    val index = p.id.removePrefix("t").toIntOrNull() ?: return
+    val spec = ToggleSettings.getOrNull(index) ?: return
+    val current = candidates.firstOrNull { it.id == p.id }?.on
+    GlassSurface(shape = StandardShape, modifier = Modifier.fillMaxWidth(), hazeState = hazeState) {
+        Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(GapRow))
+                TitleSmallText("Did you mean?")
+            }
+            Text(
+                "Turn ${spec.title} ${if (p.value) "on" else "off"}" + if (current == p.value) " (already ${if (p.value) "on" else "off"})" else "",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (current != p.value) {
+                SafeMorphTextButton(
+                    text = if (applied) "Done" else "Apply",
+                    onClick = {
+                        spec.onToggle(vm, p.value)
+                        applied = true
+                    },
+                    enabled = !applied,
+                    emphasis = ButtonEmphasis.Confirm,
+                )
+            }
+        }
+    }
+}
+
+/**
  * The card for a recognised command ("lock my Ioniq"): it runs via VehicleCommandRunner, the same
  * path as the rest of the app, and reports what happened. With no named car it falls back to the
  * single car, or asks which when several exist.
