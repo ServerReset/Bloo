@@ -1,5 +1,10 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.unit.dp
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -29,7 +34,7 @@ internal fun LockedControls(
 ) {
     Box(modifier) {
         Column(
-            Modifier.frosted(locked),
+            Modifier.frosted(locked, blurRadius = 12.dp),
             verticalArrangement = Arrangement.spacedBy(GapRow),
             content = content,
         )
