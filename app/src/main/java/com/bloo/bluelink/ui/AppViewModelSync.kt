@@ -252,7 +252,11 @@ internal suspend fun AppViewModel.runDriveSyncNow() {
     // Recompute the file biometric each pass; it is derived purely from the persisted URI.
     val fingerprint = withContext(Dispatchers.IO) { settingsStore.syncFileFingerprint() }
     if (outcome.ran) {
-        if (outcome.imported) refreshLocalCarConfig()
+        if (outcome.imported) {
+            refreshLocalCarConfig()
+            // Another device may have flipped the AI switches.
+            refreshAiSettings()
+        }
         _state.update {
             it.copy(
                 lastSyncMs = outcome.syncedAtMs,

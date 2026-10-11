@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.PinLockout
+import com.bloo.bluelink.data.aiAutoSummarize
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,7 @@ internal fun AppViewModel.bootstrapColdStart() {
                 it.copy(
                     aiSupported = true,
                     aiEnabled = settingsStore.aiEnabled(),
+                    aiAutoSummarize = settingsStore.aiAutoSummarize(),
                 )
             }
         }

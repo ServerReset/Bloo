@@ -129,6 +129,8 @@ data class UiState(
     /** On-device Gemini Nano availability + opt-in, and produced summaries. */
     val aiSupported: Boolean = false,
     val aiEnabled: Boolean = false,
+    /** Summarize each car on open/refresh without being asked. Off by default; only meaningful when [aiActive]. */
+    val aiAutoSummarize: Boolean = false,
     val aiSummaries: Map<String, String> = emptyMap(),
     /** In-flight AI work: VINs being summarized, plus "search" for the query box. */
     val aiBusy: Set<String> = emptySet(),
@@ -292,6 +294,9 @@ data class UiState(
      * [com.bloo.bluelink.data.supportsConnectedStore], honouring the same override
      * [isGen5WEffective] does -- mirrors that property's own Kia-is-always-eligible special case.
      */
+    /** On-device AI is usable: the device has Gemini Nano AND the user has it switched on. */
+    val aiActive: Boolean get() = aiSupported && aiEnabled
+
     fun supportsConnectedStoreEffective(v: Vehicle): Boolean =
         v.brand == com.bloo.bluelink.data.Brand.KIA || (v.platformOverridable && platformOf(v) == VehiclePlatform.CCNC)
 
@@ -302,7 +307,9 @@ data class UiState(
      */
     fun isSectionAvailable(v: Vehicle, section: String): Boolean {
         return when (section) {
-            "ai" -> aiEnabled
+            // Only where Gemini Nano exists: a setting synced from a device that has it must not make
+            // the pebble appear on one that does not.
+            "ai" -> aiActive
             // The trip-details feed is EV-only, Gen5W head units don't serve it at all, and only
             // Hyundai/Genesis US actually has the endpoint (see Brand.supportsTrips) -- Kia US,
             // every Canada brand and Europe all route to repositories with no trips() override, so

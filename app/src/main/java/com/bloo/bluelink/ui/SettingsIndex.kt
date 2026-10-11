@@ -116,6 +116,11 @@ internal val ToggleSettings = listOf(
         title = "On-device AI", label = "On-device AI (Gemini Nano)", keywords = "gemini nano ai summary assistant privacy on-device",
         visible = { it.aiSupported }, checked = { _, _, s -> s.aiEnabled }, onToggle = { vm, v -> vm.setAiEnabled(v) },
     ),
+    ToggleSpec(
+        title = "Summarize when I open the app", keywords = "ai automatic automatically summary open launch gemini nano",
+        phrases = "summarize my car automatically every time i open the app",
+        visible = { it.aiActive }, checked = { _, _, s -> s.aiAutoSummarize }, onToggle = { vm, v -> vm.setAiAutoSummarize(v) },
+    ),
     // Gated like the Backup & sync row: needs Shizuku installed and running.
     ToggleSpec(
         title = "Install updates seamlessly", label = "Install updates seamlessly (Shizuku)", keywords = "shizuku silent install update",

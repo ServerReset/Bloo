@@ -198,6 +198,9 @@ suspend fun AppViewModel.loadGarageInner() {
     // -- something the earlier per-brand/per-car error logs in this function don't cover on their
     // own since they only fire on FAILURE.
     AppLog.log("✓ Garage loaded: ${vehicles.size} vehicle(s), screen=$screen")
+    // The cached status is already on screen; if the user asked for an automatic summary on open,
+    // write it now rather than waiting for the network refresh (which re-summarizes anyway).
+    vehicles.forEach { autoSummarize(it) }
     val shortcutSet = cfg.shortcutSet
     // Restores the last-selected car (currentIndex lives in its own flow, so it is set alongside
     // the copy).

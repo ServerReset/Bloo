@@ -267,6 +267,14 @@ suspend fun SettingsStore.setAiEnabled(value: Boolean) {
     editTracked { it[booleanPreferencesKey("ai_enabled")] = value }
 }
 
+/** Whether to summarize each car automatically when the app opens or refreshes. Off until chosen. */
+suspend fun SettingsStore.aiAutoSummarize(): Boolean =
+    context.settingsDataStore.data.first()[booleanPreferencesKey("ai_auto_summarize")] ?: false
+
+suspend fun SettingsStore.setAiAutoSummarize(value: Boolean) {
+    editTracked { it[booleanPreferencesKey("ai_auto_summarize")] = value }
+}
+
 /** The single pebble pinned to the hotspot's secondary slot for [vin], or null if none
  *  selected. The primary slot ("controls") is hardcoded and never persisted here. */
 suspend fun SettingsStore.hotspots(vin: String): String? = hotspots(vin, context.settingsDataStore.data.first())

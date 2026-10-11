@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.VehicleCommandRunner
-import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.delay
@@ -159,7 +158,7 @@ internal fun SettingsSearchResults(
     }
     // When Gemini Nano is enabled, use it to enhance command parsing for ambiguous/unmatched
     // queries
-    if (state.aiEnabled && command == null && submittedQuery.isNotBlank()) {
+    if (state.aiActive && command == null && submittedQuery.isNotBlank()) {
         LaunchedEffect(submittedQuery) {
             try {
                 val enhanced = vm.enhanceCommandParsing(submittedQuery, null)
@@ -178,14 +177,14 @@ internal fun SettingsSearchResults(
     }
 
     // Free-form command via the AI when the deterministic parser did not recognise the phrasing.
-    if (command == null && state.aiEnabled && submittedQuery.isNotBlank()) {
+    if (command == null && state.aiActive && submittedQuery.isNotBlank()) {
         AiCommandProposal(submittedQuery, state, vm, hazeState)
     }
 
     // On-device AI reply (when enabled): a plain-language answer, a complement to structured
     // matches. Gated on submittedQuery, not the live query: it fires a real AI request and must
     // wait for a deliberate submit.
-    if (state.aiEnabled) {
+    if (state.aiActive) {
         AiAnswer(state, vm, submittedQuery, hazeState)
     }
 }

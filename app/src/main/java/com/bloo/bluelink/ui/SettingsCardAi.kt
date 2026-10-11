@@ -17,6 +17,14 @@ internal fun AiCardContent(state: UiState, vm: AppViewModel) {
             state.aiEnabled,
             description = "Adds an AI summary pebble and lets you ask the search box plain questions. Everything runs privately on your device.",
         ) { vm.setAiEnabled(it) }
+        // Only once the AI is on: the automatic run is an option OF it, and off until chosen.
+        PopVisible(visible = state.aiEnabled) {
+            ToggleRow(
+                "Summarize when I open the app",
+                state.aiAutoSummarize,
+                description = "Writes a fresh status summary for each car whenever the app opens or refreshes. Off by default.",
+            ) { vm.setAiAutoSummarize(it) }
+        }
     }
 }
 

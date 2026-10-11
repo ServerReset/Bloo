@@ -3,7 +3,9 @@ package com.bloo.bluelink.ui
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.aiAutoSummarize
 import com.bloo.bluelink.data.aiEnabled
+import com.bloo.bluelink.data.setAiAutoSummarize
 import com.bloo.bluelink.data.setAiEnabled
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -27,13 +29,29 @@ fun AppViewModel.setAiEnabled(value: Boolean) {
     viewModelScope.launch { settingsStore.setAiEnabled(value) }
 }
 
+fun AppViewModel.setAiAutoSummarize(value: Boolean) {
+    _state.update { it.copy(aiAutoSummarize = value) }
+    viewModelScope.launch { settingsStore.setAiAutoSummarize(value) }
+}
+
+/**
+ * Re-reads the AI switches from the store, so a change that arrived through Drive sync (turned on or
+ * off on another device) shows here without a restart.
+ */
+internal suspend fun AppViewModel.refreshAiSettings() {
+    val enabled = settingsStore.aiEnabled()
+    val auto = settingsStore.aiAutoSummarize()
+    _state.update { it.copy(aiEnabled = enabled, aiAutoSummarize = auto) }
+}
+
 /**
  * Auto-summarize a car (after open/refresh/command) when on-device AI is enabled. Silent: no nudge
  * and no error toast, since the user didn't ask.
  */
 internal fun AppViewModel.autoSummarize(v: Vehicle) {
     val s = _state.value
-    if (!s.aiSupported || !s.aiEnabled) return
+    // Only when asked for: on-device AI on, AND the automatic option on (off by default).
+    if (!s.aiActive || !s.aiAutoSummarize) return
     if (v.vin in s.aiBusy) return
     val status = s.statusFor(v) ?: return
     _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
@@ -86,7 +104,7 @@ fun AppViewModel.summarizeCar(v: Vehicle) {
 
 /** Ask Gemini Nano a free-form question answered from the cars' live data. */
 fun AppViewModel.askAi(query: String) {
-    if (!_state.value.aiEnabled || query.isBlank()) return
+    if (!_state.value.aiActive || query.isBlank()) return
     _state.update { it.copy(aiBusy = it.aiBusy + "search") }
     viewModelScope.launch {
         val data = _state.value.vehicles.joinToString("\n\n") { v ->
@@ -119,7 +137,7 @@ internal suspend fun AppViewModel.enhanceCommandParsing(
  * safely. A hallucination can only produce null, never reach the vehicle.
  */
 suspend fun AppViewModel.aiResolveCommand(query: String): Pair<String, String>? {
-    if (!_state.value.aiEnabled || query.isBlank()) return null
+    if (!_state.value.aiActive || query.isBlank()) return null
     val cars = _state.value.vehicles
     if (cars.isEmpty()) return null
     val names = cars.joinToString(", ") { it.name }
