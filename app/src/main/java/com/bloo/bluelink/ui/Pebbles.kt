@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import kotlinx.coroutines.delay
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.ui.graphics.graphicsLayer
@@ -83,6 +84,17 @@ internal fun PebbleList(
     LaunchedEffect(returningNow, pinned) {
         if (returningNow != null && returningNow !in pinned) hotDrag?.returning = null
     }
+    val pendingNow = hotDrag?.pendingPin
+    LaunchedEffect(pendingNow, pinned) {
+        if (pendingNow == null) return@LaunchedEffect
+        if (pendingNow in pinned) {
+            hotDrag?.pendingPin = null
+        } else {
+            // A drop that was never committed must not leave the drop zone hidden.
+            delay(1500)
+            hotDrag?.pendingPin = null
+        }
+    }
     // PERF: each car-pager page composes this whole pebble stack. Composing all 8-10 pebbles
     // eagerly (incl. ClimatePebble/ChargePebble's top-level effects, which run BEFORE their
     // Pebble() call regardless of collapsed state) on the fling-settle frame is the biggest
@@ -136,7 +148,9 @@ internal fun PebbleList(
                     haptics?.heavy()
                     vm.setHotspot(v, pinned)
                 }
-                d.pendingPin = null
+                // pendingPin stays set until the pin shows up in state (cleared below), so the stack
+                // row still sees "this is a pin" when it hides, and exits instantly instead of
+                // shrinking as a ghost under the pebble that just landed.
             }
         },
         onDragCancel = hotDrag?.let { d ->
