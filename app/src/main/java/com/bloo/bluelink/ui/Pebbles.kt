@@ -1,5 +1,9 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.ui.Alignment
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
@@ -144,7 +148,10 @@ internal fun PebbleList(
                 // Fade the row back in when a pinned pebble RETURNS (unpin). On PIN the row must
                 // vanish INSTANTLY (exit = None): the dropped node has just FLOWN to the hot seat, so
                 // a fade-out here would draw a second copy behind the flight.
-                enter = fadeIn(tween(MotionShort)),
+                enter = fadeIn(tween(MotionFast / 2)) + expandVertically(
+                    expandFrom = Alignment.Top,
+                    animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium),
+                ),
                 exit = ExitTransition.None,
             ) {
                 val ready by remember(section) {
