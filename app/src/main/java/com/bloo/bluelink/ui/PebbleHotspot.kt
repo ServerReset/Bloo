@@ -63,7 +63,7 @@ private const val PinRevealDelayMs = 220L
  * The spring an unpinned pebble flies back into its stack slot on. Mirrors the ReorderColumn's own
  * drop-flight spec, so pinning and unpinning are the same motion in opposite directions.
  */
-private val UnpinFlightSpec = spring<Float>(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+private val UnpinFlightProgressSpec = spring<Float>(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow)
 
 /**
  * The car-info column's "hot seat": the controls pebble pinned under the hero, plus the empty slot a
@@ -222,8 +222,37 @@ internal fun PinnedPebble(
     val dragY = remember(section) { mutableFloatStateOf(0f) }
     val settleX = remember(section) { Animatable(0f) }
     val settleY = remember(section) { Animatable(0f) }
-    val x by remember { derivedStateOf { if (dragging) dragX.floatValue else settleX.value } }
-    val y by remember { derivedStateOf { if (dragging) dragY.floatValue else settleY.value } }
+    // 0..1 flight progress toward the stack slot. The target is read LIVE every frame, so a column
+    // that scrolls or reflows mid-flight cannot leave the pebble landing at a stale position.
+    val flight = remember(section) { Animatable(0f) }
+    var flightFrom by remember(section) { mutableStateOf(Offset.Zero) }
+    var flying by remember(section) { mutableStateOf(false) }
+    val x by remember {
+        derivedStateOf {
+            when {
+                dragging -> dragX.floatValue
+                flying -> {
+                    val to = hotDrag?.stackSlot?.get(section)
+                    val from = hotDrag?.slotTopLeft
+                    if (to != null && from != null) flightFrom.x + (to.x - from.x - flightFrom.x) * flight.value else settleX.value
+                }
+                else -> settleX.value
+            }
+        }
+    }
+    val y by remember {
+        derivedStateOf {
+            when {
+                dragging -> dragY.floatValue
+                flying -> {
+                    val to = hotDrag?.stackSlot?.get(section)
+                    val from = hotDrag?.slotTopLeft
+                    if (to != null && from != null) flightFrom.y + (to.y - from.y - flightFrom.y) * flight.value else settleY.value
+                }
+                else -> settleY.value
+            }
+        }
+    }
     // Grows a little as you pick it up, and more once you have dragged it far enough that releasing
     // WILL unpin it -- so the drop is not a surprise.
     val pastUnpin = dragging && x > unpinPx
@@ -252,8 +281,10 @@ internal fun PinnedPebble(
                 settleX.snapTo(dx)
                 settleY.snapTo(dy)
                 if (from != null && to != null) {
-                    launch { settleX.animateTo(to.x - from.x, UnpinFlightSpec) }
-                    settleY.animateTo(to.y - from.y, UnpinFlightSpec)
+                    flightFrom = Offset(dx, dy)
+                    flight.snapTo(0f)
+                    flying = true
+                    flight.animateTo(1f, UnpinFlightProgressSpec)
                 }
                 vm.setHotspot(v, section)
             }
