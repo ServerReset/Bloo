@@ -122,8 +122,10 @@ internal fun GarageScreen(
     // critically damped spring gives the width/position change a smooth settle (page width clamps at 1,
     // so a bounce would just stall). Kept as a
     // STATE (not read via `by`): reading it here would recompose this whole screen every frame.
+    // False while the pager is swiping the chosen car into place; the expand waits for it.
+    val scrollAligned = remember { mutableStateOf(true) }
     val expandedT = androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (expandedIdx != null) 1f else 0f,
+        targetValue = if (expandedIdx != null && scrollAligned.value) 1f else 0f,
         animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow),
         label = "expandT",
     )
@@ -139,6 +141,7 @@ internal fun GarageScreen(
             windowInfo.containerSize.width, state, vm, hazeState,
             expandedIdx = expandedIdx,
             expandedT = expandedT,
+            scrollAligned = scrollAligned,
         )
         // THE SINGLE CarMap instance, positioned at the screen level. It animates from the pebble
         // location (collapsed) to full-screen (expanded). Same instance, literally growing -- not

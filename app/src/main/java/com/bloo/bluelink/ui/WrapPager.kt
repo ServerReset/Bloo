@@ -49,6 +49,17 @@ internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
     }
 
     /**
+     * Swipe (animated) so the shown page maps to [target], taking the nearest virtual page in either
+     * direction. Direction-neutral: it works in page indices, so a right-to-left layout, where the
+     * pager itself lays page 0 out at the right, gets the same swipe mirrored.
+     */
+    suspend fun animateToReal(target: Int) {
+        if (realCount <= 1) return
+        val page = wrapPageToward(pager.currentPage, pager.pageCount, realCount, target)
+        if (page != pager.currentPage) pager.animateScrollToPage(page)
+    }
+
+    /**
      * Call after every settle (never mid-drag -- see each call site's own `snapshotFlow {
      * pager.settledPage }` collector): if the pager has drifted within [RECENTER_MARGIN_CYCLES]
      * real-item-widths of either edge of the (small, fixed) virtual range, silently jump back to
