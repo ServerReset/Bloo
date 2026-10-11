@@ -88,6 +88,8 @@ internal fun SearchLayer(
     var submitted by rememberSaveable { mutableStateOf("") }
     var focused by rememberSaveable { mutableStateOf(false) }
     val open = focused || query.isNotEmpty()
+    val anchorForToasts = LocalSearchAnchor.current
+    SideEffect { anchorForToasts.searchOpen = open }
     var dockName by rememberSaveable { mutableStateOf(SearchDock.RIGHT.name) }
     val dock = SearchDock.valueOf(dockName)
     // The app's own haptic vocabulary (Haptics.kt), not the platform LocalHapticFeedback.
@@ -172,7 +174,7 @@ internal fun SearchLayer(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(max = minOf(360.dp, freeAbovePill))
+                        .heightIn(max = minOf(480.dp, freeAbovePill))
                         .verticalScroll(rememberScrollState())
                         .padding(GapSection),
                     verticalArrangement = Arrangement.spacedBy(GapRow),

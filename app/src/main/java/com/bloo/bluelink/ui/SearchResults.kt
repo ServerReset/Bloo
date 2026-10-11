@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
@@ -90,8 +91,6 @@ internal fun SettingsSearchResults(
             scored.sortedByDescending { it.second }.map { it.first }
         }.let { if (it.size > limit) it.take(limit) else it }
     }
-    // Floating search results use GlassSurface, the shared glass chrome of floating surfaces.
-    val resultCardShape = StandardShape
 
     // Command suggestions from CommandIndex when available
     val suggestedCommands = remember(query) {
@@ -104,78 +103,40 @@ internal fun SettingsSearchResults(
     }
 
     if (results.isEmpty() && suggestedCommands.isEmpty()) {
-        GlassSurface(
-            shape = resultCardShape,
-            modifier = Modifier.fillMaxWidth(),
-            shadow = false,
-        ) {
-            Column(Modifier.padding(GapSection)) {
-                Text(
-                    "No matches for \"$query\"",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(GapRow))
-                // Not a dead end: point at the three kinds of thing the bar understands.
-                Text(
-                    "Try a car name, a setting, or a command like \"lock my car\".",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Column(Modifier.fillMaxWidth().padding(vertical = GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+            Text("No matches for \"$query\"", style = MaterialTheme.typography.titleSmall)
+            // Not a dead end: point at the three kinds of thing the bar understands.
+            Text(
+                "Try a car name, a setting, or a command like \"lock my car\".",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     } else {
-        // Restarts the stagger whenever the actual SET of results changes -- not on every
-        // keystroke, which would re-pop a list that hasn't actually moved just because the user is
-        // still typing the same word. Titles joined is cheap and exactly captures "did the ranked
-        // list change," which is the only thing that should trigger this.
-        val resultsKey = results.joinToString("|") { it.title }
-        results.forEachIndexed { i, e ->
-            PopVisible(visible = staggeredResultVisible(resultsKey, i)) {
-                GlassSurface(
-                    shape = resultCardShape,
-                    modifier = Modifier.fillMaxWidth(),
-                    shadow = false,
-                ) {
-                    Row(Modifier.padding(GapSection)) {
-                        // A small leading icon badge per result, as in the update pebble and
-                        // settings hero stats.
-                        IconBadge(
-                            AppIcons.Search,
-                            tint = MaterialTheme.colorScheme.primary,
-                            size = 28.dp,
-                            iconSize = 15.dp,
-                        )
-                        Spacer(Modifier.width(GapGroup))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                            TitleSmallText(e.title)
-                            e.content()
-                        }
+        // One flat list under small group headings, not a stack of bordered cards: a result is a row
+        // (icon, then its own control), and a car's name rides above its value instead of repeating
+        // the label the control already shows. Groups keep the order of their best match.
+        val groups = results.groupBy { if (" · " in it.title) "Your cars" else "Settings" }
+        if (suggestedCommands.isNotEmpty()) {
+            ResultGroup("Actions") {
+                suggestedCommands.forEach { cmd ->
+                    ResultRow(cmd.icon, MaterialTheme.colorScheme.secondary, caption = null) {
+                        TitleSmallText(cmd.title)
+                        Text(cmd.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
         }
-    }
-
-    // Command suggestions from the command index, displayed inline
-    suggestedCommands.forEachIndexed { i, cmd ->
-        PopVisible(visible = staggeredResultVisible(suggestedCommands.joinToString("|") { it.id }, i + results.size)) {
-            GlassSurface(
-                shape = resultCardShape,
-                modifier = Modifier.fillMaxWidth(),
-                shadow = false,
-            ) {
-                Row(Modifier.padding(GapSection)) {
-                    IconBadge(
-                        cmd.icon,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        size = 28.dp,
-                        iconSize = 15.dp,
+        groups.forEach { (heading, entriesInGroup) ->
+            ResultGroup(heading) {
+                entriesInGroup.forEach { e ->
+                    val car = e.title.substringAfter(" · ", "").takeIf { it.isNotBlank() }
+                    ResultRow(
+                        if (car != null) AppIcons.DirectionsCar else Icons.Filled.Settings,
+                        MaterialTheme.colorScheme.primary,
+                        caption = car,
+                        content = e.content,
                     )
-                    Spacer(Modifier.width(GapGroup))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-                        TitleSmallText(cmd.title)
-                        Text(cmd.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                 }
             }
         }
@@ -217,5 +178,41 @@ internal fun SettingsSearchResults(
     // wait for a deliberate submit.
     if (state.aiEnabled) {
         AiAnswer(state, vm, submittedQuery, hazeState)
+    }
+}
+
+/** A small heading over a run of result rows, with hairline dividers between the rows. */
+@Composable
+private fun ResultGroup(heading: String, rows: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            heading,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = GapHairline),
+        )
+        rows()
+    }
+}
+
+/** One result: its icon, an optional muted caption (the car), then the result's own control. */
+@Composable
+private fun ResultRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: androidx.compose.ui.graphics.Color,
+    caption: String?,
+    content: @Composable () -> Unit,
+) {
+    androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    Row(Modifier.fillMaxWidth().padding(vertical = GapGroup), verticalAlignment = androidx.compose.ui.Alignment.Top) {
+        IconBadge(icon, tint = tint, size = 32.dp, iconSize = 17.dp)
+        Spacer(Modifier.width(GapGroup))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
+            if (caption != null) {
+                Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            content()
+        }
     }
 }

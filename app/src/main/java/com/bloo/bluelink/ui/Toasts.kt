@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.layout.layout
 import android.os.SystemClock
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
@@ -194,8 +196,17 @@ internal fun ToastHost(
     // Every toast gets its own full slot; oldest above, newest at the bottom, nothing tucked.
     val step = with(density) { (SearchElementHeight + GapRow).toPx() }
 
+    // While the search results are up the toasts fade out and step aside (kept alive, just not placed
+    // or hit-tested), so they never sit over the panel; they return when it closes.
+    val show by animateFloatAsState(if (anchor.searchOpen) 0f else 1f, tween(MotionShort), label = "toastShow")
+    val parked = anchor.searchOpen && show < 0.01f
     Box(
         modifier
+            .graphicsLayer { alpha = show }
+            .layout { measurable, constraints ->
+                val p = measurable.measure(constraints)
+                layout(p.width, p.height) { if (!parked) p.place(0, 0) }
+            }
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
             .padding(start = ToastEdge, end = ToastEdge, bottom = ToastEdge),

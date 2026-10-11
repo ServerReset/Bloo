@@ -30,6 +30,9 @@ internal class SearchAnchor {
     var dock: SearchDock by mutableStateOf(SearchDock.RIGHT)
         internal set
 
+    /** True while the search bar is open with its results panel up; toasts step out of its way. */
+    var searchOpen: Boolean by mutableStateOf(false)
+
     internal fun publish(rect: Rect?, dock: SearchDock) {
         this.rect = rect
         this.dock = dock
