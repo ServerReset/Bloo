@@ -255,6 +255,66 @@ internal fun Modifier.pullDownToDismiss(
     )
 }
 
+/**
+ * The upward pull on the map's top bar: [up] is the rubber-banded travel in px, [armed] is true once
+ * the pull has reached full tension (releasing then refreshes the location).
+ */
+internal class MapPullState {
+    val up = androidx.compose.animation.core.Animatable(0f)
+    var armed by mutableStateOf(false)
+}
+
+/**
+ * The map bar's drag: down dismisses (as [pullDownToDismiss]); UP stretches against a rubber band
+ * until it hits full tension, which arms a location refresh that fires on release.
+ */
+internal fun Modifier.pullToRefreshOrDismiss(
+    dragPx: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    pull: MapPullState,
+    scope: kotlinx.coroutines.CoroutineScope,
+    density: androidx.compose.ui.unit.Density,
+    spring: androidx.compose.animation.core.AnimationSpec<Float>,
+    haptics: Haptics?,
+    close: () -> Unit,
+    refresh: () -> Unit,
+): Modifier = this.pointerInput(Unit) {
+    val maxPx = with(density) { 64.dp.toPx() }
+    val armPx = with(density) { 120.dp.toPx() }
+    var raw = 0f
+    detectVerticalDragGestures(
+        onVerticalDrag = { change, amount ->
+            change.consume()
+            if (raw > 0f || (amount < 0f && dragPx.value <= 0f)) {
+                raw = (raw - amount).coerceAtLeast(0f)
+                // Resisted: travel approaches maxPx however far the finger goes.
+                scope.launch { pull.up.snapTo(maxPx * raw / (raw + maxPx)) }
+                val nowArmed = raw >= armPx
+                if (nowArmed && !pull.armed) haptics?.heavy()
+                pull.armed = nowArmed
+            } else {
+                scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
+            }
+        },
+        onDragEnd = {
+            if (raw > 0f) {
+                if (pull.armed) refresh()
+                raw = 0f
+                pull.armed = false
+                scope.launch { pull.up.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
+            } else {
+                val thresholdPx = with(density) { 96.dp.toPx() }
+                if (dragPx.value > thresholdPx) close() else scope.launch { dragPx.animateTo(0f, spring) }
+            }
+        },
+        onDragCancel = {
+            raw = 0f
+            pull.armed = false
+            scope.launch { pull.up.animateTo(0f, spring) }
+            scope.launch { dragPx.animateTo(0f, spring) }
+        },
+    )
+}
+
 /** "88% · 415 km": a car's charge and range for the map pill, or null when it has neither yet. */
 // chargeReadoutOf is @Composable (it reads MaterialTheme/LocalContentColor for the state-colour
 // pair it derives), so this wrapper must be too -- not for composition itself, but because a plain

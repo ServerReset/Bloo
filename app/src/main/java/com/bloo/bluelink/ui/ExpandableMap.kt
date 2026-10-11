@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.core.animateFloat
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -103,6 +104,15 @@ internal fun ExpandableMapLayer(
     // How far the drag handle has actually been pulled down, in px -- the SAME real drag-to-dismiss
     // CarMapSheetBody's own handle uses (its own `dragPx`; see that doc).
     val dragPx = remember { Animatable(0f) }
+    val pull = remember { MapPullState() }
+    val shakeTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "mapTension")
+    val shake = shakeTransition.animateFloat(
+        initialValue = -3f, targetValue = 3f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(45), androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "mapTensionShake",
+    )
     // Read here, at composable scope, not inline inside the scope.launch{} blocks below --
     // lowPowerAwareSpring is itself @Composable (it reads battery-saver state), so it can't be
     // called from inside a suspend lambda.
@@ -195,13 +205,19 @@ internal fun ExpandableMapLayer(
                     vehicleName = vehicleName,
                     statusLine = statusLine,
                     mapHazeState = mapHazeState,
-                    onRefreshLocation = onRefreshLocation,
-                    refreshing = refreshing,
-                    dragModifier = Modifier.pullDownToDismiss(dragPx, scope, density, dragSpring, ::close),
+                    // No refresh button: pull the bar up to full tension and let go instead.
+                    dragModifier = Modifier.pullToRefreshOrDismiss(
+                        dragPx, pull, scope, density, dragSpring, LocalHaptics.current, ::close, onRefreshLocation,
+                    ),
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(start = GapSection, end = GapSection, top = GapSection)
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+                        .graphicsLayer {
+                            alpha = expandFraction.value.coerceIn(0f, 1f)
+                            translationY = -pull.up.value
+                            // At full tension the bar trembles; it stops the moment you let go.
+                            translationX = if (pull.armed) shake.value else 0f
+                        },
                 )
             }
 

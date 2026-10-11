@@ -2,6 +2,7 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -136,6 +137,13 @@ internal fun PullRefreshIndicatorHost(
     // While a refresh is in flight (or the disc is springing away) the spring owns the disc;
     // otherwise it tracks the finger 1:1.
     val t = if (active || retracting) refreshSpring.value else finger
+    val liveStretch = over / (1f + over)
+    val releaseStretch by animateFloatAsState(
+        if (active || retracting) 0f else liveStretch,
+        spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium),
+        label = "refreshStretch",
+    )
+    val stretch = if (active || retracting) releaseStretch else liveStretch
     if (t <= 0.01f) return
 
     val density = LocalDensity.current
@@ -158,11 +166,13 @@ internal fun PullRefreshIndicatorHost(
                     // Sliding the full-size disc down from off-screen is the whole motion; the
                     // spinner's own progress arc does the rest.
                     translationY = -sizePx + t * (sizePx + restPx)
+                    // Past the arm point the disc stretches downward, then springs back on release.
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
+                    scaleY = 1f + 0.45f * stretch
                 },
             hazeState = hazeState,
-            // Bare liquid glass while pulling; a faint accent shows once releasing will refresh.
-            tint = if (armed) androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-            else androidx.compose.ui.graphics.Color.Transparent,
+            // Bare liquid glass throughout: no accent tint at the bottom of the pull.
+            tint = androidx.compose.ui.graphics.Color.Transparent,
             clear = true,
             shadow = true,
         ) {
