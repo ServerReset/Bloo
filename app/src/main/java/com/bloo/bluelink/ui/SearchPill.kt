@@ -1,5 +1,8 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -248,68 +251,45 @@ internal fun SearchPill(
  * questions and runs commands, not just finds settings.
  */
 @Composable
-internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: (String) -> Unit) {
-    // Plain Surface chips, not MorphButton, so click() is wired by hand.
-    val haptics = LocalHaptics.current
-    val carName = state.vehicles.firstOrNull()?.name
-    // Short forms when room is short (keyboard up): a long hint would wrap and
-    // push the next chip off the panel. Long forms teach the syntax.
-    val examples = buildList {
-        if (compact) {
-            add("lock")
-            add("unlock")
-            add("start charging")
-            add("climate")
-            add("odometer")
-            add("battery")
-        } else {
-            // Commands (actions)
-            add("lock" + (carName?.let { " my $it" } ?: " my car"))
-            add("start charging" + (carName?.let { " $it" } ?: ""))
-            add("start climate")
-            add("flash lights")
-            // Data queries
-            add("odometer" + (carName?.let { " for $it" } ?: ""))
-            add("battery level")
-            // Settings
-            add("haptic feedback")
-            if (state.vehicles.any { state.hasBattery(it) }) add("smart climate")
-            add("text scale")
-        }
+internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: (String, Boolean) -> Unit) {
+    // The same grouped rows the results use, so the empty state and the answers read as one surface.
+    // Every row is a button: tap to run an action or fill the box with a lookup.
+    val scheme = MaterialTheme.colorScheme
+    val actions = remember(state.vehicles) {
+        getAvailableCommands(state.vehicles).filter { !it.requiresArg }.take(if (compact) 3 else 4)
+    }
+    val lookups = remember(state.vehicles) {
+        buildList {
+            add("Battery level" to Icons.Filled.Bolt)
+            add("Range" to Icons.Filled.Speed)
+            add("Odometer" to Icons.Filled.Speed)
+            if (state.vehicles.size > 1) add("Where is my car" to Icons.Filled.Place)
+        }.take(if (compact) 2 else 4)
     }
     Text(
-        "Try commands, settings, or ask about your car",
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.Bold,
-        // Floats over the aurora with nothing opaque behind it; full-strength onSurface for
-        // contrast.
-        color = MaterialTheme.colorScheme.onSurface,
+        "Ask for anything",
+        style = MaterialTheme.typography.titleSmall,
+        color = scheme.onSurface,
     )
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(GapRow), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        // Same staggered pop as the search result cards (staggeredResultVisible).
-        val examplesKey = examples.joinToString("|")
-        examples.forEachIndexed { i, example ->
-            PopVisible(visible = staggeredResultVisible(examplesKey, i)) {
-                // Same MorphButton as every selector chip, with the search screen's tonal fill.
-                val exampleSource = remember { MutableInteractionSource() }
-                MorphButton(
-                    onClick = { onPick(example) },
-                    interactionSource = exampleSource,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
-                    minHeight = 0.dp,
-                    // Theme-weighted, not a bare dropShadow() (0.38-alpha black is a halo on light
-                    // themes); same split as glassDropShadow (GlassChrome.kt).
-                    modifier = Modifier.themedDropShadow(CircleShape, blurRadius = 8.dp, offsetY = 3.dp),
-                    expressive = true,
-                ) {
-                    Text(
-                        example,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+    if (actions.isNotEmpty()) {
+        ResultGroup("Actions") {
+            actions.forEach { cmd ->
+                ResultRow(cmd.icon, scheme.secondary, caption = null, onClick = { onPick(cmd.title, true) }) {
+                    TitleSmallText(cmd.title)
+                    if (!compact) Text(cmd.description, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
                 }
+            }
+        }
+    }
+    ResultGroup("Look up") {
+        lookups.forEach { (label, icon) ->
+            ResultRow(icon, scheme.primary, caption = null, onClick = { onPick(label, true) }) { TitleSmallText(label) }
+        }
+    }
+    if (!compact) {
+        ResultGroup("Settings") {
+            listOf("Haptic feedback", "Text scale", "Glass style").forEach { label ->
+                ResultRow(Icons.Filled.Settings, scheme.primary, caption = null, onClick = { onPick(label, false) }) { TitleSmallText(label) }
             }
         }
     }

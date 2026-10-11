@@ -4,6 +4,9 @@
  */
 package com.bloo.bluelink.ui
 
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,6 +64,8 @@ internal fun SettingsSearchResults(
     /** Show at most this many, best first (a keyboard leaves no room for a long list). */
     limit: Int = Int.MAX_VALUE,
     hazeState: dev.chrisbanes.haze.HazeState? = null,
+    /** Fill the search box with this text, and run it when the flag is true. */
+    onPick: (String, Boolean) -> Unit = { _, _ -> },
 ) {
     // remember(query): this composable recomposes on every UiState emission, and an equal-but-new
     // token list would defeat the `results` memo below.
@@ -120,7 +125,11 @@ internal fun SettingsSearchResults(
         if (suggestedCommands.isNotEmpty()) {
             ResultGroup("Actions") {
                 suggestedCommands.forEach { cmd ->
-                    ResultRow(cmd.icon, MaterialTheme.colorScheme.secondary, caption = null) {
+                    ResultRow(
+                        cmd.icon, MaterialTheme.colorScheme.secondary, caption = null,
+                        // Runs it, unless it needs a value first ("set charge limit"): then it just fills the box.
+                        onClick = { onPick(if (cmd.requiresArg) cmd.title + " " else cmd.title, !cmd.requiresArg) },
+                    ) {
                         TitleSmallText(cmd.title)
                         Text(cmd.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -183,7 +192,7 @@ internal fun SettingsSearchResults(
 
 /** A small heading over a run of result rows, with hairline dividers between the rows. */
 @Composable
-private fun ResultGroup(heading: String, rows: @Composable () -> Unit) {
+internal fun ResultGroup(heading: String, rows: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth()) {
         Text(
             heading,
@@ -198,14 +207,29 @@ private fun ResultGroup(heading: String, rows: @Composable () -> Unit) {
 
 /** One result: its icon, an optional muted caption (the car), then the result's own control. */
 @Composable
-private fun ResultRow(
+internal fun ResultRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tint: androidx.compose.ui.graphics.Color,
     caption: String?,
+    /** Makes the whole row a button (and adds the chevron): tapping it acts on the result. */
+    onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-    Row(Modifier.fillMaxWidth().padding(vertical = GapGroup), verticalAlignment = androidx.compose.ui.Alignment.Top) {
+    val haptics = LocalHaptics.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) {
+                    Modifier.clip(StandardShape).clickable { haptics?.click(); onClick() }
+                } else {
+                    Modifier
+                },
+            )
+            .padding(vertical = GapGroup),
+        verticalAlignment = if (onClick != null) androidx.compose.ui.Alignment.CenterVertically else androidx.compose.ui.Alignment.Top,
+    ) {
         IconBadge(icon, tint = tint, size = 32.dp, iconSize = 17.dp)
         Spacer(Modifier.width(GapGroup))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
@@ -213,6 +237,14 @@ private fun ResultRow(
                 Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             content()
+        }
+        if (onClick != null) {
+            Icon(
+                AppIcons.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }

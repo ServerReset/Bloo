@@ -184,11 +184,12 @@ internal fun SearchLayer(
                             query, submitted, vm, state.value, appearance, notif,
                             limit = if (keyboardUp) 4 else Int.MAX_VALUE,
                             hazeState = hazeState,
+                            onPick = { text, run -> query = text; if (run) submitted = text },
                         )
                     } else {
-                        SearchSuggestions(state.value, compact = keyboardUp) { picked ->
+                        SearchSuggestions(state.value, compact = keyboardUp) { picked, run ->
                             query = picked
-                            submitted = picked
+                            if (run) submitted = picked
                         }
                     }
                 }
