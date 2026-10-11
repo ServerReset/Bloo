@@ -90,5 +90,11 @@
 # The availability check and inference reach the system AI service through generated binder/AIDL
 # classes and parcelables; a stripped one fails at runtime, silently, as "AI unavailable". Keep the
 # SDK whole and do not fail the build over optional references.
--keep class com.google.mlkit.genai.** { *; }
+# AGP 9 runs R8 in strict mode, where `-keep class A { *; }` no longer keeps A's constructors, so they
+# are named, and the surrounding ML Kit and Play-services internals the SDK reflects over are kept too.
+-keep class com.google.mlkit.genai.** { <init>(...); *; }
+-keep class com.google.mlkit.common.** { <init>(...); *; }
+-keep class com.google.android.gms.internal.mlkit_genai** { <init>(...); *; }
 -dontwarn com.google.mlkit.genai.**
+-dontwarn com.google.android.gms.internal.mlkit_genai**
+-dontrepackage
