@@ -206,9 +206,14 @@ class EuApi(private val brand: Brand) {
      * does with `pAuth`.
      */
     suspend fun controlToken(session: EuSession, pin: String): String = withContext(Dispatchers.IO) {
-        val body = buildJsonObject { put("deviceId", session.deviceId); put("pin", pin) }
+        // Hyundai answers a missing or malformed PIN with a bare HTTP 400, which read as an outage.
+        val cleanPin = pin.trim()
+        if (cleanPin.length != 4 || !cleanPin.all { it.isDigit() }) {
+            throw BlueLinkException("Enter your 4-digit Bluelink service PIN to send commands")
+        }
+        val body = buildJsonObject { put("deviceId", session.deviceId); put("pin", cleanPin) }
             .toString().toRequestBody(jsonMedia)
-        val req = Request.Builder().url(userApi + "pin?token=")
+        val req = Request.Builder().url(userApi + "pin")
             .header("Content-Type", "application/json")
             // Strip any prefix a stored session may still carry from the old CCI bug, so an existing
             // login is corrected on its first call instead of needing a re-login ("Bearer Bearer ..."
@@ -218,8 +223,11 @@ class EuApi(private val brand: Brand) {
             .header("Accept-Encoding", "gzip")
             .header("User-Agent", USER_AGENT_OKHTTP)
             .put(body).build()
-        val token = call(req).path("controlToken").str()
-            ?: throw BlueLinkException("Incorrect service PIN")
+        val token = try {
+            call(req).path("controlToken").str()
+        } catch (e: BlueLinkException) {
+            if (e.code == 400) throw BlueLinkException("Incorrect service PIN", code = 400) else throw e
+        } ?: throw BlueLinkException("Incorrect service PIN")
         if (token.startsWith("Bearer ")) token else "Bearer $token"
     }
 
