@@ -55,7 +55,13 @@ import kotlinx.coroutines.launch
  * troubleshooting.
  */
 @Composable
-internal fun DebugCardContent(logs: List<String>, vm: AppViewModel, clipboardScope: CoroutineScope, clipboard: Clipboard) {
+internal fun DebugCardContent(
+    logs: List<String>,
+    vm: AppViewModel,
+    clipboardScope: CoroutineScope,
+    clipboard: Clipboard,
+    aiAvailability: com.bloo.bluelink.data.AiAvailability? = null,
+) {
     fun copy(label: String, text: String) {
         clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, text))) }
     }
@@ -63,6 +69,10 @@ internal fun DebugCardContent(logs: List<String>, vm: AppViewModel, clipboardSco
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             SettingsGroup("Device info") {
                 DebugSettingsPanel(onCopyToClipboard = { copy("bloo debug", it) })
+                // Why the AI features are or are not offered. This is a diagnostic line only: nothing AI
+                // appears elsewhere unless this device reports a usable Gemini Nano.
+                StatusRow("On-device AI (Gemini Nano)", aiAvailability?.describe() ?: "Checking…")
+                SafeMorphTextButton("Check again", onClick = { vm.reprobeAi() })
             }
             SettingsGroup("Activity log") {
                 BodySmallText("${logs.size} lines, newest last.")

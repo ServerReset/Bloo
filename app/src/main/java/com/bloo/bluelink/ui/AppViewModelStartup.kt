@@ -26,20 +26,7 @@ internal fun AppViewModel.bootstrapColdStart() {
     // Dispatchers.IO, like the probe below: ai.isSupported() builds an ML Kit client
     // synchronously on first call, which on viewModelScope's Main.immediate landed on the main
     // thread during cold start.
-    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-        val startedAt = System.currentTimeMillis()
-        val supported = ai.isSupported()
-        logStartup("AI probe done in ${System.currentTimeMillis() - startedAt}ms, supported=$supported")
-        if (supported) {
-            _state.update {
-                it.copy(
-                    aiSupported = true,
-                    aiEnabled = settingsStore.aiEnabled(),
-                    aiAutoSummarize = settingsStore.aiAutoSummarize(),
-                )
-            }
-        }
-    }
+    probeAi()
     // Probe Shizuku; the "seamless install" toggle only appears if it's installed + running.
     // pingBinder() is a cross-process binder call, so keep it off the main thread (like the AI
     // probe above).
@@ -130,3 +117,48 @@ internal fun AppViewModel.bootstrapColdStart() {
         }
     }
 }
+
+/** When the AI probe last ran, so coming back to the app does not hammer it. */
+private var lastAiProbeMs = 0L
+
+/**
+ * Asks the system whether Gemini Nano is usable and records the ANSWER, including the reason when the
+ * check fails, in [UiState.aiAvailability] and the log. A result that is not usable is retried a few
+ * times with growing waits (the service can still be starting, or the first call can race the
+ * foreground), and again whenever the app returns to the foreground. Nothing AI is shown unless the
+ * result is usable: [UiState.aiSupported] follows it exactly.
+ */
+internal fun AppViewModel.probeAi() {
+    lastAiProbeMs = System.currentTimeMillis()
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        var attempt = 0
+        while (true) {
+            val startedAt = System.currentTimeMillis()
+            val result = ai.availability()
+            val tookMs = System.currentTimeMillis() - startedAt
+            logStartup("AI probe: ${result.describe()} (${tookMs}ms, attempt ${attempt + 1})")
+            val enabled = if (result.usable) settingsStore.aiEnabled() else false
+            val auto = if (result.usable) settingsStore.aiAutoSummarize() else false
+            _state.update {
+                it.copy(
+                    aiAvailability = result,
+                    aiSupported = result.usable,
+                    aiEnabled = if (result.usable) enabled else it.aiEnabled,
+                    aiAutoSummarize = if (result.usable) auto else it.aiAutoSummarize,
+                )
+            }
+            val wait = com.bloo.bluelink.data.AiProbePolicy.nextDelayMs(result, attempt) ?: break
+            kotlinx.coroutines.delay(wait)
+            attempt++
+        }
+    }
+}
+
+/** Probes again on returning to the app if Gemini Nano was not found, at most once a minute. */
+internal fun AppViewModel.recheckAiOnForeground() {
+    val now = System.currentTimeMillis()
+    if (com.bloo.bluelink.data.AiProbePolicy.shouldRecheckOnForeground(_state.value.aiAvailability, lastAiProbeMs, now)) probeAi()
+}
+
+/** The Debug card's "Check again": probe now, whatever the last result was. */
+fun AppViewModel.reprobeAi() = probeAi()

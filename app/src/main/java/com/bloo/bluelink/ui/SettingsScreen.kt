@@ -197,7 +197,7 @@ internal fun SettingsScreen(
             // Debug -- device info and the activity log together, for support troubleshooting. A
             // power-user card, so it only exists in Advanced mode.
             AnimatedVisibility(visibleState = advTransition1, enter = expandEnterSized(), exit = expandExitSized()) {
-            DebugCardContent(logs, vm, clipboardScope, clipboard)
+            DebugCardContent(logs, vm, clipboardScope, clipboard, state.aiAvailability)
             }
             }
             item {

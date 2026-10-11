@@ -70,12 +70,27 @@ class Ai(context: Context) {
     }
 
     /**
-     * True if Gemini Nano summarization is available or downloadable here. Queries the current
-     * [FeatureStatus] and treats anything other than UNAVAILABLE (i.e.
+     * What the system says about Gemini Nano summarization here, with the REASON when the check
+     * itself fails: an exception comes back as [AiAvailability.Error] carrying its class and message,
+     * never as a bare "unsupported". The device's answer ([FeatureStatus]) maps one-to-one.
      */
-    suspend fun isSupported(): Boolean = runCatching {
-        withSummarizer { it.checkFeatureStatus().await() != FeatureStatus.UNAVAILABLE }
-    }.getOrDefault(false)
+    suspend fun availability(): AiAvailability = try {
+        withSummarizer { s ->
+            when (s.checkFeatureStatus().await()) {
+                FeatureStatus.AVAILABLE -> AiAvailability.Available
+                FeatureStatus.DOWNLOADABLE -> AiAvailability.Downloadable
+                FeatureStatus.DOWNLOADING -> AiAvailability.Downloading
+                else -> AiAvailability.Unavailable
+            }
+        }
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (t: Throwable) {
+        AiAvailability.Error("${t.javaClass.simpleName}: ${t.message ?: "no message"}")
+    }
+
+    /** True if the model is, or can be, used here. */
+    suspend fun isSupported(): Boolean = availability().usable
 
     /**
      * Summarize [text] on-device, downloading the model first if needed. Throws on failure so the
