@@ -73,6 +73,12 @@ internal fun PebbleList(
     }
     val hotDrag = if (pinHotspot) LocalHotSeatDrag.current else null
     val haptics = LocalHaptics.current
+    // The unpin commit removes the flying overlay (and its scope), so the list clears the flag itself
+    // once the section has left the pinned set.
+    val returningNow = hotDrag?.returning
+    LaunchedEffect(returningNow, pinned) {
+        if (returningNow != null && returningNow !in pinned) hotDrag?.returning = null
+    }
     // PERF: each car-pager page composes this whole pebble stack. Composing all 8-10 pebbles
     // eagerly (incl. ClimatePebble/ChargePebble's top-level effects, which run BEFORE their
     // Pebble() call regardless of collapsed state) on the fling-settle frame is the biggest
@@ -144,7 +150,7 @@ internal fun PebbleList(
             },
         ) {
             AnimatedVisibility(
-                visible = section !in pinned,
+                visible = section !in pinned || hotDrag?.returning == section,
                 // Fade the row back in when a pinned pebble RETURNS (unpin). On PIN the row must
                 // vanish INSTANTLY (exit = None): the dropped node has just FLOWN to the hot seat, so
                 // a fade-out here would draw a second copy behind the flight.
@@ -158,7 +164,10 @@ internal fun PebbleList(
                     derivedStateOf { section in eager || section in filledSections }
                 }
                 if (ready) {
-                    SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
+                    // Open but unseen while its pebble is still flying home; shown the frame it lands.
+                    Box(Modifier.graphicsLayer { alpha = if (hotDrag?.returning == section) 0f else 1f }) {
+                        SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
+                    }
                 } else {
                     // Below the fold, so this transient state is never seen or interacted with.
                     // heightIn(min), not a fixed height: a pebble header carries a title plus an

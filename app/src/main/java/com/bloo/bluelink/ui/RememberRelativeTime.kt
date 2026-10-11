@@ -124,6 +124,11 @@ internal class HotSeatDrag {
      * a live target to fly back to -- the mirror of [slotTopLeft] for the pin direction.
      */
     val stackSlot = mutableStateMapOf<String, Offset>()
+    /**
+     * The pinned section flying home. Its stack row opens (invisibly) for the whole flight, so the
+     * list has already made room and the landing is a plain swap: no reflow, no pop.
+     */
+    var returning by mutableStateOf<String?>(null)
     val overSlot: Boolean
         get() = section != null && slotSize.width > 0 &&
             pointer.x in slotTopLeft.x..(slotTopLeft.x + slotSize.width) &&

@@ -284,6 +284,7 @@ internal fun PinnedPebble(
                     flightFrom = Offset(dx, dy)
                     flight.snapTo(0f)
                     flying = true
+                    hotDrag?.returning = section
                     flight.animateTo(1f, UnpinFlightProgressSpec)
                 }
                 vm.setHotspot(v, section)
