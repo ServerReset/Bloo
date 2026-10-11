@@ -36,46 +36,15 @@ object SyncMerge {
     const val BACKUP_VERSION = 1
 
     /**
-     * Preference keys that describe THIS device's own Drive-sync wiring (the content:// URI it was
-     * granted, its last-sync bookkeeping, its Wi-Fi-only preference, its local dirty set, and its
-     * sync-identity/registry bookkeeping) — never portable, so never exported, imported, or merged.
+     * Preference keys that are THIS device's own (its Drive-sync wiring, view state, capabilities):
+     * never exported, imported, merged or hashed. Defined once, in [SettingsCatalog], next to what
+     * search knows about each setting.
      */
-    val DEVICE_LOCAL_KEYS = setOf(
-        "sync_uri", "sync_last_ms", "sync_last_error", "sync_wifi", "sync_dirty_keys",
-        // Sync identity + hash-gate + registry bookkeeping (all per-device, never travel):
-        "sync_device_id", "sync_device_name", "sync_last_hash", "sync_synced_ever",
-        "sync_devices_cache", "sync_pull_primary", "sync_primary_cache", "sync_file_id",
-        // A primary designation made here and not yet uploaded: a one-shot write intent that
-        // must not roam.
-        "sync_primary_pending",
-        // Whether THIS device installs updates silently via Shizuku — a device-local capability
-        // (Shizuku may not be present elsewhere), so it must not roam.
-        "seamless_install_shizuku",
-        // Which car is on screen right now: transient view state, must not roam or cost a sync per swipe.
-        "last_vehicle_vin",
-        // Which version of the settings schema this install last migrated to (see [SyncSchema]).
-        "settings_schema",
-    )
-
-    /** Per-VIN key prefixes (dynamic suffix) that are device-local runtime state and never travel:
-     *  - `alert_*`: "already fired" flags; a peer's flag would suppress this device's notification.
-     *  - `door_since_*` / `engine_since_*` / `unlocked_since_*`: wall-clock episode starts that are
-     *    meaningless in another device's clock domain.
-     *  - `tile_refreshed_*`: per-car refresh throttle stamps.
-     *  Excluding them also keeps the content hash stable across alert/refresh ticks. */
-    private val DEVICE_LOCAL_PREFIXES = listOf(
-        // Includes unlocked_since_* (same clock-domain reasoning as its siblings).
-        "alert_", "door_since_", "engine_since_", "unlocked_since_", "tile_refreshed_",
-        // live_dismissed_* : "the user swiped THIS device's live charging bar away for the current
-        // charging session". Dismissing a notification on a phone says nothing about whether a
-        // tablet should show one, and roaming it would suppress the bar on a device the user never
-        // touched.
-        "live_dismissed_",
-    )
+    val DEVICE_LOCAL_KEYS: Set<String> get() = SettingsCatalog.deviceLocalKeys
 
     /** Whether [name] is device-local (exact key or per-VIN prefix): never exported, imported, merged or hashed. */
     fun isDeviceLocal(name: String): Boolean =
-        name in DEVICE_LOCAL_KEYS || DEVICE_LOCAL_PREFIXES.any { name.startsWith(it) } ||
+        !SettingsCatalog.syncs(name) ||
             // A retired setting never travels either: not exported, not imported, not in the hash.
             SyncSchema.isDeprecated(name)
 
