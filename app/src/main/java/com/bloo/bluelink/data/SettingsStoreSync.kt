@@ -45,17 +45,38 @@ private fun SettingsStore.providerLastModifiedMs(parsed: android.net.Uri): Long?
 /**
  * A cheap "did another device write the file?" check for the foreground poll: one metadata query, no
  * download. The file's modified time is read in the PROVIDER's clock and compared with what this
- * device last wrote or read there, so our own uploads never look like a change. False when there is
- * nothing to compare (no sync file, or a provider that does not report a modified time -- those still
- * sync on refresh and on the periodic worker).
+ * device last wrote or read there, so our own uploads never look like a change. A provider that
+ * reports no modified time is checked by content hash instead, at most every 30 seconds. False when
+ * there is no sync file.
  */
 suspend fun SettingsStore.syncFileChangedRemotely(): Boolean {
     val uri = syncUri() ?: return false
-    val modified = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        providerLastModifiedMs(uri.toUri())
+    val parsed = uri.toUri()
+    val modified = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { providerLastModifiedMs(parsed) }
+    if (modified != null) return modified > lastSyncMs()
+    // A provider that reports no modified time cannot be checked with a metadata query, so fall back
+    // to reading the file and comparing its content hash with the one this device last synced -- but
+    // only every so often, since that is a real download.
+    val now = android.os.SystemClock.elapsedRealtime()
+    if (now - lastContentPeekMs < CONTENT_PEEK_MIN_INTERVAL_MS) return false
+    lastContentPeekMs = now
+    val remote = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        runCatching {
+            kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
+            }
+        }.getOrNull()
     } ?: return false
-    return modified > lastSyncMs()
+    val json = remote.substringAfter('\n', "").takeIf { it.isNotBlank() } ?: return false
+    val hash = SyncMerge.parseMeta(json)?.hash ?: return false
+    return hash != syncLastHash()
 }
+
+/** When [syncFileChangedRemotely] last downloaded the file to compare hashes (providers with no modified time). */
+private var lastContentPeekMs = 0L
+
+/** The least time between those downloads, so a metadata-less provider is polled gently. */
+private const val CONTENT_PEEK_MIN_INTERVAL_MS = 30_000L
 
 /**
  * One full bidirectional Drive-sync pass: download the file at [syncUri] (if configured), import it
