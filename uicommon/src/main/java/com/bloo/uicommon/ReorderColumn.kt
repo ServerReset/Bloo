@@ -311,7 +311,9 @@ fun <T> ReorderColumn(
         val pos = IntArray(placeables.size)
         var total = 0
         placeables.forEachIndexed { i, p ->
-            if (total > 0 && p.height > 0) total += gap
+            // The gap grows in with the row (full once it is a few gaps tall), so a row expanding from
+            // zero eases its spacing in instead of popping a whole gap on its first frame.
+            if (total > 0 && p.height > 0) total += (gap * minOf(1f, p.height / (gap * 4f))).toInt()
             pos[i] = total
             total += p.height
         }
