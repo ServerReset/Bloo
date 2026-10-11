@@ -241,11 +241,7 @@ internal fun ExpandableMapLayer(
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .imePadding()
-                        .graphicsLayer {
-                            alpha = expandFraction.value.coerceIn(0f, 1f)
-                            // The buttons ride up with the page; the map grows beneath them.
-                            translationY = -minOf(pull.up.value, gapPx)
-                        },
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
                 ) {
                     MapFeatureRow(
                         features = listOf(
