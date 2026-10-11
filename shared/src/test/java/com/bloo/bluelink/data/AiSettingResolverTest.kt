@@ -15,6 +15,8 @@ class AiSettingResolverTest {
         Candidate("c0", "Units", "imperial", options = listOf(Option("imperial", "Imperial"), Option("metric", "Metric / kilometres"))),
         Candidate("r0", "Text scale", "1", min = 0.85, max = 1.3),
         Candidate("r1", "Door alert delay", "5", min = 1.0, max = 120.0),
+        Candidate("x0", "Weather location", "none", text = true),
+        Candidate("a0", "Reset pebble order", "", options = listOf(Option("run", "Reset"))),
     )
 
     @Test
@@ -70,5 +72,18 @@ class AiSettingResolverTest {
         assertTrue("c0 | Units | imperial | choices: imperial (Imperial), metric (Metric / kilometres)" in p)
         assertTrue("r0 | Text scale | 1 | number from 0.85 to 1.3" in p)
         assertTrue(p.trimEnd().endsWith("Request: make the text bigger"))
+    }
+
+    @Test
+    fun aFreeTextSettingTakesShortTextOnly() {
+        assertEquals(Resolution("x0", "San Jose"), AiSettingResolver.parse("x0|San Jose", list))
+        assertNull(AiSettingResolver.parse("x0|", list))
+        assertNull(AiSettingResolver.parse("x0|" + "a".repeat(200), list))
+    }
+
+    @Test
+    fun anActionIsAPickerWithOneOption() {
+        assertEquals(Resolution("a0", "run"), AiSettingResolver.parse("a0|run", list))
+        assertNull(AiSettingResolver.parse("a0|on", list))
     }
 }

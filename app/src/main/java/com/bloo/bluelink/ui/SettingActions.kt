@@ -25,11 +25,15 @@ internal class SettingAction(
     val options: List<Option> = emptyList(),
     val min: Double? = null,
     val max: Double? = null,
+    /** A free-text value (a place name) rather than a switch, option or number. */
+    val text: Boolean = false,
+    /** A one-shot action (reset, clear, collapse all): a picker with a single "run" option. */
+    val isAction: Boolean = false,
     val read: (SettingContext) -> String,
     val write: (AppViewModel, String) -> Unit,
 ) {
     fun candidate(ctx: SettingContext) =
-        AiSettingResolver.Candidate(id, title, read(ctx), hint, options, min, max)
+        AiSettingResolver.Candidate(id, title, read(ctx), hint, options, min, max, text)
 
     /** How a resolved value reads to a person ("on", "Metric", "1.2"). */
     fun describe(value: String): String = options.firstOrNull { it.key == value }?.label ?: value
@@ -43,6 +47,17 @@ private fun choice(
     read: (SettingContext) -> String,
     write: (AppViewModel, String) -> Unit,
 ) = SettingAction(id, title, hint, options = options, read = read, write = write)
+
+/** A one-shot action the request can run: it has no value, only "run". */
+private fun action(
+    id: String,
+    title: String,
+    hint: String,
+    run: (AppViewModel) -> Unit,
+) = SettingAction(
+    id, title, hint, options = listOf(Option("run", title)), isAction = true,
+    read = { "" }, write = { vm, _ -> run(vm) },
+)
 
 private fun range(
     id: String,
@@ -207,6 +222,55 @@ private fun dynamicSettingActions(state: UiState, appearance: SettingsStore.Appe
                 },
             ),
         )
+    }
+    if (state.vehicles.size > 1) {
+        add(
+            choice(
+                "o_first", "Car order: put this car first", "car order reorder sort first garage move",
+                state.vehicles.map { Option(it.vin, it.name) },
+                { c -> c.state.vehicles.firstOrNull()?.vin.orEmpty() },
+                { vm, vin ->
+                    val cars = vm._state.value.vehicles
+                    cars.firstOrNull { it.vin == vin }?.let { first -> vm.reorderVehicles(listOf(first) + cars.filter { it.vin != vin }) }
+                },
+            ),
+        )
+    }
+    state.vehicles.forEachIndexed { i, v ->
+        add(
+            action("a_order$i", "Reset pebble order · ${v.name}", "pebbles order reset default ${v.name}") {
+                it.setSectionOrder(v, com.bloo.bluelink.data.DEFAULT_SECTIONS)
+            },
+        )
+        val sections = state.sectionsFor(v).filter { it != "summary" && state.isSectionAvailable(v, it) }
+        add(
+            action("a_collapse$i", "Collapse all pebbles · ${v.name}", "pebbles collapse close fold ${v.name}") { vm ->
+                sections.filter { vm._state.value.isPebbleExpanded(v.vin, it) }.forEach { vm.togglePebble(v, it) }
+            },
+        )
+        add(
+            action("a_expand$i", "Expand all pebbles · ${v.name}", "pebbles expand open unfold ${v.name}") { vm ->
+                sections.filter { !vm._state.value.isPebbleExpanded(v.vin, it) }.forEach { vm.togglePebble(v, it) }
+            },
+        )
+        if (!state.imageUrls[v.vin].isNullOrBlank()) {
+            add(
+                action("a_photo$i", "Clear photo · ${v.name}", "photo picture image remove clear default ${v.name}") {
+                    it.setVehicleImage(v.vin, "")
+                },
+            )
+        }
+    }
+    add(
+        SettingAction(
+            "x_weather", "Weather location", "weather place city location forecast",
+            text = true,
+            read = { c -> c.appearance.weatherLabel ?: "none" },
+            write = { vm, place -> vm.setWeatherPlace(place) },
+        ),
+    )
+    if (appearance.weatherLabel != null) {
+        add(action("a_weatherclear", "Clear weather location", "weather place city location clear follow device") { it.clearWeatherLocation() })
     }
     if (appearance.customPalettes.isNotEmpty()) {
         add(

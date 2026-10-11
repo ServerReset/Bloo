@@ -25,10 +25,13 @@ object AiSettingResolver {
         val options: List<Option> = emptyList(),
         val min: Double? = null,
         val max: Double? = null,
+        /** A free-text setting (a place name); the value is whatever short text the request names. */
+        val text: Boolean = false,
     ) {
         val isChoice get() = options.isNotEmpty()
         val isRange get() = min != null && max != null
-        val isToggle get() = !isChoice && !isRange
+        val isText get() = text
+        val isToggle get() = !isChoice && !isRange && !isText
 
         companion object {
             fun toggle(id: String, title: String, on: Boolean, hint: String = "") =
@@ -42,6 +45,9 @@ object AiSettingResolver {
         val asNumber: Double? get() = value.toDoubleOrNull()
     }
 
+    /** The longest free-text value accepted (a place name is far shorter). */
+    private const val MAX_TEXT = 80
+
     private val ON = setOf("on", "true", "yes", "enable", "enabled", "1")
     private val OFF = setOf("off", "false", "no", "disable", "disabled", "0")
 
@@ -49,7 +55,7 @@ object AiSettingResolver {
         append("Pick the one app setting the request is about, and the value to set it to.\n")
         append("Reply with ONE line in exactly this form: ID|VALUE  (or the single word none).\n")
         append("ID must be copied from the list. VALUE must be on or off for a switch, one of the listed\n")
-        append("choices for a picker, or a number in the stated range. Use none if no setting fits.\n\n")
+        append("choices for a picker, a number in the stated range, or the short text asked for. Use none if no setting fits.\n\n")
         append("Settings (id | name | currently | allowed values | related words):\n")
         candidates.forEach { c ->
             append(c.id).append(" | ").append(c.title).append(" | ").append(c.current).append(" | ")
@@ -57,6 +63,7 @@ object AiSettingResolver {
                 when {
                     c.isChoice -> "choices: " + c.options.joinToString(", ") { if (it.label == it.key) it.key else "${it.key} (${it.label})" }
                     c.isRange -> "number from ${trim(c.min!!)} to ${trim(c.max!!)}"
+                    c.isText -> "short text"
                     else -> "on or off"
                 },
             )
@@ -78,6 +85,7 @@ object AiSettingResolver {
             candidate.isChoice -> candidate.options.firstOrNull {
                 it.key.equals(rawValue, ignoreCase = true) || it.label.equals(rawValue, ignoreCase = true)
             }?.key
+            candidate.isText -> rawValue.takeIf { it.isNotBlank() && it.length <= MAX_TEXT && '\n' !in it }
             candidate.isRange -> rawValue.toDoubleOrNull()
                 ?.takeIf { it.isFinite() && it >= candidate.min!! && it <= candidate.max!! }
                 ?.let { trim(it) }

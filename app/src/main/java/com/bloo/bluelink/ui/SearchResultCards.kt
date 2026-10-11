@@ -161,7 +161,7 @@ internal fun AiSettingProposal(
     val p = proposal ?: return
     val action = actions.firstOrNull { it.id == p.id } ?: return
     val current = candidates.firstOrNull { it.id == p.id }?.current
-    val already = current == p.value
+    val already = !action.isAction && current == p.value
     val target = action.describe(p.value)
     GlassSurface(shape = StandardShape, modifier = Modifier.fillMaxWidth(), hazeState = hazeState) {
         Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -171,13 +171,17 @@ internal fun AiSettingProposal(
                 TitleSmallText("Did you mean?")
             }
             Text(
-                (if (action.options.isEmpty() && action.min == null) "Turn ${action.title} $target" else "Set ${action.title} to $target") +
-                    if (already) " (already set)" else "",
+                when {
+                    action.isAction -> action.title
+                    action.text -> "Set ${action.title} to \"${p.value}\""
+                    action.options.isEmpty() && action.min == null -> "Turn ${action.title} $target"
+                    else -> "Set ${action.title} to $target"
+                } + if (already && !action.isAction) " (already set)" else "",
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (!already) {
                 SafeMorphTextButton(
-                    text = if (applied) "Done" else "Apply",
+                    text = if (applied) "Done" else if (action.isAction) "Run" else "Apply",
                     onClick = {
                         action.write(vm, p.value)
                         applied = true
