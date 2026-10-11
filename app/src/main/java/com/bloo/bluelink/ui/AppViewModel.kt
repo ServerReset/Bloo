@@ -137,6 +137,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     internal val _state = MutableStateFlow(UiState())
 
+    /** True while the Activity is on screen; the live Drive-sync poll only runs then. Set from MainActivity. */
+    internal val appForeground = MutableStateFlow(false)
+
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     /**

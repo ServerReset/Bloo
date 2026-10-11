@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.syncFileChangedRemotely
 import android.app.Application
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.dirtyKeysFlow
@@ -21,6 +22,7 @@ import com.bloo.bluelink.data.watchLockTiming
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -132,6 +134,22 @@ internal fun AppViewModel.bootstrapDriveSync() {
                     runDriveSyncNow()
                 }
             }
+    }
+
+    // Near-real-time pull: while the app is on screen, check every few seconds whether another device
+    // wrote the file, and run a full pass the moment it did. Coming to the foreground checks at once.
+    viewModelScope.launch {
+        appForeground.collectLatest { foreground ->
+            if (!foreground) return@collectLatest
+            while (true) {
+                if (_state.value.syncUri != null && !_state.value.refreshing &&
+                    runCatching { settingsStore.syncFileChangedRemotely() }.getOrDefault(false)
+                ) {
+                    runDriveSyncNow()
+                }
+                delay(FOREGROUND_SYNC_POLL_MS)
+            }
+        }
     }
 
     // Sweep car photos no pref points at any more, once per launch. The crop screen writes a fresh

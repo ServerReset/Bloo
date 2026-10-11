@@ -43,6 +43,21 @@ private fun SettingsStore.providerLastModifiedMs(parsed: android.net.Uri): Long?
 }.getOrNull()
 
 /**
+ * A cheap "did another device write the file?" check for the foreground poll: one metadata query, no
+ * download. The file's modified time is read in the PROVIDER's clock and compared with what this
+ * device last wrote or read there, so our own uploads never look like a change. False when there is
+ * nothing to compare (no sync file, or a provider that does not report a modified time -- those still
+ * sync on refresh and on the periodic worker).
+ */
+suspend fun SettingsStore.syncFileChangedRemotely(): Boolean {
+    val uri = syncUri() ?: return false
+    val modified = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        providerLastModifiedMs(uri.toUri())
+    } ?: return false
+    return modified > lastSyncMs()
+}
+
+/**
  * One full bidirectional Drive-sync pass: download the file at [syncUri] (if configured), import it
  * when it's newer than our last sync (by the file's real last-modified time, falling back to a
  * timestamp embedded in the file for providers that don't expose one), then upload our current

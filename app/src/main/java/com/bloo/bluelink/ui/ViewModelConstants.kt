@@ -35,7 +35,11 @@ internal const val DEVICE_GEOCODE_INTERVAL_MS = 60_000L
 
 // Debounce window for the auto-push-on-change collector: a burst of edits (e.g. dragging pebbles,
 // sliding a value) coalesces into one Drive write this long after the LAST change.
-internal const val AUTO_PUSH_DEBOUNCE_MS = 2000L
+internal const val AUTO_PUSH_DEBOUNCE_MS = 1000L
+
+// While the app is on screen, how often to ask Drive whether another device changed the settings file
+// (a metadata query, not a download), so a change or a new car photo shows up within about this long.
+internal const val FOREGROUND_SYNC_POLL_MS = 10_000L
 
 // How long after launch the orphaned-car-photo sweep runs.
 internal const val PHOTO_SWEEP_DELAY_MS = 8000L

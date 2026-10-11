@@ -189,11 +189,13 @@ class MainActivity : FragmentActivity() {
     override fun onStop() {
         super.onStop()
         backgroundedAt = System.currentTimeMillis()
+        viewModel.appForeground.value = false
     }
 
     override fun onStart() {
         StartupTrace.mark("MainActivity.onStart")
         super.onStart()
+        viewModel.appForeground.value = true
         // Reattach AutoLock's dynamic Bluetooth watcher for existing installs whose config was
         // already enabled before the watcher existed. This is idempotent: starting the service
         // again only refreshes its foreground notification and receiver, it does not start a car
