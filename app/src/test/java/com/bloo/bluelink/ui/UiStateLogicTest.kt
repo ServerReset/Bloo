@@ -223,9 +223,17 @@ class UiStateLogicTest {
     // --- isSectionAvailable: the per-section gate everything renders through ----
 
     @Test
-    fun section_aiRequiresTheFeatureFlag() {
-        assertFalse(UiState(aiEnabled = false).isSectionAvailable(usHyundai, "ai"))
-        assertTrue(UiState(aiEnabled = true).isSectionAvailable(usHyundai, "ai"))
+    fun section_aiRequiresTheFeatureFlagAndADeviceThatSupportsIt() {
+        assertFalse(UiState(aiSupported = true, aiEnabled = false).isSectionAvailable(usHyundai, "ai"))
+        assertTrue(UiState(aiSupported = true, aiEnabled = true).isSectionAvailable(usHyundai, "ai"))
+        // A setting synced from a device WITH Gemini Nano must not show the pebble on one without it.
+        assertFalse(UiState(aiSupported = false, aiEnabled = true).isSectionAvailable(usHyundai, "ai"))
+    }
+
+    @Test
+    fun aiAutoSummarizeIsOffByDefault() {
+        assertFalse(UiState().aiAutoSummarize)
+        assertFalse(UiState(aiSupported = true, aiEnabled = true).aiAutoSummarize)
     }
 
     @Test
