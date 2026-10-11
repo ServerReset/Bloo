@@ -67,7 +67,7 @@ class AiSettingResolverTest {
     fun thePromptDescribesEveryKindOfSetting() {
         val p = AiSettingResolver.prompt("make the text bigger", list)
         assertTrue("t0 | Haptic feedback | on | on or off | vibration" in p)
-        assertTrue("c0 | Units | imperial | choices: imperial, metric (Metric / kilometres)" in p)
+        assertTrue("c0 | Units | imperial | choices: imperial (Imperial), metric (Metric / kilometres)" in p)
         assertTrue("r0 | Text scale | 1 | number from 0.85 to 1.3" in p)
         assertTrue(p.trimEnd().endsWith("Request: make the text bigger"))
     }
