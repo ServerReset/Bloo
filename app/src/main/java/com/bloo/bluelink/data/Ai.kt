@@ -36,6 +36,9 @@ class Ai(context: Context) {
 
         // How long the availability check may take before it is reported as "no answer".
         const val PROBE_TIMEOUT_MS = 10_000L
+
+        // How long a freshly built client settles before it is asked anything.
+        const val CLIENT_WARMUP_MS = 400L
     }
 
     // NOT `by lazy` any more -- a `by lazy` value, once created, is held (and the underlying AICore
@@ -87,6 +90,10 @@ class Ai(context: Context) {
      */
     suspend fun availability(): AiAvailability = try {
         withTimeout(PROBE_TIMEOUT_MS) { withSummarizer { s ->
+            // Some devices (a Galaxy S25 report, googlesamples/mlkit#1071) throw a NullPointerException
+            // when the status is asked for in the same instant the client is built; the system service
+            // is still binding. A short settle first costs nothing on a background thread.
+            kotlinx.coroutines.delay(CLIENT_WARMUP_MS)
             when (s.checkFeatureStatus().await()) {
                 FeatureStatus.AVAILABLE -> AiAvailability.Available
                 FeatureStatus.DOWNLOADABLE -> AiAvailability.Downloadable
@@ -100,7 +107,11 @@ class Ai(context: Context) {
     } catch (e: kotlinx.coroutines.CancellationException) {
         throw e
     } catch (t: Throwable) {
-        AiAvailability.Error("${t.javaClass.simpleName}: ${t.message ?: "no message"}")
+        // The class, the message, and the frame that threw: enough to tell a missing class (R8) from a
+        // device that refuses the feature, without needing a stack trace from the user.
+        val frame = t.stackTrace.firstOrNull()?.let { " @ ${it.className.substringAfterLast('.')}.${it.methodName}(${it.fileName}:${it.lineNumber})" }.orEmpty()
+        val cause = t.cause?.let { " (cause: ${it.javaClass.simpleName}: ${it.message})" }.orEmpty()
+        AiAvailability.Error("${t.javaClass.simpleName}: ${t.message ?: "no message"}$frame$cause")
     }
 
     /** True if the model is, or can be, used here. */
