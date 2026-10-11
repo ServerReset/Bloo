@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.ScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,4 +59,53 @@ internal fun Modifier.bleedHorizontally(inset: Dp): Modifier = layout { measurab
     val width = constraints.maxWidth + extra
     val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
     layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
+}
+
+/** The scroll state and viewport height of the search list, so each row can warp near its top and bottom edge. */
+internal class EdgeScroll(
+    val scroll: ScrollState,
+    val viewportPx: androidx.compose.runtime.State<Int>,
+    /** The list viewport's top edge in window coordinates, so a row at any depth can find its place in it. */
+    val windowTop: androidx.compose.runtime.State<Float>,
+)
+
+internal val LocalEdgeScroll = androidx.compose.runtime.staticCompositionLocalOf<EdgeScroll?> { null }
+
+/**
+ * A row of a vertically scrolling glass list that bends as it nears an edge with more content past
+ * it: it compresses toward that edge (as if curving around a lens), blurs and fades, then flattens
+ * back to normal toward the middle. The vertical counterpart of [scrollEdgeBlur], with the warp.
+ */
+@Composable
+internal fun Modifier.glassEdgeWarp(): Modifier {
+    val edge = LocalEdgeScroll.current ?: return this
+    var y by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var h by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val fadePx = with(density) { 48.dp.toPx() }
+    val maxBlurPx = with(density) { 4.dp.toPx() }
+    val blurOk = canBlurBackdrops()
+    return this
+        .onGloballyPositioned { y = it.positionInWindow().y; h = it.size.height.toFloat() }
+        .graphicsLayer {
+            val vp = edge.viewportPx.value.toFloat()
+            val scroll = edge.scroll
+            if (vp <= 0f || h <= 0f) return@graphicsLayer
+            val top = y - edge.windowTop.value
+            val bottom = top + h
+            val topGate = (scroll.value / fadePx).coerceIn(0f, 1f)
+            val bottomGate = ((scroll.maxValue - scroll.value) / fadePx).coerceIn(0f, 1f)
+            val intoTop = ((fadePx - top) / fadePx).coerceIn(0f, 1f) * topGate
+            val intoBottom = ((bottom - (vp - fadePx)) / fadePx).coerceIn(0f, 1f) * bottomGate
+            val t = maxOf(intoTop, intoBottom)
+            alpha = 1f - 0.55f * t
+            // Squash toward the edge it is sliding into, pivoting on that edge of the row.
+            scaleY = 1f - 0.22f * t
+            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, if (intoTop >= intoBottom) 0f else 1f)
+            renderEffect = if (blurOk && t > 0.03f) {
+                androidx.compose.ui.graphics.BlurEffect(maxBlurPx * t, maxBlurPx * t, androidx.compose.ui.graphics.TileMode.Decal)
+            } else {
+                null
+            }
+        }
 }

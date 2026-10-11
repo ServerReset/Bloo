@@ -1,5 +1,17 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.AnimatedContent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -162,7 +174,7 @@ internal fun SearchLayer(
         ) {
             GlassSurface(
                 shape = ExtraLargeShape,
-                modifier = Modifier.width(barW),
+                modifier = Modifier.width(barW).animateContentSize(spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)),
                 hazeState = hazeState,
                 // Flat blur, not the liquid-glass refraction: results need to be legible, not
                 // warped, so this is a near-solid surface over a straight blur behind it.
@@ -171,25 +183,48 @@ internal fun SearchLayer(
                     alpha = if (hazeState != null && canBlurBackdrops()) 0.88f else 0.98f,
                 ),
             ) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = minOf(480.dp, freeAbovePill))
-                        .verticalScroll(rememberScrollState())
-                        .padding(GapSection),
-                    verticalArrangement = Arrangement.spacedBy(GapRow),
-                ) {
-                    if (query.isNotBlank()) {
-                        SettingsSearchResults(
-                            query, submitted, vm, state.value, appearance, notif,
-                            limit = if (keyboardUp) 4 else Int.MAX_VALUE,
-                            hazeState = hazeState,
-                            onPick = { text, run -> query = text; if (run) submitted = text },
-                        )
-                    } else {
-                        SearchSuggestions(state.value, compact = keyboardUp) { picked, run ->
-                            query = picked
-                            if (run) submitted = picked
+                val listScroll = rememberScrollState()
+                val listViewportPx = remember { mutableIntStateOf(0) }
+                val listWindowTop = remember { mutableFloatStateOf(0f) }
+                val edgeScroll = remember(listScroll) { EdgeScroll(listScroll, listViewportPx, listWindowTop) }
+                CompositionLocalProvider(LocalEdgeScroll provides edgeScroll) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = minOf(480.dp, freeAbovePill))
+                            .onGloballyPositioned {
+                                listViewportPx.intValue = it.size.height
+                                listWindowTop.floatValue = it.positionInWindow().y
+                            }
+                            .verticalScroll(listScroll)
+                            .padding(GapSection),
+                    ) {
+                        // Suggestions and results are two states of one list: they cross-fade and
+                        // slide into each other while the panel itself eases to the new height.
+                        AnimatedContent(
+                            targetState = query.isNotBlank(),
+                            transitionSpec = {
+                                (fadeIn(tween(MotionMedium, delayMillis = MotionFast)) +
+                                    slideInVertically(tween(MotionMedium, delayMillis = MotionFast)) { it / 14 }) togetherWith
+                                    fadeOut(tween(MotionFast)) using SizeTransform(clip = false)
+                            },
+                            label = "searchPanelState",
+                        ) { hasQuery ->
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                                if (hasQuery) {
+                                    SettingsSearchResults(
+                                        query, submitted, vm, state.value, appearance, notif,
+                                        limit = if (keyboardUp) 4 else Int.MAX_VALUE,
+                                        hazeState = hazeState,
+                                        onPick = { text, run -> query = text; if (run) submitted = text },
+                                    )
+                                } else {
+                                    SearchSuggestions(state.value, compact = keyboardUp) { picked, run ->
+                                        query = picked
+                                        if (run) submitted = picked
+                                    }
+                                }
+                            }
                         }
                     }
                 }

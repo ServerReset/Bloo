@@ -124,7 +124,7 @@ internal fun SettingsSearchResults(
         val groups = results.groupBy { if (" · " in it.title) "Your cars" else "Settings" }
         if (suggestedCommands.isNotEmpty()) {
             ResultGroup("Actions") {
-                suggestedCommands.forEach { cmd ->
+                suggestedCommands.forEach { cmd -> androidx.compose.runtime.key(cmd.id) {
                     ResultRow(
                         cmd.icon, MaterialTheme.colorScheme.secondary, caption = null,
                         // Runs it, unless it needs a value first ("set charge limit"): then it just fills the box.
@@ -133,12 +133,12 @@ internal fun SettingsSearchResults(
                         TitleSmallText(cmd.title)
                         Text(cmd.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                }
+                } }
             }
         }
-        groups.forEach { (heading, entriesInGroup) ->
+        groups.forEach { (heading, entriesInGroup) -> androidx.compose.runtime.key(heading) {
             ResultGroup(heading) {
-                entriesInGroup.forEach { e ->
+                entriesInGroup.forEach { e -> androidx.compose.runtime.key(e.title) {
                     val car = e.title.substringAfter(" · ", "").takeIf { it.isNotBlank() }
                     ResultRow(
                         if (car != null) AppIcons.DirectionsCar else Icons.Filled.Settings,
@@ -146,9 +146,9 @@ internal fun SettingsSearchResults(
                         caption = car,
                         content = e.content,
                     )
-                }
+                } }
             }
-        }
+        } }
     }
 
     // A recognised command ("lock my Ioniq") runs via VehicleCommandRunner, the same path as the
@@ -215,6 +215,14 @@ internal fun ResultRow(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
+    // Each row eases in the first time it appears, so a changing list grows and fades rather than popping.
+    val appear = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+    androidx.compose.animation.AnimatedVisibility(
+        visibleState = appear,
+        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)) +
+            androidx.compose.animation.expandVertically(androidx.compose.animation.core.spring(dampingRatio = 0.9f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)),
+    ) {
+    Column(Modifier.glassEdgeWarp()) {
     androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     val haptics = LocalHaptics.current
     Row(
@@ -246,5 +254,7 @@ internal fun ResultRow(
                 modifier = Modifier.size(20.dp),
             )
         }
+    }
+    }
     }
 }
