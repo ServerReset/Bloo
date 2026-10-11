@@ -121,7 +121,11 @@ internal fun ExpandableMapLayer(
     // called from inside a suspend lambda.
     val dragSpring = lowPowerAwareSpring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium)
     // Same reason as dragSpring above -- read here, not inside the scope.launch{} in close().
-    val closeSpring = lowPowerAwareSpring<Float>(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)
+    val closeSpring = lowPowerAwareSpring<Float>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+    // How far down the pull has gone, 0..1 over 40% of the screen. The sheet shrinks toward its
+    // pebble as it is dragged, so letting go carries the SAME motion on, instead of the sheet snapping
+    // back to full size and then shrinking.
+    val closeDistPx = LocalWindowInfo.current.containerSize.height * 0.4f
     var closing by remember { mutableStateOf(false) }
     fun close() {
         if (closing) return
@@ -184,7 +188,9 @@ internal fun ExpandableMapLayer(
                     .clipToBounds()
                     .graphicsLayer {
                         val full = sheetBounds
-                        val t = expandFraction.value.coerceIn(0f, 1f)
+                        // Part-way to the pebble already while dragged down; the rest on release.
+                        val drag = (dragPx.value / closeDistPx).coerceIn(0f, 1f)
+                        val t = (expandFraction.value * (1f - 0.5f * drag)).coerceIn(0f, 1f)
                         if (full != null && full.width > 0f && full.height > 0f) {
                             val originScaleX = originBounds.width / full.width
                             val originScaleY = originBounds.height / full.height
@@ -229,7 +235,7 @@ internal fun ExpandableMapLayer(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(start = GapSection, end = GapSection, top = GapSection)
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) * (1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)) },
                 )
             }
 
@@ -241,7 +247,7 @@ internal fun ExpandableMapLayer(
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .imePadding()
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) * (1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)) },
                 ) {
                     MapFeatureRow(
                         features = listOf(
