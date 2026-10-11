@@ -49,10 +49,11 @@ internal fun CollapsedGaragePager(
     /** 0 collapsed, 1 expanded: drives the focused page's own reflow. A State, read only in measure. */
     expandedT: State<Float>,
     /**
-     * False while the pager is still swiping the car being expanded into the first column: the
-     * expand animation waits for this to be true, so it always grows from the right place.
+     * Set to the expanded car once the pager has it in the first column (after swiping it there if
+     * need be), and null while collapsed or still swiping: the expand animation waits for non-null,
+     * so it always grows from the right place.
      */
-    scrollAligned: androidx.compose.runtime.MutableState<Boolean> = remember { mutableStateOf(true) },
+    alignedCar: androidx.compose.runtime.MutableState<Int?> = remember { mutableStateOf(null) },
 ) {
         // Settings is appended as one more ITEM to the sequence this pager cycles through (index
         // `slots`, right after the last real page), always rendered at exactly one car-column's
@@ -115,20 +116,18 @@ internal fun CollapsedGaragePager(
         // itself lays out, so right-to-left mirrors it), THEN let the expand animation run, instead of
         // growing a different car's page or jumping.
         LaunchedEffect(expandedIdx) {
-            if (expandedIdx == null || state.value.screen != Screen.Garage) {
-                scrollAligned.value = true
+            if (expandedIdx == null) {
+                alignedCar.value = null
                 return@LaunchedEffect
             }
-            if (realItem(pager.currentPage) == expandedIdx) {
-                scrollAligned.value = true
+            if (state.value.screen != Screen.Garage || realItem(pager.currentPage) == expandedIdx) {
+                alignedCar.value = expandedIdx
                 return@LaunchedEffect
             }
-            scrollAligned.value = false
-            try {
-                wrap.animateToReal(expandedIdx.coerceIn(0, slots - 1))
-            } finally {
-                scrollAligned.value = true
-            }
+            // Keep the previous value while paging between already-expanded cars (no gate flicker);
+            // a fresh expand starts from null and so waits here.
+            wrap.animateToReal(expandedIdx.coerceIn(0, slots - 1))
+            alignedCar.value = expandedIdx
         }
         // A car-count change shifts wrap's modulo divisor and could reshuffle the shown car; snap
         // back to currentIndex. Skips its first firing and the exit transition, like the
