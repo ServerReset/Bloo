@@ -2,6 +2,7 @@ package com.bloo.uicommon
 
 /** Reorderable column + shared reorder state, pure Foundation. */
 
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -239,6 +240,10 @@ fun <T> ReorderColumn(
                                         launch { ay.animateTo(endY, DragFlightSpec) { offsetY = value } }
                                     }
                                     onDragReleaseCommitNow?.invoke(k)
+                                    // The commit reaches the list a frame or two later; resetting now would
+                                    // snap the item back to its old slot until the pin collapses it.
+                                    withFrameNanos { }
+                                    withFrameNanos { }
                                     draggingKey = null
                                     flyingKey = null
                                     offsetX = 0f

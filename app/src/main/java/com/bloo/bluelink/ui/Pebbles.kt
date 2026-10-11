@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
@@ -140,7 +141,7 @@ internal fun PebbleList(
         },
         staggerInOnColdStart = true,
         introKey = v.vin,
-    ) { section, itemDragHandle, _ ->
+    ) { section, itemDragHandle, isDragging ->
         // Register this row's slot in the STACK for the hot seat. The wrapper is composed for every
         // row (the AnimatedVisibility inside may render nothing), so a pinned row's slot stays live
         // even collapsed to zero -- the unpin flight targets exactly this point.
@@ -166,7 +167,9 @@ internal fun PebbleList(
                 if (ready) {
                     // Open but unseen while its pebble is still flying home; shown the frame it lands.
                     Box(Modifier.graphicsLayer { alpha = if (hotDrag?.returning == section) 0f else 1f }) {
-                        SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
+                        CompositionLocalProvider(LocalPebbleFloating provides isDragging) {
+                            SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
+                        }
                     }
                 } else {
                     // Below the fold, so this transient state is never seen or interacted with.

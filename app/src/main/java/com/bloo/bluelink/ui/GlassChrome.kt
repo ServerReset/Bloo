@@ -135,6 +135,13 @@ internal fun glassTint(blurred: Boolean): Color {
  * The blurred-background source every card sits on: the app's gradient and aurora, marked as a Haze
  * source in Screens.
  */
+/**
+ * True while a pebble is lifted, dragged or in flight. A backdrop blur does not follow a scaled,
+ * translated layer (the gradient behind it smears), so a floating pebble wears the flat fill and
+ * goes back to glass when it is put down.
+ */
+internal val LocalPebbleFloating = androidx.compose.runtime.staticCompositionLocalOf { false }
+
 internal val LocalBackdropHaze = androidx.compose.runtime.staticCompositionLocalOf<HazeState?> { null }
 
 /**
@@ -160,7 +167,7 @@ internal fun Modifier.glassSheen(): Modifier = this.background(
  */
 @Composable
 internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
-    val haze = LocalBackdropHaze.current
+    val haze = LocalBackdropHaze.current.takeUnless { LocalPebbleFloating.current }
     val ultra = LocalAppearance.current.ultraGlass
     // Ultra glass uses the liquid-glass effect, which needs a backdrop to refract; otherwise it
     // falls back.

@@ -312,7 +312,7 @@ internal fun PinnedPebble(
                 )
             },
     ) {
-        CompositionLocalProvider(LocalForceExpanded provides revealed) {
+        CompositionLocalProvider(LocalForceExpanded provides revealed, LocalPebbleFloating provides (dragging || flying)) {
             SinglePebble(section, v, stateSource, vm, Modifier)
         }
     }
