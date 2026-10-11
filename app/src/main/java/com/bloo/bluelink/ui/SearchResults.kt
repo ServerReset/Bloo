@@ -4,6 +4,7 @@
  */
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
@@ -76,8 +77,10 @@ internal fun SettingsSearchResults(
     // calls below read `query` at all -- only the scoring pass further down does -- so building
     // this whole list (and every entry's own composable lambda) fresh on every keystroke was pure
     // waste.
-    val entries = remember(state, appearance, notif, vm, canBio, state.settingsMode) {
-        buildSettingsSearchEntries(state, appearance, notif, vm, canBio)
+    // Live read of the whole store, so a value changed here or by a sync from another device shows up.
+    val prefs by remember(vm) { vm.settingsStore.allPrefs }.collectAsState(initial = emptyMap())
+    val entries = remember(state, appearance, notif, vm, canBio, state.settingsMode, prefs) {
+        buildSettingsSearchEntries(state, appearance, notif, vm, canBio, prefs)
     }
 
     // Matches render FIRST (top of this composable's output), the AI answer LAST -- this composable

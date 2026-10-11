@@ -69,4 +69,23 @@ class SyncSchemaTest {
         assertFalse(SyncMerge.isDeviceLocal("ai_enabled"))
         assertFalse(SyncMerge.isDeviceLocal("ai_auto_summarize"))
     }
+
+    @Test
+    fun describeReadsAStoredValueInPlainLanguage() {
+        fun fam(key: String) = SettingsCatalog.families.first { it.key == key }
+        assertTrue(SettingsCatalog.describe(fam("columns_flipped"), true) == "On")
+        assertTrue(SettingsCatalog.describe(fam("weather_label"), "San Jose") == "San Jose")
+        assertTrue(SettingsCatalog.describe(fam("weather_label"), "") == "Not set")
+        assertTrue(SettingsCatalog.describe(fam("vehicle_order"), "A,B,C") == "3 items")
+        assertTrue(SettingsCatalog.describe(fam("vehicle_order"), "") == "None")
+        assertTrue(SettingsCatalog.describe(fam("img_"), "/files/cars/x.jpg") == "Set")
+        assertTrue(SettingsCatalog.describe(fam("img_"), null) == "Not set")
+    }
+
+    @Test
+    fun theSettingsWithoutAControlAreTheOnesSearchShowsReadOnly() {
+        val readOnly = SettingsCatalog.searchable.filter { !it.control }.map { it.key }
+        assertTrue("columns_flipped" in readOnly && "img_" in readOnly && "vehicle_order" in readOnly)
+        assertFalse("haptics_enabled" in readOnly)
+    }
 }

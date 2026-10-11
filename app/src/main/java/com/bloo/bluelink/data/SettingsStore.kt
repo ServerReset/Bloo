@@ -153,6 +153,11 @@ class SettingsStore(internal val context: Context) {
     // snapshot on any DataStore change (here, or via Drive sync). Each field falls back to its
     // default when the key is absent or fails to parse, because this flow is collected at launch
     // and must never crash.
+    /** Every stored preference by key, live: what search reads so it can show any value in the store. */
+    val allPrefs: Flow<Map<String, Any>> = context.settingsDataStore.data.map { prefs ->
+        prefs.asMap().entries.associate { it.key.name to it.value }
+    }
+
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
         Appearance(
             // "AMOLED"/"SYSTEM_AMOLED" are legacy values remapped to the nearest modern mode, so an

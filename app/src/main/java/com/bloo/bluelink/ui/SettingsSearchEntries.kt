@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.autolock.AutoLockConfig
+import com.bloo.bluelink.data.SettingsCatalog
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.coordString
@@ -47,6 +48,8 @@ internal fun buildSettingsSearchEntries(
     notif: SettingsStore.NotificationPrefs,
     vm: AppViewModel,
     canBio: Boolean,
+    /** Every stored preference, so settings with no control of their own can still be found and read. */
+    prefs: Map<String, Any> = emptyMap(),
 ): List<SearchEntry> {
     val entries = ArrayList<SearchEntry>()
     fun add(title: String, keywords: String, content: @Composable () -> Unit) {
@@ -180,5 +183,29 @@ internal fun buildSettingsSearchEntries(
             AutoLockSearchToggle(v, vm, "Dry run", { it.dryRun }, { c, x -> c.copy(dryRun = x) })
         }
     }
+    // The rest of the store: every searchable setting the catalog knows that has no control above,
+    // read straight from the same preferences Drive sync carries, so what syncs is what can be found.
+    addCatalogReadOnlyEntries(entries, state, prefs)
     return entries
+}
+
+/**
+ * Read-only results for the catalog settings that have no control of their own in search (colour
+ * palette, car order, weather place, pinned pebble, photo set or not...). Per-car families get one
+ * entry per car. Anything that already has a control is skipped, so nothing appears twice.
+ */
+private fun addCatalogReadOnlyEntries(entries: MutableList<SearchEntry>, state: UiState, prefs: Map<String, Any>) {
+    SettingsCatalog.searchable.filter { !it.control }.forEach { family ->
+        fun add(title: String, key: String, car: String?) {
+            if (!isSettingAvailableInMode(family.title, state.settingsMode)) return
+            val value = SettingsCatalog.describe(family, prefs[key])
+            entries.add(
+                SearchEntry(title, "$title ${family.keywords} ${car.orEmpty()}".lowercase()) { StatusRow(family.title, value) },
+            )
+        }
+        when (family.scope) {
+            SettingsCatalog.Scope.APP -> add(family.title, family.key, null)
+            SettingsCatalog.Scope.CAR -> state.vehicles.forEach { v -> add("${family.title} · ${v.name}", family.key + v.vin, v.name) }
+        }
+    }
 }

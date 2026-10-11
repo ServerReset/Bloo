@@ -34,6 +34,8 @@ object SettingsCatalog {
         val keywords: String = "",
         val syncs: Boolean = true,
         val searchable: Boolean = syncs && title.isNotEmpty(),
+        /** True when the app already has a real control for it in search (a toggle, slider or picker). */
+        val control: Boolean = false,
     )
 
     private fun app(key: String, kind: Kind, title: String = "", keywords: String = "") =
@@ -44,7 +46,7 @@ object SettingsCatalog {
 
     private fun local(key: String, scope: Scope = Scope.APP) = Family(key, scope, Kind.STATE, syncs = false)
 
-    val families: List<Family> = listOf(
+    private val rawFamilies: List<Family> = listOf(
         // --- App-wide, synced and searchable -------------------------------------------------
         app("ai_enabled", Kind.TOGGLE, "On-device AI", "gemini nano ai summary assistant privacy on-device"),
         app("ai_auto_summarize", Kind.TOGGLE, "Summarize when I open the app", "ai automatic automatically summary open launch gemini nano"),
@@ -134,6 +136,20 @@ object SettingsCatalog {
         local("live_dismissed_", Scope.CAR),
     )
 
+    /** Settings that already have their own control in search; everything else is shown read-only. */
+    private val withControl = setOf(
+        "ai_enabled", "ai_auto_summarize", "aurora_background", "aurora_motion", "biometric_lock",
+        "distance_unit", "temp_unit", "unit_system", "dynamic_color", "font_choice", "glass_clarity",
+        "haptics_enabled", "notify_autolock", "notify_charge_complete", "notify_charging", "notify_door",
+        "notify_door_min", "notify_running", "notify_running_min", "notify_service", "notify_start",
+        "notify_unlocked", "notify_unlocked_min", "notify_watch_low", "pebble_outline", "theme_mode",
+        "ui_scale", "vibrancy", "enabled_shortcuts",
+        "plate_", "platform_", "ptrain_", "seat_", "svc_last_", "svc_interval_",
+        "autolock_enabled_", "autolock_dry_run_", "autolock_grace_",
+    )
+
+    val families: List<Family> = rawFamilies.map { if (it.key in withControl) it.copy(control = true) else it }
+
     private val appKeys: Map<String, Family> = families.filter { it.scope == Scope.APP }.associateBy { it.key }
     private val carFamilies: List<Family> = families.filter { it.scope == Scope.CAR }
         // Longest prefix first, so "autolock_device_name_" is never shadowed by a shorter one.
@@ -157,6 +173,21 @@ object SettingsCatalog {
 
     /** Everything a person can look for by name, for search and the natural-language resolver. */
     val searchable: List<Family> = families.filter { it.searchable }
+
+    /**
+     * What search shows for a stored value: the plain-language reading of whatever the preference
+     * holds, for the settings that have no control of their own to draw. Null [raw] means unset.
+     */
+    fun describe(family: Family, raw: Any?): String = when {
+        raw == null -> "Not set"
+        raw is Boolean -> if (raw) "On" else "Off"
+        family.kind == Kind.IMAGE -> if (raw.toString().isBlank()) "Not set" else "Set"
+        family.kind == Kind.LIST -> raw.toString().split(',').count { it.isNotBlank() }.let {
+            if (it == 0) "None" else if (it == 1) "1 item" else "$it items"
+        }
+        raw.toString().isBlank() -> "Not set"
+        else -> raw.toString()
+    }
 
     /**
      * The VIN a per-car key belongs to, or null for an app-wide key. [CarKeys] normalises it the way
