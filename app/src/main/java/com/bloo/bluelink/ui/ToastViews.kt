@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -120,15 +122,19 @@ internal fun BoxScope.ToastSlot(
             }
             .then(swipe),
     ) {
-        ToastCard(
-            toast = toast,
-            // Fade the CONTENT, not the glass: the pill stays a solid piece of the bar while it
-            // peels off, and an alpha on the glass layer would clip its shadow.
-            contentAlpha = { enter.value.coerceIn(0f, 1f) },
-            onDismiss = { toast.leaving = true },
-            hazeState = hazeState,
-            onCopy = onCopy,
-        )
+        // On a wide display the card stops at MaxToastWidth and sits centred in its slot, instead of
+        // stretching across the whole screen.
+        Box(Modifier.wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = MaxToastWidth)) {
+            ToastCard(
+                toast = toast,
+                // Fade the CONTENT, not the glass: the pill stays a solid piece of the bar while it
+                // peels off, and an alpha on the glass layer would clip its shadow.
+                contentAlpha = { enter.value.coerceIn(0f, 1f) },
+                onDismiss = { toast.leaving = true },
+                hazeState = hazeState,
+                onCopy = onCopy,
+            )
+        }
     }
 }
 

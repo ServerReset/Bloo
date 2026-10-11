@@ -45,6 +45,9 @@ private val ToastEdge = 16.dp
 /** The narrowest a toast beside the search may get before it lifts above instead. */
 private val MinBesideWidth = 220.dp
 
+/** The widest a toast gets, however wide the display (matches the search bar's cap). */
+internal val MaxToastWidth = 640.dp
+
 /** The toast card's root, so a test can pin its height to the search element's. */
 internal const val ToastCardTag = "toastCard"
 
@@ -147,7 +150,7 @@ internal fun ToastHost(
     val contentWidthPx = window.width.toFloat() - 2 * edgePx
     val minWidthPx = with(density) { MinBesideWidth.toPx() }
     val chromePx = with(density) { ToastChromeWidth.toPx() }
-    val maxWidthPx = contentWidthPx * 0.92f
+    val maxWidthPx = minOf(contentWidthPx * 0.92f, with(density) { MaxToastWidth.toPx() })
 
     // THIS message decides beside vs above: measure its natural width and hand that to the clearance
     // maths instead of one fixed minimum.
