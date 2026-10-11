@@ -15,6 +15,7 @@ import com.bloo.uicommon.ReorderColumn
 @Composable
 internal fun CarsCardContent(state: UiState, vm: AppViewModel, pick: (String) -> Unit) {
     var expandedCar by remember { mutableStateOf<String?>(null) }
+    val haptics = LocalHaptics.current
     if (state.vehicles.size == 1) {
         // With one car, the car card IS the section -- forceExpanded gives it the same always-open,
         // no-chevron header every other top-level Settings card has.
@@ -41,6 +42,9 @@ internal fun CarsCardContent(state: UiState, vm: AppViewModel, pick: (String) ->
             // The same gap the list puts between every other card, so cars sit exactly as far apart
             // as the rest of Settings -- the slots carry no padding of their own.
             spacing = GapGroup,
+            onPickUp = { haptics?.click() },
+            onSwap = { haptics?.tick() },
+            onLanded = { haptics?.tick() },
         ) { v, itemDragHandle, dragging ->
             Box(Modifier.settingsCardSlot()) {
                 CarSettingsCard(

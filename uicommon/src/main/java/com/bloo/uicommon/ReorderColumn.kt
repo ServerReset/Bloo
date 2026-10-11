@@ -67,6 +67,9 @@ val coldStartIntroPlayed = mutableSetOf<Any>()
 val LocalReorderActive = staticCompositionLocalOf { false }
 
 /** The spring a released pebble flies into its drop target on (see [ReorderColumn]'s onDragEnd). */
+/** A put-down that is not a pin: a short, slightly springy settle into the slot it belongs in. */
+private val DragSettleSpec = spring<Float>(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
+
 private val DragFlightSpec = spring<Float>(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
 
 @Composable
@@ -91,6 +94,12 @@ fun <T> ReorderColumn(
     onDragReleaseCommit: ((key: Any) -> Unit)? = null,
     /** Drag cancelled (not a drop): the caller should clear any in-flight drop-hover state. */
     onDragCancel: ((key: Any) -> Unit)? = null,
+    /** Fired the moment the long-press lifts an item (for a pick-up haptic). */
+    onPickUp: (() -> Unit)? = null,
+    /** Fired each time the dragged item swaps places with a neighbour. */
+    onSwap: (() -> Unit)? = null,
+    /** Fired when a put-down finishes settling into its slot. */
+    onLanded: (() -> Unit)? = null,
     staggerInOnColdStart: Boolean = false,
     // Identity for the "already played" check above -- distinct per logical column (e.g. each car's
     // VIN), so one column consuming the intro can't rob another (possibly still
@@ -107,8 +116,13 @@ fun <T> ReorderColumn(
     val dragReleaseTargetNow by rememberUpdatedState(dragReleaseTarget)
     val onDragReleaseCommitNow by rememberUpdatedState(onDragReleaseCommit)
     val onDragCancelNow by rememberUpdatedState(onDragCancel)
+    val onPickUpNow by rememberUpdatedState(onPickUp)
+    val onSwapNow by rememberUpdatedState(onSwap)
+    val onLandedNow by rememberUpdatedState(onLanded)
     val allowHorizontalNow by rememberUpdatedState(allowHorizontalDrag)
     val scope = rememberCoroutineScope()
+    // The put-down settle in flight, so a new pick-up can take over from it cleanly.
+    var settleJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var order by remember { mutableStateOf(items) }
     var draggingKey by remember { mutableStateOf<Any?>(null) }
     val reorderActive = draggingKey != null
@@ -211,7 +225,15 @@ fun <T> ReorderColumn(
                         }
                         .pointerInput(k) {
                     detectDragGesturesAfterLongPress(
-                        onDragStart = { draggingKey = k; offsetY = 0f; offsetX = 0f },
+                        onDragStart = {
+                            // Picking up an item that is still settling takes over from where it is.
+                            val carryX = if (settleJob?.isActive == true && draggingKey == k) offsetX else 0f
+                            val carryY = if (settleJob?.isActive == true && draggingKey == k) offsetY else 0f
+                            settleJob?.cancel()
+                            flyingKey = null
+                            draggingKey = k; offsetY = carryY; offsetX = carryX
+                            onPickUpNow?.invoke()
+                        },
                         onDragEnd = {
                             val handled = onDragReleaseNow?.invoke(k) ?: false
                             val target = if (handled) dragReleaseTargetNow?.invoke(k) else null
@@ -250,13 +272,41 @@ fun <T> ReorderColumn(
                                     offsetY = 0f
                                 }
                             } else {
-                                draggingKey = null; offsetY = 0f; offsetX = 0f
+                                // Not a pin: commit the order now, then let the item SETTLE into the slot
+                                // it belongs in -- from wherever it was let go, sideways included, so a
+                                // drop in the wrong place flies back instead of snapping.
                                 if (handled) onDragReleaseCommitNow?.invoke(k) else onReorderNow(order)
+                                flyingKey = k
+                                settleJob = scope.launch {
+                                    val ax = Animatable(offsetX)
+                                    val ay = Animatable(offsetY)
+                                    coroutineScope {
+                                        launch { ax.animateTo(0f, DragSettleSpec) { offsetX = value } }
+                                        launch { ay.animateTo(0f, DragSettleSpec) { offsetY = value } }
+                                    }
+                                    if (draggingKey == k) {
+                                        draggingKey = null; flyingKey = null
+                                        offsetX = 0f; offsetY = 0f
+                                    }
+                                    onLandedNow?.invoke()
+                                }
                             }
                         },
                         onDragCancel = {
                             onDragCancelNow?.invoke(k)
-                            draggingKey = null; offsetY = 0f; offsetX = 0f
+                            flyingKey = k
+                            settleJob = scope.launch {
+                                val ax = Animatable(offsetX)
+                                val ay = Animatable(offsetY)
+                                coroutineScope {
+                                    launch { ax.animateTo(0f, DragSettleSpec) { offsetX = value } }
+                                    launch { ay.animateTo(0f, DragSettleSpec) { offsetY = value } }
+                                }
+                                if (draggingKey == k) {
+                                    draggingKey = null; flyingKey = null
+                                    offsetX = 0f; offsetY = 0f
+                                }
+                            }
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
@@ -280,6 +330,7 @@ fun <T> ReorderColumn(
                                     }
                                     if (n <= order.lastIndex && acc > 0 && offsetY > acc / 2f) {
                                         order = order.toMutableList().also { it.add(n, it.removeAt(cur)) }
+                                        onSwapNow?.invoke()
                                         offsetY -= acc
                                     }
                                 } else if (offsetY < 0 && cur > 0) {
@@ -293,6 +344,7 @@ fun <T> ReorderColumn(
                                     }
                                     if (n >= 0 && acc > 0 && -offsetY > acc / 2f) {
                                         order = order.toMutableList().also { it.add(n, it.removeAt(cur)) }
+                                        onSwapNow?.invoke()
                                         offsetY += acc
                                     }
                                 }

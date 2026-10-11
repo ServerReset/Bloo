@@ -156,6 +156,9 @@ internal fun PebbleList(
         onDragCancel = hotDrag?.let { d ->
             { _ -> d.section = null; d.pendingPin = null }
         },
+        onPickUp = { haptics?.click() },
+        onSwap = { haptics?.tick() },
+        onLanded = { haptics?.tick() },
         staggerInOnColdStart = true,
         introKey = v.vin,
     ) { section, itemDragHandle, isDragging ->
