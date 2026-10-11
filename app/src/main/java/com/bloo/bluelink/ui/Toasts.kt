@@ -231,6 +231,7 @@ internal fun ToastHost(
                     hazeState = hazeState,
                     onCopy = onCopy,
                     onExpand = { state.expand(toast) },
+                    dock = anchor.dock,
                     onGone = { state.items.remove(toast) },
                 )
             }

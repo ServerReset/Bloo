@@ -1,5 +1,8 @@
 package com.bloo.bluelink.ui
 
+import kotlin.math.roundToInt
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -77,6 +80,7 @@ internal fun BoxScope.ToastSlot(
     hazeState: HazeState,
     onCopy: (String) -> Unit,
     onExpand: () -> Unit,
+    dock: SearchDock,
     onGone: () -> Unit,
 ) {
     // Its own clock, re-armed whenever the expiry moves (a repeat of the same message).
@@ -124,11 +128,26 @@ internal fun BoxScope.ToastSlot(
             }
             .then(swipe),
     ) {
-        // On a wide display the card stops at MaxToastWidth and sits centred in its slot, instead of
-        // stretching across the whole screen.
-        // Beside the search it is as wide as the gap allows; the cap is only for the stack above.
+        // The card stops at MaxToastWidth in the stack above the search, leaning toward the side the
+        // search is docked on; beside the search it takes the whole gap. The width BLENDS between the
+        // two (driven by the same spring as the insets), so moving the search never snaps a toast to
+        // full width before it animates.
         val beside = index == 0 && (startInsetPx > 1f || endInsetPx > 1f)
-        Box(Modifier.wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = if (beside) Dp.Infinity else MaxToastWidth)) {
+        val besideFrac = animateFloatAsState(if (beside) 1f else 0f, spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow), label = "toastBeside")
+        val lean = when (dock) {
+            SearchDock.LEFT -> Alignment.Start
+            SearchDock.RIGHT -> Alignment.End
+            else -> Alignment.CenterHorizontally
+        }
+        Box(
+            Modifier.layout { measurable, constraints ->
+                val avail = constraints.maxWidth
+                val capped = minOf(avail, MaxToastWidth.roundToPx())
+                val w = (capped + (avail - capped) * besideFrac.value).roundToInt().coerceIn(0, avail)
+                val p = measurable.measure(constraints.copy(minWidth = w, maxWidth = w))
+                layout(avail, p.height) { p.place(lean.align(p.width, avail, layoutDirection), 0) }
+            },
+        ) {
             ToastCard(
                 toast = toast,
                 // Fade the CONTENT, not the glass: the pill stays a solid piece of the bar while it
