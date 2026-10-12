@@ -220,6 +220,9 @@ dependencies {
     implementation("androidx.browser:browser:1.10.0")
     // Background service/door alerts
     implementation("androidx.work:work-runtime-ktx:2.12.0")
+    // The homescreen widget (see widget/BlooWidget.kt).
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.glance:glance-material3:1.1.1")
     implementation("androidx.security:security-crypto:1.1.0")
 
     // Real car photos (URL or the system photo picker)

@@ -82,6 +82,8 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
         installStartupStrictMode()
         StartupTrace.mark("Application.super.onCreate done")
         DeviceStatus.ensureInitialized(this)
+        // Keeps any homescreen widget in step with the car data.
+        com.bloo.bluelink.widget.BlooWidgetUpdater.start(this)
         StartupTrace.mark("DeviceStatus.ensureInitialized done")
         // Warm the biggest data classes off the main thread. SettingsStore() measured ~50ms on Main
         // on the first launch after install (1ms once warm) -- that is class-load/JIT of a very

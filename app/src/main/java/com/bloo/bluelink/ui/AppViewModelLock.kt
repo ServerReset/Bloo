@@ -245,6 +245,7 @@ private fun AppViewModel.openBootAndStart() {
     val app = getApplication<android.app.Application>()
     com.bloo.bluelink.data.BootGate.markOpen(app)
     com.bloo.bluelink.data.BootReauthNotice.cancel(app)
+    com.bloo.bluelink.widget.BlooWidgetUpdater.requestUpdate(app)
     com.bloo.bluelink.autolock.AutoLockBootReceiver.startWatchIfEnabled(app)
     coldStartAutoLogin()
 }

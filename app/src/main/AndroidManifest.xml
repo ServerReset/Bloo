@@ -210,6 +210,20 @@
              built from this receiver, see ActivityRecognitionManager, so it needs no
              intent-filter here. -->
         <receiver android:name=".autolock.AutoLockActivityReceiver" android:exported="false" />
+        <!-- The homescreen widget (see widget/BlooWidget.kt) and its optional "which car" picker. -->
+        <receiver android:name=".widget.BlooWidgetReceiver" android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/bloo_widget_info" />
+        </receiver>
+        <activity android:name=".widget.BlooWidgetConfigActivity" android:exported="true"
+            android:theme="@style/Theme.Bloo">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
         <!-- Relaunches MainActivity once an in-place app update finishes installing;
              see its own doc comment. -->
         <receiver android:name=".autolock.AutoLockBootReceiver" android:exported="false">
