@@ -157,12 +157,6 @@ internal fun triangleWave(elapsedMs: Long, periodMs: Long): Float {
     return if (phase < periodMs) phase.toFloat() / periodMs else 2f - phase.toFloat() / periodMs
 }
 
-/**
- * True while the car pager is dragged or flung, written by the pager and read (never in composition) by
- * [AuroraBackground] so the drift can stand still. Null outside the garage.
- */
-internal val LocalAuroraPause = androidx.compose.runtime.staticCompositionLocalOf<androidx.compose.runtime.MutableState<Boolean>?> { null }
-
 /** Animated gradient-blob backdrop for login, onboarding and (optionally) the garage. */
 @Composable
 internal fun AuroraBackground(
