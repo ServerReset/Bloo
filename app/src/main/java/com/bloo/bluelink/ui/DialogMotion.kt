@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 
 /** How dark the page behind a dialog gets once the dialog is fully up. */
-internal const val DialogScrimAlpha = 0.42f
+internal const val DialogScrimAlpha = 0.34f
 
 /**
  * One open dialog. Its content is handed up by [GlassAlertDialog] on every recomposition, so it

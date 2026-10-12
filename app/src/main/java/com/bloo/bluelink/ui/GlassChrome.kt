@@ -82,7 +82,11 @@ internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier {
     // setting, not the app's own override.
     val dark = appIsDarkTheme()
     return (if (dark) this.dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp) else this).then(
-        if (outline) {
+        // Light theme has no shadow, so without a rim a pale pebble on a pale page had no edge at all: a
+        // hairline gives it one (a border is far cheaper than another blurred shadow per card).
+        if (!dark && !outline) {
+            Modifier.border(BorderStroke(0.75.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)), shape)
+        } else if (outline) {
             Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)
         } else {
             Modifier
