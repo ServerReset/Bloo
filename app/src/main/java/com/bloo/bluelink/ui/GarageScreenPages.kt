@@ -20,6 +20,13 @@ import com.bloo.bluelink.data.Vehicle
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 
+/**
+ * True while the car pager is at rest (not being dragged or flung). Page content that is expensive to
+ * compose, and not needed to start a swipe, waits for this before it builds -- so its cost lands after
+ * the motion, not inside it. Null outside a pager (previews, tests): such content builds at once.
+ */
+internal val LocalPagerIdle = androidx.compose.runtime.staticCompositionLocalOf<State<Boolean>?> { null }
+
 /*
  * The garage's layout, peeled out of GarageScreen: CollapsedGaragePager is the pager of cars (and
  * Settings as one more page) that cycles forever, and it also carries the in-place expand of one car
@@ -139,6 +146,8 @@ internal fun CollapsedGaragePager(
         // The pixel width of ONE item's page -- viewport width divided by perPage, so `perPage`
         // of them sit side by side at rest.
         var boxWidthPx by remember { mutableIntStateOf(windowWidthPx) }
+        val pagerIdle = remember(pager) { androidx.compose.runtime.derivedStateOf { !pager.isScrollInProgress } }
+        androidx.compose.runtime.CompositionLocalProvider(LocalPagerIdle provides pagerIdle) {
         Box(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
             val columnWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).coerceAtLeast(1).toDp() }
@@ -221,5 +230,6 @@ internal fun CollapsedGaragePager(
             // Stays active mid-drag so it never disappears while swiping.
             StatusBarScrim(hazeState = hazeState)
             // No refresh indicator is drawn; the pull gesture still refreshes.
+        }
         }
 }

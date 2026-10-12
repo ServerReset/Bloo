@@ -1,5 +1,10 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import kotlinx.coroutines.flow.first
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
@@ -96,9 +101,14 @@ internal fun PebbleList(
     // Pebble() call regardless of collapsed state) on the fling-settle frame is the biggest
     // remaining car-swipe cost.
     val filledSections = remember(v.vin) { mutableStateSetOf<String>() }
+    val pagerIdle = LocalPagerIdle.current
     LaunchedEffect(v.vin, sections.size) {
-        // One per frame, in list order, first-below-the-fold first.
+        // One per frame, in list order, first-below-the-fold first -- and never while the pager is
+        // moving: a page is composed on the first frame of a drag, and its remaining pebbles used to
+        // build on the next few frames of that same drag. They wait for the swipe to finish instead
+        // (the rows show as quiet placeholders until then).
         sections.drop(EAGER_PEBBLES).forEach { section ->
+            if (pagerIdle != null && !pagerIdle.value) snapshotFlow { pagerIdle.value }.first { it }
             withFrameNanos { }
             filledSections.add(section)
         }
@@ -192,11 +202,18 @@ internal fun PebbleList(
                         }
                     }
                 } else {
-                    // Below the fold, so this transient state is never seen or interacted with.
-                    // heightIn(min), not a fixed height: a pebble header carries a title plus an
+                    // A row whose pebble has not been built yet (see the fill above). heightIn(min), not a fixed height: a pebble header carries a title plus an
                     // optional summary line, and at a large accessibility font that stacked text is
                     // taller than ControlHeight -- a hard height clipped it.
-                    Box(Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).then(itemDragHandle))
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = PebbleHeaderHeight)
+                            // A quiet pill, not a hole: on a tall screen these rows ARE on screen for the
+                            // length of a swipe, and an empty gap reads as broken.
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.35f), RoundedCornerShape(PebbleCornerCollapsed))
+                            .then(itemDragHandle),
+                    )
                 }
             }
         }
