@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -55,8 +56,8 @@ import androidx.compose.ui.unit.dp
 fun standardButtonIcon(label: String): ImageVector? = when (label) {
     // Dismissive
     "Cancel", "Not now", "Dismiss" -> AppIcons.Close
-    // Destructive: Close, since the app has no delete glyph and only reuses existing icons.
-    "Clear", "Remove", "Delete", "Remove PIN" -> AppIcons.Close
+    // Destructive: the bin, so removing something never looks like cancelling.
+    "Clear", "Remove", "Delete", "Remove PIN" -> Icons.Filled.Delete
     "Sign out" -> Icons.AutoMirrored.Filled.Logout
     "Unpin" -> Icons.Filled.PushPin
     "Done" -> AppIcons.Check

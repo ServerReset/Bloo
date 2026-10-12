@@ -67,8 +67,6 @@ internal fun SettingsScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     // Keyed on the log's version counter: the snapshot (a list copy) is only taken when the log
     // actually changed, and only while this screen is collecting.
-    val logsVersion by vm.logsVersion.collectAsStateWithLifecycle()
-    val logs = remember(logsVersion) { vm.logSnapshot() }
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     // LocalClipboard's set API is suspend; one scope for the two copy buttons below (Logs card's
@@ -191,7 +189,7 @@ internal fun SettingsScreen(
             // Debug -- device info and the activity log together, for support troubleshooting. A
             // power-user card, so it only exists in Advanced mode.
             AnimatedVisibility(visibleState = advTransition1, enter = expandEnterSized(), exit = expandExitSized()) {
-            DebugCardContent(logs, vm, clipboardScope, clipboard, state.aiAvailability)
+            DebugCardContent(vm, clipboardScope, clipboard, state.aiAvailability)
             }
             }
             item {

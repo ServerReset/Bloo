@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -169,7 +170,7 @@ internal fun ConfirmRemoveButton(name: String, fallbackNoun: String, onRemove: (
     val who = name.ifBlank { fallbackNoun }
     MorphIconButton(onClick = { if (confirm.armed) onRemove() else confirm.arm() }) {
         Icon(
-            AppIcons.Close,
+            Icons.Filled.Delete,
             contentDescription = if (confirm.armed) "Tap again to remove $who" else "Remove $who from synced devices",
             tint = if (confirm.armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),

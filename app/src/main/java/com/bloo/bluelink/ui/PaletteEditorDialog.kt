@@ -1,11 +1,12 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.Icons
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -61,7 +62,7 @@ internal fun PaletteEditorDialog(
                     if (confirmDeleteArm.armed) { onDelete(paletteId); onDismiss() } else { confirmDeleteArm.arm() }
                 }) {
                     Icon(
-                        AppIcons.Close,
+                        Icons.Filled.Delete,
                         contentDescription = if (confirmDeleteArm.armed) "Confirm delete palette" else "Delete palette",
                         tint = if (confirmDeleteArm.armed) MaterialTheme.colorScheme.error else LocalContentColor.current,
                     )

@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -95,7 +97,8 @@ internal fun StatusRow(label: String, value: String, valueMono: Boolean = false)
 internal fun SectionLabel(text: String) {
     TitleSmallText(
         text,
-        modifier = Modifier.padding(top = 2.dp),
+        // A heading to screen readers, as the Settings group titles already are.
+        modifier = Modifier.padding(top = 2.dp).semantics { heading() },
         color = LocalContentColor.current.copy(alpha = 0.85f),
     )
 }

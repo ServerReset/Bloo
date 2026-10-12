@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.ClipData
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -54,12 +56,15 @@ import kotlinx.coroutines.launch
  */
 @Composable
 internal fun DebugCardContent(
-    logs: List<String>,
     vm: AppViewModel,
     clipboardScope: CoroutineScope,
     clipboard: Clipboard,
     aiAvailability: com.bloo.bluelink.data.AiAvailability? = null,
 ) {
+    // The log is read here, only while this card is composed: collecting it in the Settings root re-copied up to
+    // 500 lines on every log line even with the card hidden.
+    val logsVersion by vm.logsVersion.collectAsStateWithLifecycle()
+    val logs = remember(logsVersion) { vm.logSnapshot() }
     fun copy(label: String, text: String) {
         clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, text))) }
     }
