@@ -1,5 +1,8 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Box
 import dev.chrisbanes.haze.HazePerformanceMode
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -189,6 +192,46 @@ internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
     } else {
         // Floating (no blur to lean on) is a lighter veil, close to the glass it lands back into.
         this.background(tint.copy(alpha = if (floating) 0.6f else 0.82f), shape)
+    }
+}
+
+/**
+ * Whether the car pager is being dragged or flung, as a lambda to read in the DRAW phase (so a change
+ * redraws, never recomposes). False outside a pager.
+ */
+internal val LocalPagerMoving = androidx.compose.runtime.staticCompositionLocalOf<() -> Boolean> { { false } }
+
+/**
+ * A pebble card's glass fill as the first child of the card, instead of a modifier on it: the same
+ * look as [glassCardFill], but the blur layer is skipped while the pager moves. A moving card makes
+ * Haze re-capture and re-blur its backdrop every frame (about twenty cards per swipe on a large
+ * screen), and over a soft backdrop the unblurred frame is indistinguishable, so the blur simply is
+ * not drawn until the page stops. The gate sits OUTSIDE the Haze node on a sibling layer, so the
+ * card's own content always draws.
+ */
+@Composable
+internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
+    val floating = LocalPebbleFloating.current
+    val haze = LocalBackdropHaze.current.takeUnless { floating }
+    val ultra = LocalAppearance.current.ultraGlass
+    val moving = LocalPagerMoving.current
+    if (haze != null && canBlurBackdrops()) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .drawWithContent { if (!moving()) drawContent() }
+                .clip(shape)
+                .then(if (ultra) Modifier.appGlassEffect(haze, shape) else Modifier.appHazeEffect(haze, cheap = true)),
+        )
+        // The veil and sheen are plain draws and stay on while moving.
+        Box(
+            Modifier
+                .matchParentSize()
+                .then(if (ultra) Modifier else Modifier.background(tint.copy(alpha = GlassCardTintAlpha)))
+                .glassSheen(),
+        )
+    } else {
+        Box(Modifier.matchParentSize().background(tint.copy(alpha = if (floating) 0.6f else 0.82f), shape))
     }
 }
 

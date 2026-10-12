@@ -147,7 +147,8 @@ internal fun CollapsedGaragePager(
         // of them sit side by side at rest.
         var boxWidthPx by remember { mutableIntStateOf(windowWidthPx) }
         val pagerIdle = remember(pager) { androidx.compose.runtime.derivedStateOf { !pager.isScrollInProgress } }
-        androidx.compose.runtime.CompositionLocalProvider(LocalPagerIdle provides pagerIdle) {
+        val pagerMoving = remember(pager) { { pager.isScrollInProgress } }
+        androidx.compose.runtime.CompositionLocalProvider(LocalPagerIdle provides pagerIdle, LocalPagerMoving provides pagerMoving) {
         Box(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
             val columnWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).coerceAtLeast(1).toDp() }
