@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -149,9 +150,14 @@ internal fun CollapsedGaragePager(
         val pagerIdle = remember(pager) { androidx.compose.runtime.derivedStateOf { !pager.isScrollInProgress } }
         val blurAmount = remember(pager) { androidx.compose.animation.core.Animatable(1f) }
         LaunchedEffect(pager) {
-            snapshotFlow { pager.isScrollInProgress }.collect { moving ->
-                if (moving) blurAmount.snapTo(0f) else blurAmount.animateTo(1f, androidx.compose.animation.core.tween(MotionMedium))
-            }
+            // Only a real page swipe drops the glass blur. Any touch-slop wobble while scrolling a car up and
+            // down starts the pager for a moment too; dropping and re-raising the blur for that was the
+            // aurora "disappearing and reappearing" the instant the finger lifted.
+            snapshotFlow { pager.isScrollInProgress && kotlin.math.abs(pager.currentPageOffsetFraction) > 0.05f }
+                .distinctUntilChanged()
+                .collect { moving ->
+                    if (moving) blurAmount.snapTo(0f) else blurAmount.animateTo(1f, androidx.compose.animation.core.tween(MotionMedium))
+                }
         }
         val pagerBlur = remember(blurAmount) { { blurAmount.value } }
         androidx.compose.runtime.CompositionLocalProvider(LocalPagerIdle provides pagerIdle, LocalPagerBlur provides pagerBlur) {
