@@ -278,7 +278,7 @@ object LiveCharge {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setRequestPromotedOngoing(true)
             .setStyle(style)
-            .addAction(0, "Stop charging", stopPi)
+            .addAction(androidx.core.app.NotificationCompat.Action.Builder(0, "Stop charging", stopPi).setAuthenticationRequired(true).build())
             .setDeleteIntent(dismissPi)
             .apply { contentPi?.let { setContentIntent(it) } }
             // The STATUS BAR CHIP's text, and the piece the rebuild dropped. Reasoning from

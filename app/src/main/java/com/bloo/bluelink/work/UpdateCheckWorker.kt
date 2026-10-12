@@ -56,6 +56,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
     override suspend fun doWork(): Result {
         // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
         if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
+        if (skipWhenLean(applicationContext, "update", 12 * 60 * 60_000L)) return Result.success()
 
         val ctx = applicationContext
         val result = UpdateChecker.checkPhone(ctx, force = false)

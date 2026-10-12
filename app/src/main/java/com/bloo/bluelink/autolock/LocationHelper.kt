@@ -69,14 +69,17 @@ object LocationHelper {
         minUpdateMs: Long = LIVE_MIN_INTERVAL_MS,
         // Balanced, not GPS-grade: a "you are here" dot on a street map and a distance to the car need a
         // fix within a few tens of metres, which Wi-Fi and cell give, at a fraction of the battery.
-        priority: Int = Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+        priority: Int? = null,
     ): Flow<android.location.Location> = callbackFlow {
+        val policy = com.bloo.bluelink.data.DeviceStatus.policy(context)
+        // Lean (see PowerPolicy): low-power fixes, a third as often.
+        val effectivePriority = priority ?: if (policy.highAccuracyLocation) Priority.PRIORITY_BALANCED_POWER_ACCURACY else Priority.PRIORITY_LOW_POWER
         if (!hasPermission(context)) {
             close()
             return@callbackFlow
         }
         val fused = LocationServices.getFusedLocationProviderClient(context)
-        val request = LocationRequest.Builder(priority, intervalMs)
+        val request = LocationRequest.Builder(effectivePriority, intervalMs * policy.pollIntervalMultiplier)
             .setMinUpdateIntervalMillis(minUpdateMs)
             .build()
         val callback = object : LocationCallback() {

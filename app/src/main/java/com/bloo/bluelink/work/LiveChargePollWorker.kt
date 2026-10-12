@@ -167,7 +167,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
          *  is the chain rescheduling itself, not a competing start. */
         private fun scheduleNext(context: Context) {
             val request = OneTimeWorkRequestBuilder<LiveChargePollWorker>()
-                .setInitialDelay(INTERVAL_MINUTES, TimeUnit.MINUTES)
+                .setInitialDelay(INTERVAL_MINUTES * com.bloo.bluelink.data.DeviceStatus.policy(context).pollIntervalMultiplier, TimeUnit.MINUTES)
                 .setConstraints(constraints())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()

@@ -182,7 +182,8 @@ internal fun AuroraBackground(
         Box(modifier.fillMaxSize().background(scheme.surface))
         return
     }
-    val saver = isBatterySaverOn()
+    // Lean (Battery Saver or a throttling phone): no drift, no tilt sensor. See PowerPolicy.ambientMotion.
+    val saver = !LocalPowerPolicy.current.ambientMotion
 
     // "Motion" follows the phone's tilt (like a lock-screen wallpaper parallax); "Static" ignores
     // tilt entirely and instead gets its own slow, small ambient drift (see p1/p2/p3 below) so it

@@ -59,7 +59,8 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
                 _state.update { it.copy(deviceLocation = loc.toDeviceGeoLocation()) }
                 // Weather follows the phone, but a forecast does not change by the metre: at most once a
                 // minute (each pass can geocode, write the store and fetch).
-                if (lastWeatherAtMs == 0L || now - lastWeatherAtMs >= DEVICE_GEOCODE_INTERVAL_MS) {
+                val pollScale = com.bloo.bluelink.data.DeviceStatus.policy(getApplication()).pollIntervalMultiplier
+                if (lastWeatherAtMs == 0L || now - lastWeatherAtMs >= DEVICE_GEOCODE_INTERVAL_MS * pollScale) {
                     lastWeatherAtMs = now
                     weather.refreshDeviceLocationForWeather(loc)
                     // Keep the weather card's "where you are" block tracking the live fix too, so its

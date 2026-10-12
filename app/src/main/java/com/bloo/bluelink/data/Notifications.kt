@@ -204,7 +204,9 @@ object Notifications {
                 context, id * 16 + i, actionIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            builder.addAction(0, a.label, actionPi)
+            // A button that drives the car needs the phone unlocked: with the screen locked, or the device in
+            // lockdown, Android asks to unlock first instead of running it from the lock screen.
+            builder.addAction(androidx.core.app.NotificationCompat.Action.Builder(0, a.label, actionPi).setAuthenticationRequired(true).build())
         }
         // NotificationManagerCompat.notify can throw if permission was revoked
         // between the hasPermission() check above and here; swallow rather than crash.

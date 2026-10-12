@@ -184,72 +184,20 @@ object AppIcons {
 // Shared Haze backdrop-blur gate and progressive-blur instances used by every blur site.
 
 /**
- * App-wide source of truth for [android.os.PowerManager.isPowerSaveMode], kept live by one
- * [android.content.BroadcastReceiver] for the whole process; [BlooApplication] calls
- * [ensureInitialized] at startup.
+ * The device-resource policy (battery saver, thermal throttling), collected ONCE at the app root and
+ * read here. [com.bloo.bluelink.data.PowerPolicy] is the single place that says what changes when the
+ * device is short on power: every visual or animated "lean" decision below reads it, never the system
+ * directly. Collected once because every call site used to collect the flow itself: about ten per
+ * pebble, hundreds of live collectors across the pages in the pager, all created mid-swipe.
  */
-internal object BatterySaverState {
-    private fun current(context: android.content.Context) =
-        (context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager)
-            ?.isPowerSaveMode == true
-
-    private val _isOn = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val isOn: kotlinx.coroutines.flow.StateFlow<Boolean> = _isOn
-
-    @Volatile
-    private var initialized = false
-
-    fun ensureInitialized(context: android.content.Context) {
-        if (initialized) return
-        synchronized(this) {
-            if (initialized) return
-            val appContext = context.applicationContext
-            _isOn.value = current(appContext)
-            val receiver = object : android.content.BroadcastReceiver() {
-                override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
-                    _isOn.value = current(appContext)
-                }
-            }
-            // ContextCompat, not Context.registerReceiver directly: this app's targetSdk (36) is
-            // well past the API 33 cutover where a context-registered receiver MUST say whether
-            // other apps can send it broadcasts, and the plain 2-arg platform call throws
-            // SecurityException at runtime on 34+ once targetSdk requires that flag instead of just
-            // warning about its absence.
-            androidx.core.content.ContextCompat.registerReceiver(
-                appContext, receiver,
-                android.content.IntentFilter(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
-                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
-            )
-            initialized = true
-        }
-    }
+internal val LocalPowerPolicy = androidx.compose.runtime.compositionLocalOf {
+    com.bloo.bluelink.data.PowerPolicy.of(com.bloo.bluelink.data.DeviceState())
 }
 
-/**
- * Live, reactive battery-saver state, read from the one shared [BatterySaverState] -- so toggling
- * it while the app is already open (Quick Settings, the battery- saver notification) takes effect
- * immediately everywhere at once, rather than only on the next cold start. [canBlurBackdrops] is
- * this value's biggest consumer today, but it's a plain top-level composable precisely so anything
- * else wanting to drop expensive visual effects under battery saver -- not just blur -- can read it
- * the same way.
- */
-@Composable
-internal fun isBatterySaverOn(): Boolean = LocalBatterySaver.current
-
-/**
- * The battery-saver flag, collected ONCE at the app root and read here. Every call site used to collect
- * the flow itself: about ten per pebble, hundreds of live collectors across the pages in the pager, all
- * created while a page was being built mid-swipe.
- */
-internal val LocalBatterySaver = androidx.compose.runtime.compositionLocalOf { false }
-
-/**
- * True on API 31+ (Haze's RenderEffect blur; no-op below) and battery saver off. Call sites fall
- * back to a solid tinted layer otherwise.
- */
+/** Real backdrop blur: API 31+ (Haze's RenderEffect; no-op below) and the policy allows it. */
 @Composable
 internal fun canBlurBackdrops(): Boolean =
-    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !isBatterySaverOn()
+    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && LocalPowerPolicy.current.blurBackdrops
 
 /**
  * Battery-saver-aware replacement for a bouncy [spring]: the real spring normally, a short
@@ -257,7 +205,7 @@ internal fun canBlurBackdrops(): Boolean =
  */
 @Composable
 internal fun <T> lowPowerAwareSpring(dampingRatio: Float, stiffness: Float) =
-    if (isBatterySaverOn()) {
+    if (!LocalPowerPolicy.current.bouncySprings) {
         tween<T>(durationMillis = 140, easing = androidx.compose.animation.core.FastOutSlowInEasing)
     } else {
         spring<T>(dampingRatio = dampingRatio, stiffness = stiffness)

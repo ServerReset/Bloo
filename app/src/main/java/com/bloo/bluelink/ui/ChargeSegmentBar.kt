@@ -101,7 +101,7 @@ internal fun ChargeSegmentBar(
     // built (not just gated) only while charging, so an idle/parked car pays nothing for an
     // InfiniteTransition it will never render: no ticket, no per-frame invalidation, nothing
     // running in the background of a page that's sitting on a fully charged or unplugged car.
-    val shimmerX: State<Float>? = if (charging && !isBatterySaverOn()) {
+    val shimmerX: State<Float>? = if (charging && LocalPowerPolicy.current.ambientMotion) {
         val shimmer = rememberInfiniteTransition(label = "chargeShimmer")
         shimmer.animateFloat(
             initialValue = -0.6f,

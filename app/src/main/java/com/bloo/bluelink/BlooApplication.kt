@@ -11,7 +11,7 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.StartupTrace
 import com.bloo.bluelink.data.snapshot
 import com.bloo.bluelink.data.warmUp
-import com.bloo.bluelink.ui.BatterySaverState
+import com.bloo.bluelink.data.DeviceStatus
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -24,7 +24,7 @@ import java.util.Locale
  * removes the default initializer, and WorkManager's own services call `WorkManager.getInstance`
  * directly (bypassing [com.bloo.bluelink.work.WorkManagerInit]), so a delegate is required.
  *
- * Also starts [BatterySaverState]'s single process-wide broadcast receiver.
+ * Also starts [DeviceStatus]'s single process-wide listeners (battery saver, thermal, lock state).
  */
 class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderFactory {
 
@@ -81,8 +81,8 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
         super.onCreate()
         installStartupStrictMode()
         StartupTrace.mark("Application.super.onCreate done")
-        BatterySaverState.ensureInitialized(this)
-        StartupTrace.mark("BatterySaverState.ensureInitialized done")
+        DeviceStatus.ensureInitialized(this)
+        StartupTrace.mark("DeviceStatus.ensureInitialized done")
         // Warm the biggest data classes off the main thread. SettingsStore() measured ~50ms on Main
         // on the first launch after install (1ms once warm) -- that is class-load/JIT of a very
         // large class, not its fields, and it lands inside AppViewModel's constructor, i.e. before

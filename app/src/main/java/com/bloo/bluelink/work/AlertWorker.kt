@@ -65,6 +65,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
     override suspend fun doWork(): Result {
         // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
         if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
+        if (skipWhenLean(applicationContext, "alerts", 30 * 60_000L)) return Result.success()
 
         val store = SessionStore(applicationContext)
         val settings = SettingsStore(applicationContext)

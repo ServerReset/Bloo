@@ -65,7 +65,7 @@ fun BlooApp(vm: AppViewModel) {
     val stateHolder = vm.state.collectAsStateWithLifecycle()
     val state by stateHolder
     val appearance by vm.appearance.collectAsStateWithLifecycle()
-    val batterySaver by BatterySaverState.isOn.collectAsStateWithLifecycle()
+    val powerPolicy by com.bloo.bluelink.data.DeviceStatus.policy.collectAsStateWithLifecycle()
     // Narrow derived reads, so unrelated UiState emissions don't recompose the whole root.
     val screen by remember { derivedStateOf { state.screen } }
     val locked by remember { derivedStateOf { state.locked } }
@@ -142,7 +142,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalToasts provides toasts,
         LocalRefreshIndicator provides refreshIndicator,
         LocalBackdropHaze provides backdropHaze,
-        LocalBatterySaver provides batterySaver,
+        LocalPowerPolicy provides powerPolicy,
         LocalAuroraPause provides auroraPause,
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
