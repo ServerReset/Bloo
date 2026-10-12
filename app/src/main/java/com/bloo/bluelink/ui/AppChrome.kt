@@ -191,9 +191,8 @@ internal fun AuroraBackground(
     var tiltY by remember { mutableFloatStateOf(0f) }
     // Live pause flag: the sensor callback and coroutines start once and must see the newest value.
     val currentPaused by rememberUpdatedState(paused)
-    // The drift also stands still while the car pager is moving (every frame it ticked re-dirtied the
-    // backdrop all the glass samples) and while the app is not on screen at all.
-    val pagerPause = LocalAuroraPause.current
+    // The drift keeps moving while the car pager is dragged (freezing it read as a stall and jumped on
+    // resume); it stands still only while the app is not on screen.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     // Tilt-follow and drift always run, except under battery saver.
     val motionActive = !saver
@@ -287,19 +286,24 @@ internal fun AuroraBackground(
     var p3 by remember { mutableFloatStateOf(0.5f) }
     // Ticks in both modes.
     LaunchedEffect(Unit) {
-        val start = System.currentTimeMillis()
+        // Active time only: a pause (search panel, background) must not make the drift jump on resume.
+        var elapsed = 0L
+        var last = System.currentTimeMillis()
         while (true) {
-            if (currentPaused || saver || pagerPause?.value == true ||
+            val now = System.currentTimeMillis()
+            if (currentPaused || saver ||
                 !lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
             ) {
+                last = now
                 delay(120)
                 continue
             }
-            val elapsed = System.currentTimeMillis() - start
+            elapsed += (now - last).coerceAtMost(200L)
+            last = now
             p1 = 0.32f + (0.68f - 0.32f) * triangleWave(elapsed, 9_000L)
             p2 = 0.68f + (0.32f - 0.68f) * triangleWave(elapsed, 7_000L)
             p3 = 0.35f + (0.65f - 0.35f) * triangleWave(elapsed, 6_000L)
-            delay(80)
+            delay(33)
         }
     }
     fun mix(a: Float, b: Float, f: Float) = a + (b - a) * f

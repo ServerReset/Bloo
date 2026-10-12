@@ -154,10 +154,6 @@ internal fun CollapsedGaragePager(
             }
         }
         val pagerBlur = remember(blurAmount) { { blurAmount.value } }
-        val auroraPause = LocalAuroraPause.current
-        LaunchedEffect(pager, auroraPause) {
-            snapshotFlow { pager.isScrollInProgress }.collect { auroraPause?.value = it }
-        }
         androidx.compose.runtime.CompositionLocalProvider(LocalPagerIdle provides pagerIdle, LocalPagerBlur provides pagerBlur) {
         Box(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
