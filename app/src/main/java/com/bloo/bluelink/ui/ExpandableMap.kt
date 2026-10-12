@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.derivedStateOf
 import kotlin.math.roundToInt
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -125,6 +126,9 @@ internal fun ExpandableMapLayer(
     // back to full size and then shrinking.
     val closeDistPx = LocalWindowInfo.current.containerSize.height * 0.4f
     var closing by remember { mutableStateOf(false) }
+    // The top bar and bottom buttons appear once the sheet is mostly open. A derived boolean, so the
+    // sheet recomposes when it FLIPS, not on every frame of the open/close spring.
+    val chromeShown by remember { derivedStateOf { expandFraction.value > 0.1f } }
     fun close() {
         if (closing) return
         closing = true
@@ -215,7 +219,7 @@ internal fun ExpandableMapLayer(
             // One consolidated top bar -- name, drag handle, and refresh, all inside one shared
             // floating pill background instead of three separate glass pieces (see MapTopBar's own
             // doc).
-            if (isExpanded && expandFraction.value > 0.1f) {
+            if (isExpanded && chromeShown) {
                 MapTopBar(
                     vehicleName = vehicleName,
                     statusLine = statusLine,
@@ -238,7 +242,7 @@ internal fun ExpandableMapLayer(
             }
 
             // Bottom buttons, which appear once the map is expanded.
-            if (isExpanded && expandFraction.value > 0.1f) {
+            if (isExpanded && chromeShown) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)

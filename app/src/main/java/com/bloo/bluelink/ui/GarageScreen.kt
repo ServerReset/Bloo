@@ -127,7 +127,7 @@ internal fun GarageScreen(
     val alignedCar = remember { mutableStateOf<Int?>(null) }
     val expandedT = androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (expandedIdx != null && alignedCar.value != null) 1f else 0f,
-        animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "expandT",
     )
 

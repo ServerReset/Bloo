@@ -303,7 +303,7 @@ internal fun Modifier.pullToRefreshOrDismiss(
                 }
                 raw = 0f
                 lastNotch = 0
-                scope.launch { pull.up.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow)) }
+                scope.launch { pull.up.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = PopDamping, stiffness = Spring.StiffnessMediumLow)) }
             } else {
                 val thresholdPx = with(density) { 96.dp.toPx() }
                 if (dragPx.value > thresholdPx) close() else scope.launch { dragPx.animateTo(0f, spring) }

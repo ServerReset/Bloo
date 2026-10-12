@@ -64,7 +64,7 @@ private const val PinRevealDelayMs = 220L
  * The spring an unpinned pebble flies back into its stack slot on. Mirrors the ReorderColumn's own
  * drop-flight spec, so pinning and unpinning are the same motion in opposite directions.
  */
-private val UnpinFlightProgressSpec = spring<Float>(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow)
+private val UnpinFlightProgressSpec = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
 
 /**
  * The car-info column's "hot seat": the controls pebble pinned under the hero, plus the empty slot a
@@ -151,7 +151,7 @@ internal fun HotspotSlot(
             enter = EnterTransition.None,
             exit = shrinkVertically(
                 shrinkTowards = Alignment.Top,
-                animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium),
+                animationSpec = spring(dampingRatio = GentleDamping, stiffness = Spring.StiffnessMedium),
             ),
         ) {
             Column {
@@ -180,7 +180,7 @@ internal fun HotspotSlot(
                         ),
                         exit = shrinkVertically(
                             shrinkTowards = Alignment.Top,
-                            animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium),
+                            animationSpec = spring(dampingRatio = GentleDamping, stiffness = Spring.StiffnessMedium),
                         ),
                     ) {
                         EmptyDropZone(hovered)
@@ -357,7 +357,7 @@ internal fun HotSeatOverlay(
 @Composable
 private fun EmptyDropZone(hovered: Boolean) {
     val scheme = MaterialTheme.colorScheme
-    val glow by animateFloatAsState(if (hovered) 1f else 0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow), label = "hotseatGlow")
+    val glow by animateFloatAsState(if (hovered) 1f else 0f, spring(dampingRatio = SettleDamping, stiffness = Spring.StiffnessMediumLow), label = "hotseatGlow")
     val tone = lerp(scheme.onSurfaceVariant, scheme.primary, glow)
     val outline = lerp(scheme.outline.copy(alpha = 0.5f), scheme.primary, glow)
     val fill = scheme.primary.copy(alpha = 0.14f * glow)

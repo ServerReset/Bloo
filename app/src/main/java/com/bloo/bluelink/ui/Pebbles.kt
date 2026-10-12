@@ -173,12 +173,12 @@ internal fun PebbleList(
                 // a fade-out here would draw a second copy behind the flight.
                 enter = fadeIn(tween(MotionFast / 2)) + expandVertically(
                     expandFrom = Alignment.Top,
-                    animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium),
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
                 ),
                 exit = if (hotDrag?.pendingPin == section) {
                     ExitTransition.None
                 } else {
-                    shrinkVertically(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(MotionFast))
+                    shrinkVertically(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(MotionFast))
                 },
             ) {
                 val ready by remember(section) {

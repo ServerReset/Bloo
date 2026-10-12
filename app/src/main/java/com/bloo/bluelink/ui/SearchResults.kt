@@ -224,7 +224,7 @@ internal fun ResultRow(
     androidx.compose.animation.AnimatedVisibility(
         visibleState = appear,
         enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)) +
-            androidx.compose.animation.expandVertically(androidx.compose.animation.core.spring(dampingRatio = 0.9f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)),
+            androidx.compose.animation.expandVertically(androidx.compose.animation.core.spring(dampingRatio = GentleDamping, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)),
     ) {
     Column(Modifier.glassEdgeWarp()) {
     androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))

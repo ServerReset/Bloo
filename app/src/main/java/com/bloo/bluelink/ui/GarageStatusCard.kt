@@ -88,7 +88,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
     val contentOffset = remember { Animatable(16f) }
     LaunchedEffect(Unit) {
         launch { contentAlpha.animateTo(1f, tween(MotionLong)) }
-        launch { contentOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
+        launch { contentOffset.animateTo(0f, spring(dampingRatio = SettleDamping, stiffness = Spring.StiffnessMediumLow)) }
     }
 
     // loadGarage() sets state.loading (not state.refreshing, which only ever covers a single car's

@@ -174,7 +174,7 @@ internal fun SearchLayer(
         ) {
             GlassSurface(
                 shape = ExtraLargeShape,
-                modifier = Modifier.width(barW).animateContentSize(spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)),
+                modifier = Modifier.width(barW).animateContentSize(spring(dampingRatio = GentleDamping, stiffness = Spring.StiffnessMediumLow)),
                 hazeState = hazeState,
                 // Flat blur, not the liquid-glass refraction: results need to be legible, not
                 // warped, so this is a near-solid surface over a straight blur behind it.

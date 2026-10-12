@@ -1,10 +1,8 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,8 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
-import com.bloo.uicommon.coldStartIntroPlayed
-import kotlinx.coroutines.launch
 
 /**
  * The car's hero card: photo/visual on top, [ChargeFuelBar] below. Corner radius eases 24dp-40dp
@@ -69,18 +64,6 @@ internal fun HeroHeader(
      */
     expandAction: PebbleHeaderAction? = null,
 ) {
-    // Play the fade/slide-up entrance only ONCE per car per session, gated on the same
-    // coldStartIntroPlayed set the pebble stagger uses. Replaying the fade on each enter added
-    // animation frames on top of the page's compose burst mid-swipe. Once-per-VIN means a page that
-    // re-enters snaps straight to rest instead of re-animating.
-    val playIntro = remember(v.vin) { coldStartIntroPlayed.add("hero:${v.vin}") }
-    val heroAlpha = remember { Animatable(if (playIntro) 0f else 1f) }
-    val heroOffset = remember { Animatable(if (playIntro) 16f else 0f) }
-    LaunchedEffect(v.vin) {
-        if (!playIntro) return@LaunchedEffect
-        launch { heroAlpha.animateTo(1f, tween(MotionLong)) }
-        launch { heroOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
-    }
     // On the phone the hero is a pebble on PebbleShell; its body collapses with the shared
     // collapseEnter/collapseExit transition, so no photo collapse logic is needed here.
     val readout = chargeReadoutOf(status, hasBattery, hasFuel, drivingLabel, metric)
@@ -92,7 +75,7 @@ internal fun HeroHeader(
     val heroShown = forcedExpanded || photoExpanded
     val heroT by animateFloatAsState(
         targetValue = if (heroShown) 1f else 0f,
-        animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "heroMorph",
     )
 

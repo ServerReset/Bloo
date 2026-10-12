@@ -56,8 +56,8 @@ import kotlinx.coroutines.launch
 
 /** The stack's motion: a bouncy rise in, a quick retreat out, a damped reflow between slots. */
 private val EnterSpring = spring<Float>(dampingRatio = 0.68f, stiffness = Spring.StiffnessMediumLow)
-private val ExitSpring = spring<Float>(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)
-private val ReflowSpring = spring<Float>(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)
+private val ExitSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
+private val ReflowSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
 
 /**
  * One toast: it owns its expiry clock, rises out of the search bar into its slot and retreats back
@@ -154,7 +154,7 @@ internal fun BoxScope.ToastSlot(
         // two (driven by the same spring as the insets), so moving the search never snaps a toast to
         // full width before it animates.
         val beside = index == 0 && (startInsetPx > 1f || endInsetPx > 1f)
-        val besideFrac = animateFloatAsState(if (beside) 1f else 0f, spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow), label = "toastBeside")
+        val besideFrac = animateFloatAsState(if (beside) 1f else 0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow), label = "toastBeside")
         Box(
             Modifier.layout { measurable, constraints ->
                 val avail = constraints.maxWidth

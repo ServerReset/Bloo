@@ -240,10 +240,10 @@ internal fun AuroraBackground(
     val explosion = remember { Animatable(0f) }
     LaunchedEffect(refreshing) {
         if (refreshing) {
-            explosion.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium))
+            explosion.animateTo(1f, spring(dampingRatio = PopDamping, stiffness = Spring.StiffnessMedium))
             delay(220)
         }
-        explosion.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow))
+        explosion.animateTo(0f, spring(dampingRatio = SettleDamping, stiffness = Spring.StiffnessMediumLow))
     }
     // Fades the blobs in from nothing on the first frame this composable exists -- for a cold start,
     // that IS the very first frame the app paints at all (LoadingScreen/LoginScreen both use this).

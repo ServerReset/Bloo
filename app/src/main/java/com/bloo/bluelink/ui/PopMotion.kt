@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.graphicsLayer
  * leaves with a small anticipatory lift, then a quick accelerating retreat back to where it came from. Dialogs
  * and toasts both ride it, so everything that appears over the app arrives and leaves the same way.
  */
-internal val PopEnterSpec = spring<Float>(dampingRatio = 0.6f, stiffness = 260f)
+internal val PopEnterSpec = spring<Float>(dampingRatio = PopDamping, stiffness = 260f)
 
 /**
  * Pop progress for one surface: 0 = hidden at its origin, 1 = resting. Starts rising on first composition; once
