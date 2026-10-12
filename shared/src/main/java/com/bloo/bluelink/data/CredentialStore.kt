@@ -27,7 +27,8 @@ class CredentialStore(context: Context) {
      * the one-time import otherwise land on the critical path.
      */
     fun warmUp() {
-        runCatching { cachedAccounts = loadAllUncached() }
+        // Sealed after a restart (see BootGate): the list would come back empty and be cached as such.
+        if (!BootGate.isLocked(appContext)) runCatching { cachedAccounts = loadAllUncached() }
     }
 
     /** Persists [credentials] under brand-prefixed keys (e.g. "HYUNDAI_email"). */
@@ -57,7 +58,9 @@ class CredentialStore(context: Context) {
     }
 
     /** Loads every brand that has an entry in [KEY_BRANDS]. */
-    fun loadAll(): List<Credentials> = cachedAccounts ?: loadAllUncached().also { cachedAccounts = it }
+    fun loadAll(): List<Credentials> = cachedAccounts ?: loadAllUncached().also {
+        if (!BootGate.isLocked(appContext)) cachedAccounts = it
+    }
 
     private fun loadAllUncached(): List<Credentials> {
         return brandSet().mapNotNull { name ->
@@ -118,6 +121,24 @@ class CredentialStore(context: Context) {
 
     /** True when stored accounts exist but this device's key cannot open them. */
     val vaultNeedsRecovery: Boolean get() = vault.needsRecovery
+
+    /**
+     * The sign-in step after a restart: whether [email] and [password] (and the service [pin]) match
+     * a stored account of [brand]. Reads past the vault's post-restart seal, so it is the only way
+     * to get a yes/no out of a sealed vault; it returns nothing else.
+     */
+    fun matchesStoredAccount(brand: Brand, email: String, password: String, pin: String): Boolean {
+        val b = brand.name
+        fun same(a: String?, typed: String, ignoreCase: Boolean = false): Boolean {
+            if (a == null) return false
+            val x = a.toByteArray(); val y = typed.toByteArray()
+            if (ignoreCase) return a.equals(typed, ignoreCase = true)
+            return java.security.MessageDigest.isEqual(x, y)
+        }
+        return same(vault.getStringUnsealed("${b}_email"), email.trim(), ignoreCase = true) &&
+            same(vault.getStringUnsealed("${b}_password"), password) &&
+            same(vault.getStringUnsealed("${b}_pin"), pin.trim())
+    }
 
     /** Consecutive PIN failures since the last successful unlock. */
     fun getPinFailures(): Int = vault.getString(KEY_PIN_FAILURES)?.toIntOrNull() ?: 0

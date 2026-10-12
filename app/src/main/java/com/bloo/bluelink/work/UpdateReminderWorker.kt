@@ -30,6 +30,9 @@ import java.util.concurrent.TimeUnit
 class UpdateReminderWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
+        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
+
         val ctx = applicationContext
         // Clear the snooze first so the check below (and every later check) can surface the
         // tile again -- this is the "bring the update thing back" half, and an active snooze

@@ -40,6 +40,13 @@ fun AppViewModel.updatePin(brand: Brand, pin: String) {
  */
 fun AppViewModel.unlocked() {
     _state.update { it.copy(locked = false, lockedToLogin = false, pinAttemptRejected = false) }
+    if (pendingBootUnlock) {
+        // The last step of the post-restart flow: the app lock passed, so the boot is open and the
+        // normal start (auto-login, garage, background work) can run.
+        pendingBootUnlock = false
+        openBootAndStart()
+        return
+    }
     if (_state.value.vehicles.isEmpty() && !loadingGarage) loadGarage()
     if (deferredStatusLoad) {
         deferredStatusLoad = false
@@ -205,4 +212,39 @@ fun AppViewModel.verifyAppPin(pin: String) {
 
 fun AppViewModel.acknowledgePinRejection() {
     _state.update { it.copy(pinAttemptRejected = false) }
+}
+
+/**
+ * Step one after a phone restart: the account details typed on the sign-in form must match a stored
+ * account (checked locally, nothing is sent anywhere). Then, if an app lock (fingerprint or PIN) is
+ * set, it is step two; with none, the boot opens straight away.
+ */
+fun AppViewModel.reauthAfterRestart(username: String, password: String, pin: String, brand: Brand) {
+    viewModelScope.launch {
+        val ok = withContext(Dispatchers.IO) { credentialStore.matchesStoredAccount(brand, username, password, pin) }
+        if (!ok) {
+            reportError("Those details don't match the account saved on this phone.")
+            return@launch
+        }
+        val armed = withContext(Dispatchers.IO) {
+            val a = settingsStore.appearance.first()
+            (a.biometricLock && canUseBiometrics()) || pinInstalled()
+        }
+        _state.update { it.copy(bootReauth = false) }
+        if (armed) {
+            pendingBootUnlock = true
+            _state.update { it.copy(screen = Screen.Loading, locked = true) }
+        } else {
+            openBootAndStart()
+        }
+    }
+}
+
+/** Opens this boot for good (see BootGate), clears the "sign in" notification and starts as normal. */
+private fun AppViewModel.openBootAndStart() {
+    val app = getApplication<android.app.Application>()
+    com.bloo.bluelink.data.BootGate.markOpen(app)
+    com.bloo.bluelink.data.BootReauthNotice.cancel(app)
+    com.bloo.bluelink.autolock.AutoLockBootReceiver.startWatchIfEnabled(app)
+    coldStartAutoLogin()
 }

@@ -46,6 +46,9 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
      * end of the pass.
      */
     override suspend fun doWork(): Result {
+        // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
+        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
+
         val store = SessionStore(applicationContext)
         val settings = SettingsStore(applicationContext)
         if (!settings.notificationPrefs().charging) return Result.success()

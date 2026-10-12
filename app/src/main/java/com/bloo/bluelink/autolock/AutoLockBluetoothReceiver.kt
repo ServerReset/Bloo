@@ -21,6 +21,7 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
+        if (com.bloo.bluelink.data.BootGate.isLocked(context)) return
         if (action != BluetoothDevice.ACTION_ACL_DISCONNECTED && action != BluetoothDevice.ACTION_ACL_CONNECTED) return
         @Suppress("DEPRECATION")
         val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)

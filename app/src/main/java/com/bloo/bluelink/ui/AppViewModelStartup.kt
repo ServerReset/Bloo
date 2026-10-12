@@ -56,9 +56,22 @@ internal fun AppViewModel.bootstrapColdStart() {
             }
         }
     }
-    // Cold-start auto-login: if any brand has saved credentials (from a previous session),
-    // silently restore all of them and start loading the garage — this is the one-time launch
-    // path, separate from the interactive login() below.
+    coldStartAutoLogin()
+}
+
+/**
+ * Cold-start auto-login: if any brand has saved credentials (from a previous session), silently
+ * restore all of them and start loading the garage — the one-time launch path, separate from the
+ * interactive login(). After a phone restart (see BootGate) it stops at the sign-in form instead and
+ * runs again once the whole re-auth flow has passed.
+ */
+internal fun AppViewModel.coldStartAutoLogin() {
+    if (com.bloo.bluelink.data.BootGate.isLocked(getApplication())) {
+        logStartup("Cold start: phone restarted -> re-auth required before anything runs")
+        _state.update { it.copy(screen = Screen.Login, bootReauth = true) }
+        reportInfo("Your phone restarted. Sign in again to continue.")
+        return
+    }
     viewModelScope.launch {
         val brands = store.loggedInBrands()
         if (brands.isEmpty()) {

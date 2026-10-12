@@ -49,6 +49,8 @@ class AlertActionReceiver : BroadcastReceiver() {
      *    ("didn't call finish()") ill effect.
      */
     override fun onReceive(context: Context, intent: Intent) {
+        // Sealed after a phone restart until the user signs in (see BootGate).
+        if (BootGate.isLocked(context)) return
         // The live charging bar's deleteIntent: the user swiped it away, so record that
         // and stop reposting it for this charging session. Handled before the ACTION_RUN
         // guard below because it carries no command -- see

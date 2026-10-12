@@ -44,6 +44,17 @@ internal fun SecurityCardContent(
                     BodySmallText("No biometrics are enrolled on this device.")
                 }
             }
+            SettingsGroup("After a restart") {
+                var requireAuth by remember { mutableStateOf(com.bloo.bluelink.data.BootGate.enabled(context)) }
+                ToggleRow(
+                    "Sign in after a restart",
+                    requireAuth,
+                    description = "After your phone restarts, Bloo stays sealed (no alerts, AutoLock or refreshes) until you sign in with your account and your fingerprint or PIN. A notification reminds you. Off: restarts change nothing.",
+                ) {
+                    requireAuth = it
+                    com.bloo.bluelink.data.BootGate.setEnabled(context, it)
+                }
+            }
             SettingsGroup("App PIN") {
                 BodySmallText(
                     if (canBio) "A 4-8 digit PIN that works as a backup when biometrics aren't available."

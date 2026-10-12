@@ -84,6 +84,11 @@ class AutoLockService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Sealed after a phone restart (see BootGate): stand down until the user has signed in.
+        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (intent?.action == ACTION_START_WATCH) {
             val vin = intent.getStringExtra(EXTRA_VIN)
             AppLog.log("AutoLock: background Bluetooth watcher started")

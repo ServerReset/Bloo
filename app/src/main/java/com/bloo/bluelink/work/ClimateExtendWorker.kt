@@ -34,6 +34,9 @@ import java.util.concurrent.TimeUnit
 class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
     override suspend fun doWork(): Result {
+        // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
+        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
+
         val vin = inputData.getString(KEY_VIN) ?: return Result.failure()
         val remainingMinutes = inputData.getInt(KEY_REMAINING_MIN, 0)
         // Nothing left to extend -- a schedule() call with 0 remaining is a

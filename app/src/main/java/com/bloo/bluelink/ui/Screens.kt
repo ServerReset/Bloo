@@ -226,9 +226,10 @@ fun BlooApp(vm: AppViewModel) {
                     com.bloo.bluelink.data.StartupTrace.once("screen-login", "screen: Login composed")
                     val loginUpdateAvailable by remember { derivedStateOf { stateHolder.value.updateAvailable } }
                     val loginUpdateChecking by remember { derivedStateOf { stateHolder.value.updateChecking } }
+                    val bootReauth by remember { derivedStateOf { stateHolder.value.bootReauth } }
                     LoginScreen(
                         loading = loading,
-                        onLogin = vm::login,
+                        onLogin = if (bootReauth) vm::reauthAfterRestart else vm::login,
                         onCancel = if (accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
                         // Logged-out users have no Settings, so Login offers its own forced update
                         // check.

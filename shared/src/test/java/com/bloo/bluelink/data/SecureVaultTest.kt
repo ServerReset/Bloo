@@ -67,4 +67,17 @@ class SecureVaultTest {
         w.key = ByteArray(32) { 9 }
         assertFalse(SecureVault(f, w, pinIterations = 10).recoverWithPin("1234"))
     }
+
+    @Test fun sealedVault_hidesEverythingButTheAppLockRecords() {
+        val f = file(); val w = FakeWrapper()
+        var sealed = false
+        val v = SecureVault(f, w, pinIterations = 10, sealed = { sealed })
+        v.edit { put("HYUNDAI_password", "secret"); put("app_pin_record", "rec") }
+        sealed = true
+        assertNull(v.getString("HYUNDAI_password"))
+        assertEquals("rec", v.getString("app_pin_record"))
+        assertEquals("secret", v.getStringUnsealed("HYUNDAI_password"))
+        sealed = false
+        assertEquals("secret", v.getString("HYUNDAI_password"))
+    }
 }

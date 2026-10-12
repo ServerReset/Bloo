@@ -11,6 +11,7 @@ import com.google.android.gms.location.DetectedActivity
  *  currently waiting on it. Ported from i5-AutoLock's `ActivityTransitionReceiver`. */
 class AutoLockActivityReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (com.bloo.bluelink.data.BootGate.isLocked(context)) return
         if (!ActivityTransitionResult.hasResult(intent)) return
         val result = ActivityTransitionResult.extractResult(intent) ?: return
         val walkedAway = result.transitionEvents.any {

@@ -63,6 +63,9 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
      * and the whole thing just runs again on the next periodic tick regardless.
      */
     override suspend fun doWork(): Result {
+        // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
+        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
+
         val store = SessionStore(applicationContext)
         val settings = SettingsStore(applicationContext)
         val prefs = settings.notificationPrefs()

@@ -158,6 +158,11 @@ data class UiState(
      * state must re-lock rather than navigate to the garage.
      */
     val lockedToLogin: Boolean = false,
+    /**
+     * The phone restarted and the app is sealed (see BootGate): the login form is the first step of
+     * the re-auth, checking what is typed against the stored account instead of signing in.
+     */
+    val bootReauth: Boolean = false,
     /** Kia sign-in only: a pending one-time-code challenge. */
     val kiaOtp: KiaOtpUi? = null,
     /** Canada sign-in only (Hyundai/Genesis/Kia): a pending one-time-code challenge. */

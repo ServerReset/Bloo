@@ -62,6 +62,7 @@ class PhoneWatchSyncService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: com.google.android.gms.wearable.MessageEvent) {
         super.onMessageReceived(messageEvent)
+        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return
         when (messageEvent.path) {
             WatchSyncProtocol.PATH_CRED_KEY -> WatchSignIn.onKey(messageEvent.sourceNodeId, messageEvent.data)
             WatchSyncProtocol.PATH_CRED_ACK -> WatchSignIn.onAck()

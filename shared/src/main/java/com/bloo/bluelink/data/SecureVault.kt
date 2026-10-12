@@ -44,6 +44,8 @@ class SecureVault(
     private val wrapper: VaultKeyWrapper,
     private val random: SecureRandom = SecureRandom(),
     private val pinIterations: Int = PIN_ITERATIONS,
+    /** True while the vault is sealed (see [BootGate]): only the app-lock records may be read. */
+    private val sealed: () -> Boolean = { false },
 ) {
     private val lock = Any()
     private var values = HashMap<String, String>()
@@ -55,10 +57,16 @@ class SecureVault(
     /** True when a vault exists on disk but this device's key can no longer open it. */
     val needsRecovery: Boolean get() = synchronized(lock) { ensureLoaded(); dek == null && file.exists() }
 
-    fun getString(key: String): String? = synchronized(lock) { ensureLoaded(); values[key] }
+    fun getString(key: String): String? = synchronized(lock) {
+        ensureLoaded()
+        if (key.startsWith(OPEN_PREFIX) || !sealed()) values[key] else null
+    }
 
-    fun keys(prefix: String = ""): List<String> =
-        synchronized(lock) { ensureLoaded(); values.keys.filter { it.startsWith(prefix) } }
+    /**
+     * Reads past the seal. Only for checking what the user types against what is stored (the
+     * sign-in step after a restart); nothing else may use it.
+     */
+    fun getStringUnsealed(key: String): String? = synchronized(lock) { ensureLoaded(); values[key] }
 
     /** Applies every change in [block] and writes the vault once. */
     fun edit(block: Editor.() -> Unit) = synchronized(lock) {
@@ -179,6 +187,10 @@ class SecureVault(
 
     companion object {
         private val AAD = "bloo-vault-v1".toByteArray()
+
+        /** Keys that stay readable while sealed: the app-lock PIN record and its lockout counters. */
+        private const val OPEN_PREFIX = "app_pin"
+
         const val PIN_ITERATIONS = 210_000
         const val FILE_NAME = "bloo_vault.json"
 
@@ -187,7 +199,8 @@ class SecureVault(
         /** The process-wide vault, built on first use. */
         fun of(context: Context): SecureVault =
             instance ?: synchronized(this) {
-                instance ?: SecureVault(File(context.applicationContext.filesDir, FILE_NAME), KeystoreWrapper)
+                val app = context.applicationContext
+                instance ?: SecureVault(File(app.filesDir, FILE_NAME), KeystoreWrapper, sealed = { BootGate.isLocked(app) })
                     .also { instance = it }
             }
     }
