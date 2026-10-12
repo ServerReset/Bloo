@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.remember
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ContentTransform
@@ -84,6 +86,21 @@ internal fun expandEnterSized(expandFrom: Alignment.Vertical = Alignment.Top): E
 /** Mirror of [expandEnterSized]. */
 internal fun expandExitSized(shrinkTowards: Alignment.Vertical = Alignment.Top, fade: Boolean = true): ExitTransition =
     expandExit(shrinkTowards, fade) + shrinkVertically(shrinkTowards = shrinkTowards)
+
+/**
+ * Eases content in the first time it appears (fade, slide and real height growth), for things that
+ * arrive WITHOUT a visibility flag of their own -- a card that is simply composed when its answer is
+ * ready. One helper, so every arriving card uses the same motion as [expandEnterSized].
+ */
+@Composable
+internal fun EnterOnce(
+    modifier: Modifier = Modifier,
+    expandFrom: Alignment.Vertical = Alignment.Bottom,
+    content: @Composable AnimatedVisibilityScope.() -> Unit,
+) {
+    val appear = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(visibleState = appear, modifier = modifier, enter = expandEnterSized(expandFrom), content = content)
+}
 
 /** Transition spec for [AnimatedContent] pairing [expandEnter] and [expandExit]. */
 internal fun expandContentTransform(): ContentTransform =

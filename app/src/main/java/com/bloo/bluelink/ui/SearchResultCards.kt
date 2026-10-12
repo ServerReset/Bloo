@@ -94,11 +94,7 @@ internal fun AiCommandProposal(
     val p = proposal
     if (p != null) {
         val car = state.vehicles.firstOrNull { it.vin == p.second }
-        GlassSurface(
-            shape = StandardShape,
-            modifier = Modifier.fillMaxWidth(),
-            hazeState = hazeState,
-        ) {
+        ResultCard(hazeState) {
             Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -169,7 +165,7 @@ internal fun AiSettingProposal(
     ) { granted ->
         if (granted) { action.write(vm, p.value); applied = true } else vm.reportError("Location permission denied. Type a place instead")
     }
-    GlassSurface(shape = StandardShape, modifier = Modifier.fillMaxWidth(), hazeState = hazeState) {
+    ResultCard(hazeState) {
         Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -249,11 +245,7 @@ internal fun CommandActionResult(
             }
         }
     }
-    GlassSurface(
-        shape = StandardShape,
-        modifier = Modifier.fillMaxWidth(),
-        hazeState = hazeState,
-    ) {
+    ResultCard(hazeState) {
         Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -273,5 +265,13 @@ internal fun CommandActionResult(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
+    }
+}
+
+/** One answer card in the search results: glass, full width, and eased in when it arrives like every other card. */
+@Composable
+private fun ResultCard(hazeState: dev.chrisbanes.haze.HazeState?, content: @Composable () -> Unit) {
+    EnterOnce {
+        GlassSurface(shape = StandardShape, modifier = Modifier.fillMaxWidth(), hazeState = hazeState, content = { content() })
     }
 }

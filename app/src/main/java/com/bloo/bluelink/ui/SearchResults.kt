@@ -220,12 +220,7 @@ internal fun ResultRow(
     content: @Composable () -> Unit,
 ) {
     // Each row eases in the first time it appears, so a changing list grows and fades rather than popping.
-    val appear = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
-    androidx.compose.animation.AnimatedVisibility(
-        visibleState = appear,
-        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)) +
-            androidx.compose.animation.expandVertically(androidx.compose.animation.core.spring(dampingRatio = GentleDamping, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)),
-    ) {
+    EnterOnce(expandFrom = androidx.compose.ui.Alignment.Top) {
     Column(Modifier.glassEdgeWarp()) {
     androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     val haptics = LocalHaptics.current
