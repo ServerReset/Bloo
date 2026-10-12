@@ -12,9 +12,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
-/** Extra room a symbol-only group needs before it goes back to showing its labels. */
-private val CompactHysteresis = 28.dp
-
 /**
  * A row of buttons where the pressed one takes ~15% more width and its neighbours give up exactly
  * that much, so the group's own width never changes and no parent remeasures.
@@ -43,11 +40,6 @@ fun ExpressiveButtonGroup(
      * pebble header chevron, the lock group), where a single icon button must never balloon.
      */
     growWhenAlone: Boolean = true,
-    /**
-     * Labels are never dropped: when they do not fit on one line the row wraps onto another instead
-     * of collapsing to glyphs, and a press only borrows room that is really spare.
-     */
-    keepLabels: Boolean = false,
     content: @Composable ExpressiveButtonGroupScope.() -> Unit,
 ) {
     // Natural (unpressed) child widths from the last resting pass. Deliberately not snapshot state:
@@ -73,9 +65,6 @@ fun ExpressiveButtonGroup(
             if (n == 0) return@Layout layout(0, 0) {}
             val gapPx = spacing.roundToPx()
             val lineGapPx = lineSpacing.roundToPx()
-            // Once collapsed to symbols a group needs this much spare room before it shows words
-            // again.
-            val hysteresisPx = CompactHysteresis.roundToPx()
             val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
             // A lone button's press-to-fill is capped here, not stretched across a whole row.
             val maxSinglePx = MaxSingleButtonWidth.roundToPx()
@@ -126,14 +115,21 @@ fun ExpressiveButtonGroup(
             val lines = ArrayList<IntArray>()
             // True when the labels do not fit on one line but every member has a symbol it can
             // shrink to, and those symbols all fit together on one line.
-            fun collapsesInsteadOfWrapping(): Boolean {
-                if (keepLabels || n < 2 || maxW == Int.MAX_VALUE || member.any { !it }) return false
-                if (full.sum() + gapPx * (n - 1) <= maxW - (if (naturals.compacted) hysteresisPx else 0)) return false
+            fun computeCollapsesInsteadOfWrapping(): Boolean {
+                if (n < 2 || maxW == Int.MAX_VALUE || member.any { !it }) return false
+                if (full.sum() + gapPx * (n - 1) <= maxW) return false
                 val c = compact ?: IntArray(n) { i -> measurables[i].minIntrinsicWidth(h).coerceIn(0, full[i]) }
                     .also { compact = it; naturals.compact = it }
                 return (0 until n).all { c[it] < full[it] } && c.sum() + gapPx * (n - 1) <= maxW
             }
-            if ((!wrap && !keepLabels) || collapsesInsteadOfWrapping()) {
+            fun collapsesInsteadOfWrapping(): Boolean {
+                val cached = naturals.collapseWrap
+                if (!resting && cached != null) return cached.second
+                val answer = computeCollapsesInsteadOfWrapping()
+                naturals.collapseWrap = maxW to answer
+                return answer
+            }
+            if (!wrap || collapsesInsteadOfWrapping()) {
                 // A row whose buttons all have a symbol never breaks into lines: when the labels do
                 // not fit, every button drops to its symbol (the fit rule below) and the one line
                 // fills the width. Wrapping is for buttons that have nothing to collapse to.
@@ -177,9 +173,14 @@ fun ExpressiveButtonGroup(
                 // FIT RULE, all-or-nothing: if the line cannot give every member the room its label
                 // needs, every member drops to its glyph so the choice never depends on text or
                 // language. Tested against content, not content plus press reserve.
-                val collapse = !keepLabels && constraints.hasBoundedWidth &&
-                    memberIdx.sumOf { full[it] } > room - (if (naturals.compacted) hysteresisPx else 0)
-                if (constraints.hasBoundedWidth) naturals.compacted = collapse
+                // The smallest state a button reaches is its label width (a press only borrows spare room), so
+                // if every label fits at that width the labels stay; if not, the whole line is glyphs.
+                // Decided once per room, from a resting pass, never mid-press.
+                val prior = naturals.decided[li]
+                val collapse = if (!constraints.hasBoundedWidth) false
+                else if (!resting && prior != null) prior.second
+                else memberIdx.sumOf { full[it] } > room
+                if (constraints.hasBoundedWidth) { naturals.compacted = collapse; naturals.decided[li] = room to collapse }
                 val basis = if (collapse) {
                     val c = compact ?: IntArray(n) { i ->
                         if (member[i]) measurables[i].minIntrinsicWidth(h).coerceIn(0, full[i]) else full[i]

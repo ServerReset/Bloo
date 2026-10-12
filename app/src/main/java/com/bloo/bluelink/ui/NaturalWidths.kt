@@ -16,6 +16,16 @@ internal class NaturalWidths {
     var compacted: Boolean = false
 
     /**
+     * The labels-or-glyphs decision per line, with the room it was made for. Made only from a RESTING
+     * pass and reused through every press, so a press can never add or drop a label; it is made again
+     * only when the room changes (a new size or shape, or different buttons).
+     */
+    val decided = HashMap<Int, Pair<Int, Boolean>>()
+
+    /** The same, for "collapse the whole row to glyphs instead of wrapping": (maxWidth, answer). */
+    var collapseWrap: Pair<Int, Boolean>? = null
+
+    /**
      * The standalone button's own single resting width, cached from its last resting measure. Only
      * [SafeExpansiveButton]'s non-group path uses this; the group derives its widths from
      * intrinsics instead ([content]/[compact]) and needs no measured cache at all.
