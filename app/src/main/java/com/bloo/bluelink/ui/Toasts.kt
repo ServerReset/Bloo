@@ -47,6 +47,9 @@ private const val ExpiryStaggerMs = 450L
 /** How far past its expiry a toast may linger before it is treated as stale (its clock never ran). */
 private const val StaleAfterMs = 3_000L
 
+/** How much longer than its own duration a repeating toast may live before it is dismissed regardless. */
+private const val MaxLifetimeExtraMs = 8_000L
+
 /** The screen-edge inset the search element and the toast stack share. */
 private val ToastEdge = 16.dp
 
@@ -73,8 +76,10 @@ private fun toastDurationMs(message: String, type: ToastKind): Long =
 
 /** One message on screen. Flipping [leaving] plays its exit; it is dropped from the stack once that finishes. */
 @Stable
-internal class Toast(val id: Long, val message: String, val type: ToastKind, expireAt: Long) {
+internal class Toast(val id: Long, val message: String, val type: ToastKind, expireAt: Long, hardExpireAt: Long = expireAt + MaxLifetimeExtraMs) {
     var expireAt by mutableLongStateOf(expireAt)
+    /** The latest it may stay however often a repeat re-arms it: a message that keeps repeating must still go. */
+    var hardExpireAt by mutableLongStateOf(hardExpireAt)
     var leaving by mutableStateOf(false)
     /** How many times this same message has repeated without leaving, shown as a count. */
     var count by mutableIntStateOf(1)
@@ -131,7 +136,7 @@ internal class ToastState {
             existing.count += 1
             return
         }
-        items += Toast(nextId++, message, type, expire)
+        items += Toast(nextId++, message, type, expire, now + toastDurationMs(message, type) + MaxLifetimeExtraMs)
         trimToLimit()
     }
 
@@ -145,7 +150,7 @@ internal class ToastState {
         val at = items.indexOf(toast) + 1
         // One card per occurrence, each leaving a beat after the one above it like any other stack.
         repeat(extra) { i ->
-            items.add(at + i, Toast(nextId++, toast.message, toast.type, toast.expireAt + (i + 1) * ExpiryStaggerMs).also { it.groupable = false })
+            items.add(at + i, Toast(nextId++, toast.message, toast.type, toast.expireAt + (i + 1) * ExpiryStaggerMs, toast.hardExpireAt + (i + 1) * ExpiryStaggerMs).also { it.groupable = false })
         }
         trimToLimit()
     }
@@ -176,7 +181,7 @@ internal class ToastState {
             pausedAt = now
         } else {
             val spent = now - pausedAt
-            items.forEach { if (!it.leaving) it.expireAt += spent }
+            items.forEach { if (!it.leaving) { it.expireAt += spent; it.hardExpireAt += spent } }
         }
         paused = value
     }

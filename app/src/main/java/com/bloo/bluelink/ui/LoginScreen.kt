@@ -34,7 +34,6 @@ import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -261,7 +260,6 @@ internal fun LoginScreen(
                                     label = if (brand.pinRequiredToSignIn) "Service PIN" else "Service PIN (optional)",
                                     digitsOnly = false,
                                     revealed = showPin,
-                                    colors = OutlinedTextFieldDefaults.colors(),
                                     trailingIcon = { RevealToggle(showPin, "service PIN") { showPin = !showPin } },
                                 )
                                 if (!brand.pinRequiredToSignIn) {

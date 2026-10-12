@@ -102,18 +102,18 @@ internal fun PebbleList(
     // remaining car-swipe cost.
     val filledSections = remember(v.vin) { mutableStateSetOf<String>() }
     val pagerIdle = LocalPagerIdle.current
-    // A page born in the middle of a swipe builds only its first pebble up front (the rest follow, below,
-    // once the pager rests), so the first frame of the drag does not pay for three.
-    val eagerCount = remember(v.vin) { if (pagerIdle != null && !pagerIdle.value) 1 else EAGER_PEBBLES }
+    val eagerCount = EAGER_PEBBLES
     LaunchedEffect(v.vin, sections.size) {
         // One per frame, in list order, first-below-the-fold first -- and never while the pager is
         // moving: a page is composed on the first frame of a drag, and its remaining pebbles used to
         // build on the next few frames of that same drag. They wait for the swipe to finish instead
         // (the rows show as quiet placeholders until then).
-        sections.drop(eagerCount).forEach { section ->
+        // Two pebbles per frame once the swipe has stopped: the rows were showing as placeholders for a
+        // noticeable beat after a swipe at one per frame.
+        sections.drop(eagerCount).chunked(2).forEach { pair ->
             if (pagerIdle != null && !pagerIdle.value) snapshotFlow { pagerIdle.value }.first { it }
             withFrameNanos { }
-            filledSections.add(section)
+            filledSections.addAll(pair)
         }
     }
     val eager = remember(sections) { sections.take(eagerCount).toSet() }

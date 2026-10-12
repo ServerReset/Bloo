@@ -76,7 +76,7 @@ internal fun PinField(
     isError: Boolean = false,
     supportingText: @Composable (() -> Unit)? = null,
     onDone: (() -> Unit)? = null,
-    colors: TextFieldColors = borderlessFieldColors(),
+    colors: TextFieldColors = OutlinedTextFieldDefaults.colors(),
 ) {
     BlooTextField(
         value = value,

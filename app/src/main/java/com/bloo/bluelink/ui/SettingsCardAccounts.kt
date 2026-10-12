@@ -7,7 +7,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -70,7 +69,7 @@ private fun AccountPanel(creds: Credentials, vm: AppViewModel, addAnother: Boole
         // Kia US has no service PIN; its commands are session-keyed.
         var pin by remember(creds.brand, creds.pin) { mutableStateOf(creds.pin) }
         if (creds.brand.requiresPin) {
-            PinField(pin, { pin = it }, label = "Service PIN", digitsOnly = false, colors = OutlinedTextFieldDefaults.colors())
+            PinField(pin, { pin = it }, label = "Service PIN", digitsOnly = false)
         }
         ActionRow {
             if (creds.brand.requiresPin && pin.isNotBlank() && pin != creds.pin) {

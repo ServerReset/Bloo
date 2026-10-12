@@ -90,9 +90,9 @@ internal fun BoxScope.ToastSlot(
     // Its own clock, re-armed whenever the expiry moves (a repeat of the same message).
     // Not while paused (search covering the stack, app in the background, a finger on a toast): the
     // clock restarts from the extended expiry when the pause ends.
-    LaunchedEffect(toast.id, toast.expireAt, paused) {
+    LaunchedEffect(toast.id, toast.expireAt, toast.hardExpireAt, paused) {
         if (paused) return@LaunchedEffect
-        delay((toast.expireAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L))
+        delay((minOf(toast.expireAt, toast.hardExpireAt) - SystemClock.elapsedRealtime()).coerceAtLeast(0L))
         toast.leaving = true
     }
     // A finger resting on the toast holds its clock. If the toast is torn down mid-press the hold is
