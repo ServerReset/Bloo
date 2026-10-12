@@ -86,7 +86,13 @@ object UpdateApi {
     private data class ReleaseAsset(
         val name: String = "",
         @SerialName("browser_download_url") val browserDownloadUrl: String = "",
-    )
+        /** "uploaded" once the file is complete; anything else (e.g. "starter") is a half-finished upload. */
+        val state: String = "",
+        val size: Long = 0,
+    ) {
+        /** A finished, non-empty file: the only kind an update may point at. */
+        val ready: Boolean get() = state == "uploaded" && size > 0 && browserDownloadUrl.isNotBlank()
+    }
 
     /**
      * Minimal slice of GitHub's Release API response — only the fields this update flow actually
@@ -99,6 +105,7 @@ object UpdateApi {
         val name: String? = null,
         val body: String? = null,
         val draft: Boolean = false,
+        val prerelease: Boolean = false,
         val assets: List<ReleaseAsset> = emptyList(),
     )
 
@@ -108,7 +115,7 @@ object UpdateApi {
             val url = "https://api.github.com/repos/$OWNER/$REPO/releases"
                 .toHttpUrl()
                 .newBuilder()
-                .addQueryParameter("per_page", "5")
+                .addQueryParameter("per_page", "10")
                 .build()
             val request = Request.Builder()
                 .url(url)
@@ -123,16 +130,22 @@ object UpdateApi {
                 // "build-<N>" tags from the rolling per-push release; skips drafts and anything
                 // from the separate tagged "vN" release job, which doesn't follow this naming
                 // convention at all.
-                val release = releases.firstOrNull { !it.draft && it.tagName.startsWith("build-") } ?: return@use null
+                // Only a FINISHED release counts: published (not a draft or prerelease -- CI publishes it after
+                // the build and tests pass) and carrying a completely uploaded phone APK. A release that is
+                // still uploading is skipped in favour of the previous finished one.
+                val release = releases.firstOrNull { r ->
+                    !r.draft && !r.prerelease && r.tagName.startsWith("build-") &&
+                        r.assets.any { it.name == PHONE_ASSET_NAME && it.ready }
+                } ?: return@use null
                 val runNumber = release.tagName.removePrefix("build-").toIntOrNull() ?: return@use null
                 if (release.htmlUrl.isBlank()) return@use null
                 WorkflowRun(
                     runNumber = runNumber,
                     htmlUrl = release.htmlUrl,
                     displayTitle = release.name,
-                    phoneApkUrl = release.assets.firstOrNull { it.name == PHONE_ASSET_NAME }?.browserDownloadUrl,
+                    phoneApkUrl = release.assets.firstOrNull { it.name == PHONE_ASSET_NAME && it.ready }?.browserDownloadUrl,
                     releaseNotes = extractChangelog(release.body),
-                    watchApkUrl = release.assets.firstOrNull { it.name == WATCH_ASSET_NAME }?.browserDownloadUrl,
+                    watchApkUrl = release.assets.firstOrNull { it.name == WATCH_ASSET_NAME && it.ready }?.browserDownloadUrl,
                 )
             }
         }.getOrNull()
