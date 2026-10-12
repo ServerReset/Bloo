@@ -7,6 +7,13 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -28,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -230,10 +238,18 @@ internal fun PebbleShell(
                     )
                     // Animate the body sliding open/closed; the exit fades the block so the
                     // shrinking bottom edge doesn't visibly clip the content.
+                    // The body rises out from BEHIND the header row (drawn under it, unclipped at the header's
+                    // bottom edge: the card's own shape is the only clip) instead of being cut off at an
+                    // arbitrary line under it.
                     AnimatedVisibility(
                         visible = expanded,
-                        enter = expandEnterSized(),
-                        exit = expandExitSized(fade = true),
+                        modifier = Modifier.zIndex(-1f),
+                        enter = fadeIn(tween(MotionShort)) +
+                            slideInVertically { -headerRowHeightPx } +
+                            expandVertically(clip = false),
+                        exit = fadeOut(tween(MotionFast)) +
+                            slideOutVertically { -headerRowHeightPx } +
+                            shrinkVertically(clip = false),
                     ) {
                         // StaggeredRevealColumn cascades rows; `transition` is this
                         // AnimatedVisibilityScope's, so the card cannot finish closing before its

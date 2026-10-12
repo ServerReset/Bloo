@@ -15,6 +15,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.ui.Alignment
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -30,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
@@ -117,8 +119,29 @@ internal fun PebbleList(
         }
     }
     val eager = remember(sections) { sections.take(eagerCount).toSet() }
+    // Pebbles that just left (advanced to simple mode) stay in the list while their row shrinks and
+    // fades, then drop out: removing them at once left their gap to close in a single frame.
+    var displayed by remember(v.vin) { mutableStateOf(sections) }
+    LaunchedEffect(sections) {
+        val leaving = displayed.filter { it !in sections }
+        if (leaving.isEmpty()) {
+            displayed = sections
+        } else {
+            val merged = sections.toMutableList()
+            displayed.forEachIndexed { i, s ->
+                if (s !in sections) merged.add(displayed.take(i).count { it in sections }.coerceAtMost(merged.size), s)
+            }
+            displayed = merged
+            delay(500)
+            displayed = sections
+        }
+    }
+    // False until the column has composed once: rows that arrive after that (simple to advanced mode)
+    // grow in, rows of the first composition simply are there.
+    var columnSettled by remember(v.vin) { mutableStateOf(false) }
+    LaunchedEffect(v.vin) { columnSettled = true }
     ReorderColumn(
-        items = sections,
+        items = displayed,
         keyOf = { it },
         // Only the full-screen view lets a pebble be carried sideways (to the hot seat); in the
         // grid/single column it reorders vertically only.
@@ -129,7 +152,7 @@ internal fun PebbleList(
             // dropped.
             val visibleSet = sections.toSet()
             val full = (allSections + com.bloo.bluelink.data.DEFAULT_SECTIONS).distinct()
-            val queue = ArrayDeque(newVisible)
+            val queue = ArrayDeque(newVisible.filter { it in visibleSet })
             val merged = full.map { s ->
                 if (s in visibleSet && queue.isNotEmpty()) queue.removeFirst() else s
             }
@@ -179,8 +202,11 @@ internal fun PebbleList(
                 hotDrag?.let { d -> d.stackSlot[section] = coords.localToWindow(Offset.Zero) }
             },
         ) {
+            val rowVisible = section in sections && (section !in pinned || hotDrag?.returning == section)
+            val rowState = remember(section) { MutableTransitionState(!columnSettled && rowVisible) }
+            rowState.targetState = rowVisible
             AnimatedVisibility(
-                visible = section !in pinned || hotDrag?.returning == section,
+                visibleState = rowState,
                 // Fade the row back in when a pinned pebble RETURNS (unpin). On PIN the row must
                 // vanish INSTANTLY (exit = None): the dropped node has just FLOWN to the hot seat, so
                 // a fade-out here would draw a second copy behind the flight.
