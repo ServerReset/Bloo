@@ -139,12 +139,17 @@ private fun BoxScope.MorphChrome(
     )
     val cornerPercent = (pillCornerPercent + (morphedCornerPercent - pillCornerPercent) * morph).roundToInt()
     val shape = shapeForCorner?.invoke(morph, cornerPercent) ?: RoundedCornerShape(percent = cornerPercent)
-    val bg by animateColorAsState(
-        targetValue = if (active) activeContainerColor else containerColor,
+    // One animated fill for every state, disabled included: a button that is disabled while a command runs,
+    // or re-enabled when it finishes, eases to the new colour instead of snapping.
+    val fill by animateColorAsState(
+        targetValue = when {
+            !enabled && disabledContainerColor != null -> disabledContainerColor
+            active -> activeContainerColor
+            else -> containerColor
+        },
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "morphBg",
     )
-    val fill = if (!enabled && disabledContainerColor != null) disabledContainerColor else bg
     val resolvedBorder = if (!enabled) (disabledBorder ?: border) else border
     // The BorderStroke passed in by the caller is the same mutable object in the parent scope;
     // Modifier.border reads it here on every morph frame -- cheap, and it keeps the reference

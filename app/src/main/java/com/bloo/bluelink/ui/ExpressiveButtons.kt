@@ -233,14 +233,12 @@ internal val LocalExpressiveGrowth = staticCompositionLocalOf { false }
  */
 @Composable
 private fun ExpressiveContent(enabled: Boolean, content: @Composable () -> Unit) {
-    if (enabled) {
-        content()
-    } else {
-        // propagateMinConstraints matches the enabled branch so the disabled measure is identical.
-        Box(
-            Modifier
-                .semantics(mergeDescendants = true) { disabled() },
-            propagateMinConstraints = true,
-        ) { content() }
-    }
+    // The same Box whether enabled or not: only its semantics change. Switching between "content" and
+    // "a Box around content" re-created the button's subtree every time it was disabled (while a command
+    // ran) or re-enabled, which dropped its running animations and snapped it. propagateMinConstraints keeps
+    // the measure identical to using the content directly.
+    Box(
+        if (enabled) Modifier else Modifier.semantics(mergeDescendants = true) { disabled() },
+        propagateMinConstraints = true,
+    ) { content() }
 }
