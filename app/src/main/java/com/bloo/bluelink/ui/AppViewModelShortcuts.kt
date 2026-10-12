@@ -7,7 +7,6 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.setEnabledShortcuts
 import kotlinx.coroutines.flow.map

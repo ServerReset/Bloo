@@ -2,9 +2,7 @@ package com.bloo.bluelink.data
 
 import android.content.Context
 import androidx.compose.runtime.Immutable
-import androidx.core.graphics.scale
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.bloo.bluelink.ui.ColorPalette
 import com.bloo.bluelink.ui.CustomPaletteData

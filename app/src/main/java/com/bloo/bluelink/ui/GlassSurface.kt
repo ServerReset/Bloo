@@ -18,7 +18,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import com.bloo.uicommon.dropShadow
 import dev.chrisbanes.haze.HazeState
 
 /**

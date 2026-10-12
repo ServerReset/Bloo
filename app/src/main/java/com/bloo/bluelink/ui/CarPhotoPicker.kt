@@ -10,7 +10,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.update
 
 /** Ask for the photo picker for one car, from anywhere: Settings, search, or a plain-language request. */

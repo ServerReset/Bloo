@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.LiveCharge
-import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.setDoorOpenMinutes
 import com.bloo.bluelink.data.setNotifyAutoLock
 import com.bloo.bluelink.data.setNotifyCarStarted

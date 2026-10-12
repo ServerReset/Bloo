@@ -3,9 +3,7 @@ package com.bloo.bluelink.ui
 import android.app.Application
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
-import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.defaultClimatePreset
 import com.bloo.bluelink.data.isCarConfigured
 import com.bloo.bluelink.data.lastVehicleVin
@@ -13,7 +11,6 @@ import com.bloo.bluelink.data.onboardingSeen
 import com.bloo.bluelink.data.snapshot
 import com.bloo.bluelink.data.vehicleOrder
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch

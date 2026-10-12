@@ -18,7 +18,6 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleRepository
-import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.setSettingsMode
 import com.bloo.bluelink.data.snapshot
@@ -27,8 +26,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update

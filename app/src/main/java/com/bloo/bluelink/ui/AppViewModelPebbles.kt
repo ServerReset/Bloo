@@ -12,7 +12,6 @@ import com.bloo.bluelink.data.setSectionCollapsed
 import com.bloo.bluelink.data.setVehicleOrder
 import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch

@@ -7,7 +7,6 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.allAutoLockConfigs
 import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.setAutoLockConfig
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 // --- AutoLock config, watcher and simulation (extracted from AppViewModel) --

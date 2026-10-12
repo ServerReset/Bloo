@@ -3,7 +3,6 @@ package com.bloo.bluelink.ui
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
-import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.autoLockConfiguredVins
 import com.bloo.bluelink.data.brand

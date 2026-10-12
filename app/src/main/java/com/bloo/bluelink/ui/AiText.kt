@@ -8,7 +8,6 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.rangeMiFor
 import java.util.Locale
-import kotlinx.coroutines.flow.first
 
 internal fun summaryPrompt(v: Vehicle, status: VehicleStatus?, state: UiState): String =
     "${v.name} vehicle status:\n" + carText(v, status, state)

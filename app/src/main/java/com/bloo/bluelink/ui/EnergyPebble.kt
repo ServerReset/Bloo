@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 /** Charge/fuel pebbles: ChargePebble, FuelPebble, chargerLabel, fmtMinutes, degLabel. */
 
-import androidx.compose.foundation.layout.only
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.LocalGasStation
@@ -16,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.onClick
-import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.DEFAULT_AC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.DEFAULT_DC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.Vehicle

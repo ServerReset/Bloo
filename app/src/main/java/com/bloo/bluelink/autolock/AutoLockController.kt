@@ -12,9 +12,7 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.carContext
-import com.bloo.bluelink.data.clearAllAutoLockConfigs
 import com.bloo.bluelink.data.notificationPrefs
-import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.runCarCommand
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope

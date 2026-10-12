@@ -4,13 +4,11 @@ import androidx.biometric.BiometricManager
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
-import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.PinCrypto
 import com.bloo.bluelink.data.PinLockout
 import com.bloo.bluelink.data.PinRecord
 import com.bloo.bluelink.data.STALE_STATUS_MS
-import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.setBiometricLock
 import com.bloo.bluelink.data.setLockTiming

@@ -43,7 +43,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.GeoLocation
 import dev.chrisbanes.haze.HazeState
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**

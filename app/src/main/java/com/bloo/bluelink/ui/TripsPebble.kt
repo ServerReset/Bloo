@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Route
@@ -18,14 +17,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.font.FontWeight
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.climateChunks
 import com.bloo.bluelink.data.fmtMinutes
-import com.bloo.bluelink.data.formatSpeed
 import com.bloo.bluelink.data.formatSpeedMph
 import com.bloo.bluelink.data.formatTripDistance
 import com.bloo.bluelink.data.isGen5W

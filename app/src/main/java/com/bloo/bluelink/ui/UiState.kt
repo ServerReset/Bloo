@@ -8,7 +8,6 @@ package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.ClimatePreset
-import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.EvTrip
@@ -23,7 +22,6 @@ import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.platformOverridable
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 
 /**

@@ -1,15 +1,10 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.only
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.Composable
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.setAiEnabled

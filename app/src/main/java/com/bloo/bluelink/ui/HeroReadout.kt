@@ -10,9 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -42,7 +40,6 @@ import com.bloo.bluelink.data.fmtMinutes
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
-import com.bloo.bluelink.data.targetForCurrentPlug
 import kotlin.math.roundToInt
 
 internal class ChargeReadout(

@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -56,7 +54,6 @@ import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.collapsedSections
-import com.bloo.bluelink.data.platformOverridable
 import kotlin.math.max
 
 /** One option in a [MorphSegmented] control; re-exported from :uicommon. */

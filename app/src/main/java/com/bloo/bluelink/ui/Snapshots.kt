@@ -11,7 +11,6 @@ import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.displayChargeLimit
-import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.rangeMiFor

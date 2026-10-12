@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.climatePresets
 import com.bloo.bluelink.data.collapsedSections
@@ -18,7 +17,6 @@ import com.bloo.bluelink.data.sectionOrder
 import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.snapshot
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext

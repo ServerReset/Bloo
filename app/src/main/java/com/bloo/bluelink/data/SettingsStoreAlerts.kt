@@ -3,7 +3,6 @@ package com.bloo.bluelink.data
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 
 // --- Notification prefs, alert bookkeeping, and search bubble (extracted from SettingsStore) --
