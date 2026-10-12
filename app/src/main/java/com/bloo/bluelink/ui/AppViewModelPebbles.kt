@@ -52,8 +52,16 @@ fun AppViewModel.selectIndex(index: Int) {
     }
     _currentIndex.value = index
     viewModelScope.launch { settingsStore.setLastVehicleVin(v.vin) }
-    ensureStatus(v)
+    // After a beat, and only if this is still the car on screen: a fetch (and the state emission, disk
+    // writes and recomposition that follow it) started right at settle would land on the next swipe.
+    viewModelScope.launch {
+        kotlinx.coroutines.delay(SettleFetchDelayMs)
+        if (_currentIndex.value == index) ensureStatus(v)
+    }
 }
+
+/** How long a car must stay on screen before its status is fetched on a swipe. */
+private const val SettleFetchDelayMs = 600L
 
 /** Persist a new car display order (drag-and-drop in Settings). */
 fun AppViewModel.reorderVehicles(order: List<Vehicle>) {
@@ -127,11 +135,11 @@ fun AppViewModel.loadTrips(v: Vehicle) {
 // --- Settings / nav --------------------------------------------------
 
 /**
- * Kept in sync by the pager settle effects (see [UiState.onSettingsPageSlot]); guarded so repeated
- * settles don't emit.
+ * Kept in sync by the pager settle effects (see [AppViewModel.onSettingsPageSlot]). A StateFlow only
+ * emits on a real change, so repeated settles are free.
  */
 fun AppViewModel.setOnSettingsPageSlot(value: Boolean) {
-    if (_state.value.onSettingsPageSlot != value) _state.update { it.copy(onSettingsPageSlot = value) }
+    _onSettingsPageSlot.value = value
 }
 
 /**

@@ -182,7 +182,9 @@ internal fun CarMap(
         // delay(300) debounces rapid zoom changes (enqueue() outlives this coroutine); the batch is
         // disposed in `finally` once superseded so it stops competing with visible tiles.
         LaunchedEffect(zoom, xTileF, yTileF, wPx, hPx) {
-            if (wPx <= 0f || hPx <= 0f) return@LaunchedEffect
+            // A static map can never zoom, so there is no next level to warm: skipping saves a burst of
+            // dozens of image requests right as a car page settles.
+            if (!interactive || wPx <= 0f || hPx <= 0f) return@LaunchedEffect
             delay(300)
             val loader = context.imageLoader
             val halfTilesX = wPx / tilePx / 2f + 1f

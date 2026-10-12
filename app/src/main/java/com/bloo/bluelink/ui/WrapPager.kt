@@ -8,7 +8,7 @@ import androidx.compose.runtime.remember
 
 // Pages are keyed by raw virtual index (see [WrapPagerState]) because real-index keying crashed
 // ("Key already used") twice.
-private const val WRAP_MULTIPLIER = 80
+private const val WRAP_MULTIPLIER = 1000
 /**
  * Recenter once the pager drifts within this many real-item-widths of either edge of the virtual
  * range -- see [WRAP_MULTIPLIER]'s own doc.

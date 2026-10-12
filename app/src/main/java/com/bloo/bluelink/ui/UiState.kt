@@ -138,11 +138,6 @@ data class UiState(
     val aiBusy: Set<String> = emptySet(),
     val aiSearchReply: String? = null,
     /**
-     * The garage's collapsed pager is settled on its Settings slot (always the last page). The only
-     * "looking at Settings" signal; drives SearchLayer's bubble/pill morph.
-     */
-    val onSettingsPageSlot: Boolean = false,
-    /**
      * A car's full-screen map overlay is expanded. Hides the floating search bubble, which shares a
      * corner with the map's bottom action row.
      */

@@ -97,6 +97,12 @@ internal fun Modifier.entrance(key: String): Modifier {
  * the whole effect.
  */
 internal fun Modifier.pageTurn(offset: () -> Float, strength: Float = 1f): Modifier = graphicsLayer {
+    // Fade each draw op instead of rendering the whole page into an offscreen buffer first. The default
+    // (Auto) turns any alpha below 1 into a full-page compositing layer, and the pager puts one on EVERY
+    // composed page on the first frame of a drag: 3-5 buffers of ~9MB each on a large screen, re-rendered
+    // every frame. The only visible difference is overlapping glass and text showing their own alpha
+    // mid-swipe.
+    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
     val o = offset().coerceIn(-0.5f, 0.5f)
     val away = (kotlin.math.abs(o) * 2f).coerceIn(0f, 1f)
     val scale = 1f - 0.09f * strength * away

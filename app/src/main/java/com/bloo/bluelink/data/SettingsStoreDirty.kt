@@ -1,5 +1,6 @@
 package com.bloo.bluelink.data
 
+import kotlinx.coroutines.flow.flowOn
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -70,6 +71,9 @@ val SettingsStore.dirtyKeysFlow: Flow<Set<String>> get() = context.settingsDataS
     }
     .distinctUntilChanged()
     .map { it.first }
+    // The whole-store map, sort and hash above run off the main thread: its collector is on Main.immediate,
+    // and this re-fires after every tracked write, including the one a car swipe makes.
+    .flowOn(kotlinx.coroutines.Dispatchers.Default)
 
 /**
  * Clear [keys] from the dirty set via set-difference, leaving any key marked dirty after the

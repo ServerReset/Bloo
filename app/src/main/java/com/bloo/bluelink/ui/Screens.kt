@@ -83,7 +83,7 @@ fun BlooApp(vm: AppViewModel) {
     val accounts by remember { derivedStateOf { state.accounts } }
     val kiaOtp by remember { derivedStateOf { state.kiaOtp } }
     val canadaOtp by remember { derivedStateOf { state.canadaOtp } }
-    val onSettingsPageSlot by remember { derivedStateOf { state.onSettingsPageSlot } }
+    val onSettingsPageSlot by vm.onSettingsPageSlot.collectAsStateWithLifecycle()
     val mapExpanded by remember { derivedStateOf { state.mapExpanded } }
     // One blur source shared by GarageScreen, SettingsScreen and SearchLayer, which floats over
     // either.

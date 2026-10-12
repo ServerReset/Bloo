@@ -153,6 +153,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     internal val _currentIndex = MutableStateFlow(0)
 
+    /**
+     * Whether Settings is in one of the visible pager columns (the search bar expands into its pill
+     * there). Its OWN flow, like [currentIndex]: it flips on two of every three swipes, and while it
+     * was a UiState field each flip re-ran every derived read on every composed car page.
+     */
+    internal val _onSettingsPageSlot = MutableStateFlow(false)
+    val onSettingsPageSlot: StateFlow<Boolean> = _onSettingsPageSlot.asStateFlow()
+
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
 
     /**

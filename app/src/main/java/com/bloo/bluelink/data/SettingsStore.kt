@@ -251,7 +251,7 @@ class SettingsStore(internal val context: Context) {
      */
     val notifications: Flow<NotificationPrefs> = context.settingsDataStore.data.map { p ->
         decodeNotificationPrefs(p)
-    }
+    }.flowOn(Dispatchers.Default)
 
     // --- Device sync identity + registry (all device-local: see SyncMerge.DEVICE_LOCAL_KEYS) ---
     //
