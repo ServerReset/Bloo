@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Box
@@ -174,10 +175,11 @@ internal fun Modifier.glassSheen(): Modifier = this.background(
 )
 
 /**
- * Whether the car pager is being dragged or flung, as a lambda to read in the DRAW phase (so a change
- * redraws, never recomposes). False outside a pager.
+ * How much of the cards' blur is showing, as a lambda to read in the DRAW phase (so a change redraws,
+ * never recomposes): 0 the instant the car pager starts moving, easing back to 1 once it rests, so the
+ * blur fades in rather than popping. 1 outside a pager.
  */
-internal val LocalPagerMoving = androidx.compose.runtime.staticCompositionLocalOf<() -> Boolean> { { false } }
+internal val LocalPagerBlur = androidx.compose.runtime.staticCompositionLocalOf<() -> Float> { { 1f } }
 
 /**
  * A pebble card's glass fill as the first child of the card, instead of a modifier on it: the same
@@ -192,12 +194,14 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
     val floating = LocalPebbleFloating.current
     val haze = LocalBackdropHaze.current.takeUnless { floating }
     val ultra = LocalAppearance.current.ultraGlass
-    val moving = LocalPagerMoving.current
+    val blur = LocalPagerBlur.current
     if (haze != null && canBlurBackdrops()) {
         Box(
             Modifier
                 .matchParentSize()
-                .drawWithContent { if (!moving()) drawContent() }
+                // Faded, and not drawn at all at 0: while it is skipped Haze does no capture or blur work.
+                .graphicsLayer { alpha = blur() }
+                .drawWithContent { if (blur() > 0.01f) drawContent() }
                 .clip(shape)
                 .then(if (ultra) Modifier.appGlassEffect(haze, shape) else Modifier.appHazeEffect(haze, cheap = true)),
         )

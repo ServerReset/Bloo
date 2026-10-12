@@ -147,12 +147,18 @@ internal fun CollapsedGaragePager(
         // of them sit side by side at rest.
         var boxWidthPx by remember { mutableIntStateOf(windowWidthPx) }
         val pagerIdle = remember(pager) { androidx.compose.runtime.derivedStateOf { !pager.isScrollInProgress } }
-        val pagerMoving = remember(pager) { { pager.isScrollInProgress } }
+        val blurAmount = remember(pager) { androidx.compose.animation.core.Animatable(1f) }
+        LaunchedEffect(pager) {
+            snapshotFlow { pager.isScrollInProgress }.collect { moving ->
+                if (moving) blurAmount.snapTo(0f) else blurAmount.animateTo(1f, androidx.compose.animation.core.tween(MotionMedium))
+            }
+        }
+        val pagerBlur = remember(blurAmount) { { blurAmount.value } }
         val auroraPause = LocalAuroraPause.current
         LaunchedEffect(pager, auroraPause) {
             snapshotFlow { pager.isScrollInProgress }.collect { auroraPause?.value = it }
         }
-        androidx.compose.runtime.CompositionLocalProvider(LocalPagerIdle provides pagerIdle, LocalPagerMoving provides pagerMoving) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalPagerIdle provides pagerIdle, LocalPagerBlur provides pagerBlur) {
         Box(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
             val columnWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).coerceAtLeast(1).toDp() }
