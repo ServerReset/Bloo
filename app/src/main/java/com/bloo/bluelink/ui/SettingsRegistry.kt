@@ -64,18 +64,6 @@ internal val ChoiceSettings: List<SettingSpec> = listOf(
         phrases = "turn on dark mode switch to light mode black background follow the phone",
     ) { a, _, _, vm -> ThemeModeSegmentedRow(a) { vm.setThemeMode(it) } },
     SettingSpec(
-        title = "Aurora motion", kind = SettingKind.Choice,
-        keywords = "aurora background animated static motion moving still",
-        phrases = "stop the background moving make the background still",
-    ) { a, _, _, vm ->
-        SettingsSegmentedRow(
-            label = "Aurora motion",
-            options = listOf(SegmentOption("static", "Static", null), SegmentOption("motion", "Motion", null)),
-            selectedKey = a.auroraMotion,
-            onSelect = { vm.setAuroraMotion(it) },
-        )
-    },
-    SettingSpec(
         title = "Units", kind = SettingKind.Choice,
         keywords = "unit system metric imperial temperature distance speed miles km",
         phrases = "use kilometres use miles celsius or fahrenheit",

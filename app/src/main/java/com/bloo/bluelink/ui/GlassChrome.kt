@@ -47,7 +47,7 @@ private fun Modifier.glassDropShadow(shape: Shape): Modifier =
     if (appIsDarkTheme()) {
         this.dropShadow(shape)
     } else {
-        this.dropShadow(shape, color = Color.Black.copy(alpha = 0.12f), blurRadius = 10.dp, offsetY = 2.dp)
+        this.dropShadow(shape, color = Color.Black.copy(alpha = 0.06f), blurRadius = 8.dp, offsetY = 1.dp)
     }
 
 /**
@@ -67,32 +67,22 @@ fun Modifier.ambientRing(shape: Shape): Modifier =
     if (appIsDarkTheme()) {
         this.sharedAmbientRing(shape)
     } else {
-        this.dropShadow(shape, color = Color.Black.copy(alpha = 0.10f), blurRadius = 7.dp, offsetY = 0.dp, offsetX = 0.dp)
+        this.dropShadow(shape, color = Color.Black.copy(alpha = 0.05f), blurRadius = 6.dp, offsetY = 0.dp, offsetX = 0.dp)
     }
 
 /**
- * The standard opaque pebble/card edge: a drop shadow, plus a solid border when the "pebble
- * outline" setting is on. Dark mode only draws the shadow; in light mode the outline provides the
- * separation.
+ * The standard opaque pebble/card edge: an outline always, plus a drop shadow in dark mode.
  */
 @Composable
-internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier {
-    // [appIsDarkTheme], NOT a raw isSystemInDarkTheme() read. That was the bug: a user who
-    // explicitly set the app to Light while their SYSTEM was in dark mode got a light-themed app
-    // that still drew this shadow, because raw isSystemInDarkTheme() only ever sees the phone's
-    // setting, not the app's own override.
+internal fun Modifier.pebbleCardEdge(shape: Shape): Modifier {
+    // [appIsDarkTheme], NOT a raw isSystemInDarkTheme() read: a user who set the app to Light while the
+    // SYSTEM is dark must get the light treatment.
     val dark = appIsDarkTheme()
-    return (if (dark) this.dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp) else this).then(
-        // Light theme has no shadow, so without a rim a pale pebble on a pale page had no edge at all: a
-        // hairline gives it one (a border is far cheaper than another blurred shadow per card).
-        if (!dark && !outline) {
-            Modifier.border(BorderStroke(0.75.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)), shape)
-        } else if (outline) {
-            Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)
-        } else {
-            Modifier
-        },
-    )
+    // The outline is always on. Dark adds the drop shadow and a firmer line; light has no shadow at all and
+    // a light hairline, so a pale pebble on a pale page still has an edge without anything sticking out.
+    val rim = MaterialTheme.colorScheme.outline.copy(alpha = if (dark) 0.55f else 0.30f)
+    return (if (dark) this.dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp) else this)
+        .border(BorderStroke(if (dark) 1.dp else 0.75.dp, rim), shape)
 }
 
 // ---- One floating-glass surface, everywhere -------------------------------
@@ -237,7 +227,7 @@ internal fun Modifier.themedDropShadow(
     offsetY: androidx.compose.ui.unit.Dp = 4.dp,
 ): Modifier = this.dropShadow(
     shape,
-    color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.12f),
+    color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.06f),
     blurRadius = blurRadius,
     offsetY = offsetY,
 )

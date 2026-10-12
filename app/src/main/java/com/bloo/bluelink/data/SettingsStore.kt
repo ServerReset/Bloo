@@ -46,7 +46,6 @@ class SettingsStore(internal val context: Context) {
         val GLASS_CLARITY = stringPreferencesKey("glass_clarity")
         val ULTRA_GLASS = stringPreferencesKey("ultra_glass")
         val HAPTICS = stringPreferencesKey("haptics_enabled")
-        val PEBBLE_OUTLINE = stringPreferencesKey("pebble_outline")
         val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey("seamless_install_shizuku")
         // Fractions (0f..1f) of the search bubble's own drag range, not raw dp -- the display
         // doesn't change size between sessions, but a fraction still degrades gracefully if it ever
@@ -54,7 +53,6 @@ class SettingsStore(internal val context: Context) {
         val SEARCH_BUBBLE_X = stringPreferencesKey("search_bubble_x")
         val SEARCH_BUBBLE_Y = stringPreferencesKey("search_bubble_y")
         val AURORA = stringPreferencesKey("aurora_background")
-        val AURORA_MOTION = stringPreferencesKey("aurora_motion")
         val UNIT_SYSTEM = stringPreferencesKey("unit_system")
         val TEMP_UNIT = stringPreferencesKey("temp_unit")
         val DISTANCE_UNIT = stringPreferencesKey("distance_unit")
@@ -120,19 +118,10 @@ class SettingsStore(internal val context: Context) {
         val ultraGlass: Boolean = false,
         /** Show an aurora gradient as the app background instead of solid surface. */
         val auroraBackground: Boolean = false,
-        /** Aurora motion mode: "off", "static", "motion". */
-        val auroraMotion: String = "static",
         /** Unit system: "imperial" (miles, mph, F) or "metric" (km, km/h, C). */
         val unitSystem: String = "imperial",
         /** Haptic feedback across the UI. */
         val hapticsEnabled: Boolean = true,
-        /**
-         * Hairline rim on pebbles/hero card. Off by default -- most of the app's "floating chrome"
-         * (buttons, dialogs, the search bar) always has one, but pebbles are the majority of
-         * on-screen surface area, and a rim on every single one read as busier than most people
-         * want as the default.
-         */
-        val pebbleOutline: Boolean = false,
         /**
          * When on, this device installs downloaded updates silently via Shizuku (local ADB) instead
          * of the tap-through system installer. Off by default; device-local capability (Shizuku may
@@ -190,7 +179,6 @@ class SettingsStore(internal val context: Context) {
             ultraGlass = prefs[Keys.ULTRA_GLASS]?.toBooleanStrictOrNull() ?: false,
             hapticsEnabled = prefs[Keys.HAPTICS]?.toBooleanStrictOrNull() ?: true,
             auroraBackground = prefs[Keys.AURORA]?.toBooleanStrictOrNull() ?: false,
-            auroraMotion = prefs[Keys.AURORA_MOTION] ?: "static",
             unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",
             // Shared rule -- see FormatUtils.useFahrenheit for why this stopped being written out
             // separately per surface. The per-measurement overrides only apply in Advanced mode,
@@ -199,7 +187,6 @@ class SettingsStore(internal val context: Context) {
             metricDistance = resolveMetricDistance(prefs[Keys.UNIT_SYSTEM], prefs[Keys.DISTANCE_UNIT].takeIf { prefs[Keys.SETTINGS_MODE] == "advanced" }),
             tempUnit = prefs[Keys.TEMP_UNIT] ?: "auto",
             distanceUnit = prefs[Keys.DISTANCE_UNIT] ?: "auto",
-            pebbleOutline = prefs[Keys.PEBBLE_OUTLINE]?.toBooleanStrictOrNull() ?: false,
             seamlessInstallShizuku = prefs[Keys.SEAMLESS_INSTALL_SHIZUKU]?.toBooleanStrictOrNull() ?: false,
         )
     }

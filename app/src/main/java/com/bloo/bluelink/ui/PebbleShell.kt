@@ -182,18 +182,13 @@ internal fun PebbleShell(
         label = "pebbleCorner",
     )
     val pebbleShape = RoundedCornerShape(corner)
-    // Off by default -- see Appearance.pebbleOutline's doc comment. Most floating chrome always has
-    // a rim, but pebbles are the majority of on-screen surface area, so a rim on every single one
-    // is a much bigger visual commitment than one more floating button.
-    val pebbleAppearance = LocalAppearance.current
-    val pebbleOutline = pebbleAppearance.pebbleOutline
     Box(Modifier.fillMaxWidth()) {
         Card(
             Modifier
                 .fillMaxWidth()
                 // The card's bounding box is glass (GlassCardBackdrop, its first child below, so the blur
                 // can be skipped while the pager moves); its own panels stay solid.
-                .pebbleCardEdge(pebbleShape, pebbleOutline),
+                .pebbleCardEdge(pebbleShape),
             shape = pebbleShape,
             // No shadow elevation: the whole card is scaled by ReorderColumn's drag lift and the
             // cold-start intro (a graphicsLayer on the pebble's own Box above), and the default 1dp

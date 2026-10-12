@@ -6,7 +6,6 @@ import com.bloo.bluelink.data.saveCustomPalette
 import com.bloo.bluelink.data.searchBubblePosition
 import com.bloo.bluelink.data.setActiveCustomPaletteId
 import com.bloo.bluelink.data.setAuroraBackground
-import com.bloo.bluelink.data.setAuroraMotion
 import com.bloo.bluelink.data.setColorPalette
 import com.bloo.bluelink.data.setColumnsFlipped
 import com.bloo.bluelink.data.setDistanceUnit
@@ -14,7 +13,6 @@ import com.bloo.bluelink.data.setDynamicColor
 import com.bloo.bluelink.data.setFontChoice
 import com.bloo.bluelink.data.setGlassClarity
 import com.bloo.bluelink.data.setHapticsEnabled
-import com.bloo.bluelink.data.setPebbleOutline
 import com.bloo.bluelink.data.setSeamlessInstallShizuku
 import com.bloo.bluelink.data.setSearchBubblePosition
 import com.bloo.bluelink.data.setTempUnit
@@ -64,9 +62,8 @@ fun AppViewModel.setVibrancySoon(value: Float) =
 fun AppViewModel.setHapticsEnabled(value: Boolean) = viewModelScope.launch { settingsStore.setHapticsEnabled(value) }
 
 // More of the same appearance-setter pattern described above the setThemeMode group: DataStore
-// write only, UI updates via the `appearance` StateFlow mirror. setAuroraMotion configures the
-// animated background's speed; its colors always derive from the current theme.
-fun AppViewModel.setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
+// write only, UI updates via the `appearance` StateFlow mirror. the animated background's colors
+// always derive from the current theme.
 
 /**
  * Where the floating search bubble was last dragged to (fractions of its own drag range), or null
@@ -110,8 +107,6 @@ fun AppViewModel.refreshShizukuAvailable() {
 }
 
 fun AppViewModel.setAuroraBackground(value: Boolean) = viewModelScope.launch { settingsStore.setAuroraBackground(value) }
-
-fun AppViewModel.setAuroraMotion(value: String) = viewModelScope.launch { settingsStore.setAuroraMotion(value) }
 
 /** Imperial vs. metric display throughout the app. */
 fun AppViewModel.setUnitSystem(value: String) = viewModelScope.launch { settingsStore.setUnitSystem(value) }

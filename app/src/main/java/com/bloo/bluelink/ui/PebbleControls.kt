@@ -119,8 +119,6 @@ internal fun CriticalContent(
  */
 @Composable
 internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Modifier) {
-    // Honours the pebbleOutline setting like every other pebble, since this one bypasses Pebble().
-    val pebbleOutline = LocalAppearance.current.pebbleOutline
     // Recent remote commands, revealed by pressing the card's background. Deliberately has no
     // visible affordance; per-car and not saved, so reopening lands on the plain lock control.
     var showHistory by remember(v.vin) { mutableStateOf(false) }
@@ -150,7 +148,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                     ) { showHistory = !showHistory; true },
                 )
             }
-            .pebbleCardEdge(shape, pebbleOutline),
+            .pebbleCardEdge(shape),
         shape = shape,
         color = Color.Transparent,
         // contentColorFor the container, as PebbleShell's cardColors does, so muted labels share

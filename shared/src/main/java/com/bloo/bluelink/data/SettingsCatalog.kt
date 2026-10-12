@@ -51,7 +51,6 @@ object SettingsCatalog {
         app("ai_enabled", Kind.TOGGLE, "On-device AI", "gemini nano ai summary assistant privacy on-device"),
         app("ai_auto_summarize", Kind.TOGGLE, "Summarize when I open the app", "ai automatic automatically summary open launch gemini nano"),
         app("aurora_background", Kind.TOGGLE, "Aurora background", "gradient animated theme background glow"),
-        app("aurora_motion", Kind.CHOICE, "Aurora motion", "aurora background animated static motion"),
         app("biometric_lock", Kind.TOGGLE, "App lock", "biometric fingerprint face lock security"),
         app("color_palette", Kind.CHOICE, "Colour palette", "color theme palette accent"),
         app("custom_palettes", Kind.LIST, "Custom palettes", "color theme palette accent custom"),
@@ -79,7 +78,6 @@ object SettingsCatalog {
         app("notify_unlocked", Kind.TOGGLE, "Left-unlocked alerts", "notification unlocked left"),
         app("notify_unlocked_min", Kind.NUMBER, "Left-unlocked alert delay", "minutes before alerting unlocked"),
         app("notify_watch_low", Kind.TOGGLE, "Watch low-battery alerts", "watch wear notification low battery"),
-        app("pebble_outline", Kind.TOGGLE, "Pebble outline", "border rim card theme"),
         app("settings_mode", Kind.CHOICE, "Simple or advanced settings", "simple advanced mode"),
         app("theme_mode", Kind.CHOICE, "Display mode", "theme light dark amoled system appearance"),
         app("ui_scale", Kind.NUMBER, "Text & layout scale", "display size zoom bigger smaller text"),
@@ -139,11 +137,11 @@ object SettingsCatalog {
 
     /** Settings that already have their own control in search; everything else is shown read-only. */
     private val withControl = setOf(
-        "ai_enabled", "ai_auto_summarize", "aurora_background", "aurora_motion", "biometric_lock",
+        "ai_enabled", "ai_auto_summarize", "aurora_background", "biometric_lock",
         "distance_unit", "temp_unit", "unit_system", "dynamic_color", "font_choice", "glass_clarity",
         "haptics_enabled", "notify_autolock", "notify_charge_complete", "notify_charging", "notify_door",
         "notify_door_min", "notify_running", "notify_running_min", "notify_service", "notify_start",
-        "notify_unlocked", "notify_unlocked_min", "notify_watch_low", "pebble_outline", "theme_mode",
+        "notify_unlocked", "notify_unlocked_min", "notify_watch_low", "theme_mode",
         "ui_scale", "vibrancy", "enabled_shortcuts", "color_palette", "columns_flipped", "settings_mode",
         "vehicle_order", "custom_palettes", "weather_label", "weather_follows_device",
         "hotspots_", "sections_", "collapsed_", "img_",

@@ -189,10 +189,6 @@ suspend fun SettingsStore.setAuroraBackground(value: Boolean) {
 // fall back to the default if it's anything else (e.g. a stale string from a future app version we
 // don't recognize), rather than storing garbage that the appearance Flow above would then have to
 // re-validate on every read.
-suspend fun SettingsStore.setAuroraMotion(value: String) {
-    editTracked { it[SettingsStore.Keys.AURORA_MOTION] = value.takeIf { it in setOf("off", "static", "motion") } ?: "static" }
-}
-
 suspend fun SettingsStore.setUnitSystem(value: String) {
     editTracked { it[SettingsStore.Keys.UNIT_SYSTEM] = value.takeIf { it in setOf("imperial", "metric") } ?: "imperial" }
 }

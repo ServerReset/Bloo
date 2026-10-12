@@ -176,13 +176,13 @@ internal fun AuroraBackground(
     paused: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
-    // Battery saver (or pre-S, where the blur can't run): one flat surface fill, no sensor, drift
-    // or blur.
-    if (!canBlurBackdrops()) {
+    // Pre-S (where the glass cannot run): one flat surface fill. Under battery saver the aurora is still
+    // drawn, but STANDS STILL: no drift, no tilt sensor, no animation of any kind.
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
         Box(modifier.fillMaxSize().background(scheme.surface))
         return
     }
-    val motionMode = appearance?.auroraMotion ?: "static"
+    val saver = isBatterySaverOn()
 
     // "Motion" follows the phone's tilt (like a lock-screen wallpaper parallax); "Static" ignores
     // tilt entirely and instead gets its own slow, small ambient drift (see p1/p2/p3 below) so it
@@ -195,7 +195,8 @@ internal fun AuroraBackground(
     // backdrop all the glass samples) and while the app is not on screen at all.
     val pagerPause = LocalAuroraPause.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    val motionActive = motionMode == "motion"
+    // Tilt-follow and drift always run, except under battery saver.
+    val motionActive = !saver
     if (motionActive) {
         val ctx = LocalContext.current
         DisposableEffect(ctx, lifecycleOwner) {
@@ -288,7 +289,7 @@ internal fun AuroraBackground(
     LaunchedEffect(Unit) {
         val start = System.currentTimeMillis()
         while (true) {
-            if (currentPaused || pagerPause?.value == true ||
+            if (currentPaused || saver || pagerPause?.value == true ||
                 !lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
             ) {
                 delay(120)

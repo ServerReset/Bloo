@@ -97,14 +97,6 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         choice(
-            "c_aurora", "Aurora motion", "aurora background animated static motion moving still",
-            listOf(Option("static", "Still"), Option("motion", "Moving")),
-            { it.appearance.auroraMotion },
-            { vm, v -> vm.setAuroraMotion(v) },
-        ),
-    )
-    add(
-        choice(
             "c_units", "Units", "metric imperial kilometres miles celsius fahrenheit",
             listOf(Option("imperial", "Imperial (miles, °F)"), Option("metric", "Metric (km, °C)")),
             { it.appearance.unitSystem },

@@ -322,9 +322,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadPhoneWeather(force: Boolean = false) = weather.loadPhoneWeather(force)
 
-    // setColumnsFlipped / setUiScaleSoon / setVibrancySoon / setHapticsEnabled / setPebbleOutline /
+    // setColumnsFlipped / setUiScaleSoon / setVibrancySoon / setHapticsEnabled /
     // setShowSearch / searchBubblePosition / setSearchBubblePosition / setSeamlessInstallShizuku /
-    // refreshShizukuAvailable / setAuroraBackground / setAuroraMotion / setUnitSystem moved to
+    // refreshShizukuAvailable / setAuroraBackground / setUnitSystem moved to
     // AppViewModelAppearance.kt.
 
     /**

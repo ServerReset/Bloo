@@ -16,7 +16,6 @@ import com.bloo.bluelink.data.setNotifyDoor
 import com.bloo.bluelink.data.setNotifyRunning
 import com.bloo.bluelink.data.setNotifyService
 import com.bloo.bluelink.data.setNotifyUnlocked
-import com.bloo.bluelink.data.setPebbleOutline
 import com.bloo.bluelink.data.setSeamlessInstallShizuku
 import com.bloo.bluelink.data.setSeatFlag
 
@@ -104,10 +103,6 @@ internal val ToggleSettings = listOf(
         title = "Flip columns", keywords = "layout columns swap sides left right wide screen tablet hot seat pebbles controls",
         phrases = "put the controls on the other side swap the two columns",
         checked = { a, _, _ -> a.columnsFlipped }, onToggle = { vm, v -> vm.setColumnsFlipped(v) },
-    ),
-    ToggleSpec(
-        title = "Pebble outline", keywords = "border rim card theme appearance",
-        checked = { a, _, _ -> a.pebbleOutline }, onToggle = { vm, v -> vm.setPebbleOutline(v) },
     ),
     // Same top-level gate the AI card itself uses -- these two only mean anything on a device
     // Gemini Nano actually supports, same reason the card is hidden entirely rather than shown

@@ -12,12 +12,14 @@ package com.bloo.bluelink.data
  */
 object SyncSchema {
     /** Bumped whenever keys are retired or a migration is added. */
-    const val VERSION = 2
+    const val VERSION = 3
 
     /** Exact keys of settings that no longer exist. */
     val DEPRECATED_KEYS: Set<String> = setOf(
         "show_search",                      // the search bubble is always on now
         "cover_settings_hint_dismissed",    // the flip-cover screen is gone
+        "pebble_outline",                   // pebbles always have their outline now
+        "aurora_motion",                    // the aurora always moves, and stands still under battery saver
     )
 
     /** Per-car (VIN-suffixed) key families that no longer exist. */

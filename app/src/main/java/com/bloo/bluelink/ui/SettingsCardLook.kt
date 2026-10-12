@@ -23,12 +23,10 @@ import com.bloo.bluelink.data.deleteCustomPalette
 import com.bloo.bluelink.data.saveCustomPalette
 import com.bloo.bluelink.data.setActiveCustomPaletteId
 import com.bloo.bluelink.data.setAuroraBackground
-import com.bloo.bluelink.data.setAuroraMotion
 import com.bloo.bluelink.data.setColorPalette
 import com.bloo.bluelink.data.setDynamicColor
 import com.bloo.bluelink.data.setFontChoice
 import com.bloo.bluelink.data.setHapticsEnabled
-import com.bloo.bluelink.data.setPebbleOutline
 import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.unitSystem
 
@@ -122,14 +120,6 @@ private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean,
                             appearance.auroraBackground,
                             description = "A gradient aurora behind the content instead of a solid surface.",
                         ) { vm.setAuroraBackground(it) }
-                        PopVisible(visible = appearance.auroraBackground) {
-                            SettingsSegmentedRow(
-                                label = "Motion",
-                                options = listOf(SegmentOption("static", "Static", null), SegmentOption("motion", "Motion", null)),
-                                selectedKey = appearance.auroraMotion,
-                                onSelect = { vm.setAuroraMotion(it) },
-                            )
-                        }
                     }
                     SettingsGroup("Colour") {
                         ToggleRow(
@@ -141,7 +131,6 @@ private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean,
                         VibrancySlider(appearance, vm)
                     }
                     SettingsGroup("Style") {
-                        ToggleRow("Pebble outline", appearance.pebbleOutline) { vm.setPebbleOutline(it) }
                         GlassClaritySlider(appearance, vm)
                     }
                 }
