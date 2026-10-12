@@ -1,6 +1,7 @@
 package com.bloo.bluelink.wear
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -205,7 +206,13 @@ fun WearHero(
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { text() }
         return
     }
-    val sweep by animateFloatAsState(progress.coerceIn(0f, 1f), label = "heroRing")
+    // Lean (the watch's Battery Saver or a throttling watch, see PowerPolicy): the ring jumps instead of sweeping.
+    val bouncy by com.bloo.bluelink.data.DeviceStatus.policy.collectAsState()
+    val sweep by animateFloatAsState(
+        progress.coerceIn(0f, 1f),
+        animationSpec = if (bouncy.bouncySprings) androidx.compose.animation.core.spring() else androidx.compose.animation.core.snap(),
+        label = "heroRing",
+    )
     val track = tint.copy(alpha = 0.18f)
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Box(

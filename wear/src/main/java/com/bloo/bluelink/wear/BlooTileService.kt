@@ -36,7 +36,7 @@ class BlooTileService : TileService() {
                 val tile = TileBuilders.Tile.Builder()
                     .setResourcesVersion(RESOURCES_VERSION)
                     // Refresh about once a minute while it is on screen.
-                    .setFreshnessIntervalMillis(60_000)
+                    .setFreshnessIntervalMillis(60_000L * com.bloo.bluelink.data.DeviceStatus.policy(applicationContext).pollIntervalMultiplier)
                     .setTileTimeline(TimelineBuilders.Timeline.fromLayoutElement(layoutFor(car)))
                     .build()
                 completer.set(tile)

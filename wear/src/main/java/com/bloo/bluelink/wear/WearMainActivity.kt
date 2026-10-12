@@ -20,6 +20,8 @@ import kotlinx.coroutines.launch
 class WearMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The watch's own power state (Battery Saver, thermal): see PowerPolicy.
+        com.bloo.bluelink.data.DeviceStatus.ensureInitialized(this)
         val repo = WearSnapshotRepository(this)
         val pinStore = WatchPinStore(this)
         // Sealed after a restart until the PIN is entered (see WearBootGate): nothing starts before that.
@@ -42,7 +44,8 @@ class WearMainActivity : ComponentActivity() {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 0)
         }
         // The watch checks for its OWN updates over its own internet, independent of the phone.
-        lifecycleScope.launch { WearUpdateChecker.check() }
+        // Lean: not unasked; the watch has its own power budget.
+        if (com.bloo.bluelink.data.DeviceStatus.policy(this).pollIntervalMultiplier == 1) lifecycleScope.launch { WearUpdateChecker.check() }
         // A watch the phone has signed in fetches its own car status.
         lifecycleScope.launch { WearCredentialSync.refresh(this@WearMainActivity) }
     }
