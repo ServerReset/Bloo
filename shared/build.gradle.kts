@@ -43,4 +43,5 @@ dependencies {
     // runs the tests — the bare `kotlin-test` artifact provides only the assert
     // API with no runner, so no tests would be found. Version = project Kotlin 2.2.20.
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
+    testImplementation("org.json:json:20240303")
 }

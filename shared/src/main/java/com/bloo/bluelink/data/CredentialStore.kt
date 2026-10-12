@@ -1,9 +1,6 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 
 /** Blue Link sign-in credentials, persisted so the user need not retype them. */
 data class Credentials(
@@ -14,39 +11,35 @@ data class Credentials(
 )
 
 /**
- * Stores credentials at rest using AES-256 via Jetpack Security (EncryptedSharedPreferences) — one
- * set per brand, so multiple accounts can be remembered and re-authenticated after a token expires.
+ * Credentials, car service PINs and the app-lock PIN record, kept in the app's single encrypted
+ * [SecureVault] (AES-256-GCM, Keystore-backed) -- one set per brand, so multiple accounts can be
+ * remembered and re-authenticated after a token expires.
  */
 class CredentialStore(context: Context) {
 
     private val appContext: Context = context.applicationContext
 
-    // ONE EncryptedSharedPreferences per process, shared by every CredentialStore instance.
-    private val prefs: SharedPreferences get() = sharedPrefs(appContext)
+    private val vault: SecureVault get() = vaultFor(appContext)
 
     /**
      * Called from the startup warm-up thread in BlooApplication, which starts well over a second
-     * before the cold-start auto-login first touches credentials. That first real access otherwise
-     * pays this setup on the critical path -- directly ahead of the app-lock check and the garage
-     * load -- and it measures ~470ms on the API 34 emulator.
+     * before the cold-start auto-login first touches credentials: opening the vault (Keystore) and
+     * the one-time import otherwise land on the critical path.
      */
     fun warmUp() {
         runCatching { cachedAccounts = loadAllUncached() }
     }
 
-    /**
-     * Persists [credentials] under brand-prefixed keys (e.g. "HYUNDAI_email") so multiple brands'
-     * accounts coexist in the same prefs file.
-     */
+    /** Persists [credentials] under brand-prefixed keys (e.g. "HYUNDAI_email"). */
     fun save(credentials: Credentials) {
         val b = credentials.brand.name
         val brands = brandSet().toMutableSet().apply { add(b) }
-        prefs.edit()
-            .putString("${b}_email", credentials.email)
-            .putString("${b}_password", credentials.password)
-            .putString("${b}_pin", credentials.pin)
-            .putStringSet(KEY_BRANDS, brands)
-            .apply()
+        vault.edit {
+            put("${b}_email", credentials.email)
+            put("${b}_password", credentials.password)
+            put("${b}_pin", credentials.pin)
+            put(KEY_BRANDS, brands.joinToString(","))
+        }
         cachedAccounts = null
     }
 
@@ -57,16 +50,13 @@ class CredentialStore(context: Context) {
      */
     fun load(brand: Brand): Credentials? {
         val b = brand.name
-        val email = prefs.getString("${b}_email", null) ?: return null
-        val password = prefs.getString("${b}_password", null) ?: return null
-        val pin = prefs.getString("${b}_pin", null) ?: return null
+        val email = vault.getString("${b}_email") ?: return null
+        val password = vault.getString("${b}_password") ?: return null
+        val pin = vault.getString("${b}_pin") ?: return null
         return Credentials(email, password, pin, brand)
     }
 
-    /**
-     * Loads every brand that has an entry in [KEY_BRANDS], mapping each stored brand name back to a
-     * [Brand] enum value and then to its [Credentials] via [load].
-     */
+    /** Loads every brand that has an entry in [KEY_BRANDS]. */
     fun loadAll(): List<Credentials> = cachedAccounts ?: loadAllUncached().also { cachedAccounts = it }
 
     private fun loadAllUncached(): List<Credentials> {
@@ -77,7 +67,7 @@ class CredentialStore(context: Context) {
 
     /** Overwrites just the stored PIN for [brand], leaving email/password untouched. */
     fun updatePin(brand: Brand, pin: String) {
-        prefs.edit().putString("${brand.name}_pin", pin).apply()
+        vault.edit { put("${brand.name}_pin", pin) }
         cachedAccounts = null
     }
 
@@ -85,23 +75,19 @@ class CredentialStore(context: Context) {
     fun clear(brand: Brand) {
         val b = brand.name
         val brands = brandSet().toMutableSet().apply { remove(b) }
-        prefs.edit()
-            .remove("${b}_email").remove("${b}_password").remove("${b}_pin")
-            .putStringSet(KEY_BRANDS, brands)
-            .apply()
+        vault.edit {
+            remove("${b}_email"); remove("${b}_password"); remove("${b}_pin")
+            put(KEY_BRANDS, brands.joinToString(","))
+        }
         cachedAccounts = null
     }
 
     // --- App PIN (device app-lock, unrelated to any car's service PIN) ----
     //
-    // The app PIN is NOT a brand credential, but it shares this store
-    // deliberately: it is a secret that must never leave the device, and this
-    // is the file that already guarantees exactly that (AES-256-GCM via
-    // Android Keystore, see the class doc). It lives under its own flat keys
-    // so it cannot collide with the per-brand "%s_email" scheme.
+    // Same vault, its own flat keys so it cannot collide with the per-brand "%s_email" scheme.
 
     /** The encoded [PinRecord] (or null when no PIN is set). */
-    fun getPinRecord(): String? = prefs.getString(KEY_PIN_RECORD, null)
+    fun getPinRecord(): String? = vault.getString(KEY_PIN_RECORD)
 
     /**
      * Sets (or, with null, clears) the stored PIN record. Clearing also wipes the failure counter
@@ -109,51 +95,62 @@ class CredentialStore(context: Context) {
      */
     fun setPinRecord(record: String?) {
         if (record == null) {
-            prefs.edit()
-                .remove(KEY_PIN_RECORD)
-                .remove(KEY_PIN_FAILURES)
-                .remove(KEY_PIN_LOCKED_UNTIL)
-                .remove(KEY_PIN_LOCKED_UNTIL_ELAPSED)
-                .apply()
+            vault.edit {
+                remove(KEY_PIN_RECORD); remove(KEY_PIN_FAILURES)
+                remove(KEY_PIN_LOCKED_UNTIL); remove(KEY_PIN_LOCKED_UNTIL_ELAPSED)
+            }
+            vault.unbindPin()
         } else {
-            prefs.edit().putString(KEY_PIN_RECORD, record).apply()
+            vault.edit { put(KEY_PIN_RECORD, record) }
         }
     }
 
+    /**
+     * Seals the vault's data key under the app PIN too, so entering the PIN can recover every
+     * account if this device's key is ever lost. The PIN is stretched (PBKDF2, 210k rounds): call
+     * off the main thread.
+     */
+    fun bindVaultToPin(pin: String) = vault.bindPin(pin)
+
+    /** Opens a vault this device's key cannot, with the app PIN. True when it is open (or already was). */
+    fun recoverVaultWithPin(pin: String): Boolean =
+        vault.recoverWithPin(pin).also { if (it) cachedAccounts = null }
+
+    /** True when stored accounts exist but this device's key cannot open them. */
+    val vaultNeedsRecovery: Boolean get() = vault.needsRecovery
+
     /** Consecutive PIN failures since the last successful unlock. */
-    fun getPinFailures(): Int = prefs.getInt(KEY_PIN_FAILURES, 0)
+    fun getPinFailures(): Int = vault.getString(KEY_PIN_FAILURES)?.toIntOrNull() ?: 0
 
     /**
      * Whether the PIN is currently in its rejection window, and for how long -- wall-clock epoch ms
      * until the next attempt may proceed.
      */
-    fun getPinLockedUntil(): Long = prefs.getLong(KEY_PIN_LOCKED_UNTIL, 0L)
+    fun getPinLockedUntil(): Long = vault.getString(KEY_PIN_LOCKED_UNTIL)?.toLongOrNull() ?: 0L
 
-    fun getPinLockedUntilElapsed(): Long = prefs.getLong(KEY_PIN_LOCKED_UNTIL_ELAPSED, 0L)
+    fun getPinLockedUntilElapsed(): Long = vault.getString(KEY_PIN_LOCKED_UNTIL_ELAPSED)?.toLongOrNull() ?: 0L
 
     /** Persists the whole [PinLockout] state atomically. */
     fun setPinLockout(lockout: PinLockout) {
-        prefs.edit()
-            .putInt(KEY_PIN_FAILURES, lockout.failures)
-            .putLong(KEY_PIN_LOCKED_UNTIL, lockout.lockedUntilEpochMs)
-            .putLong(KEY_PIN_LOCKED_UNTIL_ELAPSED, lockout.lockedUntilElapsedMs)
-            .apply()
+        vault.edit {
+            put(KEY_PIN_FAILURES, lockout.failures.toString())
+            put(KEY_PIN_LOCKED_UNTIL, lockout.lockedUntilEpochMs.toString())
+            put(KEY_PIN_LOCKED_UNTIL_ELAPSED, lockout.lockedUntilElapsedMs.toString())
+        }
     }
 
-    // Falls back to emptySet() because getStringSet can return null if the key was never written.
-    private fun brandSet(): Set<String> = prefs.getStringSet(KEY_BRANDS, emptySet()) ?: emptySet()
+    private fun brandSet(): Set<String> =
+        vault.getString(KEY_BRANDS)?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
-    private companion object {
-        // Prefs key holding the Set<String> of brand names ("HYUNDAI", "KIA", ...) that currently
-        // have credentials saved.
+    internal companion object {
+        // Holds the comma-joined brand names ("HYUNDAI,KIA") that currently have credentials saved.
         const val KEY_BRANDS = "brands"
         const val KEY_PIN_RECORD = "app_pin_record"
         const val KEY_PIN_FAILURES = "app_pin_failures"
         const val KEY_PIN_LOCKED_UNTIL = "app_pin_locked_until"
         const val KEY_PIN_LOCKED_UNTIL_ELAPSED = "app_pin_locked_until_elapsed"
-
-        @Volatile
-        private var cachedPrefs: SharedPreferences? = null
+        private const val KEY_IMPORTED = "legacy_credentials_imported"
+        private const val LEGACY_PREFS = "bloo_credentials"
 
         /**
          * Process-wide cache of the decrypted account list, populated by [warmUp] and invalidated
@@ -162,33 +159,49 @@ class CredentialStore(context: Context) {
         @Volatile
         private var cachedAccounts: List<Credentials>? = null
 
-        /** The process-wide [EncryptedSharedPreferences], built once on first access. */
-        fun sharedPrefs(context: Context): SharedPreferences =
-            cachedPrefs ?: synchronized(this) {
-                cachedPrefs ?: buildPrefs(context).also { cachedPrefs = it }
+        /** The vault, with the one-time import of the old EncryptedSharedPreferences file done. */
+        fun vaultFor(context: Context): SecureVault {
+            val vault = SecureVault.of(context)
+            if (vault.getString(KEY_IMPORTED) == null) synchronized(this) {
+                if (vault.getString(KEY_IMPORTED) == null) importLegacy(context, vault)
             }
+            return vault
+        }
 
         /**
-         * The (relatively expensive) master-key generation/lookup + setup itself.
-         *
-         * @Suppress("DEPRECATION"): androidx.security's EncryptedSharedPreferences/MasterKey are
-         * deprecated as a library, with no drop-in replacement; Bloo relies on them for at-rest
-         * credential encryption, so these warnings are expected. Migrating would mean a bespoke
-         * keystore + AES-GCM implementation.
+         * Copies the old encrypted prefs into the vault, then deletes them. Skipped (and retried next
+         * launch) if the old file cannot be read yet, so nothing is lost to a transient failure.
          */
         @Suppress("DEPRECATION")
-        fun buildPrefs(context: Context): SharedPreferences {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            return EncryptedSharedPreferences.create(
-                context,
-                "bloo_credentials",
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-            )
+        private fun importLegacy(context: Context, vault: SecureVault) {
+            // A fresh install has no old file: skip building the old Keystore master key entirely.
+            val legacyFile = java.io.File(context.applicationInfo.dataDir, "shared_prefs/$LEGACY_PREFS.xml")
+            if (!legacyFile.exists()) {
+                vault.edit { put(KEY_IMPORTED, "1") }
+                return
+            }
+            val old = runCatching {
+                val masterKey = androidx.security.crypto.MasterKey.Builder(context)
+                    .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                androidx.security.crypto.EncryptedSharedPreferences.create(
+                    context, LEGACY_PREFS, masterKey,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+                )
+            }.getOrNull()
+            val all = runCatching { old?.all }.getOrNull() ?: return
+            vault.edit {
+                all.forEach { (k, v) ->
+                    when (v) {
+                        is String -> put(k, v)
+                        is Set<*> -> put(k, v.joinToString(","))
+                        is Int, is Long, is Boolean -> put(k, v.toString())
+                    }
+                }
+                put(KEY_IMPORTED, "1")
+            }
+            runCatching { context.deleteSharedPreferences(LEGACY_PREFS) }
         }
     }
-
 }

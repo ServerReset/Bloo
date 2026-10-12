@@ -2,19 +2,18 @@ package com.bloo.bluelink.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 
-// A corruption handler so a file damaged by an interrupted write/power loss resets to empty prefs
-// (signed out) instead of rethrowing an uncaught exception out of every read — every surface (the
-// app UI, the background workers, the command runners) reads this at some point, and a crash loop
-// is worse than a forced re-login.
+// The OLD plain-text session file: read once to move its contents into the encrypted vault, then
+// emptied. A corruption handler so a damaged file resets instead of crash-looping every reader.
 private val Context.dataStore by safePreferencesDataStore("bloo_session")
 
 /**
  * Persists Blue Link sessions — one per brand, so a Hyundai and a Genesis account can be signed in
  * at the same time. The service PIN is required as a header on every remote command, so it is
- * stored locally on-device only.
+ * stored locally on-device only, in the encrypted [SecureVault] with the credentials.
  */
 class SessionStore(private val context: Context) {
 
@@ -59,39 +58,55 @@ class SessionStore(private val context: Context) {
         }
     }
 
-    // Namespaces every stored field by brand, e.g. key(KIA, "access") -> "KIA_access", so each
-    // brand's session fields live under distinct DataStore keys in the same file.
-    private fun key(brand: Brand, field: String) = stringPreferencesKey("${brand.name}_$field")
-    // Comma-joined list of brand names that currently have a saved session; DataStore Preferences
-    // has no native Set<String> support here so it's hand-rolled as CSV (contrast with
-    // CredentialStore, which uses putStringSet on plain SharedPreferences).
-    private val brandsKey = stringPreferencesKey("brands")
+    // Namespaces every stored field by brand, e.g. "session/KIA_access", in the shared vault.
+    private fun key(brand: Brand, field: String) = "session/${brand.name}_$field"
+    // Comma-joined list of brand names that currently have a saved session.
+    private val brandsKey = "session/brands"
 
     /**
-     * Writes all of [session]'s fields under that brand's namespaced keys in one DataStore
-     * transaction. Also adds the brand to the CSV [brandsKey] set (via a Set to dedupe) so this
-     * brand shows up in [loggedInBrands].
+     * The encrypted vault, after the one-time move of the old plain-text session file into it (the
+     * old file is emptied only once its contents are safely written).
      */
+    private suspend fun vault(): SecureVault = withContext(Dispatchers.IO) {
+        val v = CredentialStore.vaultFor(context)
+        if (v.getString(IMPORTED) == null) {
+            val old = runCatching { context.dataStore.data.first() }.getOrNull()
+            v.edit {
+                old?.asMap()?.forEach { (k, value) ->
+                    (value as? String)?.let { put("session/${k.name}", it) }
+                }
+                put(IMPORTED, "1")
+            }
+            runCatching { context.dataStore.edit { it.clear() } }
+        }
+        v
+    }
+
+    /** Writes all of [session]'s fields under that brand's namespaced keys in one vault write. */
     suspend fun save(session: Session) {
-        context.dataStore.edit { p ->
-            p[key(session.brand, "access")] = session.accessToken
-            session.refreshToken?.let { p[key(session.brand, "refresh")] = it }
-            p[key(session.brand, "username")] = session.username
-            p[key(session.brand, "pin")] = session.pin
-            session.deviceId?.let { p[key(session.brand, "device")] = it }
-            // CCI token set (EU only) -- written only when present, so a non-EU session never
-            // touches these keys and an EU refresh that clears one leaves the others intact.
-            session.cciAccessToken?.let { p[key(session.brand, "cciAccess")] = it }
-            session.exchangeableToken?.let { p[key(session.brand, "cciExchangeable")] = it }
-            session.exchangeableRefreshToken?.let { p[key(session.brand, "cciExchangeableRefresh")] = it }
-            session.nonCcsToken?.let { p[key(session.brand, "cciNonCcs")] = it }
-            session.nonCcsRefreshToken?.let { p[key(session.brand, "cciNonCcsRefresh")] = it }
-            session.idToken?.let { p[key(session.brand, "cciId")] = it }
-            val set = (p[brandsKey]?.split(",")?.filter { it.isNotBlank() } ?: emptyList()).toMutableSet()
-            set.add(session.brand.name)
-            p[brandsKey] = set.joinToString(",")
+        val v = vault()
+        withContext(Dispatchers.IO) {
+            v.edit {
+                put(key(session.brand, "access"), session.accessToken)
+                session.refreshToken?.let { put(key(session.brand, "refresh"), it) }
+                put(key(session.brand, "username"), session.username)
+                put(key(session.brand, "pin"), session.pin)
+                session.deviceId?.let { put(key(session.brand, "device"), it) }
+                // CCI token set (EU only) -- written only when present, so a non-EU session never
+                // touches these keys and an EU refresh that clears one leaves the others intact.
+                session.cciAccessToken?.let { put(key(session.brand, "cciAccess"), it) }
+                session.exchangeableToken?.let { put(key(session.brand, "cciExchangeable"), it) }
+                session.exchangeableRefreshToken?.let { put(key(session.brand, "cciExchangeableRefresh"), it) }
+                session.nonCcsToken?.let { put(key(session.brand, "cciNonCcs"), it) }
+                session.nonCcsRefreshToken?.let { put(key(session.brand, "cciNonCcsRefresh"), it) }
+                session.idToken?.let { put(key(session.brand, "cciId"), it) }
+                put(brandsKey, (brandNames(v) + session.brand.name).joinToString(","))
+            }
         }
     }
+
+    private fun brandNames(v: SecureVault): Set<String> =
+        v.getString(brandsKey)?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
     /**
      * Persist a just-established login from its raw fields -- the shared path the Canada and EU
@@ -122,56 +137,62 @@ class SessionStore(private val context: Context) {
      */
     suspend fun load(brand: Brand): Session? {
         StartupTrace.markIfStarting("SessionStore.load(${brand.name}): begin")
-        val p = context.dataStore.data.first()
-        val access = p[key(brand, "access")] ?: return null
-        val username = p[key(brand, "username")] ?: return null
-        val pin = p[key(brand, "pin")] ?: return null
+        val v = vault()
+        val access = v.getString(key(brand, "access")) ?: return null
+        val username = v.getString(key(brand, "username")) ?: return null
+        val pin = v.getString(key(brand, "pin")) ?: return null
         return Session(
-            access, p[key(brand, "refresh")], username, pin, brand, p[key(brand, "device")],
-            cciAccessToken = p[key(brand, "cciAccess")],
-            exchangeableToken = p[key(brand, "cciExchangeable")],
-            exchangeableRefreshToken = p[key(brand, "cciExchangeableRefresh")],
-            nonCcsToken = p[key(brand, "cciNonCcs")],
-            nonCcsRefreshToken = p[key(brand, "cciNonCcsRefresh")],
-            idToken = p[key(brand, "cciId")],
+            access, v.getString(key(brand, "refresh")), username, pin, brand, v.getString(key(brand, "device")),
+            cciAccessToken = v.getString(key(brand, "cciAccess")),
+            exchangeableToken = v.getString(key(brand, "cciExchangeable")),
+            exchangeableRefreshToken = v.getString(key(brand, "cciExchangeableRefresh")),
+            nonCcsToken = v.getString(key(brand, "cciNonCcs")),
+            nonCcsRefreshToken = v.getString(key(brand, "cciNonCcsRefresh")),
+            idToken = v.getString(key(brand, "cciId")),
         )
     }
 
     suspend fun warmUp() {
-        runCatching { context.dataStore.data.first() }
+        runCatching { vault() }
     }
 
-    suspend fun loggedInBrands(): List<Brand> {
-        return context.dataStore.data.first()[brandsKey]
-            ?.split(",")?.mapNotNull { runCatching { Brand.valueOf(it) }.getOrNull() } ?: emptyList()
-    }
+    suspend fun loggedInBrands(): List<Brand> =
+        brandNames(vault()).mapNotNull { runCatching { Brand.valueOf(it) }.getOrNull() }
 
-    /** Rewrites just the access/refresh tokens after a successful refresh, in one transaction. */
+    /** Rewrites just the access/refresh tokens after a successful refresh, in one write. */
     suspend fun updateAccessToken(brand: Brand, access: String, refresh: String?) {
-        context.dataStore.edit { p ->
-            p[key(brand, "access")] = access
-            refresh?.let { p[key(brand, "refresh")] = it }
+        val v = vault()
+        withContext(Dispatchers.IO) {
+            v.edit {
+                put(key(brand, "access"), access)
+                refresh?.let { put(key(brand, "refresh"), it) }
+            }
         }
     }
 
     /** Rewrites just the stored service PIN for [brand]. */
     suspend fun updatePin(brand: Brand, pin: String) {
-        context.dataStore.edit { it[key(brand, "pin")] = pin }
+        val v = vault()
+        withContext(Dispatchers.IO) { v.edit { put(key(brand, "pin"), pin) } }
     }
 
-    /**
-     * Removes every namespaced field for [brand] and drops it from the CSV [brandsKey] set; if that
-     * leaves the set empty, removes the key entirely rather than storing an empty string.
-     */
+    /** Removes every namespaced field for [brand] and drops it from the brand list. */
     suspend fun clear(brand: Brand) {
-        context.dataStore.edit { p ->
-            listOf(
-                "access", "refresh", "username", "pin", "device",
-                "cciAccess", "cciExchangeable", "cciExchangeableRefresh",
-                "cciNonCcs", "cciNonCcsRefresh", "cciId",
-            ).forEach { p.remove(key(brand, it)) }
-            val set = p[brandsKey]?.split(",")?.filter { it.isNotBlank() && it != brand.name } ?: emptyList()
-            if (set.isEmpty()) p.remove(brandsKey) else p[brandsKey] = set.joinToString(",")
+        val v = vault()
+        withContext(Dispatchers.IO) {
+            v.edit {
+                listOf(
+                    "access", "refresh", "username", "pin", "device",
+                    "cciAccess", "cciExchangeable", "cciExchangeableRefresh",
+                    "cciNonCcs", "cciNonCcsRefresh", "cciId",
+                ).forEach { remove(key(brand, it)) }
+                val rest = brandNames(v) - brand.name
+                if (rest.isEmpty()) remove(brandsKey) else put(brandsKey, rest.joinToString(","))
+            }
         }
+    }
+
+    private companion object {
+        const val IMPORTED = "legacy_session_imported"
     }
 }
