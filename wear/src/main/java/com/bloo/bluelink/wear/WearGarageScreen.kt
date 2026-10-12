@@ -51,7 +51,11 @@ fun WearGarageScreen(
     repo: WearSnapshotRepository,
     pinStore: WatchPinStore,
     modifier: Modifier = Modifier,
+    /** Called once the post-restart PIN has opened the watch, so the activity can start its work. */
+    onBootUnlocked: () -> Unit = {},
 ) {
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    var bootLocked by remember { mutableStateOf(WearBootGate.isLocked(appContext)) }
     val vehicles by repo.vehicles.collectAsStateWithLifecycle(initialValue = emptyList())
     val connected by repo.connected.collectAsStateWithLifecycle(initialValue = false)
     val timing = pinStore.timing
@@ -67,6 +71,21 @@ fun WearGarageScreen(
         WatchPinPolicy.requiresUnlock(timing, WatchPinPolicy.GateEvent.OPEN_APP, sessionUnlocked)
 
     AppScaffold(modifier = modifier) {
+        if (bootLocked) {
+            ScreenScaffold(timeText = { TimeText() }) {
+                WearPinScreen(
+                    store = pinStore,
+                    title = "Restarted: enter PIN",
+                    onUnlocked = {
+                        WearBootGate.open(appContext)
+                        bootLocked = false
+                        sessionUnlocked = true
+                        onBootUnlocked()
+                    },
+                )
+            }
+            return@AppScaffold
+        }
         if (needsOpenUnlock) {
             ScreenScaffold(timeText = { TimeText() }) {
                 WearPinScreen(

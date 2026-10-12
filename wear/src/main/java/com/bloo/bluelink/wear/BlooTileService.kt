@@ -29,7 +29,9 @@ class BlooTileService : TileService() {
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> =
         CallbackToFutureAdapter.getFuture { completer ->
             scope.launch {
-                val snapshot = runCatching { SnapshotStore(applicationContext).current() }.getOrNull()
+                // Sealed after a restart: the tile shows nothing about the car until the PIN is entered.
+                val snapshot = if (WearBootGate.isLocked(applicationContext)) null
+                else runCatching { SnapshotStore(applicationContext).current() }.getOrNull()
                 val car = snapshot?.vehicles?.let { all -> all.firstOrNull { it.vin == snapshot.selectedVin } ?: all.firstOrNull() }
                 val tile = TileBuilders.Tile.Builder()
                     .setResourcesVersion(RESOURCES_VERSION)

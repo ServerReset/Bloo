@@ -7,6 +7,7 @@
          the phone-created Android Keystore-protected session (CredentialStore). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Seamless in-watch update: the phone pushes the watch APK and the watch hands it to the
          system installer (see WatchDataListenerService). -->
@@ -73,6 +74,13 @@
 
         <!-- Runs the action buttons on the watch's own notifications (Stop charging). -->
         <receiver android:name=".WearActionReceiver" android:exported="false" />
+
+        <!-- After a restart the watch is sealed until the PIN is entered; this posts the reminder. -->
+        <receiver android:name=".WearBootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Serves the cached update APK to the system installer (see file_paths.xml). -->
         <provider

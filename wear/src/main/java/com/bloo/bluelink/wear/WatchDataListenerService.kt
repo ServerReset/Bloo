@@ -21,6 +21,8 @@ class WatchDataListenerService : WearableListenerService() {
     private val scope = ioScope()
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
+        // Sealed after a restart until the PIN is entered (see WearBootGate): nothing is mirrored.
+        if (WearBootGate.isLocked(applicationContext)) return
         for (event in dataEvents) {
             if (event.type != DataEvent.TYPE_CHANGED) continue
             val map = DataMapItem.fromDataItem(event.dataItem).dataMap
@@ -58,6 +60,7 @@ class WatchDataListenerService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         super.onMessageReceived(messageEvent)
+        if (WearBootGate.isLocked(applicationContext)) return
         val phone = messageEvent.sourceNodeId
         when (messageEvent.path) {
             WatchSyncProtocol.PATH_CRED_OFFER -> scope.launch { WearCredentialSync.onOffer(applicationContext, phone) }

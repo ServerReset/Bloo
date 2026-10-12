@@ -143,6 +143,7 @@ object WearNotifier {
  */
 class WearActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (WearBootGate.isLocked(context)) return
         val vin = intent.getStringExtra(EXTRA_VIN) ?: return
         val action = intent.getStringExtra(EXTRA_ACTION) ?: return
         val pending = goAsync()

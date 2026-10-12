@@ -22,6 +22,18 @@ class WearMainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val repo = WearSnapshotRepository(this)
         val pinStore = WatchPinStore(this)
+        // Sealed after a restart until the PIN is entered (see WearBootGate): nothing starts before that.
+        if (!WearBootGate.isLocked(this)) startWork()
+        setContent {
+            WearTheme {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    WearGarageScreen(repo, pinStore, onBootUnlocked = { startWork() })
+                }
+            }
+        }
+    }
+
+    private fun startWork() {
         // Begin listening for the phone's pushes (real-time sync; the watch never hits the network
         // for CAR data -- see WearDataLayerSync).
         WearDataLayerSync.start(this)
@@ -33,13 +45,6 @@ class WearMainActivity : ComponentActivity() {
         lifecycleScope.launch { WearUpdateChecker.check() }
         // A watch the phone has signed in fetches its own car status.
         lifecycleScope.launch { WearCredentialSync.refresh(this@WearMainActivity) }
-        setContent {
-            WearTheme {
-                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    WearGarageScreen(repo, pinStore)
-                }
-            }
-        }
     }
 }
 
