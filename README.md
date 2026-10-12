@@ -20,6 +20,7 @@ A third-party Android app for **Hyundai**, **Genesis** and **Kia** vehicles (US,
 - **One encrypted vault.** Sign-in credentials, car service PINs, session tokens and the app-lock PIN record all live in a single AES-256-GCM encrypted file. Nothing sensitive is stored anywhere else.
 - **Two keys over one data key.** The vault's data key is sealed by a hardware-backed Android Keystore key, so background refresh, notifications and AutoLock keep working. If you set an app PIN, the same key is also sealed under a key derived from your PIN (PBKDF2-HMAC-SHA256, 210,000 rounds), so entering the PIN recovers your accounts if the device key is ever lost.
 - **App lock.** Biometric unlock, with an optional 4 to 8 digit PIN backup, a lockout after repeated wrong PINs, and a choice of when to re-lock.
+- **Sealed after a restart.** After your phone reboots, Bloo hands out nothing and runs nothing (no alerts, AutoLock or refreshes) until you sign in with your account and then your fingerprint or PIN. A notification reminds you. You can turn this off in Settings.
 - **Nothing leaves the device** except requests to the car brand's own servers. The app collects no data.
 
 ## Install
