@@ -148,6 +148,10 @@ internal fun CollapsedGaragePager(
         var boxWidthPx by remember { mutableIntStateOf(windowWidthPx) }
         val pagerIdle = remember(pager) { androidx.compose.runtime.derivedStateOf { !pager.isScrollInProgress } }
         val pagerMoving = remember(pager) { { pager.isScrollInProgress } }
+        val auroraPause = LocalAuroraPause.current
+        LaunchedEffect(pager, auroraPause) {
+            snapshotFlow { pager.isScrollInProgress }.collect { auroraPause?.value = it }
+        }
         androidx.compose.runtime.CompositionLocalProvider(LocalPagerIdle provides pagerIdle, LocalPagerMoving provides pagerMoving) {
         Box(Modifier.fillMaxSize()) {
             val density = LocalDensity.current

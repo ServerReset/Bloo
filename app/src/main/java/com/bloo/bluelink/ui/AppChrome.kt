@@ -157,6 +157,12 @@ internal fun triangleWave(elapsedMs: Long, periodMs: Long): Float {
     return if (phase < periodMs) phase.toFloat() / periodMs else 2f - phase.toFloat() / periodMs
 }
 
+/**
+ * True while the car pager is dragged or flung, written by the pager and read (never in composition) by
+ * [AuroraBackground] so the drift can stand still. Null outside the garage.
+ */
+internal val LocalAuroraPause = androidx.compose.runtime.staticCompositionLocalOf<androidx.compose.runtime.MutableState<Boolean>?> { null }
+
 /** Animated gradient-blob backdrop for login, onboarding and (optionally) the garage. */
 @Composable
 internal fun AuroraBackground(
@@ -185,10 +191,14 @@ internal fun AuroraBackground(
     var tiltY by remember { mutableFloatStateOf(0f) }
     // Live pause flag: the sensor callback and coroutines start once and must see the newest value.
     val currentPaused by rememberUpdatedState(paused)
+    // The drift also stands still while the car pager is moving (every frame it ticked re-dirtied the
+    // backdrop all the glass samples) and while the app is not on screen at all.
+    val pagerPause = LocalAuroraPause.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val motionActive = motionMode == "motion"
     if (motionActive) {
         val ctx = LocalContext.current
-        DisposableEffect(ctx) {
+        DisposableEffect(ctx, lifecycleOwner) {
             val mgr = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
             val sensor = mgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
             // Raw accelerometer values include gravity (~±9.8) from how the phone is held. raw*
@@ -213,8 +223,21 @@ internal fun AuroraBackground(
                 }
                 override fun onAccuracyChanged(s: Sensor, acc: Int) {}
             }
-            if (sensor != null) mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
-            onDispose { mgr.unregisterListener(listener) }
+            // Listening only while the app is on screen: the observer replays ON_START on attach, so this
+            // registers at once when already started.
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                when (event) {
+                    androidx.lifecycle.Lifecycle.Event.ON_START ->
+                        if (sensor != null) mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+                    androidx.lifecycle.Lifecycle.Event.ON_STOP -> mgr.unregisterListener(listener)
+                    else -> Unit
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+                mgr.unregisterListener(listener)
+            }
         }
     } else {
         // Not tracking tilt in Static mode -- reset so a mode switch away from Motion doesn't leave
@@ -265,7 +288,9 @@ internal fun AuroraBackground(
     LaunchedEffect(Unit) {
         val start = System.currentTimeMillis()
         while (true) {
-            if (currentPaused) {
+            if (currentPaused || pagerPause?.value == true ||
+                !lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+            ) {
                 delay(120)
                 continue
             }

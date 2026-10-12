@@ -130,6 +130,7 @@ fun BlooApp(vm: AppViewModel) {
     // and page spacers read it. See SearchAnchor.kt.
     val searchAnchor = remember { SearchAnchor() }
     val dialogHost = remember { DialogHost(searchHazeState) }
+    val auroraPause = remember { androidx.compose.runtime.mutableStateOf(false) }
     CompositionLocalProvider(
         // Removes the default ripple app-wide (see NoTapHighlight). Material 3 components ignore
         // LocalIndication, so LocalRippleConfiguration = null turns off theirs.
@@ -140,6 +141,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalToasts provides toasts,
         LocalRefreshIndicator provides refreshIndicator,
         LocalBackdropHaze provides backdropHaze,
+        LocalAuroraPause provides auroraPause,
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
         LocalAppearance provides appearance,
