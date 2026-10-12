@@ -67,7 +67,9 @@ object LocationHelper {
         context: Context,
         intervalMs: Long = LIVE_INTERVAL_MS,
         minUpdateMs: Long = LIVE_MIN_INTERVAL_MS,
-        priority: Int = Priority.PRIORITY_HIGH_ACCURACY,
+        // Balanced, not GPS-grade: a "you are here" dot on a street map and a distance to the car need a
+        // fix within a few tens of metres, which Wi-Fi and cell give, at a fraction of the battery.
+        priority: Int = Priority.PRIORITY_BALANCED_POWER_ACCURACY,
     ): Flow<android.location.Location> = callbackFlow {
         if (!hasPermission(context)) {
             close()

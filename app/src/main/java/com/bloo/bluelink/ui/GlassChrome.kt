@@ -170,32 +170,6 @@ internal fun Modifier.glassSheen(): Modifier = this.background(
 )
 
 /**
- * The standard card fill: the backdrop blurred behind a veil of [tint], while the card's contents
- * keep their own opaque panels. Falls back to a nearly opaque fill without a backdrop.
- */
-@Composable
-internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
-    val floating = LocalPebbleFloating.current
-    val haze = LocalBackdropHaze.current.takeUnless { floating }
-    val ultra = LocalAppearance.current.ultraGlass
-    // Ultra glass uses the liquid-glass effect, which needs a backdrop to refract; otherwise it
-    // falls back.
-    return if (ultra && haze != null && canBlurBackdrops()) {
-        this.clip(shape)
-            .appGlassEffect(haze, shape)
-            .glassSheen()
-    } else if (haze != null && canBlurBackdrops()) {
-        this.clip(shape)
-            .appHazeEffect(haze, cheap = true)
-            .background(tint.copy(alpha = GlassCardTintAlpha))
-            .glassSheen()
-    } else {
-        // Floating (no blur to lean on) is a lighter veil, close to the glass it lands back into.
-        this.background(tint.copy(alpha = if (floating) 0.6f else 0.82f), shape)
-    }
-}
-
-/**
  * Whether the car pager is being dragged or flung, as a lambda to read in the DRAW phase (so a change
  * redraws, never recomposes). False outside a pager.
  */
@@ -203,7 +177,7 @@ internal val LocalPagerMoving = androidx.compose.runtime.staticCompositionLocalO
 
 /**
  * A pebble card's glass fill as the first child of the card, instead of a modifier on it: the same
- * look as [glassCardFill], but the blur layer is skipped while the pager moves. A moving card makes
+ * look as the old modifier-based glassCardFill, but the blur layer is skipped while the pager moves. A moving card makes
  * Haze re-capture and re-blur its backdrop every frame (about twenty cards per swipe on a large
  * screen), and over a soft backdrop the unblurred frame is indistinguishable, so the blur simply is
  * not drawn until the page stops. The gate sits OUTSIDE the Haze node on a sibling layer, so the

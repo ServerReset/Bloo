@@ -235,10 +235,14 @@ internal object BatterySaverState {
  * the same way.
  */
 @Composable
-internal fun isBatterySaverOn(): Boolean {
-    val active by BatterySaverState.isOn.collectAsState()
-    return active
-}
+internal fun isBatterySaverOn(): Boolean = LocalBatterySaver.current
+
+/**
+ * The battery-saver flag, collected ONCE at the app root and read here. Every call site used to collect
+ * the flow itself: about ten per pebble, hundreds of live collectors across the pages in the pager, all
+ * created while a page was being built mid-swipe.
+ */
+internal val LocalBatterySaver = androidx.compose.runtime.compositionLocalOf { false }
 
 /**
  * True on API 31+ (Haze's RenderEffect blur; no-op below) and battery saver off. Call sites fall

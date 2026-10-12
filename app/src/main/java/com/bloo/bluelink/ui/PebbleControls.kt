@@ -150,9 +150,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                     ) { showHistory = !showHistory; true },
                 )
             }
-            .pebbleCardEdge(shape, pebbleOutline)
-            // The same glass fill as every PebbleShell card.
-            .glassCardFill(shape, MaterialTheme.colorScheme.surfaceVariant),
+            .pebbleCardEdge(shape, pebbleOutline),
         shape = shape,
         color = Color.Transparent,
         // contentColorFor the container, as PebbleShell's cardColors does, so muted labels share
@@ -162,6 +160,10 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
         // mode); tonal elevation stays 0 as it would be a no-op.
         shadowElevation = 0.dp,
     ) {
+        // The same glass fill as every PebbleShell card, as the first child so its blur is skipped while the
+        // pager moves.
+        Box(Modifier.fillMaxWidth()) {
+        GlassCardBackdrop(shape, MaterialTheme.colorScheme.surfaceVariant)
         Column(Modifier.fillMaxWidth()) {
             // Asymmetric padding matches pebble header alignment. Height lives here, not on the
             // Surface, so the pebble keeps its resting silhouette; heightIn(min) lets it grow with
@@ -186,6 +188,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
             ) {
                 RemoteActionsInline(history)
             }
+        }
         }
     }
 }

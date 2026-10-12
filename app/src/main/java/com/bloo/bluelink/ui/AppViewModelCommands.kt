@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import kotlinx.coroutines.flow.collectLatest
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkException
@@ -32,35 +33,47 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
     if (!restart && liveLocationJob?.isActive == true) return
     liveLocationJob?.cancel()
     liveLocationJob = viewModelScope.launch {
-        // See MIN_DEVICE_LOCATION_INTERVAL_MS/_MOVE_METERS' own doc -- a real device OOM crash
-        // traced back to this collector publishing every raw fused-location callback verbatim,
-        // which a burst of near-identical fixes (GPS jitter, or the provider "catching up" right
-        // after its first-ever fix) turned into hundreds of genuinely distinct GeoLocation values
-        // in under a second.
-        var lastPublished: android.location.Location? = null
-        var lastPublishedAtMs = 0L
-        var lastGeocodedAtMs = 0L
-        com.bloo.bluelink.autolock.LocationHelper.liveUpdates(getApplication()).collect { loc ->
-            val now = System.currentTimeMillis()
-            val last = lastPublished
-            val tooSoonAndTooClose = last != null &&
-                now - lastPublishedAtMs < MIN_DEVICE_LOCATION_INTERVAL_MS &&
-                last.distanceTo(loc) < MIN_DEVICE_LOCATION_MOVE_METERS
-            if (tooSoonAndTooClose) return@collect
-            lastPublished = loc
-            lastPublishedAtMs = now
-            _state.update { it.copy(deviceLocation = loc.toDeviceGeoLocation()) }
-            weather.refreshDeviceLocationForWeather(loc)
-            // Keep the weather card's "where you are" block tracking the live fix too, so its
-            // car-vs-you merge decision uses the current position, not a one-shot reading.
-            weather.loadPhoneWeather()
-            // Reverse-geocode the place name at most every DEVICE_GEOCODE_INTERVAL_MS (and always
-            // until we have one at all), so the location label stays current without a geocode on
-            // every fix.
-            if (_state.value.devicePlace == null || now - lastGeocodedAtMs >= DEVICE_GEOCODE_INTERVAL_MS) {
-                lastGeocodedAtMs = now
-                reverseGeocode(loc.toDeviceGeoLocation())?.let { place ->
-                    _state.update { it.copy(devicePlace = place.full) }
+        // Only while the app is on screen: the fused-location request is torn down when it leaves (the
+        // flow's awaitClose removes the updates) and started again when it returns. It used to keep
+        // asking the phone for a fix every 10 seconds for the life of the process, background included.
+        appForeground.collectLatest { onScreen ->
+            if (!onScreen) return@collectLatest
+            // See MIN_DEVICE_LOCATION_INTERVAL_MS/_MOVE_METERS' own doc -- a real device OOM crash
+            // traced back to this collector publishing every raw fused-location callback verbatim,
+            // which a burst of near-identical fixes (GPS jitter, or the provider "catching up" right
+            // after its first-ever fix) turned into hundreds of genuinely distinct GeoLocation values
+            // in under a second.
+            var lastPublished: android.location.Location? = null
+            var lastPublishedAtMs = 0L
+            var lastGeocodedAtMs = 0L
+            var lastWeatherAtMs = 0L
+            com.bloo.bluelink.autolock.LocationHelper.liveUpdates(getApplication()).collect { loc ->
+                val now = System.currentTimeMillis()
+                val last = lastPublished
+                val tooSoonAndTooClose = last != null &&
+                    now - lastPublishedAtMs < MIN_DEVICE_LOCATION_INTERVAL_MS &&
+                    last.distanceTo(loc) < MIN_DEVICE_LOCATION_MOVE_METERS
+                if (tooSoonAndTooClose) return@collect
+                lastPublished = loc
+                lastPublishedAtMs = now
+                _state.update { it.copy(deviceLocation = loc.toDeviceGeoLocation()) }
+                // Weather follows the phone, but a forecast does not change by the metre: at most once a
+                // minute (each pass can geocode, write the store and fetch).
+                if (lastWeatherAtMs == 0L || now - lastWeatherAtMs >= DEVICE_GEOCODE_INTERVAL_MS) {
+                    lastWeatherAtMs = now
+                    weather.refreshDeviceLocationForWeather(loc)
+                    // Keep the weather card's "where you are" block tracking the live fix too, so its
+                    // car-vs-you merge decision uses the current position, not a one-shot reading.
+                    weather.loadPhoneWeather()
+                }
+                // Reverse-geocode the place name at most every DEVICE_GEOCODE_INTERVAL_MS (and always
+                // until we have one at all), so the location label stays current without a geocode on
+                // every fix.
+                if (_state.value.devicePlace == null || now - lastGeocodedAtMs >= DEVICE_GEOCODE_INTERVAL_MS) {
+                    lastGeocodedAtMs = now
+                    reverseGeocode(loc.toDeviceGeoLocation())?.let { place ->
+                        _state.update { it.copy(devicePlace = place.full) }
+                    }
                 }
             }
         }
