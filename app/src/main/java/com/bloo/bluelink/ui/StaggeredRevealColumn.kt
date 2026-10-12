@@ -2,6 +2,8 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
@@ -41,7 +43,8 @@ internal fun StaggeredRevealColumn(
                 // this far open" -- a flat delay is what's available, short enough that the rows
                 // are still clearly popping in DURING the open rather than only once it's fully
                 // settled.
-                tween(durationMillis = 480, delayMillis = 90, easing = LinearEasing)
+                // The body's own opening spring: a row's pop is keyed to how far the body has grown.
+                spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = PebbleOpenStiffness)
             } else {
                 tween(durationMillis = 400, easing = LinearEasing)
             }
@@ -61,10 +64,12 @@ internal fun StaggeredRevealColumn(
         val gaps = gapPx * (placeables.size - 1).coerceAtLeast(0)
         val height = (placeables.sumOf { it.height } + gaps).coerceIn(constraints.minHeight, constraints.maxHeight)
         layout(width, height) {
-            val n = placeables.size
             var y = 0
             placeables.forEachIndexed { i, p ->
-                val start = if (n <= 1) 0f else (i.toFloat() / n) * PebbleStaggerSpan
+                // Where this row sits in the body, as the fraction of the opening it takes to uncover it,
+                // plus a short beat so it pops just AFTER the card reaches it.
+                val reached = if (height > 0) y.toFloat() / height else 0f
+                val start = (reached * RowRevealCoverage + RowPopDelay).coerceAtMost(0.9f)
                 // `progress` is read INSIDE the layerBlock (draw phase), not in the placement body,
                 // so transition ticks redraw instead of re-measuring every child.
                 p.placeWithLayer(0, y) {
@@ -72,7 +77,7 @@ internal fun StaggeredRevealColumn(
                     val raw = if (closing) {
                         progress.coerceIn(0f, 1f)
                     } else {
-                        ((progress - start) / (1f - PebbleStaggerSpan)).coerceIn(0f, 1f)
+                        ((progress - start) / RowPopWindow).coerceIn(0f, 1f)
                     }
                     // Smoothstep for alpha: opacity cannot overshoot, so a plain ease fits.
                     val local = raw * raw * (3f - 2f * raw)
@@ -82,8 +87,8 @@ internal fun StaggeredRevealColumn(
                     // larger first).
                     val scaleT = pebbleRowOvershoot(raw)
                     // 0.7 -> 1.0, not 0.85: a smaller change is lost next to the alpha fade.
-                    scaleX = 0.7f + 0.3f * scaleT
-                    scaleY = 0.7f + 0.3f * scaleT
+                    scaleX = 0.82f + 0.18f * scaleT
+                    scaleY = 0.82f + 0.18f * scaleT
                     transformOrigin = TransformOrigin(0f, 0.5f)
                 }
                 y += p.height + gapPx
@@ -91,3 +96,12 @@ internal fun StaggeredRevealColumn(
         }
     }
 }
+
+/** How much of the opening a row's position maps onto (the last row is reached near the end). */
+private const val RowRevealCoverage = 0.8f
+
+/** The beat, in opening progress, between the card reaching a row and the row popping. */
+private const val RowPopDelay = 0.05f
+
+/** How much opening progress a row's pop takes. */
+private const val RowPopWindow = 0.22f

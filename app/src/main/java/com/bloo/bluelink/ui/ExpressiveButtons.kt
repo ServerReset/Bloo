@@ -189,7 +189,7 @@ fun SafeExpansiveButton(
                 val room = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
                 // Filling needs a bounded edge; on an unbounded axis it falls back to the small
                 // push. A lone button's fill is capped so it never stretches across a whole row.
-                val cap = maxOf(cached, MaxSingleButtonWidth.roundToPx())
+                val cap = minOf(maxOf(cached, MaxSingleButtonWidth.roundToPx()), (cached * 1.25f).roundToInt())
                 val grown = if (fillOnPress && constraints.hasBoundedWidth) {
                     (cached + ((room - cached) * p.coerceIn(0f, 1f)).roundToInt()).coerceAtMost(cap)
                 } else {

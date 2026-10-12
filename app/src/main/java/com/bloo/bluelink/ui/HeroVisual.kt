@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -50,18 +51,51 @@ import kotlinx.coroutines.delay
  */
 @Composable
 internal fun carTonalBrush(scheme: ColorScheme): Brush {
-    // The hero is the opposite tone of the theme: deep, saturated accents in the light theme (under light text),
-    // pale tints of the same accents in the dark theme (under dark text). Primary leads, tertiary and secondary
-    // sweep across it, so the card always reads as the palette's own colours.
     val dark = appIsDarkTheme()
     val toward = if (dark) Color.White else Color.Black
-    val amount = if (dark) 0.62f else 0.5f
-    val tone = { c: Color -> lerp(c, toward, amount) }
+    val tone = { c: Color -> lerp(c, toward, if (dark) 0.62f else 0.5f) }
     return Brush.linearGradient(
         listOf(tone(scheme.primary), tone(scheme.tertiary), tone(scheme.secondary)),
         start = androidx.compose.ui.geometry.Offset.Zero,
         end = androidx.compose.ui.geometry.Offset.Infinite,
     )
+}
+
+/**
+ * The hero's no-photo backdrop, built from the app's own palette: a diagonal sweep from primary through
+ * tertiary to secondary (deep in the light theme, pale in the dark one, opposite the card text), with a
+ * soft light of the primary pooling in the upper corner and one of the tertiary in the lower, so it reads as
+ * a lit surface rather than a flat ramp. Drawn, not an image, so it follows the palette and the theme.
+ */
+@Composable
+internal fun Modifier.carTonalBackground(scheme: ColorScheme): Modifier {
+    val dark = appIsDarkTheme()
+    val toward = if (dark) Color.White else Color.Black
+    val tone = { c: Color -> lerp(c, toward, if (dark) 0.62f else 0.5f) }
+    val glow = { c: Color -> lerp(c, if (dark) Color.White else Color.White, if (dark) 0.8f else 0.35f) }
+    val base = tone(scheme.primary); val mid = tone(scheme.tertiary); val end = tone(scheme.secondary)
+    return this.drawBehind {
+        drawRect(
+            Brush.linearGradient(
+                0f to base, 0.55f to mid, 1f to end,
+                start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                end = androidx.compose.ui.geometry.Offset(size.width, size.height),
+            ),
+        )
+        val r = size.maxDimension * 0.85f
+        drawRect(
+            Brush.radialGradient(
+                listOf(glow(scheme.primary).copy(alpha = if (dark) 0.34f else 0.30f), Color.Transparent),
+                center = androidx.compose.ui.geometry.Offset(size.width * 0.12f, size.height * 0.05f), radius = r,
+            ),
+        )
+        drawRect(
+            Brush.radialGradient(
+                listOf(glow(scheme.tertiary).copy(alpha = if (dark) 0.30f else 0.26f), Color.Transparent),
+                center = androidx.compose.ui.geometry.Offset(size.width * 0.92f, size.height * 0.98f), radius = r * 0.9f,
+            ),
+        )
+    }
 }
 
 /**
@@ -155,7 +189,7 @@ internal fun HeroVisual(
         Box(
             sizeModifier
                 .clip(RoundedCornerShape(corner))
-                .background(carTonalBrush(scheme)),
+                .carTonalBackground(scheme),
         )
     } else {
         // A locally-cropped photo is an absolute path; a pasted one is a URL.
@@ -209,7 +243,7 @@ internal fun HeroVisual(
             Box(
                 sizeModifier
                     .clip(RoundedCornerShape(corner))
-                    .background(carTonalBrush(scheme)),
+                    .carTonalBackground(scheme),
             )
         } else {
             AsyncImage(

@@ -7,7 +7,9 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -15,14 +17,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.layout.VerticalAlignmentLine
 
@@ -62,26 +63,30 @@ internal val PebbleCloseDamping = 0.95f
 internal val PebbleBounceStiffness = Spring.StiffnessLow
 
 /**
- * Standard enter animation for expanding surfaces: a fade-in plus a slide from the direction of
- * expansion.
+ * Standard enter animation for expanding surfaces: a fade-in. Nothing slides: the surface grows
+ * (see [expandEnterSized]) and its rows pop in as it uncovers them ([StaggeredRevealColumn]).
  */
 internal fun expandEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
-    fadeIn(tween(MotionShort)) + slideInVertically {
-        if (expandFrom == Alignment.Top) -it / 3 else it / 3
-    }
+    fadeIn(tween(MotionShort))
 
 /**
  * Standard exit animation for expanding surfaces: mirrors [expandEnter] in reverse. [fade] false
  * suits nested content with its own per-row fades (e.g. StaggeredRevealColumn).
  */
 internal fun expandExit(shrinkTowards: Alignment.Vertical = Alignment.Top, fade: Boolean = true): ExitTransition =
-    (if (fade) fadeOut(tween(MotionFast)) else ExitTransition.None) + slideOutVertically {
-        if (shrinkTowards == Alignment.Top) -it / 3 else it / 3
-    }
+    if (fade) fadeOut(tween(MotionFast)) else ExitTransition.None
 
 /** [expandEnter] plus real container-height growth via [expandVertically]. */
 internal fun expandEnterSized(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
     expandEnter(expandFrom) + expandVertically(expandFrom = expandFrom)
+
+/**
+ * The spring a pebble's body opens with. [StaggeredRevealColumn] runs its own progress on the SAME
+ * spring, so a row pops at the moment the growing body reaches it.
+ */
+internal val PebbleOpenStiffness = Spring.StiffnessMediumLow
+internal fun pebbleOpenSizeSpec(): FiniteAnimationSpec<IntSize> =
+    spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = PebbleOpenStiffness)
 
 /** Mirror of [expandEnterSized]. */
 internal fun expandExitSized(shrinkTowards: Alignment.Vertical = Alignment.Top, fade: Boolean = true): ExitTransition =
