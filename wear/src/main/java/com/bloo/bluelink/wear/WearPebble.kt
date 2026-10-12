@@ -236,6 +236,8 @@ data class WearQuickAction(
     val label: String,
     val icon: ImageVector,
     val active: Boolean = false,
+    /** The command is in flight: shows "Sending…" and ignores taps. */
+    val pending: Boolean = false,
     val onClick: () -> Unit,
 )
 
@@ -253,15 +255,16 @@ fun WearQuickActions(actions: List<WearQuickAction>, modifier: Modifier = Modifi
                 row.forEach { a ->
                     WearButton(
                         active = a.active,
+                        enabled = !a.pending,
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
                         onClick = a.onClick,
                     ) {
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                             val tint = if (a.active) scheme.onPrimary else scheme.onSecondaryContainer
-                            Icon(a.icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+                            Icon(a.icon, contentDescription = null, tint = tint.copy(alpha = if (a.pending) 0.5f else 1f), modifier = Modifier.size(22.dp))
                             Text(
-                                a.label,
+                                if (a.pending) "Sending…" else a.label,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = tint,

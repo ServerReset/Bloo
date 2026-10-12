@@ -1,6 +1,7 @@
 package com.bloo.bluelink.wear
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
@@ -9,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FlashOn
@@ -35,10 +37,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.AppScaffold
+import androidx.wear.compose.material3.HorizontalPageIndicator
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
 import com.bloo.bluelink.data.BlooColors
+import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WatchPinPolicy
 import com.bloo.bluelink.data.supportsHornLights
@@ -137,6 +141,7 @@ fun WearGarageScreen(
             return@AppScaffold
         }
         val pagerState = rememberPagerState(pageCount = { vehicles.size })
+        Box(Modifier.fillMaxSize()) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             vehicles.getOrNull(page)?.let { v ->
                 WearCarPage(
@@ -157,6 +162,9 @@ fun WearGarageScreen(
                 )
             }
         }
+        // Which car this is, when there is more than one.
+        if (vehicles.size > 1) HorizontalPageIndicator(pagerState = pagerState)
+        }
     }
 }
 
@@ -170,6 +178,8 @@ private fun WearCarPage(
     val context = LocalContext.current
     val listState = rememberScalingLazyListState()
     val signedIn by WearCredentialSync.signedIn.collectAsStateWithLifecycle()
+    val pendingCommands by WearCommands.pending.collectAsStateWithLifecycle()
+    var confirmUnlock by remember { mutableStateOf(false) }
     val lastResult by repo.lastCommandResult.collectAsStateWithLifecycle(initialValue = null)
     val updateAdvice by WearDataLayerSync.updateAdvice.collectAsStateWithLifecycle(initialValue = null)
     val selfUpdate by WearUpdateChecker.available.collectAsStateWithLifecycle(initialValue = null)
@@ -187,6 +197,22 @@ private fun WearCarPage(
         com.bloo.bluelink.data.WorkflowRun(it.runNumber, htmlUrl = "", watchApkUrl = it.apkUrl)
     }
 
+    // Unlocking is the one command that opens the car, so it asks once more.
+    if (confirmUnlock) {
+        ScreenScaffold(timeText = { TimeText() }) {
+            ScalingLazyColumn(state = rememberScalingLazyListState(), modifier = Modifier.fillMaxSize()) {
+                item { WearCenteredText("Unlock ${v.name}?") }
+                item {
+                    WearActionRow("Unlock", Icons.Filled.LockOpen) {
+                        confirmUnlock = false
+                        requestCommand { repo.lock(v.vin) }
+                    }
+                }
+                item { WearActionRow("Cancel", Icons.Filled.Close) { confirmUnlock = false } }
+            }
+        }
+        return
+    }
     ScreenScaffold(scrollState = listState, timeText = { TimeText() }) {
         ScalingLazyColumn(
             state = listState,
@@ -244,21 +270,24 @@ private fun WearCarPage(
             item {
                 val actions = buildList {
                     val locked = v.locked == true
-                    add(WearQuickAction(if (locked) "Unlock" else "Lock", if (locked) Icons.Filled.LockOpen else Icons.Filled.Lock) {
-                        requestCommand { repo.lock(v.vin) }
+                    add(WearQuickAction(
+                        if (locked) "Unlock" else "Lock", if (locked) Icons.Filled.LockOpen else Icons.Filled.Lock,
+                        pending = WearCommands.key(v.vin, CarAction.TOGGLE_LOCK) in pendingCommands,
+                    ) {
+                        if (locked) confirmUnlock = true else requestCommand { repo.lock(v.vin) }
                     })
                     val on = v.climateOn == true
-                    add(WearQuickAction(if (on) "Climate off" else "Climate", Icons.Filled.AcUnit, active = on) {
+                    add(WearQuickAction(if (on) "Climate off" else "Climate", Icons.Filled.AcUnit, active = on, pending = WearCommands.key(v.vin, CarAction.TOGGLE_CLIMATE) in pendingCommands) {
                         requestCommand { repo.climate(v.vin) }
                     })
                     if (v.hasBattery) {
                         val charging = v.charging == true
-                        add(WearQuickAction(if (charging) "Stop charge" else "Charge", Icons.Filled.Bolt, active = charging) {
+                        add(WearQuickAction(if (charging) "Stop charge" else "Charge", Icons.Filled.Bolt, active = charging, pending = WearCommands.key(v.vin, CarAction.TOGGLE_CHARGE) in pendingCommands) {
                             requestCommand { repo.charge(v.vin) }
                         })
                     }
                     if (v.toVehicle().supportsHornLights) {
-                        add(WearQuickAction("Flash", Icons.Filled.FlashOn) { requestCommand { repo.flashLights(v.vin) } })
+                        add(WearQuickAction("Flash", Icons.Filled.FlashOn, pending = WearCommands.key(v.vin, CarAction.FLASH_LIGHTS) in pendingCommands) { requestCommand { repo.flashLights(v.vin) } })
                     }
                 }
                 WearQuickActions(actions)

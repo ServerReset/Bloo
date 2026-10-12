@@ -5,6 +5,11 @@ import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.ioScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 
 /**
@@ -39,7 +44,7 @@ class WearSnapshotRepository(private val context: Context) {
     }
 
     private fun run(vin: String, action: String) {
-        scope.launch { runWatchCommand(context, vin, action) }
+        scope.launch { WearCommands.track(vin, action) { runWatchCommand(context, vin, action) } }
     }
 
     /** The last command result, so the UI can clear pending + show a failure. */
@@ -54,8 +59,39 @@ class WearSnapshotRepository(private val context: Context) {
  * phone. The watch's one command path, shared by [WearSnapshotRepository] and [WearActionReceiver]
  * (a notification's Stop action).
  */
-internal suspend fun runWatchCommand(context: Context, vin: String, action: String) {
-    if (WearCredentialSync.runLocally(context, vin, action) == null) {
-        WearDataLayerSync.sendCommand(context, vin, action)
+internal suspend fun runWatchCommand(context: Context, vin: String, action: String): Boolean {
+    if (WearCredentialSync.runLocally(context, vin, action) != null) return true
+    WearDataLayerSync.sendCommand(context, vin, action)
+    return false
+}
+
+/**
+ * Which commands are in flight, so a button can say "Sending..." and ignore a second tap instead of
+ * firing the same command twice. A command the watch runs itself is done when it returns; one handed
+ * to the phone is done when its result comes back (or after 20 seconds, so a lost link never leaves a
+ * button stuck).
+ */
+internal object WearCommands {
+    private val _pending = MutableStateFlow<Set<String>>(emptySet())
+    val pending: StateFlow<Set<String>> = _pending
+
+    fun key(vin: String, action: String) = "$vin:$action"
+
+    /** Runs [block] (true = it finished on the watch) and keeps [vin]/[action] marked pending meanwhile. */
+    suspend fun track(vin: String, action: String, block: suspend () -> Boolean) {
+        val k = key(vin, action)
+        if (k in _pending.value) return
+        _pending.update { it + k }
+        try {
+            val before = WearDataLayerSync.lastCommandResult.value
+            val ranHere = block()
+            if (!ranHere) {
+                withTimeoutOrNull(20_000L) {
+                    WearDataLayerSync.lastCommandResult.first { it != before && it?.vin == vin }
+                }
+            }
+        } finally {
+            _pending.update { it - k }
+        }
     }
 }
