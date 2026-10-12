@@ -204,7 +204,7 @@ internal fun updateAction(state: UiState, info: UpdateInfo, seamless: Boolean): 
         else -> "Open release page"
     },
     icon = when {
-        state.updateApkReady -> Icons.Filled.CheckCircle
+        state.updateApkReady -> AppIcons.CheckCircle
         state.updateDownloading -> Icons.Filled.Download
         else -> Icons.Filled.SystemUpdate
     },

@@ -174,7 +174,7 @@ internal fun SearchPill(
                         Modifier.fillMaxSize().padding(horizontal = GapSection),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Icon(AppIcons.Search, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(GapGroup))
                         Box(Modifier.weight(1f)) {
                             BasicTextField(
@@ -207,7 +207,7 @@ internal fun SearchPill(
                         }
                         MorphIconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) }) {
                             Icon(
-                                Icons.Filled.Close,
+                                AppIcons.Close,
                                 contentDescription = if (query.isNotEmpty()) "Clear" else "Close",
                             )
                         }
@@ -218,7 +218,7 @@ internal fun SearchPill(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Icon(AppIcons.Search, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(GapGroup))
                         Text("Search", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
                     }
@@ -226,7 +226,7 @@ internal fun SearchPill(
                     // is no label.
                     else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(
-                            Icons.Filled.Search,
+                            AppIcons.Search,
                             contentDescription = "Search",
                             // 18dp in a 40dp circle left an oversized empty ring.
                             modifier = Modifier.size(22.dp),
@@ -252,7 +252,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
     }
     val lookups = remember(state.vehicles) {
         buildList {
-            add("Battery level" to Icons.Filled.Bolt)
+            add("Battery level" to AppIcons.Bolt)
             add("Range" to Icons.Filled.Speed)
             add("Odometer" to Icons.Filled.Speed)
             if (state.vehicles.size > 1) add("Where is my car" to Icons.Filled.Place)
@@ -281,7 +281,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
     if (!compact) {
         ResultGroup("Settings") {
             listOf("Haptic feedback", "Text scale", "Glass style").forEach { label ->
-                ResultRow(Icons.Filled.Settings, scheme.primary, caption = null, onClick = { onPick(label, false) }) { TitleSmallText(label) }
+                ResultRow(AppIcons.Settings, scheme.primary, caption = null, onClick = { onPick(label, false) }) { TitleSmallText(label) }
             }
         }
     }

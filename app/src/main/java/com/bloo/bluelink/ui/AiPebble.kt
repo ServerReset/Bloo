@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,7 +23,7 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
     val busy = v.vin in state.aiBusy
     val summary = state.aiSummaries[v.vin]
     Pebble(
-        v, "ai", "AI summary", Icons.Filled.AutoAwesome, state, vm, modifier,
+        v, "ai", "AI summary", AppIcons.AutoAwesome, state, vm, modifier,
         // What the tile can tell you, not what engine it runs on. The engine is still named in the
         // body copy ("generated privately on your device"), where a fact you read once belongs.
         summary = when {
@@ -55,7 +54,7 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
         },
         headerAction = PebbleHeaderAction(
             label = "Summarize",
-            icon = Icons.Filled.AutoAwesome,
+            icon = AppIcons.AutoAwesome,
             onClick = { vm.summarizeCar(v) },
             pending = busy,
         ),

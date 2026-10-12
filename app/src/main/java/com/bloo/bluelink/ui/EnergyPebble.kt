@@ -72,11 +72,11 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
     }
 
     Pebble(
-        v, "charge", "Charge", Icons.Filled.Bolt, state, vm, modifier,
+        v, "charge", "Charge", AppIcons.Bolt, state, vm, modifier,
         summary = summary,
         headerAction = PebbleHeaderAction(
             label = if (charging) "Stop" else "Start",
-            icon = Icons.Filled.Bolt,
+            icon = AppIcons.Bolt,
             onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
             enabled = plugged,
             pending = pending,
@@ -120,7 +120,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
             )
             ChargeLimitPill(
                 label = "DC (fast) limit",
-                icon = Icons.Filled.Bolt,
+                icon = AppIcons.Bolt,
                 limit = dcLimit,
                 pending = limitPending,
                 enabled = enabled,

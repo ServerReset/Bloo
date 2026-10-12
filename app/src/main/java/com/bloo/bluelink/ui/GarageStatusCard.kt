@@ -77,7 +77,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
             "${garageLoadError}\n\nPull down to try again.",
         )
         else -> Triple(
-            Icons.Filled.DirectionsCar,
+            AppIcons.DirectionsCar,
             "No vehicles found",
             "No vehicles found on this account.\n\nRegister your car in the BlueLink / UVO app, then pull to reload.",
         )

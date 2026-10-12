@@ -119,7 +119,7 @@ internal fun <T : Enum<T>> EnumSegmented(
 internal fun PowertrainPicker(current: Powertrain, onSelect: (Powertrain) -> Unit) = EnumSegmented(
     Powertrain.entries, current, onSelect = onSelect,
     label = { when (it) { Powertrain.GAS -> "Gas"; Powertrain.HYBRID -> "Hybrid"; Powertrain.PHEV -> "PHEV"; Powertrain.EV -> "EV" } },
-    icon = { when (it) { Powertrain.GAS -> Icons.Filled.LocalGasStation; Powertrain.HYBRID -> Icons.Filled.Bolt; Powertrain.PHEV -> Icons.Filled.Power; Powertrain.EV -> Icons.Filled.FlashOn } },
+    icon = { when (it) { Powertrain.GAS -> Icons.Filled.LocalGasStation; Powertrain.HYBRID -> AppIcons.Bolt; Powertrain.PHEV -> Icons.Filled.Power; Powertrain.EV -> Icons.Filled.FlashOn } },
 )
 
 /**
@@ -222,7 +222,7 @@ internal fun SettingsCard(
         PebbleShell(
             expanded = expanded,
             onToggle = { if (!inline) vm.togglePebble(SettingsPseudoVehicle, title) },
-            icon = icon ?: Icons.Filled.Settings,
+            icon = icon ?: AppIcons.Settings,
             title = title,
             canToggle = !inline,
             titleTrailing = inlineSetting ?: status?.takeIf { it.isNotBlank() }?.let {
@@ -309,7 +309,7 @@ internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
         exit = scaleOut() + fadeOut(),
     ) {
         Icon(
-            Icons.Filled.Check,
+            AppIcons.Check,
             contentDescription = null,
             modifier = Modifier.size(ButtonIconSize),
         )

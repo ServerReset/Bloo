@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -139,7 +138,7 @@ internal fun SettingsSearchResults(
                 entriesInGroup.forEach { e -> androidx.compose.runtime.key(e.title) {
                     val car = e.title.substringAfter(" · ", "").takeIf { it.isNotBlank() }
                     ResultRow(
-                        if (car != null) AppIcons.DirectionsCar else Icons.Filled.Settings,
+                        if (car != null) AppIcons.DirectionsCar else AppIcons.Settings,
                         MaterialTheme.colorScheme.primary,
                         caption = car,
                         content = e.content,

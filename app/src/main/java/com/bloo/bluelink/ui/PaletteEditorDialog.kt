@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
@@ -62,7 +61,7 @@ internal fun PaletteEditorDialog(
                     if (confirmDeleteArm.armed) { onDelete(paletteId); onDismiss() } else { confirmDeleteArm.arm() }
                 }) {
                     Icon(
-                        Icons.Filled.Close,
+                        AppIcons.Close,
                         contentDescription = if (confirmDeleteArm.armed) "Confirm delete palette" else "Delete palette",
                         tint = if (confirmDeleteArm.armed) MaterialTheme.colorScheme.error else LocalContentColor.current,
                     )
@@ -93,7 +92,7 @@ internal fun PaletteEditorDialog(
         buttons = {
             MorphActionButton(
                 label = "Save",
-                icon = Icons.Filled.Check,
+                icon = AppIcons.Check,
                 onClick = {
                     onSave(
                         CustomPaletteData(

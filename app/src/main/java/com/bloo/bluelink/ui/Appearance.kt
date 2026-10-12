@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -123,7 +122,7 @@ internal fun CustomPaletteSwatch(palette: CustomPaletteData, selected: Boolean, 
             // grid.
             MorphIconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                 Icon(
-                    Icons.Filled.Settings,
+                    AppIcons.Settings,
                     contentDescription = "Edit palette",
                     modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -306,7 +305,7 @@ private fun snapStep(v: Float, step: Float): Float = Math.round(v / step) * step
 @Composable
 private fun SelectedCheck() {
     Icon(
-        Icons.Filled.Check,
+        AppIcons.Check,
         contentDescription = null,
         tint = Color.White,
         modifier = Modifier.size(22.dp),

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.MaterialTheme
@@ -39,7 +38,7 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
     val isSamsung = remember { Build.MANUFACTURER.lowercase() == "samsung" }
     GlassAlertDialog(
         onDismissRequest = onDismiss,
-        icon = Icons.Filled.Info,
+        icon = AppIcons.Info,
         title = "Live update not showing?",
         text = {
             Text("A few things to check, in order:", style = MaterialTheme.typography.bodyMedium)

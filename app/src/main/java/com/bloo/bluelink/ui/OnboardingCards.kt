@@ -64,7 +64,7 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
         "Quick actions, a Tile and notifications on your wrist.",
     )
     OnboardingStepKind.CAR_POWERTRAIN -> OnboardingCardSpec(
-        Icons.Filled.DirectionsCar, if (newCar) "Meet ${carName ?: "your new car"}" else "${carName ?: "Your car"}: what powers it",
+        AppIcons.DirectionsCar, if (newCar) "Meet ${carName ?: "your new car"}" else "${carName ?: "Your car"}: what powers it",
         if (newCar) "A new car just joined your garage. First: what powers it?" else "Gas, hybrid, plug-in or electric.",
     )
     OnboardingStepKind.CAR_PLATFORM -> OnboardingCardSpec(
@@ -80,7 +80,7 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
         "A few things that make Bloo quick to use.",
     )
     OnboardingStepKind.FEATURES -> OnboardingCardSpec(
-        Icons.Filled.AutoAwesome, "More Bloo can do",
+        AppIcons.AutoAwesome, "More Bloo can do",
         "Worth knowing about, whenever you're ready for them.",
     )
 }

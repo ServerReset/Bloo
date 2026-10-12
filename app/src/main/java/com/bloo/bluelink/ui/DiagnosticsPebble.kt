@@ -127,7 +127,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
         headerAction = if (hasWarning) PebbleHeaderAction(
             label = "",
-            icon = Icons.Filled.Warning,
+            icon = AppIcons.Warning,
             onClick = { vm.togglePebble(v, "diagnostics") },
             isWarning = true,
             contentDescription = "Diagnostics warning",

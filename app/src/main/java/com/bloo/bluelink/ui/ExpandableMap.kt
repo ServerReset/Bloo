@@ -253,7 +253,7 @@ internal fun ExpandableMapLayer(
                 ) {
                     MapFeatureRow(
                         features = listOf(
-                            MapFeature(Icons.Filled.DirectionsCar, "Car") { mapState.recenter() },
+                            MapFeature(AppIcons.DirectionsCar, "Car") { mapState.recenter() },
                             MapFeature(Icons.Filled.MyLocation, "Me") { showMe() },
                             MapFeature(Icons.Filled.Share, "Share") {
                                 shareLocation(context, location, vehicleName)

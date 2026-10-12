@@ -204,8 +204,8 @@ internal fun UpdateStatusLine(
     val (statusIcon, statusKind, statusTint) = when {
         state.updateInstalling -> Triple(Icons.Filled.SystemUpdate, "installing", scheme.onSurfaceVariant)
         state.updateDownloading -> Triple(Icons.Filled.Download, "downloading", scheme.onSurfaceVariant)
-        state.updateApkReady && seamless -> Triple(Icons.Filled.CheckCircle, "ready_seamless", ChargeGreen)
-        state.updateApkReady -> Triple(Icons.Filled.CheckCircle, "ready", ChargeGreen)
+        state.updateApkReady && seamless -> Triple(AppIcons.CheckCircle, "ready_seamless", ChargeGreen)
+        state.updateApkReady -> Triple(AppIcons.CheckCircle, "ready", ChargeGreen)
         seamless -> Triple(AppIcons.Bolt, "seamless", scheme.onSurfaceVariant)
         else -> Triple(Icons.Filled.SystemUpdate, "update", scheme.primary)
     }

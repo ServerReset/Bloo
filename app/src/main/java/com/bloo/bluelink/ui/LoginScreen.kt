@@ -242,7 +242,7 @@ internal fun LoginScreen(
                             onValueChange = { password = it },
                             label = { Text("Password") },
                             singleLine = true,
-                            leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            leadingIcon = { Icon(AppIcons.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             trailingIcon = { RevealToggle(showPassword, "password") { showPassword = !showPassword } },
                             visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),

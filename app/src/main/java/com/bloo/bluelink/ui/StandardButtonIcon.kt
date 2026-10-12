@@ -54,31 +54,31 @@ import androidx.compose.ui.unit.dp
  */
 fun standardButtonIcon(label: String): ImageVector? = when (label) {
     // Dismissive
-    "Cancel", "Not now", "Dismiss" -> Icons.Filled.Close
+    "Cancel", "Not now", "Dismiss" -> AppIcons.Close
     // Destructive: Close, since the app has no delete glyph and only reuses existing icons.
-    "Clear", "Remove", "Delete", "Remove PIN" -> Icons.Filled.Close
+    "Clear", "Remove", "Delete", "Remove PIN" -> AppIcons.Close
     "Sign out" -> Icons.AutoMirrored.Filled.Logout
     "Unpin" -> Icons.Filled.PushPin
-    "Done" -> Icons.Filled.Check
+    "Done" -> AppIcons.Check
     // Confirmation: the second tap of a two-step action takes the affirmative glyph.
-    "Tap again to confirm", "Tap again to reset", "Keep it", "Keep PIN" -> Icons.Filled.Check
+    "Tap again to confirm", "Tap again to reset", "Keep it", "Keep PIN" -> AppIcons.Check
     // Content. "Choose photo" opens the system picker; a label with no glyph can't compact its row.
     "Choose photo" -> Icons.Filled.FileOpen
     "Choose device" -> Icons.Filled.Bluetooth
     "Copy" -> Icons.Filled.ContentCopy
     "Export" -> Icons.Filled.Download
     "Restore" -> Icons.Filled.CloudDone
-    "Save" -> Icons.Filled.Check
+    "Save" -> AppIcons.Check
     "Save as preset" -> Icons.Filled.Star
     // Disclosure: one chevron for both directions.
     "Show", "Full notes", "Trouble installing?" -> Icons.Filled.KeyboardArrowDown
     "Hide", "Hide install help", "Hide diagnostics" -> Icons.Filled.KeyboardArrowDown
     // Navigation / external
     "GitHub", "Open release page" -> Icons.AutoMirrored.Filled.OpenInNew
-    "Simulate leaving" -> Icons.Filled.DirectionsCar
+    "Simulate leaving" -> AppIcons.DirectionsCar
     // Sync / run
     "Test sync", "Pull from primary", "Change Drive file" -> Icons.Filled.CloudSync
-    "Run it", "Working…" -> Icons.Filled.Bolt
+    "Run it", "Working…" -> AppIcons.Bolt
     "Remind me", "Retry" -> Icons.Filled.Refresh
     // Security
     "Use biometrics" -> Icons.Filled.Fingerprint

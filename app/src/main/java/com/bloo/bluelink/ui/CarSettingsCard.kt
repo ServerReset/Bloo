@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -61,7 +60,7 @@ internal fun CarSettingsCard(
     PebbleShell(
         expanded = expanded,
         onToggle = onToggle,
-        icon = Icons.Filled.DirectionsCar,
+        icon = AppIcons.DirectionsCar,
         title = v.name,
         modifier = modifier,
         summary = "${v.model} · ${state.powertrainLabel(v)}",

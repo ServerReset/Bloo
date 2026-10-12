@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,7 +24,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
     // Shared GlassAlertDialog shell with stacked full-width buttons.
     GlassAlertDialog(
         onDismissRequest = { if (!loading) vm.kiaCancelOtp() },
-        icon = Icons.Filled.Lock,
+        icon = AppIcons.Lock,
         title = if (otp.sentTo == null) "Verify it's you" else "Enter your code",
         text = {
             if (otp.sentTo == null) {
@@ -87,7 +86,7 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
     var code by remember(otp.challenge) { mutableStateOf("") }
     GlassAlertDialog(
         onDismissRequest = { if (!loading) vm.canadaCancelOtp() },
-        icon = Icons.Filled.Lock,
+        icon = AppIcons.Lock,
         title = "Enter your code",
         text = {
             Text(

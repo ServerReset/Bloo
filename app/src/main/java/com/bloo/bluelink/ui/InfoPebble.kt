@@ -76,7 +76,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     // Matches the lock control, which already handles unknown.
     val infoSummary = status?.doorLock?.let { if (it) "Locked" else "Unlocked" }
     val glance = LocalForceExpanded.current
-    Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, modifier, summary = infoSummary) {
+    Pebble(v, "info", "Car info", AppIcons.Info, state, vm, modifier, summary = infoSummary) {
         PebbleStatusGate(status, state.refreshing) { status ->
             SectionLabel("Status")
             status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }

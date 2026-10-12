@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -120,7 +119,7 @@ internal fun HeroHeader(
     PebbleShell(
         expanded = heroShown,
         onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
-        icon = Icons.Filled.DirectionsCar,
+        icon = AppIcons.DirectionsCar,
         title = v.name,
         modifier = modifier,
         titleColor = heroTitleColorNow,

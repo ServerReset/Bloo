@@ -345,7 +345,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 // No mechanism at all -- should not be reachable (the lock gate refuses to engage
                 // without one); a calm fallback so the overlay never dead-ends silently.
                 Icon(
-                    Icons.Filled.Lock,
+                    AppIcons.Lock,
                     contentDescription = null,
                     modifier = Modifier.size(72.dp),
                     tint = lockFg,

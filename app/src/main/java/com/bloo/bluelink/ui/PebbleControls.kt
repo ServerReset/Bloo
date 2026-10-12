@@ -250,7 +250,7 @@ internal fun PrimaryActions(
                 LoadingIndicator(Modifier.size(22.dp))
             } else {
                 Icon(
-                    if (locked == true) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                    if (locked == true) AppIcons.Lock else Icons.Filled.LockOpen,
                     contentDescription = null,
                     tint = stateColor,
                     modifier = Modifier.size(22.dp),
@@ -276,10 +276,10 @@ internal fun PrimaryActions(
         val mainSource = remember { MutableInteractionSource() }
         val lockContent: @Composable RowScope.() -> Unit = {
             Box(contentAlignment = Alignment.Center) {
-                val buttonIcon = if (locked == true) Icons.Filled.LockOpen else Icons.Filled.Lock
+                val buttonIcon = if (locked == true) Icons.Filled.LockOpen else AppIcons.Lock
                 MorphButtonLabel(buttonIcon, if (locked == true) "Unlock" else "Lock", pending)
                 // Reserves the width of the longer label so the button doesn't jump on the flip.
-                Box(Modifier.alpha(0f)) { MorphButtonLabel(Icons.Filled.Lock, "Unlock", false) }
+                Box(Modifier.alpha(0f)) { MorphButtonLabel(AppIcons.Lock, "Unlock", false) }
             }
         }
         ButtonCluster(
