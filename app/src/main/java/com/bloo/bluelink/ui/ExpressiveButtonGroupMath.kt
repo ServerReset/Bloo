@@ -81,7 +81,9 @@ internal fun clampLineToBudget(memberIdx: List<Int>, exact: DoubleArray, basis: 
  */
 internal fun largestRemainderWidths(memberIdx: List<Int>, exact: DoubleArray, total: Int): IntArray {
     val target = IntArray(exact.size)
-    for (i in memberIdx) target[i] = exact[i].toInt()
+    // Epsilon: a width a hair under a whole pixel (float trim/scale) must not floor a pixel short of a
+    // label's need, which drops the label.
+    for (i in memberIdx) target[i] = (exact[i] + 1e-6).toInt()
     var remainder = total - memberIdx.sumOf { target[it] }
     if (remainder > 0) {
         val order = memberIdx.sortedByDescending { exact[it] - exact[it].toInt() }

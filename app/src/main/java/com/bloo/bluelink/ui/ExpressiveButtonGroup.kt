@@ -43,6 +43,11 @@ fun ExpressiveButtonGroup(
      * pebble header chevron, the lock group), where a single icon button must never balloon.
      */
     growWhenAlone: Boolean = true,
+    /**
+     * Labels are never dropped: when they do not fit on one line the row wraps onto another instead
+     * of collapsing to glyphs, and a press only borrows room that is really spare.
+     */
+    keepLabels: Boolean = false,
     content: @Composable ExpressiveButtonGroupScope.() -> Unit,
 ) {
     // Natural (unpressed) child widths from the last resting pass. Deliberately not snapshot state:
@@ -122,13 +127,13 @@ fun ExpressiveButtonGroup(
             // True when the labels do not fit on one line but every member has a symbol it can
             // shrink to, and those symbols all fit together on one line.
             fun collapsesInsteadOfWrapping(): Boolean {
-                if (n < 2 || maxW == Int.MAX_VALUE || member.any { !it }) return false
+                if (keepLabels || n < 2 || maxW == Int.MAX_VALUE || member.any { !it }) return false
                 if (full.sum() + gapPx * (n - 1) <= maxW - (if (naturals.compacted) hysteresisPx else 0)) return false
                 val c = compact ?: IntArray(n) { i -> measurables[i].minIntrinsicWidth(h).coerceIn(0, full[i]) }
                     .also { compact = it; naturals.compact = it }
                 return (0 until n).all { c[it] < full[it] } && c.sum() + gapPx * (n - 1) <= maxW
             }
-            if (!wrap || collapsesInsteadOfWrapping()) {
+            if ((!wrap && !keepLabels) || collapsesInsteadOfWrapping()) {
                 // A row whose buttons all have a symbol never breaks into lines: when the labels do
                 // not fit, every button drops to its symbol (the fit rule below) and the one line
                 // fills the width. Wrapping is for buttons that have nothing to collapse to.
@@ -172,7 +177,7 @@ fun ExpressiveButtonGroup(
                 // FIT RULE, all-or-nothing: if the line cannot give every member the room its label
                 // needs, every member drops to its glyph so the choice never depends on text or
                 // language. Tested against content, not content plus press reserve.
-                val collapse = constraints.hasBoundedWidth &&
+                val collapse = !keepLabels && constraints.hasBoundedWidth &&
                     memberIdx.sumOf { full[it] } > room - (if (naturals.compacted) hysteresisPx else 0)
                 if (constraints.hasBoundedWidth) naturals.compacted = collapse
                 val basis = if (collapse) {

@@ -23,6 +23,8 @@ fun ExpressiveButtonRow(
     lineSpacing: Dp = spacing,
     /** See [ExpressiveButtonGroup]'s own `wrap`. */
     wrap: Boolean = true,
+    /** See [ExpressiveButtonGroup]'s own `keepLabels`. */
+    keepLabels: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     ExpressiveButtonGroup(
@@ -33,6 +35,7 @@ fun ExpressiveButtonRow(
         horizontalAlignment = horizontalAlignment,
         lineSpacing = lineSpacing,
         wrap = wrap,
+        keepLabels = keepLabels,
     ) {
         content()
     }

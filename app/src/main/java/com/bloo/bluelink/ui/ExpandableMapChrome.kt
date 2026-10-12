@@ -89,6 +89,7 @@ internal fun MapFeatureRow(
             modifier = Modifier.fillMaxWidth(),
             spacing = GapRow,
             lineSpacing = GapRow,
+            keepLabels = true,
         ) {
             features.forEach { feature ->
                 MorphActionButton(
