@@ -187,7 +187,15 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 .padding(horizontal = GapHero, vertical = GapBlock),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (showBiometric) {
+            // The biometric card, the PIN card and the fallback cross-fade into each other (switching to
+            // "Use PIN" used to swap them with a hard cut).
+            androidx.compose.animation.Crossfade(
+                targetState = if (showBiometric) 0 else if (appState.appPinSet) 1 else 2,
+                animationSpec = androidx.compose.animation.core.tween(MotionMedium),
+                label = "lockCard",
+            ) { mode ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (mode == 0) {
                 // The same liquid glass as the rest of the app, over the force-blurred app behind
                 // it: the blur (LockBlurLayer) is what keeps data from leaking, the glass is what
                 // makes this one of us.
@@ -249,7 +257,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 }
                 }
                 }
-            } else if (appState.appPinSet) {
+            } else if (mode == 1) {
                 // --- PIN prompt (device has no biometrics, or user chose PIN) --
                 // GlassSurface (GlassChrome.kt): the same fill/rim/shadow every other
                 // floating surface in the app shares, replacing this card's own
@@ -355,6 +363,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = lockFg.copy(alpha = 0.85f),
                 )
+            }
+            }
             }
         }
     }

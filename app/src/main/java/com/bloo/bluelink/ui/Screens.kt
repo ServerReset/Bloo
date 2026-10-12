@@ -308,7 +308,11 @@ fun BlooApp(vm: AppViewModel) {
     CarPhotoPickerHost(vm, state.photoPickRequest)
 
     // The welcome cards, when summoned from Settings: over the app, dismissed back to it.
-    if (state.welcomeCardsOpen) {
+    androidx.compose.animation.AnimatedVisibility(
+        visible = state.welcomeCardsOpen,
+        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)),
+        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MotionShort)),
+    ) {
         Box(Modifier.fillMaxSize()) { OnboardingScreen(vm, OnboardingMode.Replay) }
     }
     // The pre-install guide: shown before the system installer runs when Shizuku is off, so the

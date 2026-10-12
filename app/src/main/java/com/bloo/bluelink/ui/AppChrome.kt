@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.animateContentSize
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -115,7 +116,9 @@ private fun DialogCard(
     buttons: @Composable ColumnScope.() -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    Column(Modifier.padding(GapBlock)) {
+    // Animating the card's own size means a dialog whose body changes (a step, an error line, a progress
+    // bar) grows or shrinks smoothly instead of snapping.
+    Column(Modifier.animateContentSize(spring(dampingRatio = GentleDamping, stiffness = Spring.StiffnessMediumLow)).padding(GapBlock)) {
         if (icon != null) {
             Box(
                 Modifier.size(48.dp).background(scheme.primaryContainer, CircleShape),

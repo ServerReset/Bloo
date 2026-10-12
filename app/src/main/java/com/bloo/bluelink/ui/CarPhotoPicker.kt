@@ -27,8 +27,11 @@ internal fun AppViewModel.clearPhotoPickRequest() = _state.update { it.copy(phot
 internal fun CarPhotoPickerHost(vm: AppViewModel, request: String?) {
     var pickTarget by remember { mutableStateOf<String?>(null) }
     var cropUri by remember { mutableStateOf<Uri?>(null) }
+    // The crop screen is shown by this flag, not by cropUri itself, so it can fade out with its content
+    // intact: the picked image and target are cleared only after the exit has played.
+    var showCrop by remember { mutableStateOf(false) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null && pickTarget != null) cropUri = uri else pickTarget = null
+        if (uri != null && pickTarget != null) { cropUri = uri; showCrop = true } else pickTarget = null
     }
     LaunchedEffect(request) {
         if (request != null) {
@@ -37,14 +40,26 @@ internal fun CarPhotoPickerHost(vm: AppViewModel, request: String?) {
             launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
     }
-    cropUri?.let { uri ->
+    LaunchedEffect(showCrop) {
+        if (!showCrop && cropUri != null) {
+            kotlinx.coroutines.delay((MotionShort + 100).toLong())
+            cropUri = null
+            pickTarget = null
+        }
+    }
+    androidx.compose.animation.AnimatedVisibility(
+        visible = showCrop,
+        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)),
+        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MotionShort)),
+    ) {
+        val uri = cropUri
         val target = pickTarget
-        if (target != null) {
+        if (uri != null && target != null) {
             CropScreen(
                 vin = target,
                 uriString = uri.toString(),
-                onCancel = { cropUri = null; pickTarget = null },
-                onSave = { path -> vm.setVehicleImage(target, path); cropUri = null; pickTarget = null },
+                onCancel = { showCrop = false },
+                onSave = { path -> vm.setVehicleImage(target, path); showCrop = false },
             )
         }
     }
