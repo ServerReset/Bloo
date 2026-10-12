@@ -120,7 +120,9 @@ internal class ToastState {
         // Toasts that overstayed because no host was mounted to run their clocks (a show before the
         // UI exists, or a screen swap) are gone, not replayed as a burst later.
         items.removeAll { !paused && it.expireAt + StaleAfterMs < now }
-        val expire = nextExpiry(now, toastDurationMs(message, type))
+        // Created while the clocks are paused: resuming adds the whole pause to every live toast, so this one
+        // starts the pause already owed, and nets out to its intended duration.
+        val expire = nextExpiry(now, toastDurationMs(message, type)) - (if (paused) now - pausedAt else 0L)
         // Identical toasts collapse into one entry wherever it sits in the stack: re-arm it and bump
         // its count instead of pushing a duplicate card.
         val existing = items.lastOrNull { !it.leaving && it.groupable && it.message == message && it.type == type }
@@ -319,11 +321,14 @@ private fun naturalToastWidthPx(
     minPx: Float,
     maxPx: Float,
 ): Float {
+    // A window narrower than the minimum (or not measured yet) gives maxPx < minPx or < 0, and both a
+    // reversed coerceIn range and a negative Constraints throw.
+    val maxSafe = maxPx.coerceAtLeast(0f)
     val textPx = measurer.measure(
         text = AnnotatedString(message),
         style = style,
         maxLines = 1,
-        constraints = Constraints(maxWidth = maxPx.roundToInt()),
+        constraints = Constraints(maxWidth = maxSafe.roundToInt()),
     ).size.width
-    return (chromePx + textPx).coerceIn(minPx, maxPx)
+    return (chromePx + textPx).coerceIn(minOf(minPx, maxSafe), maxSafe)
 }

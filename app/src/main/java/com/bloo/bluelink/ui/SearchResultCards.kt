@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -216,9 +217,11 @@ internal fun CommandActionResult(
     val targetVehicle = remember(submittedQuery, state.vehicles) {
         resolveCommandTarget(submittedQuery, state.vehicles)
     }
-    var actionResult by remember(submittedQuery) { mutableStateOf<String?>(null) }
+    var actionResult by rememberSaveable(submittedQuery) { mutableStateOf<String?>(null) }
     var actionRunning by remember(submittedQuery) { mutableStateOf(false) }
-    var commandExecuted by remember(submittedQuery) { mutableStateOf(false) }
+    // Saveable: the submitted query survives an activity recreation, so the 'already ran' flag must too, or
+    // a car command would be sent again on every rotation or theme change.
+    var commandExecuted by rememberSaveable(submittedQuery) { mutableStateOf(false) }
     LaunchedEffect(submittedQuery) {
         if (targetVehicle != null && !commandExecuted) {
             if (command.cmd == "open_app") {

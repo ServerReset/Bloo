@@ -119,7 +119,7 @@ object SettingsCatalog {
         local("sync_dirty_keys"), local("sync_device_id"), local("sync_device_name"),
         local("sync_last_hash"), local("sync_synced_ever"), local("sync_devices_cache"),
         local("sync_pull_primary"), local("sync_primary_cache"), local("sync_file_id"),
-        local("sync_primary_pending"),
+        local("sync_primary_pending"), local("sync_pending_removed_device_ids"),
         // Whether THIS device installs updates silently via Shizuku: Shizuku may not exist elsewhere.
         local("seamless_install_shizuku"),
         // Which car is on screen right now: transient view state.

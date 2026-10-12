@@ -222,6 +222,9 @@ fun <T> ReorderColumn(
                             )
                         }
                         .pointerInput(k) {
+                    // A swap moves the item past a neighbour AND the gap between them, so the drag offset
+                    // is corrected by both (by the neighbour alone it jumped one gap per swap).
+                    val gapPx = spacing.toPx()
                     detectDragGesturesAfterLongPress(
                         onDragStart = {
                             // Picking up an item that is still settling takes over from where it is.
@@ -329,7 +332,7 @@ fun <T> ReorderColumn(
                                     if (n <= order.lastIndex && acc > 0 && offsetY > acc / 2f) {
                                         order = order.toMutableList().also { it.add(n, it.removeAt(cur)) }
                                         onSwapNow?.invoke()
-                                        offsetY -= acc
+                                        offsetY -= acc + gapPx
                                     }
                                 } else if (offsetY < 0 && cur > 0) {
                                     var n = cur - 1
@@ -343,7 +346,7 @@ fun <T> ReorderColumn(
                                     if (n >= 0 && acc > 0 && -offsetY > acc / 2f) {
                                         order = order.toMutableList().also { it.add(n, it.removeAt(cur)) }
                                         onSwapNow?.invoke()
-                                        offsetY += acc
+                                        offsetY += acc + gapPx
                                     }
                                 }
                             }

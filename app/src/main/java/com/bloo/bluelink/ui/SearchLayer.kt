@@ -110,6 +110,9 @@ internal fun SearchLayer(
     BackHandler(enabled = open) { query = ""; focused = false }
     // Report open-state so the aurora can pause (see AuroraBackground `paused`).
     SideEffect { onOpenChanged?.invoke(open) }
+    // Leaving composition while open (lock engaged, map expanded) must not leave the toasts parked and the
+    // aurora paused.
+    DisposableEffect(Unit) { onDispose { anchorForToasts.searchOpen = false; onOpenChanged?.invoke(false) } }
     // Click on open, tick on close, on the frame the shape starts moving. Armed after first
     // composition so a LaunchedEffect born false does not buzz on launch.
     var hapticArmed by remember { mutableStateOf(false) }

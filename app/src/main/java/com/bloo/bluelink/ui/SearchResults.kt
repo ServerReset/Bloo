@@ -1,6 +1,6 @@
 /**
- * Search results surface: the ranked settings/car-data result list, its stagger timing constant and
- * the per-result pop-in helper.
+ * Search results surface: the ranked settings and car-data result list, the command suggestions, and the
+ * answer cards beneath them.
  */
 package com.bloo.bluelink.ui
 
@@ -30,19 +30,6 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.bluelink.rethrowIfCancellation
-import kotlinx.coroutines.delay
-
-internal const val SEARCH_RESULT_STAGGER_MS = 35L
-
-@Composable
-internal fun staggeredResultVisible(resetKey: Any, index: Int): Boolean {
-    var visible by remember(resetKey) { mutableStateOf(false) }
-    LaunchedEffect(resetKey) {
-        delay(index * SEARCH_RESULT_STAGGER_MS)
-        visible = true
-    }
-    return visible
-}
 
 /**
  * Live search over app settings and per-car data/fields. Tokenises the query (dropping filler
@@ -95,7 +82,7 @@ internal fun SettingsSearchResults(
     }
 
     // Command suggestions from CommandIndex when available
-    val suggestedCommands = remember(query) {
+    val suggestedCommands = remember(query, state.vehicles, results.isEmpty()) {
         if (query.isNotBlank()) {
             searchCommands(query, state.vehicles, fuzzy = false)
                 .take(if (results.isNotEmpty()) 1 else 3) // Show fewer if settings results exist
