@@ -92,7 +92,7 @@ class SettingsCardsTest {
 
     @Test fun debugAndLogsAreOneCard() = checkCard("Debug", "Activity log") { vm ->
         DebugCardContent(
-            listOf("one", "two"), vm, CoroutineScope(Dispatchers.Main),
+            vm, CoroutineScope(Dispatchers.Main),
             androidx.compose.ui.platform.LocalClipboard.current,
         )
     }
