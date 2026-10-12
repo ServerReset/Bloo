@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -20,8 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.delay
 
@@ -85,25 +82,6 @@ internal fun AnimatedSlider(
         reduceMotion = LocalReduceMotion.current,
         onStepTick = { haptics?.tick() },
         onSettle = { haptics?.click(); onValueSettled?.invoke(latestValue) },
-    )
-}
-
-@Composable
-internal fun WiggleText(
-    text: String,
-    style: TextStyle,
-    fontWeight: FontWeight,
-    color: Color = Color.Unspecified,
-) {
-    val resolvedColor = if (color == Color.Unspecified) LocalContentColor.current else color
-    // Memoize the style copy to avoid recreating it when color/fontWeight don't change.
-    val resolvedStyle = remember(style, fontWeight, resolvedColor) {
-        style.copy(fontWeight = fontWeight, color = resolvedColor)
-    }
-    com.bloo.uicommon.WiggleText(
-        text = text,
-        style = resolvedStyle,
-        reduceMotion = LocalReduceMotion.current,
     )
 }
 

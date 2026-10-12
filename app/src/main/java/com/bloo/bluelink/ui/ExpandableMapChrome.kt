@@ -230,37 +230,13 @@ internal fun MapTopBar(
     }
 }
 
-/**
- * The pull-down-to-close drag both map sheets use on their top bar: the sheet follows the finger
- * ([dragPx]), and on release a pull of 96dp or more closes it while anything less springs back.
- */
-internal fun Modifier.pullDownToDismiss(
-    dragPx: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
-    scope: kotlinx.coroutines.CoroutineScope,
-    density: androidx.compose.ui.unit.Density,
-    spring: androidx.compose.animation.core.AnimationSpec<Float>,
-    close: () -> Unit,
-): Modifier = this.pointerInput(Unit) {
-    detectVerticalDragGestures(
-        onVerticalDrag = { change, amount ->
-            change.consume()
-            scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
-        },
-        onDragEnd = {
-            val thresholdPx = with(density) { 96.dp.toPx() }
-            if (dragPx.value > thresholdPx) close() else scope.launch { dragPx.animateTo(0f, spring) }
-        },
-        onDragCancel = { scope.launch { dragPx.animateTo(0f, spring) } },
-    )
-}
-
 /** How far the whole map sheet has been pulled up, in px (see [pullToRefreshOrDismiss]). */
 internal class MapPullState {
     val up = androidx.compose.animation.core.Animatable(0f)
 }
 
 /**
- * The map bar's drag: down dismisses (as [pullDownToDismiss]); UP lifts the whole sheet toward the
+ * The map bar's drag: down dismisses once pulled 96dp or more (and springs back before that); UP lifts the whole sheet toward the
  * top of the screen, ticking harder the closer it gets ([gapPx] is the room above it). Let go near
  * the top and [refresh] fires; let go earlier and it just settles back.
  */
