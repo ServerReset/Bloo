@@ -67,8 +67,8 @@ internal fun confirmTone(): ActionTone =
 internal fun denyTone(): ActionTone =
     if (appIsDarkTheme()) ActionTone(Color(0xFFFF8A80), Color(0xFF4A0507)) else ActionTone(Color(0xFFC62828), Color.White)
 
-/** The app's muted/secondary-text alpha, applied over LocalContentColor. */
-internal const val MutedContentAlpha = 0.7f
+/** The app's muted/secondary-text alpha over LocalContentColor. 0.78, not 0.7: 0.7 measured about 3.8:1 on light glass, under the 4.5:1 text minimum. */
+internal const val MutedContentAlpha = 0.78f
 
 /**
  * The ambient content colour, muted: secondary text on any surface (tinted pebbles, glass, the map
