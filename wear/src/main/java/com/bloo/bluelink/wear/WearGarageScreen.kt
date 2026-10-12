@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,7 +26,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -171,6 +175,14 @@ private fun WearCarPage(
     val selfUpdate by WearUpdateChecker.available.collectAsStateWithLifecycle(initialValue = null)
     val downloading by WearUpdateChecker.downloading.collectAsStateWithLifecycle(initialValue = false)
     val progress by WearUpdateChecker.progress.collectAsStateWithLifecycle(initialValue = 0f)
+    // A buzz when a command comes back: a confirm for success, a reject for a failure -- the watch is
+    // often glanced at, not looked at.
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(lastResult) {
+        lastResult?.takeIf { it.vin == v.vin }?.let {
+            haptics.performHapticFeedback(if (it.ok) HapticFeedbackType.Confirm else HapticFeedbackType.Reject)
+        }
+    }
     val updateRun = selfUpdate ?: updateAdvice?.let {
         com.bloo.bluelink.data.WorkflowRun(it.runNumber, htmlUrl = "", watchApkUrl = it.apkUrl)
     }
@@ -213,7 +225,18 @@ private fun WearCarPage(
                         line,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+                        fontWeight = FontWeight.Normal,
+                    )
+                }
+            }
+
+            v.updatedLine()?.let { (text, stale) ->
+                item {
+                    WearCenteredText(
+                        text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (stale) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Normal,
                     )
                 }
             }
@@ -252,7 +275,7 @@ private fun WearCarPage(
                         failure.message ?: "Command failed",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 3,
                     )
                 }
@@ -273,6 +296,21 @@ private fun VehicleSnapshot.stateLine(): String? = listOfNotNull(
     if (charging == true) "Charging" else null,
     rangeMi?.let { "$it mi" },
 ).joinToString(" · ").ifBlank { null }
+
+/**
+ * "Updated 4 min ago" for the car's last reading, and whether that is old enough to doubt (over half an
+ * hour). Null before the first reading. Read when the page composes, so it refreshes with each snapshot.
+ */
+private fun VehicleSnapshot.updatedLine(): Pair<String, Boolean>? {
+    if (fetchedAt <= 0L) return null
+    val minutes = ((System.currentTimeMillis() - fetchedAt) / 60_000L).coerceAtLeast(0L)
+    val text = when {
+        minutes < 1 -> "Updated just now"
+        minutes < 60 -> "Updated $minutes min ago"
+        else -> "Updated ${minutes / 60} h ago"
+    }
+    return text to (minutes >= 30)
+}
 
 /** Charge/fuel reads in the brand accent; a lock-only car reads in the plain on-background tone. */
 @Composable
