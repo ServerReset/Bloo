@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import dev.chrisbanes.haze.HazePerformanceMode
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -46,7 +47,8 @@ internal fun Modifier.appGlassEffect(
     val backing = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f * (1f - clarity))
     val blur = (18f - 16.5f * clarity).dp
     val style = remember(shape, backing, blur, ultra) { glassStyle(shape, backing, blur, ultra) }
-    return this.hazeGlass(input = HazeInput.Sources(state), style = style)
+    // A fixed middle quality rather than Adaptive, so the resolution cannot change mid-gesture.
+    return this.hazeGlass(input = HazeInput.Sources(state), style = style, performanceMode = HazePerformanceMode.Balanced)
 }
 
 @OptIn(ExperimentalHazeApi::class)

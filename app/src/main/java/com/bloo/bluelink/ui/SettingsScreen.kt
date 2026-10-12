@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.AnimatedVisibility
@@ -76,6 +77,7 @@ internal fun SettingsScreen(
     val canBio = remember { vm.canUseBiometrics() }
     // LazyColumn: many heavy collapsible sections, unlike a car page's pebble list.
     val settingsListState = rememberLazyListState()
+    val atTop by remember { derivedStateOf { settingsListState.firstVisibleItemIndex == 0 && settingsListState.firstVisibleItemScrollOffset == 0 } }
 
   val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -107,9 +109,15 @@ internal fun SettingsScreen(
                 // Rows melt away as they slide up under the status bar and the Simple/Advanced tab,
                 // instead of being cut by a hard line. The mask sits OUTSIDE hazeSource, so the glass
                 // header still blurs the full, unfaded content.
-                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .graphicsLayer {
+                    // The fade only matters once rows have scrolled up under the header; at the top the
+                    // first item is an empty spacer. Skipping the offscreen layer there keeps this page
+                    // cheap while it slides in the pager.
+                    compositingStrategy = if (atTop) androidx.compose.ui.graphics.CompositingStrategy.Auto else androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                }
                 .drawWithContent {
                     drawContent()
+                    if (atTop) return@drawWithContent
                     val top = topInset.toPx()
                     val fade = 44.dp.toPx()
                     drawRect(

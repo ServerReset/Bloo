@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import dev.chrisbanes.haze.HazePerformanceMode
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -129,6 +130,10 @@ internal fun glassTint(blurred: Boolean): Color {
             if (cheap) noiseFactor(0f)
             if (progressive) this.progressive(StandardBlurProgressive)
         },
+        // Pinned, not Adaptive: the adaptive mode re-picks the sample resolution as the card moves, so
+        // it can change at the start and end of every swipe (a layer re-allocation and a visible
+        // re-sample). Cards blur a soft backdrop by 20dp, where half resolution looks the same.
+        performanceMode = if (cheap) HazePerformanceMode.Performance else HazePerformanceMode.Balanced,
     )
 
 /**
