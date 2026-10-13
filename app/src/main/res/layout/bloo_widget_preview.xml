@@ -7,7 +7,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bloo_widget_preview_bg"
-    android:padding="14dp">
+    android:padding="14dp"
+    tools:ignore="ContentDescription,HardcodedText,UseAppTint">
 
     <TextView
         android:id="@+id/preview_name"
@@ -45,6 +46,5 @@
         android:background="@drawable/bloo_widget_preview_btn"
         android:padding="10dp"
         android:src="@drawable/ic_widget_lock"
-        android:tint="#FF6750A4"
-        tools:ignore="UseAppTint" />
+        android:tint="#FF6750A4" />
 </RelativeLayout>

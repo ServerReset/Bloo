@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:description="@string/widget_description"
     android:initialLayout="@layout/bloo_widget_loading"
     android:previewLayout="@layout/bloo_widget_preview"
@@ -15,4 +16,5 @@
     android:updatePeriodMillis="1800000"
     android:widgetCategory="home_screen"
     android:configure="com.bloo.bluelink.widget.BlooWidgetConfigActivity"
-    android:widgetFeatures="reconfigurable|configuration_optional" />
+    android:widgetFeatures="reconfigurable|configuration_optional"
+    tools:ignore="UnusedAttribute" />
