@@ -149,7 +149,10 @@ internal fun PebbleTitleRow(
                 style = if (atRest) MaterialTheme.typography.titleMedium else titleStyle,
                 color = titleColor,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1,
+                // Wrap rather than cut, so a big display size fills a second line instead of
+                // ellipsizing ("Cha…"). Two lines is the ceiling: past that it ellipsizes like any
+                // small label. At normal sizes the title is one line, unchanged.
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -163,8 +166,9 @@ internal fun PebbleTitleRow(
             style = MaterialTheme.typography.titleMedium,
             color = titleColor,
             fontWeight = FontWeight.Bold,
-            // One line so a large font never wraps into the header action button.
-            maxLines = 1,
+            // Wrap to a second line instead of ellipsizing at a large font size, so the header grows
+            // rather than cutting the name. Normal sizes stay one line.
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
     }

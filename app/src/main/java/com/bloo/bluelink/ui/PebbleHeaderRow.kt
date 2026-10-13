@@ -132,6 +132,9 @@ internal fun PebbleHeaderRow(
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
                     color = mutedContentColor(),
+                    // Wrap the summary at a big font instead of cutting it ("Not pl…"); normal sizes
+                    // keep it on one line.
+                    maxLines = 2,
                 ) }
             }
             headerContent?.invoke()

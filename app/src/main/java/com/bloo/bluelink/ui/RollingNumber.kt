@@ -20,6 +20,8 @@ internal fun RollingNumber(
     fontWeight: FontWeight,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
+    /** How many lines the value may take. Pebble summaries pass >1 so a big font wraps, not cuts. */
+    maxLines: Int = 1,
 ) {
     // The rolling digits are drawn by uicommon (no Text, so no LocalContentColor lookup there): an
     // unspecified colour has to be resolved HERE or it paints black on dark surfaces.
@@ -31,7 +33,7 @@ internal fun RollingNumber(
     AnimatedValue(
         value = text,
         style = style.merge(TextStyle(fontWeight = fontWeight, color = resolved)),
-        maxLines = 1,
+        maxLines = maxLines,
         reduceMotion = LocalReduceMotion.current,
         modifier = modifier,
     )
