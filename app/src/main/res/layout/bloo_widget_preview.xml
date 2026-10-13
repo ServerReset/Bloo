@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The widget's static preview in the launcher's picker. Plain colours, not the platform's
+     system_neutral*/system_accent* roles: those are API 31+, and this must render on every device
+     the app supports (minSdk 26). It is a picture, not the live widget. -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bloo_widget_preview_bg"
@@ -10,7 +14,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Daisy"
-        android:textColor="@android:color/system_neutral1_900"
+        android:textColor="#FF1D1B20"
         android:textSize="15sp"
         android:textStyle="bold" />
 
@@ -20,7 +24,7 @@
         android:layout_height="wrap_content"
         android:layout_above="@+id/preview_state"
         android:text="92%"
-        android:textColor="@android:color/system_neutral1_900"
+        android:textColor="#FF1D1B20"
         android:textSize="34sp"
         android:textStyle="bold" />
 
@@ -30,7 +34,7 @@
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:text="Locked · 277 mi"
-        android:textColor="@android:color/system_neutral2_700"
+        android:textColor="#FF49454F"
         android:textSize="12sp" />
 
     <ImageView
@@ -41,5 +45,6 @@
         android:background="@drawable/bloo_widget_preview_btn"
         android:padding="10dp"
         android:src="@drawable/ic_widget_lock"
-        android:tint="@android:color/system_accent2_900" />
+        android:tint="#FF6750A4"
+        tools:ignore="UseAppTint" />
 </RelativeLayout>
