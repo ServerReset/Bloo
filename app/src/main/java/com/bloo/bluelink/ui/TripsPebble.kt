@@ -69,7 +69,6 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
     }
 }
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
     val primaryColor = MaterialTheme.colorScheme.onSurface

@@ -6,7 +6,6 @@ import android.provider.Settings
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -357,7 +356,6 @@ fun blooColorScheme(
  * The app's root theme wrapper, applied once around the whole Compose tree (see
  * [com.bloo.bluelink.MainActivity]).
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 /** Process-wide cache for the animator-duration-scale probe -- see its use in BlooTheme. */
 private var reduceMotionCache: Boolean? = null
 

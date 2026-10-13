@@ -2,9 +2,7 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -28,7 +26,6 @@ import kotlinx.coroutines.delay
  * Top-level garage screen: picks between two fundamentally different layouts based on screen size
  * and dispatches to the right one, then owns the pager(s) that let the user swipe between cars.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 internal fun GarageScreen(
     state: State<UiState>,

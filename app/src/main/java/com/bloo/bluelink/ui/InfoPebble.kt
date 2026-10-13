@@ -9,7 +9,6 @@ import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -152,7 +151,6 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
  * Owner/assistance destinations as compact labelled buttons that flow 2+ per row where they fit.
  * Each says where it goes; the phone icon dials, others open links.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
     val links = v.brand.links
