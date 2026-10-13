@@ -423,8 +423,11 @@ internal fun AuroraBackground(
                 // Five blobs on slow, uneven loops (sines at different rates, so the pattern never repeats
                 // quickly), each breathing in size, and each pulled a little toward a finger.
                 fun blob(c: Color, bx: Float, by: Float, ax: Float, ay: Float, f1: Float, f2: Float, ph: Float, r: Float, alpha: Float) {
-                    var cx = size.width * ((bx + ax * sin(t * f1 + ph) + tiltX * (if (ph > 2f) -1f else 1f)) * explodeSpread()) + size.width * leanX * 0.06f
-                    var cy = size.height * ((by + ay * sin(t * f2 + ph * 1.3f) + tiltY * (if (ph > 2f) -1f else 1f)) * explodeSpread()) + size.height * leanY * 0.06f
+                    // The lean is OPPOSITE the navigation: scroll down and the glow drifts to the top,
+                    // swipe right and it drifts left, so the aurora answers the gesture. Added to the
+                    // tilt parallax, so it also dances with how the phone is held.
+                    var cx = size.width * ((bx + ax * sin(t * f1 + ph) + tiltX * (if (ph > 2f) -1f else 1f)) * explodeSpread()) - size.width * leanX * 0.11f
+                    var cy = size.height * ((by + ay * sin(t * f2 + ph * 1.3f) + tiltY * (if (ph > 2f) -1f else 1f)) * explodeSpread()) - size.height * leanY * 0.11f
                     if (e > 0.001f) {
                         val dx = finger.x - cx
                         val dy = finger.y - cy

@@ -112,7 +112,7 @@ internal fun SplitExpandButton(
         square = action.label.isEmpty(),
         modifier = if (description != null) Modifier.semantics { contentDescription = description } else Modifier,
     ) {
-        Box(Modifier.widthIn(max = 132.dp).graphicsLayer { translationY = bounceY.value }) {
+        Box(Modifier.widthIn(max = 104.dp).graphicsLayer { translationY = bounceY.value }) {
             MorphButtonLabel(action.icon, action.label, pending = action.pending && !bouncing, spinning = action.spinning)
         }
     }
@@ -125,7 +125,7 @@ internal fun SplitExpandButton(
         onLongClick = { chevron.spin(); haptics?.heavy() },
         active = expanded,
         square = true,
-        contentPadding = PaddingValues(start = 13.dp, end = 12.dp),
+        contentPadding = PaddingValues(start = 10.dp, end = 9.dp),
         interactionSource = chevronSource,
         // The icon's own description is the NEXT action; this announces the CURRENT state on focus.
         modifier = Modifier.semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
