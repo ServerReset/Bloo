@@ -2,8 +2,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
@@ -37,15 +35,11 @@ internal fun StaggeredRevealColumn(
         label = "pebbleRowCascade",
         transitionSpec = {
             if (targetState == EnterExitState.Visible) {
-                // A short head start for the CARD, not the rows -- asked for explicitly: the pop
-                // should read as arriving just after the pebble has started opening, not racing it
-                // from the same frame. collapseEnter's own bounce has no fixed duration (it's a
-                // spring, not a tween), so this can't be timed to "wait until the card is exactly
-                // this far open" -- a flat delay is what's available, short enough that the rows
-                // are still clearly popping in DURING the open rather than only once it's fully
-                // settled.
-                // The body's own opening spring: a row's pop is keyed to how far the body has grown.
-                spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = PebbleOpenStiffness)
+                // The rows run on their OWN clock, not the card's growth spring: keyed to the growth,
+                // the pops all landed within the same few frames and read as the card simply
+                // uncovering its content. A flat tween spread across the per-row windows makes each
+                // row pop in turn, a beat after the card has opened to it.
+                tween(durationMillis = 460, easing = LinearEasing)
             } else {
                 tween(durationMillis = 400, easing = LinearEasing)
             }
@@ -107,7 +101,7 @@ internal fun StaggeredRevealColumn(
 }
 
 /** How much of the opening a row's position maps onto (the last row is reached near the end). */
-private const val RowRevealCoverage = 0.8f
+private const val RowRevealCoverage = 0.6f
 
 /** How much of the closing a row's position maps onto; bottom rows leave first (mirror of the open). */
 private const val RowExitCoverage = 0.5f
@@ -116,4 +110,4 @@ private const val RowExitCoverage = 0.5f
 private const val RowPopDelay = 0.08f
 
 /** How much opening progress a row's pop takes. */
-private const val RowPopWindow = 0.22f
+private const val RowPopWindow = 0.25f
