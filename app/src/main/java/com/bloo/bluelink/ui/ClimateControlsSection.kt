@@ -57,7 +57,8 @@ internal fun ClimateControlsSection(
     onSaveAsPreset: () -> Unit,
 ) {
     LockedControls(locked = locked, message = "Stop climate to change settings") {
-        SectionLabel("Controls")
+        // No "Controls" heading: the pebble is already called Climate, so a heading that repeats it
+        // was a word with no meaning.
 
         // Show the set temperature when climate is running, with an animated entrance.
         AnimatedVisibility(
@@ -176,7 +177,7 @@ internal fun ClimateControlsSection(
             }
         }
 
-        SectionLabel("Save")
+        // No "Save" heading either: the button below already says what it does.
         SafeMorphTextButton(
             text = "Save as preset",
             onClick = onSaveAsPreset,

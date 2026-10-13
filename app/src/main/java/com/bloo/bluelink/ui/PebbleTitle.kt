@@ -86,6 +86,8 @@ internal fun PebbleTitleRow(
     // wrapping there made "AI summary" a broken "AI / sum…" and turned ordinary pebbles into tall,
     // odd blocks.
     val allowWrap = LocalDensity.current.fontScale >= 1.3f
+    // The title is written out letter by letter on each open, like every other line.
+    val titleReveal = rememberTextReveal()
     Row(
         // Only stretched when the trailing slot is being pushed to the end -- a row that merely
         // holds a name and a stat must stay shrink-wrapped, or the stat drifts away from the name.
@@ -109,7 +111,7 @@ internal fun PebbleTitleRow(
     if (growTitleOnExpand) {
         // Only the hero flips atRestScale. The Crossfade hides the pop when the scaled and native
         // paths swap; CenterStart keeps their glyphs aligned despite differing box heights.
-        Box(modifier = titleBaseModifier, contentAlignment = Alignment.CenterStart) {
+        Box(modifier = titleBaseModifier.textReveal { titleReveal.value }, contentAlignment = Alignment.CenterStart) {
         Crossfade(
             targetState = atRestScale,
             animationSpec = tween(MotionFast),
@@ -164,7 +166,7 @@ internal fun PebbleTitleRow(
         // -- always native titleMedium.
         Text(
             title,
-            modifier = titleBaseModifier,
+            modifier = titleBaseModifier.textReveal { titleReveal.value },
             style = MaterialTheme.typography.titleMedium,
             color = titleColor,
             fontWeight = FontWeight.Bold,

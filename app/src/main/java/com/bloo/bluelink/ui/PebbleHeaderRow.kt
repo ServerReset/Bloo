@@ -71,6 +71,8 @@ internal fun PebbleHeaderRow(
 ) {
     val haptics = LocalHaptics.current
     val density = LocalDensity.current
+    // The summary is written out letter by letter too.
+    val summaryReveal = rememberTextReveal()
     // Header: tap anywhere to toggle, long-press to drag-reorder; the action button and chevron
     // handle their own clicks. headerActionMaxWidth reserves room for the icon, gaps and a small
     // title floor before SplitExpandButton gets the rest. The floor is deliberately small because
@@ -132,8 +134,8 @@ internal fun PebbleHeaderRow(
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
                     color = mutedContentColor(),
-                    // Only a large display scale wraps the summary; normal zoom ellipsizes on one line.
                     maxLines = if (density.fontScale >= 1.3f) 2 else 1,
+                    modifier = Modifier.textReveal { summaryReveal.value },
                 ) }
             }
             headerContent?.invoke()

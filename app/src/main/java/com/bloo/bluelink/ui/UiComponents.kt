@@ -81,9 +81,10 @@ private const val SecondaryHaloBlurPx = 9f
 /** Label text styling for subtle secondary text (a step up from the old labelMedium). */
 @Composable
 internal fun LabelText(text: String, modifier: Modifier = Modifier) {
+    val reveal = rememberTextReveal()
     Text(
         text,
-        modifier = modifier,
+        modifier = modifier.textReveal { reveal.value },
         style = secondaryTextStyle(),
         color = secondaryTextColor(),
     )
@@ -96,9 +97,10 @@ internal fun LabelText(text: String, modifier: Modifier = Modifier) {
  */
 @Composable
 internal fun PebbleMessage(text: String, modifier: Modifier = Modifier) {
+    val reveal = rememberTextReveal()
     Text(
         text,
-        modifier = modifier,
+        modifier = modifier.textReveal { reveal.value },
         style = secondaryTextStyle(),
         color = secondaryTextColor(),
     )
@@ -107,9 +109,10 @@ internal fun PebbleMessage(text: String, modifier: Modifier = Modifier) {
 /** Body text (bodyMedium, onSurface) -- muted/secondary content. */
 @Composable
 internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: Color = secondaryTextColor()) {
+    val reveal = rememberTextReveal()
     Text(
         text,
-        modifier = modifier,
+        modifier = modifier.textReveal { reveal.value },
         style = secondaryTextStyle(),
         color = color,
     )
@@ -118,9 +121,10 @@ internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: C
 /** Body text (bodyMedium, onSurface) -- regular secondary content. */
 @Composable
 internal fun BodyMediumText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
+    val reveal = rememberTextReveal()
     Text(
         text,
-        modifier = modifier,
+        modifier = modifier.textReveal { reveal.value },
         style = MaterialTheme.typography.bodyMedium,
         color = color,
     )
@@ -134,9 +138,10 @@ internal fun TitleSmallText(
     color: Color = MaterialTheme.colorScheme.onSurface,
     fontWeight: FontWeight = FontWeight.Bold,
 ) {
+    val reveal = rememberTextReveal()
     Text(
         text,
-        modifier = modifier,
+        modifier = modifier.textReveal { reveal.value },
         style = MaterialTheme.typography.titleSmall,
         color = color,
         fontWeight = fontWeight,
