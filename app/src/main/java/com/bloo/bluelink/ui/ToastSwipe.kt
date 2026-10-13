@@ -28,9 +28,12 @@ private val DismissDistance = 110.dp
  * [DismissDistance] or springs back. The finger's position is a plain float written straight from
  * the gesture (no coroutine per delta); the Animatable only runs the fly-off or spring-back once the
  * finger lifts.
+ *
+ * A [Modifier] extension (not a bare factory) so it chains: see Compose's own convention for
+ * anything returning a modifier.
  */
 @Composable
-internal fun rememberSwipeToDismiss(key: Any, onDismiss: () -> Unit): Modifier {
+internal fun Modifier.rememberSwipeToDismiss(key: Any, onDismiss: () -> Unit): Modifier {
     var dragging by remember(key) { mutableStateOf(false) }
     val dragPx = remember(key) { mutableFloatStateOf(0f) }
     val settle = remember(key) { Animatable(0f) }
@@ -50,7 +53,7 @@ internal fun rememberSwipeToDismiss(key: Any, onDismiss: () -> Unit): Modifier {
             }
         }
     }
-    return Modifier
+    return this
         .offset { IntOffset(offsetX.roundToInt(), 0) }
         .graphicsLayer { alpha = (1f - abs(offsetX) / (dismissPx * 2.2f)).coerceIn(0f, 1f) }
         .pointerInput(key) {

@@ -1,6 +1,7 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
+import androidx.core.content.edit
 import com.bloo.bluelink.data.DeviceStatus
 
 /**
@@ -16,7 +17,7 @@ internal fun skipWhenLean(context: Context, name: String, baseIntervalMs: Long):
     val last = prefs.getLong(name, 0L)
     // A few minutes of slack: WorkManager runs periodic work flexibly, not on the dot.
     if (scale > 1 && now - last < baseIntervalMs * scale - SLACK_MS) return true
-    prefs.edit().putLong(name, now).apply()
+    prefs.edit { putLong(name, now) }
     return false
 }
 

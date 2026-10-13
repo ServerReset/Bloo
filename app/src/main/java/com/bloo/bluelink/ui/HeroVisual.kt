@@ -49,22 +49,6 @@ import kotlinx.coroutines.delay
  */
 
 /**
- * Tonal primary-tertiary-secondary gradient used as the fallback fill behind car photos. Callers
- * apply their own `.alpha(...)`; this returns only the brush.
- */
-@Composable
-internal fun carTonalBrush(scheme: ColorScheme): Brush {
-    val dark = appIsDarkTheme()
-    val toward = if (dark) Color.White else Color.Black
-    val tone = { c: Color -> lerp(c, toward, if (dark) 0.62f else 0.5f) }
-    return Brush.linearGradient(
-        listOf(tone(scheme.primary), tone(scheme.tertiary), tone(scheme.secondary)),
-        start = androidx.compose.ui.geometry.Offset.Zero,
-        end = androidx.compose.ui.geometry.Offset.Infinite,
-    )
-}
-
-/**
  * The hero's no-photo backdrop, built from the app's own palette: a diagonal sweep from primary through
  * tertiary to secondary (deep in the light theme, pale in the dark one, opposite the card text), with a
  * soft light of the primary pooling in the upper corner and one of the tertiary in the lower, so it reads as

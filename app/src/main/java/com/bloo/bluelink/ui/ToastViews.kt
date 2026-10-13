@@ -110,7 +110,7 @@ internal fun BoxScope.ToastSlot(
             onGone()
         }
     }
-    val swipe = rememberSwipeToDismiss(toast.id) { toast.leaving = true }
+    val swipe = Modifier.rememberSwipeToDismiss(toast.id) { toast.leaving = true }
     val density = LocalDensity.current
     // The placement springs are underdamped, so an inset mid-flight can dip below zero; padding
     // must not (it throws). Clamp before it becomes a Dp. The lift is a distance too, for the same

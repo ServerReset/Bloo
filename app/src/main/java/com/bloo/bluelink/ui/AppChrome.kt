@@ -208,12 +208,6 @@ private fun Modifier.dialogScrollbar(state: ScrollState): Modifier {
     }
 }
 
-/** Triangle wave in [0,1]: rises for [periodMs], falls for [periodMs], repeats. */
-internal fun triangleWave(elapsedMs: Long, periodMs: Long): Float {
-    val phase = elapsedMs % (2 * periodMs)
-    return if (phase < periodMs) phase.toFloat() / periodMs else 2f - phase.toFloat() / periodMs
-}
-
 /** Tilt-parallax of the aurora blobs: gain per m/s^2 of tilt, the most they may shift (fraction of the screen), and the easing. */
 private const val TiltGain = 0.012f
 private const val TiltMax = 0.06f

@@ -66,7 +66,7 @@ internal fun BlooTextField(
 internal fun PinField(
     value: String,
     onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier.fillMaxWidth(),
+    modifier: Modifier = Modifier,
     placeholder: String? = null,
     label: String? = null,
     digitsOnly: Boolean = true,
@@ -81,7 +81,7 @@ internal fun PinField(
     BlooTextField(
         value = value,
         onValueChange = { onValueChange(if (digitsOnly) it.take(maxDigits).filter(Char::isDigit) else it) },
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
         label = label?.let { { RevealText(it) } },
         placeholder = placeholder?.let { { RevealText(it) } },
         trailingIcon = trailingIcon,
