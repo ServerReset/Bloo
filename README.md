@@ -25,10 +25,16 @@ A third-party Android app for **Hyundai**, **Genesis** and **Kia** vehicles (US,
 
 ## Install
 
-1. Download `Bloo.apk` from the [latest release](../../releases).
-2. Open it. If Play Protect warns you, choose **More details**, then **Install anyway**.
+Bloo isn't on the Play Store, so you install it from a release (no GitHub sign-in needed).
 
-The app updates itself after that. Every push publishes a new release, and the build number is the version.
+1. On your phone, open the [latest release](https://github.com/ServerReset/Bloo/releases/latest) and, under **Assets**, download **`Bloo.apk`**. (Wear OS owners: `Bloo-watch.apk` is there too.)
+2. Open the downloaded file. If you can't find it, pull down your notifications and tap the finished download, or open **Downloads** — in your browser it's usually behind the **⋮** or **☰** menu, or use the **Files** app → **Downloads**.
+3. Android warns that Bloo isn't from a trusted source. What you tap depends on the warning you get:
+   - **"Blocked by Play Protect" / "unsafe app"**: tap **More details** — if you don't see it, look for a **⌄** or **⋮** on the warning sheet to expand it — then **Install anyway**.
+   - **"For your security…" (unknown sources)**: tap **Settings**, turn on **Allow from this source** for the app you're installing with (your browser, or Files), then go **Back** and tap **Install**.
+4. Confirm with your **fingerprint, face, PIN, pattern or password**.
+
+After that the app updates itself: every push publishes a new release, and the build number is the version.
 
 ## Build
 
