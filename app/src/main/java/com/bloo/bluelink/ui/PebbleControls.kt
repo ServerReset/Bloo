@@ -22,8 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.Icon
@@ -64,18 +62,8 @@ internal fun CriticalContent(
     v: Vehicle,
     stateSource: State<UiState>,
     vm: AppViewModel,
-    /**
-     * Rides the hero card's drag-handle slot: in the dual-column view it is the "swipe to switch
-     * cars" gesture.
-     */
+    /** Rides the hero card's drag-handle slot (the "swipe to switch cars" gesture). */
     modifier: Modifier = Modifier,
-    /** Fires the hero's one trailing button while collapsed ("go full screen"). */
-    onExpand: (() -> Unit)? = null,
-    onCollapse: (() -> Unit)? = null,
-    /** True once expanded, so the trailing button becomes "leave full screen". */
-    expanded: Boolean = false,
-    /** Force the photo open and drop the hero's own chevron (the wide grid always shows the photo). */
-    forceHero: Boolean = false,
 ) {
     // Narrow derived reads, one per thing the hero draws, so unrelated UiState emissions don't
     // recompose it.
@@ -90,26 +78,12 @@ internal fun CriticalContent(
     }
     val drivingLabel by remember(v.vin) { derivedStateOf { stateSource.value.drivingLabel(v) } }
     val metric = LocalAppearance.current.metricDistance
+    // The hero's trailing control is its own expand/collapse chevron now that the full-screen button
+    // is gone -- there is no separate "expanded" screen to enter; the layout just scales with width.
     HeroHeader(
         v, status, imageUrl, hasBattery, hasFuel, vm,
         modifier = modifier,
         drivingLabel = drivingLabel, metric = metric, photoExpanded = photoExpanded,
-        // The wide view always shows the car photo; the user's own choice is remembered and restored
-        // on the phone.
-        forcedExpanded = forceHero,
-        // ONE trailing button: "go full screen" while collapsed, "leave full screen" once expanded.
-        // The hero's own expand/collapse chevron is replaced by it.
-        expandAction = (if (expanded) onCollapse else onExpand)?.let { action ->
-            PebbleHeaderAction(
-                label = "",
-                icon = if (expanded) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                contentDescription = if (expanded) "Leave full screen" else "Go full screen",
-                // While expanded the button reads as "on": the same active morph every toggle uses
-                // (round -> squarish) plus the active fill, so its state is obvious at a glance.
-                active = expanded,
-                onClick = action,
-            )
-        },
     )
 }
 

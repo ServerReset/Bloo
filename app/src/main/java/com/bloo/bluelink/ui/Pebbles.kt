@@ -24,8 +24,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -40,18 +38,16 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.ReorderColumn
 
 /**
  * The reorderable pebble stack for a car. [pinHotspot] defaults to true (exclude "controls" + any
  * secondary pin, on the assumption the caller renders them separately via [HotspotSlot] -- true for
- * the wide/dual-column [ExpandedCar]). [VehicleDetailContent]'s single-column layout has no
- * separate hero-column slot to pin anything into, so it passes false: "controls" and any secondary
- * pin then flow through this list like any other pebble, landing in their normal [DEFAULT_SECTIONS]
- * position (right after "summary"/"update") instead of vanishing from the list with nothing
- * rendering them in their place.
+ * the wide/dual-column [ExpandedCar]). A one-column car has no separate hero-column slot to pin
+ * anything into, so it passes false: "controls" and any secondary pin then flow through this list
+ * like any other pebble, landing in their normal [DEFAULT_SECTIONS] position (right after
+ * "summary"/"update") instead of vanishing from the list with nothing rendering them in their place.
  */
 @Composable
 internal fun PebbleList(
@@ -60,8 +56,6 @@ internal fun PebbleList(
     vm: AppViewModel,
     exclude: Set<String> = emptySet(),
     pinHotspot: Boolean = true,
-    /** Forwarded to the "summary" hero pebble only; see [HeroHeader]'s `expandAction`. */
-    onExpand: (() -> Unit)? = null,
 ) {
     // One derived computation, not `state.value` read in this body: that would subscribe the whole
     // stack to every UiState emission. As derived state it only invalidates when the resulting LIST
@@ -230,7 +224,7 @@ internal fun PebbleList(
                     // Open but unseen while its pebble is still flying home; shown the frame it lands.
                     Box(Modifier.graphicsLayer { alpha = if (hotDrag?.returning == section) 0f else 1f }) {
                         CompositionLocalProvider(LocalPebbleFloating provides isDragging) {
-                            SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
+                            SinglePebble(section, v, state, vm, itemDragHandle)
                         }
                     }
                 } else {
@@ -286,7 +280,7 @@ internal fun stateSlice(state: State<UiState>, contextKey: Any?, keys: (UiState)
 
 /** Renders one pebble by section name (used by the list and the hot spot). */
 @Composable
-internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm: AppViewModel, modifier: Modifier, onExpand: (() -> Unit)? = null) {
+internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm: AppViewModel, modifier: Modifier) {
     // Narrow derived read of this car's status; `state.value` here would subscribe every pebble to
     // every UiState emission.
     val status by remember(v.vin) { derivedStateOf { state.value.statuses[v.vin] } }
@@ -304,18 +298,6 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
                 modifier = modifier,
                 drivingLabel = heroState.drivingLabel(v), metric = metric,
                 photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
-                expandAction = onExpand?.let {
-                    // Icon-only, like the collapse action on the dual-column view: the label here is
-                    // a whole sentence ("Expand to full screen"), so a visible label both reads
-                    // wrong and made the button overlap the title. contentDescription carries it to
-                    // TalkBack.
-                    PebbleHeaderAction(
-                        label = "",
-                        icon = Icons.Filled.Fullscreen,
-                        contentDescription = "Expand to full screen",
-                        onClick = it,
-                    )
-                },
             )
         }
         "update" -> {

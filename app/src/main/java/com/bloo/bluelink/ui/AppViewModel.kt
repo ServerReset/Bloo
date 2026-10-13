@@ -245,18 +245,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal var canadaPending: Credentials? = null
 
     /**
-     * Large-screen only: expand one car to full screen (also selects it, so the two indices never
-     * disagree about which car is "current").
-     */
-    fun expand(index: Int) {
-        _currentIndex.value = index
-        _state.update { it.copy(expandedIndex = index) }
-    }
-
-    /** Back out of the expanded single-car view to the grid. */
-    fun collapse() = _state.update { it.copy(expandedIndex = null) }
-
-    /**
      * How long a text field must be quiet before its change is published to the other surfaces.
      * Long enough to collapse a whole typed word, short enough that letting go of the keyboard
      * feels immediate.

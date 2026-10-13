@@ -56,8 +56,6 @@ data class UiState(
     val refreshing: Boolean = false,
     val vehicles: List<Vehicle> = emptyList(),
     // currentIndex is deliberately NOT here; see AppViewModel.currentIndex.
-    /** On large screens, the index expanded to full screen (null = grid view). */
-    val expandedIndex: Int? = null,
     val statuses: Map<String, VehicleStatus> = emptyMap(),
     /** Wall-clock millis the app last pulled status from the server, keyed by VIN. */
     val lastFetched: Map<String, Long> = emptyMap(),

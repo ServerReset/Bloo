@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -40,7 +39,6 @@ internal fun GarageScreen(
     // DERIVED reads, not body reads of `state.value`.
     val vehicles by remember { derivedStateOf { state.value.vehicles } }
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
-    val expandedIndex by remember { derivedStateOf { state.value.expandedIndex } }
     val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
     val showSettingsHint by remember { derivedStateOf { state.value.showSettingsHint } }
     val appearance = LocalAppearance.current
@@ -92,7 +90,6 @@ internal fun GarageScreen(
     val slots = maxOf(count, 1)
     val windowInfo = LocalWindowInfo.current
     val widthDp = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
-    val large = widthDp >= TWO_COLUMN_MIN_DP.dp
     // See StatusBarScrim's doc for why plain Modifier.blur never worked here.
     val expandedMap = remember { ExpandedMapState() }
     // Mirrors expandedMap.vin into shared UiState -- see UiState.mapExpanded's own doc -- so
@@ -101,48 +98,27 @@ internal fun GarageScreen(
     // sheet covers the same corner its own bottom action row occupies.
     LaunchedEffect(expandedMap.vin) { vm.setMapExpanded(expandedMap.vin != null) }
     DisposableEffect(Unit) { onDispose { vm.setMapExpanded(false) } }
-    // How many full-height cards fit side by side; pages advance by this many. `slots`, not
-    // `count`: coerceIn(1, 0) throws (min > max) with zero cars, and there is exactly one
-    // non-Settings page to show anyway in that case (the status card), so multi-column grid mode
-    // never applies to it.
+    // As many whole two-column cars as fit side by side; capped at the number of items.
     val perPage = carColumnsFor(widthDp.value).coerceIn(1, slots)
-    // Expanding to the dual-column view only makes sense on a wide screen.
-    val canExpand = large && count > 1
-    // There is deliberately no automatic "a lone car on a wide screen fills the screen by itself"
-    // case -- that shortcut bypassed the block pager below, and with Settings folded into that
-    // pager as its own page it would have made Settings unreachable by swipe for exactly that one
-    // combination (a single car on a wide screen).
-    val expandedIdx = expandedIndex?.takeIf { it in vehicles.indices && canExpand }
-
-    BackHandler(enabled = expandedIdx != null) { vm.collapse() }
-
-    // 0 collapsed, 1 expanded: the pebble list's own reflow (under the hero -> beside it) runs on
-    // this, so expanding is an in-place animation of the same content rather than a screen swap. A
-    // critically damped spring gives the width/position change a smooth settle (page width clamps at 1,
-    // so a bounce would just stall). Kept as a
-    // STATE (not read via `by`): reading it here would recompose this whole screen every frame.
-    // Null until the pager reports the expanded car in place (see CollapsedGaragePager); the expand
-    // waits for it, and it is read in the same composition that sees expandedIdx change, so there is
-    // no frame where the expand has started but is not yet gated.
-    val alignedCar = remember { mutableStateOf<Int?>(null) }
+    // THE single experience, scaling to the device: a car reflows to two columns (hero beside its
+    // pebbles, hot seat and all) when its own page is at least TWO_COLUMN_MIN_DP wide, and stays one
+    // column on a narrow window. No manual expand state, no second screen, nothing to open or close.
+    val twoColumn = (widthDp / perPage.toFloat()) >= TWO_COLUMN_MIN_DP.dp
     val expandedT = androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (expandedIdx != null && alignedCar.value != null) 1f else 0f,
+        targetValue = if (twoColumn) 1f else 0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "expandT",
     )
 
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
     BackdropHost {
-        // ONE page, ALWAYS the pager: expanding reflows the focused car's page in place -- its pebbles
-        // slide from under the hero to beside it, and the other car / Settings columns slide off as
-        // the focused page grows to the full width. No second screen, no route change, nothing to
-        // fade in.
+        // ONE page, ALWAYS the pager: a car's own layout scales with the device width, so there is no
+        // expand or collapse to reconcile -- the pebbles slide from under the hero to beside it purely
+        // as the page grows wide enough.
         CollapsedGaragePager(
-            vehicles, count, slots, perPage, canExpand, currentIndex,
+            vehicles, count, slots, perPage, currentIndex,
             windowInfo.containerSize.width, state, vm, hazeState,
-            expandedIdx = expandedIdx,
             expandedT = expandedT,
-            alignedCar = alignedCar,
         )
         // THE SINGLE CarMap instance, positioned at the screen level. It animates from the pebble
         // location (collapsed) to full-screen (expanded). Same instance, literally growing -- not

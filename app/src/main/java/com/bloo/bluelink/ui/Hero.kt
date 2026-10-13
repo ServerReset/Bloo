@@ -51,17 +51,6 @@ internal fun HeroHeader(
      * recompose on unrelated state changes.
      */
     photoExpanded: Boolean = true,
-    /**
-     * The dual-column full-screen view forces the photo open and drops the hero's own expand/collapse
-     * chevron (the full-screen action replaces it). The user's own expanded/collapsed choice is left
-     * untouched, so leaving full screen reverts to it.
-     */
-    forcedExpanded: Boolean = false,
-    /**
-     * Grid "expand to full screen" / expanded-view "back to all cars" toggle, shown as this
-     * pebble's [PebbleShell] header action. Null (phone single-column) renders none.
-     */
-    expandAction: PebbleHeaderAction? = null,
 ) {
     // On the phone the hero is a pebble on PebbleShell; its body collapses with the shared
     // collapseEnter/collapseExit transition, so no photo collapse logic is needed here.
@@ -69,9 +58,8 @@ internal fun HeroHeader(
     // 0 collapsed, 1 expanded: the one value the readout morph (type sizes, gaps, paddings, header
     // reservation) lerps on. Critically damped: this drives a SIZE, and an under-damped spatial
     // spring would overshoot type size.
-    // Forced open when the multi-column full-screen view asks for it; otherwise the user's own
-    // choice.
-    val heroShown = forcedExpanded || photoExpanded
+    // The hero's body is open when the user's own choice says so.
+    val heroShown = photoExpanded
     val heroT by animateFloatAsState(
         targetValue = if (heroShown) 1f else 0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
@@ -123,10 +111,8 @@ internal fun HeroHeader(
         title = v.name,
         modifier = modifier,
         titleColor = heroTitleColorNow,
-        headerAction = expandAction,
-        // The forced-open full-screen view has no hero chevron: the full-screen action is the only
-        // trailing control there.
-        canToggle = !forcedExpanded,
+        // The hero's own expand/collapse chevron; there is no separate full-screen action any more.
+        canToggle = true,
         // The ONLY pebble that grows its title. Here the title is the car's NAME and the card
         // becomes a photo of that car, so the name scaling up reads as the card taking over. On
         // "Location" or "Diagnostics" it is a heading resizing for no reason.
@@ -134,7 +120,7 @@ internal fun HeroHeader(
         // No `summary`: the bar is the summary. The photo is the card's BACKGROUND, running behind
         // the header row, with the title and chevron overlaid.
         background = {
-            HeroBackground(cardCoords, v, imageUrl, heroShown, height, heroT, expandAction != null, readout, hoisted, statusAlpha, report(expandedNumbers))
+            HeroBackground(cardCoords, v, imageUrl, heroShown, height, heroT, false, readout, hoisted, statusAlpha, report(expandedNumbers))
         },
         // The travelling numbers: a plain lerp between the two anchors in this Box's space.
         // Rendered as `foreground` so they cross the header row above its buttons, not under.

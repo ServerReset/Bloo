@@ -31,7 +31,7 @@ internal fun AppViewModel.tryRunPendingShortcut() {
     val idx = _state.value.vehicles.indexOf(v)
     if (idx >= 0) selectIndex(idx)
     // A shortcut tap always means "look at this car," so force back to the garage.
-    _state.update { it.copy(screen = Screen.Garage, expandedIndex = null) }
+    _state.update { it.copy(screen = Screen.Garage) }
     val status = _state.value.statusFor(v)
     when (cmd) {
         // Toggles: do the opposite of the last-known state.

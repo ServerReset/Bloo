@@ -1,8 +1,8 @@
 package com.bloo.bluelink.ui
 
 /**
- * Full-detail (single-car) views of the garage: [VehicleDetailContent] (the collapsed single-column
- * car), [ExpandedCar] (the wide dual-column detail), and their shared [CarHeaderRow] fact-chip row.
+ * The car's detail view: [ExpandedCar] -- one column, or two side by side when its page is wide
+ * enough -- and the shared [CarHeaderRow] fact-chip row.
  */
 
 import androidx.compose.foundation.layout.Arrangement
@@ -47,84 +47,17 @@ import kotlin.math.roundToInt
 
 // --- Full detail ----------------------------------------------------------
 
-/**
- * Single-column car view (phones, and each column of the grid). Everything scrolls together in one
- * [Column] inside [Refreshable] (header row, then the reorderable [PebbleList]).
- */
-@Composable
-internal fun VehicleDetailContent(
-    v: Vehicle,
-    /**
-     * State SOURCE (vm.state.value from a collectAsStateWithLifecycle()), consistent with
-     * PebbleList/SinglePebble: per-use state.value reads keep this page and its pebble rows stable
-     * against emissions that don't touch the values they actually read.
-     */
-    state: State<UiState>,
-    vm: AppViewModel,
-    onExpand: (() -> Unit)? = null,
-    /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
-    hazeState: HazeState? = null,
-) {
-    com.bloo.bluelink.data.StartupTrace.once("vehicle-detail-${v.vin}", "VehicleDetailContent composing for ${v.name}")
-    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val scroll = rememberScrollState()
-    // The aurora leans as this page scrolls (bottom of the page lifts it, top lets it settle).
-    val aurora = LocalAuroraReactions.current
-    LaunchedEffect(scroll, aurora) {
-        if (aurora == null) return@LaunchedEffect
-        snapshotFlow { scroll.value to scroll.maxValue }.collect { (v, m) ->
-            aurora.leanY.floatValue = if (m > 0) (v.toFloat() / m) * 2f - 1f else 0f
-        }
-    }
-    // Narrowed, not `state.value.refreshing`: a bare read here would subscribe this whole page --
-    // all three of them live at once in the pager -- to every UiState emission.
-    val refreshing by remember { derivedStateOf { state.value.refreshing } }
-    Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(scroll)
-                .padding(horizontal = ScreenGutter),
-            verticalArrangement = Arrangement.spacedBy(GapGroup),
-        ) {
-            // Inset spacer (not padding) so content scrolls *behind* the bars -- topInset alone, no
-            // extra breathing room, so the name sits right at the status bar's own edge instead of
-            // noticeably below it.
-            Spacer(Modifier.height(topInset))
-            CarHeaderRow(v, state, hazeState = hazeState)
-            // Single column has no separate "hero info column" to pin anything into -- that's a
-            // wide/dual-column-only concept (ExpandedCar's own HotspotSlot, with its drag-to-pin
-            // secondary slot and "Add a pebble" call to action). pinHotspot = false here lets
-            // "controls" (lock/unlock/lights/horn) -- and any pebble the user pinned to the
-            // secondary slot -- render as ordinary members of this reorderable list instead,
-            // landing in their normal DEFAULT_SECTIONS position (summary, then update, then
-            // controls, ...) -- i.e. right below the hero card, with no separate pin/CTA UI of any
-            // kind.
-            PebbleList(v, state, vm, pinHotspot = false, onExpand = onExpand)
-            Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
-        }
-    }
-}
-
 /** Wide expanded view: critical info in one column, pebbles in the other. */
 @Composable
 internal fun ExpandedCar(
     v: Vehicle,
-    /** See VehicleDetailContent's `state` doc -- same source plumbing. */
     state: State<UiState>,
     vm: AppViewModel,
-    flipped: Boolean,
     /**
-     * Width of ONE column -- the collapsed page's width. The reflow holds this constant so the
-     * blocks never re-wrap as the page grows to two columns.
+     * Width of ONE column. The reflow holds this constant so the blocks never re-wrap as the page
+     * grows to two columns.
      */
     pageColumnWidth: Dp,
-    onCollapse: () -> Unit,
-    /** The hero's single trailing button shows "go full screen" while collapsed; this fires. */
-    onExpand: (() -> Unit)? = null,
-    /** Force the hero photo open and drop its own chevron (the wide grid always shows the photo). */
-    forceHero: Boolean = false,
     /**
      * Switch to the neighbouring car, -1 = previous / +1 = next -- two-finger-free car swapping
      * driven by a horizontal swipe on the hero card itself (see [CriticalContent]'s own
@@ -132,8 +65,8 @@ internal fun ExpandedCar(
      */
     onSwipeCar: (Int) -> Unit = {},
     /**
-     * 0 = the pebbles sit UNDER the hero (the collapsed single-column look), 1 = BESIDE it (the
-     * expanded two-column look). A STATE, not a plain float: it is read only where it flips
+     * 0 = the pebbles sit UNDER the hero (one column), 1 = BESIDE it (two columns). Driven by the
+     * device width now, not a manual expand. A STATE, not a plain float: read only where it flips
      * ([expanded]) and in the reflow's measure phase, so a running animation never recomposes the
      * car every frame.
      */
@@ -159,7 +92,7 @@ internal fun ExpandedCar(
     // same ScrollState paired with the same content across a flip -- which is what makes it the
     // right thing for the badge's own tap-to-scroll-to-top.
     val pebblesScroll = rememberScrollState()
-    // The aurora leans as the page scrolls; see VehicleDetailContent.
+    // The aurora leans as the page scrolls; see ExpandedCar.
     val aurora = LocalAuroraReactions.current
     LaunchedEffect(pebblesScroll, aurora) {
         if (aurora == null) return@LaunchedEffect
@@ -208,13 +141,7 @@ internal fun ExpandedCar(
                             // every horizontal swipe (the columns scroll vertically only, so a
                             // horizontal drag falls through to it).
                             CarHeaderRow(v, state, hazeState = hazeState)
-                            CriticalContent(
-                                v, state, vm,
-                                onExpand = onExpand,
-                                onCollapse = onCollapse,
-                                expanded = expanded,
-                                forceHero = forceHero,
-                            )
+                            CriticalContent(v, state, vm)
                             // The hot seat lives only in the full-screen two-column view; collapsed,
                             // its pinned pebbles are ordinary members of the stack below. Its reveal
                             // rides the reflow fraction itself (measure/draw only, never recomposed).
@@ -298,7 +225,7 @@ private fun hotSeatFraction(t: Float): Float {
 @Composable
 internal fun CarHeaderRow(
     v: Vehicle,
-    /** State SOURCE, not a snapshot -- see VehicleDetailContent's own `state` doc. */
+    /** State SOURCE, not a snapshot -- see ExpandedCar's own `state` doc. */
     state: State<UiState>,
     hazeState: HazeState? = null,
 ) {
