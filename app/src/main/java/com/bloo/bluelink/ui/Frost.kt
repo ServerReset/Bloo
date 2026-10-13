@@ -65,6 +65,15 @@ internal fun Modifier.frosted(
 private const val FrostVeilWeight = 5f
 
 /**
+ * The app's one treatment for an inert button: soften and fade it with the shared frost, leaving its
+ * own (morphing) shape alone -- no veil, no rim. Every disabled button goes through here so one
+ * place's inert button looks like another's, instead of each re-deriving the blur.
+ */
+@Composable
+internal fun Modifier.inertButtonFrost(inert: Boolean, shape: Shape): Modifier =
+    frosted(inert, shape, blurRadius = 1.2.dp, rim = false, veil = false)
+
+/**
  * The pill that says why something is frozen: a snowflake-cool lock and the reason, in the app's
  * standard [GlassSurface] chrome.
  */

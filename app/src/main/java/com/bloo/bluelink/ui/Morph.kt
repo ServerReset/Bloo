@@ -104,7 +104,7 @@ fun MorphButton(
     var everInert by remember { mutableStateOf(!enabled) }
     SideEffect { if (!enabled) everInert = true }
     val frost = if (everInert || !enabled) {
-        Modifier.frosted(!enabled, RoundedCornerShape(pillCornerPercent.toInt()), blurRadius = 1.2.dp, rim = false, veil = false)
+        Modifier.inertButtonFrost(!enabled, RoundedCornerShape(pillCornerPercent.toInt()))
     } else {
         Modifier
     }
