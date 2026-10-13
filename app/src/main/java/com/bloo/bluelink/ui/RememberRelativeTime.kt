@@ -85,7 +85,12 @@ internal fun AnimatedSlider(
         dotOnActive = scheme.onPrimary.copy(alpha = 0.7f),
         dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
         reduceMotion = LocalReduceMotion.current,
-        onStepTick = { haptics?.tick() },
+        // Each notch's strength scales with where the value sits on the track: a light tick down low,
+        // a firm click up high, so the haptics say how far along you are, not just that you moved.
+        onStepTick = {
+            val span = (valueRange.endInclusive - valueRange.start).takeIf { it > 0f } ?: 1f
+            haptics?.ramp(((latestValue - valueRange.start) / span).coerceIn(0f, 1f))
+        },
         onSettle = { haptics?.click(); onValueSettled?.invoke(latestValue) },
         enabled = enabled,
         // An inert slider wears the same standard disabled treatment as every button (the morph

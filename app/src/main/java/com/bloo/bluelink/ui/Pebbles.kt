@@ -190,6 +190,9 @@ internal fun PebbleList(
         },
         onPickUp = { haptics?.click() },
         onSwap = { haptics?.tick() },
+        // Hot/cold placement guidance: the closer the pebble is to a clean drop, the stronger the
+        // pulse, so the hand is led to a good spot.
+        onDragProximity = { haptics?.ramp(it) },
         onLanded = { haptics?.tick() },
         staggerInOnColdStart = true,
         introKey = v.vin,

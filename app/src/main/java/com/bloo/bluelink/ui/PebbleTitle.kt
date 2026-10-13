@@ -81,6 +81,11 @@ internal fun PebbleTitleRow(
     // near 0). Rest renders a native titleMedium Text so its baseline matches the hero numbers
     // beside it.
     val atRestScale = !growTitleOnExpand || headerTState.value < 0.02f
+    // Only a genuinely LARGE display/font scale may wrap the title (and the summary below), so the
+    // header grows instead of cutting. At normal zoom a long title ellipsizes cleanly on one line --
+    // wrapping there made "AI summary" a broken "AI / sum…" and turned ordinary pebbles into tall,
+    // odd blocks.
+    val allowWrap = LocalDensity.current.fontScale >= 1.3f
     Row(
         // Only stretched when the trailing slot is being pushed to the end -- a row that merely
         // holds a name and a stat must stay shrink-wrapped, or the stat drifts away from the name.
@@ -149,10 +154,7 @@ internal fun PebbleTitleRow(
                 style = if (atRest) MaterialTheme.typography.titleMedium else titleStyle,
                 color = titleColor,
                 fontWeight = FontWeight.Bold,
-                // Wrap rather than cut, so a big display size fills a second line instead of
-                // ellipsizing ("Cha…"). Two lines is the ceiling: past that it ellipsizes like any
-                // small label. At normal sizes the title is one line, unchanged.
-                maxLines = 2,
+                maxLines = if (allowWrap) 2 else 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -166,9 +168,7 @@ internal fun PebbleTitleRow(
             style = MaterialTheme.typography.titleMedium,
             color = titleColor,
             fontWeight = FontWeight.Bold,
-            // Wrap to a second line instead of ellipsizing at a large font size, so the header grows
-            // rather than cutting the name. Normal sizes stay one line.
-            maxLines = 2,
+            maxLines = if (allowWrap) 2 else 1,
             overflow = TextOverflow.Ellipsis,
         )
     }

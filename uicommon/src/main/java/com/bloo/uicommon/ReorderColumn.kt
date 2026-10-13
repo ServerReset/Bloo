@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,6 +92,12 @@ fun <T> ReorderColumn(
     onPickUp: (() -> Unit)? = null,
     /** Fired each time the dragged item swaps places with a neighbour. */
     onSwap: (() -> Unit)? = null,
+    /**
+     * Hot/cold drag guidance: a throttled 0..1 proximity to the nearest drop slot (1 = the item is
+     * centred on a slot, so a release there is "optimal"; 0 = straddling the midpoint between two).
+     * The caller turns it into a ramping haptic, so the hand is guided toward a clean drop.
+     */
+    onDragProximity: ((Float) -> Unit)? = null,
     /** Fired when a put-down finishes settling into its slot. */
     onLanded: (() -> Unit)? = null,
     staggerInOnColdStart: Boolean = false,
@@ -111,6 +118,7 @@ fun <T> ReorderColumn(
     val onDragCancelNow by rememberUpdatedState(onDragCancel)
     val onPickUpNow by rememberUpdatedState(onPickUp)
     val onSwapNow by rememberUpdatedState(onSwap)
+    val onDragProximityNow by rememberUpdatedState(onDragProximity)
     val onLandedNow by rememberUpdatedState(onLanded)
     val allowHorizontalNow by rememberUpdatedState(allowHorizontalDrag)
     val scope = rememberCoroutineScope()
@@ -121,6 +129,8 @@ fun <T> ReorderColumn(
     var offsetY by remember { mutableFloatStateOf(0f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     val heights = remember { mutableStateMapOf<Any, Int>() }
+    // Throttle for the drag's hot/cold proximity haptic (see onDragProximity).
+    var dragHapticAt by remember { mutableLongStateOf(0L) }
     // Consumed the instant this key is first read, so navigating back to the garage (or a second
     // car's column composing) later never replays it.
     val playIntro = remember(introKey) {
@@ -325,6 +335,18 @@ fun <T> ReorderColumn(
                             if (allowHorizontalNow) offsetX += dragAmount.x
                             handleCoords.value?.takeIf { it.isAttached }?.let {
                                 onDragMoveNow?.invoke(k, it.localToWindow(change.position))
+                            }
+                            // Hot/cold: pulse the guide haptic harder the closer the item is centred
+                            // on its slot (a clean drop), lighter while it straddles the gap between
+                            // two. Throttled, so it reads as a steady buzz that swells, not a rattle.
+                            val slotH = heights[k] ?: 0
+                            if (slotH > 0) {
+                                val prox = 1f - (kotlin.math.abs(offsetY) / (slotH * 0.5f)).coerceIn(0f, 1f)
+                                val nowMs = android.os.SystemClock.elapsedRealtime()
+                                if (nowMs - dragHapticAt > 90L) {
+                                    dragHapticAt = nowMs
+                                    onDragProximityNow?.invoke(prox)
+                                }
                             }
                             val cur = order.indexOfFirst { keyOfNow(it) == k }
                             if (cur >= 0) {
