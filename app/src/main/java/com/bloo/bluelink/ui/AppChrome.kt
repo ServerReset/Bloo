@@ -1,14 +1,11 @@
 package com.bloo.bluelink.ui
 
 import kotlin.math.sin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.coroutineScope
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.animation.animateContentSize
@@ -321,13 +318,12 @@ internal fun AuroraBackground(
         }
     }
 
-    // Touch: the blobs swarm toward a finger, a glow follows it, and a ring spreads from where it landed. The
+    // Touch: the blobs swarm toward a finger and a faint glow follows it, so the aurora feels alive
+    // under the hand. (No rings: navigation and touch read as one soft glow, not a ripple.) The
     // finger is observed (never consumed) by the garage; see AuroraTouch.
     val touch = LocalAuroraTouch.current
     val energy = remember { Animatable(0f) }
     val follow = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
-    val ripple = remember { Animatable(1f) }
-    var rippleAt by remember { mutableStateOf(Offset.Zero) }
     if (touch != null && !saver) {
         LaunchedEffect(touch) {
             snapshotFlow { touch.pos.value }.collectLatest { p ->
@@ -339,15 +335,6 @@ internal fun AuroraBackground(
                     }
                 } else {
                     energy.animateTo(0f, tween(1100))
-                }
-            }
-        }
-        LaunchedEffect(touch) {
-            snapshotFlow { touch.downCount.value }.collectLatest { count ->
-                if (count > 0) {
-                    rippleAt = touch.downPos.value
-                    ripple.snapTo(0f)
-                    ripple.animateTo(1f, tween(1000, easing = LinearOutSlowInEasing))
                 }
             }
         }
@@ -396,7 +383,9 @@ internal fun AuroraBackground(
                 blob(lerp(basePrimary, baseTertiary, 0.5f).let { lerp(it, auroraWhite, 0.22f) }, 0.46f, 0.60f, 0.26f, 0.18f, 0.47f, 0.36f, 4.4f, 0.34f, 0.40f)
                 blob(lerp(baseSecondary, basePrimary, 0.5f).let { lerp(it, auroraWhite, 0.18f) }, 0.54f, 0.34f, 0.24f, 0.20f, 0.31f, 0.52f, 5.6f, 0.32f, 0.36f)
                 if (e > 0.001f) {
-                    // A glow under the finger that shifts between the palette's colours, with a hot core.
+                    // A soft glow under the finger that shifts between the palette's colours, with a
+                    // hot core. It is the one reactive light: it dances with the touch and fades back
+                    // into the drift when the finger lifts.
                     val mixT = 0.5f + 0.5f * sin(t * 1.3f)
                     val glow = lerp(basePrimary, baseTertiary, mixT)
                     drawCircle(
@@ -407,27 +396,16 @@ internal fun AuroraBackground(
                         radius = minDim * 0.34f, center = finger,
                     )
                 }
-                val rp = ripple.value
-                if (rp < 0.999f) {
-                    // A ring spreading out from where the finger landed, and a fainter one a beat behind.
-                    val fade = (1f - rp) * (1f - rp)
-                    val maxR = size.maxDimension * 0.7f
-                    val ring = lerp(baseTertiary, auroraWhite, 0.35f)
-                    drawCircle(ring.copy(alpha = 0.38f * fade), radius = rp * maxR, center = rippleAt, style = Stroke(width = 3.dp.toPx()))
-                    drawCircle(ring.copy(alpha = 0.2f * fade), radius = rp * maxR * 0.62f, center = rippleAt, style = Stroke(width = 2.dp.toPx()))
-                }
             },
     )
 }
 
 /**
- * The finger on the garage, observed (not consumed) so the aurora can react to it: [pos] while pressed,
- * [downPos] where the latest press landed, and [downCount] ticking up per press (it triggers the ring).
+ * The finger on the garage, observed (not consumed) so the aurora's glow can follow it: [pos] while
+ * pressed, null once released.
  */
 internal class AuroraTouch {
     val pos = mutableStateOf<Offset?>(null)
-    val downPos = mutableStateOf(Offset.Zero)
-    val downCount = mutableIntStateOf(0)
 }
 
 internal val LocalAuroraTouch = androidx.compose.runtime.staticCompositionLocalOf<AuroraTouch?> { null }

@@ -257,10 +257,6 @@ fun BlooApp(vm: AppViewModel) {
                                     val event = awaitPointerEvent(PointerEventPass.Initial)
                                     val pressed = event.changes.firstOrNull { it.pressed }
                                     if (pressed != null) {
-                                        if (auroraTouch.pos.value == null) {
-                                            auroraTouch.downPos.value = pressed.position
-                                            auroraTouch.downCount.intValue++
-                                        }
                                         auroraTouch.pos.value = pressed.position
                                     } else {
                                         auroraTouch.pos.value = null

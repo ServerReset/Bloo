@@ -35,13 +35,13 @@ internal fun StaggeredRevealColumn(
         label = "pebbleRowCascade",
         transitionSpec = {
             if (targetState == EnterExitState.Visible) {
-                // The rows run on their OWN clock, not the card's growth spring: keyed to the growth,
-                // the pops all landed within the same few frames and read as the card simply
-                // uncovering its content. A flat tween spread across the per-row windows makes each
-                // row pop in turn, a beat after the card has opened to it.
-                tween(durationMillis = 460, easing = LinearEasing)
+                // Content enters AFTER the container: a short delay so the card opens first and the
+                // rows cascade into the space it just made, rather than racing it open.
+                tween(durationMillis = 360, delayMillis = 150, easing = LinearEasing)
             } else {
-                tween(durationMillis = 400, easing = LinearEasing)
+                // Content exits BEFORE the container: a shorter burst with no delay, so every row is
+                // gone a beat before the card finishes shrinking rather than leaving with it.
+                tween(durationMillis = 220, easing = LinearEasing)
             }
         },
     ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
