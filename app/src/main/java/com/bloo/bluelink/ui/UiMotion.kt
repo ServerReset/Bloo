@@ -186,3 +186,18 @@ internal fun rememberSpinAngle(spinning: Boolean): androidx.compose.animation.co
     }
     return angle
 }
+
+/**
+ * Whether the app's own content is being dragged right now -- the car pager moving, or a page
+ * scrolling. Read by surfaces that must not re-render per frame while the content under them moves:
+ * the status strip's refraction blurs this very pager, so a scrolling page made it re-record a
+ * full-width refraction pass on every frame. Read in composition here (it flips once per gesture, not
+ * per frame), so a flip is a recomposition of one small strip, never of the content.
+ */
+internal class ContentMotion {
+    var pagerMoving by androidx.compose.runtime.mutableStateOf(false)
+    var scrollMoving by androidx.compose.runtime.mutableStateOf(false)
+    val moving: Boolean get() = pagerMoving || scrollMoving
+}
+
+internal val LocalContentMotion = androidx.compose.runtime.staticCompositionLocalOf<ContentMotion?> { null }

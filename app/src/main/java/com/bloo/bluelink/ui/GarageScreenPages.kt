@@ -142,6 +142,9 @@ internal fun CollapsedGaragePager(
         var boxWidthPx by remember { mutableIntStateOf(windowWidthPx) }
         val pagerIdle = remember(pager) { androidx.compose.runtime.derivedStateOf { !pager.isScrollInProgress } }
         val blurAmount = remember(pager) { androidx.compose.animation.core.Animatable(1f) }
+        // Lets the status strip skip its refraction while the pager moves (see ContentMotion).
+        val contentMotion = LocalContentMotion.current
+        DisposableEffect(contentMotion) { onDispose { contentMotion?.pagerMoving = false } }
         LaunchedEffect(pager) {
             // Only a real page swipe drops the glass blur. Any touch-slop wobble while scrolling a car up and
             // down starts the pager for a moment too; dropping and re-raising the blur for that was the
@@ -149,6 +152,7 @@ internal fun CollapsedGaragePager(
             snapshotFlow { pager.isScrollInProgress && kotlin.math.abs(pager.currentPageOffsetFraction) > 0.05f }
                 .distinctUntilChanged()
                 .collect { moving ->
+                    contentMotion?.pagerMoving = moving
                     if (moving) blurAmount.snapTo(0f) else blurAmount.animateTo(1f, androidx.compose.animation.core.tween(MotionMedium))
                 }
         }

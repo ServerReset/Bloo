@@ -73,7 +73,8 @@ internal fun StatusBarScrim(hazeState: HazeState? = null) {
     // plain tint stands in mid-swipe and the glass returns the instant it settles. Read once per
     // gesture (LocalPagerIdle flips on start/stop), not per frame.
     val pagerIdle = LocalPagerIdle.current
-    val moving = pagerIdle != null && !pagerIdle.value
+    val motion = LocalContentMotion.current
+    val moving = (pagerIdle != null && !pagerIdle.value) || motion?.moving == true
     val glass = hazeState != null && canBlurBackdrops() && !moving
     val overscan = with(androidx.compose.ui.platform.LocalDensity.current) { StatusGlassOverscan.roundToPx() }
     Box(

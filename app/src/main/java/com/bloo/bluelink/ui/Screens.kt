@@ -99,6 +99,9 @@ fun BlooApp(vm: AppViewModel) {
     val backdropHaze = remember { HazeState() }
     // The one "is the user touching anything" clock the aurora reads; observed at the root below.
     val ambientActivity = remember { AmbientActivity() }
+    // Whether the app's own content is being dragged (the pager, a page scroll); the status strip
+    // skips its refraction while it is, so a scroll never pays for it per frame.
+    val contentMotion = remember { ContentMotion() }
     val toasts = remember { ToastState() }
     // The one pull-to-refresh indicator; every Refreshable feeds it.
     val refreshIndicator = remember { RefreshIndicatorState() }
@@ -153,6 +156,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalRefreshIndicator provides refreshIndicator,
         LocalBackdropHaze provides backdropHaze,
         LocalAmbientActivity provides ambientActivity,
+        LocalContentMotion provides contentMotion,
         LocalPowerPolicy provides powerPolicy,
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
