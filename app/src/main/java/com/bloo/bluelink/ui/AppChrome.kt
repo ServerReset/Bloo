@@ -157,6 +157,11 @@ internal fun triangleWave(elapsedMs: Long, periodMs: Long): Float {
     return if (phase < periodMs) phase.toFloat() / periodMs else 2f - phase.toFloat() / periodMs
 }
 
+/** Tilt-parallax of the aurora blobs: gain per m/s^2 of tilt, the most they may shift (fraction of the screen), and the easing. */
+private const val TiltGain = 0.012f
+private const val TiltMax = 0.06f
+private const val TiltEase = 0.12f
+
 /** Animated gradient-blob backdrop for login, onboarding and (optionally) the garage. */
 @Composable
 internal fun AuroraBackground(
@@ -213,8 +218,17 @@ internal fun AuroraBackground(
                     rawY = rawY * (1 - fastAlpha) + y * fastAlpha
                     baseX = baseX * (1 - slowAlpha) + x * slowAlpha
                     baseY = baseY * (1 - slowAlpha) + y * slowAlpha
-                    tiltX = (rawX - baseX) * 0.06f
-                    tiltY = (rawY - baseY) * 0.06f
+                    // A subtle parallax, never a displacement: the old gain (0.06 per m/s^2, unbounded) pushed the
+                    // blobs up to half a screen away whenever the hold on the phone changed -- the aurora "left"
+                    // the moment a finger lifted, then drifted back as the slow baseline caught up. Now small,
+                    // capped, and eased so a change of grip glides instead of jumping.
+                    val targetX = ((rawX - baseX) * TiltGain).coerceIn(-TiltMax, TiltMax)
+                    val targetY = ((rawY - baseY) * TiltGain).coerceIn(-TiltMax, TiltMax)
+                    val nx = tiltX + (targetX - tiltX) * TiltEase
+                    val ny = tiltY + (targetY - tiltY) * TiltEase
+                    // Writes only when it has actually moved: every write redraws the whole backdrop.
+                    if (kotlin.math.abs(nx - tiltX) > 0.0015f) tiltX = nx
+                    if (kotlin.math.abs(ny - tiltY) > 0.0015f) tiltY = ny
                 }
                 override fun onAccuracyChanged(s: Sensor, acc: Int) {}
             }
