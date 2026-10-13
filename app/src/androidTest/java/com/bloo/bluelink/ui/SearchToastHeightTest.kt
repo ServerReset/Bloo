@@ -16,9 +16,9 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * The search element and a toast are the SAME height ([SearchElementHeight]), so a toast reads as the
+ * The search element and a toast are the SAME height ([ChromeBarHeight]), so a toast reads as the
  * bar it emerged from. The toast's content used to force 56dp (40dp icon buttons + 16dp padding)
- * while the search was 52, so a `heightIn(min)` never matched them.
+ * while the search element was smaller, so a `heightIn(min)` never matched them.
  */
 class SearchToastHeightTest {
     @get:Rule val rule = createComposeRule()
@@ -38,8 +38,8 @@ class SearchToastHeightTest {
                             query = "",
                             focused = false,
                             form = SearchForm.BUBBLE,
-                            width = SearchElementHeight,
-                            height = SearchElementHeight,
+                            width = ChromeBarHeight,
+                            height = ChromeBarHeight,
                             onQueryChange = {},
                             onFocusChange = {},
                             onSubmit = {},
@@ -55,9 +55,9 @@ class SearchToastHeightTest {
             }
         }
         rule.waitForIdle()
-        val target = SearchElementHeight.value.toDouble()
-        assertEquals("the search element is SearchElementHeight tall", target, height("search").toDouble(), 1.0)
-        assertEquals("the toast is SearchElementHeight tall", target, height(ToastCardTag).toDouble(), 1.0)
+        val target = ChromeBarHeight.value.toDouble()
+        assertEquals("the search element is ChromeBarHeight tall", target, height("search").toDouble(), 1.0)
+        assertEquals("the toast is ChromeBarHeight tall", target, height(ToastCardTag).toDouble(), 1.0)
         assertEquals("and they match each other", height("search").toDouble(), height(ToastCardTag).toDouble(), 0.5)
     }
 

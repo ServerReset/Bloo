@@ -60,7 +60,7 @@ class ToastStackTest {
         rule.waitUntil(8_000) { exists("First") && exists("Second") }
         val first = rule.onNodeWithText("First").getBoundsInRoot().top.value
         val second = rule.onNodeWithText("Second").getBoundsInRoot().top.value
-        // Already a full slot apart (SearchElementHeight + gap), no tap needed.
+        // Already a full slot apart (ChromeBarHeight + gap), no tap needed.
         assertTrue("the stack is expanded with no tap (${second - first}px)", second - first > 40f)
     }
 

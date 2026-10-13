@@ -6,7 +6,7 @@ import kotlin.test.assertNull
 
 /**
  * Pure-JVM tests for the forecast half of [Weather]: the [HourPoint]/[DayPoint] helpers
- * the redesigned Location & Weather block relies on to label the hourly strip and the
+ * the redesigned weather section of the Location pebble relies on to label the hourly strip and the
  * multi-day rows.
  *
  * These pin the parsing rules that would otherwise fail silently -- a bad hour label
