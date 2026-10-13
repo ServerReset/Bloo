@@ -74,9 +74,9 @@ internal fun ButtonCluster(
     val needsHeight = buttons.any { it.square }
     var rowHeight by remember { mutableStateOf(0.dp) }
     val scheme = MaterialTheme.colorScheme
-    // 11.dp, not 14: the horizontal padding is what a header action takes out of the row, and at the
+    // 10.dp, not 14: the horizontal padding is what a header action takes out of the row, and at the
     // app's bigger type scale 14 was eating the title beside it. Vertical stays GapRow.
-    val standardPadding = PaddingValues(horizontal = 11.dp, vertical = GapRow)
+    val standardPadding = PaddingValues(horizontal = 10.dp, vertical = GapRow)
     ExpressiveButtonGroup(
         modifier = modifier
             .height(IntrinsicSize.Min)

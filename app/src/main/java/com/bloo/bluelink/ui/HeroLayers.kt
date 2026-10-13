@@ -10,7 +10,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -93,7 +92,7 @@ internal fun BoxScope.HeroBackground(
                 animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
             ),
     ) {
-        HeroPhotoBackdrop(v, imageUrl, height, aspectRatio = 16f / 9f)
+        HeroPhotoBackdrop(v, imageUrl, height)
     }
     // The expanded readout at the BOTTOM of the card: a sibling of the photo, not a child, so it
     // does not inherit the photo's scale settle (text should not zoom).

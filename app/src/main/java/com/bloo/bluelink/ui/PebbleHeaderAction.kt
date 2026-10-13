@@ -112,7 +112,7 @@ internal fun SplitExpandButton(
         square = action.label.isEmpty(),
         modifier = if (description != null) Modifier.semantics { contentDescription = description } else Modifier,
     ) {
-        Box(Modifier.widthIn(max = 104.dp).graphicsLayer { translationY = bounceY.value }) {
+        Box(Modifier.widthIn(max = 96.dp).graphicsLayer { translationY = bounceY.value }) {
             MorphButtonLabel(action.icon, action.label, pending = action.pending && !bouncing, spinning = action.spinning)
         }
     }

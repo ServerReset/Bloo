@@ -79,8 +79,11 @@ internal fun PebbleHeaderRow(
     // the title column is WEIGHTED: it already takes whatever the button leaves, so a large fixed
     // floor (this was 140dp) left the button a near-zero cap on a narrow card and forced it to
     // icon-only even with obvious room beside a short title like "Charge".
+    // The fixed reservations here are what the row leaves OUTSIDE the header action: the leading
+    // padding, the glyph, its gap, the title floor and the chevron's own padding. Kept tight, so the
+    // action keeps its label longer instead of collapsing to a bare glyph while there is still room.
     val headerActionMaxWidth = (
-        rowWidthDp - 16.dp - 20.dp - ButtonIconGap - 10.dp - 12.dp - HeaderActionTitleFloor
+        rowWidthDp - 12.dp - 18.dp - ButtonIconGap - 8.dp - 10.dp - HeaderActionTitleFloor
         ).coerceAtLeast(0.dp)
     Row(
         Modifier
