@@ -111,8 +111,14 @@ object DeviceStatus {
     }
 
     private fun publish(s: DeviceState) {
+        val changed = s != _state.value
         _state.value = s
         _policy.value = PowerPolicy.of(s)
+        // Logged on every CHANGE, so the app's own log shows exactly why it went lean (and what the
+        // device actually reported) instead of it looking like a phantom battery saver.
+        if (changed) {
+            AppLog.log("power: battery saver=${s.batterySaver} thermalThrottled=${s.thermalThrottled} -> lean=${_policy.value.lean}")
+        }
     }
 
     private fun read(context: Context): DeviceState {
@@ -120,8 +126,11 @@ object DeviceStatus {
         val km = context.getSystemService(KeyguardManager::class.java)
         return DeviceState(
             batterySaver = pm?.isPowerSaveMode == true,
+            // CRITICAL or worse (4+ of 6), not SEVERE (3): many devices report SEVERE for an
+            // ordinary warm phone, which was making the app run lean (no blur, no motion, no text
+            // reveal) while the user had neither battery saver nor a genuinely hot device on.
             thermalThrottled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                (pm?.currentThermalStatus ?: 0) >= PowerManager.THERMAL_STATUS_SEVERE,
+                (pm?.currentThermalStatus ?: 0) >= PowerManager.THERMAL_STATUS_CRITICAL,
             deviceLocked = km?.isDeviceLocked == true,
         )
     }

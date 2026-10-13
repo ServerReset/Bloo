@@ -29,10 +29,10 @@ import androidx.compose.ui.text.withStyle
  * and remembered across a pass so a settled line is never re-animated.
  */
 
-/** Whether the text entrance may play right now: never under reduce-motion or battery saver. */
+/** Whether the text entrance may play right now: off under reduce-motion OR power saving. */
 @Composable
 private fun textRevealAllowed(): Boolean =
-    !LocalReduceMotion.current && LocalPowerPolicy.current.bouncySprings
+    !LocalReduceMotion.current && !LocalPowerPolicy.current.batterySaver
 
 /** One word's own beat. Long enough to read as a deliberate build, short enough not to drag. */
 private const val MsPerWord = 95
