@@ -370,13 +370,22 @@ internal val FieldShape: androidx.compose.foundation.shape.RoundedCornerShape
 
 // --- Garage (main) --------------------------------------------------------
 
-/** Window width from which a car reflows to two columns (hero + pebbles side by side). */
+/** Window width from which a car reflows to its OWN two columns (hero + pebbles side by side). */
 internal const val TWO_COLUMN_MIN_DP = 600
 
+/** Window width from which the garage shows two car columns side by side. */
+internal const val THREE_COLUMN_MIN_DP = 900
+
 /**
- * How many car columns a window [widthDp] wide gets: as many whole two-column cars as fit, 1..3, so
- * a car is a full two-column experience wherever there is room and only shrinks to one column on a
- * narrow window. (The caller still caps it at the number of cars.)
+ * How many car columns a window [widthDp] wide gets side by side: 1 on a phone, 2 on a foldable or
+ * small tablet, 3 on a wide tablet or desktop. This is the GRID -- multiple cars visible at once.
+ * Separately, each individual car reflows to its own two columns only when its column is wide enough
+ * (GarageScreen's `twoColumn`), so a lone car on a wide screen gets the hero-beside-pebbles layout.
+ * (An earlier take collapsed this to `width / 600`, which showed one wide car instead of the grid --
+ * wrong: a large screen wants MORE columns, not fewer.)
  */
-internal fun carColumnsFor(widthDp: Float): Int =
-    (widthDp / TWO_COLUMN_MIN_DP).toInt().coerceIn(1, 3)
+internal fun carColumnsFor(widthDp: Float): Int = when {
+    widthDp >= THREE_COLUMN_MIN_DP -> 3
+    widthDp >= TWO_COLUMN_MIN_DP -> 2
+    else -> 1
+}
