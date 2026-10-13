@@ -146,7 +146,9 @@ private fun Message(root: GlanceModifier, title: String, detail: String) {
 /**
  * ONE body that adapts to the span, instead of a layout per size. The value's weight, whether the
  * status/detail lines fit, how many controls to show and whether they carry labels are all derived
- * from the cells, so nothing overflows at any size from 2x2 to 5x5.
+ * from the cells, so nothing overflows at any size from 2x2 to 5x5. [WidgetShape] decides only the
+ * one structural split -- a bare 2x2 shares its row between the value and the lock button -- while
+ * ROW/COLUMN/FULL all render the same value-over-actions flow, denser as the span grows.
  */
 @Composable
 private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: String?, armed: Boolean, note: String?, opts: WidgetOptions) {

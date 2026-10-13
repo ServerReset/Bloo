@@ -371,7 +371,7 @@ private fun WearAlertsPebble() {
 private fun WearAutoLockPebble() {
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(WearAutoLock.isEnabled(context)) }
-    WearPebble(title = "Auto lock · Beta", icon = Icons.Filled.Lock) {
+    WearPebble(title = if (WearAutoLock.BETA) "Auto lock · Beta" else "Auto lock", icon = Icons.Filled.Lock) {
         WearActionRow("Lock when I walk away", Icons.Filled.Lock, active = enabled) {
             enabled = !enabled
             WearAutoLock.setEnabled(context, enabled)
