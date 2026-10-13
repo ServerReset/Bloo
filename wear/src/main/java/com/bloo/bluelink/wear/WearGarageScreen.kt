@@ -47,7 +47,7 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.stateLine
-import com.bloo.bluelink.data.updatedText
+import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.data.WatchPinPolicy
 import com.bloo.bluelink.data.supportsHornLights
 import kotlinx.coroutines.launch
@@ -260,7 +260,7 @@ private fun WearCarPage(
                 }
             }
 
-            v.updatedText()?.let { updated ->
+            v.updatedLabel()?.let { updated ->
                 item {
                     WearCenteredText(
                         "Updated $updated",

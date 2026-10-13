@@ -51,7 +51,7 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.stateLineOrParked
-import com.bloo.bluelink.data.updatedText
+import com.bloo.bluelink.data.updatedLabel
 
 /** What the widget draws from: the saved cars, and whether the app is sealed after a restart. */
 private data class WidgetData(val sealed: Boolean, val cars: List<VehicleSnapshot>)
@@ -236,7 +236,7 @@ private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptio
                 style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Medium),
             )
             if (showUpdated) {
-                car.updatedText()?.let { updated ->
+                car.updatedLabel()?.let { updated ->
                     Text(
                         updated,
                         style = TextStyle(color = if (stale) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp),

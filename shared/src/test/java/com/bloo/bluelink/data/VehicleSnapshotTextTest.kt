@@ -45,12 +45,12 @@ class VehicleSnapshotTextTest {
         assertEquals("Charging", car(charging = true).stateLineOrParked())
     }
 
-    @Test fun updatedTextCountsUpAndIsNullBeforeAnyReading() {
-        val now = 1_000_000_000L
-        assertNull(car().updatedText(now))
-        assertEquals("Just now", car(fetchedAt = now - 30_000L).updatedText(now))
-        assertEquals("4 min ago", car(fetchedAt = now - 4 * 60_000L).updatedText(now))
-        assertEquals("2 h ago", car(fetchedAt = now - 2 * 3_600_000L).updatedText(now))
+    @Test fun updatedLabelIsRelativeAndNullBeforeAnyReading() {
+        assertNull(car().updatedLabel(), "never read")
+        val now = System.currentTimeMillis()
+        assertEquals("just now", car(fetchedAt = now - 30_000L).updatedLabel())
+        assertEquals("4 min ago", car(fetchedAt = now - 4 * 60_000L).updatedLabel())
+        assertEquals("2 hr ago", car(fetchedAt = now - 2 * 3_600_000L).updatedLabel())
     }
 
     @Test fun staleOnlyPastHalfAnHour() {
