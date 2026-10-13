@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -88,12 +89,20 @@ fun BlooApp(vm: AppViewModel) {
     val canadaOtp by remember { derivedStateOf { state.canadaOtp } }
     val onSettingsPageSlot by vm.onSettingsPageSlot.collectAsStateWithLifecycle()
     val mapExpanded by remember { derivedStateOf { state.mapExpanded } }
+    // Derived too, so only a photo pick / welcome-card / install-guide change recomposes the root:
+    // reading `state.x` directly here subscribed BlooApp to EVERY UiState emission.
+    val photoPickRequest by remember { derivedStateOf { state.photoPickRequest } }
+    val welcomeCardsOpen by remember { derivedStateOf { state.welcomeCardsOpen } }
+    val showInstallGuide by remember { derivedStateOf { state.showInstallGuide } }
     // One blur source shared by GarageScreen, SettingsScreen and SearchLayer, which floats over
     // either.
     val searchHazeState = remember { HazeState() }
     val backdropHaze = remember { HazeState() }
     // The one "is the user touching anything" clock the aurora reads; observed at the root below.
     val ambientActivity = remember { AmbientActivity() }
+    // Whether the app's own content is being dragged (the pager, a page scroll): the screen-edge
+    // warp skips itself while it is, so a swipe never pays for a full-window refraction per frame.
+    val contentMotion = remember { ContentMotion() }
     val toasts = remember { ToastState() }
     // The one pull-to-refresh indicator; every Refreshable feeds it.
     val refreshIndicator = remember { RefreshIndicatorState() }
@@ -148,6 +157,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalRefreshIndicator provides refreshIndicator,
         LocalBackdropHaze provides backdropHaze,
         LocalAmbientActivity provides ambientActivity,
+        LocalContentMotion provides contentMotion,
         LocalPowerPolicy provides powerPolicy,
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
@@ -294,9 +304,16 @@ fun BlooApp(vm: AppViewModel) {
         }
         // The screen-edge liquid-glass warp (top, bottom, left, right -- no blur), sitting UNDER the
         // floating chrome so it never bends the search, the toasts or the dialogs, and OFF under
-        // battery saver. Extreme under Ultra glass.
+        // battery saver. Extreme under Ultra glass. Skipped entirely -- no Haze sampling at all --
+        // while the content is being dragged or scrolled: the same trick the glass cards use,
+        // because a full-window refraction re-sampled every frame is what made a swipe stutter.
         if (canBlurBackdrops()) {
-            Box(Modifier.fillMaxSize().screenEdgeWarp(searchHazeState, ultra = appearance.ultraGlass))
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent { if (!contentMotion.moving) drawContent() }
+                    .screenEdgeWarp(searchHazeState, ultra = appearance.ultraGlass),
+            )
         }
         // Search lives above the AnimatedContent so one element survives the transition (corner
         // bubble morphing into the settings pill). Only the garage is searchable.
@@ -345,11 +362,11 @@ fun BlooApp(vm: AppViewModel) {
         LockAlphaOverlay(locked = locked, vm = vm, opaqueBackdrop = !contentSettled)
 
     // Choosing and cropping a car photo, for whichever page (or request) asked for one.
-    CarPhotoPickerHost(vm, state.photoPickRequest)
+    CarPhotoPickerHost(vm, photoPickRequest)
 
     // The welcome cards, when summoned from Settings: over the app, dismissed back to it.
     androidx.compose.animation.AnimatedVisibility(
-        visible = state.welcomeCardsOpen,
+        visible = welcomeCardsOpen,
         enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)),
         exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MotionShort)),
     ) {
@@ -357,7 +374,7 @@ fun BlooApp(vm: AppViewModel) {
     }
     // The pre-install guide: shown before the system installer runs when Shizuku is off, so the
     // Play-Protect steps are seen before the sheet appears rather than after it looks broken.
-    if (state.showInstallGuide) {
+    if (showInstallGuide) {
         UpdateInstallGuideDialog(
             onDismiss = { vm.dismissInstallGuide() },
             onContinue = { vm.confirmInstallUpdate() },
