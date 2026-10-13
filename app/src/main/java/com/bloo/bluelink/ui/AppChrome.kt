@@ -1,5 +1,16 @@
 package com.bloo.bluelink.ui
 
+import kotlin.math.sin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.coroutineScope
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.animation.animateContentSize
 import android.content.Context
 import android.hardware.Sensor
@@ -288,18 +299,14 @@ internal fun AuroraBackground(
     val explodeAlpha = { 1f + explosion.value * 2.5f }
     val explodeSize = { 1f + explosion.value * 0.8f }
     val explodeSpread = { 1f + explosion.value * 0.3f }
-    // Both modes run this ambient drift (Motion adds tilt on top) so a still phone isn't a frozen
-    // frame. Hand-ticked at ~12fps, not Compose's per-frame clock.
-    var p1 by remember { mutableFloatStateOf(0.5f) }
-    var p2 by remember { mutableFloatStateOf(0.5f) }
-    var p3 by remember { mutableFloatStateOf(0.5f) }
-    // Ticks in both modes.
+    // The aurora's clock, in seconds of ACTIVE time (a pause never makes it jump). Ticked at ~24fps, not per
+    // frame: the blobs are big and slow, and every tick redraws the backdrop all the glass samples.
+    var clock by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
-        // Active time only: a pause (search panel, background) must not make the drift jump on resume.
-        var elapsed = 0L
-        var last = System.currentTimeMillis()
+        var seconds = 0f
+        var last = System.nanoTime()
         while (true) {
-            val now = System.currentTimeMillis()
+            val now = System.nanoTime()
             if (currentPaused || saver ||
                 !lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
             ) {
@@ -307,42 +314,120 @@ internal fun AuroraBackground(
                 delay(120)
                 continue
             }
-            elapsed += (now - last).coerceAtMost(200L)
+            seconds += ((now - last) / 1_000_000_000f).coerceAtMost(0.2f)
             last = now
-            p1 = 0.32f + (0.68f - 0.32f) * triangleWave(elapsed, 9_000L)
-            p2 = 0.68f + (0.32f - 0.68f) * triangleWave(elapsed, 7_000L)
-            p3 = 0.35f + (0.65f - 0.35f) * triangleWave(elapsed, 6_000L)
-            delay(33)
+            clock = seconds
+            delay(42)
         }
     }
-    fun mix(a: Float, b: Float, f: Float) = a + (b - a) * f
+
+    // Touch: the blobs swarm toward a finger, a glow follows it, and a ring spreads from where it landed. The
+    // finger is observed (never consumed) by the garage; see AuroraTouch.
+    val touch = LocalAuroraTouch.current
+    val energy = remember { Animatable(0f) }
+    val follow = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    val ripple = remember { Animatable(1f) }
+    var rippleAt by remember { mutableStateOf(Offset.Zero) }
+    if (touch != null && !saver) {
+        LaunchedEffect(touch) {
+            snapshotFlow { touch.pos.value }.collectLatest { p ->
+                if (p != null) {
+                    if (energy.value < 0.02f) follow.snapTo(p)
+                    coroutineScope {
+                        launch { energy.animateTo(1f, tween(160)) }
+                        follow.animateTo(p, spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow))
+                    }
+                } else {
+                    energy.animateTo(0f, tween(1100))
+                }
+            }
+        }
+        LaunchedEffect(touch) {
+            snapshotFlow { touch.downCount.value }.collectLatest { count ->
+                if (count > 0) {
+                    rippleAt = touch.downPos.value
+                    ripple.snapTo(0f)
+                    ripple.animateTo(1f, tween(1000, easing = LinearOutSlowInEasing))
+                }
+            }
+        }
+    }
+    val auroraWhite = Color.White
     Box(
         modifier
             .fillMaxSize()
-            // No Modifier.blur here. A full-screen 44dp blur, rebuilt on every drift tick, was the
-            // app's costliest steady draw; the blobs are drawn as soft radial gradients instead, so
-            // the aurora reads just as soft with no RenderEffect to re-render.
+            // No Modifier.blur here. A full-screen 44dp blur, rebuilt on every tick, was the app's costliest
+            // steady draw; the blobs are soft radial gradients instead, so the aurora reads just as soft with
+            // no RenderEffect to re-render.
             .drawBehind {
                 drawRect(scheme.surface)
-                fun blob(c: Color, fx: Float, fy: Float, r: Float) {
-                    val center = Offset(size.width * fx, size.height * fy)
-                    val radius = size.minDimension * r
-                    // Solid-ish core, soft edge: the falloff the blur used to supply, without a
-                    // RenderEffect.
+                val t = clock
+                val minDim = size.minDimension
+                val a = appear.value
+                val e = energy.value
+                val finger = follow.value
+                // Five blobs on slow, uneven loops (sines at different rates, so the pattern never repeats
+                // quickly), each breathing in size, and each pulled a little toward a finger.
+                fun blob(c: Color, bx: Float, by: Float, ax: Float, ay: Float, f1: Float, f2: Float, ph: Float, r: Float, alpha: Float) {
+                    var cx = size.width * ((bx + ax * sin(t * f1 + ph) + tiltX * (if (ph > 2f) -1f else 1f)) * explodeSpread())
+                    var cy = size.height * ((by + ay * sin(t * f2 + ph * 1.3f) + tiltY * (if (ph > 2f) -1f else 1f)) * explodeSpread())
+                    if (e > 0.001f) {
+                        val dx = finger.x - cx
+                        val dy = finger.y - cy
+                        val pull = e * 0.22f * kotlin.math.exp(-kotlin.math.sqrt(dx * dx + dy * dy) / (minDim * 0.9f))
+                        cx += dx * pull
+                        cy += dy * pull
+                    }
+                    val radius = minDim * r * (1f + 0.09f * sin(t * 0.55f + ph * 2f)) * explodeSize() * (1f + 0.18f * e)
+                    val col = c.copy(alpha = (alpha * (1f + 0.5f * e) * explodeAlpha() * a).coerceIn(0f, 1f))
                     drawCircle(
                         brush = Brush.radialGradient(
-                            listOf(c, c.copy(alpha = c.alpha * 0.55f), Color.Transparent),
-                            center = center,
+                            listOf(col, col.copy(alpha = col.alpha * 0.55f), Color.Transparent),
+                            center = Offset(cx, cy),
                             radius = radius,
                         ),
                         radius = radius,
-                        center = center,
+                        center = Offset(cx, cy),
                     )
                 }
-                val a = appear.value
-                blob(basePrimary.copy(alpha = (0.55f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.26f, 0.74f, p1) + tiltX) * explodeSpread(), (mix(0.30f, 0.65f, p2) + tiltY) * explodeSpread(), 0.50f * explodeSize())
-                blob(baseTertiary.copy(alpha = (0.46f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p2) - tiltX) * explodeSpread(), (mix(0.35f, 0.70f, p3) - tiltY) * explodeSpread(), 0.44f * explodeSize())
-                blob(baseSecondary.copy(alpha = (0.38f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p3) + tiltX) * explodeSpread(), (mix(0.28f, 0.62f, p1) + tiltY) * explodeSpread(), 0.42f * explodeSize())
+                blob(basePrimary, 0.50f, 0.42f, 0.30f, 0.20f, 0.34f, 0.27f, 0.0f, 0.56f, 0.66f)
+                blob(baseTertiary, 0.50f, 0.52f, 0.28f, 0.22f, 0.29f, 0.41f, 1.7f, 0.48f, 0.58f)
+                blob(baseSecondary, 0.50f, 0.46f, 0.30f, 0.24f, 0.38f, 0.31f, 3.1f, 0.46f, 0.52f)
+                blob(lerp(basePrimary, baseTertiary, 0.5f).let { lerp(it, auroraWhite, 0.22f) }, 0.46f, 0.60f, 0.26f, 0.18f, 0.47f, 0.36f, 4.4f, 0.34f, 0.40f)
+                blob(lerp(baseSecondary, basePrimary, 0.5f).let { lerp(it, auroraWhite, 0.18f) }, 0.54f, 0.34f, 0.24f, 0.20f, 0.31f, 0.52f, 5.6f, 0.32f, 0.36f)
+                if (e > 0.001f) {
+                    // A glow under the finger that shifts between the palette's colours, with a hot core.
+                    val mixT = 0.5f + 0.5f * sin(t * 1.3f)
+                    val glow = lerp(basePrimary, baseTertiary, mixT)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(lerp(glow, auroraWhite, 0.3f).copy(alpha = 0.6f * e), glow.copy(alpha = 0.22f * e), Color.Transparent),
+                            center = finger, radius = minDim * 0.34f,
+                        ),
+                        radius = minDim * 0.34f, center = finger,
+                    )
+                }
+                val rp = ripple.value
+                if (rp < 0.999f) {
+                    // A ring spreading out from where the finger landed, and a fainter one a beat behind.
+                    val fade = (1f - rp) * (1f - rp)
+                    val maxR = size.maxDimension * 0.7f
+                    val ring = lerp(baseTertiary, auroraWhite, 0.35f)
+                    drawCircle(ring.copy(alpha = 0.38f * fade), radius = rp * maxR, center = rippleAt, style = Stroke(width = 3.dp.toPx()))
+                    drawCircle(ring.copy(alpha = 0.2f * fade), radius = rp * maxR * 0.62f, center = rippleAt, style = Stroke(width = 2.dp.toPx()))
+                }
             },
     )
 }
+
+/**
+ * The finger on the garage, observed (not consumed) so the aurora can react to it: [pos] while pressed,
+ * [downPos] where the latest press landed, and [downCount] ticking up per press (it triggers the ring).
+ */
+internal class AuroraTouch {
+    val pos = mutableStateOf<Offset?>(null)
+    val downPos = mutableStateOf(Offset.Zero)
+    val downCount = mutableIntStateOf(0)
+}
+
+internal val LocalAuroraTouch = androidx.compose.runtime.staticCompositionLocalOf<AuroraTouch?> { null }

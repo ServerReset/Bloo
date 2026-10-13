@@ -28,6 +28,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -245,12 +247,35 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Garage -> {
                     com.bloo.bluelink.data.StartupTrace.once("screen-garage", "screen: Garage composed (first garage frame next)")
                     // Reuses the outer `appearance`.
-                    Box(Modifier.fillMaxSize()) {
+                    val auroraTouch = remember { AuroraTouch() }
+                    Box(
+                        Modifier.fillMaxSize().pointerInput(auroraTouch) {
+                            // Watches the finger for the aurora without taking it: the Initial pass sees every touch
+                            // first and nothing is consumed, so scrolling, swiping and taps behave exactly as before.
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    val pressed = event.changes.firstOrNull { it.pressed }
+                                    if (pressed != null) {
+                                        if (auroraTouch.pos.value == null) {
+                                            auroraTouch.downPos.value = pressed.position
+                                            auroraTouch.downCount.intValue++
+                                        }
+                                        auroraTouch.pos.value = pressed.position
+                                    } else {
+                                        auroraTouch.pos.value = null
+                                    }
+                                }
+                            }
+                        },
+                    ) {
                         // `paused = searchOpen`: the search panel sits ABOVE this background, and
                         // while it's up (typing frames, panel scrolling) the ambient drift would
                         // otherwise keep redrawing the blurred backdrop underneath at ~12fps --
                         // real contention on exactly the frames search is using.
-                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize().hazeSource(backdropHaze), appearance, refreshing = refreshing, paused = searchOpen)
+                        if (appearance.auroraBackground) CompositionLocalProvider(LocalAuroraTouch provides auroraTouch) {
+                            AuroraBackground(Modifier.matchParentSize().hazeSource(backdropHaze), appearance, refreshing = refreshing, paused = searchOpen)
+                        }
                         // Cold-start lock: don't compose (and blur) the full garage behind a lock
                         // the user hasn't passed; it composes once `locked` flips.
                         if (!(locked && !unlockedThisSession)) {
