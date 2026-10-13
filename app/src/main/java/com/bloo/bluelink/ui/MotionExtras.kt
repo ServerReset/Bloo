@@ -17,53 +17,6 @@ import androidx.compose.ui.unit.dp
 
 /** One place, so every surface that uses them moves the same way. */
 
-/**
- * Text that fades in when [text] changes, instead of swapping in a frame. One plain Text and one
- * alpha (no cross-fade, which composes both strings at once): this sits inside every button label,
- * so it has to be close to free when nothing is changing.
- */
-@Composable
-internal fun AnimatedText(
-    text: String,
-    modifier: Modifier = Modifier,
-    style: TextStyle = TextStyle.Default,
-    color: Color = Color.Unspecified,
-    fontWeight: FontWeight? = null,
-    maxLines: Int = Int.MAX_VALUE,
-    softWrap: Boolean = true,
-    overflow: TextOverflow = TextOverflow.Clip,
-) {
-    // Long / wrapping / digit-free text keeps this fade, which is the right shape for wholesale
-    // changes.
-    if (maxLines == 1 && text.length <= 24 && text.any { it.isDigit() } && !text.contains('\n')) {
-        RollingNumber(
-            text,
-            style = style,
-            fontWeight = fontWeight ?: FontWeight.Normal,
-            color = color,
-            modifier = modifier,
-        )
-        return
-    }
-    val fade = remember { Animatable(1f) }
-    var first by remember { androidx.compose.runtime.mutableStateOf(true) }
-    LaunchedEffect(text) {
-        if (first) { first = false; return@LaunchedEffect }
-        fade.snapTo(0.2f)
-        fade.animateTo(1f, tween(MotionShort))
-    }
-    RevealText(
-        text,
-        modifier = modifier.graphicsLayer { alpha = fade.value },
-        style = style,
-        color = color,
-        fontWeight = fontWeight,
-        maxLines = maxLines,
-        softWrap = softWrap,
-        overflow = overflow,
-    )
-}
-
 /** Names of the things that have already played their entrance this session. */
 private val enteredThisSession = mutableSetOf<String>()
 

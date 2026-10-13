@@ -150,7 +150,7 @@ fun MorphButtonLabel(
         content = {
             MorphButtonGlyph(icon, pending, iconSize, spinning)
             // The one button label style, shared with MorphTextButton.
-            AnimatedText(
+            RevealText(
                 label,
                 style = ButtonLabelStyle,
                 fontWeight = FontWeight.SemiBold,

@@ -188,7 +188,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                         maxLines = 1,
                         softWrap = false,
                     )
-                    AnimatedText(
+                    RevealText(
                         if (carCount == 0) "No vehicles yet" else "$carCount car${if (carCount == 1) "" else "s"}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -101,10 +101,13 @@ internal fun SettingsSearchResults(
             )
         }
     } else {
-        // One flat list under small group headings, not a stack of bordered cards: a result is a row
-        // (icon, then its own control), and a car's name rides above its value instead of repeating
-        // the label the control already shows. Groups keep the order of their best match.
-        val groups = results.groupBy { if (" · " in it.title) "Your cars" else "Settings" }
+        // Split the single best match out on top, then group the rest. One obvious answer should say
+        // so at a glance instead of hiding at the head of a list, and a heading carrying its count
+        // tells you how much is under it without scrolling. Still one flat list under small headings,
+        // not a stack of bordered cards.
+        val top = if (tokens.isNotEmpty() && results.size > 1) results.first() else null
+        val rest = if (top != null) results.drop(1) else results
+
         if (suggestedCommands.isNotEmpty()) {
             ResultGroup("Actions") {
                 suggestedCommands.forEach { cmd -> androidx.compose.runtime.key(cmd.id) {
@@ -119,19 +122,33 @@ internal fun SettingsSearchResults(
                 } }
             }
         }
-        groups.forEach { (heading, entriesInGroup) -> androidx.compose.runtime.key(heading) {
-            ResultGroup(heading) {
-                entriesInGroup.forEach { e -> androidx.compose.runtime.key(e.title) {
-                    val car = e.title.substringAfter(" · ", "").takeIf { it.isNotBlank() }
+        if (top != null) {
+            androidx.compose.runtime.key(top.title) {
+                ResultGroup("Top result") {
+                    val car = top.title.substringAfter(" · ", "").takeIf { it.isNotBlank() }
                     ResultRow(
                         if (car != null) AppIcons.DirectionsCar else AppIcons.Settings,
                         MaterialTheme.colorScheme.primary,
                         caption = car,
-                        content = e.content,
+                        content = top.content,
                     )
-                } }
+                }
             }
-        } }
+        }
+        rest.groupBy { if (" · " in it.title) "Your cars" else "Settings" }
+            .forEach { (heading, entriesInGroup) -> androidx.compose.runtime.key(heading) {
+                ResultGroup(if (entriesInGroup.size > 1) "$heading · ${entriesInGroup.size}" else heading) {
+                    entriesInGroup.forEach { e -> androidx.compose.runtime.key(e.title) {
+                        val car = e.title.substringAfter(" · ", "").takeIf { it.isNotBlank() }
+                        ResultRow(
+                            if (car != null) AppIcons.DirectionsCar else AppIcons.Settings,
+                            MaterialTheme.colorScheme.primary,
+                            caption = car,
+                            content = e.content,
+                        )
+                    } }
+                }
+            } }
     }
 
     // A recognised command ("lock my Ioniq") runs via VehicleCommandRunner, the same path as the

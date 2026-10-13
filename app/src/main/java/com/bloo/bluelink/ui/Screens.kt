@@ -292,6 +292,12 @@ fun BlooApp(vm: AppViewModel) {
             }
             }
         }
+        // The screen-edge liquid-glass warp (top, bottom, left, right -- no blur), sitting UNDER the
+        // floating chrome so it never bends the search, the toasts or the dialogs, and OFF under
+        // battery saver. Extreme under Ultra glass.
+        if (canBlurBackdrops()) {
+            Box(Modifier.fillMaxSize().screenEdgeWarp(searchHazeState, ultra = appearance.ultraGlass))
+        }
         // Search lives above the AnimatedContent so one element survives the transition (corner
         // bubble morphing into the settings pill). Only the garage is searchable.
         val searchable = target == Screen.Garage

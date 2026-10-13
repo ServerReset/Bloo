@@ -301,7 +301,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                             onDone = { attemptPin() },
                             supportingText = {
                                 when {
-                                    rejected -> AnimatedText(
+                                    rejected -> RevealText(
                                         "Too many attempts. Try again in ${formatLockoutSeconds(remainingMs)}",
                                         color = MaterialTheme.colorScheme.error,
                                     )

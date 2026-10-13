@@ -61,7 +61,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
                 Icon(icon, contentDescription = null, modifier = Modifier.size(12.dp))
                 Spacer(Modifier.width(GapHairline))
             }
-            AnimatedText(
+            RevealText(
                 text,
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,
@@ -77,7 +77,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
  */
 @Composable
 internal fun StatusChip(text: String, tint: Color, modifier: Modifier = Modifier, icon: ImageVector? = null) {
-    StatusChip(tint = tint, modifier = modifier, icon = icon) { AnimatedText(text) }
+    StatusChip(tint = tint, modifier = modifier, icon = icon) { RevealText(text) }
 }
 
 /**

@@ -226,7 +226,7 @@ internal fun SettingsCard(
             canToggle = !inline,
             titleTrailing = inlineSetting ?: status?.takeIf { it.isNotBlank() }?.let {
                 {
-                    AnimatedText(
+                    RevealText(
                         it,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
