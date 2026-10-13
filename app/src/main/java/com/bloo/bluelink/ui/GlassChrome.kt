@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
@@ -153,16 +154,18 @@ internal val LocalBackdropHaze = androidx.compose.runtime.staticCompositionLocal
 private const val GlassCardTintAlpha = 0.26f
 
 /**
- * The shared glass sheen: light from the top-left fading across, so a surface reads as glass rather
- * than a flat tint.
+ * The one glass-sheen brush: light from the top-left fading across, so a surface reads as glass
+ * rather than a flat tint. [glassSheen] lays it behind a surface; the locked-control frost draws the
+ * same brush directly, on top of the controls it clouds.
  */
-internal fun Modifier.glassSheen(): Modifier = this.background(
-    androidx.compose.ui.graphics.Brush.linearGradient(
-        0f to Color.White.copy(alpha = 0.09f),
-        0.45f to Color.White.copy(alpha = 0.01f),
-        1f to Color.White.copy(alpha = 0.04f),
-    ),
+internal fun glassSheenBrush(): Brush = Brush.linearGradient(
+    0f to Color.White.copy(alpha = 0.09f),
+    0.45f to Color.White.copy(alpha = 0.01f),
+    1f to Color.White.copy(alpha = 0.04f),
 )
+
+/** The shared glass sheen; see [glassSheenBrush]. */
+internal fun Modifier.glassSheen(): Modifier = this.background(glassSheenBrush())
 
 /**
  * How much of the cards' blur is showing, as a lambda to read in the DRAW phase (so a change redraws,
