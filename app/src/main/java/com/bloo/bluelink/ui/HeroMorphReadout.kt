@@ -13,7 +13,6 @@ import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,7 +103,7 @@ internal fun HeroMorphReadout(
                     tint = fuelColor,
                 )
                 Spacer(Modifier.width(ButtonIconGap))
-                Text("Fuel $fuelPct%", style = type.bodyMedium, color = fuelColor, maxLines = 1)
+                RevealText("Fuel $fuelPct%", style = type.bodyMedium, color = fuelColor, maxLines = 1)
             }
         }
         ChargeSegmentBar(

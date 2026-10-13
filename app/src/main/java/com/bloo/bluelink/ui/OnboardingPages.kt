@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -289,7 +288,7 @@ internal fun OnboardingPebbleDemo() {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconBadge(AppIcons.Bolt, tint = scheme.primary, size = 28.dp, iconSize = 15.dp)
                 Spacer(Modifier.width(GapRow))
-                Text(
+                RevealText(
                     "Charge",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -303,7 +302,7 @@ internal fun OnboardingPebbleDemo() {
                 )
             }
             AnimatedVisibility(visible = open) {
-                Text(
+                RevealText(
                     "That is a pebble. Tap it for details, hold to reorder, and swipe its top row to change cars.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = scheme.onSurfaceVariant,

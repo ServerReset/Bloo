@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -85,7 +84,7 @@ internal fun DebugCardContent(
                 }
                 val scroll = rememberScrollState()
                 SelectionContainer {
-                    Text(
+                    RevealText(
                         text = logs.joinToString("\n").ifBlank { "No activity yet." },
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
@@ -194,7 +193,7 @@ private fun CreditRow(entry: CreditEntry) {
             iconSize = 20.dp,
         )
         Column(Modifier.weight(1f)) {
-            Text(entry.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            RevealText(entry.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(2.dp))
             BodySmallText(
                 entry.description,
@@ -213,7 +212,7 @@ private fun CreditRow(entry: CreditEntry) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(GapHairline),
             ) {
-                Text(
+                RevealText(
                     entry.url.removePrefix("https://").removePrefix("http://"),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,

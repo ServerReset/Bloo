@@ -18,7 +18,6 @@ import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,7 +68,7 @@ fun WearCompanionRow(
         Spacer(Modifier.width(GapGroup))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
+                RevealText(
                     name.ifBlank { "Watch" },
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
@@ -161,7 +160,7 @@ internal fun DriveSyncSetupDialog(
                         .padding(GapSection),
                     verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
-                    Text(
+                    RevealText(
                         "Starts a new Drive file. Your devices stop sharing settings.",
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onErrorContainer,
@@ -209,7 +208,7 @@ internal fun DriveSyncChoiceRow(
         Spacer(Modifier.width(ButtonIconGap))
         Column(horizontalAlignment = Alignment.Start) {
             TitleSmallText(title)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall)
+            RevealText(subtitle, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,7 +48,7 @@ internal fun LoadingScreen(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize()) {
         // Gated on the user's own setting, like the garage already gates it.
         if (LocalAppearance.current.auroraBackground) AuroraBackground(Modifier.matchParentSize())
-        Text(
+        RevealText(
             "Bloo",
             style = MaterialTheme.typography.displayLarge,
             fontWeight = FontWeight.Black,

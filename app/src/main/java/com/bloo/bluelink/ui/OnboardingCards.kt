@@ -130,7 +130,7 @@ internal fun OnboardingStepCard(spec: OnboardingCardSpec, content: @Composable (
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
         contentGap = GapGroup,
     ) {
-        androidx.compose.material3.Text(
+        RevealText(
             spec.summary,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

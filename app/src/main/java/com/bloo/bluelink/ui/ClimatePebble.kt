@@ -9,7 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -223,7 +222,7 @@ internal fun ClimatePebble(
         // No hero: the summary is the same expression and already renders as the tile headline.
         if (running) {
             if (climateOn) {
-                Text(
+                RevealText(
                     "On at the car. Read-only while the car is running.",
                     style = MaterialTheme.typography.bodySmall,
                     color = mutedContentColor(),
@@ -238,7 +237,7 @@ internal fun ClimatePebble(
                     s.frSeatHeatState?.takeIf { it != 0 }?.let { StatusRow("Passenger seat", onOff(it)) }
                 }
             } else {
-                Text(
+                RevealText(
                     "Climate can't be started while the car is running.",
                     style = MaterialTheme.typography.bodySmall,
                     color = mutedContentColor(),
@@ -289,7 +288,7 @@ internal fun ClimatePebble(
                         onClick = { startAtTarget(smartTarget, currentReq) },
                         enabled = !pending && !climateOn,
                     )
-                    Text(
+                    RevealText(
                         "It's $ambientLabel by your car. Smart climate targets $targetLabel.",
                         style = MaterialTheme.typography.bodySmall,
                         color = mutedContentColor(),
@@ -327,7 +326,7 @@ internal fun ClimatePebble(
                     BlooTextField(
                         value = presetName,
                         onValueChange = { presetName = it },
-                        label = { Text("Name") },
+                        label = { RevealText("Name") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )

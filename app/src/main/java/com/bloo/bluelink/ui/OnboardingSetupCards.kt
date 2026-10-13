@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,7 +53,7 @@ internal fun OnboardingPinForm(
             isError = attempted && confirm.isNotEmpty() && pin != confirm,
         )
         if (attempted && (pin.length < PinCrypto.PIN_MIN_DIGITS || pin != confirm)) {
-            Text(
+            RevealText(
                 "PINs must be 4-8 digits and match.",
                 style = MaterialTheme.typography.bodySmall,
                 color = scheme.error,

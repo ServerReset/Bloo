@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +57,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
                 .background(statusColor(action.status), CircleShape),
         )
         Spacer(Modifier.width(GapRow))
-        Text(
+        RevealText(
             text = action.action,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurface,
@@ -70,7 +69,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
         // is worth showing but never worth a row of its own here.
         if (action.details != null) {
             Spacer(Modifier.width(GapRow))
-            Text(
+            RevealText(
                 text = action.details,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -82,7 +81,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
             Spacer(Modifier.weight(1f))
         }
         Spacer(Modifier.width(GapRow))
-        Text(
+        RevealText(
             text = shortTime(action.timestamp, use24Hour),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -127,7 +126,7 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
             // with no chrome to announce it -- so drawing nothing for a car that has not been
             // commanded yet made a working gesture indistinguishable from a missing one. The empty
             // state is the only feedback that the press did something.
-            Text(
+            RevealText(
                 text = "No remote actions yet",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -140,7 +139,7 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
         val use24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
         actions.take(max).forEach { RemoteActionItem(it, use24Hour) }
         if (actions.size > max) {
-            Text(
+            RevealText(
                 text = "+${actions.size - max} more in the last $REMOTE_ACTION_HISTORY_DAYS days",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

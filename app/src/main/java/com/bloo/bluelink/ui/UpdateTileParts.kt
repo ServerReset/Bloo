@@ -39,7 +39,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -135,7 +134,7 @@ internal fun UpdateReleaseNotes(
                     fillOnPress = false,
                 )
             }
-            Text(
+            RevealText(
                 notes,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -240,15 +239,15 @@ internal fun UpdateStatusLine(
                 color = LocalContentColor.current,
             )
             when (kind) {
-                "installing" -> Text("Installing silently via Shizuku…", style = textStyle)
-                "downloading" -> Text("Downloading", style = textStyle)
-                "ready_seamless" -> Text("Downloaded · installs silently via Shizuku", style = textStyle)
-                "ready" -> Text("Downloaded · tap Install", style = textStyle)
-                "seamless" -> Text("Installs silently via Shizuku, no prompts", style = textStyle)
+                "installing" -> RevealText("Installing silently via Shizuku…", style = textStyle)
+                "downloading" -> RevealText("Downloading", style = textStyle)
+                "ready_seamless" -> RevealText("Downloaded · installs silently via Shizuku", style = textStyle)
+                "ready" -> RevealText("Downloaded · tap Install", style = textStyle)
+                "seamless" -> RevealText("Installs silently via Shizuku, no prompts", style = textStyle)
                 // Never blank: when showDelta is false the caller's own summary line already says
                 // the delta, but leaving this Unit left the icon badge floating in the row with
                 // nothing beside it -- a real empty gap, not just an unused word.
-                else -> Text(if (showDelta) deltaLabel else "Ready to download", style = textStyle)
+                else -> RevealText(if (showDelta) deltaLabel else "Ready to download", style = textStyle)
             }
         }
     }

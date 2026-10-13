@@ -28,7 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -244,7 +243,7 @@ internal fun PrimaryActions(
                 transitionSpec = { expandContentTransform() },
                 label = "lockStateText",
             ) { text ->
-                Text(
+                RevealText(
                     text,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,

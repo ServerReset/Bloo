@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,7 +52,7 @@ internal fun AnimatedText(
         fade.snapTo(0.2f)
         fade.animateTo(1f, tween(MotionShort))
     }
-    Text(
+    RevealText(
         text,
         modifier = modifier.graphicsLayer { alpha = fade.value },
         style = style,

@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -216,14 +215,14 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     tint = lockFg,
                 )
                 Spacer(Modifier.height(GapPage))
-                Text(
+                RevealText(
                     "Bloo is locked",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = lockFg,
                 )
                 Spacer(Modifier.height(GapHairline))
-                Text(
+                RevealText(
                     if (appState.appPinSet) "Confirm it's you, or use your PIN." else "Confirm it's you to reach your vehicles.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = lockFg.copy(alpha = 0.85f),
@@ -280,13 +279,13 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                                 iconSize = 24.dp,
                             )
                             Column {
-                                Text(
+                                RevealText(
                                     "Enter your PIN",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
-                                Text(
+                                RevealText(
                                     if (bioAvailable) "Your biometrics or your PIN unlock Bloo."
                                     else "This device has no biometrics, so a PIN is required.",
                                     style = MaterialTheme.typography.bodySmall,
@@ -306,7 +305,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                                         "Too many attempts. Try again in ${formatLockoutSeconds(remainingMs)}",
                                         color = MaterialTheme.colorScheme.error,
                                     )
-                                    else -> Text(
+                                    else -> RevealText(
                                         lockout.attemptsRemainingInBatch(nowTick, elapsedTick)?.let { left ->
                                             if (left <= 2) "Careful. $left ${if (left == 1) "attempt" else "attempts"} before a lockout"
                                             else "${PinLockout.STRIKES_PER_BATCH} wrong attempts lock the app for 30 seconds. The wait doubles each time."
@@ -351,14 +350,14 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     tint = lockFg,
                 )
                 Spacer(Modifier.height(GapSection))
-                Text(
+                RevealText(
                     "Bloo is locked",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = lockFg,
                 )
                 Spacer(Modifier.height(GapHairline))
-                Text(
+                RevealText(
                     "Please try opening Bloo again.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = lockFg.copy(alpha = 0.85f),

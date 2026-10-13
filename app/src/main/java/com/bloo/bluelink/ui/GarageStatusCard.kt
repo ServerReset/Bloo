@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -141,7 +140,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                         style = MaterialTheme.typography.headlineSmall.copy(textAlign = TextAlign.Center),
                         fontWeight = FontWeight.SemiBold,
                     )
-                    Text(
+                    RevealText(
                         body,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

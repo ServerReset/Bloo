@@ -9,7 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -184,7 +183,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                 }
             }
             status?.let {
-                Text(
+                RevealText(
                     it,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -286,7 +285,7 @@ private fun SetupField(
     BlooTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text(label) },
+        label = { RevealText(label) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboard),
         modifier = modifier.fillMaxWidth(),

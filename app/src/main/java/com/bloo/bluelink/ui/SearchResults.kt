@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -93,9 +92,9 @@ internal fun SettingsSearchResults(
 
     if (results.isEmpty() && suggestedCommands.isEmpty()) {
         Column(Modifier.fillMaxWidth().padding(vertical = GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            Text("No matches for \"$query\"", style = MaterialTheme.typography.titleSmall)
+            RevealText("No matches for \"$query\"", style = MaterialTheme.typography.titleSmall)
             // Not a dead end: point at the three kinds of thing the bar understands.
-            Text(
+            RevealText(
                 "Try a car name, a setting, or a command like \"lock my car\".",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -115,7 +114,7 @@ internal fun SettingsSearchResults(
                         onClick = { onPick(if (cmd.requiresArg) cmd.title + " " else cmd.title, !cmd.requiresArg) },
                     ) {
                         TitleSmallText(cmd.title)
-                        Text(cmd.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        RevealText(cmd.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } }
             }
@@ -184,7 +183,7 @@ internal fun SettingsSearchResults(
 @Composable
 internal fun ResultGroup(heading: String, rows: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth()) {
-        Text(
+        RevealText(
             heading,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
@@ -227,7 +226,7 @@ internal fun ResultRow(
         Spacer(Modifier.width(GapGroup))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
             if (caption != null) {
-                Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                RevealText(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             content()
         }

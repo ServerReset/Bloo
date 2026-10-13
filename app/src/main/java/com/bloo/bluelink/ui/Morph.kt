@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
@@ -351,7 +350,7 @@ val ButtonIconOnlySize = 24.dp
  */
 @Composable
 internal fun ButtonLabelText(text: String) {
-    Text(
+    RevealText(
         text,
         style = ButtonLabelStyle,
         fontWeight = FontWeight.SemiBold,

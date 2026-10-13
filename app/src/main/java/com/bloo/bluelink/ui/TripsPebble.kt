@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -92,14 +91,14 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         ) {
-            Text(
+            RevealText(
                 tripDate(trip.startdate),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = primaryColor,
             )
             trip.distance?.let {
-                Text(
+                RevealText(
                     formatTripDistance(it, metric),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
@@ -127,8 +126,8 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
 @Composable
 private fun TripStat(label: String, value: String, captionColor: androidx.compose.ui.graphics.Color) {
     Column {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = captionColor, maxLines = 1)
-        Text(
+        RevealText(label, style = MaterialTheme.typography.labelSmall, color = captionColor, maxLines = 1)
+        RevealText(
             value,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,

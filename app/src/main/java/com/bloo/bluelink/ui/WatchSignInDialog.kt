@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -33,7 +32,7 @@ internal fun WatchSignInDialog() {
                 WatchSignIn.State.WaitingForWatch -> BodyMediumText("Waiting for the watch. Keep Bloo open on it.")
                 is WatchSignIn.State.Confirm -> {
                     BodyMediumText("Does the watch show this code?")
-                    Text(current.code, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
+                    RevealText(current.code, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
                     BodyMediumText("Your accounts are encrypted so only that watch can read them, then sent. It will work without this phone afterwards.")
                 }
                 WatchSignIn.State.Sending -> BodyMediumText("Sending securely…")

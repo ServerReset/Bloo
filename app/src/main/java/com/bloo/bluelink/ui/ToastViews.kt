@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -218,7 +217,7 @@ private fun ToastCard(
             IconBadge(icon = icon, tint = accent, size = 34.dp, iconSize = 19.dp)
             Spacer(Modifier.width(GapGroup))
             SelectionContainer(Modifier.weight(1f)) {
-                Text(
+                RevealText(
                     toast.message,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
@@ -228,7 +227,7 @@ private fun ToastCard(
             // A grouped repeat shows its count, so a burst of one message reads as one toast.
             if (toast.count > 1) {
                 Spacer(Modifier.width(GapRow))
-                Text("×${toast.count}", style = MaterialTheme.typography.labelMedium, color = accent)
+                RevealText("×${toast.count}", style = MaterialTheme.typography.labelMedium, color = accent)
             }
             CopyButton(toast, accent, onCopy)
             MorphIconButton(onClick = onDismiss) { Icon(AppIcons.Close, contentDescription = "Dismiss") }

@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -158,19 +157,19 @@ internal fun UpdateAvailableTile(
                             // anyway". Spell that out up front rather than only after someone
                             // reports it as broken.
                             if (!state.shizukuAvailable || !LocalAppearance.current.seamlessInstallShizuku) {
-                                Text(
+                                RevealText(
                                     "Shizuku is off, so Android asks you to confirm each update. On the next screen tap \"More details\" to expand it, then \"Install anyway\".",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Text(
+                            RevealText(
                                 if (hasDirectDownload) "1. Tap \"Update\", then \"Install\" once it downloads" else "1. Download the APK, then open it",
                                 style = MaterialTheme.typography.bodySmall,
                             )
                             // Play Protect flags any non-Play-Store APK; the tip stops "Blocked by
                             // Play Protect" reading as a failure.
-                            Text(
+                            RevealText(
                                 "2. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
                                 style = MaterialTheme.typography.bodySmall,
                             )

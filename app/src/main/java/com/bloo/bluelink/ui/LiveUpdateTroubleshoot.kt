@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -41,7 +40,7 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
         icon = AppIcons.Info,
         title = "Live update not showing?",
         text = {
-            Text("A few things to check, in order:", style = MaterialTheme.typography.bodyMedium)
+            RevealText("A few things to check, in order:", style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(GapGroup))
             TroubleshootStep(
                 1,
@@ -87,13 +86,13 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
 @Composable
 internal fun TroubleshootStep(number: Int, text: String) {
     Row(modifier = Modifier.padding(bottom = GapGroup)) {
-        Text(
+        RevealText(
             "$number.",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.width(20.dp),
         )
-        Text(text, style = MaterialTheme.typography.bodyMedium)
+        RevealText(text, style = MaterialTheme.typography.bodyMedium)
     }
 }

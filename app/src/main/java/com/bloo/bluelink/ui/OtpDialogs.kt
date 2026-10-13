@@ -3,7 +3,6 @@ package com.bloo.bluelink.ui
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +27,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
         title = if (otp.sentTo == null) "Verify it's you" else "Enter your code",
         text = {
             if (otp.sentTo == null) {
-                Text("Kia needs a one-time code. Where should it go?")
+                RevealText("Kia needs a one-time code. Where should it go?")
                 if (otp.challenge.hasEmail) {
                     SafeMorphTextButton(
                         text = "Email" + (otp.challenge.email?.let { " · $it" } ?: ""),
@@ -46,7 +45,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                     )
                 }
             } else {
-                Text(
+                RevealText(
                     if (otp.sentTo == "SMS") "We texted you a one-time code."
                     else "We emailed you a one-time code.",
                 )
@@ -89,7 +88,7 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
         icon = AppIcons.Lock,
         title = "Enter your code",
         text = {
-            Text(
+            RevealText(
                 "We emailed a one-time code" +
                     (otp.challenge.email?.let { " to $it" } ?: "") + " to verify this sign-in.",
             )
@@ -124,7 +123,7 @@ internal fun OtpCodeField(code: String, onCodeChange: (String) -> Unit) {
     BlooTextField(
         value = code,
         onValueChange = onCodeChange,
-        label = { Text("Code") },
+        label = { RevealText("Code") },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.fillMaxWidth(),

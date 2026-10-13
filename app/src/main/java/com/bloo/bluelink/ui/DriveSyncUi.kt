@@ -11,7 +11,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -195,8 +194,8 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                 BlooTextField(
                     value = draft,
                     onValueChange = { draft = it },
-                    label = { Text("Device name") },
-                    placeholder = { Text(Build.MODEL ?: "This device") },
+                    label = { RevealText("Device name") },
+                    placeholder = { RevealText(Build.MODEL ?: "This device") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth(),

@@ -7,7 +7,6 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -91,7 +90,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
         ),
     ) {
         if (running) {
-            Text(
+            RevealText(
                 "Unavailable while the car is running.",
                 style = MaterialTheme.typography.bodySmall,
                 color = mutedContentColor(),

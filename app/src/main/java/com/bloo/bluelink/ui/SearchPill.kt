@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -193,7 +192,7 @@ internal fun SearchPill(
                                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                                 decorationBox = { inner ->
                                     if (query.isEmpty()) {
-                                        Text(
+                                        RevealText(
                                             "Search settings, commands & data",
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = scheme.onSurfaceVariant,
@@ -220,7 +219,7 @@ internal fun SearchPill(
                     ) {
                         Icon(AppIcons.Search, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(GapGroup))
-                        Text("Search", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                        RevealText("Search", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
                     }
                     // Closed BUBBLE: the glyph alone; contentDescription is on the icon since there
                     // is no label.
@@ -258,7 +257,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
             if (state.vehicles.size > 1) add("Where is my car" to Icons.Filled.Place)
         }.take(if (compact) 2 else 4)
     }
-    Text(
+    RevealText(
         "Ask for anything",
         style = MaterialTheme.typography.titleSmall,
         color = scheme.onSurface,
@@ -268,7 +267,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
             actions.forEach { cmd ->
                 ResultRow(cmd.icon, scheme.secondary, caption = null, onClick = { onPick(cmd.title, true) }) {
                     TitleSmallText(cmd.title)
-                    if (!compact) Text(cmd.description, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                    if (!compact) RevealText(cmd.description, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
                 }
             }
         }

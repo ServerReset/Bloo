@@ -12,7 +12,6 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,7 +58,7 @@ internal fun WeatherPlaceControls(appearance: SettingsStore.Appearance, vm: AppV
         BlooTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("City or place") },
+            label = { RevealText("City or place") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),

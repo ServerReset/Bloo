@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -136,7 +135,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
                 StatusRow("Next service due", "${formatDistance(it, metric)}$note")
             }
             if (lastSvc == null || interval == null) {
-                Text(
+                RevealText(
                     "Set last-service mileage and interval in Settings to track service.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

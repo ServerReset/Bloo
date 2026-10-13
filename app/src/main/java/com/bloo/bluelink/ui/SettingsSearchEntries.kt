@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -89,7 +88,7 @@ internal fun buildSettingsSearchEntries(
             BlooTextField(
                 value = plate,
                 onValueChange = { vm.setLicensePlate(v.vin, it) },
-                label = { Text("Licence plate") },
+                label = { RevealText("Licence plate") },
                 singleLine = true, shape = FieldShape, modifier = Modifier.fillMaxWidth(),
             )
         }

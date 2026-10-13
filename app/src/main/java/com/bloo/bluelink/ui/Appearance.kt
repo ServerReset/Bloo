@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -106,7 +105,7 @@ internal fun PaletteSwatch(palette: ColorPalette, selected: Boolean, onClick: ()
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         SwatchDisc(palette.swatch, selected, palette.label, onClick)
         Spacer(Modifier.height(GapHairline))
-        Text(palette.label, style = MaterialTheme.typography.labelSmall, color = swatchLabelColor(selected))
+        RevealText(palette.label, style = MaterialTheme.typography.labelSmall, color = swatchLabelColor(selected))
     }
 }
 
@@ -117,7 +116,7 @@ internal fun CustomPaletteSwatch(palette: CustomPaletteData, selected: Boolean, 
         SwatchDisc(Color(palette.primaryArgb.toLong() and 0xFFFFFFFFL), selected, palette.name, onClick)
         Spacer(Modifier.height(GapHairline))
         Row(horizontalArrangement = Arrangement.spacedBy(SplitSeam), verticalAlignment = Alignment.CenterVertically) {
-            Text(palette.name, style = MaterialTheme.typography.labelSmall, color = swatchLabelColor(selected))
+            RevealText(palette.name, style = MaterialTheme.typography.labelSmall, color = swatchLabelColor(selected))
             // 32dp, not 48dp: it sits in a caption row inside a 58dp-wide swatch column in a tight
             // grid.
             MorphIconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
@@ -277,14 +276,14 @@ internal fun ColorPickerCanvas(
         BlooTextField(
             value = hexInput,
             onValueChange = { hexInput = it; hexError = false },
-            label = { Text("Hex colour") },
+            label = { RevealText("Hex colour") },
             singleLine = true,
             // FieldShape, like every other text field in the app -- this one was the single call
             // site that never passed it, so it drew M3's default 4dp corners directly above the
             // "Name" field of the very dialog it lives in (which does pass FieldShape). Same field,
             // two corner radii, one dialog.
             isError = hexError,
-            supportingText = if (hexError) { { Text("Not a valid colour") } } else null,
+            supportingText = if (hexError) { { RevealText("Not a valid colour") } } else null,
             keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { commitHex() }),
             modifier = Modifier.fillMaxWidth().onFocusChanged { if (!it.isFocused) commitHex() },

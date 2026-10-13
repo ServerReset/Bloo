@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +57,7 @@ private fun DebugInfoItem(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             // Theme typography so it scales with the user's font-size setting.
-            Text(
+            RevealText(
                 text = info.label,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -153,7 +152,7 @@ fun DebugSettingsPanel(
     // No self-styled card: it renders inside SettingsCard("Debug", ...), whose title row already
     // says so.
     Column(modifier.fillMaxWidth()) {
-        Text(
+        RevealText(
             "Tap a copyable value to copy it to the clipboard.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -182,7 +181,7 @@ fun DebugSettingsPanel(
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 2.dp).size(16.dp),
                     )
-                    Text(
+                    RevealText(
                         text = "Share only when support asks.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,

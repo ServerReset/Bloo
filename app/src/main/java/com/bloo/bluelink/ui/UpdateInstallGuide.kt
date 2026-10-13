@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
@@ -29,21 +28,21 @@ internal fun UpdateInstallGuideDialog(
         icon = Icons.Filled.SystemUpdate,
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                Text(
+                RevealText(
                     "Android will hand off to its installer. Two things to expect:",
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Text(
+                RevealText(
                     "1. Tap \"Install\" on the system sheet.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
+                RevealText(
                     "2. If it says \"Blocked by Play Protect\" (Bloo does not come from the Play Store), tap \"More details\", then \"Install anyway\".",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
+                RevealText(
                     "3. Confirm with your PIN, password or biometrics.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

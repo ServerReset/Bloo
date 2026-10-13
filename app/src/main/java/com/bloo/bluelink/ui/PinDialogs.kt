@@ -74,7 +74,7 @@ internal fun PinDialogs(
         text = {
             when (stage) {
                 "current" -> {
-                    Text(
+                    RevealText(
                         "Enter your current PIN to continue.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = scheme.onSurfaceVariant,
@@ -93,7 +93,7 @@ internal fun PinDialogs(
                         isError = rejected,
                         supportingText = if (rejected) {
                             {
-                                Text(
+                                RevealText(
                                     "Incorrect PIN. Wrong attempts count toward a lockout.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = scheme.error,
@@ -106,7 +106,7 @@ internal fun PinDialogs(
                 "finish" -> {
                     when (mode) {
                         "set" -> {
-                            Text(
+                            RevealText(
                                 "Choose a new 4-8 digit PIN.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = scheme.onSurfaceVariant,
@@ -118,7 +118,7 @@ internal fun PinDialogs(
                             )
                         }
                         else -> {
-                            Text(
+                            RevealText(
                                 if (canBio)
                                     "Removing the PIN leaves biometrics as the only way to lock the app."
                                 else

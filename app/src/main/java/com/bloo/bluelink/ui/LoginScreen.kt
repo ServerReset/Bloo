@@ -34,7 +34,6 @@ import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -167,7 +166,7 @@ internal fun LoginScreen(
                     )
                 }
                 Column {
-                    Text(
+                    RevealText(
                         "Bloo",
                         style = if (shortScreen) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayMedium,
                         fontWeight = FontWeight.Black,
@@ -181,7 +180,7 @@ internal fun LoginScreen(
                         },
                         label = "loginSubtitle",
                     ) { subtitle ->
-                        Text(subtitle, style = MaterialTheme.typography.titleSmall, color = scheme.onSurfaceVariant)
+                        RevealText(subtitle, style = MaterialTheme.typography.titleSmall, color = scheme.onSurfaceVariant)
                     }
                 }
             }
@@ -230,7 +229,7 @@ internal fun LoginScreen(
                         BlooTextField(
                             value = email,
                             onValueChange = { email = it },
-                            label = { Text(emailLabel) },
+                            label = { RevealText(emailLabel) },
                             singleLine = true,
                             leadingIcon = { Icon(Icons.Filled.MailOutline, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -239,7 +238,7 @@ internal fun LoginScreen(
                         BlooTextField(
                             value = password,
                             onValueChange = { password = it },
-                            label = { Text("Password") },
+                            label = { RevealText("Password") },
                             singleLine = true,
                             leadingIcon = { Icon(AppIcons.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             trailingIcon = { RevealToggle(showPassword, "password") { showPassword = !showPassword } },
@@ -306,7 +305,7 @@ internal fun LoginScreen(
                                 transitionSpec = { fadeIn(tween(MotionShort)) togetherWith fadeOut(tween(MotionShort)) },
                                 label = "privacyNote",
                             ) { label ->
-                                Text(
+                                RevealText(
                                     "Sent only to $label's servers; stored encrypted on this device.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = scheme.onSurfaceVariant,

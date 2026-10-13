@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -154,7 +153,7 @@ internal fun CarSettingsCard(
                 BlooTextField(
                     value = state.licensePlates[v.vin] ?: "",
                     onValueChange = { vm.setLicensePlate(v.vin, it) },
-                    label = { Text("Licence plate") },
+                    label = { RevealText("Licence plate") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )

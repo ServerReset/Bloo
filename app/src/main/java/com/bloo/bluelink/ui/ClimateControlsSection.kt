@@ -119,7 +119,7 @@ internal fun ClimateControlsSection(
         }
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            Text(
+            RevealText(
                 "Run time",
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,

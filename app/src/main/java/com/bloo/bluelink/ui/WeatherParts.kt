@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -69,8 +68,8 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
     ) {
         WeatherGlyph(weather.condition, weather.isDay, 30.dp, describe = false)
         Column(Modifier.weight(1f)) {
-            Text(weather.condition.label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
-            Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            RevealText(weather.condition.label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
+            RevealText(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         RollingNumber(
             text = weather.tempLabel(fahrenheit),
@@ -114,9 +113,9 @@ internal fun WeatherBlock(
 private fun WeatherLocationHeading(title: String, subtitle: String?, weather: Weather) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
         WeatherGlyph(weather.condition, weather.isDay, 16.dp, describe = false)
-        Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        RevealText(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         if (!subtitle.isNullOrBlank()) {
-            Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            RevealText(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -143,7 +142,7 @@ private fun CurrentConditions(weather: Weather, fahrenheit: Boolean, tint: Color
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
             )
-            Text(weather.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            RevealText(weather.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -160,7 +159,7 @@ private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
     val hours = weather.hourly.drop(startIndex).take(12)
     if (hours.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        Text("Next hours", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        RevealText("Next hours", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         val scroll = rememberScrollState()
         val viewportPx = remember { androidx.compose.runtime.mutableIntStateOf(0) }
         val blurOk = canBlurBackdrops()
@@ -201,14 +200,14 @@ private fun HourCell(hour: HourPoint, fahrenheit: Boolean, label: String, modifi
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(GapHairline),
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        RevealText(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         WeatherGlyph(hour.condition, true, 22.dp)
-        Text(
+        RevealText(
             com.bloo.bluelink.data.weatherTemp(hour.tempC, fahrenheit),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(
+        RevealText(
             hour.precipProbability?.takeIf { it > 0 }?.let { "$it%" } ?: " ",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
@@ -238,10 +237,10 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
     val days = weather.daily.take(MAX_FORECAST_DAYS)
     if (days.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-        Text("Forecast", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        RevealText("Forecast", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         days.forEachIndexed { i, day ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
-                Text(
+                RevealText(
                     if (i == 0) "Today" else weekdayName(day.date),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (i == 0) FontWeight.SemiBold else FontWeight.Normal,
@@ -249,7 +248,7 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
                     maxLines = 1,
                 )
                 WeatherGlyph(day.condition, true, 20.dp)
-                Text(
+                RevealText(
                     day.condition.label,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -259,7 +258,7 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
                 )
                 val hi = (if (fahrenheit) day.highC?.let { it * 9 / 5 + 32 } else day.highC)?.roundToInt()
                 val lo = (if (fahrenheit) day.lowC?.let { it * 9 / 5 + 32 } else day.lowC)?.roundToInt()
-                Text(
+                RevealText(
                     buildString {
                         if (hi != null) append("$hi°")
                         if (hi != null && lo != null) append(" / ")

@@ -13,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -238,7 +237,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel, gen5w: Boolean 
             title = "Choose the car's Bluetooth device",
             text = {
                 if (devices.isEmpty()) {
-                    Text(
+                    RevealText(
                         "No paired Bluetooth devices. Pair your car in Android's Bluetooth settings first.",
                         style = MaterialTheme.typography.bodyMedium,
                     )

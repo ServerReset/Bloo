@@ -286,7 +286,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                             }
                             // The swipe section's own cue, on its first page only.
                             if (idx == swipeStart) {
-                                androidx.compose.material3.Text(
+                                RevealText(
                                     "Swipe to continue.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,

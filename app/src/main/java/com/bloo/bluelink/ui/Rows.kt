@@ -21,7 +21,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -49,7 +48,7 @@ internal fun StatusRow(label: String, value: String, valueMono: Boolean = false)
         // Top-align so a wrapped value leaves the label on the first line.
         verticalAlignment = Alignment.Top,
     ) {
-        Text(
+        RevealText(
             label,
             // Natural width, not weight(1f): a 50/50 split starved the value (the long side) into
             // wrapping. The value below is the row's one weighted child.
@@ -107,7 +106,7 @@ internal fun SectionLabel(text: String) {
 internal fun StepRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         // bodySmall keeps slider labels compact.
-        Text(
+        RevealText(
             label,
             Modifier.weight(1f),
             style = MaterialTheme.typography.bodySmall,
@@ -122,7 +121,7 @@ internal fun StepRow(label: String, value: String, valueColor: Color = Color.Uns
                 (fadeIn() + slideInVertically { it / 2 }) togetherWith (fadeOut() + slideOutVertically { -it / 2 })
             },
             label = "stepValue",
-        ) { v -> Text(v, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1) }
+        ) { v -> RevealText(v, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1) }
     }
 }
 
@@ -221,7 +220,7 @@ private fun ToggleRowControl(label: String, checked: Boolean, modifier: Modifier
             .padding(vertical = GapHairline),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
+        RevealText(
             label,
             Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,

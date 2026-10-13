@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -71,13 +70,13 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
                     val bulleted = line.startsWith("* ") || line.startsWith("- ")
                     Row(horizontalArrangement = Arrangement.spacedBy(GapRow)) {
                         if (bulleted) {
-                            Text(
+                            RevealText(
                                 "•",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = mutedContentColor(),
                             )
                         }
-                        Text(
+                        RevealText(
                             if (bulleted) line.substring(2) else line,
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -85,13 +84,13 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
                 }
             }
         } else {
-            Text(
+            RevealText(
                 "Summarizes this car's latest status, on your device.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = mutedContentColor(),
             )
         }
-        Text(
+        RevealText(
             "Reflects the last refresh. Tap Summarize to update.",
             style = MaterialTheme.typography.bodySmall,
             color = mutedContentColor(),

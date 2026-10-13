@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,7 +53,7 @@ internal fun SettingsGroup(title: String? = null, content: @Composable ColumnSco
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         if (!title.isNullOrBlank()) {
-            Text(
+            RevealText(
                 title,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
@@ -81,7 +80,7 @@ internal fun MinutesField(initial: Int, label: String, onSet: (Int) -> Unit) {
             text = it.filter(Char::isDigit)
             text.toIntOrNull()?.takeIf { m -> m in 1..120 }?.let(onSet)
         },
-        label = { Text(label) },
+        label = { RevealText(label) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.fillMaxWidth().padding(top = GapRow),
@@ -94,7 +93,7 @@ internal fun MilesField(value: Int?, label: String, modifier: Modifier, onSet: (
     BlooTextField(
         value = value?.toString() ?: "",
         onValueChange = { onSet(it.filter(Char::isDigit).toIntOrNull()) },
-        label = { Text(label) },
+        label = { RevealText(label) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = modifier,

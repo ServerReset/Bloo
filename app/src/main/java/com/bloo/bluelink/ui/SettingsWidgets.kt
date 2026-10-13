@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -257,7 +256,7 @@ internal fun SecretRow(label: String, value: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
+        RevealText(
             label,
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
@@ -265,7 +264,7 @@ internal fun SecretRow(label: String, value: String) {
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(GapGroup))
-        Text(
+        RevealText(
             if (show) value else "•".repeat(value.length.coerceIn(4, 10)),
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
@@ -297,7 +296,7 @@ internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
         fillOnPress = true,
         groupWeight = GroupWeightProportional,
     ) {
-    Text(
+    RevealText(
         label,
         Modifier.weight(1f),
         style = ButtonLabelStyle,

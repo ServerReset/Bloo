@@ -14,7 +14,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,9 +66,9 @@ internal fun AiAnswer(
                     TitleSmallText("AI answer")
                 }
                 if (reply != null) {
-                    Text(reply, style = MaterialTheme.typography.bodyMedium)
+                    RevealText(reply, style = MaterialTheme.typography.bodyMedium)
                 } else {
-                    Text("Thinking…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    RevealText("Thinking…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -101,7 +100,7 @@ internal fun AiCommandProposal(
                     Spacer(Modifier.width(GapRow))
                     TitleSmallText("Did you mean?")
                 }
-                Text(
+                RevealText(
                     ran ?: "${aiCommandLabel(p.first)} ${car?.name ?: "your car"}",
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -172,7 +171,7 @@ internal fun AiSettingProposal(
                 Spacer(Modifier.width(GapRow))
                 TitleSmallText("Did you mean?")
             }
-            Text(
+            RevealText(
                 when {
                     action.isAction -> action.title
                     action.text -> "Set ${action.title} to \"${p.value}\""
@@ -254,7 +253,7 @@ internal fun CommandActionResult(
                 Spacer(Modifier.width(GapRow))
                 TitleSmallText("Action")
             }
-            Text(
+            RevealText(
                 when {
                     targetVehicle == null -> {
                         val example = state.vehicles.firstOrNull()?.name ?: "car"

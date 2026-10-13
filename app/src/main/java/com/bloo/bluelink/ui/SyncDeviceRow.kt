@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,7 +97,7 @@ internal fun SyncDeviceRow(
         Spacer(Modifier.width(GapGroup))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
+                RevealText(
                     device.name.ifBlank { "Unnamed device" },
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (isPrimary || isSelf) FontWeight.SemiBold else FontWeight.Normal,
@@ -132,7 +131,7 @@ internal fun SyncDeviceRow(
                 )
             }
             if (health == DeviceHealth.STALE) {
-                Text(
+                RevealText(
                     "Hasn't synced in a while. It may be on a different Drive file.",
                     style = MaterialTheme.typography.labelSmall,
                     color = scheme.onSurfaceVariant,
@@ -151,7 +150,7 @@ internal fun SyncDeviceRow(
 
 @Composable
 internal fun DeviceTag(text: String, color: Color) {
-    Text(
+    RevealText(
         text,
         style = MaterialTheme.typography.labelSmall,
         color = color,

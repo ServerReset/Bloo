@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -144,7 +143,7 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
                 transitionSpec = { expandContentTransform() },
                 label = "statusHeaderText",
             ) { s ->
-                Text(s, style = MaterialTheme.typography.labelMedium, color = animTint, fontWeight = FontWeight.Medium)
+                RevealText(s, style = MaterialTheme.typography.labelMedium, color = animTint, fontWeight = FontWeight.Medium)
             }
         }
     }
@@ -182,7 +181,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                 )
                 Spacer(Modifier.width(GapGroup))
                 Column(Modifier.weight(1f)) {
-                    Text(
+                    RevealText(
                         "Bloo",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
@@ -288,7 +287,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                     .padding(GapSection),
                                 verticalArrangement = Arrangement.spacedBy(GapRow),
                             ) {
-                                Text(
+                                RevealText(
                                     "Update available",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,

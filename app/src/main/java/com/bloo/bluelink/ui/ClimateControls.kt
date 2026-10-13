@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -259,9 +258,9 @@ internal fun PresetPill(
                     Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
                     Spacer(Modifier.width(ButtonIconGap))
                     Column {
-                        Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        RevealText(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         if (detail.isNotBlank()) {
-                            Text(detail, style = MaterialTheme.typography.labelSmall, color = mutedContentColor(), maxLines = 1)
+                            RevealText(detail, style = MaterialTheme.typography.labelSmall, color = mutedContentColor(), maxLines = 1)
                         }
                     }
                 }
@@ -325,7 +324,7 @@ internal fun ChargeLimitPill(
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
                         Spacer(Modifier.width(ButtonIconGap))
-                        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        RevealText(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                         RollingNumber(text = "$limit%", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                     }
                 },
@@ -338,7 +337,7 @@ internal fun ChargeLimitPill(
                     contentPadding = PaddingValues(horizontal = 18.dp),
                 ) {
                     if (pending) LoadingIndicator(Modifier.size(18.dp))
-                    else Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                    else RevealText("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
                 }
             ),
             // The same target height as every other button (the 11dp content padding alone left

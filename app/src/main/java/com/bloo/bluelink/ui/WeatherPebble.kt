@@ -15,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -149,7 +148,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
             enter = expandEnterSized(Alignment.Bottom),
             exit = expandExitSized(Alignment.Bottom),
         ) {
-            Text("Tap Locate to query the car's current position.")
+            RevealText("Tap Locate to query the car's current position.")
         }
         // Mirror of the "not located yet" AnimatedVisibility above -- same pebble, same boolean
         // flip, only the empty side had the treatment.

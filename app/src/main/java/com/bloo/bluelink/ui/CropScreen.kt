@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -122,7 +121,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                             drawIntoCanvas { it.nativeCanvas.drawBitmap(image, m, null) }
                         }
                     }
-                    failed -> Text("Couldn't load that image", color = Color.White)
+                    failed -> RevealText("Couldn't load that image", color = Color.White)
                     else -> LoadingIndicator()
                 }
             }
@@ -169,7 +168,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                     expressive = true,
                 fillOnPress = true,
                 groupWeight = GroupWeightProportional,
-            ) { Text("Use photo", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
+            ) { RevealText("Use photo", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
             }
         }
     }

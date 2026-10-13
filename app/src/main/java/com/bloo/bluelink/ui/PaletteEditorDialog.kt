@@ -10,7 +10,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -73,7 +72,7 @@ internal fun PaletteEditorDialog(
                 BlooTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Name") },
+                    label = { RevealText("Name") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
@@ -165,7 +164,7 @@ internal fun UiScaleSlider(appearance: SettingsStore.Appearance, vm: AppViewMode
 @Composable
 private fun ColorPickerSection(label: String, color: Color, onColor: (Color) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        RevealText(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         ColorPickerCanvas(color, onColor)
     }
 }

@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -10,6 +11,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -19,15 +21,18 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import kotlinx.coroutines.delay
+import androidx.compose.ui.unit.TextUnit
 
 /**
  * The app's standard text entrance: a line is revealed WORD BY WORD, each word a beat behind the one
- * before it, so the sentence builds itself. Applied in every shared text helper and the pebble title,
- * so all text enters identically.
+ * before it, so the sentence builds itself. Every text in the app draws through here (directly or via
+ * the shared helpers), so all text enters identically.
  *
  * The reveal is done in the DRAW phase (a clip over the already-laid-out words), NOT by rebuilding the
  * string -- so it costs one cheap clip per frame and never recomposes the text. That also clips the
@@ -98,25 +103,41 @@ internal fun rememberTextReveal(wordCount: Int): State<Float> {
 }
 
 /**
- * A [Text] that writes itself out word by word, in the draw phase. Drop-in for `Text`; a settled line
- * (or one with the entrance off) is a plain draw, so there is no per-frame cost once it is done.
+ * A drop-in replacement for Material3's `Text` (the `String` overload) that writes itself out word by
+ * word, in the draw phase. Every parameter of `Text` is supported, so any bare `Text(...)` in the app
+ * can -- and does -- become a `RevealText(...)` with no other change.
+ *
+ * A settled line (or one with the entrance off) is a plain draw, so there is no per-frame cost once
+ * it is done. When [text] changes the new value simply appears (no re-reveal): text that genuinely
+ * streams or ticks would otherwise flash, and the components that want an ANIMATED update --
+ * [RollingNumber] for values, `AnimatedContent` for a swap -- already provide it around their text.
  */
 @Composable
 internal fun RevealText(
     text: String,
-    style: TextStyle,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
+    fontSize: TextUnit = TextUnit.Unspecified,
+    fontStyle: FontStyle? = null,
     fontWeight: FontWeight? = null,
-    maxLines: Int = Int.MAX_VALUE,
+    fontFamily: FontFamily? = null,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    textDecoration: TextDecoration? = null,
+    textAlign: TextAlign? = null,
+    lineHeight: TextUnit = TextUnit.Unspecified,
     overflow: TextOverflow = TextOverflow.Clip,
     softWrap: Boolean = true,
-    textAlign: TextAlign? = null,
+    maxLines: Int = Int.MAX_VALUE,
+    minLines: Int = 1,
+    onTextLayout: ((TextLayoutResult) -> Unit)? = null,
+    style: TextStyle = LocalTextStyle.current,
 ) {
     val progress = rememberTextReveal(text.wordCount())
     val ranges = remember(text) { wordRanges(text) }
     // Set once by the text layout; read in the draw phase so the reveal never recomposes.
     var layout by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
+    // A rare caller-supplied onTextLayout still runs; the reveal's own capture is chained on top.
+    val callerOnTextLayout by rememberUpdatedState(onTextLayout)
     Text(
         text = text,
         modifier = modifier.drawWithContent {
@@ -148,13 +169,23 @@ internal fun RevealText(
             }
             clipPath(path) { this@drawWithContent.drawContent() }
         },
-        style = style,
         color = color,
+        fontSize = fontSize,
+        fontStyle = fontStyle,
         fontWeight = fontWeight,
-        maxLines = maxLines,
+        fontFamily = fontFamily,
+        letterSpacing = letterSpacing,
+        textDecoration = textDecoration,
+        textAlign = textAlign,
+        lineHeight = lineHeight,
         overflow = overflow,
         softWrap = softWrap,
-        textAlign = textAlign,
-        onTextLayout = { layout = it },
+        maxLines = maxLines,
+        minLines = minLines,
+        onTextLayout = { result ->
+            layout = result
+            callerOnTextLayout?.invoke(result)
+        },
+        style = style,
     )
 }

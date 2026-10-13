@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -35,6 +34,7 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.ui.RevealText
 import kotlinx.coroutines.launch
 
 /**
@@ -66,8 +66,8 @@ class BlooWidgetConfigActivity : ComponentActivity() {
             MaterialTheme(colorScheme = scheme) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
                     Column(Modifier.padding(20.dp)) {
-                        Text("Choose a car", style = MaterialTheme.typography.headlineSmall)
-                        Text(
+                        RevealText("Choose a car", style = MaterialTheme.typography.headlineSmall)
+                        RevealText(
                             if (sealed) "Open Bloo and sign in first." else if (cars.isEmpty()) "No cars yet. Open Bloo to add one." else "This widget will show it.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -91,8 +91,8 @@ class BlooWidgetConfigActivity : ComponentActivity() {
                                     },
                                 ) {
                                     Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-                                        Text(car.name, style = MaterialTheme.typography.titleMedium)
-                                        Text(car.model, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                        RevealText(car.name, style = MaterialTheme.typography.titleMedium)
+                                        RevealText(car.model, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
                                     }
                                 }
                             }
