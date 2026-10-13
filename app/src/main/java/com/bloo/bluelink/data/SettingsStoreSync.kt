@@ -184,71 +184,94 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
         // Snapshot the dirty set that this upload body actually carries, taken right before the
         // body is built.
         val uploadedDirtyKeys = dirtyKeys()
-        // Snapshot the portable content ONCE (post-import): its SHA-256 is both the change gate
-        // written into the file AND, being computed over the exact prefs/photos we upload,
-        // guarantees the file's `_hash` matches its own content.
-        val prefsSnapshot = context.settingsDataStore.data.first()
-        val prefsMap: Map<String, Any> = prefsSnapshot.toNameMap()
-        val photos = SyncPhotos.encode(prefsSnapshot).mapValues { it.value.content }
-        // ONE set, used by both the hash and the body -- see portableContentHash's param doc for
-        // why passing it to only one of them corrupts the change gate.
-        val carriedTombstones = remoteJson?.let { SyncMerge.parseRemoved(it) } ?: emptySet()
-        val localHash = SyncMerge.portableContentHash(
-            prefsMap, uploadedDirtyKeys, photos, priorRemoved = carriedTombstones,
-        )
         val self = selfSyncDevice(now)
         outcomeDevices = SyncMerge.mergeDevices(remoteDevices, self, now)
-        val driveBody = SyncMerge.buildExportForMainToMain(
-            prefs = prefsMap,
+        // A pass that found the file "changed" but has nothing of its OWN to say must not rewrite it.
+        // The foreground poll runs every few seconds, and our own upload advances the file's
+        // modified time -- which the very next poll then reads as a remote change. An unconditional
+        // upload here therefore became a Drive write every ~10 seconds, forever, feeding itself.
+        // Only a pass with dirty keys, a registry/primary change, a first-ever sync, or a file we
+        // have not written yet actually uploads; everything else is a no-op read.
+        val registryChanged = outcomeDevices != remoteDevices
+        val primaryChanged = primaryToWrite != remoteMeta?.primaryDeviceId
+        val fileAlreadyCarriesUs = remoteHasContent && remoteHash != null && remoteHash == syncLastHash()
+        val nothingToUpload = !SyncPoll.shouldUpload(
             dirtyKeys = uploadedDirtyKeys,
-            photos = photos,
-            hash = localHash,
-            primaryDeviceId = primaryToWrite,
-            selfDevice = self,
-            knownDevices = remoteDevices,
-            nowMs = now,
-            fileId = resolvedFileId,
-            // Carry the remote file's OWN tombstones forward.
-            priorRemoved = carriedTombstones,
+            registryChanged = registryChanged,
+            primaryChanged = primaryChanged,
+            fullAdopt = fullAdopt,
+            fileAlreadyCarriesUs = fileAlreadyCarriesUs,
         )
-        val body = "$now\n$driveBody"
-        uploaded = runCatching {
-            withDriveRetry {
-                kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                    context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
-                        ?: error("Couldn't open the Drive file for writing")
-                    val verify = context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
-                    if (verify != body) error("Upload didn't verify: the Drive file doesn't match what was written")
+        if (nothingToUpload) {
+            uploaded = false
+            // The file already carries our content: record the revision we just saw, so the next
+            // poll's change check is a no-op instead of re-reading the file every few seconds.
+            fileModifiedMs?.let { setLastSyncMs(it) }
+        } else {
+            // Snapshot the portable content ONCE (post-import): its SHA-256 is both the change gate
+            // written into the file AND, being computed over the exact prefs/photos we upload,
+            // guarantees the file's `_hash` matches its own content.
+            val prefsSnapshot = context.settingsDataStore.data.first()
+            val prefsMap: Map<String, Any> = prefsSnapshot.toNameMap()
+            val photos = SyncPhotos.encode(prefsSnapshot).mapValues { it.value.content }
+            // ONE set, used by both the hash and the body -- see portableContentHash's param doc for
+            // why passing it to only one of them corrupts the change gate.
+            val carriedTombstones = remoteJson?.let { SyncMerge.parseRemoved(it) } ?: emptySet()
+            val localHash = SyncMerge.portableContentHash(
+                prefsMap, uploadedDirtyKeys, photos, priorRemoved = carriedTombstones,
+            )
+            val driveBody = SyncMerge.buildExportForMainToMain(
+                prefs = prefsMap,
+                dirtyKeys = uploadedDirtyKeys,
+                photos = photos,
+                hash = localHash,
+                primaryDeviceId = primaryToWrite,
+                selfDevice = self,
+                knownDevices = remoteDevices,
+                nowMs = now,
+                fileId = resolvedFileId,
+                // Carry the remote file's OWN tombstones forward.
+                priorRemoved = carriedTombstones,
+            )
+            val body = "$now\n$driveBody"
+            uploaded = runCatching {
+                withDriveRetry {
+                    kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                        context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
+                            ?: error("Couldn't open the Drive file for writing")
+                        val verify = context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
+                        if (verify != body) error("Upload didn't verify: the Drive file doesn't match what was written")
+                    }
                 }
-            }
-            AppLog.log("Drive sync: uploaded settings")
-            true
-        }.onFailure {
-            uploadError = if (it is kotlinx.coroutines.TimeoutCancellationException) "Timed out writing the Drive file" else it.message ?: "Couldn't write the Drive file"
-            AppLog.log("⚠ Drive sync: upload failed: ${it.message}")
-        }.getOrElse { false }
-        if (uploaded) {
-            // Keep the wall-clock lastSyncMs advancing IN PARALLEL with the hash gate: it's the
-            // fallback gate for a file an un-updated client overwrote (dropping `_hash`), so it
-            // must stay current or the fallback breaks exactly when it's needed.
-            val uploadedModifiedMs = providerLastModifiedMs(parsed)
-            setLastSyncMs(uploadedModifiedMs ?: now)
-            // Clear ONLY the keys this upload body actually carried, not the whole set -- an edit
-            // made after the body snapshot (setters don't hold mainToMainSyncMutex) is still
-            // pending and must stay dirty so a later remote import can't overwrite it.
-            clearDirtyKeys(uploadedDirtyKeys)
-            // The content-hash self-write guard: next pass reads this exact hash back and the gate
-            // is a no-op (mirrors the lastSyncMs self-guard).
-            setSyncLastHash(localHash)
-            setSyncSyncedEver(true)
-            // Cache the registry + primary for offline Settings display.
-            setSyncedDevicesCache(outcomeDevices)
-            setSyncPrimaryCache(primaryToWrite)
-            if (pendingPrimary != null) setSyncPrimaryPending(null)
-            // Same reasoning, same place: a kicked device is only truly gone once THIS upload --
-            // the one that actually wrote a registry without it -- has verifiably landed.
-            if (pendingRemovedIds.isNotEmpty()) {
-                setSyncPendingRemovedDeviceIds(syncPendingRemovedDeviceIds() - pendingRemovedIds)
+                AppLog.log("Drive sync: uploaded settings")
+                true
+            }.onFailure {
+                uploadError = if (it is kotlinx.coroutines.TimeoutCancellationException) "Timed out writing the Drive file" else it.message ?: "Couldn't write the Drive file"
+                AppLog.log("⚠ Drive sync: upload failed: ${it.message}")
+            }.getOrElse { false }
+            if (uploaded) {
+                // Keep the wall-clock lastSyncMs advancing IN PARALLEL with the hash gate: it's the
+                // fallback gate for a file an un-updated client overwrote (dropping `_hash`), so it
+                // must stay current or the fallback breaks exactly when it's needed.
+                val uploadedModifiedMs = providerLastModifiedMs(parsed)
+                setLastSyncMs(uploadedModifiedMs ?: now)
+                // Clear ONLY the keys this upload body actually carried, not the whole set -- an edit
+                // made after the body snapshot (setters don't hold mainToMainSyncMutex) is still
+                // pending and must stay dirty so a later remote import can't overwrite it.
+                clearDirtyKeys(uploadedDirtyKeys)
+                // The content-hash self-write guard: next pass reads this exact hash back and the gate
+                // is a no-op (mirrors the lastSyncMs self-guard).
+                setSyncLastHash(localHash)
+                setSyncSyncedEver(true)
+                // Cache the registry + primary for offline Settings display.
+                setSyncedDevicesCache(outcomeDevices)
+                setSyncPrimaryCache(primaryToWrite)
+                if (pendingPrimary != null) setSyncPrimaryPending(null)
+                // Same reasoning, same place: a kicked device is only truly gone once THIS upload --
+                // the one that actually wrote a registry without it -- has verifiably landed.
+                if (pendingRemovedIds.isNotEmpty()) {
+                    setSyncPendingRemovedDeviceIds(syncPendingRemovedDeviceIds() - pendingRemovedIds)
+                }
             }
         }
     }

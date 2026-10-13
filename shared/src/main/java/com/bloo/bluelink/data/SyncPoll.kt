@@ -43,4 +43,22 @@ object SyncPoll {
         if (!peekDue) return false
         return changedByHash(remoteHash(), lastSyncedHash)
     }
+
+    /**
+     * Whether a pass that FOUND the file changed should actually write it.
+     *
+     * A pass with nothing of its own to say -- no dirty keys, no device-registry or primary change,
+     * not a first-ever sync, and the file already carrying our content hash -- must not. The
+     * foreground poll runs every [POLL_INTERVAL_MS], and our own upload advances the file's modified
+     * time, which the next poll reads as a remote change: an unconditional upload is therefore a
+     * Drive write every ~10 seconds that feeds itself. Pure, so it is unit-tested.
+     */
+    fun shouldUpload(
+        dirtyKeys: Collection<String>,
+        registryChanged: Boolean,
+        primaryChanged: Boolean,
+        fullAdopt: Boolean,
+        fileAlreadyCarriesUs: Boolean,
+    ): Boolean =
+        dirtyKeys.isNotEmpty() || registryChanged || primaryChanged || fullAdopt || !fileAlreadyCarriesUs
 }

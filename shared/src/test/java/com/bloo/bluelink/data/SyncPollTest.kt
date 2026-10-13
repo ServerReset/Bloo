@@ -51,4 +51,33 @@ class SyncPollTest {
         // one-second push delay on the writer: comfortably "near real time".
         assertTrue(SyncPoll.POLL_INTERVAL_MS <= 10_000L)
     }
+
+    @Test
+    fun aPassWithNothingOfItsOwnToSayDoesNotUpload() {
+        // No dirty keys, no registry or primary change, not a first sync, and the file already
+        // carries our hash -- so the poll finding "changed" must not become a write.
+        assertFalse(
+            SyncPoll.shouldUpload(
+                dirtyKeys = emptySet(),
+                registryChanged = false,
+                primaryChanged = false,
+                fullAdopt = false,
+                fileAlreadyCarriesUs = true,
+            ),
+        )
+    }
+
+    @Test
+    fun anythingOfOurOwnStillUploads() {
+        // Dirty keys.
+        assertTrue(SyncPoll.shouldUpload(setOf("look.theme"), false, false, false, true))
+        // A device-registry change.
+        assertTrue(SyncPoll.shouldUpload(emptySet(), registryChanged = true, primaryChanged = false, fullAdopt = false, fileAlreadyCarriesUs = true))
+        // A primary-device change.
+        assertTrue(SyncPoll.shouldUpload(emptySet(), registryChanged = false, primaryChanged = true, fullAdopt = false, fileAlreadyCarriesUs = true))
+        // A first-ever sync / adopt.
+        assertTrue(SyncPoll.shouldUpload(emptySet(), registryChanged = false, primaryChanged = false, fullAdopt = true, fileAlreadyCarriesUs = true))
+        // A file that does not carry us yet.
+        assertTrue(SyncPoll.shouldUpload(emptySet(), registryChanged = false, primaryChanged = false, fullAdopt = false, fileAlreadyCarriesUs = false))
+    }
 }
