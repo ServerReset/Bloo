@@ -6,6 +6,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Power
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,6 +36,8 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
     val plugged = ev.isPluggedOrCharging
     val pending = state.isPending(v.vin, "charge")
     val limitPending = state.isPending(v.vin, "chargeLimit")
+    // The car rejects charge commands while it is running, so every charge control greys out.
+    val running = state.isRunning(v)
     val summary = when {
         charging -> "Charging"
         plugged -> "Plugged in · idle"
@@ -78,7 +82,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
             label = if (charging) "Stop" else "Start",
             icon = AppIcons.Bolt,
             onClick = { if (charging) vm.stopCharge(v) else vm.startCharge(v) },
-            enabled = plugged,
+            enabled = plugged && !running,
             pending = pending,
             active = charging,
             // Running means the button is Stop: the deny red.
@@ -86,6 +90,13 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
             activeContent = denyTone().content,
         ),
     ) {
+        if (running) {
+            Text(
+                "Unavailable while the car is running.",
+                style = MaterialTheme.typography.bodySmall,
+                color = mutedContentColor(),
+            )
+        }
         // Charge limits are EDITABLE here (see the AC/DC pills below, which replaced an earlier
         // read-only ChargeFuelBar state). ChargeFuelBar itself only renders in a forced-open
         // context for a brand that cannot report limits at all (Canada) -- there would otherwise be
@@ -114,7 +125,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
                 icon = Icons.Filled.Power,
                 limit = acLimit,
                 pending = limitPending,
-                enabled = enabled,
+                enabled = enabled && !running,
                 onValueChange = { acLimit = it },
                 onApply = { vm.setChargeLimits(v, acLimit, dcLimit) },
             )
@@ -123,7 +134,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
                 icon = AppIcons.Bolt,
                 limit = dcLimit,
                 pending = limitPending,
-                enabled = enabled,
+                enabled = enabled && !running,
                 onValueChange = { dcLimit = it },
                 onApply = { vm.setChargeLimits(v, acLimit, dcLimit) },
             )

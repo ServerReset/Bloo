@@ -353,6 +353,7 @@ internal fun ChargeLimitPill(
             onValueChange = { onValueChange((it / 10f).roundToInt() * 10) },
             valueRange = CHARGE_LIMIT_RANGE.first.toFloat()..CHARGE_LIMIT_RANGE.last.toFloat(),
             steps = 4,
+            enabled = enabled,
         )
         Spacer(Modifier.height(GapHairline))
     }

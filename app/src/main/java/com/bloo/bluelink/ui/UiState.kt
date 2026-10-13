@@ -347,6 +347,18 @@ data class UiState(
     fun isDriving(v: Vehicle): Boolean = (speedOf(v) ?: 0.0) > 0.0
 
     /**
+     * True while the car is moving or its engine/ignition is on. The car rejects the commands that
+     * actuate the vehicle (charge, climate) in this state, so their controls render disabled rather
+     * than firing a command that comes straight back rejected.
+     */
+    fun isRunning(v: Vehicle): Boolean {
+        val status = statusFor(v)
+        // Charging means parked: never gate on a stale speed while it sits on the charger.
+        if (status?.evStatus?.batteryCharge == true) return false
+        return isDriving(v) || status?.engine == true
+    }
+
+    /**
      * The car's best-known speed: the tracked location's, else the last status's. One accessor so
      * [isDriving] and [drivingLabel] agree; `locations` is fresher but only written with lat AND
      * lon.

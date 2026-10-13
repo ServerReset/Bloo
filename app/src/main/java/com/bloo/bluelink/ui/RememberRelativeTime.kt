@@ -66,6 +66,11 @@ internal fun AnimatedSlider(
     // drag tick and each one recomposes the whole app since they feed BlooTheme's
     // colorScheme/LocalDensity).
     onValueSettled: ((Float) -> Unit)? = null,
+    /**
+     * False greys the slider out (a muted accent) and makes it inert: no drag, tap or screen-reader
+     * set, for a control the car will not accept in its current state.
+     */
+    enabled: Boolean = true,
 ) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
@@ -75,13 +80,14 @@ internal fun AnimatedSlider(
         onValueChange = { latestValue = it; onValueChange(it) },
         valueRange = valueRange,
         steps = steps.coerceAtLeast(1),
-        accent = accent,
-        inactiveColor = scheme.surfaceContainerHighest,
+        accent = if (enabled) accent else scheme.onSurfaceVariant.copy(alpha = 0.38f),
+        inactiveColor = if (enabled) scheme.surfaceContainerHighest else scheme.surfaceContainerHighest.copy(alpha = 0.5f),
         dotOnActive = scheme.onPrimary.copy(alpha = 0.7f),
         dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
         reduceMotion = LocalReduceMotion.current,
         onStepTick = { haptics?.tick() },
         onSettle = { haptics?.click(); onValueSettled?.invoke(latestValue) },
+        enabled = enabled,
     )
 }
 

@@ -58,6 +58,11 @@ fun AnimatedSlider(
     onStepTick: () -> Unit,
     onSettle: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * False makes the slider inert: no drag, tap or screen-reader set. Colour is the caller's, so a
+     * disabled slider can pass its own muted accent.
+     */
+    enabled: Boolean = true,
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -167,7 +172,9 @@ fun AnimatedSlider(
             // false (undecided) and only flips true once horizontal movement exceeds touch slop and
             // dominates vertical movement, at which point this becomes a drag and every subsequent
             // move updates the thumb live via trackTo().
-            .pointerInput(valueRange, steps) {
+            .pointerInput(valueRange, steps, enabled) {
+                // Inert while disabled: a control the car will not accept takes no gesture at all.
+                if (!enabled) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val slop = viewConfiguration.touchSlop
@@ -220,7 +227,7 @@ fun AnimatedSlider(
             // it (touch-exploration intercepts the raw drag gesture the pointerInput above depends
             // on).
             .semantics {
-                setProgress { target ->
+                if (enabled) setProgress { target ->
                     settleTo(snapToStep(target, valueRange, steps))
                     true
                 }
