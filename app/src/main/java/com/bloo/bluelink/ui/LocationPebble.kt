@@ -1,8 +1,8 @@
 package com.bloo.bluelink.ui
 
 /**
- * The Location pebble (map, address, distance to car, the car's local weather) and its supporting
- * pieces: CarMap, weatherIcon/weatherTint and the openUrl/openApp/dial launchers.
+ * The Location pebble (map, address, distance to car, and the car's local weather where it is parked)
+ * and its supporting pieces: CarMap, weatherIcon/weatherTint and the openUrl/openApp/dial launchers.
  */
 
 import androidx.compose.animation.AnimatedVisibility
@@ -132,7 +132,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     // Show the place name (or a hint) in the header so it's visible even collapsed.
     val summary = place ?: if (location != null) "Located" else "Not located yet"
     Pebble(
-        v, "location", "Location & Weather", Icons.Filled.LocationOn, state, vm, modifier, summary = summary,
+        v, "location", "Location", Icons.Filled.LocationOn, state, vm, modifier, summary = summary,
         headerAction = PebbleHeaderAction(
             label = "Locate",
             icon = Icons.Filled.LocationOn,
@@ -242,4 +242,4 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     }
 }
 
-// --- Weather --------------------------------------------------------------
+// --- Weather inside the Location pebble -----------------------------------

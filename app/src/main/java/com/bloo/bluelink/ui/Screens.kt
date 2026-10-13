@@ -127,6 +127,8 @@ fun BlooApp(vm: AppViewModel) {
     LaunchedEffect(message) {
         message?.let { msg ->
             toasts.show(msg, messageType)
+            // The one arrival haptic: every message the app raises is felt, at the lightest weight.
+            haptics.arrive()
             vm.clearMessage()
         }
     }

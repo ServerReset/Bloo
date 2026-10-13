@@ -53,6 +53,17 @@ private const val MsPerWord = 55
 private const val MinRevealMs = 140
 private const val MaxRevealMs = 1200
 
+/**
+ * The longest text the entrance will animate. Past this it draws settled instead.
+ *
+ * The reveal builds a clip rectangle per revealed word every frame by asking the text layout for
+ * each character's box -- cost that grows with the text. That is nothing for a label, but a long
+ * blob (the activity log is one string of up to five hundred lines) turned into thousands of boxes
+ * per frame, which is exactly the stutter from scrolling Settings over the Debug card: the card was
+ * composing mid-scroll and the whole log was trying to write itself out word by word.
+ */
+private const val MaxRevealChars = 320
+
 /** A rough word count for sizing the reveal, without allocating the list. */
 private fun String.wordCount(): Int {
     var n = 0
@@ -132,11 +143,10 @@ internal fun RevealText(
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
     style: TextStyle = LocalTextStyle.current,
 ) {
-    // Under reduce-motion or battery saver there is nothing to reveal -- so skip the reveal
-    // machinery ENTIRELY (the word ranges, the layout capture, the draw node, the chained callback)
-    // rather than carrying it around with a settled progress. That is the exact mode where the user
-    // is asking for the saving, and it is the one place the reveal costs anything at rest.
-    if (!textRevealAllowed()) {
+    // Draw settled -- no reveal machinery at all (word ranges, layout capture, the draw node, the
+    // chained callback) -- when the entrance is off, or the text is too long to animate cheaply.
+    // This is the one place the reveal costs anything, and both cases want it gone entirely.
+    if (!textRevealAllowed() || text.length > MaxRevealChars) {
         Text(
             text = text,
             modifier = modifier,

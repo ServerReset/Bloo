@@ -48,6 +48,8 @@ class WearMainActivity : ComponentActivity() {
         if (com.bloo.bluelink.data.DeviceStatus.policy(this).pollIntervalMultiplier == 1) lifecycleScope.launch { WearUpdateChecker.check() }
         // A watch the phone has signed in fetches its own car status.
         lifecycleScope.launch { WearCredentialSync.refresh(this@WearMainActivity) }
+        // The watch's own AutoLock (beta): re-arm its one-shot trigger sensor for this run.
+        WearAutoLock.arm(this)
     }
 }
 

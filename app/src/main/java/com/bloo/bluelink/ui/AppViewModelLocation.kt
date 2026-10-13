@@ -17,7 +17,7 @@ internal fun AppViewModel.refreshDeviceLocation() {
     viewModelScope.launch {
         val loc = com.bloo.bluelink.autolock.LocationHelper.currentLocation(getApplication()) ?: return@launch
         _state.update { it.copy(deviceLocation = loc.toDeviceGeoLocation()) }
-        // Reverse-geocode the phone's fix so the Location & Weather pebble can label the "your
+        // Reverse-geocode the phone's fix so the Location pebble can label the "your
         // location" block with a place name, not just coordinates. Best-effort: a failure leaves
         // the prior name (or null) and is never surfaced as an error.
         reverseGeocode(loc.toDeviceGeoLocation())?.let { place ->

@@ -123,10 +123,12 @@ internal val PebbleContentInset = 12.dp
 internal val ScreenGutter = 12.dp
 
 /**
- * The one height shared by the search element (bubble / pill / bar) and the toasts that pop out of
- * it, so the two read as one family -- a toast is exactly the bar it emerged from.
+ * The app's one bottom-chrome bar height, and the whole family that shares it: the search element
+ * (bubble / pill / bar) and every toast that grows out of it, plus the settings tab. A toast is
+ * exactly the bar it emerged from, so the two must never disagree -- one token, used by all of them.
+ * Sized a step taller than it used to be (52dp), for a more comfortable tap target and a calmer bar.
  */
-internal val SearchElementHeight = 52.dp
+internal val ChromeBarHeight = 62.dp
 
 /**
  * The app's vertical rhythm: one base unit ([SpaceUnit]) that every gap and inset is a multiple of.

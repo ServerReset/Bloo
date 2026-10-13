@@ -126,7 +126,7 @@ internal fun BoxScope.ToastSlot(
             .graphicsLayer {
                 val merge = 1f - enter.value.coerceIn(0f, 1f)
                 // Rise out of the search's own row and settle into the slot; retreat on the way out.
-                translationY = -slot.value * stepPx - lift + merge * SearchElementHeight.toPx()
+                translationY = -slot.value * stepPx - lift + merge * ChromeBarHeight.toPx()
                 // While still merged, sit over the search element itself: centred on it and squeezed
                 // to its width, so each toast looks like it grew out of the search bubble and split
                 // off, and on the way out merges back into it.
@@ -203,7 +203,7 @@ private fun ToastCard(
             .fillMaxWidth()
             // At least the search element's height: normally it is exactly the bar it emerged
             // from, but a long message may wrap to a second line and grow past it.
-            .heightIn(min = SearchElementHeight)
+            .heightIn(min = ChromeBarHeight)
             .semantics { liveRegion = LiveRegionMode.Polite }
             .testTag(ToastCardTag),
     ) {

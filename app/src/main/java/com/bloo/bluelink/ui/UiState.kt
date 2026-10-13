@@ -67,7 +67,7 @@ data class UiState(
     val deviceLocation: GeoLocation? = null,
     /**
      * A short human-readable name for [deviceLocation] (reverse-geocoded on refresh), shown as the
-     * phone-side location label in the Location & Weather pebble. Null until a fix has been
+     * phone-side location label in the Location pebble. Null until a fix has been
      * geocoded -- geocoding fails routinely and is never treated as an error.
      */
     val devicePlace: String? = null,

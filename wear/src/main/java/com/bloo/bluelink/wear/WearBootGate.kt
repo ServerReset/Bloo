@@ -67,5 +67,7 @@ class WearBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         if (WearBootGate.isLocked(context)) WearBootNotice.post(context)
+        // The AutoLock trigger registration does not survive a reboot.
+        WearAutoLock.rearmIfEnabled(context)
     }
 }

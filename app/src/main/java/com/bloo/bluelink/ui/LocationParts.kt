@@ -1,10 +1,12 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -15,6 +17,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
@@ -228,36 +234,43 @@ private fun WeatherDetailRows(weather: Weather, fahrenheit: Boolean, metric: Boo
 }
 
 /**
- * The multi-day forecast: one row per day, "Today" for the first, weekday name otherwise, with an
- * icon, condition word and the day's high/low. The first [MAX_FORECAST_DAYS] days are shown so the
+ * The multi-day forecast: one row per day with a temperature RANGE BAR scaled across the whole week,
+ * so a glance shows which day is the warm or cold outlier without reading every number. "Today" for
+ * the first row, the weekday name otherwise. The first [MAX_FORECAST_DAYS] days are drawn so the
  * card stays bounded.
  */
 @Composable
 private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
     val days = weather.daily.take(MAX_FORECAST_DAYS)
     if (days.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-        RevealText("Forecast", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // The week's own extremes: every bar is drawn against these, so the rows compare directly.
+    val weekLow = days.mapNotNull { dayTemp(it.lowC, fahrenheit) }.minOrNull()
+    val weekHigh = days.mapNotNull { dayTemp(it.highC, fahrenheit) }.maxOrNull()
+    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        RevealText("This week", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         days.forEachIndexed { i, day ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
+            val hi = dayTemp(day.highC, fahrenheit)
+            val lo = dayTemp(day.lowC, fahrenheit)
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(GapRow),
+            ) {
                 RevealText(
                     if (i == 0) "Today" else weekdayName(day.date),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (i == 0) FontWeight.SemiBold else FontWeight.Normal,
-                    modifier = Modifier.width(72.dp),
+                    modifier = Modifier.width(58.dp),
                     maxLines = 1,
                 )
                 WeatherGlyph(day.condition, true, 20.dp)
-                RevealText(
-                    day.condition.label,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                DayRangeBar(
+                    low = lo,
+                    high = hi,
+                    weekLow = weekLow,
+                    weekHigh = weekHigh,
                     modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
-                val hi = (if (fahrenheit) day.highC?.let { it * 9 / 5 + 32 } else day.highC)?.roundToInt()
-                val lo = (if (fahrenheit) day.lowC?.let { it * 9 / 5 + 32 } else day.lowC)?.roundToInt()
                 RevealText(
                     buildString {
                         if (hi != null) append("$hi°")
@@ -270,6 +283,36 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
                 )
             }
         }
+    }
+}
+
+/** A day's temperature in the display unit, rounded; null when the source is unknown. */
+private fun dayTemp(c: Double?, fahrenheit: Boolean): Int? =
+    c?.let { (if (fahrenheit) it * 9 / 5 + 32 else it).roundToInt() }
+
+/**
+ * One day's low-to-high as a segment on a shared track, positioned against the week's coldest low and
+ * warmest high, so every row is comparable at a glance and the warm days visibly lean right.
+ */
+@Composable
+private fun DayRangeBar(low: Int?, high: Int?, weekLow: Int?, weekHigh: Int?, modifier: Modifier = Modifier) {
+    val track = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    val accent = MaterialTheme.colorScheme.primary
+    Canvas(modifier.height(6.dp)) {
+        val r = size.height / 2f
+        drawRoundRect(color = track, size = size, cornerRadius = CornerRadius(r))
+        if (low == null || high == null || weekLow == null || weekHigh == null) return@Canvas
+        val span = (weekHigh - weekLow).coerceAtLeast(1)
+        val start = ((low - weekLow).toFloat() / span).coerceIn(0f, 1f) * size.width
+        val end = ((high - weekLow).toFloat() / span).coerceIn(0f, 1f) * size.width
+        // A minimum, so a single-degree day still shows a mark rather than a hairline.
+        val w = (end - start).coerceAtLeast(r * 2f).coerceAtMost(size.width - start)
+        drawRoundRect(
+            brush = Brush.horizontalGradient(listOf(accent.copy(alpha = 0.45f), accent)),
+            topLeft = Offset(start, 0f),
+            size = Size(w, size.height),
+            cornerRadius = CornerRadius(r),
+        )
     }
 }
 

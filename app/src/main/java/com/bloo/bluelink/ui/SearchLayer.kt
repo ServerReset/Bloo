@@ -134,7 +134,7 @@ internal fun SearchLayer(
     val bottomInset = WindowInsets.navigationBars.union(WindowInsets.ime)
         .asPaddingValues().calculateBottomPadding()
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val barH = SearchElementHeight
+        val barH = ChromeBarHeight
         val barW = minOf(maxWidth - SearchEdge * 2, MaxSearchBarWidth)
         val freeAbovePill = (maxHeight - bottomInset - barH - SearchEdge * 2 - 24.dp).coerceAtLeast(96.dp)
         val form = when {
@@ -280,13 +280,13 @@ private fun BoxScope.SearchElement(
     onDockChange: (SearchDock) -> Unit,
     hazeState: HazeState?,
 ) {
-    val bubble = SearchElementHeight
+    val bubble = ChromeBarHeight
     val targetW = when (form) {
         SearchForm.BAR -> barWidth
         SearchForm.PILL -> pillWidth
         SearchForm.BUBBLE -> bubble
     }
-    val targetH = SearchElementHeight
+    val targetH = ChromeBarHeight
 
     // Resting position (top-left) for the current form/dock.
     val minX = SearchEdge

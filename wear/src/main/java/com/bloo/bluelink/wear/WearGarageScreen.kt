@@ -296,6 +296,7 @@ private fun WearCarPage(
                 item { WearActionRow(label = "Refresh", icon = Icons.Filled.Refresh) { repo.refresh() } }
             }
             item { WearAlertsPebble() }
+            item { WearAutoLockPebble() }
 
             val failure = lastResult?.takeIf { it.vin == v.vin && !it.ok }
             if (failure != null) {
@@ -358,5 +359,29 @@ private fun WearAlertsPebble() {
         WearActionRow("Charging card", Icons.Filled.Bolt, active = charging) { charging = !charging; prefs.charging = charging; prefs.sendToPhone(context) }
         WearActionRow("Charged", Icons.Filled.BatteryFull, active = complete) { complete = !complete; prefs.chargeComplete = complete; prefs.sendToPhone(context) }
         WearActionRow("Low battery", Icons.Filled.BatteryAlert, active = low) { low = !low; prefs.lowBattery = low; prefs.sendToPhone(context) }
+    }
+}
+
+/**
+ * The watch's own AutoLock, tagged **beta**: lock the car when the wearer walks away. Off by
+ * default, and honest about what beta means -- the phone does not need to be nearby, and the watch
+ * only ever locks a car it has data for and that is not already locked.
+ */
+@Composable
+private fun WearAutoLockPebble() {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(WearAutoLock.isEnabled(context)) }
+    WearPebble(title = "Auto lock · Beta", icon = Icons.Filled.Lock) {
+        WearActionRow("Lock when I walk away", Icons.Filled.Lock, active = enabled) {
+            enabled = !enabled
+            WearAutoLock.setEnabled(context, enabled)
+        }
+        WearCenteredText(
+            if (enabled) "On: the watch locks the car about a minute after it feels you set off."
+            else "Beta: the watch locks the car when it feels you leave. Off by default.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Normal,
+        )
     }
 }

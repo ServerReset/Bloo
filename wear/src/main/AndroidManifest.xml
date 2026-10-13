@@ -75,6 +75,9 @@
         <!-- Runs the action buttons on the watch's own notifications (Stop charging). -->
         <receiver android:name=".WearActionReceiver" android:exported="false" />
 
+        <!-- The watch's own AutoLock (beta): the grace alarm after a significant-motion trigger. -->
+        <receiver android:name=".WearAutoLockReceiver" android:exported="false" />
+
         <!-- After a restart the watch is sealed until the PIN is entered; this posts the reminder. -->
         <receiver android:name=".WearBootReceiver" android:exported="false">
             <intent-filter>

@@ -100,6 +100,26 @@ class Haptics(context: Context) {
     }
 
     /**
+     * A car page settling under the finger: a soft rise into a light landing, so the swipe reads as
+     * something physical arriving rather than a screen that simply stopped moving. Deliberately
+     * softer and longer than [click] (which is a tap) so the two never feel the same.
+     */
+    fun pageTurn() {
+        if (composes) composed {
+            add(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 0.32f, 0)
+            add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.5f, 24)
+        } else waveform(longArrayOf(0, 10, 20, 10), intArrayOf(0, 55, 0, 115))
+    }
+
+    /**
+     * A gentle acknowledgement for something arriving on its own (a toast, a new readout): the
+     * lightest thing in the vocabulary, so ambient arrivals never feel like a tap.
+     */
+    fun arrive() {
+        if (composes) composed { add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.35f, 0) } else oneShot(6, 40)
+    }
+
+    /**
      * One notch of a rising pull: [level] 0..1 scales the strength, so a run of these under a
      * finger gets steadily stronger the closer it gets to its limit.
      */

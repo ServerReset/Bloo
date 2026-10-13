@@ -85,6 +85,10 @@ internal fun CollapsedGaragePager(
             }
         }
         fun realItem(virtualPage: Int) = wrap.real(virtualPage)
+        // Settle haptic when a car page lands (but not for the pager's very first settle, which is
+        // just the screen opening).
+        val haptics = LocalHaptics.current
+        val skipFirstSettle = remember { mutableStateOf(true) }
         LaunchedEffect(pager, total, perPage) {
             snapshotFlow { pager.settledPage }.collect { page ->
                 // Same fade/scale transition the expanded single-car pager above uses (see its own
@@ -100,6 +104,7 @@ internal fun CollapsedGaragePager(
                 vm.setOnSettingsPageSlot((0 until perPage.coerceAtLeast(1)).any { realItem(page + it) == slots })
                 wrap.recenterIfNearEdge()
                 aurora?.let { it.kick.intValue += 1; it.leanX.floatValue = 0f }
+                if (skipFirstSettle.value) skipFirstSettle.value = false else haptics?.pageTurn()
             }
         }
         // Resets the flag above the moment this pager itself leaves composition (navigating away

@@ -250,7 +250,7 @@ internal fun ToastHost(
     val lift by animateFloatAsState(clearance.bottomLiftPx, placeSpec, label = "toastLift")
 
     // Every toast gets its own full slot; oldest above, newest at the bottom, nothing tucked.
-    val step = with(density) { (SearchElementHeight + GapRow).toPx() }
+    val step = with(density) { (ChromeBarHeight + GapRow).toPx() }
 
     // While the search results are up the toasts fade out and step aside (kept alive, just not placed
     // or hit-tested), so they never sit over the panel; they return when it closes.
