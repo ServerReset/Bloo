@@ -57,7 +57,7 @@ internal fun <T : Any> PebbleStatusGate(status: T?, refreshing: Boolean, content
  */
 @Composable
 internal fun secondaryTextStyle(): TextStyle = MaterialTheme.typography.bodyMedium.copy(
-    fontWeight = FontWeight.Medium,
+    fontWeight = FontWeight.SemiBold,
     shadow = secondaryTextShadow(),
 )
 

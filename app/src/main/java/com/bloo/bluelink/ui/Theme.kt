@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
@@ -226,10 +227,20 @@ private fun fontFamilyFor(choice: FontChoice): FontFamily = when (choice) {
     )
 }
 
-/** Apply the chosen typeface across the type scale and lean into bold display text. */
+/**
+ * Apply the chosen typeface across the type scale, with the app's own defaults: every body, label and
+ * title step is a notch bigger than Material's and carries at least Medium weight, so text stands out
+ * instead of receding. One place decides this, so the whole app moves together.
+ */
 fun expressiveTypography(choice: FontChoice): Typography {
     val family = fontFamilyFor(choice)
     val base = Typography()
+    fun TextStyle.bigger(scale: Float, weight: FontWeight? = null): TextStyle = copy(
+        fontFamily = family,
+        fontWeight = weight ?: fontWeight,
+        fontSize = fontSize * scale,
+        lineHeight = lineHeight * scale,
+    )
     return base.copy(
         displayLarge = base.displayLarge.copy(fontFamily = family, fontWeight = FontWeight.Black),
         displayMedium = base.displayMedium.copy(fontFamily = family, fontWeight = FontWeight.Black),
@@ -237,15 +248,15 @@ fun expressiveTypography(choice: FontChoice): Typography {
         headlineLarge = base.headlineLarge.copy(fontFamily = family, fontWeight = FontWeight.ExtraBold),
         headlineMedium = base.headlineMedium.copy(fontFamily = family, fontWeight = FontWeight.Bold),
         headlineSmall = base.headlineSmall.copy(fontFamily = family, fontWeight = FontWeight.Bold),
-        titleLarge = base.titleLarge.copy(fontFamily = family, fontWeight = FontWeight.SemiBold),
-        titleMedium = base.titleMedium.copy(fontFamily = family, fontWeight = FontWeight.SemiBold),
-        titleSmall = base.titleSmall.copy(fontFamily = family),
-        bodyLarge = base.bodyLarge.copy(fontFamily = family),
-        bodyMedium = base.bodyMedium.copy(fontFamily = family),
-        bodySmall = base.bodySmall.copy(fontFamily = family),
-        labelLarge = base.labelLarge.copy(fontFamily = family, fontWeight = FontWeight.Medium),
-        labelMedium = base.labelMedium.copy(fontFamily = family),
-        labelSmall = base.labelSmall.copy(fontFamily = family),
+        titleLarge = base.titleLarge.bigger(1.0f, FontWeight.SemiBold),
+        titleMedium = base.titleMedium.bigger(1.06f, FontWeight.SemiBold),
+        titleSmall = base.titleSmall.bigger(1.08f, FontWeight.SemiBold),
+        bodyLarge = base.bodyLarge.bigger(1.06f, FontWeight.Medium),
+        bodyMedium = base.bodyMedium.bigger(1.08f, FontWeight.Medium),
+        bodySmall = base.bodySmall.bigger(1.12f, FontWeight.Medium),
+        labelLarge = base.labelLarge.bigger(1.08f, FontWeight.SemiBold),
+        labelMedium = base.labelMedium.bigger(1.1f, FontWeight.Medium),
+        labelSmall = base.labelSmall.bigger(1.1f, FontWeight.Medium),
     )
 }
 
