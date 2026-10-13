@@ -101,8 +101,15 @@ internal fun ExpandedCar(
     val aurora = LocalAuroraReactions.current
     LaunchedEffect(pebblesScroll, aurora) {
         if (aurora == null) return@LaunchedEffect
+        // Quantized like the page lean (AuroraLeanStep): every write repaints the whole backdrop, and
+        // a scroll would otherwise write it on every scrolling frame.
+        var last = 0f
         snapshotFlow { pebblesScroll.value to pebblesScroll.maxValue }.collect { (v, m) ->
-            aurora.leanY.floatValue = if (m > 0) (v.toFloat() / m) * 2f - 1f else 0f
+            val lean = if (m > 0) (v.toFloat() / m) * 2f - 1f else 0f
+            if (kotlin.math.abs(lean - last) >= AuroraLeanStep) {
+                last = lean
+                aurora.leanY.floatValue = lean
+            }
         }
     }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()

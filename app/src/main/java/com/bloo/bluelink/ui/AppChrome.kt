@@ -534,6 +534,15 @@ internal class AuroraReactions {
 internal val LocalAuroraReactions = androidx.compose.runtime.staticCompositionLocalOf<AuroraReactions?> { null }
 
 /**
+ * How far the navigation lean must move before it is written to [AuroraReactions]. The lean is read
+ * in the aurora's DRAW phase, so every write repaints the whole full-screen backdrop; writing it per
+ * frame meant a backdrop repaint on every swipe/scroll frame -- the swipe's own lag and heat. The
+ * lean is a subtle background shift, so a step this size (about half a percent of the screen once
+ * scaled) is invisible, while it turns ~120 repaints per swipe into ~20.
+ */
+internal const val AuroraLeanStep = 0.05f
+
+/**
  * When the user last touched anything, in uptime millis. The aurora's drift freezes once the app has
  * been left alone for [AmbientIdleMs] (see [AuroraBackground]): a phone sitting on the garage was
  * otherwise redrawing a full-screen animated backdrop -- and re-blurring it under every glass card --

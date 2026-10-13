@@ -68,7 +68,13 @@ internal fun StatusBarScrim(hazeState: HazeState? = null) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val shape = RoundedCornerShape(StatusGlassCorner)
-    val glass = hazeState != null && canBlurBackdrops()
+    // While the car pager is being swiped, drop the glass: the strip's Haze source is the whole pager,
+    // so during a swipe it forced a full-screen re-capture on every frame -- for a thin bar. The
+    // plain tint stands in mid-swipe and the glass returns the instant it settles. Read once per
+    // gesture (LocalPagerIdle flips on start/stop), not per frame.
+    val pagerIdle = LocalPagerIdle.current
+    val moving = pagerIdle != null && !pagerIdle.value
+    val glass = hazeState != null && canBlurBackdrops() && !moving
     val overscan = with(androidx.compose.ui.platform.LocalDensity.current) { StatusGlassOverscan.roundToPx() }
     Box(
         Modifier

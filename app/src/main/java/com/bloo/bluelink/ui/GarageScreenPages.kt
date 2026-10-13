@@ -74,7 +74,15 @@ internal fun CollapsedGaragePager(
         val aurora = LocalAuroraReactions.current
         LaunchedEffect(pager, aurora) {
             if (aurora == null) return@LaunchedEffect
-            snapshotFlow { pager.currentPageOffsetFraction }.collect { aurora.leanX.floatValue = it }
+            // QUANTIZED (see AuroraLeanStep): the lean repaints the whole backdrop wherever it is read,
+            // so it must not be written on every swipe frame.
+            var last = 0f
+            snapshotFlow { pager.currentPageOffsetFraction }.collect { frac ->
+                if (kotlin.math.abs(frac - last) >= AuroraLeanStep) {
+                    last = frac
+                    aurora.leanX.floatValue = frac
+                }
+            }
         }
         fun realItem(virtualPage: Int) = wrap.real(virtualPage)
         LaunchedEffect(pager, total, perPage) {
