@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -29,7 +30,9 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -180,8 +183,12 @@ internal fun HeroVisual(
     aspectRatio: Float? = null,
 ) {
     com.bloo.bluelink.data.StartupTrace.once("hero-visual-${v.vin}", "HeroVisual composing for ${v.name}")
+    val density = LocalDensity.current
     val sizeModifier = when {
-        aspectRatio != null -> Modifier.fillMaxWidth().aspectRatio(aspectRatio)
+        // The photo fills the column at 16:9, but never grows past a height cap: on a wide column a
+        // plain aspect ratio made it a huge slab, and a fixed height alone cut the expanded hero's
+        // own text on a phone. Capped, it is a proper photo band on every width.
+        aspectRatio != null -> Modifier.fillMaxWidth().cappedAspect(aspectRatio, with(density) { MaxHeroPhotoHeight.toPx() })
         else -> Modifier.fillMaxWidth().height(height)
     }
     if (imageUrl.isNullOrBlank()) {
@@ -308,3 +315,18 @@ internal fun ChargeFuelBar(
 
 // Colours, sizes and motion specs shared across screens live in UiTokens.kt. The shared
 // floating/card edge (glassRim) lives in GlassChrome.kt.
+
+/** The tallest the hero photo may get, however wide its column is (a wide column must not make it a slab). */
+private val MaxHeroPhotoHeight = 300.dp
+
+/**
+ * Lays the content out at [ratio] against its own width, but no taller than [maxHeightPx]. A plain
+ * [androidx.compose.foundation.layout.aspectRatio] on a wide column produced a giant card; this keeps
+ * the photo a band on any width. A plain [layout] modifier, not a SubcomposeLayout, so it is cheap.
+ */
+private fun Modifier.cappedAspect(ratio: Float, maxHeightPx: Float): Modifier = layout { measurable, constraints ->
+    val w = constraints.maxWidth.coerceAtLeast(0)
+    val h = (w / ratio).toInt().coerceIn(0, maxHeightPx.toInt().coerceAtLeast(0))
+    val p = measurable.measure(Constraints.fixed(w, h))
+    layout(w, h) { p.place(0, 0) }
+}

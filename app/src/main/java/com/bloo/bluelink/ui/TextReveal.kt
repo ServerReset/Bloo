@@ -34,12 +34,12 @@ import androidx.compose.ui.text.withStyle
 private fun textRevealAllowed(): Boolean =
     !LocalReduceMotion.current && !LocalPowerPolicy.current.batterySaver
 
-/** One word's own beat. Long enough to read as a deliberate build, short enough not to drag. */
-private const val MsPerWord = 95
+/** One word's own beat. Short -- the words should trip out quickly, not crawl. */
+private const val MsPerWord = 55
 
 /** Bounds on a whole line's reveal, so a one-word label still eases and a paragraph still finishes. */
-private const val MinRevealMs = 220
-private const val MaxRevealMs = 1600
+private const val MinRevealMs = 140
+private const val MaxRevealMs = 1200
 
 /** A rough word count for sizing the reveal, without allocating the list. */
 private fun String.wordCount(): Int {
@@ -102,10 +102,18 @@ internal fun RevealText(
     val words = remember(text) { Regex("\\S+\\s*").findAll(text).map { it.value }.toList().ifEmpty { listOf(text) } }
     val n = words.size
     val base = if (color == Color.Unspecified) LocalContentColor.current else color
+    val halo = style.shadow
     val annotated = buildAnnotatedString {
         words.forEachIndexed { i, w ->
             val a = ((progress * n) - i).coerceIn(0f, 1f)
-            withStyle(SpanStyle(color = base.copy(alpha = a))) { append(w) }
+            withStyle(
+                SpanStyle(
+                    color = base.copy(alpha = a),
+                    // The halo rides its own word: nothing is drawn before the word is, so a shadow
+                    // can never pop in ahead of the glyphs it belongs to.
+                    shadow = halo?.copy(color = halo.color.copy(alpha = halo.color.alpha * a)),
+                ),
+            ) { append(w) }
         }
     }
     Text(annotated, modifier, style = style, color = Color.Unspecified, fontWeight = fontWeight, maxLines = maxLines, overflow = overflow, softWrap = softWrap, textAlign = textAlign)

@@ -343,8 +343,11 @@ internal fun AuroraBackground(
     val explodeAlpha = { 1f + explosion.value * 2.5f }
     val explodeSize = { 1f + explosion.value * 0.8f }
     val explodeSpread = { 1f + explosion.value * 0.3f }
-    // The aurora's clock, in seconds of ACTIVE time (a pause never makes it jump). Ticked at ~24fps, not per
-    // frame: the blobs are big and slow, and every tick redraws the backdrop all the glass samples.
+    // The aurora's clock, in seconds of ACTIVE time (a pause never makes it jump). Ticked at ~14fps,
+    // not per frame: the blobs are big and slow, and -- because the aurora is the Haze source behind
+    // every glass card -- every tick also re-captures and re-blurs the backdrop under each one. A
+    // per-frame tick here was the app's costliest idle draw (and its battery/heat drain on a phone
+    // that is only sitting on the garage).
     var clock by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         var seconds = 0f
@@ -361,7 +364,7 @@ internal fun AuroraBackground(
             seconds += ((now - last) / 1_000_000_000f).coerceAtMost(0.2f)
             last = now
             clock = seconds
-            delay(42)
+            delay(70)
         }
     }
 
@@ -450,8 +453,6 @@ internal fun AuroraBackground(
                 blob(basePrimary, 0.50f, 0.42f, 0.30f, 0.20f, 0.34f, 0.27f, 0.0f, 0.56f, 0.66f)
                 blob(baseTertiary, 0.50f, 0.52f, 0.28f, 0.22f, 0.29f, 0.41f, 1.7f, 0.48f, 0.58f)
                 blob(baseSecondary, 0.50f, 0.46f, 0.30f, 0.24f, 0.38f, 0.31f, 3.1f, 0.46f, 0.52f)
-                blob(lerp(basePrimary, baseTertiary, 0.5f).let { lerp(it, auroraWhite, 0.22f) }, 0.46f, 0.60f, 0.26f, 0.18f, 0.47f, 0.36f, 4.4f, 0.34f, 0.40f)
-                blob(lerp(baseSecondary, basePrimary, 0.5f).let { lerp(it, auroraWhite, 0.18f) }, 0.54f, 0.34f, 0.24f, 0.20f, 0.31f, 0.52f, 5.6f, 0.32f, 0.36f)
                 if (e > 0.001f) {
                     // A soft glow under the finger that shifts between the palette's colours, with a
                     // hot core. It is the one reactive light: it dances with the touch and fades back

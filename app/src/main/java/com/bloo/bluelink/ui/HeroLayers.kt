@@ -92,7 +92,7 @@ internal fun BoxScope.HeroBackground(
                 animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
             ),
     ) {
-        HeroPhotoBackdrop(v, imageUrl, height)
+        HeroPhotoBackdrop(v, imageUrl, height, aspectRatio = 16f / 9f)
     }
     // The expanded readout at the BOTTOM of the card: a sibling of the photo, not a child, so it
     // does not inherit the photo's scale settle (text should not zoom).
