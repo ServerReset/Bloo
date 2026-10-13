@@ -157,12 +157,17 @@ private const val GlassCardTintAlpha = 0.26f
  * The one glass-sheen brush: light from the top-left fading across, so a surface reads as glass
  * rather than a flat tint. [glassSheen] lays it behind a surface; the locked-control frost draws the
  * same brush directly, on top of the controls it clouds.
+ *
+ * ONE shared instance: the gradient is immutable and identical every time, and every glass card asks
+ * for it on every composition -- so building a fresh brush each call was pure per-card allocation.
  */
-internal fun glassSheenBrush(): Brush = Brush.linearGradient(
+private val GlassSheen = Brush.linearGradient(
     0f to Color.White.copy(alpha = 0.09f),
     0.45f to Color.White.copy(alpha = 0.01f),
     1f to Color.White.copy(alpha = 0.04f),
 )
+
+internal fun glassSheenBrush(): Brush = GlassSheen
 
 /** The shared glass sheen; see [glassSheenBrush]. */
 internal fun Modifier.glassSheen(): Modifier = this.background(glassSheenBrush())

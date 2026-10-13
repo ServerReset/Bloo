@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -123,27 +124,41 @@ internal fun RevealText(
     val progress = remember { Animatable(0f) }
     val layoutState = remember(text) { mutableStateOf<TextLayoutResult?>(null) }
     val scope = rememberCoroutineScope()
+    // Whether the reveal has finished. Kept as a DERIVED state so it flips exactly once, and read in
+    // composition only to decide whether the clip node exists at all: once a text has settled, its
+    // draw lambda is gone -- and it is not free to keep, because every text's draw lambda otherwise
+    // runs (and reads two states) on every frame of a scroll, ~150 of them.
+    val settled by remember { derivedStateOf { progress.value >= 1f } }
+    // ONE path, reused for the whole reveal: it is rebuilt every frame the clip runs, and a page of
+    // texts revealing together was otherwise allocating (and then collecting) a Path per text per
+    // frame -- a native allocation each.
+    val revealPath = remember { Path() }
     // A rare caller-supplied onTextLayout still runs; the reveal's own capture is chained on top.
     val callerOnTextLayout by rememberUpdatedState(onTextLayout)
     Text(
         text = text,
-        modifier = modifier.drawWithContent {
-            val lr = layoutState.value
-            val p = progress.value
-            if (lr == null || p >= 1f || lr.lineCount <= 1) {
-                drawContent()
-                return@drawWithContent
+        modifier = if (settled) {
+            // Done: the plain modifier, so nothing of the reveal is even a node any more.
+            modifier
+        } else {
+            modifier.drawWithContent {
+                val lr = layoutState.value
+                val p = progress.value
+                if (lr == null || p >= 1f || lr.lineCount <= 1) {
+                    drawContent()
+                    return@drawWithContent
+                }
+                // One full-width band per revealed line (the lines not yet due -- and, because the
+                // clip covers the halo too, their shadows -- are simply not drawn).
+                revealPath.reset()
+                val n = lr.lineCount
+                var i = 0
+                while (i < n && p * n > i) {
+                    revealPath.addRect(Rect(0f, lr.getLineTop(i), size.width, lr.getLineBottom(i)))
+                    i++
+                }
+                clipPath(revealPath) { this@drawWithContent.drawContent() }
             }
-            // One full-width band per revealed line (the lines not yet due -- and, because the clip
-            // covers the halo too, their shadows -- are simply not drawn).
-            val path = Path()
-            val n = lr.lineCount
-            var i = 0
-            while (i < n && p * n > i) {
-                path.addRect(Rect(0f, lr.getLineTop(i), size.width, lr.getLineBottom(i)))
-                i++
-            }
-            clipPath(path) { this@drawWithContent.drawContent() }
         },
         color = color,
         fontSize = fontSize,
