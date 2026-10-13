@@ -48,27 +48,29 @@ import dev.chrisbanes.haze.HazeState
 internal var inMultiWindowMode by mutableStateOf(false)
 
 /**
- * The strip behind the system icons: a soft tinted fade, so the icons have something to sit on and the
- * content under them reads as covered rather than cut off.
+ * The strip behind the system icons: the app's standard glass -- a blur that is STRONG at the top and
+ * tapers away by the bottom of the strip -- over the backdrop, plus the usual glass tint.
  *
- * It used to be a Haze glass pane over the car pager -- but the pager is TRANSPARENT behind the status
- * bar (each page insets its content below it), so that pane had nothing to show and read as a black
- * bar in the dark theme. The liquid-glass frosting of this edge is the app's screen-edge glass
- * (GlassRefraction.edgeGlass), which samples the backdrop behind everything; this is only the tint.
- * Skipped in [inMultiWindowMode].
+ * It blurs the BACKDROP ([LocalBackdropHaze]), not the car pager: the pager is transparent behind the
+ * status bar (each page insets its content below it), so a pane over IT had nothing to sample and read
+ * as a black bar in the dark theme. The backdrop is what is actually there, so the frost has something
+ * to frost. Skipped in [inMultiWindowMode].
  */
 @Composable
 internal fun StatusBarScrim() {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val tint = glassTint(false)
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(topInset)
-            .clipToBounds()
-            .background(Brush.verticalGradient(listOf(tint, Color.Transparent))),
-    )
+    val haze = LocalBackdropHaze.current
+    Box(Modifier.fillMaxWidth().height(topInset).clipToBounds()) {
+        if (haze != null && canBlurBackdrops()) {
+            Box(Modifier.matchParentSize().appHazeEffect(haze, progressive = true))
+        }
+        Box(
+            Modifier.matchParentSize().background(
+                Brush.verticalGradient(listOf(glassTint(haze != null && canBlurBackdrops()), Color.Transparent)),
+            ),
+        )
+    }
 }
 
 /**
