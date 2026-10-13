@@ -17,7 +17,6 @@ import com.bloo.bluelink.data.settingsMode
  */
 internal val ADVANCED_ONLY_SETTINGS = setOf(
     // Per-car settings in Advanced mode only
-    "Default climate start", // Car settings card - advanced-only per-car setting
     "Temperature unit", // Units group - per-measurement override
     "Distance unit", // Units group - per-measurement override
     "Car-running alerts", // Notifications card - advanced-only
@@ -25,11 +24,6 @@ internal val ADVANCED_ONLY_SETTINGS = setOf(
     "Left-unlocked alert delay", // Notifications card - advanced-only minutes field
     "Door-open alert delay", // Notifications card - advanced-only minutes field
     "Car-running alert delay", // Notifications card - advanced-only minutes field
-    "Aurora motion", // Look card - advanced-only background group
-
-    // App-wide settings in Advanced mode only
-    "Palette override", // Appearance card - custom palette override
-    "Custom palette", // Appearance card - custom palette creation
 
     // Identity paperwork (Advanced only) - these have car names appended. The SERVICE fields are
     // not here: the car card shows them in Simple mode too (they drive the "service due" alert), so

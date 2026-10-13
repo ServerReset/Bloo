@@ -60,7 +60,7 @@ internal fun buildSettingsSearchEntries(
         // Additional mode filter for ToggleSettings
         if (!isSettingAvailableInMode(spec.title, state.settingsMode)) return@forEach
         add(spec.title, "${spec.keywords} ${spec.phrases}") {
-            ToggleRow(spec.label, spec.checked(appearance, notif, state)) { spec.onToggle(vm, it) }
+            ToggleRow(spec.rowLabel, spec.checked(appearance, notif, state)) { spec.onToggle(vm, it) }
         }
     }
     // Two of Security's own controls, missing from here entirely -- "biometric" and "lock" are

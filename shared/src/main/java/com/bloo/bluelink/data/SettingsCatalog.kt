@@ -52,40 +52,40 @@ object SettingsCatalog {
         app("ai_auto_summarize", Kind.TOGGLE, "Summarize when I open the app", "ai automatic automatically summary open launch gemini nano"),
         app("aurora_background", Kind.TOGGLE, "Aurora background", "gradient animated theme background glow"),
         app("biometric_lock", Kind.TOGGLE, "App lock", "biometric fingerprint face lock security"),
-        app("color_palette", Kind.CHOICE, "Colour palette", "color theme palette accent"),
-        app("custom_palettes", Kind.LIST, "Custom palettes", "color theme palette accent custom"),
+        app("color_palette", Kind.CHOICE, "Colour palette", "color theme palette accent blue violet teal forest amber rose bloo"),
+        app("custom_palettes", Kind.LIST, "Custom palettes", "color theme palette accent custom saved"),
         app("active_custom_palette_id", Kind.CHOICE),
-        app("columns_flipped", Kind.TOGGLE, "Flip columns", "layout columns swap sides left right"),
-        app("distance_unit", Kind.CHOICE, "Distance unit", "miles kilometres km metric imperial units"),
-        app("temp_unit", Kind.CHOICE, "Temperature unit", "celsius fahrenheit units"),
-        app("unit_system", Kind.CHOICE, "Units", "metric imperial units"),
+        app("columns_flipped", Kind.TOGGLE, "Flip columns", "layout columns swap sides left right wide screen tablet hot seat pebbles controls"),
+        app("distance_unit", Kind.CHOICE, "Distance unit", "distance mileage odometer range miles kilometres km units"),
+        app("temp_unit", Kind.CHOICE, "Temperature unit", "temperature celsius fahrenheit degrees c f units"),
+        app("unit_system", Kind.CHOICE, "Units", "unit system metric imperial temperature distance speed miles km"),
         app("dynamic_color", Kind.TOGGLE, "Dynamic colour", "material you wallpaper theme color"),
         app("enabled_shortcuts", Kind.LIST, "App shortcuts", "launcher icon long press quick action"),
-        app("font_choice", Kind.CHOICE, "Font", "typeface text font"),
-        app("glass_clarity", Kind.NUMBER, "Glass clarity", "liquid glass transparency frosted clear crystal ultra"),
-        app("haptics_enabled", Kind.TOGGLE, "Haptic feedback", "vibration vibrate buzz"),
-        app("lock_timing", Kind.CHOICE, "App lock timing", "biometric grace re-lock"),
-        app("watch_lock_timing", Kind.CHOICE, "Watch lock timing", "watch wear re-lock"),
-        app("notify_autolock", Kind.TOGGLE, "AutoLock alerts", "notification autolock locked"),
-        app("notify_charge_complete", Kind.TOGGLE, "Charge-complete alerts", "notification charging finished full"),
-        app("notify_charging", Kind.TOGGLE, "Live charging updates", "notification charging live progress"),
+        app("font_choice", Kind.CHOICE, "Font", "typeface atkinson hyperlegible google sans accessibility low vision text"),
+        app("glass_clarity", Kind.NUMBER, "Glass clarity", "liquid glass transparency frosted medium soft clear crystal ultra refraction edge blur backing everywhere"),
+        app("haptics_enabled", Kind.TOGGLE, "Haptic feedback", "vibration vibrate buzz sound"),
+        app("lock_timing", Kind.CHOICE, "App lock timing", "biometric grace re-lock screen off immediate"),
+        app("watch_lock_timing", Kind.CHOICE, "Watch lock timing", "watch wear pin lock ask passcode security open commands"),
+        app("notify_autolock", Kind.TOGGLE, "AutoLock alerts", "notification autolock locked dry run test"),
+        app("notify_charge_complete", Kind.TOGGLE, "Charge-complete alerts", "notification charging finished full done battery"),
+        app("notify_charging", Kind.TOGGLE, "Live charging updates", "notification charging live progress ongoing bar ev limit"),
         app("notify_door", Kind.TOGGLE, "Door-left-open alerts", "notification door open"),
-        app("notify_door_min", Kind.NUMBER, "Door-open alert delay", "minutes before alerting door open"),
-        app("notify_running", Kind.TOGGLE, "Car-running alerts", "notification engine climate running"),
-        app("notify_running_min", Kind.NUMBER, "Car-running alert delay", "minutes before alerting engine running"),
+        app("notify_door_min", Kind.NUMBER, "Door-open alert delay", "minutes before alerting door open notification delay wait"),
+        app("notify_running", Kind.TOGGLE, "Car-running alerts", "notification engine climate running left on"),
+        app("notify_running_min", Kind.NUMBER, "Car-running alert delay", "minutes before alerting engine running notification delay wait"),
         app("notify_service", Kind.TOGGLE, "Service due alerts", "notification reminder service"),
-        app("notify_start", Kind.TOGGLE, "Car-started alerts", "notification engine started remote start"),
-        app("notify_unlocked", Kind.TOGGLE, "Left-unlocked alerts", "notification unlocked left"),
-        app("notify_unlocked_min", Kind.NUMBER, "Left-unlocked alert delay", "minutes before alerting unlocked"),
-        app("notify_watch_low", Kind.TOGGLE, "Watch low-battery alerts", "watch wear notification low battery"),
-        app("settings_mode", Kind.CHOICE, "Simple or advanced settings", "simple advanced mode"),
-        app("theme_mode", Kind.CHOICE, "Display mode", "theme light dark amoled system appearance"),
-        app("ui_scale", Kind.NUMBER, "Text & layout scale", "display size zoom bigger smaller text"),
+        app("notify_start", Kind.TOGGLE, "Car-started alerts", "notification engine started remote start someone"),
+        app("notify_unlocked", Kind.TOGGLE, "Left-unlocked alerts", "notification unlocked lock left open"),
+        app("notify_unlocked_min", Kind.NUMBER, "Left-unlocked alert delay", "minutes before alerting unlocked notification delay wait"),
+        app("notify_watch_low", Kind.TOGGLE, "Watch low-battery alerts", "watch wear notification low battery under 20 percent"),
+        app("settings_mode", Kind.CHOICE, "Simple or advanced settings", "simple advanced mode power user more options fewer options settings"),
+        app("theme_mode", Kind.CHOICE, "Display mode", "theme light dark amoled oled system appearance"),
+        app("ui_scale", Kind.NUMBER, "Text & layout scale", "display size zoom bigger smaller text interface density"),
         app("ultra_glass", Kind.TOGGLE, "Ultra glass", "liquid glass edge refraction"),
-        app("vibrancy", Kind.NUMBER, "Colour vibrancy", "color saturation vivid muted"),
+        app("vibrancy", Kind.NUMBER, "Colour vibrancy", "color saturation vivid material you monochrome best buy tv muted"),
         app("vehicle_order", Kind.LIST, "Car order", "garage cars order reorder sort"),
         app("weather_follows_device", Kind.TOGGLE, "Weather follows my location", "weather location device gps"),
-        app("weather_label", Kind.TEXT, "Weather location", "weather place city"),
+        app("weather_label", Kind.TEXT, "Weather location", "weather place city location forecast"),
         app("weather_lat", Kind.NUMBER),
         app("weather_lon", Kind.NUMBER),
         app("search_bubble_x", Kind.NUMBER),
@@ -118,8 +118,14 @@ object SettingsCatalog {
         local("sync_last_hash"), local("sync_synced_ever"), local("sync_devices_cache"),
         local("sync_pull_primary"), local("sync_primary_cache"), local("sync_file_id"),
         local("sync_primary_pending"), local("sync_pending_removed_device_ids"),
-        // Whether THIS device installs updates silently via Shizuku: Shizuku may not exist elsewhere.
-        local("seamless_install_shizuku"),
+        // Whether THIS device installs updates silently via Shizuku: Shizuku may not exist elsewhere,
+        // so it never syncs -- but it is still a setting a person searches for, so it carries a
+        // title and keywords like any other, and the app reads them from here.
+        Family(
+            "seamless_install_shizuku", Scope.APP, Kind.STATE,
+            title = "Install updates seamlessly", keywords = "shizuku silent install update",
+            syncs = false,
+        ),
         // Which car is on screen right now: transient view state.
         local("last_vehicle_vin"),
         // Which version of the settings schema this install last migrated to (see [SyncSchema]).
@@ -161,6 +167,16 @@ object SettingsCatalog {
     /** The family a stored preference key belongs to, or null if the catalog does not know it. */
     fun familyOf(prefName: String): Family? =
         appKeys[prefName] ?: carFamilies.firstOrNull { prefName.startsWith(it.key) }
+
+    /**
+     * The one title for a setting key, or null if the catalog has none. This is THE source of truth:
+     * the settings UI, search and the natural-language resolver all read it from here rather than
+     * declaring their own copy.
+     */
+    fun titleOf(key: String): String? = familyOf(key)?.title?.takeIf { it.isNotBlank() }
+
+    /** The one keyword set for a setting key ("" if the catalog has none); see [titleOf]. */
+    fun keywordsOf(key: String): String = familyOf(key)?.keywords.orEmpty()
 
     /** Keys that must never travel: every exact device-local app key. */
     val deviceLocalKeys: Set<String> =

@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.runtime.Composable
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.SeatConfig
+import com.bloo.bluelink.data.SettingsCatalog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.aiEnabled
@@ -24,22 +25,31 @@ internal class SearchEntry(val title: String, val haystack: String, val content:
     val titleLowercase: String = title.lowercase()
 }
 
-/** Declarative description of one plain on/off setting: one entry here makes it searchable. */
+/**
+ * Declarative description of one plain on/off setting: one entry here makes it searchable. The
+ * display title and the words that find it come from [SettingsCatalog] by [key] -- declared once,
+ * there, never copied here. Everything this file adds is the BEHAVIOUR (how to read and write it).
+ */
 internal class ToggleSpec(
-    val title: String,
-    val keywords: String,
+    val key: String,
     /**
-     * Shown on the row itself; defaults to [title] since most toggles read identically in both
-     * places. Only a few (e.g. "Dynamic colour (Material You)") spell the row out more fully than
-     * the search title.
+     * The row label, when it spells the setting out more fully than its title ("Dynamic colour
+     * (Material You)"). Null uses the title.
      */
-    val label: String = title,
+    val label: String? = null,
     /** How a person would ask for it in a sentence; matched like keywords. */
     val phrases: String = "",
     val visible: (UiState) -> Boolean = { true },
     val checked: (SettingsStore.Appearance, SettingsStore.NotificationPrefs, UiState) -> Boolean,
     val onToggle: (AppViewModel, Boolean) -> Unit,
-)
+) {
+    /** The title, from the catalog (the one source of truth). */
+    val title: String = SettingsCatalog.titleOf(key) ?: key
+    /** The words that find it, from the catalog. */
+    val keywords: String = SettingsCatalog.keywordsOf(key)
+    /** The label the row draws; see [label]. */
+    val rowLabel: String get() = label ?: title
+}
 
 /**
  * Every plain app-wide toggle, in the order it should appear when searched. Add a new one here --
@@ -48,59 +58,59 @@ internal class ToggleSpec(
  */
 internal val ToggleSettings = listOf(
     ToggleSpec(
-        title = "Haptic feedback", keywords = "vibration vibrate buzz sound",
+        key = "haptics_enabled",
         checked = { a, _, _ -> a.hapticsEnabled }, onToggle = { vm, v -> vm.setHapticsEnabled(v) },
     ),
     ToggleSpec(
-        title = "Live charging updates", keywords = "notification charging live progress ongoing bar ev limit",
+        key = "notify_charging",
         checked = { _, n, _ -> n.charging }, onToggle = { vm, v -> vm.setNotifyCharging(v) },
     ),
     ToggleSpec(
-        title = "Service due alerts", keywords = "notification reminder service",
+        key = "notify_service",
         checked = { _, n, _ -> n.service }, onToggle = { vm, v -> vm.setNotifyService(v) },
     ),
     ToggleSpec(
-        title = "Door-left-open alerts", keywords = "notification door open",
+        key = "notify_door",
         checked = { _, n, _ -> n.doorOpen }, onToggle = { vm, v -> vm.setNotifyDoor(v) },
     ),
     ToggleSpec(
-        title = "Car-running alerts", keywords = "notification engine climate running left on",
+        key = "notify_running",
         checked = { _, n, _ -> n.running }, onToggle = { vm, v -> vm.setNotifyRunning(v) },
     ),
     ToggleSpec(
-        title = "Charge-complete alerts", keywords = "notification charging finished full done battery",
+        key = "notify_charge_complete",
         phrases = "tell me when the car is done charging",
         checked = { _, n, _ -> n.chargeComplete }, onToggle = { vm, v -> vm.setNotifyChargeComplete(v) },
     ),
     ToggleSpec(
-        title = "Car-started alerts", keywords = "notification engine started remote start someone",
+        key = "notify_start",
         phrases = "tell me when somebody starts my car",
         checked = { _, n, _ -> n.carStarted }, onToggle = { vm, v -> vm.setNotifyCarStarted(v) },
     ),
     ToggleSpec(
-        title = "Watch low-battery alerts", keywords = "watch wear notification low battery under 20 percent",
+        key = "notify_watch_low",
         phrases = "warn me on my watch when the battery is low",
         checked = { _, n, _ -> n.watchLowBattery }, onToggle = { vm, v -> vm.setNotifyWatchLowBattery(v) },
     ),
     ToggleSpec(
-        title = "AutoLock alerts", keywords = "autolock notification locked dry run test",
+        key = "notify_autolock",
         phrases = "tell me when autolock locks the car",
         checked = { _, n, _ -> n.autoLockAlerts }, onToggle = { vm, v -> vm.setNotifyAutoLock(v) },
     ),
     ToggleSpec(
-        title = "Left-unlocked alerts", keywords = "notification unlocked lock left open",
+        key = "notify_unlocked",
         checked = { _, n, _ -> n.unlocked }, onToggle = { vm, v -> vm.setNotifyUnlocked(v) },
     ),
     ToggleSpec(
-        title = "Aurora background", keywords = "gradient animated theme background glow",
+        key = "aurora_background",
         checked = { a, _, _ -> a.auroraBackground }, onToggle = { vm, v -> vm.setAuroraBackground(v) },
     ),
     ToggleSpec(
-        title = "Dynamic colour", label = "Dynamic colour (Material You)", keywords = "material you wallpaper theme color",
+        key = "dynamic_color", label = "Dynamic colour (Material You)",
         checked = { a, _, _ -> a.dynamicColor }, onToggle = { vm, v -> vm.setDynamicColor(v) },
     ),
     ToggleSpec(
-        title = "Flip columns", keywords = "layout columns swap sides left right wide screen tablet hot seat pebbles controls",
+        key = "columns_flipped",
         phrases = "put the controls on the other side swap the two columns",
         checked = { a, _, _ -> a.columnsFlipped }, onToggle = { vm, v -> vm.setColumnsFlipped(v) },
     ),
@@ -108,17 +118,17 @@ internal val ToggleSettings = listOf(
     // Gemini Nano actually supports, same reason the card is hidden entirely rather than shown
     // disabled.
     ToggleSpec(
-        title = "On-device AI", label = "On-device AI (Gemini Nano)", keywords = "gemini nano ai summary assistant privacy on-device",
+        key = "ai_enabled", label = "On-device AI (Gemini Nano)",
         visible = { it.aiSupported }, checked = { _, _, s -> s.aiEnabled }, onToggle = { vm, v -> vm.setAiEnabled(v) },
     ),
     ToggleSpec(
-        title = "Summarize when I open the app", keywords = "ai automatic automatically summary open launch gemini nano",
+        key = "ai_auto_summarize",
         phrases = "summarize my car automatically every time i open the app",
         visible = { it.aiActive }, checked = { _, _, s -> s.aiAutoSummarize }, onToggle = { vm, v -> vm.setAiAutoSummarize(v) },
     ),
     // Gated like the Backup & sync row: needs Shizuku installed and running.
     ToggleSpec(
-        title = "Install updates seamlessly", label = "Install updates seamlessly (Shizuku)", keywords = "shizuku silent install update",
+        key = "seamless_install_shizuku", label = "Install updates seamlessly (Shizuku)",
         visible = { it.shizukuAvailable }, checked = { a, _, _ -> a.seamlessInstallShizuku }, onToggle = { vm, v -> vm.setSeamlessInstallShizuku(v) },
     ),
 )

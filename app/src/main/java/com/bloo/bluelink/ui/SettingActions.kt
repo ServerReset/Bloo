@@ -2,6 +2,7 @@ package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.AiSettingResolver
 import com.bloo.bluelink.data.AiSettingResolver.Option
+import com.bloo.bluelink.data.SettingsCatalog
 import com.bloo.bluelink.data.SettingsStore
 
 /** Everything a setting's current value is read from: the same three sources search draws its controls from. */
@@ -41,14 +42,20 @@ internal class SettingAction(
     fun describe(value: String): String = options.firstOrNull { it.key == value }?.label ?: value
 }
 
+/**
+ * One setting's title and the words that find it both come from [SettingsCatalog] by [key]; the
+ * [phrases] here are the sentence forms that are only useful to the resolver.
+ */
+private fun hintOf(key: String, phrases: String): String = "${SettingsCatalog.keywordsOf(key)} $phrases".trim()
+
 private fun choice(
     id: String,
-    title: String,
-    hint: String,
+    key: String,
+    phrases: String,
     options: List<Option>,
     read: (SettingContext) -> String,
     write: (AppViewModel, String) -> Unit,
-) = SettingAction(id, title, hint, options = options, read = read, write = write)
+) = SettingAction(id, SettingsCatalog.titleOf(key) ?: key, hintOf(key, phrases), options = options, read = read, write = write)
 
 /** A one-shot action the request can run: it has no value, only "run". */
 private fun action(
@@ -63,13 +70,13 @@ private fun action(
 
 private fun range(
     id: String,
-    title: String,
-    hint: String,
+    key: String,
+    phrases: String,
     min: Double,
     max: Double,
     read: (SettingContext) -> String,
     write: (AppViewModel, String) -> Unit,
-) = SettingAction(id, title, hint, min = min, max = max, read = read, write = write)
+) = SettingAction(id, SettingsCatalog.titleOf(key) ?: key, hintOf(key, phrases), min = min, max = max, read = read, write = write)
 
 /**
  * Every app-wide switch, picker and range a plain-language request can change. The switches are
@@ -89,7 +96,7 @@ internal val SettingActions: List<SettingAction> = buildList {
     }
     add(
         choice(
-            "c_theme", "Display mode", "theme light dark system appearance night",
+            "c_theme", "theme_mode", "night black background follow the phone",
             listOf(Option("system", "Follow the phone"), Option("light", "Light"), Option("dark", "Dark")),
             { it.appearance.themeMode.name.lowercase() },
             { vm, v -> vm.setThemeMode(ThemeMode.valueOf(v.uppercase())) },
@@ -97,7 +104,7 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         choice(
-            "c_units", "Units", "metric imperial kilometres miles celsius fahrenheit",
+            "c_units", "unit_system", "kilometres miles celsius fahrenheit",
             listOf(Option("imperial", "Imperial (miles, °F)"), Option("metric", "Metric (km, °C)")),
             { it.appearance.unitSystem },
             { vm, v -> vm.setUnitSystem(v) },
@@ -105,7 +112,7 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         choice(
-            "c_temp", "Temperature unit", "temperature celsius fahrenheit degrees",
+            "c_temp", "temp_unit", "degrees",
             listOf(Option("auto", "Follow units"), Option("f", "Fahrenheit"), Option("c", "Celsius")),
             { it.appearance.tempUnit },
             { vm, v -> vm.setTempUnit(v) },
@@ -113,7 +120,7 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         choice(
-            "c_distance", "Distance unit", "distance mileage odometer range miles kilometres km",
+            "c_distance", "distance_unit", "mileage odometer range",
             listOf(Option("auto", "Follow units"), Option("mi", "Miles"), Option("km", "Kilometres")),
             { it.appearance.distanceUnit },
             { vm, v -> vm.setDistanceUnit(v) },
@@ -121,7 +128,7 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         choice(
-            "c_font", "Font", "typeface atkinson hyperlegible google sans accessibility dyslexia",
+            "c_font", "font_choice", "atkinson hyperlegible google sans dyslexia",
             FontChoice.entries.map { Option(it.name.lowercase(), it.label) },
             { it.appearance.fontChoice.name.lowercase() },
             { vm, v -> vm.setFontChoice(FontChoice.valueOf(v.uppercase())) },
@@ -129,7 +136,7 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         choice(
-            "c_palette", "Colour palette", "color theme palette accent",
+            "c_palette", "color_palette", "",
             ColorPalette.entries.map { Option(it.name.lowercase(), it.label) },
             { it.appearance.colorPalette.name.lowercase() },
             { vm, v -> vm.setColorPalette(ColorPalette.valueOf(v.uppercase())) },
@@ -137,7 +144,7 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         choice(
-            "c_watchlock", "Watch lock timing", "watch wear pin lock ask passcode security open commands",
+            "c_watchlock", "watch_lock_timing", "",
             com.bloo.bluelink.data.WatchLockTiming.entries.map { Option(it.wireKey, it.label) },
             { it.state.watchLockTiming.wireKey },
             { vm, v -> vm.setWatchLockTiming(com.bloo.bluelink.data.WatchLockTiming.fromWire(v)) },
@@ -145,7 +152,7 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         choice(
-            "c_mode", "Simple or advanced settings", "simple advanced mode power user",
+            "c_mode", "settings_mode", "power user",
             listOf(Option("simple", "Simple"), Option("advanced", "Advanced")),
             { it.state.settingsMode },
             { vm, v -> vm.setSettingsMode(v) },
@@ -153,7 +160,7 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         choice(
-            "c_glass", "Glass clarity", "liquid glass transparency frosted clear crystal ultra blur",
+            "c_glass", "glass_clarity", "",
             GlassStops.map { Option(it.name.lowercase(), it.name) },
             { c -> (if (c.appearance.ultraGlass) GlassStops.last() else GlassStops[nearestGlassStop(c.appearance.glassClarity)]).name.lowercase() },
             { vm, v ->
@@ -165,31 +172,31 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         range(
-            "r_scale", "Text & layout scale", "display size zoom bigger smaller text interface", 0.85, 1.3,
+            "r_scale", "ui_scale", "", 0.85, 1.3,
             { it.appearance.uiScale.toString() }, { vm, v -> vm.setUiScaleSoon(v.toFloat()) },
         ),
     )
     add(
         range(
-            "r_vibrancy", "Colour vibrancy", "color saturation vivid muted", 0.5, 1.6,
+            "r_vibrancy", "vibrancy", "", 0.5, 1.6,
             { it.appearance.vibrancy.toString() }, { vm, v -> vm.setVibrancySoon(v.toFloat()) },
         ),
     )
     add(
         range(
-            "r_unlocked", "Left-unlocked alert delay (minutes)", "minutes before alerting unlocked notification delay", 1.0, 120.0,
+            "r_unlocked", "notify_unlocked_min", "", 1.0, 120.0,
             { it.notif.unlockedMinutes.toString() }, { vm, v -> vm.setUnlockedMinutes(v.toDouble().toInt()) },
         ),
     )
     add(
         range(
-            "r_door", "Door-open alert delay (minutes)", "minutes before alerting door open notification delay", 1.0, 120.0,
+            "r_door", "notify_door_min", "", 1.0, 120.0,
             { it.notif.doorOpenMinutes.toString() }, { vm, v -> vm.setDoorOpenMinutes(v.toDouble().toInt()) },
         ),
     )
     add(
         range(
-            "r_running", "Car-running alert delay (minutes)", "minutes before alerting engine running notification delay", 1.0, 120.0,
+            "r_running", "notify_running_min", "", 1.0, 120.0,
             { it.notif.runningMinutes.toString() }, { vm, v -> vm.setRunningMinutes(v.toDouble().toInt()) },
         ),
     )
@@ -262,7 +269,7 @@ private fun dynamicSettingActions(state: UiState, appearance: SettingsStore.Appe
     }
     add(
         SettingAction(
-            "x_weather", "Weather location", "weather place city location forecast",
+            "x_weather", SettingsCatalog.titleOf("weather_label") ?: "Weather location", "weather place city location forecast",
             text = true,
             read = { c -> c.appearance.weatherLabel ?: "none" },
             write = { vm, place -> vm.setWeatherPlace(place) },
@@ -281,7 +288,7 @@ private fun dynamicSettingActions(state: UiState, appearance: SettingsStore.Appe
     if (appearance.customPalettes.isNotEmpty()) {
         add(
             choice(
-                "c_custom", "Custom palettes", "color theme palette accent custom saved",
+                "c_custom", "custom_palettes", "saved",
                 listOf(Option("builtin", "Built-in palette")) + appearance.customPalettes.map { Option(it.id, it.name) },
                 { c -> c.appearance.activeCustomPaletteId ?: "builtin" },
                 { vm, value -> vm.setActiveCustomPaletteId(value.takeIf { it != "builtin" }) },
