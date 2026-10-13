@@ -110,10 +110,11 @@ fun MorphButton(
     val providedContent = if (enabled) {
         resolvedContent
     } else {
-        // Keep the button's full background when disabled (only the label fades) instead of M3's
-        // default onSurface@12%, which is invisible against light cards and made disabled buttons
-        // look backgroundless.
-        disabledContentColor ?: resolvedContent
+        // A disabled button is one inert thing: the fill already goes to neutral glass (see
+        // disabledContainerColor below), so the label goes muted too. Leaving it the vivid emphasis
+        // colour read as a washed-out pill with a bright label -- worst on the Confirm/Deny/active
+        // buttons that are actually coloured.
+        disabledContentColor ?: MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = DisabledContentAlpha)
     }
     val body: @Composable () -> Unit = {
         CompositionLocalProvider(LocalContentColor provides providedContent) {
@@ -173,6 +174,9 @@ fun MorphButton(
         body()
     }
 }
+
+/** How far a disabled button's label is muted; the fill is neutral glass of its own. */
+private const val DisabledContentAlpha = 0.55f
 
 /**
  * How a button speaks, resolved to colours in one place. [Tonal]: the standard button. [Confirm]: go ahead

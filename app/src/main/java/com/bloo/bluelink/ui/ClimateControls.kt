@@ -336,8 +336,6 @@ internal fun ChargeLimitPill(
                     enabled = enabled && !pending,
                     active = pending,
                     contentPadding = PaddingValues(horizontal = 18.dp),
-                    // The spinner must not fade with the disabled content.
-                    disabledContentColor = MaterialTheme.colorScheme.onPrimary,
                 ) {
                     if (pending) LoadingIndicator(Modifier.size(18.dp))
                     else Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
