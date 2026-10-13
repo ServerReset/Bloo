@@ -134,7 +134,7 @@ internal fun CarSettingsCard(
             }
         }
 
-        AutoLockSettingsGroup(v, vm)
+        AutoLockSettingsGroup(v, vm, gen5w = state.isGen5WEffective(v))
 
         // Service is shown in Simple mode too -- it feeds the "service due" alert -- not just
         // Advanced. Only the identity paperwork (VIN, plate) stays advanced.

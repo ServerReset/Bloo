@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -10,11 +11,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -22,21 +26,45 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.autolock.AutoLockConfig
+import com.bloo.bluelink.autolock.AutoLockNotification
 import com.bloo.bluelink.autolock.DetectionState
+import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.autoLockConfig
+import com.bloo.bluelink.data.isBackgroundUnrestricted
+import com.bloo.bluelink.data.requestBackgroundUnrestricted
 import com.bloo.bluelink.data.setAutoLockConfig
 import kotlin.math.roundToInt
 
+/** The AutoLock countdown's own bounds: low to start (see the Gen5W note), and no long waits. */
+private const val GraceMinSeconds = 5
+private const val GraceMaxSeconds = 45
+
 /** AutoLock's per-car Settings section, inside [CarSettingsCard]. */
 @Composable
-internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
+internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel, gen5w: Boolean = false) {
     val context = LocalContext.current
     var config by remember(v.vin) { mutableStateOf<AutoLockConfig?>(null) }
     LaunchedEffect(v.vin) { config = vm.autoLockConfig(v.vin) }
     val current = config ?: return
+
+    // The background exemption is granted in a system screen, so re-read it every time we come back
+    // to the settings instead of only once -- otherwise the "allow background" step never clears.
+    var recheck by remember(v.vin) { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) recheck++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val backgroundOk = remember(recheck) {
+        runCatching { LiveCharge.isBackgroundUnrestricted(context) }.getOrDefault(true)
+    }
 
     fun granted(permission: String) =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
@@ -79,9 +107,18 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
 
     SettingsGroup("AutoLock") {
         BodySmallText(
-            "Locks ${v.name} when you walk away (Bluetooth disconnect + motion). Runs in dry run: it decides and logs, but never locks until you turn that off.",
+            "Locks ${v.name} when you walk away, using the car's Bluetooth to tell you've left.",
         )
-        ToggleRow("Enabled", current.enabled, onChange = { onEnabledChanged(it) })
+        ToggleRow(
+            "Enabled",
+            current.enabled,
+            description = if (current.enabled) {
+                "On: Bloo locks ${v.name} when you walk away (Bluetooth disconnect + motion)."
+            } else {
+                "Off: Bloo never locks ${v.name} by itself. Turn on to set it up."
+            },
+            onChange = { onEnabledChanged(it) },
+        )
 
         // AutoLock's notification controls (its alerts, the watcher notification, and the
         // permission and reliability prompts it depends on) are in Settings -> Notifications, next
@@ -100,22 +137,67 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 },
             )
 
+            // The setup flow, in order: let Bloo keep running in the background, THEN quiet the
+            // watcher notification. Both are what actually lets AutoLock fire after you walk away --
+            // a Doze-suspended process never reacts to the disconnect, and the watcher notification
+            // is the only sign it is running.
+            if (!backgroundOk) {
+                BodySmallText(
+                    "AutoLock has to keep running while Bloo is in the background, or it can't lock " +
+                        "the car after you walk away. Allow background activity next.",
+                )
+                SafeMorphTextButton(
+                    "Allow background activity",
+                    onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
+                )
+            } else {
+                BodySmallText(
+                    "Bloo can run in the background. AutoLock keeps a quiet watcher notification " +
+                        "while it's on -- hide it if you'd rather not see it.",
+                )
+                SafeMorphTextButton(
+                    "Hide watcher notification",
+                    onClick = {
+                        context.tryStart(
+                            Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                                putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, AutoLockNotification.CHANNEL_ID)
+                            },
+                        )
+                    },
+                    icon = Icons.Filled.NotificationsOff,
+                )
+            }
+
             StepRow("Grace period", "${current.graceSeconds}s")
             AnimatedSlider(
-                value = current.graceSeconds.toFloat(),
+                value = current.graceSeconds.coerceIn(GraceMinSeconds, GraceMaxSeconds).toFloat(),
                 onValueChange = { updateLocal(current.copy(graceSeconds = it.roundToInt())) },
                 onValueSettled = { update(current.copy(graceSeconds = it.roundToInt())) },
-                valueRange = 10f..120f,
-                steps = 10,
+                valueRange = GraceMinSeconds.toFloat()..GraceMaxSeconds.toFloat(),
+                // 5s steps across the (short) range, so every stop is a distinct, low delay.
+                steps = (GraceMaxSeconds - GraceMinSeconds) / 5 - 1,
             )
             BodySmallText(
-                "Wait this long before locking. Taps \"Lock now\" to skip the countdown.",
+                "Waits ${current.graceSeconds}s after you walk away, then locks. \"Lock now\" skips " +
+                    "the countdown.",
             )
+            if (gen5w) {
+                BodySmallText(
+                    "This car's Gen5W head unit is older and slower to lock once Bloo asks, so the " +
+                        "car adds its own delay on top of this. Keep the grace period low to start; " +
+                        "raise it only if it locks before you're away.",
+                )
+            }
 
             ToggleRow(
                 "Dry run (testing mode)",
                 current.dryRun,
-                description = "Runs the full flow but never locks the car. Turn off once you trust it.",
+                description = if (current.dryRun) {
+                    "On: AutoLock runs the whole flow but never locks the car. Turn off once you trust it."
+                } else {
+                    "Off: AutoLock sends the real lock command."
+                },
             ) { update(current.copy(dryRun = it)) }
 
             // Trying it out lives with the settings it exercises.
