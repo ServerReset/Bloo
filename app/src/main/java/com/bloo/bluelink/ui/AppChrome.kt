@@ -441,11 +441,13 @@ internal fun AuroraBackground(
     Box(
         modifier
             .fillMaxSize()
+            // The base tone is STATIC, so it is a background node drawn once -- not a full-screen
+            // opaque fill re-rasterized on every tick, which it used to be, sitting under the blobs.
+            .background(scheme.surface)
             // No Modifier.blur here. A full-screen 44dp blur, rebuilt on every tick, was the app's costliest
             // steady draw; the blobs are soft radial gradients instead, so the aurora reads just as soft with
             // no RenderEffect to re-render.
             .drawBehind {
-                drawRect(scheme.surface)
                 val t = clock
                 val minDim = size.minDimension
                 val a = appear.value
