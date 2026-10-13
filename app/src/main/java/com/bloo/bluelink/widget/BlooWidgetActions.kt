@@ -1,6 +1,7 @@
 package com.bloo.bluelink.widget
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
@@ -23,6 +24,14 @@ internal object WidgetKeys {
     val ARMED = stringPreferencesKey("armed")
     /** "text|millis": a short result line (a failure) shown for a few seconds. */
     val NOTE = stringPreferencesKey("note")
+
+    // Per-widget options, chosen in the configuration screen.
+    val SHOW_CLIMATE = booleanPreferencesKey("show_climate")
+    val SHOW_CHARGE = booleanPreferencesKey("show_charge")
+    val SHOW_FLASH = booleanPreferencesKey("show_flash")
+    val SHOW_REFRESH = booleanPreferencesKey("show_refresh")
+    /** Tighter padding and no detail rows, for a smaller widget. */
+    val COMPACT = booleanPreferencesKey("compact")
 
     val PARAM_VIN = ActionParameters.Key<String>("vin")
     val PARAM_ACTION = ActionParameters.Key<String>("action")

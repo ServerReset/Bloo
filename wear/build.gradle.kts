@@ -23,9 +23,26 @@ android {
         buildConfigField("int", "BUILD_RUN_NUMBER", System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
+    signingConfigs {
+        // The SAME checked-in keystore the phone app uses, so every CI build of the watch is signed
+        // with one stable key -- an unsigned release APK cannot be installed at all (the phone hands
+        // it to the watch's installer and PackageManager rejects it with NO_CERTIFICATES), and a
+        // key that changed per build would make in-place updates impossible.
+        getByName("debug") {
+            storeFile = file("../app/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 

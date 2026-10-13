@@ -3,7 +3,7 @@ package com.bloo.bluelink.widget
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
@@ -52,18 +52,37 @@ import com.bloo.bluelink.data.VehicleSnapshot
 /** What the widget draws from: the saved cars, and whether the app is sealed after a restart. */
 private data class WidgetData(val sealed: Boolean, val cars: List<VehicleSnapshot>)
 
-/** The three layouts, picked from the size the launcher gives the widget. */
-private val Small = DpSize(110.dp, 110.dp)
-private val Wide = DpSize(250.dp, 110.dp)
-private val Tall = DpSize(250.dp, 220.dp)
+/**
+ * The widget's per-instance options, chosen on the configuration screen and stored in the widget's
+ * own Glance state. Everything defaults to on/shown, so a widget placed without configuring still
+ * does the useful thing.
+ */
+private data class WidgetOptions(
+    val climate: Boolean,
+    val charge: Boolean,
+    val flash: Boolean,
+    val refresh: Boolean,
+    val compact: Boolean,
+) {
+    companion object {
+        fun of(prefs: Preferences) = WidgetOptions(
+            climate = prefs[WidgetKeys.SHOW_CLIMATE] ?: true,
+            charge = prefs[WidgetKeys.SHOW_CHARGE] ?: true,
+            flash = prefs[WidgetKeys.SHOW_FLASH] ?: true,
+            refresh = prefs[WidgetKeys.SHOW_REFRESH] ?: true,
+            compact = prefs[WidgetKeys.COMPACT] ?: false,
+        )
+    }
+}
 
 /**
- * The homescreen widget: one car's charge, range and lock at a glance, with lock, climate and charge
- * buttons. Material You colours (it follows the wallpaper and the light/dark theme), three responsive
- * layouts, and a sealed state that shows no car data until the app is signed in after a restart.
+ * The homescreen widget: one car's charge, range and lock at a glance, with lock, climate, charge,
+ * flash and refresh controls. Material You colours, every size from 2x2 to 5x5 (the content adapts
+ * to the span rather than overflowing it -- see [AdaptiveBody]), per-widget options, and a sealed
+ * state that shows no car data until the app is signed in after a restart.
  */
 class BlooWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Responsive(setOf(Small, Wide, Tall))
+    override val sizeMode = SizeMode.Responsive(WidgetSizes)
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -79,14 +98,14 @@ class BlooWidget : GlanceAppWidget() {
 @Composable
 private fun WidgetContent(data: WidgetData) {
     val prefs = currentState<Preferences>()
-    val size = LocalSize.current
     val context = androidx.glance.LocalContext.current
+    val opts = WidgetOptions.of(prefs)
     val open = actionStartActivity(Intent(context, MainActivity::class.java))
     val root = GlanceModifier
         .fillMaxSize()
         .background(GlanceTheme.colors.widgetBackground)
         .cornerRadius(28.dp)
-        .padding(14.dp)
+        .padding(if (opts.compact) 8.dp else 12.dp)
         .clickable(open)
 
     if (data.sealed) {
@@ -100,14 +119,14 @@ private fun WidgetContent(data: WidgetData) {
     }
     val pending = prefs[WidgetKeys.PENDING]
     val now = System.currentTimeMillis()
-    val armed = prefs[WidgetKeys.ARMED]?.split("|")?.takeIf { it.size == 2 && it[0] == car.vin && now - (it[1].toLongOrNull() ?: 0L) < UNLOCK_CONFIRM_MS } != null
-    val note = prefs[WidgetKeys.NOTE]?.split("|")?.takeIf { it.size == 2 && now - (it[1].toLongOrNull() ?: 0L) < NOTE_MS }?.get(0)
+    val armed = prefs[WidgetKeys.ARMED]?.split("|")?.takeIf {
+        it.size == 2 && it[0] == car.vin && now - (it[1].toLongOrNull() ?: 0L) < UNLOCK_CONFIRM_MS
+    } != null
+    val note = prefs[WidgetKeys.NOTE]?.split("|")?.takeIf {
+        it.size == 2 && now - (it[1].toLongOrNull() ?: 0L) < NOTE_MS
+    }?.get(0)
 
-    when {
-        size.width < Wide.width -> SmallLayout(root, car, pending, armed)
-        size.height < Tall.height -> WideLayout(root, car, pending, armed, note)
-        else -> TallLayout(root, car, pending, armed, note)
-    }
+    AdaptiveBody(root, car, pending, armed, note, opts)
 }
 
 @Composable
@@ -124,98 +143,156 @@ private fun Message(root: GlanceModifier, title: String, detail: String) {
     }
 }
 
-/** ~2x2: the charge, the lock state and one lock button. */
+/**
+ * ONE body that adapts to the span, instead of a layout per size. The value's weight, whether the
+ * status/detail lines fit, how many controls to show and whether they carry labels are all derived
+ * from the cells, so nothing overflows at any size from 2x2 to 5x5.
+ */
 @Composable
-private fun SmallLayout(root: GlanceModifier, car: VehicleSnapshot, pending: String?, armed: Boolean) {
-    Column(root) {
-        Header(car, compact = true)
-        Spacer(GlanceModifier.defaultWeight())
-        Text(car.bigValue(), style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 34.sp, fontWeight = FontWeight.Bold))
-        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                car.stateLine(), maxLines = 1,
-                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
-                modifier = GlanceModifier.defaultWeight(),
-            )
-            ActionButton(car, CarAction.TOGGLE_LOCK, pending, armed, label = null)
-        }
-    }
-}
+private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: String?, armed: Boolean, note: String?, opts: WidgetOptions) {
+    val size = LocalSize.current
+    val cols = widgetCells(size.width)
+    val rows = widgetCells(size.height)
+    val shape = widgetShapeFor(size.width, size.height)
 
-/** ~4x2: adds the actions in a row. */
-@Composable
-private fun WideLayout(root: GlanceModifier, car: VehicleSnapshot, pending: String?, armed: Boolean, note: String?) {
+    val valueSp: TextUnit = when {
+        shape == WidgetShape.MINIMAL -> 28.sp
+        rows >= 4 -> 52.sp
+        rows >= 3 -> 42.sp
+        else -> 32.sp
+    }
+    // The status line needs a second row to sit under the value without crowding it.
+    val showStatus = shape != WidgetShape.MINIMAL
+    // The "updated X ago" line only where the header has room for a second line.
+    val showUpdated = rows >= 3 && cols >= 3
+    // The odometer / charge-limit line only on the roomiest layouts, and never when compact.
+    val showDetails = rows >= 4 && cols >= 3 && !opts.compact
+    // Labelled (text) buttons are wider than icon circles, so they only appear where four of them
+    // actually fit; below that, icon-only controls.
+    val labels = cols >= 5 && rows >= 3 && !opts.compact
+    val maxActions = minOf(4, cols)
+
     Column(root) {
-        Header(car, compact = false)
+        Header(car, showUpdated = showUpdated, opts = opts, pending = pending)
         Spacer(GlanceModifier.defaultWeight())
-        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-            Column(GlanceModifier.defaultWeight()) {
-                Text(car.bigValue(), style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 34.sp, fontWeight = FontWeight.Bold))
-                Text(note ?: car.stateLine(), maxLines = 1, style = TextStyle(color = if (note != null) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp))
+        if (shape == WidgetShape.MINIMAL) {
+            // 2x2: the value and the lock button share one row, so it fits without a status line.
+            Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    car.bigValue(),
+                    modifier = GlanceModifier.defaultWeight(),
+                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = valueSp, fontWeight = FontWeight.Bold),
+                )
+                ActionButton(car, CarAction.TOGGLE_LOCK, pending, armed, label = null, compact = true)
             }
-            Actions(car, pending, armed, labels = false)
+        } else {
+            Text(car.bigValue(), style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = valueSp, fontWeight = FontWeight.Bold))
+            if (showStatus) StatusText(car, note, if (rows >= 3) 13.sp else 12.sp)
+            if (showDetails) {
+                Spacer(GlanceModifier.height(4.dp))
+                car.detailLine()?.let { line ->
+                    Text(line, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp))
+                }
+            }
+            Spacer(GlanceModifier.height(if (opts.compact) 6.dp else 10.dp))
+            Actions(car, pending, armed, opts, labels = labels, maxActions = maxActions)
         }
     }
 }
 
-/** ~4x4: bigger numbers and labelled actions. */
+/** The line under the value: a failure note (in red) else the car's state line. */
 @Composable
-private fun TallLayout(root: GlanceModifier, car: VehicleSnapshot, pending: String?, armed: Boolean, note: String?) {
-    Column(root) {
-        Header(car, compact = false)
-        Spacer(GlanceModifier.defaultWeight())
-        Text(car.bigValue(), style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 52.sp, fontWeight = FontWeight.Bold))
-        Text(note ?: car.stateLine(), maxLines = 1, style = TextStyle(color = if (note != null) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 14.sp))
-        Spacer(GlanceModifier.height(14.dp))
-        Actions(car, pending, armed, labels = true)
-    }
+private fun StatusText(car: VehicleSnapshot, note: String?, size: TextUnit) {
+    Text(
+        note ?: car.stateLine(), maxLines = 1,
+        style = TextStyle(
+            color = if (note != null) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant,
+            fontSize = size,
+        ),
+    )
 }
 
+// --- Header and controls -----------------------------------------------------------------------
+
 @Composable
-private fun Header(car: VehicleSnapshot, compact: Boolean) {
+private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptions, pending: String?) {
     val stale = car.isStale()
     Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Image(
             ImageProvider(R.drawable.ic_widget_car), null,
-            modifier = GlanceModifier.size(if (compact) 14.dp else 16.dp),
+            modifier = GlanceModifier.size(16.dp),
             colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
         )
         Spacer(GlanceModifier.width(6.dp))
-        Text(
-            car.name, maxLines = 1,
-            style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = if (compact) 13.sp else 15.sp, fontWeight = FontWeight.Medium),
-            modifier = GlanceModifier.defaultWeight(),
-        )
-        if (!compact) {
+        Column(GlanceModifier.defaultWeight()) {
             Text(
-                car.updatedText(),
-                style = TextStyle(color = if (stale) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp),
+                car.name, maxLines = 1,
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Medium),
             )
+            if (showUpdated) {
+                Text(
+                    car.updatedText(),
+                    style = TextStyle(color = if (stale) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp),
+                )
+            }
         }
+        if (opts.refresh) RefreshButton(car, pending)
     }
 }
 
-/** Lock, climate and (for a car with a battery) charge. */
+/** A small refresh control in the header: re-fetches this car's status through the same runner. */
 @Composable
-private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, labels: Boolean) {
-    Row(GlanceModifier.fillMaxWidth(), horizontalAlignment = if (labels) Alignment.Start else Alignment.End) {
-        ActionButton(car, CarAction.TOGGLE_LOCK, pending, armed, label = if (labels) "Lock" else null)
-        Spacer(GlanceModifier.width(8.dp))
-        ActionButton(car, CarAction.TOGGLE_CLIMATE, pending, armed = false, label = if (labels) "Climate" else null)
-        if (car.hasBattery) {
-            Spacer(GlanceModifier.width(8.dp))
-            ActionButton(car, CarAction.TOGGLE_CHARGE, pending, armed = false, label = if (labels) "Charge" else null)
-        }
+private fun RefreshButton(car: VehicleSnapshot, pending: String?) {
+    val busy = pending == "${car.vin}:${CarAction.REFRESH}"
+    Box(
+        modifier = GlanceModifier
+            .size(32.dp)
+            .cornerRadius(16.dp)
+            .background(GlanceTheme.colors.secondaryContainer)
+            .clickable(actionFor(car, CarAction.REFRESH, busy)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            ImageProvider(R.drawable.ic_widget_refresh), "Refresh",
+            modifier = GlanceModifier.size(18.dp),
+            colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
+        )
     }
 }
 
 /**
- * One round (or pill, with a [label]) action button. It shows the car's CURRENT state (a lock closed or
- * open, climate and charge lit when on), ignores taps while its command is in flight, and for an Unlock
- * asks "Confirm" first.
+ * The controls, honouring the widget's options and the room available: at most [maxActions] of them,
+ * left to right, so a narrow widget never pushes a button off the edge.
  */
 @Composable
-private fun ActionButton(car: VehicleSnapshot, action: String, pending: String?, armed: Boolean, label: String?) {
+private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts: WidgetOptions, labels: Boolean, maxActions: Int) {
+    val actions = buildList {
+        add(WidgetAction(CarAction.TOGGLE_LOCK, if (labels) lockLabel(car) else null))
+        if (opts.climate) add(WidgetAction(CarAction.TOGGLE_CLIMATE, if (labels) "Climate" else null))
+        if (opts.charge && car.hasBattery) add(WidgetAction(CarAction.TOGGLE_CHARGE, if (labels) "Charge" else null))
+        if (opts.flash) add(WidgetAction(CarAction.FLASH_LIGHTS, if (labels) "Flash" else null))
+    }.take(maxActions)
+    Row(GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.Start, verticalAlignment = Alignment.CenterVertically) {
+        actions.forEachIndexed { i, a ->
+            if (i > 0) Spacer(GlanceModifier.width(8.dp))
+            ActionButton(car, a.action, pending, armed, label = a.label)
+        }
+    }
+}
+
+/** One control to draw: which command, and the word beside it (null = icon only). */
+private data class WidgetAction(val action: String, val label: String?)
+
+/** The lock button's own word, showing what a tap DOES: "Unlock" while locked, "Lock" while open. */
+private fun lockLabel(car: VehicleSnapshot): String = if (car.locked == true) "Unlock" else "Lock"
+
+/**
+ * One round (or pill, with a [label]) action button. It shows the car's CURRENT state (a lock closed
+ * or open, climate and charge lit when on), ignores taps while its command is in flight, and for an
+ * Unlock asks "Confirm" first.
+ */
+@Composable
+private fun ActionButton(car: VehicleSnapshot, action: String, pending: String?, armed: Boolean, label: String?, compact: Boolean = false) {
     val busy = pending == "${car.vin}:$action"
     val locked = car.locked == true
     val active = when (action) {
@@ -224,8 +301,9 @@ private fun ActionButton(car: VehicleSnapshot, action: String, pending: String?,
         else -> false
     }
     val icon = when (action) {
-        CarAction.TOGGLE_LOCK -> if (locked) R.drawable.ic_widget_lock else R.drawable.ic_widget_unlock
+        CarAction.TOGGLE_LOCK -> if (locked) R.drawable.ic_widget_unlock else R.drawable.ic_widget_lock
         CarAction.TOGGLE_CLIMATE -> R.drawable.ic_widget_climate
+        CarAction.FLASH_LIGHTS -> R.drawable.ic_widget_flash
         else -> R.drawable.ic_widget_bolt
     }
     val text = when {
@@ -235,28 +313,45 @@ private fun ActionButton(car: VehicleSnapshot, action: String, pending: String?,
     }
     val container: ColorProvider = if (active || armed) GlanceTheme.colors.primary else GlanceTheme.colors.secondaryContainer
     val content: ColorProvider = if (active || armed) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSecondaryContainer
-    val context = androidx.glance.LocalContext.current
-    val click: Action = if (busy) actionStartActivity(Intent(context, MainActivity::class.java)) else actionRunCallback<CarActionCallback>(
-        actionParametersOf(WidgetKeys.PARAM_VIN to car.vin, WidgetKeys.PARAM_ACTION to action),
-    )
+    val h = if (compact) 32.dp else 38.dp
     Box(
         modifier = GlanceModifier
-            .height(40.dp)
-            .then(if (text == null) GlanceModifier.width(40.dp) else GlanceModifier.padding(horizontal = 14.dp))
+            .height(h)
+            .then(if (text == null) GlanceModifier.width(h) else GlanceModifier.padding(horizontal = 12.dp))
             .background(container)
-            .cornerRadius(20.dp)
-            .clickable(click),
+            .cornerRadius(h / 2)
+            .clickable(actionFor(car, action, busy)),
         contentAlignment = Alignment.Center,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(ImageProvider(icon), null, modifier = GlanceModifier.size(20.dp), colorFilter = ColorFilter.tint(content))
-            if (text != null) {
-                Spacer(GlanceModifier.width(6.dp))
+            // An unlabelled control is an icon circle; a labelled one is a TEXT pill -- dropping the
+            // glyph keeps four of them inside a wide widget, which icon+label never fit.
+            if (text == null) {
+                Image(
+                    ImageProvider(icon), null,
+                    modifier = GlanceModifier.size(if (compact) 16.dp else 18.dp),
+                    colorFilter = ColorFilter.tint(content),
+                )
+            } else {
                 Text(text, maxLines = 1, style = TextStyle(color = content, fontSize = 13.sp, fontWeight = FontWeight.Medium))
             }
         }
     }
 }
+
+/**
+ * What a tap does: run the command, unless it is already busy, when it opens the app instead (so a
+ * stuck command is one tap from the app rather than a dead button).
+ */
+@Composable
+private fun actionFor(car: VehicleSnapshot, action: String, busy: Boolean): Action =
+    if (busy) {
+        actionStartActivity(Intent(androidx.glance.LocalContext.current, MainActivity::class.java))
+    } else {
+        actionRunCallback<CarActionCallback>(
+            actionParametersOf(WidgetKeys.PARAM_VIN to car.vin, WidgetKeys.PARAM_ACTION to action),
+        )
+    }
 
 // --- The car's words ---------------------------------------------------------------------------
 
@@ -268,6 +363,13 @@ private fun VehicleSnapshot.stateLine(): String = listOfNotNull(
     if (charging == true) "Charging" else null,
     rangeMi?.let { "$it mi" },
 ).joinToString(" · ").ifBlank { "Parked" }
+
+/** The detail line the roomiest layouts show: charge limit, odometer, service — whichever exist. */
+private fun VehicleSnapshot.detailLine(): String? = listOfNotNull(
+    chargeLimitPct?.let { "Limit $it%" },
+    odometer?.takeIf { it.isNotBlank() }?.let { "Odo $it" },
+    lastServiceMiles?.let { "Service ${it} mi" },
+).joinToString("   ·   ").ifBlank { null }
 
 private fun VehicleSnapshot.isStale(): Boolean =
     fetchedAt > 0L && System.currentTimeMillis() - fetchedAt > 30 * 60_000L
