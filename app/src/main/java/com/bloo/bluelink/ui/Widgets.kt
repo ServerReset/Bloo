@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -30,14 +29,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.unit.dp
@@ -51,50 +47,27 @@ import dev.chrisbanes.haze.HazeState
  */
 internal var inMultiWindowMode by mutableStateOf(false)
 
-private val StatusGlassCorner = 24.dp
-
-/** How far the status bar's glass pane reaches past the visible strip on the sides and below, out of sight. */
-private val StatusGlassOverscan = 64.dp
-
 /**
- * The status bar as a thin pane of bare liquid glass that bends light along its TOP edge only. The pane is drawn
- * larger than the strip you see (past both sides and below it, clipped away), so its other edges never reach the
- * screen: what is left is a clear strip behind the system icons whose top edge refracts the content scrolling
- * under it. [hazeState] marks the content behind it; without one (or without blur support) it is a soft tinted
- * fade. Skipped in [inMultiWindowMode].
+ * The strip behind the system icons: a soft tinted fade, so the icons have something to sit on and the
+ * content under them reads as covered rather than cut off.
+ *
+ * It used to be a Haze glass pane over the car pager -- but the pager is TRANSPARENT behind the status
+ * bar (each page insets its content below it), so that pane had nothing to show and read as a black
+ * bar in the dark theme. The liquid-glass frosting of this edge is the app's screen-edge glass
+ * (GlassRefraction.edgeGlass), which samples the backdrop behind everything; this is only the tint.
+ * Skipped in [inMultiWindowMode].
  */
 @Composable
-internal fun StatusBarScrim(hazeState: HazeState? = null) {
+internal fun StatusBarScrim() {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val shape = RoundedCornerShape(StatusGlassCorner)
-    // While the car pager is being swiped, drop the glass: the strip's Haze source is the whole pager,
-    // so during a swipe it forced a full-screen re-capture on every frame -- for a thin bar. The
-    // plain tint stands in mid-swipe and the glass returns the instant it settles. Read once per
-    // gesture (LocalPagerIdle flips on start/stop), not per frame.
-    val pagerIdle = LocalPagerIdle.current
-    val motion = LocalContentMotion.current
-    val moving = (pagerIdle != null && !pagerIdle.value) || motion?.moving == true
-    val glass = hazeState != null && canBlurBackdrops() && !moving
-    val overscan = with(androidx.compose.ui.platform.LocalDensity.current) { StatusGlassOverscan.roundToPx() }
+    val tint = glassTint(false)
     Box(
         Modifier
             .fillMaxWidth()
             .height(topInset)
             .clipToBounds()
-            .then(
-                if (glass) {
-                    Modifier.layout { measurable, constraints ->
-                        val w = constraints.maxWidth + 2 * overscan
-                        val h = constraints.maxHeight + overscan
-                        val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(w, h))
-                        layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-overscan, 0) }
-                    }.clip(shape).appGlassEffect(hazeState, shape, clear = true)
-                } else {
-                    val tint = glassTint(false)
-                    Modifier.background(Brush.verticalGradient(listOf(tint.copy(alpha = tint.alpha * 0.5f), Color.Transparent)))
-                },
-            ),
+            .background(Brush.verticalGradient(listOf(tint, Color.Transparent))),
     )
 }
 

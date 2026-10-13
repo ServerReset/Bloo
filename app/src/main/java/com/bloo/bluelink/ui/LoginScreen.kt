@@ -347,6 +347,6 @@ internal fun LoginScreen(
         }
         // The hero wordmark has no top inset padding (deliberate), so it draws under the status
         // bar: same scrim as every other call site.
-        StatusBarScrim(hazeState = hazeState)
+        StatusBarScrim()
     }
 }

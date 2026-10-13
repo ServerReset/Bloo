@@ -24,7 +24,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -34,7 +33,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -113,13 +111,6 @@ internal fun ExpandedCar(
                 aurora.leanY.floatValue = lean
             }
         }
-    }
-    // Lets the status strip skip its refraction while a page scrolls (see ContentMotion).
-    val contentMotion = LocalContentMotion.current
-    DisposableEffect(contentMotion) { onDispose { contentMotion?.scrollMoving = false } }
-    LaunchedEffect(pebblesScroll, contentMotion) {
-        if (contentMotion == null) return@LaunchedEffect
-        snapshotFlow { pebblesScroll.isScrollInProgress }.distinctUntilChanged().collect { contentMotion.scrollMoving = it }
     }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
