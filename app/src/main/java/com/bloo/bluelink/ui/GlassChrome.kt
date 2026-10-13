@@ -199,7 +199,11 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
                 .graphicsLayer { alpha = blur() }
                 .drawWithContent { if (blur() > 0.01f) drawContent() }
                 .clip(shape)
-                .then(if (ultra) Modifier.appGlassEffect(haze, shape) else Modifier.appHazeEffect(haze, cheap = true)),
+                // ALWAYS the cheap blur, even in Ultra glass. A card is large and flat: the liquid
+                // refraction's edge bend is lost across it, but the displacement + chromatic pass is
+                // paid in full, on the most numerous glass nodes on the screen and again on every
+                // tick the aurora moves. Refraction stays where it reads: the floating surfaces.
+                .appHazeEffect(haze, cheap = true),
         )
         // The veil and sheen are plain draws and stay on while moving.
         Box(

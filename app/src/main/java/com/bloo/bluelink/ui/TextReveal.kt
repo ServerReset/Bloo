@@ -132,6 +132,32 @@ internal fun RevealText(
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
     style: TextStyle = LocalTextStyle.current,
 ) {
+    // Under reduce-motion or battery saver there is nothing to reveal -- so skip the reveal
+    // machinery ENTIRELY (the word ranges, the layout capture, the draw node, the chained callback)
+    // rather than carrying it around with a settled progress. That is the exact mode where the user
+    // is asking for the saving, and it is the one place the reveal costs anything at rest.
+    if (!textRevealAllowed()) {
+        Text(
+            text = text,
+            modifier = modifier,
+            color = color,
+            fontSize = fontSize,
+            fontStyle = fontStyle,
+            fontWeight = fontWeight,
+            fontFamily = fontFamily,
+            letterSpacing = letterSpacing,
+            textDecoration = textDecoration,
+            textAlign = textAlign,
+            lineHeight = lineHeight,
+            overflow = overflow,
+            softWrap = softWrap,
+            maxLines = maxLines,
+            minLines = minLines,
+            onTextLayout = onTextLayout,
+            style = style,
+        )
+        return
+    }
     val progress = rememberTextReveal(text.wordCount())
     val ranges = remember(text) { wordRanges(text) }
     // Set once by the text layout; read in the draw phase so the reveal never recomposes.

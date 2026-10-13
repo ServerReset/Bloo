@@ -1,13 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,9 +12,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.CornerRadius
@@ -101,14 +97,11 @@ internal fun ChargeSegmentBar(
     // built (not just gated) only while charging, so an idle/parked car pays nothing for an
     // InfiniteTransition it will never render: no ticket, no per-frame invalidation, nothing
     // running in the background of a page that's sitting on a fully charged or unplugged car.
-    val shimmerX: State<Float>? = if (charging && LocalPowerPolicy.current.ambientMotion) {
-        val shimmer = rememberInfiniteTransition(label = "chargeShimmer")
-        shimmer.animateFloat(
-            initialValue = -0.6f,
-            targetValue = 1.6f,
-            animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Restart),
-            label = "chargeShimmerX",
-        )
+    // It steps at ~20fps rather than the display's rate (see rememberSlowShimmer): the band is a
+    // wide, slow sweep, so 20 steps a second is smooth and it is a third of the redraws of a 60Hz
+    // one -- a real drain on a phone that sits on the charge screen for an hour.
+    val shimmer: State<Float>? = if (charging && LocalPowerPolicy.current.ambientMotion) {
+        rememberSlowShimmer(periodMs = 1800L)
     } else {
         null
     }
@@ -142,9 +135,12 @@ internal fun ChargeSegmentBar(
             // shimmerX. Drawn as a SECOND rounded rect the same size as the fill (rather than a
             // separate clip) -- drawRoundRect only lights up the pixels its own shape covers, so
             // this rides on top of the gradient above without needing to clip anything itself.
-            if (shimmerX != null) {
+            if (shimmer != null) {
                 val bandWidth = layout.fillWidth * 0.35f
-                val bandCenter = layout.fillWidth * shimmerX.value
+                // -0.6 .. 1.6: starts off the left edge and runs off the right before the sawtooth
+                // restarts, so the band is fully clear of the fill at each wrap. Read here, in the
+                // DrawScope, so the 20fps step invalidates a DRAW rather than recomposing the bar.
+                val bandCenter = layout.fillWidth * (-0.6f + shimmer.value * 2.2f)
                 drawRoundRect(
                     brush = Brush.linearGradient(
                         colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.30f), Color.Transparent),
@@ -188,6 +184,34 @@ internal fun ChargeSegmentBar(
             }
         }
     }
+}
+
+/** How often the charging shimmer advances, in nanos: ~20fps. See [rememberSlowShimmer]. */
+private const val ShimmerStepNanos = 50_000_000L
+
+/**
+ * A 0..1 sawtooth that advances at ~20fps rather than the display's refresh rate. It still rides the
+ * frame clock (so it stops with the window, never ticks in the background), but only PUBLISHES a
+ * value every [ShimmerStepNanos]; the bar's Canvas then redraws ~20 times a second instead of 60-120.
+ * On a wide, slow shimmer band the step is invisible, and it is a real saving on a phone that sits on
+ * the charging screen for an hour.
+ */
+@Composable
+private fun rememberSlowShimmer(periodMs: Long): State<Float> {
+    val state = remember { mutableFloatStateOf(0f) }
+    val periodNanos = periodMs * 1_000_000L
+    LaunchedEffect(periodNanos) {
+        val start = System.nanoTime()
+        var lastStep = 0L
+        while (true) {
+            withFrameNanos { }
+            val now = System.nanoTime()
+            if (now - lastStep < ShimmerStepNanos) continue
+            lastStep = now
+            state.floatValue = ((now - start) % periodNanos).toFloat() / periodNanos.toFloat()
+        }
+    }
+    return state
 }
 
 /**
