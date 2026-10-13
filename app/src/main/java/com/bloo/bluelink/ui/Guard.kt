@@ -49,7 +49,9 @@ import com.bloo.bluelink.data.PinCrypto
 import com.bloo.bluelink.data.PinLockout
 import com.bloo.bluelink.data.formatLockoutSeconds
 import kotlin.math.max
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
@@ -103,6 +105,16 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     // Start on the biometric prompt when there's one to show; the user can switch to PIN; devices
     // without biometrics land straight on PIN.
     var usePinMode by remember { mutableStateOf(!bioAvailable) }
+    // Whether the app has a PIN installed, read from the VAULT -- the SAME check the lock gate uses.
+    // `appState.appPinSet` is only a mirror refreshed on IO, and trusting it alone left a device with
+    // NO biometrics staring at "Bloo is locked / Please try opening Bloo again" instead of its PIN
+    // pad: the gate had armed off the vault, the mirror had not caught up. With no biometrics the PIN
+    // is the only mechanism there is, so read it directly (and nudge the mirror along too).
+    var pinInstalled by remember { mutableStateOf(appState.appPinSet) }
+    LaunchedEffect(Unit) {
+        vm.refreshPinState()
+        pinInstalled = withContext(Dispatchers.IO) { vm.appPinInstalled() }
+    }
     var pin by remember { mutableStateOf("") }
     // A wall-clock ticker that only runs while a rejection window is open -- the countdown line
     // needs a fresh "seconds left" each second, and nothing else here wants a 1s recomposition
@@ -189,7 +201,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             // The biometric card, the PIN card and the fallback cross-fade into each other (switching to
             // "Use PIN" used to swap them with a hard cut).
             androidx.compose.animation.Crossfade(
-                targetState = if (showBiometric) 0 else if (appState.appPinSet) 1 else 2,
+                targetState = if (showBiometric) 0 else if (pinInstalled) 1 else 2,
                 animationSpec = androidx.compose.animation.core.tween(MotionMedium),
                 label = "lockCard",
             ) { mode ->
@@ -223,7 +235,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 )
                 Spacer(Modifier.height(GapHairline))
                 RevealText(
-                    if (appState.appPinSet) "Confirm it's you, or use your PIN." else "Confirm it's you to reach your vehicles.",
+                    if (pinInstalled) "Confirm it's you, or use your PIN." else "Confirm it's you to reach your vehicles.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = lockFg.copy(alpha = 0.85f),
                 )
@@ -245,7 +257,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     // primary CTA.
                     MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
                 }
-                if (appState.appPinSet) {
+                if (pinInstalled) {
                     Spacer(Modifier.height(GapGroup))
                     SafeMorphTextButton(
                         "Use PIN",

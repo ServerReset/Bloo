@@ -87,7 +87,7 @@ fun AppViewModel.maybeRelock(backgroundedAtMs: Long, screenTurnedOff: Boolean = 
         // Either mechanism re-arms the lock: the biometric lock when the device has usable
         // biometrics, or the app PIN when one is set. The PIN half reads the encrypted prefs, so
         // the whole check is taken on IO.
-        val armed = withContext(Dispatchers.IO) { (a.biometricLock && canUseBiometrics()) || pinInstalled() }
+        val armed = withContext(Dispatchers.IO) { (a.biometricLock && canUseBiometrics()) || appPinInstalled() }
         if (!armed) return@launch
         val elapsed = System.currentTimeMillis() - backgroundedAtMs
         // See LockTiming.wireKey (exhaustive, so a new enum value must be mapped) and
@@ -121,7 +121,7 @@ fun AppViewModel.setBiometricLock(enabled: Boolean) {
 }
 
 /** Whether a PIN record currently exists in the credential store. */
-private fun AppViewModel.pinInstalled(): Boolean = credentialStore.getPinRecord() != null
+fun AppViewModel.appPinInstalled(): Boolean = credentialStore.getPinRecord() != null
 
 /**
  * Re-mirrors PIN presence + lockout state from the credential store into [UiState] (called on cold
@@ -228,7 +228,7 @@ fun AppViewModel.reauthAfterRestart(username: String, password: String, pin: Str
         }
         val armed = withContext(Dispatchers.IO) {
             val a = settingsStore.appearance.first()
-            (a.biometricLock && canUseBiometrics()) || pinInstalled()
+            (a.biometricLock && canUseBiometrics()) || appPinInstalled()
         }
         _state.update { it.copy(bootReauth = false) }
         if (armed) {

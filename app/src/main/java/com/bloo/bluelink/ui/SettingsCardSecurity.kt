@@ -28,20 +28,29 @@ internal fun SecurityCardContent(
     appearance: SettingsStore.Appearance,
 ) {
     val locked = canBio && appearance.biometricLock
+    val pinSet = state.appPinSet
+    // With no biometrics the PIN IS the lock -- the lock gate arms off a PIN alone
+    // ((biometricLock && canUseBiometrics()) || pinInstalled) -- so the status is about the PIN, not
+    // about a biometric toggle this device cannot offer.
     val status = when {
-        !canBio -> "No biometrics enrolled"
+        !canBio -> if (pinSet) "Locked · PIN" else "Set a PIN to lock Bloo"
         locked -> "Locked · ${appearance.lockTiming.label}"
         else -> "Not locked"
     }
     var pinDialog by remember { mutableStateOf<String?>(null) }
-    val pinSet = state.appPinSet
     SettingsCard("Security", AppIcons.Lock, vm, status = status) {
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             SettingsGroup("App lock") {
                 if (canBio) {
                     AppLockRow(state, appearance, vm, context)
                 } else {
-                    BodySmallText("No biometrics are enrolled on this device.")
+                    // No biometrics: the PIN is the only mechanism, so say so plainly rather than
+                    // leaving a note that reads like the lock is unavailable. The App PIN group below
+                    // is the control.
+                    BodySmallText(
+                        if (pinSet) "No biometrics on this device. Bloo locks with your app PIN below."
+                        else "No biometrics on this device. Set an app PIN below and Bloo will lock with it.",
+                    )
                 }
             }
             SettingsGroup {
