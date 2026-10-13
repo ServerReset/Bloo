@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,14 +46,17 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -147,11 +151,26 @@ fun MorphSegmented(
     fun weightsNow(): FloatArray = segmentWeights(n, posNow(), shown.value * stretch.value, ratio)
 
     val gap = 4.dp
-    Box(
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(
         modifier = modifier.fillMaxWidth().clip(trackShape).background(containerColor)
             .then(if (borderColor != null) Modifier.border(BorderStroke(1.dp, borderColor), trackShape) else Modifier),
     ) {
-        val gapPx = with(androidx.compose.ui.platform.LocalDensity.current) { gap.toPx() }
+        val gapPx = with(density) { gap.toPx() }
+        // A pick-one group runs out of room at a large display size: keep the labels while they fit,
+        // and fall back to the options' icons when they don't -- the standard for this control. A
+        // text-only picker (no icons to fall back to) keeps its labels, ellipsized.
+        val iconPx = with(density) { 16.dp.toPx() }
+        val iconGapPx = with(density) { 6.dp.toPx() }
+        val padPx = with(density) { 4.dp.toPx() }
+        val usablePx = with(density) { maxWidth.toPx() } - 2 * padPx - gapPx * (n - 1)
+        var needWithLabels = 0f
+        options.forEach { opt ->
+            if (opt.icon != null) needWithLabels += iconPx + iconGapPx
+            needWithLabels += measurer.measure(AnnotatedString(opt.label), style = textStyle).size.width
+        }
+        val iconsOnly = options.all { it.icon != null } && needWithLabels > usablePx
         // The segment widths of the last layout, written by the track and read by touch handling.
         val widths = remember(n) { FloatArray(n) }
         fun indexAt(x: Float): Int {
@@ -298,14 +317,16 @@ fun MorphSegmented(
                             colorFilter = ColorFilter.tint(fg),
                             modifier = Modifier.size(16.dp),
                         )
-                        Spacer(Modifier.width(6.dp))
+                        if (!iconsOnly) Spacer(Modifier.width(6.dp))
                     }
-                    BasicText(
-                        opt.label,
-                        style = textStyle.copy(color = fg, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    if (!iconsOnly) {
+                        BasicText(
+                            opt.label,
+                            style = textStyle.copy(color = fg, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
