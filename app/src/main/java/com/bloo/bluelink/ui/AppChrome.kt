@@ -370,10 +370,10 @@ internal fun AuroraBackground(
                 val e = energy.value
                 val finger = follow.value
                 // Navigation lean (-1..1) and the action pulse (0..1), both read here in the draw
-                // phase.
-                val leanX = reactions?.leanX?.floatValue ?: 0f
-                val leanY = reactions?.leanY?.floatValue ?: 0f
-                val k = kick.value
+                // phase. Battery saver freezes the aurora outright, so both are zero there.
+                val leanX = if (saver) 0f else (reactions?.leanX?.floatValue ?: 0f)
+                val leanY = if (saver) 0f else (reactions?.leanY?.floatValue ?: 0f)
+                val k = if (saver) 0f else kick.value
                 // Five blobs on slow, uneven loops (sines at different rates, so the pattern never repeats
                 // quickly), each breathing in size, and each pulled a little toward a finger.
                 fun blob(c: Color, bx: Float, by: Float, ax: Float, ay: Float, f1: Float, f2: Float, ph: Float, r: Float, alpha: Float) {
