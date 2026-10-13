@@ -1,6 +1,12 @@
 package com.bloo.bluelink.ui
 
 import kotlin.math.sin
+import androidx.compose.foundation.ScrollState
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.coroutineScope
 import androidx.compose.runtime.snapshotFlow
@@ -125,9 +131,19 @@ private fun DialogCard(
     buttons: @Composable ColumnScope.() -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    // The card grows to fit whatever is in it, up to what the screen can hold; only past that does
+    // the body scroll -- and then it shows a scrollbar, so "there is more below" is visible rather
+    // than something you discover by trying to drag.
+    val screenHDp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val bodyScroll = rememberScrollState()
     // Animating the card's own size means a dialog whose body changes (a step, an error line, a progress
     // bar) grows or shrinks smoothly instead of snapping.
-    Column(Modifier.animateContentSize(spring(dampingRatio = GentleDamping, stiffness = Spring.StiffnessMediumLow)).padding(GapBlock)) {
+    Column(
+        Modifier
+            .animateContentSize(spring(dampingRatio = GentleDamping, stiffness = Spring.StiffnessMediumLow))
+            .heightIn(max = (screenHDp * 0.9f))
+            .padding(GapBlock),
+    ) {
         if (icon != null) {
             Box(
                 Modifier.size(48.dp).background(scheme.primaryContainer, CircleShape),
@@ -151,12 +167,42 @@ private fun DialogCard(
         }
         Spacer(Modifier.height(GapRow))
         Column(
-            Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+            // weight(fill = false): wrap the body while it fits, take only the leftover (and scroll)
+            // once the card has grown to its cap.
+            Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(bodyScroll)
+                .dialogScrollbar(bodyScroll),
             verticalArrangement = Arrangement.spacedBy(GapGroup),
             content = text,
         )
         Spacer(Modifier.height(GapSection))
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapHairline), content = buttons)
+    }
+}
+
+/**
+ * A thin scrollbar on a scrolling dialog body, shown only while there is more to scroll: a body that
+ * fits has none, and one that does not says so plainly instead of relying on a drag.
+ */
+@Composable
+private fun Modifier.dialogScrollbar(state: ScrollState): Modifier {
+    val thumb = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+    return drawWithContent {
+        drawContent()
+        val max = state.maxValue
+        if (max <= 0) return@drawWithContent
+        val trackH = size.height
+        val contentH = trackH + max
+        val w = 4.dp.toPx()
+        val thumbH = (trackH * (trackH / contentH)).coerceIn(24.dp.toPx(), trackH)
+        val y = (trackH - thumbH) * (state.value.toFloat() / max).coerceIn(0f, 1f)
+        drawRoundRect(
+            color = thumb,
+            topLeft = Offset(size.width - w - 3.dp.toPx(), y),
+            size = Size(w, thumbH),
+            cornerRadius = CornerRadius(w / 2f),
+        )
     }
 }
 
