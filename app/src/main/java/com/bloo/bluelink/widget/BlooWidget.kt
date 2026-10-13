@@ -48,6 +48,10 @@ import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.bigValue
+import com.bloo.bluelink.data.isStale
+import com.bloo.bluelink.data.stateLineOrParked
+import com.bloo.bluelink.data.updatedText
 
 /** What the widget draws from: the saved cars, and whether the app is sealed after a restart. */
 private data class WidgetData(val sealed: Boolean, val cars: List<VehicleSnapshot>)
@@ -206,7 +210,7 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
 @Composable
 private fun StatusText(car: VehicleSnapshot, note: String?, size: TextUnit) {
     Text(
-        note ?: car.stateLine(), maxLines = 1,
+        note ?: car.stateLineOrParked(), maxLines = 1,
         style = TextStyle(
             color = if (note != null) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant,
             fontSize = size,
@@ -232,10 +236,12 @@ private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptio
                 style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Medium),
             )
             if (showUpdated) {
-                Text(
-                    car.updatedText(),
-                    style = TextStyle(color = if (stale) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp),
-                )
+                car.updatedText()?.let { updated ->
+                    Text(
+                        updated,
+                        style = TextStyle(color = if (stale) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp),
+                    )
+                }
             }
         }
         if (opts.refresh) RefreshButton(car, pending)
@@ -357,31 +363,9 @@ private fun actionFor(car: VehicleSnapshot, action: String, busy: Boolean): Acti
 
 // --- The car's words ---------------------------------------------------------------------------
 
-private fun VehicleSnapshot.bigValue(): String =
-    percent?.let { "$it%" } ?: locked?.let { if (it) "Locked" else "Unlocked" } ?: "—"
-
-private fun VehicleSnapshot.stateLine(): String = listOfNotNull(
-    locked?.let { if (it) "Locked" else "Unlocked" }.takeIf { percent != null },
-    if (charging == true) "Charging" else null,
-    rangeMi?.let { "$it mi" },
-).joinToString(" · ").ifBlank { "Parked" }
-
 /** The detail line the roomiest layouts show: charge limit, odometer, service — whichever exist. */
 private fun VehicleSnapshot.detailLine(): String? = listOfNotNull(
     chargeLimitPct?.let { "Limit $it%" },
     odometer?.takeIf { it.isNotBlank() }?.let { "Odo $it" },
     lastServiceMiles?.let { "Service ${it} mi" },
 ).joinToString("   ·   ").ifBlank { null }
-
-private fun VehicleSnapshot.isStale(): Boolean =
-    fetchedAt > 0L && System.currentTimeMillis() - fetchedAt > 30 * 60_000L
-
-private fun VehicleSnapshot.updatedText(): String {
-    if (fetchedAt <= 0L) return ""
-    val minutes = ((System.currentTimeMillis() - fetchedAt) / 60_000L).coerceAtLeast(0L)
-    return when {
-        minutes < 1 -> "Just now"
-        minutes < 60 -> "$minutes min ago"
-        else -> "${minutes / 60} h ago"
-    }
-}

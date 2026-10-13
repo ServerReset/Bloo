@@ -44,6 +44,10 @@ import androidx.wear.compose.material3.TimeText
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.bigValue
+import com.bloo.bluelink.data.isStale
+import com.bloo.bluelink.data.stateLine
+import com.bloo.bluelink.data.updatedText
 import com.bloo.bluelink.data.WatchPinPolicy
 import com.bloo.bluelink.data.supportsHornLights
 import kotlinx.coroutines.launch
@@ -239,7 +243,7 @@ private fun WearCarPage(
             // for as the big value.
             item {
                 WearHero(
-                    value = v.heroValue(),
+                    value = v.bigValue(),
                     caption = v.name,
                     tint = v.heroTint(),
                     progress = v.percent?.let { it / 100f },
@@ -256,12 +260,12 @@ private fun WearCarPage(
                 }
             }
 
-            v.updatedLine()?.let { (text, stale) ->
+            v.updatedText()?.let { updated ->
                 item {
                     WearCenteredText(
-                        text,
+                        "Updated $updated",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (stale) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (v.isStale()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Normal,
                     )
                 }
@@ -312,34 +316,6 @@ private fun WearCarPage(
             }
         }
     }
-}
-
-/** The single value a glance at this car should show: charge/fuel %, else lock state. */
-private fun VehicleSnapshot.heroValue(): String =
-    percent?.let { "$it%" } ?: locked?.let { if (it) "Locked" else "Unlocked" } ?: "—"
-
-/**
- * The supporting line under the hero: lock state, charging, and range, whichever the car reports.
- */
-private fun VehicleSnapshot.stateLine(): String? = listOfNotNull(
-    locked?.let { if (it) "Locked" else "Unlocked" }.takeIf { percent != null },
-    if (charging == true) "Charging" else null,
-    rangeMi?.let { "$it mi" },
-).joinToString(" · ").ifBlank { null }
-
-/**
- * "Updated 4 min ago" for the car's last reading, and whether that is old enough to doubt (over half an
- * hour). Null before the first reading. Read when the page composes, so it refreshes with each snapshot.
- */
-private fun VehicleSnapshot.updatedLine(): Pair<String, Boolean>? {
-    if (fetchedAt <= 0L) return null
-    val minutes = ((System.currentTimeMillis() - fetchedAt) / 60_000L).coerceAtLeast(0L)
-    val text = when {
-        minutes < 1 -> "Updated just now"
-        minutes < 60 -> "Updated $minutes min ago"
-        else -> "Updated ${minutes / 60} h ago"
-    }
-    return text to (minutes >= 30)
 }
 
 /** Charge/fuel reads in the brand accent; a lock-only car reads in the plain on-background tone. */

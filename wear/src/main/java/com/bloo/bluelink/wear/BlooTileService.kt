@@ -15,6 +15,8 @@ import androidx.wear.tiles.TileService
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.bigValue
+import com.bloo.bluelink.data.stateLine
 import com.bloo.bluelink.ioScope
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.launch
@@ -84,13 +86,8 @@ class BlooTileService : TileService() {
         } else {
             column.addContent(text(car.name, 14f, MUTED))
             column.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(4f)).build())
-            column.addContent(text(car.percent?.let { "$it%" } ?: car.locked?.let { if (it) "Locked" else "Unlocked" } ?: "—", 40f, if (car.charging == true) GREEN else WHITE, bold = true))
-            val line = listOfNotNull(
-                car.locked?.let { if (it) "Locked" else "Unlocked" }.takeIf { car.percent != null },
-                if (car.charging == true) "Charging" else null,
-                car.rangeMi?.let { "$it mi" },
-            ).joinToString(" · ")
-            if (line.isNotBlank()) column.addContent(text(line, 13f, MUTED))
+            column.addContent(text(car.bigValue(), 40f, if (car.charging == true) GREEN else WHITE, bold = true))
+            car.stateLine()?.let { line -> column.addContent(text(line, 13f, MUTED)) }
         }
         return LayoutElementBuilders.Box.Builder()
             .setWidth(androidx.wear.protolayout.DimensionBuilders.expand())
