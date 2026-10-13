@@ -146,10 +146,11 @@ internal fun ClimatePebble(
     }
 
     val climateOn = status?.airCtrlOn == true
-    // The car rejects remote climate commands while it's moving, so the whole control goes
-    // read-only when driving - and if it's already on, we show what it's currently set to at the
-    // car instead of editable inputs.
-    val driving = state.isDriving(v)
+    // The car rejects remote climate commands while it is running (moving, or its engine on), so the
+    // whole control goes read-only then: it cannot be started, and a climate already running cannot
+    // be stopped remotely either. If it IS on, we show what the car is currently set to at the car
+    // instead of editable inputs.
+    val running = state.isRunning(v)
     val startClimate = { vm.startClimate(v, currentReq) }
     val weather = state.carWeather[v.vin] ?: state.homeWeather
     val simpleMode = state.settingsMode != "advanced"
@@ -178,13 +179,13 @@ internal fun ClimatePebble(
     Pebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, modifier,
         summary = when {
-            climateOn && driving -> "On · driving"
+            climateOn && running -> "On · running"
             climateOn -> "On"
             else -> "Off"
         },
         headerAction = PebbleHeaderAction(
             label = when {
-                climateOn && driving -> "On"
+                climateOn && running -> "On"
                 climateOn -> "Stop"
                 else -> "Start"
             },
@@ -210,7 +211,7 @@ internal fun ClimatePebble(
                     } else startClimateWithEngineCheck(currentReq)
                 }
             },
-            enabled = !driving,
+            enabled = !running,
             pending = pending,
             active = climateOn,
             spinning = climateOn,
@@ -220,10 +221,10 @@ internal fun ClimatePebble(
         ),
     ) {
         // No hero: the summary is the same expression and already renders as the tile headline.
-        if (driving) {
+        if (running) {
             if (climateOn) {
                 Text(
-                    "On at the car. Read-only while driving.",
+                    "On at the car. Read-only while the car is running.",
                     style = MaterialTheme.typography.bodySmall,
                     color = mutedContentColor(),
                 )
@@ -238,7 +239,7 @@ internal fun ClimatePebble(
                 }
             } else {
                 Text(
-                    "Climate can't be started while the car is driving.",
+                    "Climate can't be started while the car is running.",
                     style = MaterialTheme.typography.bodySmall,
                     color = mutedContentColor(),
                 )
