@@ -43,19 +43,25 @@ internal fun Modifier.entrance(key: String): Modifier {
  * the whole effect.
  */
 internal fun Modifier.pageTurn(offset: () -> Float, strength: Float = 1f): Modifier = graphicsLayer {
-    // Never an offscreen page buffer: a page is only scaled and tilted here, drawn straight to the frame.
-    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
     val o = offset().coerceIn(-0.5f, 0.5f)
     val away = (kotlin.math.abs(o) * 2f).coerceIn(0f, 1f)
-    val scale = 1f - 0.09f * strength * away
-    scaleX = scale
-    scaleY = scale
-    // No fade: every column sits at the same fractional offset, so a fade dimmed the whole screen
-    // mid-swipe (cards over the black backdrop) and lifted again at rest.
-    rotationY = o * 2f * 26f * strength
-    translationY = away * 12.dp.toPx() * strength
-    // A distant camera keeps the tilt a clean foreshortening with no clipped top/bottom corners.
-    cameraDistance = 360.dp.toPx()
+    // Everything below is set only while the page is actually TURNED. At rest (away == 0) every
+    // layer property is then left at its default, so Compose draws a flat page straight to the frame
+    // with no offscreen buffer -- an unconditional compositingStrategy/cameraDistance made each
+    // on-screen page allocate one even when it was perfectly still.
+    if (away > 0f) {
+        // Never an offscreen page buffer while it turns: scaled and tilted, drawn straight to the frame.
+        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+        // No fade: every column sits at the same fractional offset, so a fade dimmed the whole screen
+        // mid-swipe (cards over the black backdrop) and lifted again at rest.
+        rotationY = o * 2f * 26f * strength
+        translationY = away * 12.dp.toPx() * strength
+        // A distant camera keeps the tilt a clean foreshortening with no clipped top/bottom corners.
+        cameraDistance = 360.dp.toPx()
+        val scale = 1f - 0.09f * strength * away
+        scaleX = scale
+        scaleY = scale
+    }
 }
 
 /**
