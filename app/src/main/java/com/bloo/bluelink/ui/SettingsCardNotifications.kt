@@ -68,7 +68,11 @@ internal fun NotificationsCardContent(
             ToggleRow(
                 "Live charging updates",
                 notif.charging,
-                description = "A live notification with progress, the charge limit and a Stop button; on Android 16+ it also shows in the status bar.",
+                description = if (notif.charging) {
+                    "On: a live notification with progress, the charge limit and a Stop button; on Android 16+ it also shows in the status bar."
+                } else {
+                    "Off: no live charging notification. Turn on to watch a charge session from your lock screen."
+                },
             ) { vm.setNotifyCharging(it) }
             // The troubleshooting lives WITH the live notification it is about -- in the same
             // "Charging" group, right under the toggle that turns it on -- not tucked at the bottom
@@ -82,37 +86,89 @@ internal fun NotificationsCardContent(
                 )
                 if (showTroubleshoot) LiveUpdateTroubleshootDialog(onDismiss = { showTroubleshoot = false })
             }
-            ToggleRow("Charge complete", notif.chargeComplete) { vm.setNotifyChargeComplete(it) }
+            ToggleRow(
+                "Charge complete",
+                notif.chargeComplete,
+                description = if (notif.chargeComplete) {
+                    "On: Bloo tells you when a charge session finishes."
+                } else {
+                    "Off: no charge-complete alert."
+                },
+            ) { vm.setNotifyChargeComplete(it) }
             val hasWatchApp by com.bloo.bluelink.wear.WatchPresence.hasApp.collectAsStateWithLifecycle()
             PopVisible(visible = hasWatchApp) {
                 ToggleRow(
                     "Low battery on watch",
                     notif.watchLowBattery,
-                    description = "Your watch warns you when a car drops under 20% and isn't charging. Charging and charge-complete alerts show on the watch too; these switches match the ones there.",
+                    description = if (notif.watchLowBattery) {
+                        "On: your watch warns you when a car drops under 20% and isn't charging."
+                    } else {
+                        "Off: no low-battery alert on the watch."
+                    },
                 ) { vm.setNotifyWatchLowBattery(it) }
             }
         }
 
         SettingsGroup("Car alerts") {
-            ToggleRow("Left unlocked", notif.unlocked) { vm.setNotifyUnlocked(it) }
+            ToggleRow(
+                "Left unlocked",
+                notif.unlocked,
+                description = if (notif.unlocked) {
+                    "On: alerts when a car has been left unlocked for over ${notif.unlockedMinutes} min."
+                } else {
+                    "Off: no left-unlocked alert."
+                },
+            ) { vm.setNotifyUnlocked(it) }
             PopVisible(visible = notif.unlocked && advanced) {
                 MinutesField(notif.unlockedMinutes, "Minutes before alerting", vm::setUnlockedMinutes)
             }
-            ToggleRow("Door left open", notif.doorOpen) { vm.setNotifyDoor(it) }
+            ToggleRow(
+                "Door left open",
+                notif.doorOpen,
+                description = if (notif.doorOpen) {
+                    "On: alerts when a door, trunk or hood has been open for over ${notif.doorOpenMinutes} min."
+                } else {
+                    "Off: no door-left-open alert."
+                },
+            ) { vm.setNotifyDoor(it) }
             PopVisible(visible = notif.doorOpen && advanced) {
                 MinutesField(notif.doorOpenMinutes, "Minutes before alerting", vm::setDoorOpenMinutes)
             }
-            ToggleRow("Service due", notif.service) { vm.setNotifyService(it) }
+            ToggleRow(
+                "Service due",
+                notif.service,
+                description = if (notif.service) {
+                    "On: alerts when a car's odometer passes its service interval."
+                } else {
+                    "Off: no service-due alert."
+                },
+            ) { vm.setNotifyService(it) }
             PopVisible(visible = advanced) {
                 Column {
-                    ToggleRow("Car left running", notif.running) { vm.setNotifyRunning(it) }
+                    ToggleRow(
+                        "Car left running",
+                        notif.running,
+                        description = if (notif.running) {
+                            "On: alerts when a parked car's engine or climate has been on for over ${notif.runningMinutes} min."
+                        } else {
+                            "Off: no car-left-running alert."
+                        },
+                    ) { vm.setNotifyRunning(it) }
                     PopVisible(visible = notif.running) {
                         MinutesField(notif.runningMinutes, "Minutes before alerting", vm::setRunningMinutes)
                     }
-                    ToggleRow("Car started", notif.carStarted) { vm.setNotifyCarStarted(it) }
+                    ToggleRow(
+                        "Car started",
+                        notif.carStarted,
+                        description = if (notif.carStarted) {
+                            "On: an alert each time a car's engine starts."
+                        } else {
+                            "Off: no car-started alert."
+                        },
+                    ) { vm.setNotifyCarStarted(it) }
                 }
             }
-            BodySmallText("Checks run about every 30 minutes. Door and running alerts include a one-tap action.")
+            BodySmallText("Checks run about every 30 minutes, and never while a car is driving. Door and running alerts include a one-tap action.")
         }
 
         // Only worth a line for someone using AutoLock; in advanced mode it is always listed so the
@@ -123,8 +179,11 @@ internal fun NotificationsCardContent(
                     ToggleRow(
                         "AutoLock alerts",
                         notif.autoLockAlerts,
-                        description = "Tells you when AutoLock locks the car, or would have in testing mode. " +
-                            "A failed lock always notifies.",
+                        description = if (notif.autoLockAlerts) {
+                            "On: tells you when AutoLock locks the car, or would have in testing mode. A failed lock always notifies."
+                        } else {
+                            "Off: no AutoLock alerts. A failed lock still notifies."
+                        },
                     ) { vm.setNotifyAutoLock(it) }
                     PopVisible(visible = autoLockOn) {
                         Column {

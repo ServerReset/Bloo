@@ -49,7 +49,11 @@ internal fun SecurityCardContent(
                 ToggleRow(
                     "Sign in after a restart",
                     requireAuth,
-                    description = "After your phone restarts, Bloo stays sealed (no alerts, AutoLock or refreshes) until you sign in with your account and your fingerprint or PIN. A notification reminds you. Off: restarts change nothing.",
+                    description = if (requireAuth) {
+                        "On: after your phone restarts, Bloo stays sealed (no alerts, AutoLock or refreshes) until you sign in and unlock. A notification reminds you."
+                    } else {
+                        "Off: a restart changes nothing -- Bloo keeps running its alerts and AutoLock."
+                    },
                 ) {
                     requireAuth = it
                     com.bloo.bluelink.data.BootGate.setEnabled(context, it)
