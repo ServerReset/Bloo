@@ -185,7 +185,10 @@ internal val LocalPagerBlur = androidx.compose.runtime.staticCompositionLocalOf<
 @Composable
 internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
     val floating = LocalPebbleFloating.current
-    val haze = LocalBackdropHaze.current.takeUnless { floating }
+    // A picked-up pebble stays glass. It used to drop the backdrop blur while floating, which made
+    // the card go flat and read as "not transparent any more"; keep the same blur+tint so it is as
+    // see-through lifted as it is at rest.
+    val haze = LocalBackdropHaze.current
     val ultra = LocalAppearance.current.ultraGlass
     val blur = LocalPagerBlur.current
     if (haze != null && canBlurBackdrops()) {
