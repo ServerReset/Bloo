@@ -28,7 +28,9 @@ import kotlinx.coroutines.sync.withLock
  * load.
  */
 internal suspend fun AppViewModel.checkAlerts(v: Vehicle, status: VehicleStatus) {
-    val alerts = CarAlerts.evaluate(settingsStore, v, status)
+    // The phone's tracked location is a better "driving" signal than the status alone, which often
+    // carries no location fix.
+    val alerts = CarAlerts.evaluate(settingsStore, v, status, driving = _state.value.isDriving(v))
     alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions, it.channelId, it.localOnly) }
     alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text, messageType = ToastKind.ERROR) } }
 }

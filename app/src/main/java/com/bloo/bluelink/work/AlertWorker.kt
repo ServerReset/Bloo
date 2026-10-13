@@ -15,6 +15,7 @@ import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.data.isDriving
 import com.bloo.bluelink.data.notificationPrefs
 import com.bloo.bluelink.data.repositoryFor
 import java.util.concurrent.TimeUnit
@@ -94,6 +95,13 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         // full decode plus re-encode plus commit of the whole vehicle blob and emits on
         // `payload`, so N per-car writes mean N fsyncs for one poll.
         val fetched = mutableMapOf<String, VehicleStatus>()
+        // The best-known speed per car, from the snapshot the app folds its tracked location into.
+        // Many status payloads carry no location, so `status.isDriving` alone reads 0 while the car
+        // is genuinely moving, and the parked-car alerts (unlocked, door open, running too long)
+        // then fire mid-drive. A missing/empty snapshot just falls back to the status itself.
+        val snapshotDriving = runCatching {
+            SnapshotStore(applicationContext).current().vehicles.associate { it.vin to it.isDriving }
+        }.getOrDefault(emptyMap())
 
         for (brand in store.loggedInBrands()) {
             val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }.getOrNull() ?: continue
@@ -126,6 +134,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     CarAlerts.evaluate(
                         settings, v, status, prefs,
                         canDeliver = Notifications.hasPermission(applicationContext),
+                        driving = snapshotDriving[v.vin],
                     ).forEach {
                         Notifications.post(applicationContext, it.id, it.title, it.text, it.actions, it.channelId, it.localOnly)
                     }

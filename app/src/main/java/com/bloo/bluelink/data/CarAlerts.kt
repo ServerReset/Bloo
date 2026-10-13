@@ -36,11 +36,20 @@ object CarAlerts {
          * (Notifications.post silently skips without POST_NOTIFICATIONS).
          */
         canDeliver: Boolean = true,
+        /**
+         * The app's own "is the car driving" answer, when the caller has a better one than
+         * [status] alone. A status payload frequently carries no location fix, so
+         * [VehicleStatus.isDriving] reads 0 and the parked-car alerts below (unlocked, door open,
+         * running too long) fire mid-drive. The phone's tracked location and the stored snapshot both
+         * know the speed the status lacks; callers pass that. Null falls back to the status itself.
+         */
+        driving: Boolean? = null,
     ): List<Alert> {
         val prefs = prefs ?: settings.notificationPrefs()
         val out = mutableListOf<Alert>()
         // The shared powertrain rule: an EV has no "engine" for the wording below.
         val powertrain = resolvePowertrain(v, settings.powertrain(v.vin))
+        val isDriving = driving ?: (status?.isDriving == true)
 
         if (prefs.service) {
             // Odometer strings may have thousands separators and fractions; parseOdometerMiles floors to Int.
@@ -94,7 +103,7 @@ object CarAlerts {
                 } else if (
                     canDeliver &&
                     // Not while driving (matches the unlocked and running checks): an unlatched trunk mid-drive is expected.
-                    !status.isDriving &&
+                    !isDriving &&
                     now - since > prefs.doorOpenMinutes * 60_000L && !settings.alertFired(key)
                 ) {
                     // Open long enough and not yet alerted: offer a one-tap Lock action.
@@ -127,7 +136,7 @@ object CarAlerts {
                     canDeliver &&
                     // Not while driving: some cars report doorLock == false mid-drive. `since` is not reset, so a
                     // still-unlocked car alerts immediately after the drive using the original start time.
-                    !status.isDriving &&
+                    !isDriving &&
                     now - since > prefs.unlockedMinutes * 60_000L &&
                     !settings.alertFired(key)
                 ) {
@@ -159,7 +168,7 @@ object CarAlerts {
                 } else if (
                     canDeliver &&
                     // Not while driving: running is expected on a drive. `since` is not reset (see the unlocked check).
-                    !status.isDriving &&
+                    !isDriving &&
                     now - since > prefs.runningMinutes * 60_000L &&
                     !settings.alertFired(key)
                 ) {
@@ -196,7 +205,7 @@ object CarAlerts {
                 // shows up only after the drive already happened would be equally useless -- so the
                 // sent flag is set here even though nothing was posted, closing out this ON-episode
                 // for good.
-                if (status.isDriving) {
+                if (isDriving) {
                     settings.setEngineStartNotificationSent(v.vin, true)
                 } else if (canDeliver) {
                     out += Alert(
