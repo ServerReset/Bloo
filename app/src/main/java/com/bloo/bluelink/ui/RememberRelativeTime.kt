@@ -90,7 +90,7 @@ internal fun AnimatedSlider(
         enabled = enabled,
         // An inert slider wears the same standard disabled treatment as every button (the morph
         // frost), instead of a bespoke muted accent, so "disabled" looks one way everywhere.
-        modifier = if (enabled) Modifier else Modifier.inertButtonFrost(true, StandardShape),
+        modifier = if (enabled) Modifier else Modifier.inertButtonFrost(true),
     )
 }
 

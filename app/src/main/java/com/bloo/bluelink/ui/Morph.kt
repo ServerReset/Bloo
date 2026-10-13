@@ -8,7 +8,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -104,7 +103,7 @@ fun MorphButton(
     var everInert by remember { mutableStateOf(!enabled) }
     SideEffect { if (!enabled) everInert = true }
     val frost = if (everInert || !enabled) {
-        Modifier.inertButtonFrost(!enabled, RoundedCornerShape(pillCornerPercent.toInt()))
+        Modifier.inertButtonFrost(!enabled)
     } else {
         Modifier
     }
