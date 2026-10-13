@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bloo_widget_preview_bg"
+    android:padding="14dp">
+
+    <TextView
+        android:id="@+id/preview_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Daisy"
+        android:textColor="@android:color/system_neutral1_900"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/preview_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/preview_state"
+        android:text="92%"
+        android:textColor="@android:color/system_neutral1_900"
+        android:textSize="34sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/preview_state"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:text="Locked · 277 mi"
+        android:textColor="@android:color/system_neutral2_700"
+        android:textSize="12sp" />
+
+    <ImageView
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:background="@drawable/bloo_widget_preview_btn"
+        android:padding="10dp"
+        android:src="@drawable/ic_widget_lock"
+        android:tint="@android:color/system_accent2_900" />
+</RelativeLayout>
