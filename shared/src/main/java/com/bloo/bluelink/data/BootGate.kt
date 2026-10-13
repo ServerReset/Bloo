@@ -2,6 +2,7 @@ package com.bloo.bluelink.data
 
 import android.content.Context
 import android.provider.Settings
+import androidx.core.content.edit
 
 /**
  * "Sign in again after the phone restarts". When on (the default), the first launch after every
@@ -29,7 +30,7 @@ object BootGate {
 
     /** Turning it on mid-session does not lock anything: the CURRENT boot counts as opened. */
     fun setEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
+        prefs(context).edit { putBoolean(KEY_ENABLED, enabled) }
         if (enabled) markOpen(context)
     }
 
@@ -41,13 +42,13 @@ object BootGate {
         val p = prefs(context)
         // First run of a build that has the gate (or a fresh install): nothing to protect yet, and
         // locking the user out of an app they just installed would be wrong.
-        if (!p.contains(KEY_OPEN_BOOT)) { p.edit().putInt(KEY_OPEN_BOOT, now).apply(); return false }
+        if (!p.contains(KEY_OPEN_BOOT)) { p.edit { putInt(KEY_OPEN_BOOT, now) }; return false }
         return p.getInt(KEY_OPEN_BOOT, now) != now
     }
 
     /** The user finished the whole flow: this boot is open. */
     fun markOpen(context: Context) {
         val now = bootCount(context)
-        if (now >= 0) prefs(context).edit().putInt(KEY_OPEN_BOOT, now).apply()
+        if (now >= 0) prefs(context).edit { putInt(KEY_OPEN_BOOT, now) }
     }
 }

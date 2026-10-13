@@ -5,12 +5,10 @@ import android.app.NotificationManager
 import android.content.Context
 import android.media.AudioAttributes
 import android.net.Uri
-import android.os.Build
 
 /**
- * Each copy did the same three things: guard on API O (channels don't exist below it), read the
- * channel back by id and only create it when missing, then create it with a
- * name/importance/description.
+ * Creates a notification channel only when it is missing. Channels are API 26+ and the app's minSdk
+ * IS 26, so there is no version guard to make.
  */
 fun ensureNotificationChannel(
     context: Context,
@@ -21,7 +19,6 @@ fun ensureNotificationChannel(
     showBadge: Boolean = true,
     sound: Uri? = null,
 ) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
     val manager = context.getSystemService(NotificationManager::class.java)
     if (manager.getNotificationChannel(id) != null) return
     manager.createNotificationChannel(

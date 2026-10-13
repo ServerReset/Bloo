@@ -9,6 +9,7 @@ import android.hardware.SensorManager
 import android.hardware.TriggerEvent
 import android.hardware.TriggerEventListener
 import android.os.SystemClock
+import androidx.core.content.edit
 import com.bloo.bluelink.data.VehicleSnapshot
 
 /**
@@ -42,7 +43,7 @@ object WearAutoLock {
     fun isEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
 
     fun setEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
+        prefs(context).edit { putBoolean(KEY_ENABLED, enabled) }
         if (enabled) arm(context) else disarm(context)
     }
 
