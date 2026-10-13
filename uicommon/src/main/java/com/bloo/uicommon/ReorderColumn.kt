@@ -136,6 +136,10 @@ fun <T> ReorderColumn(
     // Set while a released item is FLYING to a drop target: its pick-up lift eases back to 1.0 during
     // the flight, so the element that lands matches the one the caller then draws in place (no pop).
     var flyingKey by remember { mutableStateOf<Any?>(null) }
+    // Set while a released item is SETTLING back into its own slot after an ordinary reorder drop (no
+    // pin). Kept separate from [flyingKey] so the put-down can land with a small bounce instead of the
+    // pin flight's flat, no-overshoot ease.
+    var settlingKey by remember { mutableStateOf<Any?>(null) }
 
     // Sync with upstream changes only while not actively dragging.
     LaunchedEffect(items) { if (draggingKey == null) order = items }
@@ -151,8 +155,9 @@ fun <T> ReorderColumn(
             // reusing nodes by slot, which looks janky).
             key(k) {
                 val dragging = draggingKey == k
-                val lifted = dragging && flyingKey != k
                 val flying = dragging && flyingKey == k
+                val settling = dragging && settlingKey == k
+                val lifted = dragging && !flying && !settling
                 val lift by animateFloatAsState(
                     targetValue = if (lifted) 1.08f else 1f,
                     animationSpec = when {
@@ -161,6 +166,10 @@ fun <T> ReorderColumn(
                         // FLYING to the drop target: ease the lift straight down to 1.0 with NO
                         // overshoot, so the pebble the caller then draws in place lines up exactly.
                         flying -> spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow)
+                        // SETTLING into its own slot after an ordinary reorder drop: let the lift ease
+                        // back with a touch of overshoot so the put-down reads as a landing bounce
+                        // rather than a flat snap.
+                        settling -> spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow)
                         else -> spring(dampingRatio = 0.3f, stiffness = Spring.StiffnessMediumLow)
                     },
                     label = "lift"
@@ -187,10 +196,15 @@ fun <T> ReorderColumn(
                             translationY = if (dragging) offsetY else (1f - intro.value) * 28.dp.toPx()
                             scaleX = lift
                             scaleY = lift
-                            // Scale about the TOP-LEFT, not the centre: the release flight aims the
-                            // item's top-left at the drop target, and a centre pivot would move that
-                            // corner as the lift eases back during the flight (landing a few dp off).
-                            transformOrigin = TransformOrigin(0f, 0f)
+                            // Scale about the CENTRE so the pick-up lift grows symmetrically. A
+                            // top-left pivot grew the card's right and bottom edges while the left and
+                            // top stayed pinned, which read as the pebble "popping out to the right"
+                            // -- far more noticeable than the vertical growth, because a pebble is
+                            // wide and short. This does not cost the release flight its aiming: by the
+                            // time the flight lands, the lift has eased back to 1.0, where the pivot no
+                            // longer displaces anything (the transient during the flight is a fraction
+                            // of the lift amount, and reads as the pebble settling into the slot).
+                            transformOrigin = TransformOrigin.Center
                             alpha = intro.value
                         }
                         .onSizeChanged { heights[k] = it.height },
@@ -232,6 +246,7 @@ fun <T> ReorderColumn(
                             val carryY = if (settleJob?.isActive == true && draggingKey == k) offsetY else 0f
                             settleJob?.cancel()
                             flyingKey = null
+                            settlingKey = null
                             draggingKey = k; offsetY = carryY; offsetX = carryX
                             onPickUpNow?.invoke()
                         },
@@ -246,9 +261,9 @@ fun <T> ReorderColumn(
                                 // itemWin is the item's CURRENT drawn top-left, which already includes
                                 // the drag translation, so the flight must END at start + (target -
                                 // itemWin) -- NOT at (target - itemWin), which would be short by the
-                                // whole drag offset and strand the pebble near the finger. The item
-                                // scales from its TOP-LEFT (see its graphicsLayer), so the lift easing
-                                // back during the flight cannot shift that corner either.
+                                // whole drag offset and strand the pebble near the finger. The item now
+                                // scales about its centre, but by the time the flight lands the lift has
+                                // eased back to 1.0, where the pivot is a no-op and the corner is exact.
                                 val endX = offsetX + (target.x - itemWin.x)
                                 val endY = offsetY + (target.y - itemWin.y)
                                 flyingKey = k
@@ -269,15 +284,17 @@ fun <T> ReorderColumn(
                                     withFrameNanos { }
                                     draggingKey = null
                                     flyingKey = null
+                                    settlingKey = null
                                     offsetX = 0f
                                     offsetY = 0f
                                 }
                             } else {
                                 // Not a pin: commit the order now, then let the item SETTLE into the slot
                                 // it belongs in -- from wherever it was let go, sideways included, so a
-                                // drop in the wrong place flies back instead of snapping.
+                                // drop in the wrong place flies back instead of snapping. settlingKey
+                                // drives the landing bounce (see the lift spec above).
                                 if (handled) onDragReleaseCommitNow?.invoke(k) else onReorderNow(order)
-                                flyingKey = k
+                                settlingKey = k
                                 settleJob = scope.launch {
                                     val ax = Animatable(offsetX)
                                     val ay = Animatable(offsetY)
@@ -286,7 +303,7 @@ fun <T> ReorderColumn(
                                         launch { ay.animateTo(0f, DragSettleSpec) { offsetY = value } }
                                     }
                                     if (draggingKey == k) {
-                                        draggingKey = null; flyingKey = null
+                                        draggingKey = null; flyingKey = null; settlingKey = null
                                         offsetX = 0f; offsetY = 0f
                                     }
                                     onLandedNow?.invoke()
@@ -295,7 +312,7 @@ fun <T> ReorderColumn(
                         },
                         onDragCancel = {
                             onDragCancelNow?.invoke(k)
-                            flyingKey = k
+                            settlingKey = k
                             settleJob = scope.launch {
                                 val ax = Animatable(offsetX)
                                 val ay = Animatable(offsetY)
@@ -304,7 +321,7 @@ fun <T> ReorderColumn(
                                     launch { ay.animateTo(0f, DragSettleSpec) { offsetY = value } }
                                 }
                                 if (draggingKey == k) {
-                                    draggingKey = null; flyingKey = null
+                                    draggingKey = null; flyingKey = null; settlingKey = null
                                     offsetX = 0f; offsetY = 0f
                                 }
                             }

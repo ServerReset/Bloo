@@ -291,9 +291,11 @@ internal fun PinnedPebble(
                 translationY = y
                 scaleX = pickScale
                 scaleY = pickScale
-                // Scale about the TOP-LEFT so the pick-up lift easing back during the unpin flight
-                // cannot shift the corner we aim at the stack slot.
-                transformOrigin = TransformOrigin(0f, 0f)
+                // Scale about the CENTRE so the pick-up grows symmetrically instead of the top-left
+                // pinning the left/top edge and pushing the right edge out (the same right-pop the
+                // stack's reorder had). The unpin flight still lands exactly: pickScale has eased back
+                // to 1.0 by the time it arrives, where the pivot no longer displaces anything.
+                transformOrigin = TransformOrigin.Center
             }
             .pointerInput(section) {
                 detectDragGesturesAfterLongPress(
