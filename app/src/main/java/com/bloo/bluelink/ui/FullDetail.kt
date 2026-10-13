@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -31,6 +32,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -67,6 +69,14 @@ internal fun VehicleDetailContent(
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val scroll = rememberScrollState()
+    // The aurora leans as this page scrolls (bottom of the page lifts it, top lets it settle).
+    val aurora = LocalAuroraReactions.current
+    LaunchedEffect(scroll, aurora) {
+        if (aurora == null) return@LaunchedEffect
+        snapshotFlow { scroll.value to scroll.maxValue }.collect { (v, m) ->
+            aurora.leanY.floatValue = if (m > 0) (v.toFloat() / m) * 2f - 1f else 0f
+        }
+    }
     // Narrowed, not `state.value.refreshing`: a bare read here would subscribe this whole page --
     // all three of them live at once in the pager -- to every UiState emission.
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
@@ -149,6 +159,14 @@ internal fun ExpandedCar(
     // same ScrollState paired with the same content across a flip -- which is what makes it the
     // right thing for the badge's own tap-to-scroll-to-top.
     val pebblesScroll = rememberScrollState()
+    // The aurora leans as the page scrolls; see VehicleDetailContent.
+    val aurora = LocalAuroraReactions.current
+    LaunchedEffect(pebblesScroll, aurora) {
+        if (aurora == null) return@LaunchedEffect
+        snapshotFlow { pebblesScroll.value to pebblesScroll.maxValue }.collect { (v, m) ->
+            aurora.leanY.floatValue = if (m > 0) (v.toFloat() / m) * 2f - 1f else 0f
+        }
+    }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     // Full screen (two columns): the hot seat is shown and its pinned pebbles are pulled out of the

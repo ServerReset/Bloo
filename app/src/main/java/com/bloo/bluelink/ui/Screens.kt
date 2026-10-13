@@ -248,6 +248,7 @@ fun BlooApp(vm: AppViewModel) {
                     com.bloo.bluelink.data.StartupTrace.once("screen-garage", "screen: Garage composed (first garage frame next)")
                     // Reuses the outer `appearance`.
                     val auroraTouch = remember { AuroraTouch() }
+                    val auroraReactions = remember { AuroraReactions() }
                     Box(
                         Modifier.fillMaxSize().pointerInput(auroraTouch) {
                             // Watches the finger for the aurora without taking it: the Initial pass sees every touch
@@ -269,6 +270,9 @@ fun BlooApp(vm: AppViewModel) {
                         // while it's up (typing frames, panel scrolling) the ambient drift would
                         // otherwise keep redrawing the blurred backdrop underneath at ~12fps --
                         // real contention on exactly the frames search is using.
+                        // The aurora leans with the pager/scroll and springs on a page settle; both
+                        // screens publish into this holder, read in the aurora's draw phase.
+                        CompositionLocalProvider(LocalAuroraReactions provides auroraReactions) {
                         if (appearance.auroraBackground) CompositionLocalProvider(LocalAuroraTouch provides auroraTouch) {
                             AuroraBackground(Modifier.matchParentSize().hazeSource(backdropHaze), appearance, refreshing = refreshing, paused = searchOpen)
                         }
@@ -276,6 +280,7 @@ fun BlooApp(vm: AppViewModel) {
                         // the user hasn't passed; it composes once `locked` flips.
                         if (!(locked && !unlockedThisSession)) {
                             GarageScreen(stateHolder, vm, hazeState = searchHazeState)
+                        }
                         }
                     }
                 }

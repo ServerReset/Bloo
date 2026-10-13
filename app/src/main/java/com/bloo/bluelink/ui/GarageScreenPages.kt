@@ -73,6 +73,12 @@ internal fun CollapsedGaragePager(
         // One virtual page per real item; the real item for a page is wrap.real(page).
         val wrap = rememberWrapPager(total, initialItem)
         val pager = wrap.pager
+        // The aurora leans with the page as it turns, and springs once each time a page settles.
+        val aurora = LocalAuroraReactions.current
+        LaunchedEffect(pager, aurora) {
+            if (aurora == null) return@LaunchedEffect
+            snapshotFlow { pager.currentPageOffsetFraction }.collect { aurora.leanX.floatValue = it }
+        }
         fun realItem(virtualPage: Int) = wrap.real(virtualPage)
         LaunchedEffect(pager, total, perPage, expandedIdx) {
             snapshotFlow { pager.settledPage }.collect { page ->
@@ -92,6 +98,7 @@ internal fun CollapsedGaragePager(
                 // showing.
                 vm.setOnSettingsPageSlot((0 until perPage.coerceAtLeast(1)).any { realItem(page + it) == slots })
                 wrap.recenterIfNearEdge()
+                aurora?.let { it.kick.intValue += 1; it.leanX.floatValue = 0f }
             }
         }
         // Resets the flag above the moment this pager itself leaves composition (navigating away

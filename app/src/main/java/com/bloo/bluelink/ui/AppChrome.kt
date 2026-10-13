@@ -45,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -340,6 +341,21 @@ internal fun AuroraBackground(
         }
     }
     val auroraWhite = Color.White
+    // Navigation reaction: one sprung pulse per app action (a page settling, a refresh). The lean is
+    // read straight off the shared signals in the draw phase, so a page turn never recomposes this.
+    val reactions = LocalAuroraReactions.current
+    val kick = remember { Animatable(0f) }
+    if (reactions != null && !saver) {
+        LaunchedEffect(reactions) {
+            snapshotFlow { reactions.kick.intValue }.collect { k ->
+                if (k > 0) {
+                    kick.snapTo(0f)
+                    kick.animateTo(1f, spring(dampingRatio = PopDamping, stiffness = Spring.StiffnessMedium))
+                    kick.animateTo(0f, spring(dampingRatio = SettleDamping, stiffness = Spring.StiffnessMediumLow))
+                }
+            }
+        }
+    }
     Box(
         modifier
             .fillMaxSize()
@@ -353,11 +369,16 @@ internal fun AuroraBackground(
                 val a = appear.value
                 val e = energy.value
                 val finger = follow.value
+                // Navigation lean (-1..1) and the action pulse (0..1), both read here in the draw
+                // phase.
+                val leanX = reactions?.leanX?.floatValue ?: 0f
+                val leanY = reactions?.leanY?.floatValue ?: 0f
+                val k = kick.value
                 // Five blobs on slow, uneven loops (sines at different rates, so the pattern never repeats
                 // quickly), each breathing in size, and each pulled a little toward a finger.
                 fun blob(c: Color, bx: Float, by: Float, ax: Float, ay: Float, f1: Float, f2: Float, ph: Float, r: Float, alpha: Float) {
-                    var cx = size.width * ((bx + ax * sin(t * f1 + ph) + tiltX * (if (ph > 2f) -1f else 1f)) * explodeSpread())
-                    var cy = size.height * ((by + ay * sin(t * f2 + ph * 1.3f) + tiltY * (if (ph > 2f) -1f else 1f)) * explodeSpread())
+                    var cx = size.width * ((bx + ax * sin(t * f1 + ph) + tiltX * (if (ph > 2f) -1f else 1f)) * explodeSpread()) + size.width * leanX * 0.06f
+                    var cy = size.height * ((by + ay * sin(t * f2 + ph * 1.3f) + tiltY * (if (ph > 2f) -1f else 1f)) * explodeSpread()) + size.height * leanY * 0.06f
                     if (e > 0.001f) {
                         val dx = finger.x - cx
                         val dy = finger.y - cy
@@ -365,8 +386,8 @@ internal fun AuroraBackground(
                         cx += dx * pull
                         cy += dy * pull
                     }
-                    val radius = minDim * r * (1f + 0.09f * sin(t * 0.55f + ph * 2f)) * explodeSize() * (1f + 0.18f * e)
-                    val col = c.copy(alpha = (alpha * (1f + 0.5f * e) * explodeAlpha() * a).coerceIn(0f, 1f))
+                    val radius = minDim * r * (1f + 0.09f * sin(t * 0.55f + ph * 2f)) * explodeSize() * (1f + 0.18f * e) * (1f + 0.22f * k)
+                    val col = c.copy(alpha = (alpha * (1f + 0.5f * e) * explodeAlpha() * a * (1f + 0.35f * k)).coerceIn(0f, 1f))
                     drawCircle(
                         brush = Brush.radialGradient(
                             listOf(col, col.copy(alpha = col.alpha * 0.55f), Color.Transparent),
@@ -409,3 +430,20 @@ internal class AuroraTouch {
 }
 
 internal val LocalAuroraTouch = androidx.compose.runtime.staticCompositionLocalOf<AuroraTouch?> { null }
+
+/**
+ * How navigation nudges the aurora, beyond its own drift and the tilt sensor: a bounded lean
+ * ([leanX] from the car pager's page offset, [leanY] from a page's scroll) and a [kick] raised by an
+ * app action (a page settling, a refresh) that springs the whole backdrop once. Published by the
+ * screens and read in the draw phase, so a page turn never recomposes the aurora.
+ */
+internal class AuroraReactions {
+    /** -1..1 horizontal lean (a page turn). */
+    val leanX = mutableFloatStateOf(0f)
+    /** -1..1 vertical lean (scrolling down a page). */
+    val leanY = mutableFloatStateOf(0f)
+    /** Bumped on an app action; each change springs one pulse. */
+    val kick = mutableIntStateOf(0)
+}
+
+internal val LocalAuroraReactions = androidx.compose.runtime.staticCompositionLocalOf<AuroraReactions?> { null }
