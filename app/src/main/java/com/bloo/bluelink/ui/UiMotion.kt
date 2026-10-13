@@ -162,13 +162,6 @@ fun pebbleRowOvershoot(t: Float): Float {
 }
 
 /**
- * How much of the shared progress each row's stagger window is offset by, end to end (see
- * [StaggeredRevealColumn]). 0.85 gives each row a narrow 15% window so up to 5 rows never overlap
- * and each reads as a distinct step.
- */
-const val PebbleStaggerSpan = 0.85f
-
-/**
  * The app's one "working" spin, for any icon that turns while something loads: the first turn
  * accelerates from rest, then it holds a steady fast spin, and when [spinning] ends it decelerates
  * to the next full turn and resets. The Animatable only runs while spinning, so idle icons hold no

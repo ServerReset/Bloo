@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -26,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
@@ -60,9 +58,6 @@ import kotlinx.coroutines.launch
  * intro before the page the user actually sees composes.
  */
 val coldStartIntroPlayed = mutableSetOf<Any>()
-
-/** True while ANY [ReorderColumn] item is being dragged (the "floating pebble" state). */
-val LocalReorderActive = staticCompositionLocalOf { false }
 
 /** The spring a released pebble flies into its drop target on (see [ReorderColumn]'s onDragEnd). */
 /** A put-down that is not a pin: a short, slightly springy settle into the slot it belongs in. */
@@ -123,8 +118,6 @@ fun <T> ReorderColumn(
     var settleJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var order by remember { mutableStateOf(items) }
     var draggingKey by remember { mutableStateOf<Any?>(null) }
-    val reorderActive = draggingKey != null
-    CompositionLocalProvider(LocalReorderActive provides reorderActive) {
     var offsetY by remember { mutableFloatStateOf(0f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     val heights = remember { mutableStateMapOf<Any, Int>() }
@@ -399,7 +392,6 @@ fun <T> ReorderColumn(
             if (dragIdx in placeables.indices) placeables[dragIdx].place(0, pos[dragIdx])
         }
     }
-}
 }
 
 /**

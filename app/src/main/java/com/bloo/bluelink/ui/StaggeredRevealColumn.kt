@@ -45,9 +45,8 @@ internal fun StaggeredRevealColumn(
             }
         },
     ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
-    // Windowing (see [PebbleStaggerSpan]) applies only on the way IN. Closing, late-window rows
-    // would stay opaque then cut out at the end, so closing maps every row to the same un-windowed
-    // `progress` and they fade together.
+    // True while the exit transition runs: the row cascade reads it to reverse (bottom rows pop out
+    // first, top rows last) instead of the open's top-to-bottom order.
     val closing = transition.targetState != EnterExitState.Visible
     val gapPx = with(LocalDensity.current) { verticalGap.roundToPx() }
     // `content` takes the ColumnScope receiver PebbleShell bodies use, via NoOpColumnScope.

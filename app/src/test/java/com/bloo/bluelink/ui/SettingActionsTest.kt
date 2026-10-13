@@ -15,7 +15,6 @@ import kotlin.test.assertTrue
  * answer from the model can never be thrown away and an illegal one can never get through.
  */
 class SettingActionsTest {
-    private val ctx = SettingContext(SettingsStore.Appearance(), SettingsStore.NotificationPrefs(), UiState())
     private val car = Vehicle(
         vin = "V1", regId = "reg-V1", name = "Daisy", model = "Ioniq 5", generation = "5", brandIndicator = "H", isEv = true,
     )
