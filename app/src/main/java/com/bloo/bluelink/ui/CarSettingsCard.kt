@@ -154,7 +154,7 @@ internal fun CarSettingsCard(
                 BlooTextField(
                     value = state.licensePlates[v.vin] ?: "",
                     onValueChange = { vm.setLicensePlate(v.vin, it) },
-                    label = { Text("License plate") },
+                    label = { Text("Licence plate") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )

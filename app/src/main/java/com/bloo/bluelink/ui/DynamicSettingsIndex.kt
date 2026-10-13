@@ -12,7 +12,7 @@ import com.bloo.bluelink.data.settingsMode
  * Settings that are only visible in advanced mode. These are completely
  * hidden when state.settingsMode == "simple".
  *
- * Per-car settings have car names appended (e.g., "License plate · Ioniq"),
+ * Per-car settings have car names appended (e.g., "Licence plate · Ioniq"),
  * so we match by prefix for those.
  */
 internal val ADVANCED_ONLY_SETTINGS = setOf(
@@ -34,7 +34,7 @@ internal val ADVANCED_ONLY_SETTINGS = setOf(
     // Identity paperwork (Advanced only) - these have car names appended. The SERVICE fields are
     // not here: the car card shows them in Simple mode too (they drive the "service due" alert), so
     // search must find them there as well, not hide what the card shows.
-    "License plate · ", // Prefix for "License plate · <car name>"
+    "Licence plate · ", // Prefix for "Licence plate · <car name>"
     "VIN · ", // Prefix for "VIN · <car name>"
 )
 

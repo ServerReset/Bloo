@@ -30,7 +30,7 @@ internal class ToggleSpec(
     val keywords: String,
     /**
      * Shown on the row itself; defaults to [title] since most toggles read identically in both
-     * places. Only a few (e.g. "Dynamic color (Material You)") spell the row out more fully than
+     * places. Only a few (e.g. "Dynamic colour (Material You)") spell the row out more fully than
      * the search title.
      */
     val label: String = title,
@@ -96,7 +96,7 @@ internal val ToggleSettings = listOf(
         checked = { a, _, _ -> a.auroraBackground }, onToggle = { vm, v -> vm.setAuroraBackground(v) },
     ),
     ToggleSpec(
-        title = "Dynamic color", label = "Dynamic color (Material You)", keywords = "material you wallpaper theme color",
+        title = "Dynamic colour", label = "Dynamic colour (Material You)", keywords = "material you wallpaper theme color",
         checked = { a, _, _ -> a.dynamicColor }, onToggle = { vm, v -> vm.setDynamicColor(v) },
     ),
     ToggleSpec(

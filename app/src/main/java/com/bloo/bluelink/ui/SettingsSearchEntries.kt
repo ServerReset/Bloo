@@ -85,11 +85,11 @@ internal fun buildSettingsSearchEntries(
     state.vehicles.forEach { v ->
         val st = state.statusFor(v)
         val plate = state.licensePlates[v.vin] ?: ""
-        add("License plate · ${v.name}", "plate licence registration ${v.name} $plate") {
+        add("Licence plate · ${v.name}", "plate licence registration ${v.name} $plate") {
             BlooTextField(
                 value = plate,
                 onValueChange = { vm.setLicensePlate(v.vin, it) },
-                label = { Text("License plate") },
+                label = { Text("Licence plate") },
                 singleLine = true, shape = FieldShape, modifier = Modifier.fillMaxWidth(),
             )
         }

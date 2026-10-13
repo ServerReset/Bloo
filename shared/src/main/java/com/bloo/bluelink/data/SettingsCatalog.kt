@@ -59,7 +59,7 @@ object SettingsCatalog {
         app("distance_unit", Kind.CHOICE, "Distance unit", "miles kilometres km metric imperial units"),
         app("temp_unit", Kind.CHOICE, "Temperature unit", "celsius fahrenheit units"),
         app("unit_system", Kind.CHOICE, "Units", "metric imperial units"),
-        app("dynamic_color", Kind.TOGGLE, "Dynamic color", "material you wallpaper theme color"),
+        app("dynamic_color", Kind.TOGGLE, "Dynamic colour", "material you wallpaper theme color"),
         app("enabled_shortcuts", Kind.LIST, "App shortcuts", "launcher icon long press quick action"),
         app("font_choice", Kind.CHOICE, "Font", "typeface text font"),
         app("glass_clarity", Kind.NUMBER, "Glass clarity", "liquid glass transparency frosted clear crystal ultra"),
@@ -95,7 +95,7 @@ object SettingsCatalog {
 
         // --- Per-car, synced (suffix: the car's VIN) -----------------------------------------
         car("img_", Kind.IMAGE, "Car photo", "photo picture image hero"),
-        car("plate_", Kind.TEXT, "License plate", "plate licence registration"),
+        car("plate_", Kind.TEXT, "Licence plate", "plate licence registration"),
         car("platform_", Kind.CHOICE, "Head-unit generation", "gen5w ccnc platform generation"),
         car("ptrain_", Kind.CHOICE, "Powertrain", "ev gas hybrid phev"),
         car("seat_", Kind.TOGGLE, "Seat heat and cooling", "seat heat cool ventilated climate steering wheel"),

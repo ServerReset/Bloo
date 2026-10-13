@@ -127,7 +127,7 @@ private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean,
                     }
                     SettingsGroup("Colour") {
                         ToggleRow(
-                            "Dynamic color (Material You)",
+                            "Dynamic colour (Material You)",
                             appearance.dynamicColor,
                             description = if (appearance.dynamicColor) {
                                 "On: Bloo uses your wallpaper's palette (Android 12+)."

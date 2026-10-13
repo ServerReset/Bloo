@@ -126,7 +126,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         } else {
             SectionLabel("Service & identity")
             SelectionContainer { StatusRow("VIN", v.vin) }
-            if (!plate.isNullOrBlank()) StatusRow("License plate", plate)
+            if (!plate.isNullOrBlank()) StatusRow("Licence plate", plate)
             odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }
             lastSvc?.let { StatusRow("Last service at", formatDistance(it, metric)) }
             nextDue?.let {
