@@ -8,6 +8,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.ExperimentalHazeApi
 import dev.chrisbanes.haze.HazeInput
@@ -49,6 +51,58 @@ internal fun Modifier.appGlassEffect(
     val style = remember(shape, backing, blur, ultra) { glassStyle(shape, backing, blur, ultra) }
     // A fixed middle quality rather than Adaptive, so the resolution cannot change mid-gesture.
     return this.hazeGlass(input = HazeInput.Sources(state), style = style, performanceMode = HazePerformanceMode.Balanced)
+}
+
+/**
+ * The app's screen-edge warp: one AGSL pass that BENDS the content near the window's edges -- top,
+ * bottom, left and right -- the way a glass bezel would, with no blur.
+ *
+ * It is a RENDER EFFECT on the content layer, deliberately NOT a Haze glass panel. A glass node
+ * DRAWS a copy of the captured source, so a full-window one covers everything under it (it did: the
+ * pebbles' refraction was redrawn over the full-screen map, and the empty edges sampled to black).
+ * A render effect samples the content the layer already drew and displaces it, so nothing is drawn
+ * on top, there is no source capture, and it is ONE pass rather than one per card.
+ *
+ * Applied to the app's content (backdrop + screens) and UNDER the floating chrome, so the search,
+ * the toasts and the dialogs are never bent. Subtle by default; extreme under Ultra glass. Off below
+ * API 33 (RuntimeShader) and whenever the caller passes [enabled] false (battery saver).
+ */
+private const val EDGE_WARP_AGSL = """
+    uniform shader content;
+    uniform float2 size;
+    uniform float band;
+    uniform float strength;
+    half4 main(float2 coord) {
+        float2 d = min(coord, size - coord);
+        float m = min(d.x, d.y);
+        float t = clamp(1.0 - m / max(band, 1.0), 0.0, 1.0);
+        t = t * t;
+        float2 dir;
+        if (d.x < d.y) {
+            dir = float2(coord.x < size.x * 0.5 ? -1.0 : 1.0, 0.0);
+        } else {
+            dir = float2(0.0, coord.y < size.y * 0.5 ? -1.0 : 1.0);
+        }
+        return content.eval(coord + dir * (strength * t));
+    }
+"""
+
+/** How far in the bend reaches, and how far it displaces, in dp -- light by default, extreme ultra. */
+private const val EdgeWarpBandDp = 26f
+private const val EdgeWarpStrengthDp = 13f
+
+@Composable
+internal fun Modifier.edgeWarp(enabled: Boolean, ultra: Boolean): Modifier {
+    if (!enabled || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return this
+    val shader = remember { android.graphics.RuntimeShader(EDGE_WARP_AGSL) }
+    return this.graphicsLayer {
+        shader.setFloatUniform("size", size.width.toFloat(), size.height.toFloat())
+        shader.setFloatUniform("band", EdgeWarpBandDp.dp.toPx())
+        shader.setFloatUniform("strength", (if (ultra) EdgeWarpStrengthDp * 2.6f else EdgeWarpStrengthDp).dp.toPx())
+        renderEffect = android.graphics.RenderEffect
+            .createRuntimeShaderEffect(shader, "content")
+            .asComposeRenderEffect()
+    }
 }
 
 @OptIn(ExperimentalHazeApi::class)

@@ -177,7 +177,14 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
     LockBlurLayer(locked = locked && contentSettled) {
-    Box(Modifier.fillMaxSize()) {
+    // The edge warp is ONE render pass over the whole app layer: it bends the content into the frame
+    // at the very edges (top/bottom/left/right, no blur), including behind the status bar. Dialogs
+    // and the lock overlay are drawn outside this, so they are never bent.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .edgeWarp(enabled = canBlurBackdrops(), ultra = appearance.ultraGlass),
+    ) {
     // The app's backdrop: the Haze source every glass card blurs (a sibling under everything).
     AppBackdrop(backdropHaze, Modifier.matchParentSize())
     Scaffold(
