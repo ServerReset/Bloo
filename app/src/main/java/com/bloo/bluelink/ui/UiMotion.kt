@@ -186,18 +186,3 @@ internal fun rememberSpinAngle(spinning: Boolean): androidx.compose.animation.co
     }
     return angle
 }
-
-/**
- * Whether the app's own content is being dragged right now -- the car pager moving, or a page
- * scrolling. The screen-edge warp (GlassRefraction.kt) reads this in its DRAW phase and skips itself
- * while it is true: a full-window refraction re-samples every frame the content under the edges
- * moves, which is exactly the swipe/scroll jank it would otherwise cause. Read in draw, so a flip
- * costs a redraw, never a recomposition.
- */
-internal class ContentMotion {
-    var pagerMoving by androidx.compose.runtime.mutableStateOf(false)
-    var scrollMoving by androidx.compose.runtime.mutableStateOf(false)
-    val moving: Boolean get() = pagerMoving || scrollMoving
-}
-
-internal val LocalContentMotion = androidx.compose.runtime.staticCompositionLocalOf<ContentMotion?> { null }

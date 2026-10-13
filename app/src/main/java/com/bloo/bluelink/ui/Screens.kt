@@ -37,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -100,9 +99,6 @@ fun BlooApp(vm: AppViewModel) {
     val backdropHaze = remember { HazeState() }
     // The one "is the user touching anything" clock the aurora reads; observed at the root below.
     val ambientActivity = remember { AmbientActivity() }
-    // Whether the app's own content is being dragged (the pager, a page scroll): the screen-edge
-    // warp skips itself while it is, so a swipe never pays for a full-window refraction per frame.
-    val contentMotion = remember { ContentMotion() }
     val toasts = remember { ToastState() }
     // The one pull-to-refresh indicator; every Refreshable feeds it.
     val refreshIndicator = remember { RefreshIndicatorState() }
@@ -157,7 +153,6 @@ fun BlooApp(vm: AppViewModel) {
         LocalRefreshIndicator provides refreshIndicator,
         LocalBackdropHaze provides backdropHaze,
         LocalAmbientActivity provides ambientActivity,
-        LocalContentMotion provides contentMotion,
         LocalPowerPolicy provides powerPolicy,
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
@@ -301,19 +296,6 @@ fun BlooApp(vm: AppViewModel) {
                 }
             }
             }
-        }
-        // The screen-edge liquid-glass warp (top, bottom, left, right -- no blur), sitting UNDER the
-        // floating chrome so it never bends the search, the toasts or the dialogs, and OFF under
-        // battery saver. Extreme under Ultra glass. Skipped entirely -- no Haze sampling at all --
-        // while the content is being dragged or scrolled: the same trick the glass cards use,
-        // because a full-window refraction re-sampled every frame is what made a swipe stutter.
-        if (canBlurBackdrops()) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .drawWithContent { if (!contentMotion.moving) drawContent() }
-                    .screenEdgeWarp(searchHazeState, ultra = appearance.ultraGlass),
-            )
         }
         // Search lives above the AnimatedContent so one element survives the transition (corner
         // bubble morphing into the settings pill). Only the garage is searchable.

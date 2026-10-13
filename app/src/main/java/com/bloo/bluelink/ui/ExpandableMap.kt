@@ -8,6 +8,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -95,12 +96,20 @@ internal fun ExpandableMapLayer(
 
     // Animate from pebble size to full screen.
     val expandFraction = remember { Animatable(0f) }
+    // The chrome (top bar + bottom row) has its OWN track, so its arrival and departure can be
+    // sequenced against the sheet's: it comes in AFTER the map has grown, and leaves BEFORE the map
+    // shrinks -- the sheet morphing back into its pebble is the part the eye should follow out.
+    val chrome = remember { Animatable(0f) }
     // Read here, at composable scope, not inside the LaunchedEffect below -- lowPowerAwareSpring is
     // itself @Composable, so it can't be called from a suspend lambda.
     val openSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
 
     LaunchedEffect(Unit) {
+        // Open in two beats: the sheet grows from the pebble to full screen first, THEN the bars
+        // arrive. Previously they faded in from the very first frame (expandFraction > 0.1), so the
+        // chrome was already there while the map was still unfolding.
         expandFraction.animateTo(1f, animationSpec = openSpring)
+        chrome.animateTo(1f, animationSpec = tween(MotionMedium))
     }
 
     // How far the drag handle has actually been pulled down, in px -- the SAME real drag-to-dismiss
@@ -126,15 +135,16 @@ internal fun ExpandableMapLayer(
     // back to full size and then shrinking.
     val closeDistPx = LocalWindowInfo.current.containerSize.height * 0.4f
     var closing by remember { mutableStateOf(false) }
-    // The top bar and bottom buttons appear once the sheet is mostly open. A derived boolean, so the
-    // sheet recomposes when it FLIPS, not on every frame of the open/close spring.
-    val chromeShown by remember { derivedStateOf { expandFraction.value > 0.1f } }
+    // The top bar and bottom buttons exist only once the chrome's own track has left zero. A derived
+    // boolean, so the sheet recomposes when it FLIPS, not on every frame of the springs.
+    val chromeShown by remember { derivedStateOf { chrome.value > 0.01f } }
     fun close() {
         if (closing) return
         closing = true
         scope.launch {
-            // Both play at once so a mid-drag dismiss doesn't visibly snap dragPx back to 0 before
-            // the sheet itself starts shrinking away.
+            // Chrome first (a quick retreat), then the sheet morphs back into its pebble, and the
+            // drag offset eases away with it so a mid-drag dismiss doesn't visibly snap dragPx to 0.
+            scope.launch { chrome.animateTo(0f, animationSpec = tween(MotionFast)) }.join()
             val a = scope.launch { expandFraction.animateTo(0f, animationSpec = closeSpring) }
             val b = scope.launch { dragPx.animateTo(0f, animationSpec = closeSpring) }
             a.join(); b.join()
@@ -237,7 +247,12 @@ internal fun ExpandableMapLayer(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(start = GapSection, end = GapSection, top = GapSection)
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) * (1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)) },
+                        .graphicsLayer {
+                            val t = chrome.value.coerceIn(0f, 1f)
+                            alpha = t * (1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f))
+                            // Slides down into place as it arrives, back up as it leaves.
+                            translationY = (1f - t) * -12.dp.toPx()
+                        },
                 )
             }
 
@@ -249,7 +264,12 @@ internal fun ExpandableMapLayer(
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .imePadding()
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) * (1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)) },
+                        .graphicsLayer {
+                            val t = chrome.value.coerceIn(0f, 1f)
+                            alpha = t * (1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f))
+                            // Rises into place as it arrives, back down as it leaves.
+                            translationY = (1f - t) * 12.dp.toPx()
+                        },
                 ) {
                     MapFeatureRow(
                         features = listOf(

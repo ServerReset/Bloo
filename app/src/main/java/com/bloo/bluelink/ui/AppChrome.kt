@@ -404,20 +404,42 @@ internal fun AuroraBackground(
     // Touch: the blobs swarm toward a finger and a faint glow follows it, so the aurora feels alive
     // under the hand. (No rings: navigation and touch read as one soft glow, not a ripple.) The
     // finger is observed (never consumed) by the garage; see AuroraTouch.
+    //
+    // The glow is PUBLISHED IN STEPS, not read straight off its springs. The aurora is the Haze
+    // source behind every glass card, so any change to it re-blurs every one of them -- and a finger
+    // spring changes it on every frame of an entire drag. That made an ordinary scroll cost ~60 glass
+    // re-blurs a second, which is exactly a "smooth, then stuttery" feel. The glow is a huge soft
+    // radial and the swarm only a gentle pull, so a stepped position and brightness is
+    // indistinguishable and costs a fraction of it.
     val touch = LocalAuroraTouch.current
-    val energy = remember { Animatable(0f) }
-    val follow = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    val glow = remember { mutableFloatStateOf(0f) }
+    val glowAt = remember { mutableStateOf(Offset.Zero) }
     if (touch != null && !saver) {
         LaunchedEffect(touch) {
-            snapshotFlow { touch.pos.value }.collectLatest { p ->
-                if (p != null) {
-                    if (energy.value < 0.02f) follow.snapTo(p)
-                    coroutineScope {
-                        launch { energy.animateTo(1f, tween(160)) }
-                        follow.animateTo(p, spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow))
+            val energy = Animatable(0f)
+            val follow = Animatable(Offset.Zero, Offset.VectorConverter)
+            launch {
+                snapshotFlow { touch.pos.value }.collectLatest { p ->
+                    if (p != null) {
+                        if (energy.value < 0.02f) { follow.snapTo(p); glowAt.value = p }
+                        coroutineScope {
+                            launch { energy.animateTo(1f, tween(160)) }
+                            launch { follow.animateTo(p, spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow)) }
+                        }
+                    } else {
+                        energy.animateTo(0f, tween(1100))
                     }
-                } else {
-                    energy.animateTo(0f, tween(1100))
+                }
+            }
+            // The publisher: runs only while there is a glow to show (a finger down, or still fading).
+            snapshotFlow { touch.pos.value != null || energy.value > 0.001f }.collectLatest { active ->
+                if (!active) return@collectLatest
+                while (true) {
+                    delay(90)
+                    val e = energy.value.coerceIn(0f, 1f)
+                    if (kotlin.math.abs(e - glow.floatValue) >= 0.08f) glow.floatValue = e
+                    val f = follow.value
+                    if ((f - glowAt.value).getDistance() >= 22f) glowAt.value = f
                 }
             }
         }
@@ -451,8 +473,8 @@ internal fun AuroraBackground(
                 val t = clock
                 val minDim = size.minDimension
                 val a = appear.value
-                val e = energy.value
-                val finger = follow.value
+                val e = glow.floatValue
+                val finger = glowAt.value
                 // Navigation lean (-1..1) and the action pulse (0..1), both read here in the draw
                 // phase. Battery saver freezes the aurora outright, so both are zero there.
                 val leanX = if (saver) 0f else (reactions?.leanX?.floatValue ?: 0f)
