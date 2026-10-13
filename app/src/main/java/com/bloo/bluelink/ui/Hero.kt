@@ -51,6 +51,12 @@ internal fun HeroHeader(
      * recompose on unrelated state changes.
      */
     photoExpanded: Boolean = true,
+    /**
+     * The hero's trailing header control. Null keeps the hero's own expand/collapse chevron; set (the
+     * grid's full-screen button) it SWAPS that chevron out, since the photo toggle has nowhere to go
+     * once the control is taken.
+     */
+    headerAction: PebbleHeaderAction? = null,
 ) {
     // On the phone the hero is a pebble on PebbleShell; its body collapses with the shared
     // collapseEnter/collapseExit transition, so no photo collapse logic is needed here.
@@ -111,8 +117,10 @@ internal fun HeroHeader(
         title = v.name,
         modifier = modifier,
         titleColor = heroTitleColorNow,
-        // The hero's own expand/collapse chevron; there is no separate full-screen action any more.
-        canToggle = true,
+        // The hero's own expand/collapse chevron, unless a header control was supplied (the grid's
+        // full-screen button), which takes that slot: one trailing control, never two.
+        headerAction = headerAction,
+        canToggle = headerAction == null,
         // The ONLY pebble that grows its title. Here the title is the car's NAME and the card
         // becomes a photo of that car, so the name scaling up reads as the card taking over. On
         // "Location" or "Diagnostics" it is a heading resizing for no reason.

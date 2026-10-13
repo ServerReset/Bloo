@@ -71,6 +71,11 @@ internal fun ExpandedCar(
      * car every frame.
      */
     expandedT: State<Float> = remember { mutableFloatStateOf(1f) },
+    /**
+     * The hero's trailing header control. Null on a narrow single column (the hero keeps its own
+     * expand chevron); in the grid it is the full-screen button, which replaces that chevron.
+     */
+    heroAction: PebbleHeaderAction? = null,
     /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
     hazeState: HazeState? = null,
 ) {
@@ -141,7 +146,7 @@ internal fun ExpandedCar(
                             // every horizontal swipe (the columns scroll vertically only, so a
                             // horizontal drag falls through to it).
                             CarHeaderRow(v, state, hazeState = hazeState)
-                            CriticalContent(v, state, vm)
+                            CriticalContent(v, state, vm, heroAction = heroAction)
                             // The hot seat lives only in the full-screen two-column view; collapsed,
                             // its pinned pebbles are ordinary members of the stack below. Its reveal
                             // rides the reflow fraction itself (measure/draw only, never recomposed).

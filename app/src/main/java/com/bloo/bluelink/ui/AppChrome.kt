@@ -65,6 +65,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -281,9 +283,12 @@ internal fun AuroraBackground(
                     val targetY = ((rawY - baseY) * TiltGain).coerceIn(-TiltMax, TiltMax)
                     val nx = tiltX + (targetX - tiltX) * TiltEase
                     val ny = tiltY + (targetY - tiltY) * TiltEase
-                    // Writes only when it has actually moved: every write redraws the whole backdrop.
-                    if (kotlin.math.abs(nx - tiltX) > 0.0015f) tiltX = nx
-                    if (kotlin.math.abs(ny - tiltY) > 0.0015f) tiltY = ny
+                    // Writes only when it has actually moved, and only past a threshold the eye can
+                    // see: every write redraws the whole backdrop AND re-blurs it under every glass
+                    // card, so a jitter of a thousandth of a screen was pure heat for no visible
+                    // change.
+                    if (kotlin.math.abs(nx - tiltX) > 0.004f) tiltX = nx
+                    if (kotlin.math.abs(ny - tiltY) > 0.004f) tiltY = ny
                 }
                 override fun onAccuracyChanged(s: Sensor, acc: Int) {}
             }
@@ -343,18 +348,25 @@ internal fun AuroraBackground(
     val explodeAlpha = { 1f + explosion.value * 2.5f }
     val explodeSize = { 1f + explosion.value * 0.8f }
     val explodeSpread = { 1f + explosion.value * 0.3f }
-    // The aurora's clock, in seconds of ACTIVE time (a pause never makes it jump). Ticked at ~14fps,
+    // The aurora's clock, in seconds of ACTIVE time (a pause never makes it jump). Ticked at ~9fps,
     // not per frame: the blobs are big and slow, and -- because the aurora is the Haze source behind
     // every glass card -- every tick also re-captures and re-blurs the backdrop under each one. A
     // per-frame tick here was the app's costliest idle draw (and its battery/heat drain on a phone
-    // that is only sitting on the garage).
+    // that is only sitting on the garage), and even 14fps was enough to keep a phone warm; the blobs
+    // move so slowly that nine looks identical and costs a third less.
     var clock by remember { mutableFloatStateOf(0f) }
+    // Freezes the drift once the app has been left alone: an idle phone should not keep redrawing a
+    // full-screen animated backdrop (and re-blurring it under every glass card) for a background
+    // nobody is interacting with. Null outside the app shell (a preview) keeps it drifting.
+    val ambient = LocalAmbientActivity.current
     LaunchedEffect(Unit) {
         var seconds = 0f
         var last = System.nanoTime()
         while (true) {
             val now = System.nanoTime()
-            if (currentPaused || saver ||
+            val idle = ambient != null &&
+                android.os.SystemClock.uptimeMillis() - ambient.lastTouchMs > AmbientIdleMs
+            if (currentPaused || saver || idle ||
                 !lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
             ) {
                 last = now
@@ -364,7 +376,7 @@ internal fun AuroraBackground(
             seconds += ((now - last) / 1_000_000_000f).coerceAtMost(0.2f)
             last = now
             clock = seconds
-            delay(70)
+            delay(110)
         }
     }
 
@@ -497,3 +509,37 @@ internal class AuroraReactions {
 }
 
 internal val LocalAuroraReactions = androidx.compose.runtime.staticCompositionLocalOf<AuroraReactions?> { null }
+
+/**
+ * When the user last touched anything, in uptime millis. The aurora's drift freezes once the app has
+ * been left alone for [AmbientIdleMs] (see [AuroraBackground]): a phone sitting on the garage was
+ * otherwise redrawing a full-screen animated backdrop -- and re-blurring it under every glass card --
+ * forever, which is exactly the idle heat. Any touch resumes the drift from the same phase, so
+ * nothing jumps.
+ */
+internal class AmbientActivity {
+    // Seeded to "now", so a freshly composed aurora (cold start, login) drifts immediately rather
+    // than starting life already idle.
+    var lastTouchMs by androidx.compose.runtime.mutableLongStateOf(android.os.SystemClock.uptimeMillis())
+}
+
+internal val LocalAmbientActivity = androidx.compose.runtime.staticCompositionLocalOf<AmbientActivity?> { null }
+
+/** How long with no touch before the ambient drift stops, sparing the idle phone the redraw. */
+private const val AmbientIdleMs = 8_000L
+
+/**
+ * Runs for every pointer event anywhere in the app WITHOUT consuming it (the Initial pass sees all
+ * touches first; nothing is consumed), so [AmbientActivity] knows the app is being used. Writes are
+ * rate-limited: a write per move event would be pure churn for a "was there a touch recently" flag.
+ */
+internal fun Modifier.observeUserActivity(activity: AmbientActivity?): Modifier =
+    if (activity == null) this else this.pointerInput(activity) {
+        awaitPointerEventScope {
+            while (true) {
+                awaitPointerEvent(PointerEventPass.Initial)
+                val now = android.os.SystemClock.uptimeMillis()
+                if (now - activity.lastTouchMs > 250L) activity.lastTouchMs = now
+            }
+        }
+    }

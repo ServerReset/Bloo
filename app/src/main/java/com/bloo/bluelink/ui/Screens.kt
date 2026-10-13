@@ -92,6 +92,8 @@ fun BlooApp(vm: AppViewModel) {
     // either.
     val searchHazeState = remember { HazeState() }
     val backdropHaze = remember { HazeState() }
+    // The one "is the user touching anything" clock the aurora reads; observed at the root below.
+    val ambientActivity = remember { AmbientActivity() }
     val toasts = remember { ToastState() }
     // The one pull-to-refresh indicator; every Refreshable feeds it.
     val refreshIndicator = remember { RefreshIndicatorState() }
@@ -143,6 +145,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalToasts provides toasts,
         LocalRefreshIndicator provides refreshIndicator,
         LocalBackdropHaze provides backdropHaze,
+        LocalAmbientActivity provides ambientActivity,
         LocalPowerPolicy provides powerPolicy,
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
@@ -151,7 +154,7 @@ fun BlooApp(vm: AppViewModel) {
     // Biometric lock overlay: blur the whole app behind it and fade the blur away once unlocked.
     // Hoisted into their own small composables below so only those tiny scopes recompose per frame;
     // everything else just gets redrawn under the blurred/faded layer.
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().observeUserActivity(ambientActivity)) {
     // "Content settled": the garage's first composition has finished. Gates two full-screen blurs
     // (lock blur, Aurora backdrop blur) that dominate cold-start frame cost.
     var contentSettled by remember { mutableStateOf(screen == Screen.Garage) }

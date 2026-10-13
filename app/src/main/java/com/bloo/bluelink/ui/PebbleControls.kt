@@ -64,6 +64,11 @@ internal fun CriticalContent(
     vm: AppViewModel,
     /** Rides the hero card's drag-handle slot (the "swipe to switch cars" gesture). */
     modifier: Modifier = Modifier,
+    /**
+     * The hero's trailing header control: the full-screen button in the grid (null on a narrow single
+     * column, where the hero keeps its own expand chevron).
+     */
+    heroAction: PebbleHeaderAction? = null,
 ) {
     // Narrow derived reads, one per thing the hero draws, so unrelated UiState emissions don't
     // recompose it.
@@ -78,12 +83,15 @@ internal fun CriticalContent(
     }
     val drivingLabel by remember(v.vin) { derivedStateOf { stateSource.value.drivingLabel(v) } }
     val metric = LocalAppearance.current.metricDistance
-    // The hero's trailing control is its own expand/collapse chevron now that the full-screen button
-    // is gone -- there is no separate "expanded" screen to enter; the layout just scales with width.
+    // The hero's trailing control is its own expand/collapse chevron on a narrow single column. In
+    // the grid it is swapped for the full-screen button (heroAction): several cars share the window
+    // there, so opening one to the whole screen is the thing worth a button, not the photo toggle --
+    // and the car already reflows to two columns on its own once the page is wide enough.
     HeroHeader(
         v, status, imageUrl, hasBattery, hasFuel, vm,
         modifier = modifier,
         drivingLabel = drivingLabel, metric = metric, photoExpanded = photoExpanded,
+        headerAction = heroAction,
     )
 }
 

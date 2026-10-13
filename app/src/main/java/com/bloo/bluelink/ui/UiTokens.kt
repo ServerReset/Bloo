@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
@@ -177,6 +179,8 @@ object AppIcons {
   val DirectionsCar = Icons.Filled.DirectionsCar
   val AutoAwesome = Icons.Filled.AutoAwesome
   val Warning = Icons.Filled.Warning
+  val Fullscreen = Icons.Filled.Fullscreen
+  val FullscreenExit = Icons.Filled.FullscreenExit
 }
 
 // ---- Blur -----------------------------------------------------------------------

@@ -51,6 +51,12 @@ internal fun CollapsedGaragePager(
     hazeState: HazeState,
     /** 0 = one column, 1 = two columns: the car's own reflow, sized from the device width. */
     expandedT: State<Float>,
+    /** True when the grid shows more than one car column: the hero's full-screen button appears. */
+    multiColumn: Boolean,
+    /** One car is filling the whole window instead of sharing it with its neighbours. */
+    fullScreen: Boolean,
+    /** Expand the car at this index to full screen, or leave full screen. */
+    onToggleFullScreen: (Int) -> Unit,
 ) {
         // Settings is appended as one more ITEM to the sequence this pager cycles through (index
         // `slots`, right after the last real page), always rendered at exactly one car-column's
@@ -188,11 +194,26 @@ internal fun CollapsedGaragePager(
                         // One car experience, whatever the device: it reflows to two columns (hero
                         // beside its pebbles, hot seat and all) when its page is wide enough, and to
                         // one column when it is not. No expand button, no second screen.
+                        // In the grid this card's hero swaps its own expand chevron for the
+                        // full-screen button -- the one thing worth opening once several cars share
+                        // the window; on a single column there is nothing to open, so it is absent.
+                        val heroAction = if (multiColumn || fullScreen) {
+                            PebbleHeaderAction(
+                                label = "",
+                                icon = if (fullScreen) AppIcons.FullscreenExit else AppIcons.Fullscreen,
+                                onClick = { onToggleFullScreen(real) },
+                                active = fullScreen,
+                                contentDescription = if (fullScreen) "Exit full screen" else "Full screen",
+                            )
+                        } else {
+                            null
+                        }
                         ExpandedCar(
                             vehicles[real], state, vm,
                             pageColumnWidth = columnWidth,
                             expandedT = expandedT,
                             hazeState = hazeState,
+                            heroAction = heroAction,
                         )
                     }
                 }

@@ -226,7 +226,7 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
 private val StandardBlurRadius = 20.dp
 
 /** The blur radius cards use; see [appHazeEffect]'s `cheap`. */
-private val CardBlurRadius = 20.dp
+private val CardBlurRadius = 12.dp
 
 /**
  * A drop shadow at the weight the current theme can carry: full strength in dark, a soft contact

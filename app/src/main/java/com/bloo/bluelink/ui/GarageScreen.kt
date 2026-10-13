@@ -99,10 +99,19 @@ internal fun GarageScreen(
     LaunchedEffect(expandedMap.vin) { vm.setMapExpanded(expandedMap.vin != null) }
     DisposableEffect(Unit) { onDispose { vm.setMapExpanded(false) } }
     // As many whole two-column cars as fit side by side; capped at the number of items.
-    val perPage = carColumnsFor(widthDp.value).coerceIn(1, slots)
+    val naturalColumns = carColumnsFor(widthDp.value).coerceIn(1, slots)
+    // The hero shows its full-screen button only when there is more than one column to expand AWAY
+    // from: with a single column the car already fills the width, so there is nothing to open.
+    val multiColumn = naturalColumns >= 2
+    // Full screen: one car takes the whole window (and so reflows to its own two columns) instead of
+    // sharing it with its neighbours. Only meaningful in the grid, so a narrow window resets it.
+    var fullScreen by remember { mutableStateOf(false) }
+    LaunchedEffect(multiColumn) { if (!multiColumn) fullScreen = false }
+    val perPage = if (fullScreen && multiColumn) 1 else naturalColumns
     // THE single experience, scaling to the device: a car reflows to two columns (hero beside its
     // pebbles, hot seat and all) when its own page is at least TWO_COLUMN_MIN_DP wide, and stays one
-    // column on a narrow window. No manual expand state, no second screen, nothing to open or close.
+    // column on a narrow window. No manual expand state, no second screen, nothing to open or close --
+    // except the full-screen button above, which only widens a car's PAGE, never swaps screens.
     val twoColumn = (widthDp / perPage.toFloat()) >= TWO_COLUMN_MIN_DP.dp
     val expandedT = androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (twoColumn) 1f else 0f,
@@ -119,6 +128,18 @@ internal fun GarageScreen(
             vehicles, count, slots, perPage, currentIndex,
             windowInfo.containerSize.width, state, vm, hazeState,
             expandedT = expandedT,
+            multiColumn = multiColumn,
+            fullScreen = fullScreen,
+            onToggleFullScreen = { real ->
+                if (fullScreen) {
+                    fullScreen = false
+                } else {
+                    // Expand the car whose button was pressed: park the pager on it first, so the
+                    // single full-screen page is the one that was tapped, not whatever was centred.
+                    vm.selectIndex(real)
+                    fullScreen = true
+                }
+            },
         )
         // THE SINGLE CarMap instance, positioned at the screen level. It animates from the pebble
         // location (collapsed) to full-screen (expanded). Same instance, literally growing -- not
