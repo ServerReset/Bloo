@@ -44,7 +44,7 @@ internal fun SecurityCardContent(
                     BodySmallText("No biometrics are enrolled on this device.")
                 }
             }
-            SettingsGroup("After a restart") {
+            SettingsGroup {
                 var requireAuth by remember { mutableStateOf(com.bloo.bluelink.data.BootGate.enabled(context)) }
                 ToggleRow(
                     "Sign in after a restart",

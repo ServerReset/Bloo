@@ -38,9 +38,13 @@ internal fun Modifier.outlinedPanel(padding: Dp = 12.dp): Modifier =
  * A titled sub-group inside a settings card: a heading, then its controls, on its own filled card.
  * A filled card (a tonal fill plus the shared frosted rim), not a bare outlined box, so the groups
  * read as cards sitting inside the card's box rather than boxes nested in a box.
+ *
+ * [title] may be null/blank: the group then draws no heading. Used where a heading would only repeat
+ * the control it sits above (a lone "Aurora background" toggle under a "Background" heading), which
+ * adds a word and no meaning.
  */
 @Composable
-internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun SettingsGroup(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier.fillMaxWidth()
             .clip(StandardShape)
@@ -49,13 +53,15 @@ internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() ->
             .padding(GapSection),
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.semantics { heading() },
-        )
+        if (!title.isNullOrBlank()) {
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.semantics { heading() },
+            )
+        }
         content()
     }
 }

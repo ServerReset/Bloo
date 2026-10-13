@@ -48,7 +48,7 @@ internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: 
             // accessibility choice behind "advanced" is the one the people who need it are least
             // likely to find.
             FontGroup(appearance, vm)
-            SettingsGroup("Units") {
+            SettingsGroup {
                 UnitSystemRow(appearance, vm)
                 PopVisible(visible = advanced) {
                     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -114,7 +114,7 @@ private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean,
             }
             PopVisible(visible = advanced) {
                 Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-                    SettingsGroup("Background") {
+                    SettingsGroup {
                         ToggleRow(
                             "Aurora background",
                             appearance.auroraBackground,
@@ -125,7 +125,7 @@ private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean,
                             },
                         ) { vm.setAuroraBackground(it) }
                     }
-                    SettingsGroup("Colour") {
+                    SettingsGroup {
                         ToggleRow(
                             "Dynamic colour (Material You)",
                             appearance.dynamicColor,

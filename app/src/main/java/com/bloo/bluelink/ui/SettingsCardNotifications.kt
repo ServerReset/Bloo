@@ -175,7 +175,7 @@ internal fun NotificationsCardContent(
         // switch can be set before AutoLock is turned on.
         PopVisible(visible = autoLockOn || advanced) {
             Column {
-                SettingsGroup("AutoLock") {
+                SettingsGroup {
                     ToggleRow(
                         "AutoLock alerts",
                         notif.autoLockAlerts,
