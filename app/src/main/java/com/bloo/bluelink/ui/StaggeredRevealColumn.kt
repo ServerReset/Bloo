@@ -20,8 +20,9 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Drop-in replacement for [PebbleShell]'s body `Column`: every DIRECT CHILD gets its own
- * pop-in/pop-out as the pebble opens and closes, cascading top to bottom, with no change to
- * callers' rows.
+ * pop-in/pop-out as the pebble opens and closes. Opening, the rows cascade top to bottom, each
+ * popping a beat AFTER the card has grown to it; closing runs the same cascade in reverse, the
+ * bottom rows popping out first, just ahead of the card shrinking up past them.
  */
 @Composable
 internal fun StaggeredRevealColumn(
@@ -66,27 +67,35 @@ internal fun StaggeredRevealColumn(
         layout(width, height) {
             var y = 0
             placeables.forEachIndexed { i, p ->
-                // Where this row sits in the body, as the fraction of the opening it takes to uncover it,
-                // plus a short beat so it pops just AFTER the card reaches it.
+                // Where this row sits in the body (0 at the top, 1 at the bottom).
                 val reached = if (height > 0) y.toFloat() / height else 0f
-                val start = (reached * RowRevealCoverage + RowPopDelay).coerceAtMost(0.9f)
                 // `progress` is read INSIDE the layerBlock (draw phase), not in the placement body,
                 // so transition ticks redraw instead of re-measuring every child.
                 p.placeWithLayer(0, y) {
-                    // No windowing on the way out (see `closing`).
-                    val raw = if (closing) {
-                        progress.coerceIn(0f, 1f)
+                    // Each row runs its own window over the shared open/close progress. Opening, the
+                    // rows cascade top to bottom, each popping a beat AFTER the card reaches it.
+                    // Closing runs the cascade in reverse -- the bottom rows leave first -- so the
+                    // body empties line by line just ahead of the card shrinking up past it.
+                    val vis: Float
+                    val scaleT: Float
+                    if (closing) {
+                        val start = ((1f - reached) * RowExitCoverage + RowPopDelay).coerceAtMost(0.9f)
+                        // progress falls 1 -> 0 on the way out, so (1 - progress) is the closing clock.
+                        val raw = (((1f - progress) - start) / RowPopWindow).coerceIn(0f, 1f)
+                        // Smoothstep so opacity cannot overshoot; the row shrinks as it goes.
+                        val gone = raw * raw * (3f - 2f * raw)
+                        vis = 1f - gone
+                        scaleT = 1f - gone
                     } else {
-                        ((progress - start) / RowPopWindow).coerceIn(0f, 1f)
+                        val start = (reached * RowRevealCoverage + RowPopDelay).coerceAtMost(0.9f)
+                        val raw = ((progress - start) / RowPopWindow).coerceIn(0f, 1f)
+                        val local = raw * raw * (3f - 2f * raw)
+                        vis = local
+                        // Rows share the card's overshoot-then-settle character on the way in.
+                        scaleT = pebbleRowOvershoot(raw)
                     }
-                    // Smoothstep for alpha: opacity cannot overshoot, so a plain ease fits.
-                    val local = raw * raw * (3f - 2f * raw)
-                    alpha = local
-                    // Scale uses [pebbleRowOvershoot] rather than `local`, so rows share the card's
-                    // overshoot-then-settle character (symmetric in `raw`, so closing pops slightly
-                    // larger first).
-                    val scaleT = pebbleRowOvershoot(raw)
-                    // 0.7 -> 1.0, not 0.85: a smaller change is lost next to the alpha fade.
+                    alpha = vis
+                    // 0.82 -> 1.0, not 0.9: a smaller change is lost next to the alpha fade.
                     scaleX = 0.82f + 0.18f * scaleT
                     scaleY = 0.82f + 0.18f * scaleT
                     transformOrigin = TransformOrigin(0f, 0.5f)
@@ -100,8 +109,11 @@ internal fun StaggeredRevealColumn(
 /** How much of the opening a row's position maps onto (the last row is reached near the end). */
 private const val RowRevealCoverage = 0.8f
 
+/** How much of the closing a row's position maps onto; bottom rows leave first (mirror of the open). */
+private const val RowExitCoverage = 0.5f
+
 /** The beat, in opening progress, between the card reaching a row and the row popping. */
-private const val RowPopDelay = 0.05f
+private const val RowPopDelay = 0.08f
 
 /** How much opening progress a row's pop takes. */
 private const val RowPopWindow = 0.22f

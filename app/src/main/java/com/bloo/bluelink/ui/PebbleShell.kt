@@ -8,9 +8,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -31,6 +29,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -239,8 +238,17 @@ internal fun PebbleShell(
                     // same spring as this growth).
                     AnimatedVisibility(
                         visible = expanded,
-                        enter = expandVertically(animationSpec = pebbleOpenSizeSpec(), clip = false),
-                        exit = fadeOut(tween(MotionFast)) + shrinkVertically(clip = false),
+                        // Grow DOWNWARD from under the header (expandFrom = Top). The default
+                        // (Bottom) bottom-anchored the body, so as the card grew the body slid down
+                        // out from behind the header; top-anchoring lets each row just pop in place.
+                        enter = expandVertically(
+                            animationSpec = pebbleOpenSizeSpec(),
+                            expandFrom = Alignment.Top,
+                            clip = false,
+                        ),
+                        // No whole-body fade on the way out: closing is a per-row cascade too (see
+                        // StaggeredRevealColumn), and a body fade would wash the cascade out.
+                        exit = shrinkVertically(shrinkTowards = Alignment.Top, clip = false),
                     ) {
                         // StaggeredRevealColumn cascades rows; `transition` is this
                         // AnimatedVisibilityScope's, so the card cannot finish closing before its
