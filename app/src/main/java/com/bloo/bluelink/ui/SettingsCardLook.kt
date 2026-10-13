@@ -54,7 +54,7 @@ internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: 
                     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                         TempUnitRow(appearance, vm)
                         DistanceUnitRow(appearance, vm)
-                        BodySmallText("Auto follows Units, so you can mix them: Celsius with miles, say.")
+                        BodySmallText("Auto follows the system default, so you can mix them: Celsius with miles, say.")
                     }
                 }
             }

@@ -7,7 +7,7 @@ import com.bloo.bluelink.data.SettingsStore
 @Composable
 internal fun UnitSystemRow(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     SettingsSegmentedRow(
-        label = "Units",
+        label = "System",
         options = listOf(SegmentOption("imperial", "Imperial", null), SegmentOption("metric", "Metric", null)),
         selectedKey = appearance.unitSystem,
         onSelect = { vm.setUnitSystem(it) },
