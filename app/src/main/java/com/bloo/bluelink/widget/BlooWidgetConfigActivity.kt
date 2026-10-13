@@ -31,7 +31,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
-import androidx.glance.appwidget.update
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.SnapshotStore

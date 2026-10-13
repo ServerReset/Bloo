@@ -1,6 +1,7 @@
 package com.bloo.bluelink.widget
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -79,7 +80,8 @@ class BlooWidget : GlanceAppWidget() {
 private fun WidgetContent(data: WidgetData) {
     val prefs = currentState<Preferences>()
     val size = LocalSize.current
-    val open = actionStartActivity<MainActivity>()
+    val context = androidx.glance.LocalContext.current
+    val open = actionStartActivity(Intent(context, MainActivity::class.java))
     val root = GlanceModifier
         .fillMaxSize()
         .background(GlanceTheme.colors.widgetBackground)
@@ -233,7 +235,8 @@ private fun ActionButton(car: VehicleSnapshot, action: String, pending: String?,
     }
     val container: ColorProvider = if (active || armed) GlanceTheme.colors.primary else GlanceTheme.colors.secondaryContainer
     val content: ColorProvider = if (active || armed) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSecondaryContainer
-    val click: Action = if (busy) actionStartActivity<MainActivity>() else actionRunCallback<CarActionCallback>(
+    val context = androidx.glance.LocalContext.current
+    val click: Action = if (busy) actionStartActivity(Intent(context, MainActivity::class.java)) else actionRunCallback<CarActionCallback>(
         actionParametersOf(WidgetKeys.PARAM_VIN to car.vin, WidgetKeys.PARAM_ACTION to action),
     )
     Box(

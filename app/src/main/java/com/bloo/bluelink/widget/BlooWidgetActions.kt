@@ -6,7 +6,6 @@ import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.state.updateAppWidgetState
-import androidx.glance.appwidget.update
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.CarAction
