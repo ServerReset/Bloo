@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -30,14 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
-import kotlin.math.roundToInt
 
 private const val MaxToasts = 4
 
@@ -61,13 +54,6 @@ internal val MaxToastWidth = 420.dp
 
 /** The toast card's root, so a test can pin its height to the search element's. */
 internal const val ToastCardTag = "toastCard"
-
-/**
- * Everything a toast draws around its message: the start padding, the badge, the gap, the two 40dp
- * icon buttons and the end padding. Added to a measured message width to get the toast's natural
- * width, which is what decides whether it can slot beside the search or has to lift above it.
- */
-private val ToastChromeWidth = 12.dp + 34.dp + 12.dp + 40.dp + 40.dp + 4.dp
 
 /** How long a message stays: longer text and errors linger longer, up to a cap. */
 private fun toastDurationMs(message: String, type: ToastKind): Long =
@@ -207,8 +193,6 @@ internal fun ToastHost(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val measurer = rememberTextMeasurer()
-    val textStyle = MaterialTheme.typography.bodyMedium
     val anchor = LocalSearchAnchor.current
 
     // One clock for the whole stack: it stops while the search results cover it, while the app is
@@ -243,14 +227,6 @@ internal fun ToastHost(
     val gapPx = with(density) { GapRow.toPx() }
     val contentWidthPx = window.width.toFloat() - 2 * edgePx
     val minWidthPx = with(density) { MinBesideWidth.toPx() }
-    val chromePx = with(density) { ToastChromeWidth.toPx() }
-    val maxWidthPx = contentWidthPx * 0.92f
-
-    // THIS message decides beside vs above: measure its natural width and hand that to the clearance
-    // maths instead of one fixed minimum.
-    val newestWidthPx = newest
-        ?.let { naturalToastWidthPx(measurer, it.message, textStyle, chromePx, minWidthPx, maxWidthPx) }
-        ?: minWidthPx
 
     val clearance = toastClearance(
         searchRect = searchRect,
@@ -260,7 +236,10 @@ internal fun ToastHost(
         navBottomPx = navBottomPx,
         baseEdgePx = edgePx,
         gapPx = gapPx,
-        minToastWidthPx = newestWidthPx,
+        // A docked search slots the toast beside it as long as the fixed beside-minimum fits; a
+        // longer message wraps to its second line rather than lifting the whole stack above the
+        // search (above is reserved for a centred search, or a window too narrow for even that).
+        minToastWidthPx = minWidthPx,
     )
 
     // Animate the placement, so moving the search between the centre and a side SLIDES the stack
@@ -315,25 +294,4 @@ internal fun ToastHost(
             }
         }
     }
-}
-
-/** A message's natural toast width: the measured single-line text plus the toast's chrome. */
-private fun naturalToastWidthPx(
-    measurer: TextMeasurer,
-    message: String,
-    style: TextStyle,
-    chromePx: Float,
-    minPx: Float,
-    maxPx: Float,
-): Float {
-    // A window narrower than the minimum (or not measured yet) gives maxPx < minPx or < 0, and both a
-    // reversed coerceIn range and a negative Constraints throw.
-    val maxSafe = maxPx.coerceAtLeast(0f)
-    val textPx = measurer.measure(
-        text = AnnotatedString(message),
-        style = style,
-        maxLines = 1,
-        constraints = Constraints(maxWidth = maxSafe.roundToInt()),
-    ).size.width
-    return (chromePx + textPx).coerceIn(minOf(minPx, maxSafe), maxSafe)
 }

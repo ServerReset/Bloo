@@ -104,12 +104,15 @@ class ToastClearanceTest {
     }
 
     @Test
-    fun `the message's own width, not a fixed minimum, decides beside vs above`() {
-        // One docked search, two messages: a short one slots beside it, a long one lifts above.
-        val rect = Rect(16f, 1800f, 56f, 1852f)
-        val short = toastClearance(rect, window, height, 0f, 0f, edge, gap, minToastWidthPx = 400f)
-        val long = toastClearance(rect, window, height, 0f, 0f, edge, gap, minToastWidthPx = 1000f)
-        kotlin.test.assertTrue(short.startInsetPx > 0f && short.bottomLiftPx == 0f, "a short message slots beside")
-        kotlin.test.assertTrue(long.bottomLiftPx > 0f, "a long message lifts above")
+    fun `a docked search slots beside while the fixed minimum fits, else lifts`() {
+        // The host passes the fixed beside-minimum (MinBesideWidth), not a message's own width: a
+        // long message wraps to its second line rather than lifting the stack above the search. It
+        // lifts only when even that minimum no longer fits.
+        val narrowPill = Rect(16f, 1800f, 56f, 1852f)
+        val fits = toastClearance(narrowPill, window, height, 0f, 0f, edge, gap, minToastWidthPx = 220f)
+        kotlin.test.assertTrue(fits.startInsetPx > 0f && fits.bottomLiftPx == 0f, "a docked search slots the toast beside it")
+        val widePill = Rect(16f, 1800f, 900f, 1852f)
+        val squeezed = toastClearance(widePill, window, height, 0f, 0f, edge, gap, minToastWidthPx = 220f)
+        kotlin.test.assertTrue(squeezed.bottomLiftPx > 0f, "no usable beside width left, so it lifts")
     }
 }

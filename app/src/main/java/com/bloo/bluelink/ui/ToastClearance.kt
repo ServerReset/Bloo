@@ -7,9 +7,10 @@ internal data class ToastClearance(val startInsetPx: Float, val endInsetPx: Floa
 
 /**
  * Where the toast stack goes around the search element. A search docked to a side lets the NEWEST
- * toast slot beside it (inset on that side) as long as at least [minToastWidthPx] -- the newest
- * message's own natural width -- is left for the toast; a centred search, or one docked so close to
- * the middle that the toast would be squeezed, lifts the whole stack above it instead.
+ * toast slot beside it (inset on that side) as long as at least [minToastWidthPx] is left for the
+ * toast -- the narrowest a beside toast may be; a longer message wraps rather than lifting. A centred
+ * search, or one docked so close to the edge that even that minimum no longer fits, lifts the whole
+ * stack above the search instead.
  *
  * The lift is measured against the stack's OWN content bottom: the toast column sits at the search's
  * inset (`max(nav, ime)`) plus [baseEdgePx], so the newest toast's bottom lines up exactly with the
