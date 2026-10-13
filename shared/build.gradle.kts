@@ -17,6 +17,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    lint {
+        // The same deliberate, non-actionable toolchain-noise ids :app and :wear silence, for the
+        // same reason (see app/build.gradle.kts): a "newer dependency available" notice is a
+        // toolchain decision, not a code finding. Any NEW finding still prints.
+        disable += setOf("NewerVersionAvailable", "GradleDependency", "OldTargetApi")
+    }
 }
 
 kotlin {

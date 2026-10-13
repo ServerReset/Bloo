@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string-array name="android_wear_capabilities" translatable="false">
+<!-- Read by the Wear OS framework BY NAME (it is how the app advertises itself as a watch app), so
+     nothing in code or XML references it and lint cannot see the use. -->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string-array name="android_wear_capabilities" translatable="false" tools:ignore="UnusedResources">
         <item>bloo_watch_app</item>
     </string-array>
 </resources>

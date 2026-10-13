@@ -116,7 +116,8 @@ object WearNotifier {
             .build()
 
     private fun openApp(app: Context): PendingIntent = PendingIntent.getActivity(
-        app, 0, Intent(app, WearMainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        // No activity flags: see WearBootGate's own note (WearRecents).
+        app, 0, Intent(app, WearMainActivity::class.java),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 

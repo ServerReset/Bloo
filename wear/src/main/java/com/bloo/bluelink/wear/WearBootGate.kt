@@ -44,7 +44,9 @@ object WearBootNotice {
         nm.createNotificationChannel(NotificationChannel(CHANNEL, "Enter PIN after restart", NotificationManager.IMPORTANCE_HIGH))
         val open = PendingIntent.getActivity(
             app, 0,
-            Intent(app, WearMainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            // No activity flags: the system launches a notification's content intent in the app's own
+            // task, and Wear's own lint flags NEW_TASK|CLEAR_TOP here (WearRecents).
+            Intent(app, WearMainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val n = NotificationCompat.Builder(app, CHANNEL)
