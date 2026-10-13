@@ -78,16 +78,9 @@ internal fun secondaryTextShadow(): Shadow = Shadow(
 /** A decently strong halo, in device px (text shadows are not density-scaled). */
 private const val SecondaryHaloBlurPx = 9f
 
-/** Label text styling for subtle secondary text (a step up from the old labelMedium). */
 @Composable
 internal fun LabelText(text: String, modifier: Modifier = Modifier) {
-    val reveal = rememberTextReveal()
-    Text(
-        text,
-        modifier = modifier.textReveal { reveal.value },
-        style = secondaryTextStyle(),
-        color = secondaryTextColor(),
-    )
+    RevealText(text, style = secondaryTextStyle(), modifier = modifier, color = secondaryTextColor())
 }
 
 /**
@@ -97,37 +90,19 @@ internal fun LabelText(text: String, modifier: Modifier = Modifier) {
  */
 @Composable
 internal fun PebbleMessage(text: String, modifier: Modifier = Modifier) {
-    val reveal = rememberTextReveal()
-    Text(
-        text,
-        modifier = modifier.textReveal { reveal.value },
-        style = secondaryTextStyle(),
-        color = secondaryTextColor(),
-    )
+    RevealText(text, style = secondaryTextStyle(), modifier = modifier, color = secondaryTextColor())
 }
 
 /** Body text (bodyMedium, onSurface) -- muted/secondary content. */
 @Composable
 internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: Color = secondaryTextColor()) {
-    val reveal = rememberTextReveal()
-    Text(
-        text,
-        modifier = modifier.textReveal { reveal.value },
-        style = secondaryTextStyle(),
-        color = color,
-    )
+    RevealText(text, style = secondaryTextStyle(), modifier = modifier, color = color)
 }
 
 /** Body text (bodyMedium, onSurface) -- regular secondary content. */
 @Composable
 internal fun BodyMediumText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
-    val reveal = rememberTextReveal()
-    Text(
-        text,
-        modifier = modifier.textReveal { reveal.value },
-        style = MaterialTheme.typography.bodyMedium,
-        color = color,
-    )
+    RevealText(text, style = MaterialTheme.typography.bodyMedium, modifier = modifier, color = color)
 }
 
 /** Title text (titleSmall) -- section headers and card titles; bold by default. */
@@ -138,14 +113,7 @@ internal fun TitleSmallText(
     color: Color = MaterialTheme.colorScheme.onSurface,
     fontWeight: FontWeight = FontWeight.Bold,
 ) {
-    val reveal = rememberTextReveal()
-    Text(
-        text,
-        modifier = modifier.textReveal { reveal.value },
-        style = MaterialTheme.typography.titleSmall,
-        color = color,
-        fontWeight = fontWeight,
-    )
+    RevealText(text, style = MaterialTheme.typography.titleSmall, modifier = modifier, color = color, fontWeight = fontWeight)
 }
 
 /** The circular tinted container [IconBadge] draws into. */

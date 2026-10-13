@@ -170,11 +170,10 @@ internal fun SettingsCaption(
      */
     bottomGap: Dp = GapGroup,
 ) {
-    val reveal = rememberTextReveal()
-    Text(
+    RevealText(
         text,
-        modifier = modifier.padding(top = 2.dp, bottom = bottomGap).textReveal { reveal.value },
         style = secondaryTextStyle(),
+        modifier = modifier.padding(top = 2.dp, bottom = bottomGap),
         color = secondaryTextColor(),
     )
 }
