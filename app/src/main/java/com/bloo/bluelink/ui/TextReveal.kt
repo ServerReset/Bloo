@@ -6,13 +6,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
@@ -28,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
+import kotlinx.coroutines.launch
 
 /**
  * The app's standard text entrance: a block is revealed LINE BY LINE, each line a beat behind the one
@@ -60,28 +59,6 @@ private const val MaxRevealMs = 900
  * reveal budget on a flicker nobody asked for.
  */
 private const val MaxRevealChars = 320
-
-/**
- * The shared progress for one block's entrance, 0..1, over [lineCount] lines and scaled to the count
- * so a long paragraph builds at a steady per-line pace. Returns 1 (nothing to animate) when the
- * entrance is off or there is nothing laid out yet.
- */
-@Composable
-internal fun rememberTextReveal(lineCount: Int): State<Float> {
-    val allowed = textRevealAllowed()
-    val progress = remember { Animatable(if (allowed) 0f else 1f) }
-    LaunchedEffect(lineCount, allowed) {
-        if (!allowed || lineCount <= 0 || progress.value >= 1f) return@LaunchedEffect
-        progress.animateTo(
-            1f,
-            tween(
-                durationMillis = (lineCount * MsPerLine).coerceIn(MinRevealMs, MaxRevealMs),
-                easing = LinearEasing,
-            ),
-        )
-    }
-    return progress.asState()
-}
 
 /**
  * A drop-in replacement for Material3's `Text` (the `String` overload) that writes itself out line by
@@ -138,15 +115,20 @@ internal fun RevealText(
         )
         return
     }
-    // Set once by the text layout; read in the draw phase so the reveal never recomposes.
-    var layout by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
-    val progress = rememberTextReveal(layout?.lineCount ?: 0)
+    // The layout and the reveal's progress are BOTH read only in the draw phase; the reveal is
+    // STARTED from the layout callback. Reading the layout in composition to size the reveal by its
+    // line count made every text compose twice -- once, then again the moment its layout landed --
+    // which across a page of ~150 texts is ~150 extra recompositions, and it lands exactly when a
+    // page is composed for a swipe.
+    val progress = remember { Animatable(0f) }
+    val layoutState = remember(text) { mutableStateOf<TextLayoutResult?>(null) }
+    val scope = rememberCoroutineScope()
     // A rare caller-supplied onTextLayout still runs; the reveal's own capture is chained on top.
     val callerOnTextLayout by rememberUpdatedState(onTextLayout)
     Text(
         text = text,
         modifier = modifier.drawWithContent {
-            val lr = layout
+            val lr = layoutState.value
             val p = progress.value
             if (lr == null || p >= 1f || lr.lineCount <= 1) {
                 drawContent()
@@ -177,7 +159,20 @@ internal fun RevealText(
         maxLines = maxLines,
         minLines = minLines,
         onTextLayout = { result ->
-            layout = result
+            layoutState.value = result
+            // Start the reveal here -- the layout phase, where the line count becomes known -- rather
+            // than from a composition that read it.
+            if (progress.value == 0f && result.lineCount > 0) {
+                scope.launch {
+                    progress.animateTo(
+                        1f,
+                        tween(
+                            durationMillis = (result.lineCount * MsPerLine).coerceIn(MinRevealMs, MaxRevealMs),
+                            easing = LinearEasing,
+                        ),
+                    )
+                }
+            }
             callerOnTextLayout?.invoke(result)
         },
         style = style,
