@@ -28,6 +28,8 @@ import com.bloo.bluelink.data.WorkflowRun
 import com.bloo.bluelink.wear.PhoneWatchSyncService
 import com.bloo.bluelink.wear.WatchAdbInstaller
 import com.bloo.bluelink.wear.WatchPresence
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -87,6 +89,13 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
     var pairPort by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var connectPort by remember { mutableStateOf("") }
+
+    // Prefill the watch's address from this phone's own Wi-Fi address: both devices are on the same
+    // network, so they share the first three octets and the user only has to type the watch's last
+    // one. Only fills an empty field, so a re-entry never overwrites what the user typed.
+    LaunchedEffect(step) {
+        if (step == WatchSetupStep.Pair && host.isBlank()) phoneWifiPrefix()?.let { host = it }
+    }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     var failed by remember { mutableStateOf(false) }
@@ -283,3 +292,19 @@ private fun SetupField(
         modifier = modifier.fillMaxWidth(),
     )
 }
+
+/**
+ * This phone's own Wi-Fi IPv4 address, trimmed to the first three octets with a trailing dot
+ * ("192.168.1."), so the watch's address (same network) only needs its last octet typed. Null when
+ * there is no Wi-Fi address (e.g. on cellular).
+ */
+private fun phoneWifiPrefix(): String? = runCatching {
+    NetworkInterface.getNetworkInterfaces().toList()
+        .filter { it.isUp && !it.isLoopback && it.name.startsWith("wlan") }
+        .flatMap { it.inetAddresses.toList() }
+        .filterIsInstance<Inet4Address>()
+        .firstOrNull()
+        ?.hostAddress
+        ?.substringBeforeLast('.')
+        ?.plus(".")
+}.getOrNull()

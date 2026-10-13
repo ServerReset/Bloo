@@ -124,8 +124,17 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
      */
     suspend fun install(apk: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val streamed = runCatching { streamInstall(apk) }.getOrDefault("")
-            val reply = if (streamed.contains("Success")) streamed else pushInstall(apk, streamed)
+            // Streaming a multi-MB APK over the watch's ADB pipe can break mid-write ("broken pipe")
+            // when the watch drops the shell early; the two install paths use different device code,
+            // so keep the stream's own error and always try the push -- which itself retries through
+            // a file -- before giving up.
+            val streamed = runCatching { streamInstall(apk) }
+            val streamReply = streamed.getOrDefault("")
+            val reply = if (streamReply.contains("Success")) {
+                streamReply
+            } else {
+                pushInstall(apk, streamed.exceptionOrNull()?.message.orEmpty())
+            }
             check(reply.contains("Success")) {
                 // Include the installer's own words: they distinguish a truncated push from a genuine
                 // install rejection, which a generic message hides.
