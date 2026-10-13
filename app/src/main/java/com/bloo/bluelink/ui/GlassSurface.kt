@@ -44,6 +44,13 @@ internal fun GlassSurface(
      * [shadow] by default.
      */
     liquid: Boolean = shadow,
+    /**
+     * A plain, small-radius blur instead of the liquid refraction. For the many SMALL surfaces (the
+     * status chips on every car): the refraction's bend is invisible at that size, but it costs a
+     * displacement + chromatic pass on top of the blur -- and these are the most numerous glass
+     * nodes on screen, so it is the one place the cheap path is worth more than the look.
+     */
+    cheap: Boolean = false,
     /** Bare glass (see [appGlassEffect]): the caller passes a transparent [tint] too. */
     clear: Boolean = false,
     content: @Composable () -> Unit = {},
@@ -81,7 +88,8 @@ internal fun GlassSurface(
                     when {
                         !canBlur -> Modifier
                         liquid -> Modifier.appGlassEffect(hazeState, shape, clear)
-                        else -> Modifier.hazeWhenAble(hazeState)
+                        cheap -> Modifier.appHazeEffect(hazeState, cheap = true)
+                        else -> Modifier.appHazeEffect(hazeState)
                     },
                 )
                 .background(tint)

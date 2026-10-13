@@ -49,6 +49,9 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
         modifier = modifier,
         hazeState = hazeState,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        // Small and numerous: a plain cheap blur, not the full liquid refraction (see GlassSurface).
+        liquid = false,
+        cheap = true,
     ) {
         Row(
             Modifier.padding(horizontal = GapRow, vertical = GapHairline),

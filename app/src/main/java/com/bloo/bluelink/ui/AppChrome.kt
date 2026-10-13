@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.coroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.animation.core.VectorConverter
@@ -239,6 +240,10 @@ internal fun AuroraBackground(
     }
     // Lean (Battery Saver or a throttling phone): no drift, no tilt sensor. See PowerPolicy.ambientMotion.
     val saver = !LocalPowerPolicy.current.ambientMotion
+    // The "app is in use" clock (see AmbientActivity). Once it goes stale the drift -- AND the tilt
+    // sensor that feeds it -- stop entirely: a phone left on the garage then has nothing at all
+    // running, not even a wake-up to ask whether it should keep running.
+    val ambient = LocalAmbientActivity.current
 
     // "Motion" follows the phone's tilt (like a lock-screen wallpaper parallax); "Static" ignores
     // tilt entirely and instead gets its own slow, small ambient drift (see p1/p2/p3 below) so it
@@ -266,6 +271,13 @@ internal fun AuroraBackground(
                 override fun onSensorChanged(event: SensorEvent) {
                     // No writes while paused: samples stall instead of invalidating.
                     if (currentPaused) return
+                    // And none once the backdrop has gone idle: a tilt only moves a backdrop that is
+                    // already not moving, so past the idle mark the samples are pure redraw for
+                    // nothing. The whole sensor path is cheap, but its WRITES are a full-screen
+                    // redraw plus a re-blur under every card, which is exactly the idle heat.
+                    if (ambient != null &&
+                        android.os.SystemClock.uptimeMillis() - ambient.lastTouchMs > AmbientIdleMs
+                    ) return
                     val fastAlpha = 0.08f
                     val slowAlpha = 0.01f
                     val x = -event.values[0]
@@ -296,7 +308,10 @@ internal fun AuroraBackground(
             val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
                 when (event) {
                     androidx.lifecycle.Lifecycle.Event.ON_START ->
-                        if (sensor != null) mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+                        // NORMAL (~5Hz), not UI (~15Hz): the tilt is a slow parallax on huge, slow
+                        // blobs, so a third of the samples feeds the exact same motion while costing
+                        // three times the wake-ups.
+                        if (sensor != null) mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
                     androidx.lifecycle.Lifecycle.Event.ON_STOP -> mgr.unregisterListener(listener)
                     else -> Unit
                 }
@@ -354,22 +369,29 @@ internal fun AuroraBackground(
     // that is only sitting on the garage), and even 14fps was enough to keep a phone warm; the blobs
     // move so slowly that nine looks identical and costs a third less.
     var clock by remember { mutableFloatStateOf(0f) }
-    // Freezes the drift once the app has been left alone: an idle phone should not keep redrawing a
-    // full-screen animated backdrop (and re-blurring it under every glass card) for a background
-    // nobody is interacting with. Null outside the app shell (a preview) keeps it drifting.
-    val ambient = LocalAmbientActivity.current
     LaunchedEffect(Unit) {
         var seconds = 0f
         var last = System.nanoTime()
+        fun idleNow() = ambient != null &&
+            android.os.SystemClock.uptimeMillis() - ambient.lastTouchMs > AmbientIdleMs
         while (true) {
             val now = System.nanoTime()
-            val idle = ambient != null &&
-                android.os.SystemClock.uptimeMillis() - ambient.lastTouchMs > AmbientIdleMs
-            if (currentPaused || saver || idle ||
+            if (currentPaused || saver ||
                 !lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
             ) {
                 last = now
                 delay(120)
+                continue
+            }
+            // Idle: the drift has stopped and nothing is being touched. SUSPEND until the next touch
+            // rather than polling -- otherwise an idle phone woke every 120ms, forever, just to ask
+            // whether it should still be awake. The clock is not advanced across the gap, so the
+            // blobs resume exactly where they froze.
+            if (idleNow()) {
+                last = now
+                androidx.compose.runtime.snapshotFlow { ambient!!.lastTouchMs }
+                    .first { android.os.SystemClock.uptimeMillis() - it <= AmbientIdleMs }
+                last = System.nanoTime()
                 continue
             }
             seconds += ((now - last) / 1_000_000_000f).coerceAtMost(0.2f)
