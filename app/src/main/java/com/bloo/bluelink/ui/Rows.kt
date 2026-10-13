@@ -173,8 +173,8 @@ internal fun SettingsCaption(
     Text(
         text,
         modifier = modifier.padding(top = 2.dp, bottom = bottomGap),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = secondaryTextStyle(),
+        color = secondaryTextColor(),
     )
 }
 

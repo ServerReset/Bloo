@@ -21,7 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -46,14 +48,44 @@ internal fun <T : Any> PebbleStatusGate(status: T?, refreshing: Boolean, content
     }
 }
 
-/** Label text styling (labelMedium) for subtle secondary text. */
+/**
+ * The app's one style for "small text that is just there" -- captions, labels, muted one-liners.
+ * Bigger and Medium-weight so it reads without squinting, full-strength onSurface so it clears the
+ * contrast bar on glass, and a soft blurred halo in the surface colour behind the glyphs so it holds
+ * its own over the aurora instead of melting into it. Every secondary-text helper routes through
+ * here, so the treatment is identical everywhere.
+ */
+@Composable
+internal fun secondaryTextStyle(): TextStyle = MaterialTheme.typography.bodyMedium.copy(
+    fontWeight = FontWeight.Medium,
+    shadow = secondaryTextShadow(),
+)
+
+/** Secondary text's colour: onSurface, barely eased -- contrast, not a grey wash. */
+@Composable
+internal fun secondaryTextColor(): Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
+
+/**
+ * The halo behind secondary text: a blurred copy of the surface colour the text sits on, not a hard
+ * shadow, so glyph edges lift off a busy background without a visible drop shadow.
+ */
+@Composable
+internal fun secondaryTextShadow(): Shadow = Shadow(
+    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
+    blurRadius = SecondaryHaloBlurPx,
+)
+
+/** A decently strong halo, in device px (text shadows are not density-scaled). */
+private const val SecondaryHaloBlurPx = 9f
+
+/** Label text styling for subtle secondary text (a step up from the old labelMedium). */
 @Composable
 internal fun LabelText(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
         modifier = modifier,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = secondaryTextStyle(),
+        color = secondaryTextColor(),
     )
 }
 
@@ -67,18 +99,18 @@ internal fun PebbleMessage(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
         modifier = modifier,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = secondaryTextStyle(),
+        color = secondaryTextColor(),
     )
 }
 
-/** Body text (bodySmall, onSurfaceVariant) -- muted/secondary content. */
+/** Body text (bodyMedium, onSurface) -- muted/secondary content. */
 @Composable
-internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: Color = secondaryTextColor()) {
     Text(
         text,
         modifier = modifier,
-        style = MaterialTheme.typography.bodySmall,
+        style = secondaryTextStyle(),
         color = color,
     )
 }
