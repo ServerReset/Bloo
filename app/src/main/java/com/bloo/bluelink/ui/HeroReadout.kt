@@ -42,7 +42,9 @@ import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import kotlin.math.roundToInt
 
-internal class ChargeReadout(
+/** Immutable and compared by value, so the hero's readout and numbers skip recomposing when nothing changed. */
+@androidx.compose.runtime.Immutable
+internal data class ChargeReadout(
     val pctText: String,
     val rangeText: String?,
     val statusLine: String,
