@@ -86,7 +86,11 @@ private data class WidgetOptions(
  * state that shows no car data until the app is signed in after a restart.
  */
 class BlooWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Responsive(WidgetSizes)
+    // EXACT, not Responsive: Responsive renders the largest of a fixed set of nominal sizes that fits, and the
+    // nominal cell sizes are far smaller than a modern launcher's real cells, so the content was laid out for a
+    // smaller box than it got -- the empty space around everything. Exact hands the layout the real size, which
+    // the text and controls then scale to fill.
+    override val sizeMode = SizeMode.Exact
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
