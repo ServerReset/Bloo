@@ -93,8 +93,6 @@ class CrashActivity : ComponentActivity() {
         const val EXTRA_STACK_TRACE = "stack_trace"
     }
 
-    private fun apkCacheFile(): File = File(File(cacheDir, "apk"), "Bloo.apk")
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -111,7 +109,7 @@ class CrashActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(GapSection),
                     ) {
                         Header()
-                        UpdateRecoveryPanel(apkFile = apkCacheFile())
+                        UpdateRecoveryPanel(apkFile = com.bloo.bluelink.update.UpdateCleanup.stagedApkFile(this@CrashActivity))
                         CrashLog(report)
                     }
                 }

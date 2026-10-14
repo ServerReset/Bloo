@@ -30,11 +30,6 @@ fun AppViewModel.snoozeUpdate() {
  * can reclaim it under storage pressure, and it's automatically cleaned up on uninstall). Always
  * the same filename, so a later download simply overwrites a stale one.
  */
-private fun AppViewModel.apkCacheFile(): java.io.File {
-    val ctx = getApplication<Application>()
-    return java.io.File(java.io.File(ctx.cacheDir, "apk"), "Bloo.apk")
-}
-
 /**
  * The update tile's primary button, first tap: downloads the APK in the background with no other UI
  * change yet -- lets someone start the update mid-something-else and come back to it.
@@ -52,7 +47,7 @@ fun AppViewModel.downloadUpdateInBackground() {
     _updateDownloadProgress.value = 0f
     _state.update { it.copy(updateDownloading = true, updateTileDismissed = false) }
     viewModelScope.launch {
-        val dest = apkCacheFile()
+        val dest = com.bloo.bluelink.update.UpdateCleanup.stagedApkFile(getApplication())
         // Throttled to whole percents. UpdateApi calls back once per 64KB buffer, which on a fast
         // connection is hundreds of emissions a second for a multi-MB APK -- and every one of them
         // recomposed the whole update tile, on the main thread, while the user may well be
@@ -84,7 +79,7 @@ fun AppViewModel.installDownloadedUpdate() {
     // Guard against a second tap (or a permission-grant retry) re-entering while a seamless install
     // is already running — otherwise two concurrent installer sessions write/commit the same APK.
     if (_state.value.updateInstalling) return
-    val dest = apkCacheFile()
+    val dest = com.bloo.bluelink.update.UpdateCleanup.stagedApkFile(getApplication())
     if (!dest.exists()) {
         _state.update { it.copy(updateApkReady = false, message = "Update file missing. Tap Update to fetch it again.") }
         return
@@ -158,7 +153,7 @@ private fun AppViewModel.fallbackInstall(dest: java.io.File) {
 /** The install guide's Continue button: dismiss it, then hand the staged APK to the system installer. */
 fun AppViewModel.confirmInstallUpdate() {
     _state.update { it.copy(showInstallGuide = false) }
-    val dest = apkCacheFile()
+    val dest = com.bloo.bluelink.update.UpdateCleanup.stagedApkFile(getApplication())
     if (_state.value.updateApkReady && dest.exists()) fallbackInstall(dest)
 }
 
@@ -179,6 +174,6 @@ fun AppViewModel.onShizukuPermissionResult(requestCode: Int, grantResult: Int) {
         _state.update { it.copy(message = "Shizuku access denied. Updates will use the normal installer.", messageType = ToastKind.INFO) }
         return
     }
-    val dest = apkCacheFile()
+    val dest = com.bloo.bluelink.update.UpdateCleanup.stagedApkFile(getApplication())
     if (_state.value.updateApkReady && dest.exists()) seamlessInstall(dest)
 }

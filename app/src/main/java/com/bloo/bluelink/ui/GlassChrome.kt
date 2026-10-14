@@ -250,7 +250,7 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
  * The radius every glass surface blurs its backdrop by (Haze 2.0 defaults to 20dp; this matches the
  * tuned look).
  */
-private val StandardBlurRadius = 20.dp
+internal val StandardBlurRadius = 20.dp
 
 /** The blur radius cards use; see [appHazeEffect]'s `cheap`. */
 private val CardBlurRadius = 12.dp

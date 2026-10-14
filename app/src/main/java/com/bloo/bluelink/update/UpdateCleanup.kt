@@ -19,6 +19,13 @@ object UpdateCleanup {
     private fun apkDir(context: Context): File = File(context.cacheDir, "apk")
 
     /**
+     * The staged update APK's exact path: written by the downloader, handed to the installer, and read
+     * by the crash reporter for its version. It is named here, once, because it was spelled out twice
+     * in different classes and those two spellings have to agree for the file to be found at all.
+     */
+    fun stagedApkFile(context: Context): File = File(apkDir(context), "Bloo.apk")
+
+    /**
      * Delete every staged update download. Safe to call any time -- the ONLY consumer,
      * the installer hand-off, reads the file immediately after a download in the same
      * session, so nothing depends on it surviving a process restart.

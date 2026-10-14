@@ -88,6 +88,10 @@ internal val LocalTopEdgeScroll = staticCompositionLocalOf<TopEdgeScroll?> { nul
  * Drawn only while [scrolled] is true, i.e. while the page's content is actually running off that
  * edge. With nothing under it there is no glass edge to see, and a decorative band over an untouched
  * backdrop is just a coloured stripe.
+ *
+ * Its blur is pinned to [StandardBlurRadius], the strip's own: left at the clarity-derived default
+ * this pane is nearly sharp, and drawn over a 20dp-frosted strip that mismatch shows as a step where
+ * the two meet rather than as one edge.
  */
 @Composable
 internal fun BoxScope.TopEdgeGlass(haze: HazeState?, scrolled: Boolean) {
@@ -100,8 +104,9 @@ internal fun BoxScope.TopEdgeGlass(haze: HazeState?, scrolled: Boolean) {
             .fillMaxWidth()
             .height(TopEdgeGlassHeight)
             // A plain rectangle whose TOP edge is the window's: the refraction rides its lower
-            // boundary, which is what reads as the top of the screen being glass.
-            .appGlassEffect(haze, RoundedCornerShape(0.dp), clear = true),
+            // boundary, which is what reads as the top of the screen being glass. `clear` (no backing,
+            // so no tint of its own) with the strip's blur, so the two read as one edge.
+            .appGlassEffect(haze, RoundedCornerShape(0.dp), clear = true, blurOverride = StandardBlurRadius),
     )
 }
 
