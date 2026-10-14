@@ -2,10 +2,6 @@
 
 A third-party Android app for **Hyundai**, **Genesis** and **Kia** vehicles (US, Canada, Hyundai Europe). Built with Jetpack Compose and Material 3 Expressive for phones, foldables and tablets. Every screen talks to live servers; nothing is simulated.
 
-| | |
-| --- | --- |
-| ![Welcome](docs/screenshots/01-welcome.png) | ![Welcome, dark](docs/screenshots/02-welcome-dark.png) |
-
 ## What it does
 
 - **Control**: lock and unlock, remote climate, charging, live location, full vehicle status, trips, weather.
