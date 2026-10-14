@@ -130,7 +130,7 @@ private fun BoxScope.MorphChrome(
     onClick: () -> Unit,
 ) {
     // `active` drives the morph only for a STANDALONE button (shapeForCorner == null). Connected halves
-    // (split pair, segmented group) morph independently, so a standing `active` on one would warp its
+    // (split pair, segmented group) morph independently, so a standing `active` on one would pull its
     // outer cap and seam corners out of agreement with its neighbour; they react to PRESS only.
     val morph by animateFloatAsState(
         targetValue = if ((active && shapeForCorner == null) || pressed) 1f else 0f,

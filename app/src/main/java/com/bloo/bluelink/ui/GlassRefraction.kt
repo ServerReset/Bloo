@@ -1,15 +1,24 @@
 package com.bloo.bluelink.ui
 
 import dev.chrisbanes.haze.HazePerformanceMode
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.asComposeRenderEffect
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.ExperimentalHazeApi
 import dev.chrisbanes.haze.HazeInput
@@ -54,92 +63,38 @@ internal fun Modifier.appGlassEffect(
 }
 
 /**
- * The app's screen-edge glass: ONE render pass that BENDS the content into the frame at every edge --
- * top, bottom, left and right -- and FROSTS it only in the top band, behind the status bar.
- *
- * The frost is PROGRESSIVE down that band: strongest at the very top, down to a little by the bottom of
- * the status bar, and clear just below it -- so the icons sit on a frosted layer without the strip
- * reading as a bar. The other three edges bend only; they never frost.
- *
- * It is a RENDER EFFECT on the content layer, deliberately NOT a Haze glass panel. A glass node DRAWS
- * a copy of the captured source, so a full-window one covers everything under it (it did: the pebbles'
- * refraction was redrawn over the full-screen map). A render effect samples the content the layer has
- * already drawn and displaces/blurs it, so nothing is drawn on top, there is no source capture, and it
- * is ONE pass rather than one per card. The backdrop is inside this layer too, so the band behind the
- * status bar samples IT.
- *
- * Applied to the app's content and UNDER the floating chrome, so the search, the toasts, the dialogs
- * and the lock overlay are never bent. Light by default; turned up under Ultra glass. Off below API 33
- * (RuntimeShader) and whenever the caller passes [enabled] false (battery saver).
+ * How wide the app's glass frame is down its sides. It is [ScreenGutter], the app's own margin from
+ * the window edge to its content, so the frame sits in the gap rather than over anything.
  */
-private const val EDGE_GLASS_AGSL = """
-    uniform shader content;
-    uniform float2 size;
-    uniform float topBand;
-    uniform float edgeBand;
-    uniform float strength;
-    uniform float frost;
-    uniform float frostSpan;
-
-    half4 main(float2 coord) {
-        float2 d = min(coord, size - coord);
-        float m = min(d.x, d.y);
-        // The top band is taller: it has to cover the status bar and its icons.
-        float band = (m == coord.y) ? topBand : edgeBand;
-        float t = clamp(1.0 - m / max(band, 1.0), 0.0, 1.0);
-        float t2 = t * t;
-        float2 dir;
-        if (d.x < d.y) {
-            dir = float2(coord.x < size.x * 0.5 ? -1.0 : 1.0, 0.0);
-        } else {
-            dir = float2(0.0, coord.y < size.y * 0.5 ? -1.0 : 1.0);
-        }
-        float2 hi = size - float2(1.0);
-        // Clamped to the layer: a bend toward the edge samples PAST it, and a sample outside the layer
-        // reads black -- which is exactly the black band the edges had.
-        float2 base = clamp(coord + dir * (strength * t2), float2(0.0), hi);
-        // Frost ONLY in the top band, tapering down it: full at the very top, a little by the bottom of
-        // the status bar, gone just below. The sides and the bottom never frost.
-        float fade = clamp(1.0 - coord.y / max(frostSpan, 1.0), 0.0, 1.0);
-        float r = frost * fade;
-        // A five-tap frost, weighted so the middle of the screen is untouched.
-        half4 c = content.eval(base) * 0.36;
-        c += content.eval(clamp(base + float2(r, 0.0), float2(0.0), hi)) * 0.16;
-        c += content.eval(clamp(base - float2(r, 0.0), float2(0.0), hi)) * 0.16;
-        c += content.eval(clamp(base + float2(0.0, r), float2(0.0), hi)) * 0.16;
-        c += content.eval(clamp(base - float2(0.0, r), float2(0.0), hi)) * 0.16;
-        return c;
-    }
-"""
-
-/** How far the bend reaches on the sides and the bottom, and how hard, in dp -- light by default, extreme ultra. */
-private const val EdgeGlassEdgeBandDp = 22f
-private const val EdgeGlassStrengthDp = 10f
-
-/** How hard the top frost is at its strongest, in dp. */
-private const val EdgeGlassFrostDp = 16f
+private val EdgeGlassSideWidth = ScreenGutter
 
 /**
- * How far past the status bar the frost's taper reaches. At the bar's own bottom edge the frost is
- * therefore `1 - 1/overshoot` of its full strength -- "a little", as asked -- and it clears just below.
+ * The app's OWN glass along the window's edges: one band per side, so the frame refracts what is
+ * behind it and its inner boundary carries the same specular rim and colour fringe as every other
+ * glass surface in the app.
+ *
+ * Deliberately the app's ORDINARY glass -- the very same [appGlassEffect] the search panel and the
+ * dialogs use -- rather than anything bespoke. The refraction rides the band's boundary, and a band
+ * whose outer edge IS the window edge therefore refracts along the app's own edge.
+ *
+ * The bands live in the app's margin (the content is inset from the window edges by [ScreenGutter]),
+ * so nothing is covered. The top band is the status strip.
  */
-private const val EdgeGlassFrostOvershoot = 1.2f
-
 @Composable
-internal fun Modifier.edgeGlass(enabled: Boolean, ultra: Boolean, topBandDp: Float, statusBarDp: Float): Modifier {
-    if (!enabled || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return this
-    val shader = remember { android.graphics.RuntimeShader(EDGE_GLASS_AGSL) }
-    return this.graphicsLayer {
-        shader.setFloatUniform("size", size.width.toFloat(), size.height.toFloat())
-        shader.setFloatUniform("topBand", topBandDp.dp.toPx())
-        shader.setFloatUniform("edgeBand", EdgeGlassEdgeBandDp.dp.toPx())
-        shader.setFloatUniform("strength", (if (ultra) EdgeGlassStrengthDp * 2.6f else EdgeGlassStrengthDp).dp.toPx())
-        shader.setFloatUniform("frost", (if (ultra) EdgeGlassFrostDp * 1.6f else EdgeGlassFrostDp).dp.toPx())
-        shader.setFloatUniform("frostSpan", (statusBarDp * EdgeGlassFrostOvershoot).dp.toPx())
-        renderEffect = android.graphics.RenderEffect
-            .createRuntimeShaderEffect(shader, "content")
-            .asComposeRenderEffect()
+internal fun BoxScope.EdgeGlassFrame(hazeState: HazeState?) {
+    if (hazeState == null) return
+    // A plain rectangle: the boundary the refraction rides is the band's own.
+    val shape = RoundedCornerShape(0.dp)
+    val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    if (top > 0.dp) {
+        Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(top).appGlassEffect(hazeState, shape, clear = true))
     }
+    if (bottom > 0.dp) {
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bottom).appGlassEffect(hazeState, shape, clear = true))
+    }
+    Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(EdgeGlassSideWidth).appGlassEffect(hazeState, shape, clear = true))
+    Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(EdgeGlassSideWidth).appGlassEffect(hazeState, shape, clear = true))
 }
 
 @OptIn(ExperimentalHazeApi::class)

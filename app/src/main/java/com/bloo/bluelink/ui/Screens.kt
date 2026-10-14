@@ -14,11 +14,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.Scaffold
@@ -180,22 +177,6 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
     LockBlurLayer(locked = locked && contentSettled) {
-    // The edge glass is ONE render pass over the whole app layer: it BENDS the content into the frame
-    // at every edge (top, bottom, left, right) and FROSTS it only in the top band -- strongest at the
-    // very top, a little by the bottom of the status bar -- so the icons sit on a frosted layer. The
-    // dialogs and the lock overlay are drawn outside this, so they are never touched.
-    val statusBarDp =
-        WindowInsets.statusBars.asPaddingValues().calculateTopPadding().value
-    Box(
-        Modifier
-            .fillMaxSize()
-            .edgeGlass(
-                enabled = canBlurBackdrops(),
-                ultra = appearance.ultraGlass,
-                topBandDp = statusBarDp + 16f,
-                statusBarDp = statusBarDp,
-            ),
-    ) {
     Box(Modifier.fillMaxSize()) {
     // The app's backdrop: the Haze source every glass card blurs (a sibling under everything).
     AppBackdrop(backdropHaze, Modifier.matchParentSize())
@@ -340,6 +321,9 @@ fun BlooApp(vm: AppViewModel) {
             }
         }
     }
+    // The app's own glass along the window's edges: above the content, below the chrome, so the
+    // frame refracts the backdrop beside the content rather than covering it.
+    EdgeGlassFrame(backdropHaze)
     // Toasts sit inside the outer Box after SearchLayer so they stack above search; the lock
     // overlay and dialogs sit above them. The app-wide pull-to-refresh disc, drawn above content
     // and below toasts/dialogs; refracts searchHazeState.
@@ -383,8 +367,6 @@ fun BlooApp(vm: AppViewModel) {
     }
     // Every open dialog, above everything else.
     DialogLayer(dialogHost)
-    }
-    // Closes the edge-glass layer; the dialogs above were drawn outside it and are never bent.
     }
     }
 

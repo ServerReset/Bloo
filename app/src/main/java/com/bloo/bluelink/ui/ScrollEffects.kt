@@ -61,7 +61,7 @@ internal fun Modifier.bleedHorizontally(inset: Dp): Modifier = layout { measurab
     layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
 }
 
-/** The scroll state and viewport height of the search list, so each row can warp near its top and bottom edge. */
+/** The scroll state and viewport height of the search list, so each row can soften near its top and bottom edge. */
 internal class EdgeScroll(
     val scroll: ScrollState,
     val viewportPx: androidx.compose.runtime.State<Int>,
@@ -72,12 +72,12 @@ internal class EdgeScroll(
 internal val LocalEdgeScroll = androidx.compose.runtime.staticCompositionLocalOf<EdgeScroll?> { null }
 
 /**
- * A row of a vertically scrolling glass list that bends as it nears an edge with more content past
- * it: it compresses toward that edge (as if curving around a lens), blurs and fades, then flattens
- * back to normal toward the middle. The vertical counterpart of [scrollEdgeBlur], with the warp.
+ * A row of a vertically scrolling glass list that goes soft as it nears an edge with more content past
+ * it: it blurs and fades, then comes back into focus toward the middle. The vertical counterpart of
+ * [scrollEdgeBlur].
  */
 @Composable
-internal fun Modifier.glassEdgeWarp(): Modifier {
+internal fun Modifier.glassEdgeFocus(): Modifier {
     val edge = LocalEdgeScroll.current ?: return this
     var y by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     var h by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
@@ -99,9 +99,6 @@ internal fun Modifier.glassEdgeWarp(): Modifier {
             val intoBottom = ((bottom - (vp - fadePx)) / fadePx).coerceIn(0f, 1f) * bottomGate
             val t = maxOf(intoTop, intoBottom)
             alpha = 1f - 0.55f * t
-            // Squash toward the edge it is sliding into, pivoting on that edge of the row.
-            scaleY = 1f - 0.22f * t
-            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, if (intoTop >= intoBottom) 0f else 1f)
             renderEffect = if (blurOk && t > 0.03f) {
                 androidx.compose.ui.graphics.BlurEffect(maxBlurPx * t, maxBlurPx * t, androidx.compose.ui.graphics.TileMode.Decal)
             } else {

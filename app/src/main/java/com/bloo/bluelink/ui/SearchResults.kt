@@ -223,7 +223,7 @@ internal fun ResultRow(
 ) {
     // Each row eases in the first time it appears, so a changing list grows and fades rather than popping.
     EnterOnce(expandFrom = androidx.compose.ui.Alignment.Top) {
-    Column(Modifier.glassEdgeWarp()) {
+    Column(Modifier.glassEdgeFocus()) {
     androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     val haptics = LocalHaptics.current
     Row(

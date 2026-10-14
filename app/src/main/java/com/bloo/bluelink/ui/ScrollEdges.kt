@@ -21,7 +21,7 @@ internal val ScrollEdgeLength = 36.dp
  * The app's ONE soft-edge treatment for scrolling content -- the screen's own top/bottom, a big list
  * (the weather card's hour strip, the debug log), anywhere content runs past an edge.
  *
- * Content FADES and warps into a glass rim at any edge that still has more past it, and clears as
+ * Content FADES into a glass rim at any edge that still has more past it, and clears as
  * you scroll toward the middle. [rim] adds the bright refractive band that reads as the glass the
  * content is passing under; [ScrollAxis] picks the pair of sides ([ScrollState] is shared by both).
  */

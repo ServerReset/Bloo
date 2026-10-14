@@ -48,31 +48,40 @@ import dev.chrisbanes.haze.HazeState
 internal var inMultiWindowMode by mutableStateOf(false)
 
 /**
+ * The strip's own tint, over the backdrop. Heavier than a glass surface's own tint, because this is a
+ * thin band the system icons have to read against, and the backdrop under it (the aurora's own top,
+ * which is its faintest part) is dark: at the shared glass weight the band simply read as black.
+ */
+private const val StatusStripTintAlpha = 0.18f
+
+/**
  * The strip behind the system icons: the app's standard glass -- a blur that is STRONG at the top and
- * tapers away by the bottom of the strip -- over the backdrop, under the glass tint.
+ * tapers away by the bottom of the strip -- over the backdrop, under the strip's own tint.
  *
- * The tint is ALWAYS the unblurred glass weight, even when a real blur is running behind it. The
- * blurred weight is meant for a large glass surface with content under it (2% white in the dark
- * theme); on a strip this thin it left the icons sitting on the raw backdrop, which is what read as a
- * black bar. This weight is the "something to sit on" the icons need, in both themes.
- *
- * It blurs the BACKDROP ([LocalBackdropHaze]), not the car pager: the pager is transparent behind the
- * status bar (each page insets its content below it), so a pane over IT had nothing to sample and read
- * as a black bar in the dark theme. The backdrop is what is actually there, so the frost has something
- * to frost. Skipped in [inMultiWindowMode].
+ * The tint fades to nothing by the bottom of the strip, so the band has no lower edge; the icons sit
+ * on the strongest part of it. It blurs the BACKDROP ([LocalBackdropHaze]), not the car pager: the
+ * pager is transparent behind the status bar, so a pane over IT had nothing to sample and read as a
+ * black bar in the dark theme. Skipped in [inMultiWindowMode].
  */
 @Composable
 internal fun StatusBarScrim() {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val haze = LocalBackdropHaze.current
+    // Theme-aware: white lifts the dark theme, and the light theme's own surface keeps a pale band
+    // from reading as a grey smudge.
+    val tint = if (appIsDarkTheme()) {
+        Color.White.copy(alpha = StatusStripTintAlpha)
+    } else {
+        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = StatusStripTintAlpha * 2f)
+    }
     Box(Modifier.fillMaxWidth().height(topInset).clipToBounds()) {
         if (haze != null && canBlurBackdrops()) {
             Box(Modifier.matchParentSize().appHazeEffect(haze, progressive = true))
         }
         Box(
             Modifier.matchParentSize().background(
-                Brush.verticalGradient(listOf(glassTint(blurred = false), Color.Transparent)),
+                Brush.verticalGradient(listOf(tint, Color.Transparent)),
             ),
         )
     }

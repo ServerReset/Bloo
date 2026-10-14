@@ -180,7 +180,7 @@ internal fun SearchLayer(
                 modifier = Modifier.width(barW).animateContentSize(spring(dampingRatio = GentleDamping, stiffness = Spring.StiffnessMediumLow)),
                 hazeState = hazeState,
                 // Flat blur, not the liquid-glass refraction: results need to be legible, not
-                // warped, so this is a near-solid surface over a straight blur behind it.
+                // bent, so this is a near-solid surface over a straight blur behind it.
                 liquid = false,
                 tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
                     alpha = if (hazeState != null && canBlurBackdrops()) 0.88f else 0.98f,
