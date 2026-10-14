@@ -165,10 +165,15 @@ fun MorphSegmented(
         val iconGapPx = with(density) { 6.dp.toPx() }
         val padPx = with(density) { 4.dp.toPx() }
         val usablePx = with(density) { maxWidth.toPx() } - 2 * padPx - gapPx * (n - 1)
-        var needWithLabels = 0f
-        options.forEach { opt ->
-            if (opt.icon != null) needWithLabels += iconPx + iconGapPx
-            needWithLabels += measurer.measure(AnnotatedString(opt.label), style = textStyle).size.width
+        // Measured once per set of labels and style, not on every recomposition (this body re-runs whenever
+        // the selection springs or the parent recomposes; each measure is a real text layout per label).
+        val needWithLabels = remember(options, textStyle, density) {
+            var need = 0f
+            options.forEach { opt ->
+                if (opt.icon != null) need += iconPx + iconGapPx
+                need += measurer.measure(AnnotatedString(opt.label), style = textStyle).size.width
+            }
+            need
         }
         val iconsOnly = options.all { it.icon != null } && needWithLabels > usablePx
         // The segment widths of the last layout, written by the track and read by touch handling.
