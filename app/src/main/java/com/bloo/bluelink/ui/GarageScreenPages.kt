@@ -231,8 +231,7 @@ internal fun CollapsedGaragePager(
                     }
                 }
             }
-            // Stays active mid-drag so it never disappears while swiping.
-            StatusBarScrim()
+            // The status bar frost is the app-wide edge frame's (EdgeGlassFrame, Screens).
             // No refresh indicator is drawn; the pull gesture still refreshes.
         }
         }

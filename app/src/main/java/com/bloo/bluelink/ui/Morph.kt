@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -137,7 +138,8 @@ fun MorphButton(
                             )
                         },
                     )
-                    .then(if (minHeight > 0.dp) Modifier.heightIn(min = minHeight) else Modifier),
+                    // Never narrower than tall: the smallest a button gets (symbol only) is a circle.
+                    .then(if (minHeight > 0.dp) Modifier.heightIn(min = minHeight).widthIn(min = minHeight) else Modifier),
                 enabled = enabled,
                 active = active,
                 containerColor = containerColor,

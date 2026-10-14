@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -87,15 +88,26 @@ internal fun BoxScope.EdgeGlassFrame(hazeState: HazeState?) {
     val shape = RoundedCornerShape(0.dp)
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    if (top > 0.dp) {
-        Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(top).appGlassEffect(hazeState, shape, clear = true))
+    // TOP: the status bar's frost (strong at the very top, a little at its bottom), then a thin band of liquid
+    // glass just under it, so the top edge bends like the other three.
+    Box(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
+        StatusBarScrim(hazeState)
+        Box(
+            Modifier.padding(top = top).fillMaxWidth().height(EdgeGlassRimHeight)
+                .appGlassEffect(hazeState, shape, clear = true),
+        )
     }
-    if (bottom > 0.dp) {
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(bottom).appGlassEffect(hazeState, shape, clear = true))
-    }
+    // BOTTOM and SIDES: liquid glass, the window edge as the band's outer boundary.
+    Box(
+        Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(maxOf(bottom, EdgeGlassRimHeight))
+            .appGlassEffect(hazeState, shape, clear = true),
+    )
     Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(EdgeGlassSideWidth).appGlassEffect(hazeState, shape, clear = true))
     Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(EdgeGlassSideWidth).appGlassEffect(hazeState, shape, clear = true))
 }
+
+/** The liquid band along the top (under the status bar) and the bottom when there is no navigation bar. */
+private val EdgeGlassRimHeight = 14.dp
 
 @OptIn(ExperimentalHazeApi::class)
 private fun glassStyle(

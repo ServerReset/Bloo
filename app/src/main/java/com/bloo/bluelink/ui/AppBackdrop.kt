@@ -18,11 +18,18 @@ import dev.chrisbanes.haze.hazeSource
  * parent).
  */
 @Composable
-internal fun AppBackdrop(hazeState: HazeState, modifier: Modifier = Modifier) {
+internal fun AppBackdrop(
+    hazeState: HazeState,
+    modifier: Modifier = Modifier,
+    /** A second state this backdrop also feeds, under everything else in it (the content's, so edge glass and
+     *  the status bar frost the backdrop where no card is). */
+    alsoInto: HazeState? = null,
+) {
     val scheme = MaterialTheme.colorScheme
     Box(
         modifier
             .hazeSource(hazeState)
+            .then(if (alsoInto != null) Modifier.hazeSource(alsoInto, zIndex = -2f) else Modifier)
             .background(
                 Brush.verticalGradient(
                     listOf(

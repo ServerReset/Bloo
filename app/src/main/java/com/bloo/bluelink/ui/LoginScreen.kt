@@ -345,8 +345,7 @@ internal fun LoginScreen(
                 }
             }
         }
-        // The hero wordmark has no top inset padding (deliberate), so it draws under the status
-        // bar: same scrim as every other call site.
-        StatusBarScrim()
+        // The hero wordmark draws under the status bar (no top inset, deliberate); the app-wide edge frame
+        // (EdgeGlassFrame, Screens) frosts it like every other screen.
     }
 }

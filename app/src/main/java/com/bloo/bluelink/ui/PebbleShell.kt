@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -163,8 +164,11 @@ internal fun PebbleShell(
     // default would force compact on the first frame.
     var headerRowWidthDp by remember { mutableStateOf(1000.dp) }
     val density = LocalDensity.current
-    val collapsedCorner = if (headerRowHeightPx > 0) {
-        with(density) { (headerRowHeightPx / 2f).toDp() }
+    // Collapsed, the card is a true pill: half its OWN height (measured), not the header row's, so the left and
+    // right ends are full semicircles even when the header carries a second line.
+    var cardHeightPx by remember { mutableIntStateOf(0) }
+    val collapsedCorner = if (maxOf(headerRowHeightPx, cardHeightPx) > 0) {
+        with(density) { (maxOf(headerRowHeightPx, cardHeightPx) / 2f).toDp() }
     } else {
         PebbleCornerCollapsed
     }
@@ -191,6 +195,7 @@ internal fun PebbleShell(
                 .fillMaxWidth()
                 // The card's bounding box is glass (GlassCardBackdrop, its first child below, so the blur
                 // can be skipped while the pager moves); its own panels stay solid.
+                .onSizeChanged { cardHeightPx = it.height }
                 .pebbleCardEdge(pebbleShape),
             shape = pebbleShape,
             // No shadow elevation: the whole card is scaled by ReorderColumn's drag lift and the

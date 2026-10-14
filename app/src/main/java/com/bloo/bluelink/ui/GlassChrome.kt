@@ -119,7 +119,13 @@ internal fun glassTint(blurred: Boolean): Color {
     }
 }
 
- internal fun Modifier.appHazeEffect(state: HazeState, progressive: Boolean = false, cheap: Boolean = false): Modifier =
+internal fun Modifier.appHazeEffect(
+    state: HazeState,
+    progressive: Boolean = false,
+    cheap: Boolean = false,
+    /** With [progressive]: how much blur is left at the far end (0 fades to none). */
+    progressiveEnd: Float = 0f,
+): Modifier =
     this.hazeBlur(
         input = HazeInput.Sources(state),
         style = HazeBlurStyle {
@@ -127,7 +133,12 @@ internal fun glassTint(blurred: Boolean): Color {
             // radius is a smaller blur kernel per pixel, and no grain pass at all.
             blurRadius(if (cheap) CardBlurRadius else StandardBlurRadius)
             if (cheap) noiseFactor(0f)
-            if (progressive) this.progressive(StandardBlurProgressive)
+            if (progressive) {
+                this.progressive(
+                    if (progressiveEnd <= 0f) StandardBlurProgressive
+                    else dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = progressiveEnd),
+                )
+            }
         },
         // Pinned, not Adaptive: the adaptive mode re-picks the sample resolution as the card moves, so
         // it can change at the start and end of every swipe (a layer re-allocation and a visible

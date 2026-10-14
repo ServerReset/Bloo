@@ -55,37 +55,33 @@ internal var inMultiWindowMode by mutableStateOf(false)
 private const val StatusStripTintAlpha = 0.18f
 
 /**
- * The strip behind the system icons: the app's standard glass -- a blur that is STRONG at the top and
- * tapers away by the bottom of the strip -- over the backdrop, under the strip's own tint.
- *
- * The tint fades to nothing by the bottom of the strip, so the band has no lower edge; the icons sit
- * on the strongest part of it. It blurs the BACKDROP ([LocalBackdropHaze]), not the car pager: the
- * pager is transparent behind the status bar, so a pane over IT had nothing to sample and read as a
- * black bar in the dark theme. Skipped in [inMultiWindowMode].
+ * The status bar: clear, with the app running behind it, frosted -- nearly fully at the top edge, still a
+ * little at the bottom of the strip -- so the system icons always sit on a calm pane while the cards and the
+ * aurora show through. It blurs [haze], which carries the content AND the backdrop (see Screens), so what
+ * scrolls under the strip is what frosts. A faint tint follows the same taper. Skipped in [inMultiWindowMode].
  */
 @Composable
-internal fun StatusBarScrim() {
+internal fun StatusBarScrim(haze: HazeState? = LocalBackdropHaze.current) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val haze = LocalBackdropHaze.current
-    // Theme-aware: white lifts the dark theme, and the light theme's own surface keeps a pale band
-    // from reading as a grey smudge.
-    val tint = if (appIsDarkTheme()) {
-        Color.White.copy(alpha = StatusStripTintAlpha)
-    } else {
-        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = StatusStripTintAlpha * 2f)
-    }
+    if (topInset <= 0.dp) return
+    val dark = appIsDarkTheme()
+    val tint = if (dark) Color.White else MaterialTheme.colorScheme.surfaceContainer
+    val topAlpha = if (dark) StatusStripTintAlpha else StatusStripTintAlpha * 2f
     Box(Modifier.fillMaxWidth().height(topInset).clipToBounds()) {
         if (haze != null && canBlurBackdrops()) {
-            Box(Modifier.matchParentSize().appHazeEffect(haze, progressive = true))
+            Box(Modifier.matchParentSize().appHazeEffect(haze, progressive = true, progressiveEnd = StatusStripBottomFrost))
         }
         Box(
             Modifier.matchParentSize().background(
-                Brush.verticalGradient(listOf(tint, Color.Transparent)),
+                Brush.verticalGradient(listOf(tint.copy(alpha = topAlpha), tint.copy(alpha = topAlpha * 0.3f))),
             ),
         )
     }
 }
+
+/** How much of the status bar's frost is left at its bottom edge (1 = as frosted as the top). */
+private const val StatusStripBottomFrost = 0.35f
 
 /**
  * Settings mode (Simple/Advanced) toggle hanging flush from the status bar as one piece of chrome.

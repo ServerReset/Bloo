@@ -179,7 +179,7 @@ fun BlooApp(vm: AppViewModel) {
     LockBlurLayer(locked = locked && contentSettled) {
     Box(Modifier.fillMaxSize()) {
     // The app's backdrop: the Haze source every glass card blurs (a sibling under everything).
-    AppBackdrop(backdropHaze, Modifier.matchParentSize())
+    AppBackdrop(backdropHaze, Modifier.matchParentSize(), alsoInto = searchHazeState)
     Scaffold(
         containerColor = Color.Transparent,
         // Toasts render in ToastHost below, above search, not in the Scaffold's snackbar.
@@ -284,7 +284,7 @@ fun BlooApp(vm: AppViewModel) {
                         // screens publish into this holder, read in the aurora's draw phase.
                         CompositionLocalProvider(LocalAuroraReactions provides auroraReactions) {
                         if (appearance.auroraBackground) CompositionLocalProvider(LocalAuroraTouch provides auroraTouch) {
-                            AuroraBackground(Modifier.matchParentSize().hazeSource(backdropHaze), appearance, refreshing = refreshing, paused = searchOpen)
+                            AuroraBackground(Modifier.matchParentSize().hazeSource(backdropHaze).hazeSource(searchHazeState, zIndex = -1f), appearance, refreshing = refreshing, paused = searchOpen)
                         }
                         // Cold-start lock: don't compose (and blur) the full garage behind a lock
                         // the user hasn't passed; it composes once `locked` flips.
@@ -323,7 +323,7 @@ fun BlooApp(vm: AppViewModel) {
     }
     // The app's own glass along the window's edges: above the content, below the chrome, so the
     // frame refracts the backdrop beside the content rather than covering it.
-    EdgeGlassFrame(backdropHaze)
+    EdgeGlassFrame(searchHazeState)
     // Toasts sit inside the outer Box after SearchLayer so they stack above search; the lock
     // overlay and dialogs sit above them. The app-wide pull-to-refresh disc, drawn above content
     // and below toasts/dialogs; refracts searchHazeState.
