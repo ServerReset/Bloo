@@ -163,27 +163,33 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
 
     // The value scales with the SMALLER of the two spans, so a tall-but-narrow widget does not get a number
     // too wide for it, nor a wide-but-short one a number too tall.
-    val span = minOf(cols, rows)
-    val valueSp: TextUnit = when {
-        shape == WidgetShape.MINIMAL -> 30.sp
-        span >= 4 -> 52.sp
-        span >= 3 -> 44.sp
-        else -> 36.sp
+    // Text sized from the widget's actual dp, continuously, so it FILLS the space at every size instead of
+    // stepping between a few fixed sizes that left most widgets half empty. The value takes about a third of
+    // the height and never more than its share of the width (on a 2x2 it shares the row with the lock).
+    val w = size.width.value
+    val h = size.height.value
+    val small = minOf(w, h)
+    val valueSp: TextUnit = when (shape) {
+        WidgetShape.MINIMAL -> minOf(h * 0.30f, w * 0.26f).coerceIn(30f, 48f).sp
+        else -> minOf(h * 0.30f, w * 0.24f).coerceIn(34f, 80f).sp
     }
+    val nameSp: TextUnit = (small * 0.085f).coerceIn(14f, 19f).sp
+    val statusSp: TextUnit = (small * 0.075f).coerceIn(13f, 17f).sp
+    val detailSp: TextUnit = (small * 0.062f).coerceIn(12f, 15f).sp
     // The status line needs a second row to sit under the value without crowding it.
     val showStatus = shape != WidgetShape.MINIMAL
     // The "updated X ago" line only where the header has room for a second line.
-    val showUpdated = rows >= 3 && cols >= 3
-    // The odometer / charge-limit line only on the roomiest layouts, and never when compact.
-    val showDetails = rows >= 4 && cols >= 3 && !opts.compact
+    val showUpdated = rows >= 2 && cols >= 3
+    // The odometer / charge-limit line wherever there is a third row for it, never when compact.
+    val showDetails = rows >= 3 && cols >= 3 && !opts.compact
     // Labelled (text) buttons are wider than icon circles, so they only appear where four of them
     // actually fit; below that, icon-only controls.
     val labels = cols >= 5 && rows >= 3 && !opts.compact
     val maxActions = minOf(4, cols)
 
     Column(root) {
-        Header(car, showUpdated = showUpdated, opts = opts, pending = pending, nameSp = if (cols <= 2) 13.sp else 15.sp)
-        Spacer(GlanceModifier.defaultWeight())
+        Header(car, showUpdated = showUpdated, opts = opts, pending = pending, nameSp = nameSp)
+        if (shape == WidgetShape.MINIMAL) Spacer(GlanceModifier.defaultWeight()) else Spacer(GlanceModifier.height(WidgetGap))
         if (shape == WidgetShape.MINIMAL) {
             // 2x2: the value and the lock button share one row, so it fits without a status line.
             Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -192,19 +198,21 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
                     modifier = GlanceModifier.defaultWeight(),
                     style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = valueSp, fontWeight = FontWeight.Bold),
                 )
-                ActionButton(car, CarAction.TOGGLE_LOCK, pending, armed, label = null, compact = true)
+                ActionButton(car, CarAction.TOGGLE_LOCK, pending, armed, label = null, compact = false)
             }
         } else {
             Text(car.bigValue(), style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = valueSp, fontWeight = FontWeight.Bold))
-            if (showStatus) StatusText(car, note, if (span >= 3) 14.sp else 12.sp)
+            if (showStatus) StatusText(car, note, statusSp)
             if (showDetails) {
                 Spacer(GlanceModifier.height(4.dp))
                 car.detailLine()?.let { line ->
-                    Text(line, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp))
+                    Text(line, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = detailSp))
                 }
             }
-            Spacer(GlanceModifier.height(if (opts.compact) WidgetGap else WidgetGap * 1.5f))
-            Actions(car, pending, armed, opts, labels = labels, maxActions = maxActions)
+            // The space left over sits between the readout and the controls, so the controls hug the bottom
+            // edge and the readout reads as one block under the header (not a gap at the top).
+            Spacer(GlanceModifier.defaultWeight())
+            Actions(car, pending, armed, opts, labels = labels, maxActions = maxActions, tall = rows >= 3)
         }
     }
 }
@@ -217,6 +225,7 @@ private fun StatusText(car: VehicleSnapshot, note: String?, size: TextUnit) {
         style = TextStyle(
             color = if (note != null) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant,
             fontSize = size,
+            fontWeight = FontWeight.Medium,
         ),
     )
 }
@@ -236,7 +245,7 @@ private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptio
         Column(GlanceModifier.defaultWeight()) {
             Text(
                 car.name, maxLines = 1,
-                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = nameSp, fontWeight = FontWeight.Medium),
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = nameSp, fontWeight = FontWeight.Bold),
             )
             if (showUpdated) {
                 car.updatedLabel()?.let { updated ->
@@ -276,7 +285,7 @@ private fun RefreshButton(car: VehicleSnapshot, pending: String?) {
  * left to right, so a narrow widget never pushes a button off the edge.
  */
 @Composable
-private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts: WidgetOptions, labels: Boolean, maxActions: Int) {
+private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts: WidgetOptions, labels: Boolean, maxActions: Int, tall: Boolean = false) {
     val actions = buildList {
         add(WidgetAction(CarAction.TOGGLE_LOCK, if (labels) lockLabel(car) else null))
         if (opts.climate) add(WidgetAction(CarAction.TOGGLE_CLIMATE, if (labels) "Climate" else null))
@@ -288,7 +297,7 @@ private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts
     Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         actions.forEachIndexed { i, a ->
             if (i > 0) Spacer(GlanceModifier.width(WidgetGap))
-            ActionButton(car, a.action, pending, armed, label = a.label, modifier = GlanceModifier.defaultWeight())
+            ActionButton(car, a.action, pending, armed, label = a.label, modifier = GlanceModifier.defaultWeight(), tall = tall)
         }
     }
 }
@@ -314,6 +323,8 @@ private fun ActionButton(
     compact: Boolean = false,
     /** A width from the row (an equal share); none = a circle (icon) or a pill sized to its word. */
     modifier: GlanceModifier? = null,
+    /** On a widget three or more rows tall the controls get more height, in proportion to the space. */
+    tall: Boolean = false,
 ) {
     val busy = pending == "${car.vin}:$action"
     val locked = car.locked == true
@@ -335,7 +346,11 @@ private fun ActionButton(
     }
     val container: ColorProvider = if (active || armed) GlanceTheme.colors.primary else GlanceTheme.colors.secondaryContainer
     val content: ColorProvider = if (active || armed) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSecondaryContainer
-    val h = if (compact) 40.dp else 44.dp
+    val h = when {
+        compact -> 40.dp
+        tall -> 56.dp
+        else -> 46.dp
+    }
     Box(
         modifier = (modifier ?: GlanceModifier)
             .height(h)
@@ -357,11 +372,11 @@ private fun ActionButton(
             if (text == null) {
                 Image(
                     ImageProvider(icon), null,
-                    modifier = GlanceModifier.size(if (compact) 18.dp else 20.dp),
+                    modifier = GlanceModifier.size(if (tall) 24.dp else if (compact) 18.dp else 20.dp),
                     colorFilter = ColorFilter.tint(content),
                 )
             } else {
-                Text(text, maxLines = 1, style = TextStyle(color = content, fontSize = 14.sp, fontWeight = FontWeight.Medium))
+                Text(text, maxLines = 1, style = TextStyle(color = content, fontSize = if (tall) 16.sp else 14.sp, fontWeight = FontWeight.Bold))
             }
         }
     }
