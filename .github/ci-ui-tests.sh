@@ -12,7 +12,14 @@ set +e
 ADB="timeout 60 adb"
 
 $ADB logcat -c
-./gradlew :app:connectedSideloadDebugAndroidTest --stacktrace
+# Only the UI suite. The other two instrumented tests live in the ROOT package -- SmokeTest boots the
+# whole app (Play services, aurora, Haze) and DriveSyncPipelineTest sleeps 31s twice -- and the first
+# of those is what kills the runner's emulator: the suite gets two tests in, the device disappears,
+# and the other forty never run at all. Restricting to `ui` means the emulator is asked to do what it
+# can actually do, and both of those still run on a real device (and locally, where the emulator is
+# the developer's own).
+./gradlew :app:connectedSideloadDebugAndroidTest --stacktrace \
+  -Pandroid.testInstrumentationRunnerArguments.package=com.bloo.bluelink.ui
 status=$?
 
 # When the emulator dies mid-suite, adb stops answering, and every call below would then burn its

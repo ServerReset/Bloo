@@ -265,10 +265,12 @@ jobs:
           target: google_apis
           profile: pixel_6
           # The action's default is 2GB, and this app is not small: on that the device stops answering
-          # part-way through the suite, which is what "received 2 of 41 tests" was. More RAM is cheap
-          # here (the runner has 16GB) and it is the difference between a suite that reports a real
-          # failure and one whose device dies before it can.
-          ram-size: 4096
+          # part-way through the suite. 4GB got it further (two tests instead of none); this gives it
+          # real room, since the runner has 16GB and the emulator is the only thing on it.
+          ram-size: 6144
+          # The emulator's own per-app heap default is 256MB; the app is largeHeap and the UI suite
+          # composes real screens.
+          heap-size: 512
           disable-animations: true
           script: bash .github/ci-ui-tests.sh
 
