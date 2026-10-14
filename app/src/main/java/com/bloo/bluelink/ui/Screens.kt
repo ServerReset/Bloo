@@ -333,11 +333,13 @@ fun BlooApp(vm: AppViewModel) {
             }
         }
     }
-    // The top edge's liquid glass, then the status bar's frost over it. The glass is one-sided and
-    // only drawn while content is scrolled under that edge; the frost is the status bar's own strip.
-    // Both stand down outside full screen. See edgeChromeAllowed.
-    TopEdgeGlass(searchHazeState, topEdgeScroll.scrolled)
+    // The status bar's frost first, then the top edge's glass OVER it. The order matters: the band is
+    // 16dp and the strip is taller than that, so drawn under the strip the refraction was completely
+    // covered -- present in the code and invisible on screen. Above it, the glass reads as the top
+    // edge, and the system icons are unaffected either way: they are composited by the system on top
+    // of the whole window.
     StatusBarScrim(searchHazeState)
+    TopEdgeGlass(searchHazeState, topEdgeScroll.scrolled)
     // Toasts sit inside the outer Box after SearchLayer so they stack above search; the lock
     // overlay and dialogs sit above them. The app-wide pull-to-refresh disc, drawn above content
     // and below toasts/dialogs; refracts searchHazeState.

@@ -1,8 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,10 +20,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
@@ -71,7 +70,15 @@ internal fun SettingsScreen(
     val canBio = remember { vm.canUseBiometrics() }
     // LazyColumn: many heavy collapsible sections, unlike a car page's pebble list.
     val settingsListState = rememberLazyListState()
-    val atTop by remember { derivedStateOf { settingsListState.firstVisibleItemIndex == 0 && settingsListState.firstVisibleItemScrollOffset == 0 } }
+    // Whether rows are scrolled under the top edge, for the top-edge glass (see TopEdgeScroll). On the
+    // flip, never per frame: a per-frame write would recompose the band above for nothing.
+    val topEdgeScroll = LocalTopEdgeScroll.current
+    LaunchedEffect(settingsListState, topEdgeScroll) {
+        if (topEdgeScroll == null) return@LaunchedEffect
+        snapshotFlow {
+            settingsListState.firstVisibleItemIndex > 0 || settingsListState.firstVisibleItemScrollOffset > 0
+        }.collect { topEdgeScroll.scrolled = it }
+    }
 
   val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -100,30 +107,11 @@ internal fun SettingsScreen(
             modifier = Modifier
                 .widthIn(max = 1100.dp)
                 .fillMaxWidth()
-                // Rows melt away as they slide up under the status bar and the Simple/Advanced tab,
-                // instead of being cut by a hard line. The mask sits OUTSIDE hazeSource, so the glass
-                // header still blurs the full, unfaded content.
-                .graphicsLayer {
-                    // The fade only matters once rows have scrolled up under the header; at the top the
-                    // first item is an empty spacer. Skipping the offscreen layer there keeps this page
-                    // cheap while it slides in the pager.
-                    compositingStrategy = if (atTop) androidx.compose.ui.graphics.CompositingStrategy.Auto else androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                }
-                .drawWithContent {
-                    drawContent()
-                    if (atTop) return@drawWithContent
-                    val top = topInset.toPx()
-                    val fade = 44.dp.toPx()
-                    drawRect(
-                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                            0f to androidx.compose.ui.graphics.Color.Transparent,
-                            (top / size.height).coerceIn(0f, 1f) to androidx.compose.ui.graphics.Color.Transparent,
-                            ((top + fade) / size.height).coerceIn(0f, 1f) to androidx.compose.ui.graphics.Color.Black,
-                            1f to androidx.compose.ui.graphics.Color.Black,
-                        ),
-                        blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
-                    )
-                }
+                // Rows scroll right up under the status bar and the Simple/Advanced tab, clipped by the
+                // list like any other scrolling content. They used to fade to nothing well BELOW the
+                // status bar -- an offscreen DstIn mask, 44dp tall, starting at the inset -- which read
+                // as this page simply not going behind it, and was a bespoke edge effect besides. The
+                // standard top glass (TopEdgeGlass) is what covers that edge now.
                 .hazeSource(hazeState)
                 // Edge-to-edge disables adjustResize; imePadding shrinks the list so focused fields
                 // scroll into view.

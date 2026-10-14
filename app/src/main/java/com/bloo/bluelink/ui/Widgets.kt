@@ -134,7 +134,7 @@ internal fun StatusBarScrim(haze: HazeState? = LocalBackdropHaze.current) {
 }
 
 /** How much of the status bar's frost is left at its bottom edge (1 = as frosted as the top). */
-private const val StatusStripBottomFrost = 0.35f
+private const val StatusStripBottomFrost = 0.10f
 
 /**
  * Settings mode (Simple/Advanced) toggle hanging flush from the status bar as one piece of chrome.
