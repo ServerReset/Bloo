@@ -23,8 +23,8 @@ import org.junit.Test
  *
  *  - a button shows its label whenever the row can hold it -- the label is never dropped while there
  *    is room, and the button is never wider than the label it shows;
- *  - an icon-only button is [IconButtonMinWidth]: the size of its glyph plus a tap target, NOT a
- *    square as tall as the header;
+ *  - a button's minimum is SQUARE: never narrower than the row is tall, so a collapsed button (pill
+ *    corners) is a true circle and an expanded one a rounded square;
  *  - when a labelled button IS collapsed for want of room, its CONTAINER shrinks to the glyph instead
  *    of keeping the width the label would have needed.
  *

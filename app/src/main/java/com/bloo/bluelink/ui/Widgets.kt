@@ -55,26 +55,27 @@ internal var inMultiWindowMode by mutableStateOf(false)
 private const val StatusStripTintAlpha = 0.18f
 
 /**
- * Whether the app's edge chrome -- the status bar's frost and the TOP edge's glass -- may be drawn.
+ * Whether the status strip may be drawn.
  *
- * Both exist to sit on the app's own window edge, and both stop meaning anything when the app does
- * not own that edge: in multi-window, freeform or split screen the window is a card inside someone
- * else's layout and its top is not the device's, and in immersive full screen there is no status bar
- * inset for either to occupy. Disabled in both cases, from this one place, so they cannot drift.
+ * It exists to sit on the app's own window edge and stops meaning anything when the app does not own
+ * that edge: in multi-window, freeform or split screen the window is a card inside someone else's
+ * layout and its top is not the device's, and in immersive full screen there is no status bar inset
+ * for it to occupy.
  */
 @Composable
-private fun edgeChromeAllowed(): Boolean =
+private fun statusStripAllowed(): Boolean =
     !inMultiWindowMode && WindowInsets.statusBars.asPaddingValues().calculateTopPadding() > 0.dp
 
 /**
  * The status bar: clear, with the app running behind it, frosted -- nearly fully at the top edge, still a
  * little at the bottom of the strip -- so the system icons always sit on a calm pane while the cards and the
  * aurora show through. It blurs [haze], which carries the content AND the backdrop (see Screens), so what
- * scrolls under the strip is what frosts. A faint tint follows the same taper. Skipped in [inMultiWindowMode].
+ * scrolls under the strip is what frosts. A faint tint follows the same taper. Skipped whenever the
+ * app does not own the top of its window -- see [statusStripAllowed].
  */
 @Composable
 internal fun StatusBarScrim(haze: HazeState? = LocalBackdropHaze.current) {
-    if (!edgeChromeAllowed()) return
+    if (!statusStripAllowed()) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val dark = appIsDarkTheme()
     val tint = if (dark) Color.White else MaterialTheme.colorScheme.surfaceContainer
