@@ -210,13 +210,16 @@ internal fun OnboardingRestorePage(vm: AppViewModel) {
             pending = restoring,
         )
     }
-    BodySmallText("New here? Swipe on to set up fresh.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // This card is in the BUTTON section of the deck, where the pager's userScrollEnabled is false:
+    // telling anyone to "swipe on" here was an instruction they could not follow. The swipeable part
+    // comes later and says so itself.
+    BodySmallText("New here? Tap Next to set up fresh.", color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 /**
  * First-run only: bring this device's setup in from another one. Picking a sync file joins it and
  * re-resolves where this device lands (straight to the app if the file already covered everything).
- * Anyone starting fresh just swipes on.
+ * Anyone starting fresh taps Next.
  */
 @Composable
 internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppViewModel) {

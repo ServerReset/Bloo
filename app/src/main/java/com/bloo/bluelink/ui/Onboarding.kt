@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Build
@@ -30,8 +31,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -253,9 +256,17 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                     key = { it },
                 ) { idx ->
                     val step = steps.getOrNull(idx)
+                    // Centred and width-capped: on a wide screen (a tablet, a phone in landscape, a
+                    // foldable's inner display) a full-bleed card stretched the whole way across and
+                    // read as a wall of text. The garage caps its columns the same way.
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
                     Column(
                         Modifier
                             .fillMaxSize()
+                            .widthIn(max = OnboardingCardMaxWidth)
                             .verticalScroll(rememberScrollState())
                             .pageTurn(
                                 offset = { pageOffsetFraction(deck.currentPage, idx, deck.currentPageOffsetFraction) },
@@ -295,12 +306,16 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                             }
                         }
                     }
+                    }
                 }
 
                 // The one way forward through the button section: progress and Back/Next on a
-                // liquid-glass bar, which fluidly animates out as the swipe section begins.
+                // liquid-glass bar, which fluidly animates out as the swipe section begins -- EXCEPT
+                // on the last card, which keeps it. Without that the swipe section ends with no
+                // control on screen at all: the bar is gone, Back is gone, and the only way out is a
+                // gesture whose hand-off page is blank. Anyone it fails for is simply stuck.
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = !inSwipe,
+                    visible = !inSwipe || isLast,
                     enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionShort)) +
                         androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(MotionShort)) { it },
                     exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MotionShort)) +
@@ -332,3 +347,10 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
 
 /** Lets a UI test find the deck's card area (the pager's page content). */
 internal const val DECK_STEP_TAG = "onboardingDeckStep"
+
+/**
+ * How wide an onboarding card may grow. On a wide display (a tablet, a phone in landscape, a
+ * foldable's inner screen) a full-bleed card stretched the whole way across and read as a wall of
+ * text with its action pushed off the bottom; the deck centres its cards and caps them here.
+ */
+private val OnboardingCardMaxWidth = 600.dp
