@@ -38,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -110,6 +111,19 @@ internal fun SearchPill(
         // own explicit clip because Surface's clip applies after the caller's modifier.
         val pillShape = CircleShape
         val canBlur = hazeState != null && canBlurBackdrops()
+        val motion = LocalContentMotion.current
+        if (canBlur) {
+            // The glass on its own layer under the pill, resting while the content beneath moves (see
+            // ContentMotion): only that gate is read in draw, so a swipe or scroll does not re-render the
+            // refraction on every frame.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .drawWithContent { if (!motion.moving) drawContent() }
+                    .clip(pillShape)
+                    .appGlassEffect(hazeState!!, pillShape),
+            )
+        }
         Surface(
             onClick = { if (!expanded) onFocusChange(true) },
             shape = pillShape,
@@ -140,7 +154,6 @@ internal fun SearchPill(
                 .glassEdge(pillShape, shadow = !expanded)
                 // appHazeEffect clipped to pillShape explicitly: this chain runs before Surface's
                 // own shape clip, so an unclipped blur would poke past the rounded outline.
-                .then(if (canBlur) Modifier.clip(pillShape).appGlassEffect(hazeState, pillShape) else Modifier)
                 .then(
                     if (onDrag != null) {
                         // Callbacks read via rememberUpdatedState: pointerInput(key) keeps the

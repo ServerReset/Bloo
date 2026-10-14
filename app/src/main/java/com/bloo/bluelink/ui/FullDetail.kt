@@ -98,6 +98,11 @@ internal fun ExpandedCar(
     val pebblesScroll = rememberScrollState()
     // The aurora leans as the page scrolls; see ExpandedCar.
     val aurora = LocalAuroraReactions.current
+    val motion = LocalContentMotion.current
+    LaunchedEffect(pebblesScroll, motion) {
+        // Only a scroll that started writes; the pages that are merely composed beside it stay quiet.
+        snapshotFlow { pebblesScroll.isScrollInProgress }.collect { if (it || motion.scroll.value) motion.scroll.value = it }
+    }
     LaunchedEffect(pebblesScroll, aurora) {
         if (aurora == null) return@LaunchedEffect
         // Quantized like the page lean (AuroraLeanStep): every write repaints the whole backdrop, and

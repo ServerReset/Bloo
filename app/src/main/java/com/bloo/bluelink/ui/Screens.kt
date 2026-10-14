@@ -97,6 +97,7 @@ fun BlooApp(vm: AppViewModel) {
     // either.
     val searchHazeState = remember { HazeState() }
     val backdropHaze = remember { HazeState() }
+    val contentMotion = remember { ContentMotion() }
     // The one "is the user touching anything" clock the aurora reads; observed at the root below.
     val ambientActivity = remember { AmbientActivity() }
     val toasts = remember { ToastState() }
@@ -152,6 +153,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalToasts provides toasts,
         LocalRefreshIndicator provides refreshIndicator,
         LocalBackdropHaze provides backdropHaze,
+        LocalContentMotion provides contentMotion,
         LocalAmbientActivity provides ambientActivity,
         LocalPowerPolicy provides powerPolicy,
         LocalHaptics provides haptics,
@@ -268,7 +270,12 @@ fun BlooApp(vm: AppViewModel) {
                                     val event = awaitPointerEvent(PointerEventPass.Initial)
                                     val pressed = event.changes.firstOrNull { it.pressed }
                                     if (pressed != null) {
-                                        auroraTouch.pos.value = pressed.position
+                                        // Only a real move is published: every write restarts the glow's follow spring,
+                                        // and a panel delivers 120-240 move events a second.
+                                        val last = auroraTouch.pos.value
+                                        if (last == null || (pressed.position - last).getDistance() >= AuroraTouchStepPx) {
+                                            auroraTouch.pos.value = pressed.position
+                                        }
                                     } else {
                                         auroraTouch.pos.value = null
                                     }
@@ -402,3 +409,6 @@ internal fun carColumnsFor(widthDp: Float): Int = when {
     widthDp >= TWO_COLUMN_MIN_DP -> 2
     else -> 1
 }
+
+/** How far (px) a finger must move before the aurora's glow follows it again. */
+private const val AuroraTouchStepPx = 18f
