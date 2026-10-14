@@ -109,7 +109,7 @@ private fun WidgetContent(data: WidgetData) {
         .fillMaxSize()
         .background(GlanceTheme.colors.widgetBackground)
         .cornerRadius(28.dp)
-        .padding(if (opts.compact) 8.dp else 12.dp)
+        .padding(if (opts.compact) WidgetPadCompact else WidgetPad)
         .clickable(open)
 
     if (data.sealed) {
@@ -161,11 +161,14 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
     val rows = widgetCells(size.height)
     val shape = widgetShapeFor(size.width, size.height)
 
+    // The value scales with the SMALLER of the two spans, so a tall-but-narrow widget does not get a number
+    // too wide for it, nor a wide-but-short one a number too tall.
+    val span = minOf(cols, rows)
     val valueSp: TextUnit = when {
-        shape == WidgetShape.MINIMAL -> 28.sp
-        rows >= 4 -> 52.sp
-        rows >= 3 -> 42.sp
-        else -> 32.sp
+        shape == WidgetShape.MINIMAL -> 30.sp
+        span >= 4 -> 52.sp
+        span >= 3 -> 44.sp
+        else -> 36.sp
     }
     // The status line needs a second row to sit under the value without crowding it.
     val showStatus = shape != WidgetShape.MINIMAL
@@ -179,7 +182,7 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
     val maxActions = minOf(4, cols)
 
     Column(root) {
-        Header(car, showUpdated = showUpdated, opts = opts, pending = pending)
+        Header(car, showUpdated = showUpdated, opts = opts, pending = pending, nameSp = if (cols <= 2) 13.sp else 15.sp)
         Spacer(GlanceModifier.defaultWeight())
         if (shape == WidgetShape.MINIMAL) {
             // 2x2: the value and the lock button share one row, so it fits without a status line.
@@ -193,14 +196,14 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
             }
         } else {
             Text(car.bigValue(), style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = valueSp, fontWeight = FontWeight.Bold))
-            if (showStatus) StatusText(car, note, if (rows >= 3) 13.sp else 12.sp)
+            if (showStatus) StatusText(car, note, if (span >= 3) 14.sp else 12.sp)
             if (showDetails) {
                 Spacer(GlanceModifier.height(4.dp))
                 car.detailLine()?.let { line ->
                     Text(line, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp))
                 }
             }
-            Spacer(GlanceModifier.height(if (opts.compact) 6.dp else 10.dp))
+            Spacer(GlanceModifier.height(if (opts.compact) WidgetGap else WidgetGap * 1.5f))
             Actions(car, pending, armed, opts, labels = labels, maxActions = maxActions)
         }
     }
@@ -221,7 +224,7 @@ private fun StatusText(car: VehicleSnapshot, note: String?, size: TextUnit) {
 // --- Header and controls -----------------------------------------------------------------------
 
 @Composable
-private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptions, pending: String?) {
+private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptions, pending: String?, nameSp: TextUnit = 15.sp) {
     val stale = car.isStale()
     Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Image(
@@ -233,7 +236,7 @@ private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptio
         Column(GlanceModifier.defaultWeight()) {
             Text(
                 car.name, maxLines = 1,
-                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Medium),
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = nameSp, fontWeight = FontWeight.Medium),
             )
             if (showUpdated) {
                 car.updatedLabel()?.let { updated ->
@@ -280,10 +283,12 @@ private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts
         if (opts.charge && car.hasBattery) add(WidgetAction(CarAction.TOGGLE_CHARGE, if (labels) "Charge" else null))
         if (opts.flash) add(WidgetAction(CarAction.FLASH_LIGHTS, if (labels) "Flash" else null))
     }.take(maxActions)
-    Row(GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.Start, verticalAlignment = Alignment.CenterVertically) {
+    // The controls SHARE the row, each an equal slice: no empty run beside them, and every tap target is as
+    // big as the widget allows (never under the 44dp the row is tall).
+    Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         actions.forEachIndexed { i, a ->
-            if (i > 0) Spacer(GlanceModifier.width(8.dp))
-            ActionButton(car, a.action, pending, armed, label = a.label)
+            if (i > 0) Spacer(GlanceModifier.width(WidgetGap))
+            ActionButton(car, a.action, pending, armed, label = a.label, modifier = GlanceModifier.defaultWeight())
         }
     }
 }
@@ -300,7 +305,16 @@ private fun lockLabel(car: VehicleSnapshot): String = if (car.locked == true) "U
  * Unlock asks "Confirm" first.
  */
 @Composable
-private fun ActionButton(car: VehicleSnapshot, action: String, pending: String?, armed: Boolean, label: String?, compact: Boolean = false) {
+private fun ActionButton(
+    car: VehicleSnapshot,
+    action: String,
+    pending: String?,
+    armed: Boolean,
+    label: String?,
+    compact: Boolean = false,
+    /** A width from the row (an equal share); none = a circle (icon) or a pill sized to its word. */
+    modifier: GlanceModifier? = null,
+) {
     val busy = pending == "${car.vin}:$action"
     val locked = car.locked == true
     val active = when (action) {
@@ -321,11 +335,17 @@ private fun ActionButton(car: VehicleSnapshot, action: String, pending: String?,
     }
     val container: ColorProvider = if (active || armed) GlanceTheme.colors.primary else GlanceTheme.colors.secondaryContainer
     val content: ColorProvider = if (active || armed) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSecondaryContainer
-    val h = if (compact) 32.dp else 38.dp
+    val h = if (compact) 40.dp else 44.dp
     Box(
-        modifier = GlanceModifier
+        modifier = (modifier ?: GlanceModifier)
             .height(h)
-            .then(if (text == null) GlanceModifier.width(h) else GlanceModifier.padding(horizontal = 12.dp))
+            .then(
+                when {
+                    modifier != null -> GlanceModifier
+                    text == null -> GlanceModifier.width(h)
+                    else -> GlanceModifier.padding(horizontal = 14.dp)
+                },
+            )
             .background(container)
             .cornerRadius(h / 2)
             .clickable(actionFor(car, action, busy)),
@@ -337,11 +357,11 @@ private fun ActionButton(car: VehicleSnapshot, action: String, pending: String?,
             if (text == null) {
                 Image(
                     ImageProvider(icon), null,
-                    modifier = GlanceModifier.size(if (compact) 16.dp else 18.dp),
+                    modifier = GlanceModifier.size(if (compact) 18.dp else 20.dp),
                     colorFilter = ColorFilter.tint(content),
                 )
             } else {
-                Text(text, maxLines = 1, style = TextStyle(color = content, fontSize = 13.sp, fontWeight = FontWeight.Medium))
+                Text(text, maxLines = 1, style = TextStyle(color = content, fontSize = 14.sp, fontWeight = FontWeight.Medium))
             }
         }
     }
@@ -360,6 +380,11 @@ private fun actionFor(car: VehicleSnapshot, action: String, busy: Boolean): Acti
             actionParametersOf(WidgetKeys.PARAM_VIN to car.vin, WidgetKeys.PARAM_ACTION to action),
         )
     }
+
+/** The widget's spacing: its inner padding (compact and normal) and the gap between controls and lines. */
+private val WidgetPad = 16.dp
+private val WidgetPadCompact = 10.dp
+private val WidgetGap = 8.dp
 
 // --- The car's words ---------------------------------------------------------------------------
 
