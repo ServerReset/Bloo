@@ -366,8 +366,15 @@ val IconButtonMinWidth = 48.dp
 val ButtonPaddingH = 18.dp
 val ChipPaddingH = 16.dp
 
-/** The one content padding for a labelled button, used by every labelled button in the app. */
-val StandardButtonPadding = PaddingValues(horizontal = ButtonPaddingH, vertical = GapRow)
+/**
+ * The one content padding for a labelled button, used by every labelled button in the app.
+ *
+ * A `@Composable` getter, not a plain `val`: its vertical padding is [GapRow], which is itself a
+ * composable getter (it reads the user's spacing scale), so this can only be resolved from a
+ * composable. Declared exactly like [ButtonLabelStyle] below it, for the same reason.
+ */
+val StandardButtonPadding: PaddingValues
+    @Composable get() = PaddingValues(horizontal = ButtonPaddingH, vertical = GapRow)
 
 /**
  * The one button-label [Text]: the shared [ButtonLabelStyle], semi-bold, single line, ellipsized.

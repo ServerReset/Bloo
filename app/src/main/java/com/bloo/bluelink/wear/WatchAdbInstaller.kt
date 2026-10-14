@@ -181,6 +181,15 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
     }
 
     companion object {
-        const val WATCH_PACKAGE = "com.bloo.bluelink.wear"
+        /**
+         * The watch app's package name, which is deliberately the phone's OWN.
+         *
+         * The Wearable Data Layer only exposes a node to an app that shares its package name and
+         * signing certificate, so the watch is built with the same applicationId as this app (see
+         * wear/build.gradle.kts). Deriving it from this app's own id rather than writing it out means
+         * the two cannot drift apart again -- they did, and for that whole time the phone could not
+         * see the watch at all, while this launch silently targeted an app that was not there.
+         */
+        val WATCH_PACKAGE = com.bloo.bluelink.BuildConfig.APPLICATION_ID
     }
 }
