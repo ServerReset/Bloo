@@ -443,7 +443,15 @@ internal fun AuroraBackground(
     // read straight off the shared signals in the draw phase, so a page turn never recomposes this.
     val reactions = LocalAuroraReactions.current
     val kick = remember { Animatable(0f) }
+    // What the draw reads: the kick in steps, so its springs repaint the backdrop (and every glass surface
+    // blurring it) a handful of times, not on every frame for most of a second.
+    val kickStep = remember { mutableFloatStateOf(0f) }
     if (reactions != null && !saver) {
+        LaunchedEffect(kick) {
+            snapshotFlow { kick.value }.collect { v ->
+                if (kotlin.math.abs(v - kickStep.floatValue) >= 0.08f || (v == 0f && kickStep.floatValue != 0f)) kickStep.floatValue = v
+            }
+        }
         LaunchedEffect(reactions) {
             snapshotFlow { reactions.kick.intValue }.collect { k ->
                 if (k > 0) {
@@ -473,7 +481,7 @@ internal fun AuroraBackground(
                 // phase. Battery saver freezes the aurora outright, so both are zero there.
                 val leanX = if (saver) 0f else (reactions?.leanX?.floatValue ?: 0f)
                 val leanY = if (saver) 0f else (reactions?.leanY?.floatValue ?: 0f)
-                val k = if (saver) 0f else kick.value
+                val k = if (saver) 0f else kickStep.floatValue
                 // Five blobs on slow, uneven loops (sines at different rates, so the pattern never repeats
                 // quickly), each breathing in size, and each pulled a little toward a finger.
                 fun blob(c: Color, bx: Float, by: Float, ax: Float, ay: Float, f1: Float, f2: Float, ph: Float, r: Float, alpha: Float) {

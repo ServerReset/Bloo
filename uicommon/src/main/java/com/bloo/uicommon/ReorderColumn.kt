@@ -190,7 +190,7 @@ fun <T> ReorderColumn(
                         .zIndex(if (dragging) 1f else 0f)
                         // Non-dragged items glide to their new slot; the dragged one is positioned
                         // manually via graphicsLayer below.
-                        .then(if (dragging) Modifier else Modifier.animatePlacement())
+                        .then(if (dragging) Modifier else Modifier.animatePlacement { order })
                         .graphicsLayer {
                             // The dragged pebble follows the finger on BOTH axes, so it can be
                             // carried sideways onto the hot-seat column (the vertical part still
@@ -421,16 +421,35 @@ fun <T> ReorderColumn(
  * snapping. Used for the non-dragged pebbles so they slide out of the way smoothly. The dragged
  * item is offset manually and must not use this.
  */
-fun Modifier.animatePlacement(): Modifier = composed {
+fun Modifier.animatePlacement(
+    /**
+     * The list's order. Only a CHANGE of order glides an item to its new place; any other move (a pebble
+     * above opening or closing, a placeholder filling in) follows the layout directly. Chasing those on a
+     * spring launched an animation per row per frame and made rows trail and rubber-band behind a growing
+     * card.
+     */
+    order: () -> Any? = { null },
+): Modifier = composed {
     val scope = rememberCoroutineScope()
     var target by remember { mutableStateOf(IntOffset.Zero) }
     var anim by remember { mutableStateOf<Animatable<IntOffset, *>?>(null) }
+    // Plain holder, not state: read and written in placement, it must not invalidate anything.
+    val seen = remember { arrayOfNulls<Any?>(1).also { it[0] = order() } }
     this
         .onPlaced { target = it.positionInParent().round() }
         .offset {
             val a = anim ?: Animatable(target, IntOffset.VectorConverter).also { anim = it }
             if (a.targetValue != target) {
-                scope.launch { a.animateTo(target, spring(stiffness = Spring.StiffnessMediumLow)) }
+                val now = order()
+                if (now != seen[0] || a.isRunning) {
+                    // A reorder (or a glide still under way): slide there.
+                    seen[0] = now
+                    scope.launch { a.animateTo(target, spring(stiffness = Spring.StiffnessMediumLow)) }
+                } else {
+                    // Follow the layout this very frame; the animatable catches up in the background.
+                    scope.launch { a.snapTo(target) }
+                    return@offset IntOffset.Zero
+                }
             }
             a.value - target
         }

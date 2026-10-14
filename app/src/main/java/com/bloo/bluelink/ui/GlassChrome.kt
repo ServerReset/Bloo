@@ -207,13 +207,20 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
     val haze = LocalBackdropHaze.current.takeUnless { floating }
     val ultra = LocalAppearance.current.ultraGlass
     val blur = LocalPagerBlur.current
+    val drawBlur = androidx.compose.runtime.remember(blur) { androidx.compose.runtime.derivedStateOf { blur() > 0.01f } }
     if (haze != null && canBlurBackdrops()) {
         Box(
             Modifier
                 .matchParentSize()
                 // Faded, and not drawn at all at 0: while it is skipped Haze does no capture or blur work.
-                .graphicsLayer { alpha = blur() }
-                .drawWithContent { if (blur() > 0.01f) drawContent() }
+                // The fade lives in the layer (a re-composite, not a redraw); only crossing the on/off
+                // threshold invalidates the draw. Reading blur() in drawWithContent made every card re-capture
+                // and re-blur its backdrop on every frame of the post-swipe fade.
+                .graphicsLayer {
+                    alpha = blur()
+                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                }
+                .drawWithContent { if (drawBlur.value) drawContent() }
                 .clip(shape)
                 // ALWAYS the cheap blur, even in Ultra glass. A card is large and flat: the liquid
                 // refraction's edge bend is lost across it, but the displacement + chromatic pass is

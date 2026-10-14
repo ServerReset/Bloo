@@ -65,6 +65,9 @@ internal fun StaggeredRevealColumn(
                 // `progress` is read INSIDE the layerBlock (draw phase), not in the placement body,
                 // so transition ticks redraw instead of re-measuring every child.
                 p.placeWithLayer(0, y) {
+                    // Rows never overlap themselves: modulate each draw's alpha instead of rendering the row
+                    // (often glass) into its own offscreen buffer for the length of the open.
+                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
                     // Each row runs its own window over the shared open/close progress. Opening, the
                     // rows cascade top to bottom, each popping a beat AFTER the card reaches it.
                     // Closing runs the cascade in reverse -- the bottom rows leave first -- so the

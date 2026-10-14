@@ -335,7 +335,7 @@ internal fun HotSeatOverlay(
     hotspots: List<String>,
     hotDrag: HotSeatDrag,
     /** This layer's own origin in window coords, to convert the slot's window position. */
-    origin: Offset,
+    origin: () -> Offset,
     /** Placement in the page Box (TopStart), so the offset below is measured from the page origin. */
     modifier: Modifier = Modifier,
 ) {
@@ -345,8 +345,8 @@ internal fun HotSeatOverlay(
         modifier
             .offset {
                 IntOffset(
-                    (hotDrag.slotTopLeft.x - origin.x).roundToInt(),
-                    (hotDrag.slotTopLeft.y - origin.y).roundToInt(),
+                    (hotDrag.slotTopLeft.x - origin().x).roundToInt(),
+                    (hotDrag.slotTopLeft.y - origin().y).roundToInt(),
                 )
             }
             .width(with(LocalDensity.current) { hotDrag.slotSize.width.toDp() }),

@@ -29,7 +29,6 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -131,9 +130,11 @@ internal fun ExpandedCar(
         // One scrolling page whose two blocks reflow by [expandedT]: the pebble list sits UNDER the
         // hero while collapsed and slides up BESIDE it while expanded. Same content either way, so
         // expanding/collapsing is an in-place animation, not a screen swap.
-        var pageOrigin by remember { mutableStateOf(Offset.Zero) }
+        // Read only in the hot seat's offset (layout phase): as composition state it recomposed this whole
+        // page on every swipe frame, since the window position moves with the pager.
+        val pageOrigin = remember { arrayOf(Offset.Zero) }
         Box(
-            Modifier.fillMaxSize().onGloballyPositioned { pageOrigin = it.localToWindow(Offset.Zero) },
+            Modifier.fillMaxSize().onGloballyPositioned { pageOrigin[0] = it.localToWindow(Offset.Zero) },
             contentAlignment = Alignment.TopCenter,
         ) {
             Column(
@@ -181,7 +182,7 @@ internal fun ExpandedCar(
             // moment it was dragged out; this one never does, and it is the only node for that pebble.
             if (expanded) {
                 HotSeatOverlay(
-                    v, state, vm, hotspots, hotDrag, pageOrigin,
+                    v, state, vm, hotspots, hotDrag, { pageOrigin[0] },
                     // Arrives LAST: only once the columns have mostly moved, rising a little into
                     // its seat. Read in the draw phase, so the reflow never recomposes it.
                     modifier = Modifier.align(Alignment.TopStart).graphicsLayer {

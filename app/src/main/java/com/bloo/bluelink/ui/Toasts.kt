@@ -2,6 +2,7 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.layout.layout
@@ -254,11 +255,13 @@ internal fun ToastHost(
 
     // While the search results are up the toasts fade out and step aside (kept alive, just not placed
     // or hit-tested), so they never sit over the panel; they return when it closes.
-    val show by animateFloatAsState(if (anchor.searchOpen) 0f else 1f, tween(MotionShort), label = "toastShow")
-    val parked = anchor.searchOpen && show < 0.01f
+    val showState = animateFloatAsState(if (anchor.searchOpen) 0f else 1f, tween(MotionShort), label = "toastShow")
+    // The fade is read in the layer; composition sees only "parked or not", so the host does not recompose on
+    // every frame of the search panel opening and closing.
+    val parked by remember { derivedStateOf { anchor.searchOpen && showState.value < 0.01f } }
     Box(
         modifier
-            .graphicsLayer { alpha = show }
+            .graphicsLayer { alpha = showState.value }
             .layout { measurable, constraints ->
                 val p = measurable.measure(constraints)
                 layout(p.width, p.height) { if (!parked) p.place(0, 0) }

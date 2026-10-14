@@ -195,8 +195,12 @@ internal fun PebbleList(
         // row (the AnimatedVisibility inside may render nothing), so a pinned row's slot stays live
         // even collapsed to zero -- the unpin flight targets exactly this point.
         Box(
-            Modifier.onGloballyPositioned { coords ->
-                hotDrag?.let { d -> d.stackSlot[section] = coords.localToWindow(Offset.Zero) }
+            // Only where there is a hot seat to fly to (the full-screen view): elsewhere this was a callback per
+            // row on every scroll frame, doing nothing.
+            if (hotDrag != null) {
+                Modifier.onGloballyPositioned { coords -> hotDrag.stackSlot[section] = coords.localToWindow(Offset.Zero) }
+            } else {
+                Modifier
             },
         ) {
             val rowVisible = section in sections && (section !in pinned || hotDrag?.returning == section)

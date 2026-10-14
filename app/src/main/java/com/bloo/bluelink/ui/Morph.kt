@@ -44,6 +44,9 @@ fun MorphButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /** Whether a disabled button wears the inert frost. False for one that is busy (a pending command): it
+     *  is disabled to block taps, not "off", and a blur under its spinner would re-render every frame. */
+    frostWhenDisabled: Boolean = true,
     active: Boolean = false,
     containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
     contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -100,10 +103,11 @@ fun MorphButton(
     val resolvedContent = if (active) activeContentColor else contentColor
     // The frost's animation state only exists for a button that has ever been inert (nearly all
     // never are).
-    var everInert by remember { mutableStateOf(!enabled) }
-    SideEffect { if (!enabled) everInert = true }
-    val frost = if (everInert || !enabled) {
-        Modifier.inertButtonFrost(!enabled)
+    val inert = !enabled && frostWhenDisabled
+    var everInert by remember { mutableStateOf(inert) }
+    SideEffect { if (inert) everInert = true }
+    val frost = if (everInert || inert) {
+        Modifier.inertButtonFrost(inert)
     } else {
         Modifier
     }
@@ -233,8 +237,9 @@ fun MorphTextButton(
     MorphButton(
         onClick = onClick,
         modifier = modifier,
-        // A pending action is inert and iced out.
+        // A pending action takes no taps, but is busy rather than "off": no frost over its spinner.
         enabled = enabled && !pending,
+        frostWhenDisabled = !pending,
         active = active,
         groupWeight = groupWeight,
         expressive = expressive,

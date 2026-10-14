@@ -16,7 +16,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.CornerRadius
@@ -202,12 +201,11 @@ private fun rememberSlowShimmer(periodMs: Long): State<Float> {
     val periodNanos = periodMs * 1_000_000L
     LaunchedEffect(periodNanos) {
         val start = System.nanoTime()
-        var lastStep = 0L
         while (true) {
-            withFrameNanos { }
+            // A plain delay, not withFrameNanos: waiting on every vsync kept the frame clock awake at the
+            // panel's full rate for as long as the car charged, only to skip most of those frames.
+            kotlinx.coroutines.delay(ShimmerStepNanos / 1_000_000L)
             val now = System.nanoTime()
-            if (now - lastStep < ShimmerStepNanos) continue
-            lastStep = now
             state.floatValue = ((now - start) % periodNanos).toFloat() / periodNanos.toFloat()
         }
     }
