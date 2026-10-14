@@ -22,7 +22,8 @@ private val CollapseReturnMargin = 24.dp
 /**
  * A row of buttons where the pressed one takes ~15% more width and its neighbours give up exactly
  * that much, so the group's own width never changes and no parent remeasures.
- */@Composable
+ */
+@Composable
 fun ExpressiveButtonGroup(
     modifier: Modifier = Modifier,
     spacing: Dp = 3.dp,
@@ -77,7 +78,6 @@ fun ExpressiveButtonGroup(
             // See CollapseReturnMargin: how much extra room a collapsed line needs before its labels
             // come back. Read once per pass; the sticky state it reads is updated at the end.
             val collapseReturnMarginPx = CollapseReturnMargin.roundToPx()
-            val wasCompacted = naturals.compacted
 
             // Press fractions are read at layout time so a press invalidates layout only. Only
             // children carrying ExpressiveGroupData are members; Spacers, labels and icons keep
@@ -115,39 +115,24 @@ fun ExpressiveButtonGroup(
             for (i in 0 until n) {
                 if (weight[i] < 0f) weight[i] = if (memberCount > 1) full[i].toFloat().coerceAtLeast(1f) else 0f
             }
-            // The icon-only fallback is lazy: minIntrinsicWidth walks each member's subtree, so it
-            // is computed once per resting generation, only when some line fails the full-width
-            // test.
+            // The symbol-only widths, read lazily: minIntrinsicWidth walks each member's subtree, so it is
+            // read once per resting generation and only when some line cannot hold its labels.
             var compact: IntArray? = naturals.compact
+            fun compactWidths(): IntArray = compact ?: IntArray(n) { i ->
+                if (member[i]) measurables[i].minIntrinsicWidth(h).coerceIn(0, full[i]) else full[i]
+            }.also { compact = it; naturals.compact = it }
 
-            // Break into lines as a FlowRow would.
             val maxW = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
-            val lines = ArrayList<IntArray>()
-            // True when the labels do not fit on one line but every member has a symbol it can
-            // shrink to, and those symbols all fit together on one line.
-            fun computeCollapsesInsteadOfWrapping(): Boolean {
-                if (n < 2 || maxW == Int.MAX_VALUE || member.any { !it }) return false
-                if (full.sum() + gapPx * (n - 1) <= maxW) return false
-                val c = compact ?: IntArray(n) { i -> measurables[i].minIntrinsicWidth(h).coerceIn(0, full[i]) }
-                    .also { compact = it; naturals.compact = it }
-                return (0 until n).all { c[it] < full[it] } && c.sum() + gapPx * (n - 1) <= maxW
-            }
-            fun collapsesInsteadOfWrapping(): Boolean {
-                val cached = naturals.collapseWrap
-                if (!resting && cached != null) return cached.second
-                val answer = computeCollapsesInsteadOfWrapping()
-                naturals.collapseWrap = maxW to answer
-                return answer
-            }
-            if (!wrap || collapsesInsteadOfWrapping()) {
-                // A row whose buttons all have a symbol never breaks into lines: when the labels do
-                // not fit, every button drops to its symbol (the fit rule below) and the one line
-                // fills the width. Wrapping is for buttons that have nothing to collapse to.
-                lines.add(IntArray(n) { it })
-            } else {
-                val broken = balancedLineBreaks(full, gapPx, maxW)
-                lines.addAll(broken)
-            }
+            // Stretching to fill is only for a group GIVEN its width (fillMaxWidth: min == max). A group in a
+            // Row beside a weighted label is handed a loose, bounded width as the most it may take; stretching
+            // to that claimed the whole row and starved the label.
+            val handedItsWidth = constraints.hasBoundedWidth && constraints.minWidth == constraints.maxWidth
+            // LINES. A wrapping row keeps its labels and breaks onto another line instead (balanced, like a
+            // FlowRow) -- a label is worth more than one line of height. Only a row that reads as one object
+            // (wrap = false: connected segments, a split pill, a header cluster) stays on a single line.
+            val lines: List<IntArray> =
+                if (!wrap || maxW == Int.MAX_VALUE) listOf(IntArray(n) { it }) else balancedLineBreaks(full, gapPx, maxW)
+            val multiLine = lines.size > 1
 
             val out = arrayOfNulls<Placeable>(n)
             val lineWidth = IntArray(lines.size)
@@ -164,9 +149,10 @@ fun ExpressiveButtonGroup(
                     nonMemberWidth += p.width
                 }
                 val memberIdx = idx.filter { member[it] }
-                // A lone button on its line has nobody to share with: it rests at its own width
-                // (aligned to the start) and only fills the line while pressed -- see below.
-                if (memberIdx.size == 1) weight[memberIdx[0]] = 0f
+                // A lone button on a line of a WRAPPED row fills that line like its neighbours do, so no line
+                // is left half empty; a row that is just one button sits at its own width (it fills only
+                // while pressed, see below).
+                if (memberIdx.size == 1) weight[memberIdx[0]] = if (multiLine && handedItsWidth) 1f else 0f
                 if (memberIdx.isEmpty()) {
                     lineWidth[li] = nonMemberWidth + gapsHere
                     lineHeight[li] = idx.maxOf { out[it]?.height ?: 0 }
@@ -180,62 +166,57 @@ fun ExpressiveButtonGroup(
                     memberIdx.sumOf { full[it] + r[it] }
                 }
 
-                // FIT RULE, all-or-nothing: if the line cannot give every member the room its label
-                // needs, every member drops to its glyph so the choice never depends on text or
-                // language. Tested against content, not content plus press reserve.
-                // The smallest state a button reaches is its label width (a press only borrows spare room), so
-                // if every label fits at that width the labels stay; if not, the whole line is glyphs.
-                // Decided once per room, from a resting pass, never mid-press.
+                // FIT RULE, per button. A button keeps its label unless the line truly cannot hold it. When a
+                // line's labels do not fit, the buttons that save the most by dropping to their symbol drop
+                // first, one at a time, until the line fits; every other button keeps its label. The smallest a
+                // button ever gets is its basis (a press only borrows spare room), so the choice holds through a
+                // press: it is made from a resting pass and reused mid-press, and made again only when the room
+                // or the buttons change. A line that already dropped some needs a small margin before labels
+                // come back, so room hovering at the threshold cannot flip a label per pixel.
                 val prior = naturals.decided[li]
-                val collapse = if (!constraints.hasBoundedWidth) false
-                else if (!resting && prior != null) prior.second
-                else {
-                    // STICKY (see NaturalWidths.compacted): a line that has already dropped to glyphs
-                    // keeps them until its labels fit with a clear margin. Without this the decision
-                    // was remade on every pixel of room, so content changing beside the buttons could
-                    // put a label back and take it away again while the user watched.
-                    val need = memberIdx.sumOf { full[it] }
-                    val margin = if (wasCompacted) collapseReturnMarginPx else 0
-                    need + margin > room
+                val collapsed: BooleanArray = when {
+                    !constraints.hasBoundedWidth -> BooleanArray(n)
+                    !resting && prior != null && prior.size == n -> prior
+                    else -> {
+                        val margin = if (prior != null && prior.size == n && prior.any { it }) collapseReturnMarginPx else 0
+                        chooseSymbolOnly(memberIdx, full, ::compactWidths, room, margin)
+                    }
                 }
-                if (constraints.hasBoundedWidth) { naturals.compacted = collapse; naturals.decided[li] = room to collapse }
-                val basis = if (collapse) {
-                    val c = compact ?: IntArray(n) { i ->
-                        if (member[i]) measurables[i].minIntrinsicWidth(h).coerceIn(0, full[i]) else full[i]
-                    }.also { compact = it; naturals.compact = it }
-                    if (memberIdx.any { c[it] < full[it] }) c else full
+                if (constraints.hasBoundedWidth) naturals.decided[li] = collapsed
+                val anyCollapsed = memberIdx.any { collapsed[it] }
+                val basis = if (anyCollapsed) {
+                    val c = compactWidths()
+                    IntArray(n) { if (collapsed[it]) c[it] else full[it] }
                 } else {
                     full
                 }
+                // A button showing only its symbol never stretches: spare room goes to the labelled ones, so an
+                // icon button is never a wide empty pill.
+                for (i in memberIdx) if (collapsed[i]) weight[i] = 0f
                 // Resting width for the winning basis: content (or glyph) plus its seams' reserve.
                 // Named apart from the later `reserve` local to avoid shadowing.
                 val memberReserve = seamPressReserve(memberIdx, basis)
                 val natLine = IntArray(n) { if (member[it]) basis[it] + memberReserve[it] else full[it] }
                 val naturalTotal = memberIdx.sumOf { natLine[it] }
 
-                // Equal shares need two or more members; a lone button keeps its natural width.
-                // Once the fit rule picks `compact`, each share is capped at the member's own
-                // natLine so a generous share cannot let a label back in.
+                // Equal shares need two or more members; a lone button keeps its natural width. Only labelled
+                // members share the room; a symbol-only member keeps its own compact width.
                 val base = DoubleArray(n)
                 val total: Int
                 if (equalWidths && constraints.hasBoundedWidth && memberIdx.size > 1) {
-                    val each = room.toDouble() / memberIdx.size
-                    val isCompact = basis !== full
-                    for (i in memberIdx) {
-                        base[i] = if (isCompact) minOf(each, natLine[i].toDouble()) else each
-                    }
-                    total = if (isCompact) memberIdx.sumOf { base[it] }.roundToInt() else room
+                    val iconIdx = memberIdx.filter { collapsed[it] }
+                    val labelIdx = memberIdx.filter { !collapsed[it] }
+                    val iconTotal = iconIdx.sumOf { natLine[it] }
+                    val each = if (labelIdx.isEmpty()) 0.0 else (room - iconTotal).toDouble() / labelIdx.size
+                    for (i in iconIdx) base[i] = natLine[i].toDouble()
+                    // Never below what the label needs.
+                    for (i in labelIdx) base[i] = maxOf(each, basis[i].toDouble())
+                    total = if (labelIdx.isEmpty()) iconTotal else maxOf(room, memberIdx.sumOf { base[it] }.roundToInt())
                 } else {
                     // Weighted members stretch to fill the line's leftover, inside the budget, so a
                     // split pill spans its row and still redistributes on press.
                     val wSum = memberIdx.sumOf { weight[it].toDouble() }
                     for (i in memberIdx) base[i] = natLine[i].toDouble()
-                    // Stretching to fill is only for a group GIVEN its width (fillMaxWidth: min ==
-                    // max). A group in a Row beside a weighted label is handed a loose, bounded
-                    // width as the most it may take -- stretching to that claimed the whole row and
-                    // starved the label to nothing (the Logs header: one letter per line, buttons
-                    // on top of it).
-                    val handedItsWidth = constraints.hasBoundedWidth && constraints.minWidth == constraints.maxWidth
                     val spareRaw = room - naturalTotal
                     val spare = if (!handedItsWidth && spareRaw > 0) 0 else spareRaw
                     total = when {

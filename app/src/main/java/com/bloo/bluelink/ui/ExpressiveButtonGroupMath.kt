@@ -12,11 +12,18 @@ internal fun seamPressReserve(memberIdx: List<Int>, basis: IntArray): IntArray {
     val out = IntArray(basis.size)
     for (k in 0 until memberIdx.size - 1) {
         val a = memberIdx[k]; val b = memberIdx[k + 1]
-        out[a] += ((ExpressivePressGrowth * basis[a]) / 2f).roundToInt()
-        out[b] += ((ExpressivePressGrowth * basis[b]) / 2f).roundToInt()
+        out[a] += ((RestingPressReserve * basis[a]) / 2f).roundToInt()
+        out[b] += ((RestingPressReserve * basis[b]) / 2f).roundToInt()
     }
     return out
 }
+
+/**
+ * How much width, at rest, a button keeps beyond its content as room for a neighbour's press. Kept small: it
+ * is visible as empty space inside every button of a row that is not stretched to fill (the press can still
+ * borrow the stretch of a filled row).
+ */
+internal const val RestingPressReserve = 0.10f
 
 /**
  * Each member's exact width once pressed. A pressed member draws only on the seams it shares with
@@ -93,4 +100,31 @@ internal fun largestRemainderWidths(memberIdx: List<Int>, exact: DoubleArray, to
         }
     }
     return target
+}
+
+/**
+ * Which members show only their symbol on a line [room] wide. None, if every label fits (with [margin] extra
+ * needed when the line had dropped some before). Otherwise the members that save the most by dropping go
+ * first, one at a time, until the line fits; every other member keeps its label. [compact] (the symbol-only
+ * widths) is read only when something has to drop.
+ */
+internal fun chooseSymbolOnly(
+    memberIdx: List<Int>,
+    full: IntArray,
+    compact: () -> IntArray,
+    room: Int,
+    margin: Int = 0,
+): BooleanArray {
+    val drop = BooleanArray(full.size)
+    var need = memberIdx.sumOf { full[it] } + margin
+    if (need <= room) return drop
+    val c = compact()
+    for (i in memberIdx.sortedByDescending { full[it] - c[it] }) {
+        if (need <= room) break
+        if (c[i] < full[i]) {
+            drop[i] = true
+            need -= full[i] - c[i]
+        }
+    }
+    return drop
 }

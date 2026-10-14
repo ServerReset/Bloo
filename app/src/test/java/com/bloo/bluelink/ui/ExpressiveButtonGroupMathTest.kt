@@ -13,9 +13,29 @@ class ExpressiveButtonGroupMathTest {
     @Test
     fun seamReserveSizesEachHalfOffItsOwnContent() {
         val r = seamPressReserve(listOf(0, 1), intArrayOf(100, 200))
-        assertEquals(15, r[0]) // 0.30 * 100 / 2
-        assertEquals(30, r[1]) // 0.30 * 200 / 2
+        assertEquals(5, r[0]) // 0.10 * 100 / 2
+        assertEquals(10, r[1]) // 0.10 * 200 / 2
         assertEquals(2, r.size)
+    }
+
+    @Test
+    fun everyLabelStaysWhenTheLineFits() {
+        val drop = chooseSymbolOnly(listOf(0, 1), intArrayOf(120, 200), { error("not needed") }, room = 330)
+        assertTrue(drop.none { it })
+    }
+
+    @Test
+    fun onlyTheBiggestSaverDropsToItsSymbol() {
+        // 120 + 200 = 320 > 280: dropping the 200 (to 56) saves the most and is enough; the 120 keeps its label.
+        val drop = chooseSymbolOnly(listOf(0, 1), intArrayOf(120, 200), { intArrayOf(56, 56) }, room = 280)
+        assertTrue(!drop[0] && drop[1])
+    }
+
+    @Test
+    fun aLineThatDroppedNeedsAMarginToGetItsLabelsBack() {
+        // Fits exactly, but with the return margin it does not yet.
+        val drop = chooseSymbolOnly(listOf(0, 1), intArrayOf(100, 100), { intArrayOf(50, 50) }, room = 200, margin = 24)
+        assertTrue(drop.any { it })
     }
 
     @Test

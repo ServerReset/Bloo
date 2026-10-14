@@ -10,20 +10,10 @@ import androidx.compose.ui.unit.Density
  */
 internal class NaturalWidths {
     /**
-     * Whether the last layout dropped members to their symbols. Sticky: it returns to words only
-     * with a clear margin, so a width hovering at the threshold doesn't flip icon/text per pixel.
+     * The per-line choice of which members show only their symbol, made from a resting pass and reused
+     * through every press (so a press can never add or drop a label); made again when the room changes.
      */
-    var compacted: Boolean = false
-
-    /**
-     * The labels-or-glyphs decision per line, with the room it was made for. Made only from a RESTING
-     * pass and reused through every press, so a press can never add or drop a label; it is made again
-     * only when the room changes (a new size or shape, or different buttons).
-     */
-    val decided = HashMap<Int, Pair<Int, Boolean>>()
-
-    /** The same, for "collapse the whole row to glyphs instead of wrapping": (maxWidth, answer). */
-    var collapseWrap: Pair<Int, Boolean>? = null
+    val decided = HashMap<Int, BooleanArray>()
 
     /**
      * The standalone button's own single resting width, cached from its last resting measure. Only
