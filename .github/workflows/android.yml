@@ -13,11 +13,9 @@ on:
 permissions:
   contents: write
 
-# One run per branch at a time: a newer push cancels the older run still in flight. Several emulator runs at
-# once starved each other until they all hit their timeout and nothing was published at all.
-concurrency:
-  group: android-${{ github.ref }}
-  cancel-in-progress: true
+# No concurrency group, on purpose: runs on the same branch may overlap. Cancelling the one in flight
+# dropped builds people were waiting on, and the jobs that could starve each other are on separate
+# runners anyway -- each job gets its own VM, so two runs do not contend for one.
 
 jobs:
   # Every branch push builds the APKs and publishes them as the one rolling GitHub Release (see the
@@ -274,82 +272,6 @@ jobs:
           name: androidTest-reports
           path: app/build/reports/androidTests/
           if-no-files-found: ignore
-
-  # Keeps the README's screenshots current (maintained by the screenshot agent): builds the release APK,
-  # installs it on an emulator, captures the pre-login screens and commits them to docs/screenshots/. It never
-  # fails the run: with no capture script it skips, a capture that produces nothing commits nothing, and a push
-  # that loses a race with a newer commit is dropped (the next run captures again).
-  screenshots:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Anything to capture?
-        id: check
-        run: |
-          if [ -f .github/ci-screenshots.sh ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "No capture script: nothing to capture, skipping."
-          fi
-
-      - name: Set up JDK 21
-        if: steps.check.outputs.run == 'true'
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Set up Gradle
-        if: steps.check.outputs.run == 'true'
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build the release APK
-        if: steps.check.outputs.run == 'true'
-        run: chmod +x ./gradlew && ./gradlew :app:assembleRelease --stacktrace
-
-      - name: Enable KVM
-        if: steps.check.outputs.run == 'true'
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Capture screenshots from the APK
-        if: steps.check.outputs.run == 'true'
-        continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          arch: x86_64
-          target: google_apis
-          profile: pixel_6
-          disable-animations: true
-          script: bash .github/ci-screenshots.sh
-
-      - name: Commit the screenshots
-        if: steps.check.outputs.run == 'true'
-        run: |
-          if ! ls docs/screenshots/*.png >/dev/null 2>&1; then
-            echo "Nothing was captured; skipping."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/screenshots
-          if git diff --cached --quiet; then
-            echo "Screenshots unchanged."
-            exit 0
-          fi
-          git commit -m "Update screenshots from build #${{ github.run_number }} [skip ci]"
-          # A newer push may have landed meanwhile: rebase onto it, and if that still loses, drop this one.
-          git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" || echo "Push lost a race with a newer commit; skipped."
 
   # Makes the build visible to the in-app updater (phone and watch) only once it is finished and the build
   # and the emulator tests both passed. Until then the release is a draft, which the updater cannot see.
