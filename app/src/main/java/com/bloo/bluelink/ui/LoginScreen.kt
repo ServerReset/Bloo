@@ -345,7 +345,7 @@ internal fun LoginScreen(
                 }
             }
         }
-        // The hero wordmark draws under the status bar (no top inset, deliberate); the app-wide edge frame
-        // (EdgeGlassFrame, Screens) frosts it like every other screen.
+        // The hero wordmark draws under the status bar (no top inset, deliberate); the app-wide
+        // status strip (StatusBarScrim, Screens) frosts it like every other screen.
     }
 }

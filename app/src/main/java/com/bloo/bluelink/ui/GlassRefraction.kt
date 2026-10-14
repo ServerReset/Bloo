@@ -1,22 +1,10 @@
 package com.bloo.bluelink.ui
 
 import dev.chrisbanes.haze.HazePerformanceMode
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -62,52 +50,6 @@ internal fun Modifier.appGlassEffect(
     // A fixed middle quality rather than Adaptive, so the resolution cannot change mid-gesture.
     return this.hazeGlass(input = HazeInput.Sources(state), style = style, performanceMode = HazePerformanceMode.Balanced)
 }
-
-/**
- * How wide the app's glass frame is down its sides. It is [ScreenGutter], the app's own margin from
- * the window edge to its content, so the frame sits in the gap rather than over anything.
- */
-private val EdgeGlassSideWidth = ScreenGutter
-
-/**
- * The app's OWN glass along the window's edges: one band per side, so the frame refracts what is
- * behind it and its inner boundary carries the same specular rim and colour fringe as every other
- * glass surface in the app.
- *
- * Deliberately the app's ORDINARY glass -- the very same [appGlassEffect] the search panel and the
- * dialogs use -- rather than anything bespoke. The refraction rides the band's boundary, and a band
- * whose outer edge IS the window edge therefore refracts along the app's own edge.
- *
- * The bands live in the app's margin (the content is inset from the window edges by [ScreenGutter]),
- * so nothing is covered. The top band is the status strip.
- */
-@Composable
-internal fun BoxScope.EdgeGlassFrame(hazeState: HazeState?) {
-    if (hazeState == null) return
-    // A plain rectangle: the boundary the refraction rides is the band's own.
-    val shape = RoundedCornerShape(0.dp)
-    val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    // TOP: the status bar's frost (strong at the very top, a little at its bottom), then a thin band of liquid
-    // glass just under it, so the top edge bends like the other three.
-    Box(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
-        StatusBarScrim(hazeState)
-        Box(
-            Modifier.padding(top = top).fillMaxWidth().height(EdgeGlassRimHeight)
-                .appGlassEffect(hazeState, shape, clear = true),
-        )
-    }
-    // BOTTOM and SIDES: liquid glass, the window edge as the band's outer boundary.
-    Box(
-        Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(maxOf(bottom, EdgeGlassRimHeight))
-            .appGlassEffect(hazeState, shape, clear = true),
-    )
-    Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(EdgeGlassSideWidth).appGlassEffect(hazeState, shape, clear = true))
-    Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(EdgeGlassSideWidth).appGlassEffect(hazeState, shape, clear = true))
-}
-
-/** The liquid band along the top (under the status bar) and the bottom when there is no navigation bar. */
-private val EdgeGlassRimHeight = 14.dp
 
 @OptIn(ExperimentalHazeApi::class)
 private fun glassStyle(

@@ -328,9 +328,10 @@ fun BlooApp(vm: AppViewModel) {
             }
         }
     }
-    // The app's own glass along the window's edges: above the content, below the chrome, so the
-    // frame refracts the backdrop beside the content rather than covering it.
-    EdgeGlassFrame(searchHazeState)
+    // The status bar is the ONLY edge treatment in the app: a strip exactly the height of the status
+    // bar that blurs what is behind it, strongest at the top and still frosted at the bottom of the
+    // strip. Nothing is drawn along the sides or the bottom of the window.
+    StatusBarScrim(searchHazeState)
     // Toasts sit inside the outer Box after SearchLayer so they stack above search; the lock
     // overlay and dialogs sit above them. The app-wide pull-to-refresh disc, drawn above content
     // and below toasts/dialogs; refracts searchHazeState.

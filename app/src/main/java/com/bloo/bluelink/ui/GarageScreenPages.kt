@@ -240,7 +240,7 @@ internal fun CollapsedGaragePager(
                     }
                 }
             }
-            // The status bar frost is the app-wide edge frame's (EdgeGlassFrame, Screens).
+            // The status bar frost is the app-wide strip's (StatusBarScrim, Screens).
             // No refresh indicator is drawn; the pull gesture still refreshes.
         }
         }
