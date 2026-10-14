@@ -122,7 +122,7 @@ internal fun GarageScreen(
         // expand or collapse to reconcile -- the pebbles slide from under the hero to beside it purely
         // as the page grows wide enough.
         CollapsedGaragePager(
-            vehicles, count, slots, perPage, currentIndex,
+            vehicles, count, slots, perPage, vm.currentIndex,
             windowInfo.containerSize.width, state, vm, hazeState,
             expandedT = expandedT,
             multiColumn = multiColumn,

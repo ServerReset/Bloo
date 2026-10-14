@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -44,7 +45,8 @@ internal fun CollapsedGaragePager(
     count: Int,
     slots: Int,
     perPage: Int,
-    currentIndex: Int,
+    /** Read only inside effects (never in composition), so a settle does not recompose the pager and its pages. */
+    currentIndex: kotlinx.coroutines.flow.StateFlow<Int>,
     windowWidthPx: Int,
     state: State<UiState>,
     vm: AppViewModel,
@@ -66,7 +68,7 @@ internal fun CollapsedGaragePager(
         val total = slots + 1
         // Always the car (or status card) currentIndex was already parked on: this pager opens
         // there, never on the Settings page at the end of it.
-        val initialItem = currentIndex.coerceIn(0, slots - 1)
+        val initialItem = currentIndex.value.coerceIn(0, slots - 1)
         // One virtual page per real item; the real item for a page is wrap.real(page).
         val wrap = rememberWrapPager(total, initialItem)
         val pager = wrap.pager
@@ -121,16 +123,19 @@ internal fun CollapsedGaragePager(
         // direction -- so an external change (a shortcut tap selecting a specific car while this
         // pager was already composed on a different one) updated currentIndex, but the pager itself
         // just sat there on whatever car it last settled on.
-        val skipFirstIndexSnap = remember { mutableStateOf(true) }
-        LaunchedEffect(currentIndex) {
-            if (skipFirstIndexSnap.value) { skipFirstIndexSnap.value = false; return@LaunchedEffect }
+        suspend fun snapToIndex(idx: Int) {
             // Not on Garage any more (mid exit-transition to another screen, Settings included):
             // this composition's `state` param keeps updating live even while AnimatedContent
             // slides its ALREADY- STALE content off screen, so without this guard a snap here still
             // visibly moves the pager underneath its own exit animation -- see the `total` effect
             // below, which skips itself on the way out for the same reason.
-            if (state.value.screen != Screen.Garage) return@LaunchedEffect
-            wrap.snapToReal(currentIndex.coerceIn(0, slots - 1))
+            if (state.value.screen != Screen.Garage) return
+            wrap.snapToReal(idx.coerceIn(0, slots - 1))
+        }
+        LaunchedEffect(Unit) {
+            // Followed in an effect, not as a key: the pager's own settles change it every swipe, and as a
+            // composition read that recomposed the pager and every composed page each time.
+            currentIndex.drop(1).collect { idx -> snapToIndex(idx) }
         }
         // A car-count change shifts wrap's modulo divisor and could reshuffle the shown car; snap
         // back to currentIndex. Skips its first firing and the exit transition, like the
@@ -139,7 +144,7 @@ internal fun CollapsedGaragePager(
         LaunchedEffect(total) {
             if (skipFirstTotalSnap.value) { skipFirstTotalSnap.value = false; return@LaunchedEffect }
             if (state.value.screen != Screen.Garage) return@LaunchedEffect
-            wrap.snapToReal(currentIndex.coerceIn(0, slots - 1))
+            wrap.snapToReal(currentIndex.value.coerceIn(0, slots - 1))
         }
         // The pixel width of ONE item's page -- viewport width divided by perPage, so `perPage`
         // of them sit side by side at rest.
