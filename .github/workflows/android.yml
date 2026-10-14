@@ -9,6 +9,12 @@ on:
 permissions:
   contents: write
 
+# One run per branch at a time: a newer push cancels the older run still in flight. Several emulator runs at
+# once starved each other until they all hit their timeout and nothing was published at all.
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Every branch push builds the APKs and publishes them as the one rolling GitHub Release (see the
   # "Publish build" step below), tagged by run number. There is no separate marketing-version release
@@ -179,7 +185,7 @@ jobs:
   # (or being hidden by) the release path.
   ui-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -300,7 +306,10 @@ jobs:
   # and the emulator tests both passed. Until then the release is a draft, which the updater cannot see.
   publish:
     needs: [build, ui-tests]
-    if: github.event_name == 'push'
+    # The build must have passed, and the emulator tests must not have FAILED. A test run that was cancelled or
+    # timed out (the emulator not booting, a busy runner) says nothing about the app, and must not hold every
+    # update back the way it did.
+    if: always() && github.event_name == 'push' && needs.build.result == 'success' && needs.ui-tests.result != 'failure'
     runs-on: ubuntu-latest
     steps:
       - name: Publish the release
