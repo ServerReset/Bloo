@@ -3,6 +3,8 @@ package com.bloo.bluelink.widget
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,6 +32,7 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
@@ -67,6 +70,9 @@ private data class WidgetOptions(
     val flash: Boolean,
     val refresh: Boolean,
     val compact: Boolean,
+    val photo: Boolean,
+    val blur: Int,
+    val extras: Boolean,
 ) {
     companion object {
         fun of(prefs: Preferences) = WidgetOptions(
@@ -75,6 +81,9 @@ private data class WidgetOptions(
             flash = prefs[WidgetKeys.SHOW_FLASH] ?: true,
             refresh = prefs[WidgetKeys.SHOW_REFRESH] ?: true,
             compact = prefs[WidgetKeys.COMPACT] ?: false,
+            photo = prefs[WidgetKeys.SHOW_PHOTO] ?: true,
+            blur = prefs[WidgetKeys.PHOTO_BLUR] ?: WidgetPhoto.BLUR_MEDIUM,
+            extras = prefs[WidgetKeys.SHOW_EXTRAS] ?: true,
         )
     }
 }
@@ -109,33 +118,45 @@ private fun WidgetContent(data: WidgetData) {
     val context = androidx.glance.LocalContext.current
     val opts = WidgetOptions.of(prefs)
     val open = actionStartActivity(Intent(context, MainActivity::class.java))
-    val root = GlanceModifier
-        .fillMaxSize()
-        .background(GlanceTheme.colors.widgetBackground)
-        .cornerRadius(28.dp)
-        .padding(if (opts.compact) WidgetPadCompact else WidgetPad)
-        .clickable(open)
-
-    if (data.sealed) {
-        Message(root, "Open Bloo to sign in", "Your phone restarted")
-        return
+    val car = if (data.sealed) null else data.cars.firstOrNull { it.vin == prefs[WidgetKeys.VIN] } ?: data.cars.firstOrNull()
+    // The photo loads inside the session (not in provideGlance), so changing the car or the option in the
+    // settings swaps it right away.
+    var photo by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null) }
+    val photoKey = if (opts.photo && car != null) "${car.vin}:${opts.blur}" else null
+    androidx.compose.runtime.LaunchedEffect(photoKey) {
+        photo = if (photoKey != null && car != null) WidgetPhoto.load(context, car.vin, opts.blur) else null
     }
-    val car = data.cars.firstOrNull { it.vin == prefs[WidgetKeys.VIN] } ?: data.cars.firstOrNull()
-    if (car == null) {
-        Message(root, "No car yet", "Open Bloo to add one")
-        return
+    val pad = widgetPad(opts.compact).dp
+    Box(
+        GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(28.dp).clickable(open),
+    ) {
+        photo?.let { bmp ->
+            Image(ImageProvider(bmp), null, modifier = GlanceModifier.fillMaxSize(), contentScale = androidx.glance.layout.ContentScale.Crop)
+            // A theme-matched veil over the photo so the text keeps its contrast in light and dark.
+            Box(GlanceModifier.fillMaxSize().background(androidx.glance.color.ColorProvider(day = PhotoVeilDay, night = PhotoVeilNight))) {}
+        }
+        val root = GlanceModifier.fillMaxSize().padding(pad)
+        if (data.sealed) {
+            Message(root, "Open Bloo to sign in", "Your phone restarted")
+        } else if (car == null) {
+            Message(root, "No car yet", "Open Bloo to add one")
+        } else {
+            val pending = prefs[WidgetKeys.PENDING]
+            val now = System.currentTimeMillis()
+            val armed = prefs[WidgetKeys.ARMED]?.split("|")?.takeIf {
+                it.size == 2 && it[0] == car.vin && now - (it[1].toLongOrNull() ?: 0L) < UNLOCK_CONFIRM_MS
+            } != null
+            val note = prefs[WidgetKeys.NOTE]?.split("|")?.takeIf {
+                it.size == 2 && now - (it[1].toLongOrNull() ?: 0L) < NOTE_MS
+            }?.get(0)
+            AdaptiveBody(root, car, pending, armed, note, opts)
+        }
     }
-    val pending = prefs[WidgetKeys.PENDING]
-    val now = System.currentTimeMillis()
-    val armed = prefs[WidgetKeys.ARMED]?.split("|")?.takeIf {
-        it.size == 2 && it[0] == car.vin && now - (it[1].toLongOrNull() ?: 0L) < UNLOCK_CONFIRM_MS
-    } != null
-    val note = prefs[WidgetKeys.NOTE]?.split("|")?.takeIf {
-        it.size == 2 && now - (it[1].toLongOrNull() ?: 0L) < NOTE_MS
-    }?.get(0)
-
-    AdaptiveBody(root, car, pending, armed, note, opts)
 }
+
+/** The veil over a photo background: light enough to keep the car visible, firm enough for the text. */
+private val PhotoVeilDay = androidx.compose.ui.graphics.Color(0xB3FFFFFF)
+private val PhotoVeilNight = androidx.compose.ui.graphics.Color(0x99000000)
 
 @Composable
 private fun Message(root: GlanceModifier, title: String, detail: String) {
@@ -162,8 +183,6 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
     val size = LocalSize.current
     val context = androidx.glance.LocalContext.current
     val actionCount = 1 + (if (opts.climate) 1 else 0) + (if (opts.charge && car.hasBattery) 1 else 0) + (if (opts.flash) 1 else 0)
-    // Every choice from the widget's REAL size and the user's font scale, budgeted so nothing is cut off and
-    // the value takes the height that is left (see planWidget).
     val plan = planWidget(
         widthDp = size.width.value,
         heightDp = size.height.value,
@@ -172,26 +191,31 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
         valueChars = car.bigValue().length,
         actionCount = actionCount,
     )
+    val valueStyle = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = plan.valueSp.sp, fontWeight = FontWeight.Bold)
 
-    Column(root) {
-        Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = plan.nameSp.sp)
-        Spacer(GlanceModifier.height(WidgetGap))
-        if (plan.minimal) {
-            // Too short for a control row: the value and the lock share one row.
+    when (plan.arrangement) {
+        WidgetArrangement.MINIMAL -> Column(root) {
+            Header(car, showUpdated = false, opts = opts, pending = pending, nameSp = plan.nameSp.sp)
             Spacer(GlanceModifier.defaultWeight())
             Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    car.bigValue(), maxLines = 1,
-                    modifier = GlanceModifier.defaultWeight(),
-                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = plan.valueSp.sp, fontWeight = FontWeight.Bold),
-                )
+                Text(car.bigValue(), maxLines = 1, modifier = GlanceModifier.defaultWeight(), style = valueStyle)
                 ActionButton(car, CarAction.TOGGLE_LOCK, pending, armed, label = null, heightDp = plan.buttonHeightDp)
             }
-        } else {
-            Text(
-                car.bigValue(), maxLines = 1,
-                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = plan.valueSp.sp, fontWeight = FontWeight.Bold),
-            )
+        }
+        WidgetArrangement.SIDE -> Row(root, verticalAlignment = Alignment.CenterVertically) {
+            Column(GlanceModifier.defaultWeight().fillMaxHeight()) {
+                Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = plan.nameSp.sp)
+                Spacer(GlanceModifier.defaultWeight())
+                Text(car.bigValue(), maxLines = 1, style = valueStyle)
+                if (plan.showStatus) StatusText(car, note, plan.statusSp.sp)
+            }
+            Spacer(GlanceModifier.width(12.dp))
+            ControlGrid(car, pending, armed, opts, plan)
+        }
+        WidgetArrangement.STACK -> Column(root) {
+            Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = plan.nameSp.sp)
+            Spacer(GlanceModifier.height(WidgetGap))
+            Text(car.bigValue(), maxLines = 1, style = valueStyle)
             if (plan.showStatus) StatusText(car, note, plan.statusSp.sp)
             if (plan.showDetails) {
                 car.detailLine()?.let { line ->
@@ -199,9 +223,84 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
                     Text(line, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = plan.detailSp.sp))
                 }
             }
-            // Whatever the budget left over (rounding, a short value) sits above the controls, which hug the bottom.
+            if (plan.showBar && opts.extras) {
+                Spacer(GlanceModifier.height(WidgetGap * 2))
+                ChargeBar(car)
+            }
+            if (plan.showChips && opts.extras) {
+                Spacer(GlanceModifier.height(WidgetGap))
+                StatusChips(car)
+            }
+            // Whatever the budget left over sits above the controls, which hug the bottom edge.
             Spacer(GlanceModifier.defaultWeight())
             Actions(car, pending, armed, opts, labels = plan.labels, maxActions = plan.maxActions, heightDp = plan.buttonHeightDp)
+        }
+    }
+}
+
+/** The charge (or fuel) as a bar, with the charge limit's share in a lighter tone when it is known. */
+@Composable
+private fun ChargeBar(car: VehicleSnapshot) {
+    val pct = car.percent ?: return
+    androidx.glance.appwidget.LinearProgressIndicator(
+        progress = (pct / 100f).coerceIn(0f, 1f),
+        modifier = GlanceModifier.fillMaxWidth().height(WIDGET_BAR_DP.dp).cornerRadius((WIDGET_BAR_DP / 2).dp),
+        color = GlanceTheme.colors.primary,
+        backgroundColor = GlanceTheme.colors.secondaryContainer,
+    )
+}
+
+/** Small pills for the states worth a glance on a big widget: climate and charging. */
+@Composable
+private fun StatusChips(car: VehicleSnapshot) {
+    val chips = buildList {
+        car.climateOn?.let { add((if (it) "Climate on" else "Climate off") to it) }
+        if (car.hasBattery) car.charging?.let { add((if (it) "Charging" else "Not charging") to it) }
+        car.chargeLimitPct?.let { add("Limit $it%" to false) }
+    }.take(3)
+    if (chips.isEmpty()) return
+    Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        chips.forEachIndexed { i, (text, on) ->
+            if (i > 0) Spacer(GlanceModifier.width(6.dp))
+            Box(
+                GlanceModifier
+                    .height(WIDGET_CHIP_DP.dp)
+                    .cornerRadius((WIDGET_CHIP_DP / 2).dp)
+                    .background(if (on) GlanceTheme.colors.primaryContainer else GlanceTheme.colors.secondaryContainer)
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text, maxLines = 1,
+                    style = TextStyle(
+                        color = if (on) GlanceTheme.colors.onPrimaryContainer else GlanceTheme.colors.onSecondaryContainer,
+                        fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+/** SIDE: the controls as a grid of circles beside the readout. */
+@Composable
+private fun ControlGrid(car: VehicleSnapshot, pending: String?, armed: Boolean, opts: WidgetOptions, plan: WidgetPlan) {
+    val actions = buildList {
+        add(CarAction.TOGGLE_LOCK)
+        if (opts.climate) add(CarAction.TOGGLE_CLIMATE)
+        if (opts.charge && car.hasBattery) add(CarAction.TOGGLE_CHARGE)
+        if (opts.flash) add(CarAction.FLASH_LIGHTS)
+    }.take(plan.maxActions)
+    val cols = plan.gridColumns.coerceAtLeast(1)
+    Column(verticalAlignment = Alignment.CenterVertically) {
+        actions.chunked(cols).forEachIndexed { r, rowActions ->
+            if (r > 0) Spacer(GlanceModifier.height(WidgetGap))
+            Row {
+                rowActions.forEachIndexed { i, action ->
+                    if (i > 0) Spacer(GlanceModifier.width(WidgetGap))
+                    ActionButton(car, action, pending, armed, label = null, heightDp = plan.buttonHeightDp)
+                }
+            }
         }
     }
 }
@@ -382,9 +481,7 @@ private fun actionFor(car: VehicleSnapshot, action: String, busy: Boolean): Acti
         )
     }
 
-/** The widget's spacing: its inner padding (compact and normal) and the gap between controls and lines. */
-private val WidgetPad = 16.dp
-private val WidgetPadCompact = 10.dp
+/** The gap between the widget's controls and lines (its padding is [widgetPad]). */
 private val WidgetGap = 8.dp
 
 // --- The car's words ---------------------------------------------------------------------------

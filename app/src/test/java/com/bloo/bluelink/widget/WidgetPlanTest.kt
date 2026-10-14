@@ -10,7 +10,7 @@ class WidgetPlanTest {
         for (w in sizes) for (h in sizes) for (fs in listOf(0.85f, 1f, 1.3f)) for (compact in listOf(false, true)) {
             val plan = planWidget(w, h, fs, compact, valueChars = 4, actionCount = 4)
             val pad = if (compact) 10f else 16f
-            val used = plan.heightDp(fs, compact, w)
+            val used = plan.heightDp(fs)
             // A value at its floor on a tiny widget is the one allowed overflow; everything else must fit.
             if (plan.valueSp > 24.5f) assertTrue(used <= h - 2 * pad + 0.5f, "w=$w h=$h fs=$fs compact=$compact used=$used plan=$plan")
         }
@@ -22,8 +22,19 @@ class WidgetPlanTest {
         assertTrue(big.valueSp > small.valueSp, "a taller widget gets a bigger value ($small vs $big)")
     }
 
-    @Test fun aShortWidgetUsesTheCompactForm() {
-        assertTrue(planWidget(180f, 110f, 1f, false, valueChars = 4, actionCount = 3).minimal)
+    @Test fun aSmallSquareUsesTheMinimalForm() {
+        assertTrue(planWidget(150f, 110f, 1f, false, valueChars = 4, actionCount = 3).minimal)
+    }
+
+    @Test fun aWideShortWidgetPutsTheControlsBesideTheReadout() {
+        val plan = planWidget(340f, 150f, 1f, false, valueChars = 4, actionCount = 4)
+        assertTrue(plan.arrangement == WidgetArrangement.SIDE, "$plan")
+        assertTrue(plan.maxActions >= 2, "$plan")
+    }
+
+    @Test fun aTallWidgetWithRoomGainsABarAndChips() {
+        val plan = planWidget(250f, 420f, 1f, false, valueChars = 3, actionCount = 4)
+        assertTrue(plan.showBar && plan.showChips, "$plan")
     }
 
     @Test fun neverMoreControlsThanTheWidthHolds() {

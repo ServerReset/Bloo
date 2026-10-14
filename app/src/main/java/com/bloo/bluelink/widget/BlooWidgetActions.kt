@@ -32,6 +32,12 @@ internal object WidgetKeys {
     val SHOW_REFRESH = booleanPreferencesKey("show_refresh")
     /** Tighter padding and no detail rows, for a smaller widget. */
     val COMPACT = booleanPreferencesKey("compact")
+    /** The car's photo, blurred, as the widget's background (on by default; nothing shows without a photo). */
+    val SHOW_PHOTO = booleanPreferencesKey("show_photo")
+    /** How soft that photo is: [WidgetPhoto.BLUR_LIGHT], MEDIUM or STRONG. */
+    val PHOTO_BLUR = androidx.datastore.preferences.core.intPreferencesKey("photo_blur")
+    /** Show the charge bar and status chips when there is room (on by default). */
+    val SHOW_EXTRAS = booleanPreferencesKey("show_extras")
 
     val PARAM_VIN = ActionParameters.Key<String>("vin")
     val PARAM_ACTION = ActionParameters.Key<String>("action")
