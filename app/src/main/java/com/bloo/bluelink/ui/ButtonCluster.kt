@@ -101,10 +101,13 @@ internal fun ButtonCluster(
                     // A lone button is round at rest and squares off when it is open or pressed, like
                     // any standalone button. Only a real cluster needs the connected-corner shape,
                     // which reacts to press alone so a member's corners agree with its neighbours.
-                    shapeForCorner = if (buttons.size == 1) {
-                        null
-                    } else {
-                        { morph, cornerPercent -> clusterShape(buttons, i, morph, cornerPercent) }
+                    // Remembered by position, not rebuilt from the list: a fresh lambda (capturing a fresh list) on
+                    // every recomposition kept every member button from ever skipping.
+                    shapeForCorner = run {
+                        val size = buttons.size
+                        remember(size, i) {
+                            if (size == 1) null else { morph: Float, cornerPercent: Int -> connectedShape(i == 0, i == size - 1, cornerPercent, morph, morph) }
+                        }
                     },
                     pillCornerPercent = PillCornerPercent,
                     morphedCornerPercent = MorphedCornerPercent,

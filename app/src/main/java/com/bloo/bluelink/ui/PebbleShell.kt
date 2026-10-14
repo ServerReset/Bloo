@@ -24,6 +24,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -175,19 +177,30 @@ internal fun PebbleShell(
     // True while the chevron is held; the whole card squares off with it, targeting
     // PebbleCornerExpanded (the shape expanding lands on) so hold and expand agree.
     var chevronPressed by remember { mutableStateOf(false) }
-    val corner by animateDpAsState(
-        targetValue = when {
-            chevronPressed || expanded -> PebbleCornerExpanded
-            else -> collapsedCorner
-        },
-        // The press morph reuses the open spring: a hold is an immediate response, not a settle.
-        animationSpec = if (expanded || chevronPressed) {
-            lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
+    val cornerTarget = when {
+        chevronPressed || expanded -> PebbleCornerExpanded
+        else -> collapsedCorner
+    }
+    val cornerSpec = if (expanded || chevronPressed) {
+        lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
+    } else {
+        lowPowerAwareSpring<Dp>(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness)
+    }
+    // Animated only when the USER changed something (open, close, hold). A target that moves because the card
+    // was measured -- every pebble as it first fills in after a swipe -- snaps: springing it rebuilt the whole
+    // card on every frame for nothing, right when the page was busiest.
+    val cornerAnim = remember { androidx.compose.animation.core.Animatable(cornerTarget, Dp.VectorConverter) }
+    val mode = expanded || chevronPressed
+    val lastMode = remember { booleanArrayOf(mode) }
+    LaunchedEffect(cornerTarget, mode) {
+        if (mode == lastMode[0] && !cornerAnim.isRunning) {
+            cornerAnim.snapTo(cornerTarget)
         } else {
-            lowPowerAwareSpring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness)
-        },
-        label = "pebbleCorner",
-    )
+            lastMode[0] = mode
+            cornerAnim.animateTo(cornerTarget, cornerSpec)
+        }
+    }
+    val corner = cornerAnim.value
     val pebbleShape = RoundedCornerShape(corner)
     Box(Modifier.fillMaxWidth()) {
         Card(
