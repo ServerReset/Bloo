@@ -336,7 +336,7 @@ internal fun ChargeLimitPill(
                     active = pending,
                     contentPadding = PaddingValues(horizontal = 18.dp),
                 ) {
-                    if (pending) LoadingIndicator(Modifier.size(18.dp))
+                    if (pending) LoadingIndicator(Modifier.size(ButtonIconSize))
                     else RevealText("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
                 }
             ),

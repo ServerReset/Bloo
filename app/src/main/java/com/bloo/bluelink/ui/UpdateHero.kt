@@ -10,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 
 /**
  * The version jump at a glance, shared by the update pebble and the Settings update card: the build
@@ -37,7 +36,7 @@ internal fun UpdateDeltaHero(currentBuild: Int, newBuild: Int, modifier: Modifie
                 AppIcons.ArrowForward,
                 contentDescription = "to",
                 tint = scheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(ButtonIconSize),
             )
         }
         RollingNumber(

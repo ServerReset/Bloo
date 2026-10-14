@@ -34,7 +34,7 @@ fun MorphIconButton(
     val scheme = MaterialTheme.colorScheme
     MorphButton(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minWidth = 40.dp, minHeight = 40.dp),
+        modifier = modifier.defaultMinSize(minWidth = IconButtonMinWidth, minHeight = IconButtonMinWidth),
         enabled = enabled,
         interactionSource = interactionSource,
         containerColor = if (filled) emphasis.container() else Color.Transparent,

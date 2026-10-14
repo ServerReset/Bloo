@@ -24,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.links
@@ -61,7 +60,7 @@ internal fun AiAnswer(
         ) {
             Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(AppIcons.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(AppIcons.AutoAwesome, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
                     Spacer(Modifier.width(GapRow))
                     TitleSmallText("AI answer")
                 }
@@ -96,7 +95,7 @@ internal fun AiCommandProposal(
         ResultCard(hazeState) {
             Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(AppIcons.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(AppIcons.Bolt, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
                     Spacer(Modifier.width(GapRow))
                     TitleSmallText("Did you mean?")
                 }
@@ -167,7 +166,7 @@ internal fun AiSettingProposal(
     ResultCard(hazeState) {
         Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(AppIcons.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(AppIcons.AutoAwesome, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
                 Spacer(Modifier.width(GapRow))
                 TitleSmallText("Did you mean?")
             }
@@ -249,7 +248,7 @@ internal fun CommandActionResult(
     ResultCard(hazeState) {
         Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(AppIcons.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(AppIcons.Bolt, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
                 Spacer(Modifier.width(GapRow))
                 TitleSmallText("Action")
             }

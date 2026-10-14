@@ -77,10 +77,9 @@ internal fun secondaryTextShadow(): Shadow = Shadow(
 /** A decently strong halo, in device px (text shadows are not density-scaled). */
 private const val SecondaryHaloBlurPx = 9f
 
+/** The muted secondary line; the same text as [BodySmallText] (one implementation for every muted line). */
 @Composable
-internal fun LabelText(text: String, modifier: Modifier = Modifier) {
-    RevealText(text, style = secondaryTextStyle(), modifier = modifier, color = secondaryTextColor())
-}
+internal fun LabelText(text: String, modifier: Modifier = Modifier) = BodySmallText(text, modifier)
 
 /**
  * A muted one-liner for a pebble body with nothing to show yet (loading or empty). One component so
@@ -88,11 +87,9 @@ internal fun LabelText(text: String, modifier: Modifier = Modifier) {
  * its own style and colour.
  */
 @Composable
-internal fun PebbleMessage(text: String, modifier: Modifier = Modifier) {
-    RevealText(text, style = secondaryTextStyle(), modifier = modifier, color = secondaryTextColor())
-}
+internal fun PebbleMessage(text: String, modifier: Modifier = Modifier) = BodySmallText(text, modifier)
 
-/** Body text (bodyMedium, onSurface) -- muted/secondary content. */
+/** The app's ONE muted secondary text: [secondaryTextStyle] (bodyMedium, semi-bold, with a soft halo) in the muted colour. */
 @Composable
 internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: Color = secondaryTextColor()) {
     RevealText(text, style = secondaryTextStyle(), modifier = modifier, color = color)

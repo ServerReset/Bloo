@@ -56,7 +56,7 @@ fun WearCompanionRow(
             Icons.Filled.SubdirectoryArrowRight,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(ButtonIconSize),
         )
         Spacer(Modifier.width(GapRow))
         Icon(
@@ -104,7 +104,7 @@ fun CompanionActionRow(label: String, caption: String, modifier: Modifier = Modi
             Icons.Filled.SubdirectoryArrowRight,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(ButtonIconSize),
         )
         Spacer(Modifier.width(GapRow))
         Column(Modifier.weight(1f)) {

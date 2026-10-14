@@ -61,7 +61,7 @@ internal fun FrostMessage(message: String, modifier: Modifier = Modifier) {
             Modifier.padding(horizontal = GapSection, vertical = GapRow),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(AppIcons.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            Icon(AppIcons.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(ButtonIconSize))
             Spacer(Modifier.width(GapRow))
             RevealText(
                 message,

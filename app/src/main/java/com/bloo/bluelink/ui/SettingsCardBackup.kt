@@ -31,7 +31,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.lastSyncMs
 import com.bloo.bluelink.data.setSyncUri
 import com.bloo.bluelink.data.setSyncWifiOnly
@@ -142,7 +141,7 @@ private fun SyncErrorBanner(message: String) {
             .padding(horizontal = GapGroup, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+        Icon(Icons.Filled.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(ButtonIconSize))
         Spacer(Modifier.width(GapGroup))
         BodySmallText(message, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
     }

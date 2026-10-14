@@ -271,6 +271,8 @@ fun SafeMorphTextButton(
     contentColor: Color = Color.Unspecified,
     icon: ImageVector? = null,
     showIcon: Boolean = true,
+    /** See [MorphTextButton]'s own `active`. */
+    active: Boolean = false,
     pending: Boolean = false,
     groupWeight: Float = GroupWeightProportional,
     /**
@@ -294,6 +296,7 @@ fun SafeMorphTextButton(
             onClick = onClick,
             modifier = modifier,
             enabled = enabled,
+            active = active,
             emphasis = emphasis,
             containerColor = containerColor,
             contentColor = contentColor,

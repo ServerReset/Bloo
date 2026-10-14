@@ -140,7 +140,7 @@ internal fun SyncDeviceRow(
         }
         if (isSelf) {
             MorphIconButton(onClick = onRename) {
-                Icon(Icons.Filled.Edit, contentDescription = "Rename this device", modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Edit, contentDescription = "Rename this device", modifier = Modifier.size(ButtonIconSize))
             }
         } else {
             ConfirmRemoveButton(device.name, "this device", onRemove)
@@ -172,7 +172,7 @@ internal fun ConfirmRemoveButton(name: String, fallbackNoun: String, onRemove: (
             Icons.Filled.Delete,
             contentDescription = if (confirm.armed) "Tap again to remove $who" else "Remove $who from synced devices",
             tint = if (confirm.armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(ButtonIconSize),
         )
     }
 }
