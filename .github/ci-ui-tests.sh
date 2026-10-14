@@ -14,6 +14,17 @@ ADB="timeout 60 adb"
 $ADB logcat -c
 ./gradlew :app:connectedSideloadDebugAndroidTest --stacktrace
 status=$?
+
+# When the emulator dies mid-suite, adb stops answering, and every call below would then burn its
+# whole timeout for nothing -- about six minutes of a step that has already established the device is
+# gone. One quick check first, and if it is gone we say so and stop: there is no logcat to gather from
+# a device that is not there, and the gradle output above already says what happened.
+if ! timeout 20 adb get-state >/dev/null 2>&1; then
+  echo "!!! the emulator is gone (adb reports no device), so there are no diagnostics to gather."
+  echo "!!! that is what failed the step above, not the tests themselves."
+  exit $status
+fi
+
 echo "=== logcat: crash buffer ==="
 $ADB logcat -d -b crash -v time | head -120
 echo "=== logcat: startup trace ==="
