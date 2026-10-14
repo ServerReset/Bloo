@@ -49,7 +49,12 @@ internal var inMultiWindowMode by mutableStateOf(false)
 
 /**
  * The strip behind the system icons: the app's standard glass -- a blur that is STRONG at the top and
- * tapers away by the bottom of the strip -- over the backdrop, plus the usual glass tint.
+ * tapers away by the bottom of the strip -- over the backdrop, under the glass tint.
+ *
+ * The tint is ALWAYS the unblurred glass weight, even when a real blur is running behind it. The
+ * blurred weight is meant for a large glass surface with content under it (2% white in the dark
+ * theme); on a strip this thin it left the icons sitting on the raw backdrop, which is what read as a
+ * black bar. This weight is the "something to sit on" the icons need, in both themes.
  *
  * It blurs the BACKDROP ([LocalBackdropHaze]), not the car pager: the pager is transparent behind the
  * status bar (each page insets its content below it), so a pane over IT had nothing to sample and read
@@ -67,7 +72,7 @@ internal fun StatusBarScrim() {
         }
         Box(
             Modifier.matchParentSize().background(
-                Brush.verticalGradient(listOf(glassTint(haze != null && canBlurBackdrops()), Color.Transparent)),
+                Brush.verticalGradient(listOf(glassTint(blurred = false), Color.Transparent)),
             ),
         )
     }

@@ -12,7 +12,6 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -31,7 +30,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import kotlin.math.max
 import kotlinx.coroutines.launch
 
 /**
@@ -108,11 +106,15 @@ internal fun SplitExpandButton(
         contentColor = if (action.isWarning) scheme.onErrorContainer else null,
         activeContainerColor = action.activeContainer,
         activeContentColor = action.activeContent,
-        // An icon-only action is a true circle.
-        square = action.label.isEmpty(),
+        // An icon-only action (no label by design) is a button the size of its glyph.
+        iconOnly = action.label.isEmpty(),
         modifier = if (description != null) Modifier.semantics { contentDescription = description } else Modifier,
     ) {
-        Box(Modifier.widthIn(max = 96.dp).graphicsLayer { translationY = bounceY.value }) {
+        // No width cap on the content. A cap here made the "does the label fit" decision TWICE: the
+        // group would size the button for a label, then this Box would refuse the label and draw the
+        // glyph alone -- a wide, empty pill. The group is the one place that decides (it drops a
+        // whole line to glyphs when they do not fit), so the content just reports what it needs.
+        Box(Modifier.graphicsLayer { translationY = bounceY.value }) {
             MorphButtonLabel(action.icon, action.label, pending = action.pending && !bouncing, spinning = action.spinning)
         }
     }
@@ -124,7 +126,7 @@ internal fun SplitExpandButton(
         // toggles -- only a tap does.
         onLongClick = { chevron.spin(); haptics?.heavy() },
         active = expanded,
-        square = true,
+        iconOnly = true,
         contentPadding = PaddingValues(start = 10.dp, end = 9.dp),
         interactionSource = chevronSource,
         // The icon's own description is the NEXT action; this announces the CURRENT state on focus.

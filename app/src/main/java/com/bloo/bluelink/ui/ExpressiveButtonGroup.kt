@@ -13,10 +13,16 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
+ * How much EXTRA room a collapsed line must find before its labels come back. This is the margin
+ * that stops a row sitting right at the threshold from flickering word/icon/word: dropping to glyphs
+ * happens the moment the labels do not fit, and coming back needs this much slack on top.
+ */
+private val CollapseReturnMargin = 24.dp
+
+/**
  * A row of buttons where the pressed one takes ~15% more width and its neighbours give up exactly
  * that much, so the group's own width never changes and no parent remeasures.
- */
-@Composable
+ */@Composable
 fun ExpressiveButtonGroup(
     modifier: Modifier = Modifier,
     spacing: Dp = 3.dp,
@@ -68,6 +74,10 @@ fun ExpressiveButtonGroup(
             val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
             // A lone button's press-to-fill is capped here, not stretched across a whole row.
             val maxSinglePx = MaxSingleButtonWidth.roundToPx()
+            // See CollapseReturnMargin: how much extra room a collapsed line needs before its labels
+            // come back. Read once per pass; the sticky state it reads is updated at the end.
+            val collapseReturnMarginPx = CollapseReturnMargin.roundToPx()
+            val wasCompacted = naturals.compacted
 
             // Press fractions are read at layout time so a press invalidates layout only. Only
             // children carrying ExpressiveGroupData are members; Spacers, labels and icons keep
@@ -179,7 +189,15 @@ fun ExpressiveButtonGroup(
                 val prior = naturals.decided[li]
                 val collapse = if (!constraints.hasBoundedWidth) false
                 else if (!resting && prior != null) prior.second
-                else memberIdx.sumOf { full[it] } > room
+                else {
+                    // STICKY (see NaturalWidths.compacted): a line that has already dropped to glyphs
+                    // keeps them until its labels fit with a clear margin. Without this the decision
+                    // was remade on every pixel of room, so content changing beside the buttons could
+                    // put a label back and take it away again while the user watched.
+                    val need = memberIdx.sumOf { full[it] }
+                    val margin = if (wasCompacted) collapseReturnMarginPx else 0
+                    need + margin > room
+                }
                 if (constraints.hasBoundedWidth) { naturals.compacted = collapse; naturals.decided[li] = room to collapse }
                 val basis = if (collapse) {
                     val c = compact ?: IntArray(n) { i ->

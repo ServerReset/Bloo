@@ -11,17 +11,12 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.MorphedCornerPercent
 import com.bloo.uicommon.PillCornerPercent
@@ -45,8 +40,12 @@ internal class ClusterButton(
     val contentPadding: PaddingValues? = null,
     /** Share of the row's leftover width this button takes; 0 keeps its natural width. */
     val weight: Float = 0f,
-    /** Never narrower than the cluster is tall, so an icon-only button is a true circle (or a round nub in a cluster). */
-    val square: Boolean = false,
+    /**
+     * A button that carries no label BY DESIGN (the expand chevron, the lock group): it is sized to
+     * its glyph plus a comfortable tap target ([IconButtonMinWidth]). It is deliberately NOT a square
+     * as tall as the row -- that left every icon button much wider than the icon it shows.
+     */
+    val iconOnly: Boolean = false,
     val onClickHaptic: (() -> Unit)? = null,
     /** Hold-to-act action (the chevron's spin easter egg). Null = plain click-only. */
     val onLongClick: (() -> Unit)? = null,
@@ -69,18 +68,12 @@ internal fun ButtonCluster(
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
 ) {
     if (buttons.isEmpty()) return
-    val density = LocalDensity.current
-    // Only measured when some button must stay as wide as the row is tall.
-    val needsHeight = buttons.any { it.square }
-    var rowHeight by remember { mutableStateOf(0.dp) }
     val scheme = MaterialTheme.colorScheme
     // 10.dp, not 14: the horizontal padding is what a header action takes out of the row, and at the
     // app's bigger type scale 14 was eating the title beside it. Vertical stays GapRow.
     val standardPadding = PaddingValues(horizontal = 10.dp, vertical = GapRow)
     ExpressiveButtonGroup(
-        modifier = modifier
-            .height(IntrinsicSize.Min)
-            .then(if (needsHeight) Modifier.onSizeChanged { rowHeight = with(density) { it.height.toDp() } } else Modifier),
+        modifier = modifier.height(IntrinsicSize.Min),
         spacing = SplitSeam,
         verticalAlignment = Alignment.CenterVertically,
         horizontalAlignment = horizontalAlignment,
@@ -119,7 +112,7 @@ internal fun ButtonCluster(
                     groupWeight = b.weight,
                     modifier = Modifier
                         .fillMaxHeight()
-                        .then(if (b.square) Modifier.widthIn(min = rowHeight) else Modifier)
+                        .then(if (b.iconOnly) Modifier.widthIn(min = IconButtonMinWidth) else Modifier)
                         .then(b.modifier),
                     content = b.content,
                 )

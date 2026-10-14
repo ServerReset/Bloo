@@ -345,6 +345,14 @@ val ButtonIconSize = 18.dp
 val ButtonIconOnlySize = 24.dp
 
 /**
+ * How wide a button that shows only a glyph is: the glyph ([ButtonIconOnlySize]) plus a comfortable
+ * tap target. The ONE size for an icon-only button, anywhere -- a label-less button, or a labelled
+ * one the group has had to collapse because its row ran out of room. It deliberately does NOT grow to
+ * the row's height: a button must be the size of the thing it shows.
+ */
+val IconButtonMinWidth = 48.dp
+
+/**
  * The one button-label [Text]: the shared [ButtonLabelStyle], semi-bold, single line, ellipsized.
  * Used wherever a button shows a bare label with no glyph ([MorphTextButton], [MorphChip]).
  */
