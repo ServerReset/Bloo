@@ -247,7 +247,7 @@ fun MorphTextButton(
         interactionSource = interactionSource,
         containerColor = containerColor.takeOrElse { emphasis.container() },
         contentColor = contentColor.takeOrElse { emphasis.content() },
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
+        contentPadding = StandardButtonPadding,
         minHeight = ButtonTargetHeight,
     ) {
         val glyph = (icon ?: standardButtonIcon(text)).takeIf { showIcon }
@@ -361,6 +361,13 @@ val ButtonIconOnlySize = 24.dp
  * the row's height: a button must be the size of the thing it shows.
  */
 val IconButtonMinWidth = 48.dp
+
+/** The standard horizontal padding inside a labelled button, and inside a chip or list button. */
+val ButtonPaddingH = 18.dp
+val ChipPaddingH = 16.dp
+
+/** The one content padding for a labelled button, used by every labelled button in the app. */
+val StandardButtonPadding = PaddingValues(horizontal = ButtonPaddingH, vertical = GapRow)
 
 /**
  * The one button-label [Text]: the shared [ButtonLabelStyle], semi-bold, single line, ellipsized.

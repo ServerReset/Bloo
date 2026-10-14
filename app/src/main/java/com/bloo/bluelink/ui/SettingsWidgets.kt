@@ -305,7 +305,7 @@ internal fun ListButton(
         // Idle colours stay at MorphButton's defaults; only the active state gets an explicit colour.
         activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
         activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = GapGroup),
+        contentPadding = PaddingValues(horizontal = ChipPaddingH, vertical = GapGroup),
         minHeight = ButtonTargetHeight,
         modifier = modifier.fillMaxWidth(),
         expressive = true,

@@ -71,7 +71,7 @@ fun MorphChip(
         onClickHaptic = { haptics?.tick() },
         interactionSource = chipSource,
         active = selected,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = GapRow),
+        contentPadding = PaddingValues(horizontal = ChipPaddingH, vertical = GapRow),
         // Same target height as every other button.
         minHeight = ButtonTargetHeight,
         // `selected` semantics for TalkBack. Captured into a differently-named local because inside

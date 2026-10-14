@@ -251,7 +251,7 @@ internal fun PresetPill(
                 onClick = onStart,
                 onClickHaptic = { haptics?.click() },
                 active = active,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+                contentPadding = PaddingValues(horizontal = ChipPaddingH, vertical = 11.dp),
                 weight = 1f,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -313,7 +313,7 @@ internal fun ChargeLimitPill(
                     onClick = step,
                     onClickHaptic = { haptics?.tick() },
                     enabled = enabled,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+                    contentPadding = PaddingValues(horizontal = ChipPaddingH, vertical = 11.dp),
                     weight = 1f,
                     // TalkBack hears both the value and that this half is itself a stepper, distinct from "Set".
                     modifier = Modifier.semantics(mergeDescendants = true) {
@@ -334,7 +334,7 @@ internal fun ChargeLimitPill(
                     onClickHaptic = { haptics?.heavy() },
                     enabled = enabled && !pending,
                     active = pending,
-                    contentPadding = PaddingValues(horizontal = 18.dp),
+                    contentPadding = PaddingValues(horizontal = ButtonPaddingH),
                 ) {
                     if (pending) LoadingIndicator(Modifier.size(ButtonIconSize))
                     else RevealText("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)

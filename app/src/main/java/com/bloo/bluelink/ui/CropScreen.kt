@@ -8,7 +8,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,7 +40,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
 import androidx.core.net.toUri
 import kotlin.math.max
@@ -164,7 +162,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                 },
                 enabled = bmp != null,
                 interactionSource = confirmSource,
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
+                contentPadding = StandardButtonPadding,
                     expressive = true,
                 fillOnPress = true,
                 groupWeight = GroupWeightProportional,
