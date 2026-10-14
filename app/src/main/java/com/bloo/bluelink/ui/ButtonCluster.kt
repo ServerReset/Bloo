@@ -11,12 +11,17 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.MorphedCornerPercent
 import com.bloo.uicommon.PillCornerPercent
@@ -40,12 +45,6 @@ internal class ClusterButton(
     val contentPadding: PaddingValues? = null,
     /** Share of the row's leftover width this button takes; 0 keeps its natural width. */
     val weight: Float = 0f,
-    /**
-     * A button that carries no label BY DESIGN (the expand chevron, the lock group): it is sized to
-     * its glyph plus a comfortable tap target ([IconButtonMinWidth]). It is deliberately NOT a square
-     * as tall as the row -- that left every icon button much wider than the icon it shows.
-     */
-    val iconOnly: Boolean = false,
     val onClickHaptic: (() -> Unit)? = null,
     /** Hold-to-act action (the chevron's spin easter egg). Null = plain click-only. */
     val onLongClick: (() -> Unit)? = null,
@@ -68,12 +67,20 @@ internal fun ButtonCluster(
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
 ) {
     if (buttons.isEmpty()) return
+    val density = LocalDensity.current
+    // The floor for EVERY button: never narrower than the row is tall. A collapsed button is a pill
+    // (corner percent 50), so with width == height that floor makes it a true CIRCLE; expanded it
+    // morphs to the rounded square as before. A label wider than the row's height grows the button
+    // past it; nothing shrinks below a circle.
+    var rowHeight by remember { mutableStateOf(0.dp) }
     val scheme = MaterialTheme.colorScheme
     // 10.dp, not 14: the horizontal padding is what a header action takes out of the row, and at the
     // app's bigger type scale 14 was eating the title beside it. Vertical stays GapRow.
     val standardPadding = PaddingValues(horizontal = 10.dp, vertical = GapRow)
     ExpressiveButtonGroup(
-        modifier = modifier.height(IntrinsicSize.Min),
+        modifier = modifier
+            .height(IntrinsicSize.Min)
+            .onSizeChanged { rowHeight = with(density) { it.height.toDp() } },
         spacing = SplitSeam,
         verticalAlignment = Alignment.CenterVertically,
         horizontalAlignment = horizontalAlignment,
@@ -115,7 +122,8 @@ internal fun ButtonCluster(
                     groupWeight = b.weight,
                     modifier = Modifier
                         .fillMaxHeight()
-                        .then(if (b.iconOnly) Modifier.widthIn(min = IconButtonMinWidth) else Modifier)
+                        // Never narrower than the row is tall: a collapsed button is a circle.
+                        .widthIn(min = rowHeight)
                         .then(b.modifier),
                     content = b.content,
                 )

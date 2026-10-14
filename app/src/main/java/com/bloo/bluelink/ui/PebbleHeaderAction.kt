@@ -107,7 +107,6 @@ internal fun SplitExpandButton(
         activeContainerColor = action.activeContainer,
         activeContentColor = action.activeContent,
         // An icon-only action (no label by design) is a button the size of its glyph.
-        iconOnly = action.label.isEmpty(),
         modifier = if (description != null) Modifier.semantics { contentDescription = description } else Modifier,
     ) {
         // No width cap on the content. A cap here made the "does the label fit" decision TWICE: the
@@ -126,7 +125,6 @@ internal fun SplitExpandButton(
         // toggles -- only a tap does.
         onLongClick = { chevron.spin(); haptics?.heavy() },
         active = expanded,
-        iconOnly = true,
         contentPadding = PaddingValues(start = 10.dp, end = 9.dp),
         interactionSource = chevronSource,
         // The icon's own description is the NEXT action; this announces the CURRENT state on focus.

@@ -50,7 +50,7 @@ class ClusterSizingTest {
                 ClusterButton(onClick = {}, modifier = Modifier.testTag("action")) {
                     MorphButtonLabel(AppIcons.Bolt, actionLabel, pending = false)
                 },
-                ClusterButton(onClick = {}, iconOnly = true, modifier = Modifier.testTag("chevron")) {
+                ClusterButton(onClick = {}, modifier = Modifier.testTag("chevron")) {
                     Icon(AppIcons.Lock, contentDescription = null)
                 },
             ),
@@ -128,19 +128,15 @@ class ClusterSizingTest {
     }
 
     @Test
-    fun anIconOnlyButtonIsTheSizeOfItsGlyphNotTheHeadersHeight() {
+    fun anIconOnlyButtonIsNeverNarrowerThanItIsTall() {
         rule.setContent(header(360) { cluster() })
         rule.waitForIdle()
-        val chevron = widthOf("chevron")
-        // Its glyph plus the seam reserve it keeps so a press can borrow room from a neighbour.
-        assertTrue(
-            "an icon-only button is its glyph plus its seam reserve (width ${chevron}dp)",
-            chevron in IconButtonMinWidth.value..(IconButtonMinWidth.value + 12f),
-        )
-        assertTrue(
-            "an icon-only button must not be a square the height of the header (width ${chevron}dp)",
-            chevron < PebbleHeaderHeight.value,
-        )
+        // The rule the user asked for: a button's minimum is square. Collapsed (pill corners) that
+        // makes it a circle; the chevron here is the small case, since its glyph is 24dp.
+        val b = rule.onNodeWithTag("chevron").getBoundsInRoot()
+        val w = b.right.value - b.left.value
+        val h = b.bottom.value - b.top.value
+        assertTrue("an icon-only button must never be narrower than it is tall (w ${w}dp, h ${h}dp)", w >= h - 1.5f)
     }
 
     @Test

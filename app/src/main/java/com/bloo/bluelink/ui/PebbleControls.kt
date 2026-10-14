@@ -271,7 +271,6 @@ internal fun PrimaryActions(
                         ClusterButton(
                             onClick = { vm.flashLights(v) },
                             enabled = !hlPending,
-                            iconOnly = true,
                             contentPadding = PaddingValues(0.dp),
                         ) { Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights", modifier = Modifier.size(22.dp)) },
                     )
@@ -279,7 +278,6 @@ internal fun PrimaryActions(
                         ClusterButton(
                             onClick = { vm.hornAndLights(v) },
                             enabled = !hlPending,
-                            iconOnly = true,
                             contentPadding = PaddingValues(0.dp),
                         ) { Icon(Icons.Filled.Campaign, contentDescription = "Horn & lights", modifier = Modifier.size(22.dp)) },
                     )

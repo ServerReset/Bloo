@@ -355,10 +355,9 @@ val ButtonIconSize = 18.dp
 val ButtonIconOnlySize = 24.dp
 
 /**
- * How wide a button that shows only a glyph is: the glyph ([ButtonIconOnlySize]) plus a comfortable
- * tap target. The ONE size for an icon-only button, anywhere -- a label-less button, or a labelled
- * one the group has had to collapse because its row ran out of room. It deliberately does NOT grow to
- * the row's height: a button must be the size of the thing it shows.
+ * The smallest a standalone glyph control may be, in both axes: the glyph plus a comfortable tap
+ * target, and square, so it reads as a circle. A clustered button's own floor is the cluster's height
+ * instead (see ButtonCluster), which keeps a collapsed pill a true circle.
  */
 val IconButtonMinWidth = 48.dp
 

@@ -69,29 +69,44 @@ private fun edgeChromeAllowed(): Boolean =
     !inMultiWindowMode && WindowInsets.statusBars.asPaddingValues().calculateTopPadding() > 0.dp
 
 /**
- * The TOP edge's liquid glass: a band of the app's own refraction along the top of the window, so the
- * top edge bends and splits the light the way every other glass surface in the app does. It is the
- * ONLY edge treatment -- the sides and the bottom of the window are plain -- and it carries no tint;
- * the status bar's frost lies over the same area and does the legibility work.
+ * Whether the page on screen has its own content scrolled under the top edge, which is the only time
+ * there is anything for the top-edge glass to be glass over. Written by whichever page owns a scroll;
+ * false everywhere else, which is what both an unscrolled page and a page with no scroll are.
+ */
+internal class TopEdgeScroll {
+    var scrolled by mutableStateOf(false)
+}
+
+internal val LocalTopEdgeScroll = staticCompositionLocalOf<TopEdgeScroll?> { null }
+
+/**
+ * The TOP edge's liquid glass, one-sided: a thin band across the very top of the screen so that edge
+ * bends and splits the light the way every other glass surface in the app does. Nothing is drawn
+ * along the sides or the bottom, and nothing hangs below the top band -- the status bar's frost is
+ * its own strip and this is not part of it.
+ *
+ * Drawn only while [scrolled] is true, i.e. while the page's content is actually running off that
+ * edge. With nothing under it there is no glass edge to see, and a decorative band over an untouched
+ * backdrop is just a coloured stripe.
  */
 @Composable
-internal fun BoxScope.TopEdgeGlass(haze: HazeState?) {
+internal fun BoxScope.TopEdgeGlass(haze: HazeState?, scrolled: Boolean) {
+    if (!scrolled) return
     if (!edgeChromeAllowed()) return
     if (haze == null || !canBlurBackdrops()) return
-    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(
         Modifier
             .align(Alignment.TopCenter)
             .fillMaxWidth()
-            .height(topInset + TopEdgeGlassRim)
-            // A plain rectangle: the boundary the refraction rides is the band's own, and its inner
-            // edge is the visible rim, just under the status bar.
+            .height(TopEdgeGlassHeight)
+            // A plain rectangle whose TOP edge is the window's: the refraction rides its lower
+            // boundary, which is what reads as the top of the screen being glass.
             .appGlassEffect(haze, RoundedCornerShape(0.dp), clear = true),
     )
 }
 
-/** How far the top edge's glass reaches below the status bar, so its inner boundary reads as a rim. */
-private val TopEdgeGlassRim = 14.dp
+/** How thick the top edge's glass is: enough for the refraction's own rim, no more. */
+private val TopEdgeGlassHeight = 16.dp
 
 /**
  * The status bar: clear, with the app running behind it, frosted -- nearly fully at the top edge, still a

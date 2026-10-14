@@ -143,6 +143,10 @@ fun BlooApp(vm: AppViewModel) {
     // and page spacers read it. See SearchAnchor.kt.
     val searchAnchor = remember { SearchAnchor() }
     val dialogHost = remember { DialogHost(searchHazeState) }
+    // Whether the page on screen has content scrolled under the top edge; the top-edge glass reads
+    // it (see TopEdgeScroll). Owned here so the band at the root and the page that scrolls are
+    // talking about the same thing.
+    val topEdgeScroll = remember { TopEdgeScroll() }
     CompositionLocalProvider(
         // Removes the default ripple app-wide (see NoTapHighlight). Material 3 components ignore
         // LocalIndication, so LocalRippleConfiguration = null turns off theirs.
@@ -159,6 +163,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
         LocalAppearance provides appearance,
+        LocalTopEdgeScroll provides topEdgeScroll,
     ) {
     // Biometric lock overlay: blur the whole app behind it and fade the blur away once unlocked.
     // Hoisted into their own small composables below so only those tiny scopes recompose per frame;
@@ -328,10 +333,10 @@ fun BlooApp(vm: AppViewModel) {
             }
         }
     }
-    // The top edge's liquid glass, then the status bar's frost over it -- the ONLY edge treatment in
-    // the app (the sides and the bottom are plain), and both stand down outside full screen. See
-    // edgeChromeAllowed.
-    TopEdgeGlass(searchHazeState)
+    // The top edge's liquid glass, then the status bar's frost over it. The glass is one-sided and
+    // only drawn while content is scrolled under that edge; the frost is the status bar's own strip.
+    // Both stand down outside full screen. See edgeChromeAllowed.
+    TopEdgeGlass(searchHazeState, topEdgeScroll.scrolled)
     StatusBarScrim(searchHazeState)
     // Toasts sit inside the outer Box after SearchLayer so they stack above search; the lock
     // overlay and dialogs sit above them. The app-wide pull-to-refresh disc, drawn above content
