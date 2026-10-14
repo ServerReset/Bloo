@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -67,51 +65,6 @@ private const val StatusStripTintAlpha = 0.18f
 @Composable
 private fun edgeChromeAllowed(): Boolean =
     !inMultiWindowMode && WindowInsets.statusBars.asPaddingValues().calculateTopPadding() > 0.dp
-
-/**
- * Whether the page on screen has its own content scrolled under the top edge, which is the only time
- * there is anything for the top-edge glass to be glass over. Written by whichever page owns a scroll;
- * false everywhere else, which is what both an unscrolled page and a page with no scroll are.
- */
-internal class TopEdgeScroll {
-    var scrolled by mutableStateOf(false)
-}
-
-internal val LocalTopEdgeScroll = staticCompositionLocalOf<TopEdgeScroll?> { null }
-
-/**
- * The TOP edge's liquid glass, one-sided: a thin band across the very top of the screen so that edge
- * bends and splits the light the way every other glass surface in the app does. Nothing is drawn
- * along the sides or the bottom, and nothing hangs below the top band -- the status bar's frost is
- * its own strip and this is not part of it.
- *
- * Drawn only while [scrolled] is true, i.e. while the page's content is actually running off that
- * edge. With nothing under it there is no glass edge to see, and a decorative band over an untouched
- * backdrop is just a coloured stripe.
- *
- * Its blur is pinned to [StandardBlurRadius], the strip's own: left at the clarity-derived default
- * this pane is nearly sharp, and drawn over a 20dp-frosted strip that mismatch shows as a step where
- * the two meet rather than as one edge.
- */
-@Composable
-internal fun BoxScope.TopEdgeGlass(haze: HazeState?, scrolled: Boolean) {
-    if (!scrolled) return
-    if (!edgeChromeAllowed()) return
-    if (haze == null || !canBlurBackdrops()) return
-    Box(
-        Modifier
-            .align(Alignment.TopCenter)
-            .fillMaxWidth()
-            .height(TopEdgeGlassHeight)
-            // A plain rectangle whose TOP edge is the window's: the refraction rides its lower
-            // boundary, which is what reads as the top of the screen being glass. `clear` (no backing,
-            // so no tint of its own) with the strip's blur, so the two read as one edge.
-            .appGlassEffect(haze, RoundedCornerShape(0.dp), clear = true, blurOverride = StandardBlurRadius),
-    )
-}
-
-/** How thick the top edge's glass is: enough for the refraction's own rim, no more. */
-private val TopEdgeGlassHeight = 16.dp
 
 /**
  * The status bar: clear, with the app running behind it, frosted -- nearly fully at the top edge, still a

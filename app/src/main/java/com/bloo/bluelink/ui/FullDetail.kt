@@ -103,14 +103,6 @@ internal fun ExpandedCar(
         // Only a scroll that started writes; the pages that are merely composed beside it stay quiet.
         snapshotFlow { pebblesScroll.isScrollInProgress }.collect { if (it || motion.scroll.value) motion.scroll.value = it }
     }
-    // The top edge's glass only has something to be glass over while THIS page's content is running
-    // off the top of the screen. Written on the flip, never per frame: a per-frame write would
-    // recompose the band above for nothing, on every scrolling frame.
-    val topEdgeScroll = LocalTopEdgeScroll.current
-    LaunchedEffect(pebblesScroll, topEdgeScroll) {
-        if (topEdgeScroll == null) return@LaunchedEffect
-        snapshotFlow { pebblesScroll.value > 0 }.collect { topEdgeScroll.scrolled = it }
-    }
     LaunchedEffect(pebblesScroll, aurora) {
         if (aurora == null) return@LaunchedEffect
         // Quantized like the page lean (AuroraLeanStep): every write repaints the whole backdrop, and

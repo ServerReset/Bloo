@@ -31,12 +31,6 @@ internal fun Modifier.appGlassEffect(
     shape: Shape,
     /** Bare glass: no backing and the clearest blur, so only the bending rim and the specular show. */
     clear: Boolean = false,
-    /**
-     * Overrides the blur radius. The default is derived from clarity, which is right for a pane with
-     * its own backing; a pane sitting on top of another frosted one needs to match THAT pane's blur or
-     * the two show as a step where they meet.
-     */
-    blurOverride: androidx.compose.ui.unit.Dp? = null,
 ): Modifier {
     if (shape !is RoundedCornerShape) return this.appHazeEffect(state)
     // A theme-matched backing behind the refracted backdrop, so a floating element is never a black
@@ -51,7 +45,7 @@ internal fun Modifier.appGlassEffect(
     // `surface` matches the app's own base tone, so the backing only ever lifts or matches, never
     // darkens. Its alpha still falls to ~0 at high clarity, so clear glass has no tint at all.
     val backing = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f * (1f - clarity))
-    val blur = blurOverride ?: (18f - 16.5f * clarity).dp
+    val blur = (18f - 16.5f * clarity).dp
     val style = remember(shape, backing, blur, ultra) { glassStyle(shape, backing, blur, ultra) }
     // A fixed middle quality rather than Adaptive, so the resolution cannot change mid-gesture.
     return this.hazeGlass(input = HazeInput.Sources(state), style = style, performanceMode = HazePerformanceMode.Balanced)

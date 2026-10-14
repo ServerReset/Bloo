@@ -143,10 +143,6 @@ fun BlooApp(vm: AppViewModel) {
     // and page spacers read it. See SearchAnchor.kt.
     val searchAnchor = remember { SearchAnchor() }
     val dialogHost = remember { DialogHost(searchHazeState) }
-    // Whether the page on screen has content scrolled under the top edge; the top-edge glass reads
-    // it (see TopEdgeScroll). Owned here so the band at the root and the page that scrolls are
-    // talking about the same thing.
-    val topEdgeScroll = remember { TopEdgeScroll() }
     CompositionLocalProvider(
         // Removes the default ripple app-wide (see NoTapHighlight). Material 3 components ignore
         // LocalIndication, so LocalRippleConfiguration = null turns off theirs.
@@ -163,7 +159,6 @@ fun BlooApp(vm: AppViewModel) {
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
         LocalAppearance provides appearance,
-        LocalTopEdgeScroll provides topEdgeScroll,
     ) {
     // Biometric lock overlay: blur the whole app behind it and fade the blur away once unlocked.
     // Hoisted into their own small composables below so only those tiny scopes recompose per frame;
@@ -333,13 +328,9 @@ fun BlooApp(vm: AppViewModel) {
             }
         }
     }
-    // The status bar's frost first, then the top edge's glass OVER it. The order matters: the band is
-    // 16dp and the strip is taller than that, so drawn under the strip the refraction was completely
-    // covered -- present in the code and invisible on screen. Above it, the glass reads as the top
-    // edge, and the system icons are unaffected either way: they are composited by the system on top
-    // of the whole window.
+    // The status bar's own strip: a blur of what is behind it, strongest at the top and nearly gone
+    // by the bottom of the strip. It is the ONLY edge treatment in the app.
     StatusBarScrim(searchHazeState)
-    TopEdgeGlass(searchHazeState, topEdgeScroll.scrolled)
     // Toasts sit inside the outer Box after SearchLayer so they stack above search; the lock
     // overlay and dialogs sit above them. The app-wide pull-to-refresh disc, drawn above content
     // and below toasts/dialogs; refracts searchHazeState.
