@@ -6,8 +6,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
@@ -21,7 +19,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -244,21 +241,14 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel, gen5w: Boolean 
                 } else {
                     // The paired-device list is a handful of rows, not a feed.
                     devices.forEach { device ->
-                        MorphButton(
+                        ListButton(
+                            title = device.name,
+                            subtitle = device.address,
                             onClick = {
                                 update(current.copy(deviceAddress = device.address, deviceName = device.name))
                                 showDevicePicker = false
                             },
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = GapGroup, vertical = GapRow),
-                        ) {
-                            // name/address pair, the same label-over-caption rhythm every settings
-                            // row in the app uses.
-                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                                BodyMediumText(device.name)
-                                BodySmallText(device.address)
-                            }
-                        }
+                        )
                     }
                 }
             },

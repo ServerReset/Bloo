@@ -278,40 +278,56 @@ internal fun SecretRow(label: String, value: String) {
 }
 
 @Composable
-internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
-    // The same MorphButton every selectable option uses, with expansion animation.
-    val choiceSource = remember { MutableInteractionSource() }
+internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) =
+    ListButton(title = label, onClick = onSelect, active = selected, showCheck = true)
+
+/**
+ * The app's ONE full-width list button: a title, an optional caption under it and an optional leading icon,
+ * on the standard [MorphButton]. A selectable option (with [showCheck]) fills and shows a check when chosen;
+ * an emphasised choice (a dialog's recommended action) fills. Every "pick one of these" list in the app is
+ * this, so they share padding, type and motion.
+ */
+@Composable
+internal fun ListButton(
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    icon: ImageVector? = null,
+    active: Boolean = false,
+    showCheck: Boolean = false,
+) {
+    val source = remember { MutableInteractionSource() }
     MorphButton(
-        onClick = { onSelect() },
-        active = selected,
-        interactionSource = choiceSource,
-        // Idle colours stay at MorphButton's defaults; only SELECTED gets an explicit colour.
+        onClick = onClick,
+        active = active,
+        interactionSource = source,
+        // Idle colours stay at MorphButton's defaults; only the active state gets an explicit colour.
         activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
         activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = GapGroup),
-        // Standard target height and button label type, like every tappable.
         minHeight = ButtonTargetHeight,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         expressive = true,
         fillOnPress = true,
         groupWeight = GroupWeightProportional,
     ) {
-    RevealText(
-        label,
-        Modifier.weight(1f),
-        style = ButtonLabelStyle,
-        fontWeight = FontWeight.SemiBold,
-    )
-    AnimatedVisibility(
-        visible = selected,
-        enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
-        exit = scaleOut() + fadeOut(),
-    ) {
-        Icon(
-            AppIcons.Check,
-            contentDescription = null,
-            modifier = Modifier.size(ButtonIconSize),
-        )
+        if (icon != null) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+            Spacer(Modifier.width(ButtonIconGap))
+        }
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+            RevealText(title, style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
+            if (subtitle != null) RevealText(subtitle, style = MaterialTheme.typography.bodySmall)
+        }
+        if (showCheck) {
+            AnimatedVisibility(
+                visible = active,
+                enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
+                exit = scaleOut() + fadeOut(),
+            ) {
+                Icon(AppIcons.Check, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+            }
+        }
     }
-}
 }

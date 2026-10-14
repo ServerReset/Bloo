@@ -3,7 +3,6 @@ package com.bloo.bluelink.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -196,19 +195,6 @@ internal fun DriveSyncChoiceRow(
     // Highlights this choice as the recommended one (filled/active MorphButton).
     emphasized: Boolean = false,
 ) {
-    // The app's standard button component (MorphButton), not a bespoke Surface row -- so this
-    // dialog's actions look and feel like every other button in the app instead of a one-off.
-    MorphButton(
-        onClick = onClick,
-        active = emphasized,
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(14.dp),
-    ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-        Spacer(Modifier.width(ButtonIconGap))
-        Column(horizontalAlignment = Alignment.Start) {
-            TitleSmallText(title)
-            RevealText(subtitle, style = MaterialTheme.typography.bodySmall)
-        }
-    }
+    // The app's one list button, like every other pick-one list.
+    ListButton(title = title, onClick = onClick, subtitle = subtitle, icon = icon, active = emphasized)
 }
