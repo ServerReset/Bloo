@@ -12,6 +12,16 @@ import kotlinx.coroutines.launch
  * the snackbar (auto checks stay silent).
  */
 internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: Boolean = false) {
+    // A copy Google Play installed updates through Play, not through the CI builds: there is no tile
+    // to show and nothing the app is allowed to do itself. PlayUpdates runs instead, from
+    // MainActivity.onStart. See UpdateRuntime for why this is decided from the installer rather than
+    // from the flavor.
+    if (com.bloo.bluelink.update.UpdateRuntime.fromPlayStore(getApplication())) {
+        if (surfaceResult) _state.update {
+            it.copy(message = "Updates come from Google Play.", messageType = ToastKind.INFO)
+        }
+        return
+    }
     viewModelScope.launch {
         if (surfaceResult) _state.update { it.copy(updateChecking = true) }
         try {

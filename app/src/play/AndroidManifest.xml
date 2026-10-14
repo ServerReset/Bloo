@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The PLAY flavor's manifest: removals only.
+
+  Shizuku's provider AAR declares moe.shizuku.manager.permission.API_V23 in its own manifest, so the
+  permission arrives by MERGE. Leaving it out of src/main/AndroidManifest.xml is not enough, which is
+  what the first attempt at this split did: the Play artifact kept the permission. A library manifest
+  can only be undone by name.
+
+  The sideload flavor keeps it (see src/sideload/AndroidManifest.xml). A Play build must not carry a
+  permission it has no business holding, and this is the only way to be sure the MERGED manifest is
+  clean rather than trusting that nothing pulls it back in.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission
+        android:name="moe.shizuku.manager.permission.API_V23"
+        tools:node="remove" />
+</manifest>

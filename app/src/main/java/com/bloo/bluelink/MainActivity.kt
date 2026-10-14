@@ -120,7 +120,10 @@ class MainActivity : FragmentActivity() {
         lifecycleScope.launch(Dispatchers.Default) {
             AlertWorker.schedule(applicationContext)
             MainToMainSyncWorker.schedule(applicationContext)
-            UpdateCheckWorker.schedule(applicationContext)
+            // A copy Play installed has no CI-build check to run -- Play updates it (see UpdateRuntime).
+            if (!com.bloo.bluelink.update.UpdateRuntime.fromPlayStore(applicationContext)) {
+                UpdateCheckWorker.schedule(applicationContext)
+            }
         }
         // Shizuku (optional silent-install path): lift the runtime non-SDK block once so the
         // reflected PackageInstaller/IntentSender constructors are callable, and listen for the
@@ -215,7 +218,21 @@ class MainActivity : FragmentActivity() {
             // "Updates" toggle appears without a cold restart. Off-main-thread.
             viewModel.refreshShizukuAvailable()
         }
+        refreshUpdates()
         firstStart = false
+    }
+
+    /**
+     * Updates, for a copy Google Play installed: Play owns the download and the install, so the app
+     * hands it the foreground and stays out of the way. A copy installed from anywhere else uses the
+     * app's own updater instead (the update tile), which is why this is decided here, from the
+     * installer, and not from the build flavor -- Play will happily adopt a sideloaded copy when the
+     * signatures match, and that copy must stop updating itself the moment it does.
+     */
+    private fun refreshUpdates() {
+        if (com.bloo.bluelink.update.UpdateRuntime.fromPlayStore(this)) {
+            com.bloo.bluelink.update.PlayUpdates.onForeground(this)
+        }
     }
 
     override fun onResume() {

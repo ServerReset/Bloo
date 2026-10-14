@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The SIDELOAD flavor's permissions, and only the sideload flavor's.
+
+  This build is the one users install from the rolling GitHub Release, and it updates itself: it
+  downloads the new APK and hands it to the system installer, silently through Shizuku where that is
+  available. Both of those need permissions that must NOT appear in a Play build:
+
+    - REQUEST_INSTALL_PACKAGES is a restricted permission, and Google Play forbids an app distributed
+      on Play from updating itself outside Play.
+    - moe.shizuku.manager.permission.API_V23 is the runtime grant Shizuku gives this app to call
+      through its privileged service (the optional silent-install path).
+
+  Keeping them in a flavor source set rather than gating them at runtime is the point: the Play
+  artifact's manifest cannot carry them at all, and nothing in the Play artifact's code can install
+  anything (the whole install path lives in this flavor's own source set too).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+</manifest>

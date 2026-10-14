@@ -19,3 +19,11 @@ __pycache__/
 # sweep in -- three of them reached commits before this rule existed.
 /*.py
 .kotlin
+
+# The Play upload key and the Play service-account key are credentials: they live in CI secrets,
+# never in the repo. The checked-in app/debug.keystore is deliberately tracked (every CI build is
+# signed with the same key, so builds install over each other) and is unaffected by these patterns.
+*.keystore
+*.jks
+play-service-account.json
+

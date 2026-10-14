@@ -8,7 +8,16 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.bloo.bluelink.wear"
+        // The SAME applicationId as the phone app, and deliberately so: the Wearable Data Layer only
+        // exposes a node to an app that shares its package name and signing certificate, so with the
+        // phone's `com.bloo.bluelink` and this module's old `com.bloo.bluelink.wear` the two could
+        // never see each other -- the watch sat on "Waiting for your phone…" forever and the phone
+        // showed no paired watch, whatever else was wired correctly.
+        //
+        // The code package stays com.bloo.bluelink.wear (see `namespace` above); only the app's
+        // identity is shared. Installing this replaces any earlier watch build, which is expected --
+        // it is a different app as far as the watch is concerned.
+        applicationId = "com.bloo.bluelink"
         // Wear OS 3.0 (the first with a real Compose runtime) is API 30; the
         // phone app is 26. :shared/:uicommon both floor at 26 so they stay
         // usable by both, which is why this is not lowered to match them.

@@ -3,7 +3,7 @@
 # and the app's own startup trace -- an emulator failure with no logcat is a guessing game.
 set +e
 adb logcat -c
-./gradlew :app:connectedDebugAndroidTest --stacktrace
+./gradlew :app:connectedSideloadDebugAndroidTest --stacktrace
 status=$?
 echo "=== logcat: crash buffer ==="
 adb logcat -d -b crash -v time | head -120

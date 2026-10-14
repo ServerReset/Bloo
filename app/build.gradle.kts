@@ -18,8 +18,21 @@ android {
         // agrees, and versionCode IS the run number so each build cleanly supersedes the last on
         // install. A local (unstamped) build falls back to 1 / "dev".
         val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
+        // The MAJOR number: 0 for an ordinary build, and the number the CI reads off a `major-N` tag
+        // otherwise. Only a major build is published to Google Play (see the workflow), so this is the
+        // one thing that makes a build a release rather than just the next CI run.
+        //
+        // versionCode stays the run number -- it is monotonic by construction, which is all Play
+        // requires -- and the major rides in versionName, which Play only shows to you. Deliberately
+        // not a semantic version: Bloo's identity is "which build", and a major says "this one is a
+        // release", not "1.4.2".
+        val major = System.getenv("BLOO_MAJOR")?.toIntOrNull() ?: 0
         versionCode = runNumber.coerceAtLeast(1)
-        versionName = if (runNumber > 0) "build $runNumber" else "dev"
+        versionName = when {
+            major > 0 && runNumber > 0 -> "major $major · build $runNumber"
+            runNumber > 0 -> "build $runNumber"
+            else -> "dev"
+        }
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The GitHub Actions run number that produced this APK (0 for a local/dev
@@ -36,6 +49,31 @@ android {
         buildConfigField("String", "BUILD_BRANCH", "\"${System.getenv("GITHUB_REF_NAME") ?: ""}\"")
     }
 
+    /**
+     * How this build gets its updates, and what it may do to get them.
+     *
+     *  - `sideload` is the build users install from the rolling GitHub Release. It polls for a newer
+     *    CI build and installs the APK itself, silently through Shizuku where that is available.
+     *  - `play` is the build that goes to Google Play. Play forbids an app distributed on Play from
+     *    updating itself, so this flavor carries no REQUEST_INSTALL_PACKAGES and no Shizuku code at
+     *    all (see src/sideload/AndroidManifest.xml and the flavor-only dependencies below), and gets
+     *    its updates through the Play In-App Updates API instead.
+     *
+     * Both keep the SAME applicationId, so a user can move between them and back without uninstalling
+     * -- the signature matches and the versions climb the same way.
+     */
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("sideload") {
+            dimension = "distribution"
+            buildConfigField("boolean", "PLAY_DISTRIBUTION", "false")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "PLAY_DISTRIBUTION", "true")
+        }
+    }
+
     signingConfigs {
         // A checked-in debug keystore so every CI build is signed with the SAME
         // key — otherwise each build's signature differs and Android refuses to
@@ -45,6 +83,19 @@ android {
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
+        }
+        // The Play upload key, read from the environment so it is never in the repo and never in a
+        // build log. Play App Signing holds the real app-signing key, so this one only has to be
+        // consistent across uploads -- and it can be reset in the console if it is ever lost. Absent
+        // (a local build, or CI without the secrets), the release build falls back to the debug key,
+        // which is what every build here has always been signed with.
+        System.getenv("BLOO_UPLOAD_STORE_FILE")?.let { path ->
+            create("upload") {
+                storeFile = file(path)
+                storePassword = System.getenv("BLOO_UPLOAD_STORE_PASSWORD")
+                keyAlias = System.getenv("BLOO_UPLOAD_KEY_ALIAS")
+                keyPassword = System.getenv("BLOO_UPLOAD_KEY_PASSWORD")
+            }
         }
     }
 
@@ -60,7 +111,9 @@ android {
             // like protection. isShrinkResources is deliberately NOT enabled: it can
             // drop resources that are only ever referenced by name.
             isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("debug")
+            // The Play upload key when the environment carries it; the checked-in debug key
+            // otherwise, which is what every build here has always been signed with.
+            signingConfig = signingConfigs.findByName("upload") ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -98,9 +151,13 @@ android {
 
 androidComponents {
     onVariants { variant ->
+        // The sideload APK keeps the plain name: it is what the rolling GitHub Release has always
+        // attached, and the in-app updater matches on exactly that name (see UpdateApi). The Play
+        // flavor is uploaded as an AAB, so its APK name only has to be distinct.
+        val name = if (variant.flavorName == "play") "Bloo-play.apk" else "Bloo.apk"
         variant.outputs.forEach { output ->
             if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                output.outputFileName = "Bloo.apk"
+                output.outputFileName = name
             }
         }
     }
@@ -259,6 +316,10 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+
+    // The Play flavor's update path: Play's own In-App Updates API. Play owns the download and the
+    // install, so that flavor carries no installer code of its own at all (see the flavors above).
+    implementation("com.google.android.play:app-update-ktx:2.1.0")
 
     // Shizuku (optional): silent APK install for the self-update flow via local ADB.
     // `api`/`provider` ship; `:hidden-api-stub` is compileOnly (framework PackageInstaller

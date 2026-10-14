@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The adaptive launcher icon's background, matching the phone app's own
+         (app/src/main/res/values/colors.xml) so the two look like one product. -->
+    <color name="ic_launcher_background">#0B5FFF</color>
+</resources>

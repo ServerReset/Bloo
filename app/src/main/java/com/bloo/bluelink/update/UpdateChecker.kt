@@ -82,6 +82,10 @@ object UpdateChecker {
      *    build, otherwise a strictly greater run number is a real update.
      */
     suspend fun checkPhone(context: Context, force: Boolean = false): UpdateCheckResult {
+        // A copy Google Play installed is Play's to update: this checker must never offer it a CI
+        // build, and nothing downstream of it may try to install one. The workers come through here,
+        // which is why the guard lives at this level as well as in the ViewModel. See UpdateRuntime.
+        if (UpdateRuntime.fromPlayStore(context)) return UpdateCheckResult.UpToDate
         // Unstamped local build: bail before touching the store at all (there's no
         // baseline to compare a local build against).
         if (BuildConfig.BUILD_RUN_NUMBER <= 0) return UpdateCheckResult.UpToDate
