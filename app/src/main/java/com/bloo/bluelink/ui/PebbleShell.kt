@@ -165,11 +165,15 @@ internal fun PebbleShell(
     // default would force compact on the first frame.
     var headerRowWidthDp by remember { mutableStateOf(1000.dp) }
     val density = LocalDensity.current
-    // Collapsed, the card is a true pill: half its OWN height (measured), not the header row's, so the left and
-    // right ends are full semicircles even when the header carries a second line.
-    var cardHeightPx by remember { mutableIntStateOf(0) }
-    val collapsedCorner = if (maxOf(headerRowHeightPx, cardHeightPx) > 0) {
-        with(density) { (maxOf(headerRowHeightPx, cardHeightPx) / 2f).toDp() }
+    // Collapsed, the card is a true pill: half the HEADER ROW's height, which is the collapsed card's
+    // whole height (at rest the body is an AnimatedVisibility with nothing in it).
+    //
+    // This was briefly half the CARD's own measured height instead. That is right at rest and wrong
+    // for the entire length of a close: a closing card starts at its EXPANDED height, so the target
+    // became half of that, the corners jumped to a huge radius the moment the close began, and they
+    // then chased the card down as it shrank -- the broken close animation.
+    val collapsedCorner = if (headerRowHeightPx > 0) {
+        with(density) { (headerRowHeightPx / 2f).toDp() }
     } else {
         PebbleCornerCollapsed
     }
@@ -207,7 +211,6 @@ internal fun PebbleShell(
                 .fillMaxWidth()
                 // The card's bounding box is glass (GlassCardBackdrop, its first child below, so the blur
                 // can be skipped while the pager moves); its own panels stay solid.
-                .onSizeChanged { cardHeightPx = it.height }
                 .pebbleCardEdge(pebbleShape),
             shape = pebbleShape,
             // No shadow elevation: the whole card is scaled by ReorderColumn's drag lift and the

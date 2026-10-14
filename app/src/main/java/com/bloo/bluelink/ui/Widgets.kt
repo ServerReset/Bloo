@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +57,43 @@ internal var inMultiWindowMode by mutableStateOf(false)
 private const val StatusStripTintAlpha = 0.18f
 
 /**
+ * Whether the app's edge chrome -- the status bar's frost and the TOP edge's glass -- may be drawn.
+ *
+ * Both exist to sit on the app's own window edge, and both stop meaning anything when the app does
+ * not own that edge: in multi-window, freeform or split screen the window is a card inside someone
+ * else's layout and its top is not the device's, and in immersive full screen there is no status bar
+ * inset for either to occupy. Disabled in both cases, from this one place, so they cannot drift.
+ */
+@Composable
+private fun edgeChromeAllowed(): Boolean =
+    !inMultiWindowMode && WindowInsets.statusBars.asPaddingValues().calculateTopPadding() > 0.dp
+
+/**
+ * The TOP edge's liquid glass: a band of the app's own refraction along the top of the window, so the
+ * top edge bends and splits the light the way every other glass surface in the app does. It is the
+ * ONLY edge treatment -- the sides and the bottom of the window are plain -- and it carries no tint;
+ * the status bar's frost lies over the same area and does the legibility work.
+ */
+@Composable
+internal fun BoxScope.TopEdgeGlass(haze: HazeState?) {
+    if (!edgeChromeAllowed()) return
+    if (haze == null || !canBlurBackdrops()) return
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    Box(
+        Modifier
+            .align(Alignment.TopCenter)
+            .fillMaxWidth()
+            .height(topInset + TopEdgeGlassRim)
+            // A plain rectangle: the boundary the refraction rides is the band's own, and its inner
+            // edge is the visible rim, just under the status bar.
+            .appGlassEffect(haze, RoundedCornerShape(0.dp), clear = true),
+    )
+}
+
+/** How far the top edge's glass reaches below the status bar, so its inner boundary reads as a rim. */
+private val TopEdgeGlassRim = 14.dp
+
+/**
  * The status bar: clear, with the app running behind it, frosted -- nearly fully at the top edge, still a
  * little at the bottom of the strip -- so the system icons always sit on a calm pane while the cards and the
  * aurora show through. It blurs [haze], which carries the content AND the backdrop (see Screens), so what
@@ -62,9 +101,8 @@ private const val StatusStripTintAlpha = 0.18f
  */
 @Composable
 internal fun StatusBarScrim(haze: HazeState? = LocalBackdropHaze.current) {
-    if (inMultiWindowMode) return
+    if (!edgeChromeAllowed()) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    if (topInset <= 0.dp) return
     val dark = appIsDarkTheme()
     val tint = if (dark) Color.White else MaterialTheme.colorScheme.surfaceContainer
     val topAlpha = if (dark) StatusStripTintAlpha else StatusStripTintAlpha * 2f
