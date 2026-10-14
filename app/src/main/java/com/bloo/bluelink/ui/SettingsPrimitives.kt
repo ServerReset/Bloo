@@ -34,6 +34,17 @@ internal fun Modifier.outlinedPanel(padding: Dp = 12.dp): Modifier =
         .padding(padding)
 
 /**
+ * The app's ONE inner glass panel: a soft tonal fill with the shared frosted rim, for a group of things
+ * sitting inside a glass card (settings groups, onboarding items, tips). One definition so they cannot drift.
+ */
+@Composable
+internal fun Modifier.innerGlassPanel(padding: Dp = GapSection): Modifier =
+    this.clip(StandardShape)
+        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.30f), StandardShape)
+        .glassRim(StandardShape)
+        .padding(padding)
+
+/**
  * A titled sub-group inside a settings card: a heading, then its controls, on its own filled card.
  * A filled card (a tonal fill plus the shared frosted rim), not a bare outlined box, so the groups
  * read as cards sitting inside the card's box rather than boxes nested in a box.
@@ -45,11 +56,7 @@ internal fun Modifier.outlinedPanel(padding: Dp = 12.dp): Modifier =
 @Composable
 internal fun SettingsGroup(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        Modifier.fillMaxWidth()
-            .clip(StandardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.30f), StandardShape)
-            .glassRim(StandardShape)
-            .padding(GapSection),
+        Modifier.fillMaxWidth().innerGlassPanel(GapSection),
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         if (!title.isNullOrBlank()) {

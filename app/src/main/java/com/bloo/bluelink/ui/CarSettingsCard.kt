@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.bloo.bluelink.data.SeatConfig
@@ -86,12 +85,7 @@ internal fun CarSettingsCard(
                         .clip(StandardShape),
                 )
             }
-            // A group, not a plain Row: the buttons share the row's width and press against each
-            // other.
-            ExpressiveButtonRow(spacing = GapRow) {
-                MorphTextButton(if (hasPhoto) "Change photo" else "Choose photo", onClick = onPickPhoto)
-                if (hasPhoto) MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") }, emphasis = ButtonEmphasis.Deny)
-            }
+            CarPhotoButtons(hasPhoto, onPick = onPickPhoto, onClear = { vm.setVehicleImage(v.vin, "") })
         }
 
         SettingsGroup("Vehicle") {

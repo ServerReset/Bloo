@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,7 +12,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -130,9 +128,4 @@ internal fun OnboardingSetupCard(
  * sub-cards so they layer as glass over the card's own glass rather than reading as flat outline.
  */
 @Composable
-private fun Modifier.onboardingPanel(padding: Dp = GapGroup): Modifier =
-    this
-        .clip(StandardShape)
-        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.30f), StandardShape)
-        .glassRim(StandardShape)
-        .padding(padding)
+private fun Modifier.onboardingPanel(padding: Dp = GapGroup): Modifier = innerGlassPanel(padding)

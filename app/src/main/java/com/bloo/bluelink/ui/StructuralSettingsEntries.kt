@@ -152,9 +152,16 @@ private fun CarPhotoControl(v: Vehicle, state: UiState, vm: AppViewModel) {
     val hasPhoto = !state.imageUrls[v.vin].isNullOrBlank()
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         StatusRow("Photo", if (hasPhoto) "Custom photo set" else "Using the default")
-        ExpressiveButtonRow(spacing = GapRow) {
-            MorphTextButton(if (hasPhoto) "Change photo" else "Choose photo", onClick = { vm.requestPhotoPick(v.vin) })
-            if (hasPhoto) MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") }, emphasis = ButtonEmphasis.Deny)
-        }
+        CarPhotoButtons(hasPhoto, onPick = { vm.requestPhotoPick(v.vin) }, onClear = { vm.setVehicleImage(v.vin, "") })
+    }
+}
+
+/** The car photo's two actions, shared by the car settings card and settings search: choose (or change) and clear. */
+@Composable
+internal fun CarPhotoButtons(hasPhoto: Boolean, onPick: () -> Unit, onClear: () -> Unit) {
+    // A group, not a plain Row: the buttons share the row's width and press against each other.
+    ExpressiveButtonRow(spacing = GapRow) {
+        MorphTextButton(if (hasPhoto) "Change photo" else "Choose photo", onClick = onPick)
+        if (hasPhoto) MorphTextButton("Clear", onClick = onClear, emphasis = ButtonEmphasis.Deny)
     }
 }
