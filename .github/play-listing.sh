@@ -103,12 +103,15 @@ if [ "${PLAY_INSPECT:-false}" = "true" ]; then
   call GET "$api/edits/$edit_id/tracks" | jq -r '
     .tracks[]? | "  track \(.track)", ( (.releases // [])[] |
       "      status=\(.status // "?")  versionCodes=\((.versionCodes // [])|join(","))  name=\(.name // "")  rollout=\(.userFraction // "n/a")" )'
-  echo "  # Country availability is read-only in the API, but an app with NO countries selected cannot roll
-  # out a release at all -- and the failure it produces does not say so. Worth printing.
+  # Country availability is read-only in the API, but an app with no countries selected cannot roll a
+  # release out at all, and the error it produces does not say so. Worth printing either way.
+  echo "  country availability:"
   call GET "$api/edits/$edit_id/countryavailability" | jq -r '
-    "      countries: " + (if (.countryTargeting.countries // []) | length == 0 then "NONE SELECTED (a release cannot roll out without them)" else ((.countryTargeting.countries | length | tostring) + " selected") end)
+    "      " + (if ((.countryTargeting.countries // []) | length) == 0
+             then "NONE SELECTED (a release cannot roll out without them)"
+             else (((.countryTargeting.countries | length) | tostring) + " selected") end)
     + (if .countryTargeting.restOfWorld then " + rest of world" else "" end)' || true
-  app details (what Play considers setup):"
+  echo "  app details (what Play considers setup):"
   call GET "$api/edits/$edit_id/details" | jq -r '
     "      defaultLanguage=\(.defaultLanguage // "MISSING")  contactEmail=\(.contactEmail // "MISSING")  contactWebsite=\(.contactWebsite // "-")  contactPhone=\(.contactPhone // "-")"' || true
   echo
