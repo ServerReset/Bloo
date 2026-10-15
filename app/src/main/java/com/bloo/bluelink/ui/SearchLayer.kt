@@ -160,7 +160,7 @@ internal fun SearchLayer(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .then(if (frostScrim) Modifier.appHazeEffect(hazeState!!, cheap = true) else Modifier)
+                    .then(if (frostScrim) Modifier.appHazeEffect(hazeState, cheap = true) else Modifier)
                     .background(MaterialTheme.colorScheme.scrim.copy(alpha = if (frostScrim) 0.08f else 0.24f))
                     .noRippleClickable { query = ""; focused = false },
             )

@@ -79,17 +79,17 @@ internal fun PebbleList(
     // once the section has left the pinned set.
     val returningNow = hotDrag?.returning
     LaunchedEffect(returningNow, pinned) {
-        if (returningNow != null && returningNow !in pinned) hotDrag?.returning = null
+        if (returningNow != null && returningNow !in pinned) hotDrag.returning = null
     }
     val pendingNow = hotDrag?.pendingPin
     LaunchedEffect(pendingNow, pinned) {
         if (pendingNow == null) return@LaunchedEffect
         if (pendingNow in pinned) {
-            hotDrag?.pendingPin = null
+            hotDrag.pendingPin = null
         } else {
             // A drop that was never committed must not leave the drop zone hidden.
             delay(1500)
-            hotDrag?.pendingPin = null
+            hotDrag.pendingPin = null
         }
     }
     // PERF: each car-pager page composes this whole pebble stack. Composing all 8-10 pebbles

@@ -121,7 +121,7 @@ internal fun SearchPill(
                     .matchParentSize()
                     .drawWithContent { if (!motion.moving) drawContent() }
                     .clip(pillShape)
-                    .appGlassEffect(hazeState!!, pillShape),
+                    .appGlassEffect(hazeState, pillShape),
             )
         }
         Surface(
