@@ -121,6 +121,17 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel, gen5w: Boolean 
         // to every other reason an alert might or might not arrive.
 
         if (current.enabled) {
+            // Said FIRST, above the controls -- not only beside "Simulate leaving" at the bottom of
+            // the section. Enabled-but-unusable is the one state that produces NOTHING at all: no
+            // trigger, no notification, no command, and (until the receiver's own logging) no line
+            // anywhere saying why. It is indistinguishable from AutoLock being broken, which is how
+            // it gets reported, and the fix is a row the user scrolled past.
+            if (!current.isUsable) {
+                BodySmallText(
+                    "AutoLock needs the car's Bluetooth device below before it can run. Until one is " +
+                        "chosen, walking away does nothing at all.",
+                )
+            }
             StatusRow("Car Bluetooth device", current.deviceName ?: "Not set")
             SafeMorphTextButton(
                 "Choose device",
