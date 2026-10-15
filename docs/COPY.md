@@ -37,10 +37,19 @@ not *the GitHub Releases asset*.
 **7. One noun per thing.**
 A **car**, never a *vehicle*. A **build** (or *build 812*) for the version. A **pebble** for a card on
 the garage -- the onboarding says "That is a pebble", so that is what it is called everywhere.
+**Sign in**, as two words and both verb and noun, never *login*: the button said "Sign in" and the way
+back from it said "Back to login", in the same app.
 
 **8. Sentence case. No shouting.**
 Labels and titles use sentence case. If something is important, say it plainly; capitals don't make it
-more important.
+more important. This one is easy to break while writing instructions, because the important word feels
+like it needs marking:
+
+- ✗ *Check the watch is on the SAME Wi-Fi … The pairing port is the one NEXT TO it … (NOT the pairing port)*
+- ✓ *Check the watch is on the same Wi-Fi … The pairing port is the one next to it … (not the pairing port)*
+
+Same instructions, same emphasis, no shouting. A reader who is following steps is already paying
+attention.
 
 ## Before adding a string
 

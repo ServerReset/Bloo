@@ -133,7 +133,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             showBiometricPrompt(
                 activity = activity,
                 title = "Unlock Bloo",
-                subtitle = "Confirm it's you to access your vehicles",
+                subtitle = "Confirm it's you to access your cars",
                 onSuccess = { vm.unlocked() },
                 onError = { },
             )
@@ -182,7 +182,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     ) {
         FloatingIcon(
             icon = Icons.AutoMirrored.Filled.ArrowBack,
-            description = "Back to login",
+            description = "Back to sign in",
             onClick = { haptics?.click(); vm.lockToLogin() },
             containerColor = lockFg.copy(alpha = 0.16f),
             contentColor = lockFg,

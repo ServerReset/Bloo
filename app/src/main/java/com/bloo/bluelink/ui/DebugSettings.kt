@@ -90,7 +90,7 @@ fun getDebugInfo(): List<DebugInfo> {
     return listOf(
         // App Info
         DebugInfo(
-            label = "App Version",
+            label = "App build",
             value = BuildConfig.VERSION_NAME,
             copyable = true,
         ),
@@ -115,11 +115,11 @@ fun getDebugInfo(): List<DebugInfo> {
             value = Build.MANUFACTURER,
         ),
         DebugInfo(
-            label = "OS Version",
+            label = "OS version",
             value = "Android ${Build.VERSION.RELEASE}",
         ),
         DebugInfo(
-            label = "API Level",
+            label = "API level",
             value = Build.VERSION.SDK_INT.toString(),
         ),
 

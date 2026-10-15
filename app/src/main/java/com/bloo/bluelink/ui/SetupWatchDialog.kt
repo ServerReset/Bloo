@@ -128,7 +128,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                         BodyMediumText("1. Swipe down from the watch face → tap the gear (Settings).")
                         BodyMediumText("2. Settings → System → About → tap \"Build number\" 7 times, until it says you're a developer.")
                         BodyMediumText("3. Go back → Developer options → turn on \"Wireless debugging\".")
-                        BodyMediumText("4. Check the watch is on the SAME Wi-Fi as this phone (Settings → Connectivity → Wi-Fi).")
+                        BodyMediumText("4. Check the watch is on the same Wi-Fi as this phone (Settings → Connectivity → Wi-Fi).")
                         BodyMediumText("Tick all three below when they're done:")
                         Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                             ToggleRow("Same Wi-Fi as the phone", checkedWifi) { checkedWifi = it }
@@ -145,13 +145,13 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                         SetupField(code, { code = it.filter(Char::isDigit).take(6) }, "Wi-Fi pairing code", KeyboardType.Number, Modifier.weight(1f))
                     }
                     BodySmallText(
-                        "That code is six digits. The pairing port is the one NEXT TO it, not the port on " +
+                        "That code is six digits. The pairing port is the one next to it, not the port on " +
                             "the Wireless debugging screen behind it.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 WatchSetupStep.Install -> {
-                    BodyMediumText("Back on the watch's main Wireless debugging screen, type the port shown under the IP address (NOT the pairing port).")
+                    BodyMediumText("Back on the watch's main Wireless debugging screen, type the port shown under the IP address (not the pairing port).")
                     SetupField(connectPort, { connectPort = it.filter(Char::isDigit) }, "Connection port", KeyboardType.Number)
                     if (downloadError != null) {
                         BodySmallText("Couldn't fetch the watch app: $downloadError", color = MaterialTheme.colorScheme.error)
