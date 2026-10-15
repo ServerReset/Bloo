@@ -69,9 +69,7 @@ class AutoLockDebugReceiver : BroadcastReceiver() {
                         // The real path, unchanged: the same AutoLockTrigger the manifest
                         // receiver calls, so the debug run exercises exactly what a real
                         // Bluetooth disconnect does.
-                        AutoLockTrigger.onCarDisconnected(
-                            ctx, vin, SettingsStore(ctx).autoLockConfig(vin), log = false,
-                        )
+                        AutoLockTrigger.onCarDisconnected(ctx, vin, log = false)
                     }
                     "walk" -> AutoLockController.onWalkingConfirmedAny()
                     // Posts the outcome notification directly, so the notification's channel,

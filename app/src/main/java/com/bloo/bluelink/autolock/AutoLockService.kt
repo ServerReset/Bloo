@@ -15,6 +15,7 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.allAutoLockConfigs
+import com.bloo.bluelink.ui.hasPermission
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,6 +45,8 @@ class AutoLockService : Service() {
     private val observeJobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
     private val carNames = java.util.concurrent.ConcurrentHashMap<String, String>()
     private var watcher: BroadcastReceiver? = null
+    /** Cars whose notification is currently holding this service in the foreground (see postNotification). */
+    private val foregroundVins = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -61,7 +64,7 @@ class AutoLockService : Service() {
                         if (!config.enabled || !address.equals(config.deviceAddress, ignoreCase = true)) return@forEach
                         AppLog.log("AutoLock: watcher received ${intent.action} for $vin")
                         if (intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
-                            AutoLockTrigger.onCarDisconnected(applicationContext, vin, config)
+                            AutoLockTrigger.onCarDisconnected(applicationContext, vin)
                         } else if (intent.action == BluetoothDevice.ACTION_ACL_CONNECTED) {
                             AutoLockTrigger.onCarConnected(applicationContext, vin)
                         }
@@ -90,13 +93,28 @@ class AutoLockService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        if (intent?.action == ACTION_START_WATCH) {
+        // A STICKY RESTART arrives with a NULL intent. That is the watcher coming back from a process
+        // kill -- and it used to fall straight through to the `vin == null` guard further down, which
+        // returns START_NOT_STICKY without ever promoting to foreground. So the watcher was gone for
+        // good, silently, taking the notification the settings screen promises with it, and it only
+        // came back the next time the app was opened. Re-resolve it from the mirror instead.
+        if (intent == null) {
+            val vin = AutoLockAddresses.anyVin(applicationContext)
+            if (vin == null) {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            AppLog.log("AutoLock: the system restarted the watcher; re-promoting it for $vin.")
+            startForegroundCompat(vin, DetectionState.IDLE, 0)
+            return START_STICKY
+        }
+        if (intent.action == ACTION_START_WATCH) {
             val vin = intent.getStringExtra(EXTRA_VIN)
             AppLog.log("AutoLock: background Bluetooth watcher started")
             if (vin != null) startForegroundCompat(vin, DetectionState.IDLE, 0)
             return START_STICKY
         }
-        if (intent?.action == ACTION_STOP_WATCH) {
+        if (intent.action == ACTION_STOP_WATCH) {
             // Belt-and-suspenders alongside AutoLockController.cancel in setAutoLockConfig: if
             // the watcher is being torn down, make sure no evaluation it may have kicked off is
             // still counting down toward a lock. `forgetAll` needs the vins, which the service
@@ -107,7 +125,7 @@ class AutoLockService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        val vin = intent?.getStringExtra(EXTRA_VIN)
+        val vin = intent.getStringExtra(EXTRA_VIN)
         if (vin == null) {
             return START_NOT_STICKY
         }
@@ -197,6 +215,9 @@ class AutoLockService : Service() {
     private fun finishTracking(vin: String) {
         observeJobs.remove(vin)?.cancel()
         carNames.remove(vin)
+        // Out of the foreground set too, or a later evaluation for this car would take the `notify`
+        // path and never promote the service at all.
+        foregroundVins.remove(vin)
         runCatching { NotificationManagerCompat.from(this).cancel(AutoLockNotification.notificationId(vin)) }
         if (observeJobs.isEmpty()) stopSelf() else reanchorForeground()
     }
@@ -208,13 +229,33 @@ class AutoLockService : Service() {
     private fun reanchorForeground() {
         val vin = observeJobs.keys.firstOrNull() ?: return
         val s = AutoLockController.stateFor(vin)
-        startForegroundCompat(vin, s.detection, s.graceRemaining)
+        // promote = true: the notification that was holding the foreground standing has just been
+        // cancelled, so a survivor has to TAKE IT OVER for real -- a plain notify would update a
+        // notification the service no longer stands behind.
+        postNotification(vin, s.detection, s.graceRemaining, promote = true)
     }
 
     /** Returns false when the process could not be promoted -- see the guard's own comment. */
-    private fun startForegroundCompat(vin: String, state: DetectionState, grace: Int): Boolean {
+    private fun startForegroundCompat(vin: String, state: DetectionState, grace: Int): Boolean =
+        postNotification(vin, state, grace, promote = !foregroundVins.contains(vin))
+
+    /**
+     * The one place the notification is posted, and the only place [ServiceCompat.startForeground] is
+     * called.
+     *
+     * [promote] is false once this car's notification is already the one holding the service in the
+     * foreground. The grace countdown ticks once a second, and re-promoting is a Binder round trip to
+     * the activity manager -- so a drive spent a hundred of them animating one line. An ordinary
+     * `notify` on the same id updates the notification in place.
+     */
+    private fun postNotification(vin: String, state: DetectionState, grace: Int, promote: Boolean): Boolean {
         val carName = carNames[vin] ?: "your car"
         val notification = AutoLockNotification.build(this, vin, carName, state, grace)
+        val id = AutoLockNotification.notificationId(vin)
+        if (!promote) {
+            runCatching { NotificationManagerCompat.from(this).notify(id, notification) }
+            return true
+        }
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
         } else {
@@ -226,11 +267,15 @@ class AutoLockService : Service() {
         // so a car that is actually configured has it, but a revoked or never-granted one does
         // not -- makes startForeground throw SecurityException. Uncaught, that killed the WHOLE
         // APP every time an evaluation started. A background convenience must never do that.
-        return runCatching {
-            ServiceCompat.startForeground(this, AutoLockNotification.notificationId(vin), notification, type)
+        // (The caller asks first now, so this should not be reached without it -- see
+        // AutoLockService.start.)
+        val ok = runCatching {
+            ServiceCompat.startForeground(this, id, notification, type)
         }.onFailure {
             AppLog.log("⚠ AutoLock: couldn't promote the service to foreground (${it.javaClass.simpleName}).")
         }.isSuccess
+        if (ok) foregroundVins.add(vin)
+        return ok
     }
 
     override fun onDestroy() {
@@ -253,6 +298,15 @@ class AutoLockService : Service() {
          *  fine now -- the evaluation itself runs in AutoLockController's own scope, started by
          *  the trigger, and does not depend on this. */
         fun start(context: Context, vin: String): Boolean {
+            // The connectedDevice type needs a prerequisite permission (BLUETOOTH_CONNECT on 31+), and
+            // startForeground() throws SecurityException without it. Catching that AFTER
+            // startForegroundService() is too late: Android has already armed the five-second rule, so
+            // the process can be killed for failing to promote in time -- a missing permission turning
+            // "AutoLock is broken" into "Bloo crashed". Ask before starting anything.
+            if (!context.hasPermission(android.Manifest.permission.BLUETOOTH_CONNECT, Build.VERSION_CODES.S)) {
+                AppLog.log("AutoLock: not starting the progress service — BLUETOOTH_CONNECT is not granted, so it could not be promoted to foreground.")
+                return false
+            }
             val intent = Intent(context, AutoLockService::class.java).putExtra(EXTRA_VIN, vin)
             return try {
                 context.startForegroundService(intent)

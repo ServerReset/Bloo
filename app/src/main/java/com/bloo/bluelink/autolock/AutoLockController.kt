@@ -36,6 +36,12 @@ data class AutoLockEvalState(
     val detection: DetectionState = DetectionState.IDLE,
     val graceRemaining: Int = 0,
     val lastLockAtEpochMs: Long? = null,
+    /**
+     * The last COMPLETED evaluation's own words -- "Locked.", "Skipped — a door was open.", or the
+     * failure. The detection alone says what happened; this says why, in the one place the user is
+     * already looking (the AutoLock section), instead of only in the app log.
+     */
+    val lastOutcome: String? = null,
 )
 
 /**
@@ -105,7 +111,7 @@ object AutoLockController {
         val job = jobs[vin] ?: return
         if (!job.isActive) return
         job.cancel()
-        _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ABORTED)) }
+        _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ABORTED, lastOutcome = "Cancelled — the car reconnected.")) }
         AppLog.log("AutoLock: cancelled for $vin")
     }
 
@@ -193,7 +199,18 @@ object AutoLockController {
             // AlertWorker's own refresh=false convention for background polls.
             val v = SnapshotStore(context).current().vehicles.firstOrNull { it.vin == vin }?.toVehicle()
             if (v == null) {
-                fail(vin, "Car no longer found.")
+                // NOT "car no longer found", which is what this used to say -- and which sent the
+                // reader looking for a car that was there all along. The snapshot can simply be stale
+                // or empty (a fresh sign-in, or an app that has not been opened since). The lock
+                // command itself needs nothing but the VIN, so what is actually missing is the cached
+                // status the pre-lock check reads, and locking without that check is not something to
+                // do blind. (Fetching the account's car list here would need the Vehicle ->
+                // VehicleSnapshot conversion, which currently lives in the UI layer -- see
+                // ui/Snapshots.kt.)
+                fail(
+                    vin,
+                    "AutoLock has no cached car list yet, so it cannot check $vin before locking. Open Bloo once and let the garage load.",
+                )
                 return@withLock
             }
             val status = runCatching { statusFor(context, v) }.getOrElse {
@@ -207,7 +224,7 @@ object AutoLockController {
 
             when (val decision = LockPolicy.decide(status)) {
                 is LockDecision.Skip -> {
-                    _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
+                    _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED, lastOutcome = "Skipped — ${decision.reason}.")) }
                     AppLog.log("AutoLock: skipped for $vin — ${decision.reason}.")
                 }
                 LockDecision.Lock -> performLock(context, vin, v.name, settings)
@@ -233,7 +250,16 @@ object AutoLockController {
 
     private suspend fun statusFor(context: Context, v: Vehicle): VehicleStatus? {
         val car = carContext(context, SnapshotStore(context).current().vehicles.firstOrNull { it.vin == v.vin } ?: return null)
-        return withTimeoutOrNull(30_000) { BlueLinkGate.statusMutex.withLock { car.repository().status(car.vehicle, refresh = false) } }
+        // The CACHED read first -- never wake the car for a pre-lock check, matching AlertWorker's own
+        // refresh=false convention for background polls. But ONE waking read if the cached one comes
+        // back empty: an empty cache is what a just-opened app has, and a walk-away lock is exactly
+        // the moment to spend a wake on rather than to fail.
+        return withTimeoutOrNull(30_000) {
+            BlueLinkGate.statusMutex.withLock { car.repository().status(car.vehicle, refresh = false) }
+        } ?: withTimeoutOrNull(30_000) {
+            AppLog.log("AutoLock: no cached status for ${v.vin}; asking the car once.")
+            BlueLinkGate.statusMutex.withLock { car.repository().status(car.vehicle, refresh = true) }
+        }
     }
 
     private suspend fun performLock(context: Context, vin: String, carName: String, settings: AutoLockConfig) {
@@ -248,16 +274,32 @@ object AutoLockController {
             // locked" notification, on its own channel with the car-lock sound.
             if (announce) AutoLockEventNotifier.notifyLocked(context, vin, carName, dryRun = true)
             _state.update {
-                it + (vin to AutoLockEvalState(detection = DetectionState.LOCKED, lastLockAtEpochMs = System.currentTimeMillis()))
+                it + (vin to AutoLockEvalState(
+                    detection = DetectionState.LOCKED,
+                    lastLockAtEpochMs = System.currentTimeMillis(),
+                    lastOutcome = "Would have locked (dry run).",
+                ))
             }
             return
         }
-        val result = runCatching { runCarCommand(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
+        // ONE retry, and only here. A walk-away lock is the moment to spend it: the alternative is
+        // that a single network blip, or a token that expired a minute ago, leaves the car open and
+        // reports an error. Nothing else in this flow is retried, and this is bounded at one.
+        var result = runCatching { runCarCommand(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
+        if (result?.ok != true) {
+            AppLog.log("AutoLock: the lock command failed for $vin (${result?.message ?: "no response"}); trying once more.")
+            delay(2500)
+            result = runCatching { runCarCommand(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
+        }
         if (result?.ok == true) {
             AppLog.log("AutoLock: car locked automatically ($vin).")
             if (announce) AutoLockEventNotifier.notifyLocked(context, vin, carName, dryRun = false)
             _state.update {
-                it + (vin to AutoLockEvalState(detection = DetectionState.LOCKED, lastLockAtEpochMs = System.currentTimeMillis()))
+                it + (vin to AutoLockEvalState(
+                    detection = DetectionState.LOCKED,
+                    lastLockAtEpochMs = System.currentTimeMillis(),
+                    lastOutcome = "Locked automatically.",
+                ))
             }
         } else {
             fail(vin, "AutoLock: lock command failed${result?.message?.let { " — $it" } ?: ""}.")
@@ -267,7 +309,7 @@ object AutoLockController {
 
     private fun fail(vin: String, message: String) {
         AppLog.log("⚠ $message")
-        _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ERROR)) }
+        _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ERROR, lastOutcome = message)) }
     }
 
     /**

@@ -42,6 +42,9 @@ fun AppViewModel.logout(brand: Brand) {
                 val autoLockVins = settingsStore.autoLockConfiguredVins()
                 com.bloo.bluelink.autolock.AutoLockController.forgetAll(autoLockVins)
                 settingsStore.clearAllAutoLockConfigs()
+                // The receiver's synchronous mirror has to go with it, or a signed-out app would still
+                // match a car's Bluetooth disconnect and start an evaluation for a car that is gone.
+                runCatching { com.bloo.bluelink.autolock.AutoLockAddresses.write(getApplication(), emptyMap()) }
             }
             // `sessionFetched` is add-only and lives for the ViewModel's life, and [ensureStatus]
             // returns immediately for any VIN in it. Belongs exactly here, beside the other two

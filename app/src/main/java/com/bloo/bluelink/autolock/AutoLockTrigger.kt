@@ -5,7 +5,8 @@ import com.bloo.bluelink.data.AppLog
 
 /**
  * What happens when a car's Bluetooth link goes away (and when it comes back), shared by the
- * manifest [AutoLockBluetoothReceiver] and the debug-only [AutoLockDebugReceiver].
+ * manifest [AutoLockBluetoothReceiver], the watcher service's own dynamic receiver, and the
+ * debug-only trigger.
  *
  * Rebased onto the i5-AutoLock reference (github.com/Vel-San/i5-AutoLock), which simply runs
  * its evaluation in-process: the controller owns its own coroutine scope, so the Bluetooth
@@ -17,21 +18,16 @@ import com.bloo.bluelink.data.AppLog
  * The foreground service is still started BEST-EFFORT, purely so the progress notification can
  * show. A blocked background start (the norm on Android 12+) is expected and harmless now that
  * nothing depends on it -- the evaluation is already running in this process.
+ *
+ * Both calls are SYNCHRONOUS and do no I/O of their own: the manifest receiver runs this inside
+ * `onReceive` so the background-start exemption still applies (see its own doc). Neither needs the
+ * car's config -- the controller re-reads it at the start of its evaluation, so there is nothing here
+ * that can go stale.
  */
 internal object AutoLockTrigger {
 
-    /**
-     * A car's Bluetooth just disconnected: start an evaluation.
-     *
-     * [settings] is passed in rather than read here so the debug trigger can supply its own
-     * dry-run/short-grace config while still exercising exactly this code.
-     */
-    fun onCarDisconnected(
-        context: Context,
-        vin: String,
-        settings: AutoLockConfig,
-        log: Boolean = true,
-    ) {
+    /** A car's Bluetooth just disconnected: start an evaluation. */
+    fun onCarDisconnected(context: Context, vin: String, log: Boolean = true) {
         val ctx = context.applicationContext
         // Best-effort notification wrapper -- see this object's own doc for why nothing depends
         // on it succeeding.

@@ -414,6 +414,10 @@ private fun AutoLockSettings(
                         if (s.detection == DetectionState.GRACE) " · ${s.graceRemaining}s" else "",
                     tint = MaterialTheme.colorScheme.primary,
                 )
+                // The detection says what happened; this says WHY, in the place the user is already
+                // standing. It is the one thing the old section never showed: a skip and a failure
+                // both looked like nothing at all from here.
+                s.lastOutcome?.let { BodySmallText(it) }
             }
         }
     }

@@ -17,6 +17,7 @@ suspend fun AppViewModel.autoLockConfig(vin: String): com.bloo.bluelink.autolock
 fun AppViewModel.setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolock.AutoLockConfig) {
     viewModelScope.launch {
         settingsStore.setAutoLockConfig(vin, config)
+        refreshAutoLockAddresses()
         // Turning AutoLock OFF must also CANCEL an evaluation already in flight for this car. The
         // config read at the START of an evaluation only guards NEW ones.
         if (!config.enabled) {
@@ -53,8 +54,28 @@ fun AppViewModel.setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolo
 suspend fun AppViewModel.autoLockConfiguredElsewhere(vin: String): Boolean =
     settingsStore.allAutoLockConfigs().any { (other, config) -> other != vin && config.isUsable }
 
+/**
+ * Rebuild the synchronous address mirror the Bluetooth receiver reads (see AutoLockAddresses).
+ *
+ * Written from the two places that can change the answer -- a config write, and every foreground --
+ * rather than from a background job, because the receiver may run in a process that has no store open
+ * and no time to open one.
+ */
+suspend fun AppViewModel.refreshAutoLockAddresses() {
+    val entries = settingsStore.allAutoLockConfigs()
+        .mapNotNull { (vin, config) ->
+            config.deviceAddress?.takeIf { config.enabled }?.let { it to vin }
+        }
+        .toMap()
+    runCatching { com.bloo.bluelink.autolock.AutoLockAddresses.write(getApplication(), entries) }
+}
+
 /** Re-attaches the low-power Bluetooth watcher when the app returns to the foreground. */
-fun AppViewModel.ensureAutoLockWatcher() {    viewModelScope.launch {
+fun AppViewModel.ensureAutoLockWatcher() {
+    viewModelScope.launch {
+        // Every foreground: cheap, and it is what repairs the mirror after an upgrade from a build
+        // that did not have one.
+        refreshAutoLockAddresses()
         val entry = settingsStore.allAutoLockConfigs().entries.firstOrNull { it.value.enabled }
             ?: return@launch
         runCatching {
@@ -85,7 +106,7 @@ fun AppViewModel.pairedBluetoothDevices(): List<com.bloo.bluelink.autolock.Paire
 fun AppViewModel.simulateAutoLockLeaving(v: Vehicle) {
     viewModelScope.launch {
         val config = settingsStore.autoLockConfig(v.vin)
-        com.bloo.bluelink.autolock.AutoLockTrigger.onCarDisconnected(getApplication(), v.vin, config, log = false)
+        com.bloo.bluelink.autolock.AutoLockTrigger.onCarDisconnected(getApplication(), v.vin, log = false)
         AppLog.log("AutoLock: simulated leaving ${v.name}.")
     }
 }
