@@ -8,6 +8,15 @@ android {
     namespace = "com.bloo.bluelink"
     compileSdk = 37
 
+    // The one-off migration bridge (BLOO_LEGACY_SIGNING, set by the workflow's `legacy_signing`
+    // dispatch input). Every Bloo build before the Play upload key existed was signed with the
+    // checked-in debug keystore, and Android will not install an update signed by a different key --
+    // so those installs cannot take any build signed with the new one, and the only way to reach the
+    // people running them is a build they can still install. This mode signs with the OLD key again
+    // and sets LEGACY_SIGNING, which turns on the notice (LegacySigningNotice.kt) that explains it and
+    // the update checker's refusal to offer builds this key can never install.
+    val legacySigning = System.getenv("BLOO_LEGACY_SIGNING") == "true"
+
     defaultConfig {
         applicationId = "com.bloo.bluelink"
         minSdk = 26
@@ -47,6 +56,10 @@ android {
         // installed branch and could offer a higher-numbered build of a different
         // branch that lacks the code the user is running.
         buildConfigField("String", "BUILD_BRANCH", "\"${System.getenv("GITHUB_REF_NAME") ?: ""}\"")
+        // True only in the one-off bridge build; see `legacySigning` above. The app reads it twice:
+        // to show the migration notice, and to stop the update checker from ever offering a build
+        // this copy could not install.
+        buildConfigField("boolean", "LEGACY_SIGNING", legacySigning.toString())
     }
 
     /**
@@ -113,7 +126,15 @@ android {
             isMinifyEnabled = true
             // The Play upload key when the environment carries it; the checked-in debug key
             // otherwise, which is what every build here has always been signed with.
-            signingConfig = signingConfigs.findByName("upload") ?: signingConfigs.getByName("debug")
+            //
+            // The bridge build (see `legacySigning`) forces the debug key back on regardless of the
+            // upload key being present: reaching the installs that predate that key is the entire
+            // point of it, and signing it with the new key would make it unusable by exactly the
+            // people it is built for.
+            signingConfig = when {
+                legacySigning -> signingConfigs.getByName("debug")
+                else -> signingConfigs.findByName("upload") ?: signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

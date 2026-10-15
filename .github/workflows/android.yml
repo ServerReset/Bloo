@@ -8,7 +8,18 @@ on:
     # sideload users get the same build, by the same route they always have.
     tags: [ "major-*" ]
   pull_request:
+  # `legacy_signing` builds the one-off migration bridge: the same app, signed with the pre-Play
+  # debug keystore, for the installs that predate the Play upload key and therefore cannot install
+  # anything signed with it. It is published like any other build (same rolling release, same
+  # `Bloo.apk`) because that rolling release is the only channel those installs read -- and the
+  # build itself carries the notice that says so. Not for ordinary builds; the app's own updater is
+  # disabled inside it.
   workflow_dispatch:
+    inputs:
+      legacy_signing:
+        description: "Sign with the pre-Play debug key (the one-off migration bridge)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -110,6 +121,7 @@ jobs:
       - name: Run unit tests and build the release APK + the Play bundle (runs R8 -- the only check on proguard-rules.pro)
         env:
           BLOO_MAJOR: ${{ steps.major.outputs.major }}
+          BLOO_LEGACY_SIGNING: ${{ inputs.legacy_signing && 'true' || 'false' }}
           BLOO_UPLOAD_STORE_PASSWORD: ${{ secrets.BLOO_UPLOAD_STORE_PASSWORD }}
           BLOO_UPLOAD_KEY_ALIAS: ${{ secrets.BLOO_UPLOAD_KEY_ALIAS }}
           BLOO_UPLOAD_KEY_PASSWORD: ${{ secrets.BLOO_UPLOAD_KEY_PASSWORD }}
@@ -186,6 +198,40 @@ jobs:
             echo
           } > release_notes.md
 
+      # The migration bridge's own release body. The changelog above describes a normal build and
+      # tells people to just open the app and update, which is precisely what the bridge exists to
+      # say no longer works -- so when this run IS the bridge, overwrite it.
+      - name: Write the migration release notes (legacy bridge)
+        if: inputs.legacy_signing
+        run: |
+          {
+            echo "## ⚠️ Last update for this install"
+            echo
+            echo "Bloo is signed with a new key from here on. Android only installs an update signed with"
+            echo "the same key as the copy already on the phone, so installs that predate that change"
+            echo "cannot take any newer build — you tap Update, the download finishes, and the installer"
+            echo "says **\"App not installed\"**."
+            echo
+            echo "\`Bloo.apk\` below is the last build those installs can take, and it is signed with the"
+            echo "old key on purpose so it can be installed one final time. It will tell you the same thing"
+            echo "when you open it, and it will not be updated again."
+            echo
+            echo "### Move to the current version"
+            echo "1. **Uninstall Bloo.** (The install is what is keyed to the old signature; nothing else can clear that.)"
+            echo "2. Download the newest **\`Bloo.apk\`** from this page."
+            echo "3. Install it and sign in again. If you had Drive sync on, your cars and settings come back with it."
+            echo
+            echo "Everything you have now keeps working until you do — it just stops receiving updates."
+            echo
+            echo "### Install — watch (optional)"
+            echo "The watch app is signed with one key and always has been, so it is unaffected: pair the"
+            echo "watch and Bloo pushes the matching watch build to it, as before."
+            echo
+            echo "### Built from"
+            echo "- \`${{ github.sha }}\`"
+            echo
+          } > release_notes.md
+
       # See the comment above "No actions/upload-artifact for the APKs" for why
       # this Release, not an Actions artifact, is the one and only APK-delivery
       # path. One rolling release per push, tagged by run number. NOT a prerelease: it is the newest
@@ -196,13 +242,13 @@ jobs:
       # the whole run has passed.
       - name: Publish build as a GitHub Release (direct APK downloads)
         id: release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || inputs.legacy_signing
         uses: softprops/action-gh-release@v2
         with:
           draft: true
           target_commitish: ${{ github.sha }}
           tag_name: build-${{ github.run_number }}
-          name: "Build #${{ github.run_number }}"
+          name: ${{ inputs.legacy_signing && format('Build #{0} — final for this signing key', github.run_number) || format('Build #{0}', github.run_number) }}
           body_path: release_notes.md
           files: |
             app/build/outputs/apk/sideload/release/Bloo.apk
@@ -291,7 +337,7 @@ jobs:
     # new build at all. A build that compiled and passed R8 is worth shipping; a slow emulator says
     # nothing about it either way.
     needs: [build]
-    if: always() && github.event_name == 'push' && needs.build.result == 'success'
+    if: always() && needs.build.result == 'success' && (github.event_name == 'push' || inputs.legacy_signing)
     runs-on: ubuntu-latest
     steps:
       - name: Publish the release

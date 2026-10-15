@@ -372,6 +372,10 @@ fun BlooApp(vm: AppViewModel) {
             onContinue = { vm.confirmInstallUpdate() },
         )
     }
+    // The migration bridge's notice, if this IS the migration bridge (see LegacySigningNotice and
+    // `legacySigning` in app/build.gradle.kts). Composed unconditionally-adjacent to the layer that
+    // draws dialogs, exactly as the install guide above is.
+    if (com.bloo.bluelink.BuildConfig.LEGACY_SIGNING) LegacySigningNotice()
     // Every open dialog, above everything else.
     DialogLayer(dialogHost)
     }

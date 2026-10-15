@@ -86,6 +86,15 @@ object UpdateChecker {
         // build, and nothing downstream of it may try to install one. The workers come through here,
         // which is why the guard lives at this level as well as in the ViewModel. See UpdateRuntime.
         if (UpdateRuntime.fromPlayStore(context)) return UpdateCheckResult.UpToDate
+        // The one-off migration bridge (see `legacySigning` in app/build.gradle.kts) is signed with
+        // the key that PREDATES the Play upload key, so every build this checker could ever offer it
+        // is signed with a different one -- Android would refuse the install, every time. Reporting
+        // Available would put a tile and a 12-hourly notification in front of the user for an update
+        // that cannot succeed, so the checker reports up-to-date instead and the notice the bridge
+        // ships with (LegacySigningNotice) is what tells them where to actually go. Answered here
+        // rather than only in the ViewModel so the background worker, the reminder worker and the
+        // crash-handler check are all covered by the same rule.
+        if (BuildConfig.LEGACY_SIGNING) return UpdateCheckResult.UpToDate
         // Unstamped local build: bail before touching the store at all (there's no
         // baseline to compare a local build against).
         if (BuildConfig.BUILD_RUN_NUMBER <= 0) return UpdateCheckResult.UpToDate

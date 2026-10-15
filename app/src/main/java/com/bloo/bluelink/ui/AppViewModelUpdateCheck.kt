@@ -22,6 +22,18 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
         }
         return
     }
+    // The migration bridge: see the guard in UpdateChecker.checkPhone. A manual "Check" here must
+    // explain itself rather than fall through to "You're on the latest build.", which would be true
+    // and useless -- the point is that there IS a newer build and this copy cannot take it.
+    if (com.bloo.bluelink.BuildConfig.LEGACY_SIGNING) {
+        if (surfaceResult) _state.update {
+            it.copy(
+                message = "This is the last build for this copy — uninstall and reinstall from GitHub to move on.",
+                messageType = ToastKind.INFO,
+            )
+        }
+        return
+    }
     viewModelScope.launch {
         if (surfaceResult) _state.update { it.copy(updateChecking = true) }
         try {
