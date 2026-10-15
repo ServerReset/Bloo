@@ -137,48 +137,96 @@ if [ "${#codes[@]}" -gt 1 ]; then
 fi
 
 IFS=',' read -ra LIST <<< "$TRACKS"
-for t in "${LIST[@]}"; do
-  track="$(echo "$t" | xargs)"
-  assign "$track" "${phone_codes[@]}"
-  if [ "${#wear_codes[@]}" -gt 0 ]; then
-    # The watch's own form factor track. Play creates it on first write.
-    assign "wear:$track" "${wear_codes[@]}"
-  fi
+
+# The phone goes first, in its own edit, and its commit is the one that must succeed. Everything the
+# user has asked for on Play is the phone, so a watch problem must not be able to take it down -- which
+# is exactly what happened for the last six runs.
+phone_tracks=()
+for t in "${LIST[@]}"; do phone_tracks+=("$(echo "$t" | xargs)"); done
+
+assign_to_edit() {
+  local edit_id="$1" track="$2"; shift 2
+  local codes_json rel payload out
+  codes_json="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
+  rel="$(jq -c -n --arg status "$STATUS" --argjson codes "$codes_json" '{status: $status, versionCodes: $codes}')"
+  payload="$(jq -c -n --arg track "$track" --argjson rel "$rel" '{track: $track, releases: [$rel]}')"
+  echo; echo "--- $track <- $(printf '%s,' "$@" | sed 's/,$//')"
+  out="$(call PUT "$api/edits/$edit_id/tracks/$track" -d "$payload")" || {
+    echo "::error::could not assign to '$track'"
+    [ -n "${out:-}" ] && echo "$out" >&2
+    return 1
+  }
+  printf '%s' "$out" | jq -r '.releases[]? | "  release: status=\(.status) versionCodes=\((.versionCodes // [])|join(","))"' >&2 || true
+}
+
+for track in "${phone_tracks[@]}"; do
+  assign_to_edit "$edit" "$track" "${phone_codes[@]}"
 done
 
-echo; echo "--- committing"
+echo; echo "--- committing the phone release"
 commit_out="$(call POST "$api/edits/$edit:commit")" || {
-  echo "::error::the commit failed, so NOTHING was published"
+  echo "::error::the phone commit failed, so NOTHING was published"
   [ -n "${commit_out:-}" ] && echo "$commit_out" >&2
   exit 1
 }
 echo "  commit response: ${commit_out:-<empty>}"
 
-# Read it back, because "committed" is a claim and this is the check. A new edit only ever sees the
-# LAST COMMITTED state -- so if the version codes are not there, the commit did not take, whatever the
-# previous line said. This is the check that was missing when the script said "committed" three times
-# and changed nothing.
-echo; echo "--- verifying against a fresh edit"
+# Read it back. "Committed" is a claim; this is the check. A fresh edit only ever sees the last
+# committed state.
+echo; echo "--- verifying the phone against a fresh edit"
 verify_edit="$(call POST "$api/edits" | jq -r .id)"
-IFS=',' read -ra VERIFY_TRACKS <<< "$TRACKS"
+read_track() { call GET "$api/edits/$verify_edit/tracks/$1" | jq -r '[(.releases // [])[] | (.versionCodes // [])[]] | join(",")'; }
 ok=1
-for t in "${VERIFY_TRACKS[@]}"; do
-  track="$(echo "$t" | xargs)"
-  check_track() {
-    local tr="$1"; shift
-    local seen
-    seen="$(call GET "$api/edits/$verify_edit/tracks/$tr" | jq -r '[(.releases // [])[] | (.versionCodes // [])[]] | join(",")')"
-    echo "  $tr now holds: ${seen:-<nothing>}"
-    for c in "$@"; do
-      case ",$seen," in
-        *",$c,"*) ;;
-        *) echo "::error::$tr does NOT hold version code $c -- the commit did not take"; ok=0 ;;
-      esac
-    done
-  }
-  check_track "$track" "${phone_codes[@]}"
-  [ "${#wear_codes[@]}" -gt 0 ] && check_track "wear:$track" "${wear_codes[@]}"
+for track in "${phone_tracks[@]}"; do
+  seen="$(read_track "$track")"
+  echo "  $track now holds: ${seen:-<nothing>}"
+  for c in "${phone_codes[@]}"; do
+    case ",$seen," in *",$c,"*) ;; *) echo "::error::$track does NOT hold $c -- the commit did not take"; ok=0 ;; esac
+  done
 done
-call DELETE "$api/edits/$verify_edit" >/dev/null || true
 [ "$ok" = "1" ] || exit 1
-echo "verified: $PKG -> $TRACKS now holds $(printf '%s,' "${codes[@]}" | sed 's/,$//')"
+echo "PHONE PUBLISHED: $PKG -> $(printf '%s,' "${phone_tracks[@]}" | sed 's/,$//') holds $(printf '%s,' "${phone_codes[@]}" | sed 's/,$//')"
+
+# ---------------------------------------------------------------------------------------------------
+# The watch, in a SECOND edit, deliberately: its own commit, so a refused form-factor track cannot
+# undo the phone's. Play would roll the whole thing back if this shared an edit, and the phone is what
+# everyone actually asked for.
+if [ "${#wear_codes[@]}" -eq 0 ]; then
+  echo; echo "no watch bundle in this run"
+  call DELETE "$api/edits/$verify_edit" >/dev/null || true
+  exit 0
+fi
+
+echo; echo "=== the watch, in its own edit ==="
+watch_edit="$(call POST "$api/edits" | jq -r .id)"
+watch_ok=1
+for track in "${phone_tracks[@]}"; do
+  assign_to_edit "$watch_edit" "wear:$track" "${wear_codes[@]}" || { watch_ok=0; continue; }
+done
+if [ "$watch_ok" = "1" ]; then
+  echo; echo "--- committing the watch release"
+  if wout="$(call POST "$api/edits/$watch_edit:commit")"; then
+    echo "  commit response: ${wout:-<empty>}"
+    for track in "${phone_tracks[@]}"; do
+      seen="$(read_track "wear:$track")"
+      echo "  wear:$track now holds: ${seen:-<nothing>}"
+      for c in "${wear_codes[@]}"; do
+        case ",$seen," in *",$c,"*) ;; *) echo "::warning::wear:$track does not hold $c"; watch_ok=0 ;; esac
+      done
+    done
+  else
+    echo "::warning::the watch commit was refused -- the phone is published, the watch is not"
+    watch_ok=0
+  fi
+else
+  call DELETE "$api/edits/$watch_edit" >/dev/null || true
+fi
+call DELETE "$api/edits/$verify_edit" >/dev/null || true
+
+if [ "$watch_ok" = "1" ]; then
+  echo "WATCH PUBLISHED: $PKG -> wear:<track> holds $(printf '%s,' "${wear_codes[@]}" | sed 's/,$//')"
+else
+  echo "::warning::the watch did not publish. The phone release is unaffected."
+  echo "  Its bundle is uploaded and sits in the store's bundle library; adding it to a release is a"
+  echo "  form-factor track write (wear:<track>), which is what just failed -- see the messages above."
+fi
