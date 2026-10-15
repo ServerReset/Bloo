@@ -142,12 +142,20 @@ jobs:
       # no extra build and tests what is actually shipped, not what a source file says.
       - name: The Play artifact carries no installer permissions
         run: |
-          m=$(find app/build/intermediates/merged_manifests -path '*playRelease*' -name AndroidManifest.xml | head -1)
-          if [ -z "$m" ]; then echo "::error::no merged play manifest found to check"; exit 1; fi
-          echo "checking $m"
+          # The BUNDLE, not an intermediate. `merged_manifests/` still contains the Shizuku permission
+          # -- the removal in src/play is applied later in the pipeline -- so checking that reports a
+          # failure for an artifact that is actually clean, and a guard that lies is worse than none.
+          # The manifest proto inside the .aab is the thing that ships.
+          aab=app/build/outputs/bundle/playRelease/app-play-release.aab
+          if [ ! -f "$aab" ]; then echo "::error::no play bundle to check"; exit 1; fi
+          echo "checking $aab"
           fail=0
           for p in android.permission.REQUEST_INSTALL_PACKAGES moe.shizuku.manager.permission.API_V23; do
-            if grep -q "$p" "$m"; then echo "::error::$p is in the Play artifact"; fail=1; else echo "  absent: $p"; fi
+            if unzip -p "$aab" base/manifest/AndroidManifest.xml | grep -qa "$p"; then
+              echo "::error::$p is in the Play bundle"; fail=1
+            else
+              echo "  absent: $p"
+            fi
           done
           exit $fail
 
