@@ -77,6 +77,16 @@ allowed to contain.
    service account → grant it **Release to testing tracks** (and *Manage testing tracks* if you want
    the CI to edit the track) → create a JSON key. That JSON is `PLAY_SERVICE_ACCOUNT_JSON` below.
 
+6. **Advanced settings → form factors → Wear OS.** The one thing the CI cannot do for itself, because a
+   form factor is an app-level property with no API. Until it is set, the watch step warns and skips;
+   the phone is unaffected. After it, the watch ships on every run with nothing further. See
+   section 4.
+
+7. **App content → Foreground service permissions.** Bloo uses one foreground service type,
+   `connectedDevice`, for the walk-away auto-lock. The description and the shot list for the required
+   30–60 second video are written out in **[FGS.md](FGS.md)** — it is a paste and a five-minute
+   recording, not a form to think about. Testing tracks do not need this; production does.
+
 ---
 
 ## 3. The upload key
