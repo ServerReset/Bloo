@@ -15,22 +15,14 @@ internal fun AiCardContent(state: UiState, vm: AppViewModel) {
         ToggleRow(
             "On-device AI (Gemini Nano)",
             state.aiEnabled,
-            description = if (state.aiEnabled) {
-                "On: adds the AI summary pebble and lets you ask the search box plain questions. It all runs privately on your device."
-            } else {
-                "Off: no AI summary or questions. Turn on to use Gemini Nano on this device."
-            },
+            description = "adds the AI summary pebble and lets you ask the search box plain questions. It all runs privately on your device.",
         ) { vm.setAiEnabled(it) }
         // Only once the AI is on: the automatic run is an option OF it, and off until chosen.
         PopVisible(visible = state.aiEnabled) {
             ToggleRow(
                 "Summarize when I open the app",
                 state.aiAutoSummarize,
-                description = if (state.aiAutoSummarize) {
-                    "On: writes a fresh status summary for each car whenever the app opens or refreshes."
-                } else {
-                    "Off: summaries appear only when you ask for one."
-                },
+                description = "writes a fresh status summary for each car whenever the app opens or refreshes.",
             ) { vm.setAiAutoSummarize(it) }
         }
     }

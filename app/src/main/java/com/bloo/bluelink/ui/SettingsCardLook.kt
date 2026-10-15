@@ -118,22 +118,14 @@ private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean,
                         ToggleRow(
                             "Aurora background",
                             appearance.auroraBackground,
-                            description = if (appearance.auroraBackground) {
-                                "On: a gradient aurora drifts behind the content instead of a solid surface."
-                            } else {
-                                "Off: a solid surface. Turn on for the animated aurora."
-                            },
+                            description = "a gradient aurora drifts behind the content instead of a solid surface.",
                         ) { vm.setAuroraBackground(it) }
                     }
                     SettingsGroup {
                         ToggleRow(
                             "Dynamic colour (Material You)",
                             appearance.dynamicColor,
-                            description = if (appearance.dynamicColor) {
-                                "On: Bloo uses your wallpaper's palette (Android 12+)."
-                            } else {
-                                "Off: Bloo uses its own built-in palette."
-                            },
+                            description = "Bloo uses your wallpaper's palette (Android 12+).",
                         ) { vm.setDynamicColor(it) }
                         PopVisible(visible = !appearance.dynamicColor) { PaletteChooser(appearance, vm) }
                         VibrancySlider(appearance, vm)
