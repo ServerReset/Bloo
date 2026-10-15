@@ -173,7 +173,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: play-bundles
-          path: app/build/outputs/bundle/playRelease/app-play-release.aab
+          path: |
+            app/build/outputs/bundle/playRelease/app-play-release.aab
+            wear/build/outputs/bundle/playRelease/wear-play-release.aab
           if-no-files-found: error
 
       # Those release variants also run lintVitalRelease (AGP does this for release variants
@@ -383,52 +385,51 @@ jobs:
         with:
           name: play-bundles
 
-      # Put the bundle where the upload expects it, wherever the artifact left it.
+      # Put the bundles where the upload expects them, wherever the artifact left them.
       #
-      # download-artifact recreates the path structure of what was uploaded: one file lands at the
-      # root, two files land with the whole tree. That is how this job failed three times with
-      # "unable to find any release file matching <path>" -- twice with a path that was right for the
-      # other shape. Finding it and copying it removes the guessing, prints what it found, and fails
-      # with a sentence that says what is wrong instead of a filename that looks wrong.
-      - name: Collect the bundle
+      # download-artifact recreates the path structure of what was uploaded, so where these land depends
+      # on how many there were. Finding them and copying them removes the guessing -- that guessing cost
+      # three failed rounds -- and anything missing is named, rather than being a path that looks right.
+      - name: Collect the bundles
         run: |
           set -euo pipefail
           mkdir -p release
-          found=$(find . -name 'app-play-release.aab' -not -path './release/*')
-          echo "found: ${found:-nothing}"
-          if [ -z "$found" ]; then
-            echo "::error::the phone bundle is not in this artifact"
-            find . -name '*.aab' -printf '  %p\n'
-            exit 1
-          fi
-          cp $found release/
+          find . \( -name 'app-play-release.aab' -o -name 'wear-play-release.aab' \) -not -path './release/*' \
+            -exec cp {} release/ \;
           ls -la release
+          for f in app-play-release.aab wear-play-release.aab; do
+            if [ ! -f "release/$f" ]; then
+              echo "::error::$f is not in this artifact"
+              find . -name '*.aab' -printf '  %p\n'
+              exit 1
+            fi
+          done
 
+      # The action that used to be here builds ONE release holding every version code it uploaded, and
+      # Play answers a release holding two bundles of the same applicationId with a bare 500. Play's own
+      # packaging docs say a watch build's version code "must be unique across all form factors", which
+      # only means something if each form factor is its own release. So the script does exactly that:
+      # one bundle upload each, one release object each, per track.
       - name: Upload to Google Play
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.bloo.bluelink
-          # PHONE ONLY, and not for want of trying. Two .aab files for the same applicationId in one
-          # release does not work: Play answers the commit with "Internal error encountered." -- a 500,
-          # which is why it looked like flakiness rather than a rule. Every upload that carried only the
-          # phone bundle has committed; every upload that carried both has failed.
-          #
-          # The watch bundle is still built and still attached to the GitHub Release (which is how the
-          # phone installs it on a paired watch). Getting it onto Play needs a release OBJECT per form
-          # factor rather than one release holding both, which is a different shape of API call than
-          # this action makes. That is the next piece of work, not a flag, and it is not worth stalling
-          # the phone path behind it.
-          releaseFiles: release/app-play-release.aab
+        env:
+          SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           # EVERY push goes to internal testing, so there is always a build on a phone that is minutes
           # old. Only a `major-N` tag goes to the closed track: that is the one the
           # 12-testers-for-14-days clock runs on, and it should hold releases rather than every push.
           # A manual run can name a track (or two).
-          tracks: ${{ inputs.play_track != '' && inputs.play_track || (startsWith(github.ref, 'refs/tags/major-') && 'alpha' || 'internal') }}
+          PLAY_TRACKS: ${{ inputs.play_track != '' && inputs.play_track || (startsWith(github.ref, 'refs/tags/major-') && 'alpha' || 'internal') }}
           # Rolled out, not a draft. `internal` has always accepted this; `alpha` refused it for as long
           # as Play classed the app as a draft, which the foreground-service declaration changed.
-          status: completed
-
+          PLAY_STATUS: completed
+          PLAY_BUNDLES: release/app-play-release.aab,release/wear-play-release.aab
+        run: |
+          set -euo pipefail
+          if [ -z "${SA:-}" ]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON is not set, so nothing can be uploaded."
+            exit 1
+          fi
+          printf '%s' "$SA" > "$RUNNER_TEMP/play-sa.json"
+          PLAY_SERVICE_ACCOUNT_JSON_FILE="$RUNNER_TEMP/play-sa.json" bash .github/play-upload.sh
   # Makes the build visible to the in-app updater (phone and watch) only once it is finished and the build
   # and the emulator tests both passed. Until then the release is a draft, which the updater cannot see.
   publish:
