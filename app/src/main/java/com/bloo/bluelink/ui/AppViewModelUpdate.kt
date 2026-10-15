@@ -84,7 +84,7 @@ fun AppViewModel.installDownloadedUpdate() {
         _state.update { it.copy(updateApkReady = false, message = "Update file missing. Tap Update to fetch it again.") }
         return
     }
-    val installer = com.bloo.bluelink.update.ShizukuInstaller
+    val installer = com.bloo.bluelink.update.shizukuInstall()
     val wantSeamless = appearance.value.seamlessInstallShizuku && installer.isAvailable()
     if (!wantSeamless) {
         // Show the install guide first (the Play-Protect steps); confirmInstallUpdate() runs the
@@ -114,7 +114,7 @@ private fun AppViewModel.seamlessInstall(dest: java.io.File) {
     // anything it doesn't recognise.
     _state.update { it.copy(updateInstalling = true, message = "Installing update…", messageType = ToastKind.INFO) }
     viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-        val result = com.bloo.bluelink.update.ShizukuInstaller.installApk(dest, ctx.packageName)
+        val result = com.bloo.bluelink.update.shizukuInstall().installApk(dest, ctx.packageName)
         if (result.isFailure) {
             // Silent path failed (Shizuku died, OEM restriction, timed out, etc.) — clear the
             // in-flight flag and fall back to the system installer.

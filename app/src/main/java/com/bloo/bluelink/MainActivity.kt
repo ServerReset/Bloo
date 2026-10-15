@@ -37,8 +37,7 @@ import com.bloo.bluelink.work.MainToMainSyncWorker
 import com.bloo.bluelink.work.UpdateCheckWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.lsposed.hiddenapibypass.HiddenApiBypass
-import rikka.shizuku.Shizuku
+import com.bloo.bluelink.update.shizukuInstall
 
 /**
  * The app's single Activity: hosts the Compose UI tree ([BlooApp]) and owns the process-wide setup
@@ -81,9 +80,8 @@ class MainActivity : FragmentActivity() {
 
     // Shizuku runtime-permission result → forward to the ViewModel so the update flow can proceed
     // once the user grants it. Registered only while Shizuku is present.
-    private val shizukuPermissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
-        viewModel.onShizukuPermissionResult(requestCode, grantResult)
-    }
+    // Shizuku's own listener type, registered through the interface: this build decides whether Shizuku
+    // exists at all, and the Activity should not have to import the library to find out.
 
     /**
      * Runs once when the Activity's process/window is created (not on every foreground -- see
@@ -125,20 +123,10 @@ class MainActivity : FragmentActivity() {
                 UpdateCheckWorker.schedule(applicationContext)
             }
         }
-        // Shizuku (optional silent-install path): lift the runtime non-SDK block once so the
-        // reflected PackageInstaller/IntentSender constructors are callable, and listen for the
-        // permission-grant result.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            lifecycleScope.launch(Dispatchers.Default) {
-                StartupTrace.trace("HiddenApiBypass.addHiddenApiExemptions") {
-                    runCatching { HiddenApiBypass.addHiddenApiExemptions("") }
-                }
-            }
-        }
         // Register unconditionally (binder-independent, cheap): if Shizuku is started AFTER launch
         // and the user later grants permission, the result still routes to
         // onShizukuPermissionResult. Removed in onDestroy under runCatching.
-        runCatching { Shizuku.addRequestPermissionResultListener(shizukuPermissionListener) }
+        runCatching { shizukuInstall().registerPermissionResultListener { code, result -> viewModel.onShizukuPermissionResult(code, result) } }
         // Notification permission is requested from the onboarding screen (on a button tap), not
         // silently on first launch.
         if (savedInstanceState == null) {
@@ -245,7 +233,7 @@ class MainActivity : FragmentActivity() {
     override fun onDestroy() {
         if (current === this) current = null
         runCatching { unregisterReceiver(screenOffReceiver) }
-        runCatching { Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener) }
+        runCatching { shizukuInstall().unregisterPermissionResultListener() }
         super.onDestroy()
     }
 

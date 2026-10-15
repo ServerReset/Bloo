@@ -37,19 +37,19 @@ import rikka.shizuku.SystemServiceHelper
  * back to the normal system-installer intent on [Result.failure]. minSdk is 26 (O), so
  * only the S+ and O+ [PackageInstaller] constructors are needed (no legacy branch).
  */
-object ShizukuInstaller {
+object ShizukuInstaller : ShizukuInstall {
 
     /** Shizuku installed AND its service reachable (running + this app armed). */
-    fun isAvailable(): Boolean = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
+    override fun isAvailable(): Boolean = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
 
     /** Whether the user has already granted this app the Shizuku runtime permission. */
-    fun hasPermission(): Boolean = runCatching {
+    override fun hasPermission(): Boolean = runCatching {
         Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
     }.getOrDefault(false)
 
     /** Ask for the Shizuku runtime permission; the result arrives on the listener
      *  MainActivity registers. No-op if the binder is dead. */
-    fun requestPermission(requestCode: Int) {
+    override fun requestPermission(requestCode: Int) {
         runCatching { Shizuku.requestPermission(requestCode) }
     }
 
@@ -67,7 +67,7 @@ object ShizukuInstaller {
      * enough to have requested/queued a request; false if not installed at all (so the
      * caller can tell the user to install/start Shizuku). Fully guarded — never throws.
      */
-    fun requestPermissionOnEnable(requestCode: Int): Boolean = runCatching {
+    override fun requestPermissionOnEnable(requestCode: Int): Boolean = runCatching {
         if (hasPermission()) return@runCatching true
         if (isAvailable()) {
             // Binder alive → prompt immediately.
@@ -102,7 +102,10 @@ object ShizukuInstaller {
      * when Shizuku runs as root (uid 0). Under ADB (uid 2000) the installer must be a
      * package that uid owns, so "com.android.shell" is used (matches the Shizuku demo).
      */
-    fun installApk(apk: File, callerPackageName: String): Result<Unit> = runCatching {
+    override fun installApk(apk: File, callerPackageName: String): Result<Unit> = runCatching {
+        // Lift the runtime non-SDK block before reflecting into PackageInstaller. It used to happen at
+        // app startup; it is only needed here, and only this build needs it at all.
+        runCatching { org.lsposed.hiddenapibypass.HiddenApiBypass.addHiddenApiExemptions("") }
         require(apk.exists() && apk.length() > 0) { "APK missing or empty: ${apk.path}" }
 
         // Wrap the framework "package" service so the call runs in the privileged
@@ -231,5 +234,22 @@ object ShizukuInstaller {
     private fun orInstallFlags(params: PackageInstaller.SessionParams, extra: Int) {
         val field = PackageInstaller.SessionParams::class.java.getDeclaredField("installFlags")
         field.setInt(params, field.getInt(params) or extra)
+    }
+
+    private var permissionListener: Shizuku.OnRequestPermissionResultListener? = null
+
+    override fun registerPermissionResultListener(onResult: (requestCode: Int, grantResult: Int) -> Unit) {
+        runCatching {
+            val listener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+                onResult(requestCode, grantResult)
+            }
+            permissionListener = listener
+            Shizuku.addRequestPermissionResultListener(listener)
+        }
+    }
+
+    override fun unregisterPermissionResultListener() {
+        runCatching { permissionListener?.let { Shizuku.removeRequestPermissionResultListener(it) } }
+        permissionListener = null
     }
 }

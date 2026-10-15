@@ -328,10 +328,10 @@ dependencies {
     // `api`/`provider` ship; `:hidden-api-stub` is compileOnly (framework PackageInstaller
     // AIDL stubs, never in the APK); hiddenapibypass lifts the runtime non-SDK block on
     // the reflected hidden constructors. All gated at runtime by Shizuku.pingBinder().
-    implementation("dev.rikka.shizuku:api:13.1.5")
-    implementation("dev.rikka.shizuku:provider:13.1.5")
-    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
-    compileOnly(project(":hidden-api-stub"))
+    "sideloadImplementation"("dev.rikka.shizuku:api:13.1.5")
+    "sideloadImplementation"("dev.rikka.shizuku:provider:13.1.5")
+    "sideloadImplementation"("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
+    "sideloadCompileOnly"(project(":hidden-api-stub"))
 
     // Pure-JVM unit tests (CI: testDebugUnitTest), same setup and rationale as
     // :shared -- kotlin-test-junit maps kotlin.test's @Test/assert* onto JUnit 4

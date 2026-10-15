@@ -50,7 +50,7 @@ import com.bloo.bluelink.data.installDownloadedApk
 import com.bloo.bluelink.ui.GapSection
 import com.bloo.bluelink.ui.MorphTextButton
 import com.bloo.bluelink.ui.SettingsGroup
-import com.bloo.bluelink.update.ShizukuInstaller
+import com.bloo.bluelink.update.shizukuInstall
 import com.bloo.bluelink.update.UpdateCheckResult
 import com.bloo.bluelink.update.UpdateChecker
 import java.io.File
@@ -78,7 +78,7 @@ import kotlinx.coroutines.withContext
  * system_server before the kill, so this always comes up in a brand-new, healthy
  * process regardless. That fresh process is exactly what lets the check/download/
  * install buttons below talk to the same GitHub-release update pipeline the normal
- * app uses ([UpdateChecker]/[UpdateApi]/[ShizukuInstaller]) with a fully working main
+ * app uses ([UpdateChecker]/[UpdateApi]/[shizukuInstall]) with a fully working main
  * thread under them, completely independent of whatever state just crashed the old one.
  */
 class CrashActivity : ComponentActivity() {
@@ -197,9 +197,9 @@ class CrashActivity : ComponentActivity() {
                         installing = true
                         statusMessage = "Installing…"
                         scope.launch(Dispatchers.IO) {
-                            val seamless = ShizukuInstaller.isAvailable() && ShizukuInstaller.hasPermission()
+                            val seamless = shizukuInstall().isAvailable() && shizukuInstall().hasPermission()
                             val ok = if (seamless) {
-                                ShizukuInstaller.installApk(apkFile, context.packageName).isSuccess
+                                shizukuInstall().installApk(apkFile, context.packageName).isSuccess
                             } else {
                                 false
                             }

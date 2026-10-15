@@ -82,7 +82,7 @@ fun AppViewModel.setSearchBubblePosition(xFrac: Float, yFrac: Float) =
 fun AppViewModel.setSeamlessInstallShizuku(value: Boolean) {
     viewModelScope.launch { settingsStore.setSeamlessInstallShizuku(value) }
     if (value) {
-        val installer = com.bloo.bluelink.update.ShizukuInstaller
+        val installer = com.bloo.bluelink.update.shizukuInstall()
         if (installer.hasPermission()) return
         val queued = installer.requestPermissionOnEnable(SHIZUKU_INSTALL_REQUEST_CODE)
         if (!queued && !installer.isAvailable()) {
@@ -101,7 +101,7 @@ fun AppViewModel.setSeamlessInstallShizuku(value: Boolean) {
 fun AppViewModel.refreshShizukuAvailable() {
     com.bloo.bluelink.data.StartupTrace.markIfStarting("Shizuku probe: begin")
     viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-        val avail = com.bloo.bluelink.update.ShizukuInstaller.isAvailable()
+        val avail = com.bloo.bluelink.update.shizukuInstall().isAvailable()
         _state.update { it.copy(shizukuAvailable = avail) }
     }
 }

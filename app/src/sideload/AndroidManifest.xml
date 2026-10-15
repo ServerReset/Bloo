@@ -18,4 +18,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+    <application>
+        <!-- Shizuku entry point, here and not in main: only this build has the library, the class and
+             the runtime permission, and the Play build carries none of them.
+
+             ShizukuProvider REQUIRES android:exported="true". It throws
+             IllegalStateException("android:exported must be true") in attachInfo() at process start
+             otherwise, which is a crash on launch. Exporting is safe: access is gated by the
+             INTERACT_ACROSS_USERS_FULL signature-or-privileged permission, which normal apps cannot
+             hold. This is the canonical Shizuku declaration. -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+    </application>
 </manifest>

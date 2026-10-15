@@ -123,23 +123,6 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Shizuku entry point. Present so the app can "support Shizuku"; the
-             INTERACT_ACROSS_USERS_FULL permission just protects the provider from
-             other apps. Not exported. Only actually used when Shizuku is running
-             and the user has opted into seamless install. -->
-        <!-- ShizukuProvider REQUIRES android:exported="true" — it throws
-             IllegalStateException("android:exported must be true") in attachInfo() at
-             process start otherwise (crash on launch). Exporting is safe here: access
-             is gated by the INTERACT_ACROSS_USERS_FULL signature|privileged permission,
-             which normal apps can't hold. This is the canonical Shizuku declaration. -->
-        <provider
-            android:name="rikka.shizuku.ShizukuProvider"
-            android:authorities="${applicationId}.shizuku"
-            android:multiprocess="false"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
-
         <!-- Disables two androidx.startup auto-initializers that otherwise run as a
              ContentProvider's onCreate(), synchronously on the MAIN thread, during process
              attach, before Application.onCreate() and therefore before every deliberately
