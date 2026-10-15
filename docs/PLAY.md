@@ -136,6 +136,30 @@ clock runs on, and it should hold releases rather than every push. A manual run 
 (`play_track`), which is how a single build gets pushed somewhere on its own. Nothing is promoted to production by the CI — that stays a deliberate click in the
 console.
 
+### Form factors: the one thing the pipeline cannot set up for itself
+
+The phone publishes itself with no involvement. The watch needs **one setting turned on once**, because
+a form factor is an app-level property rather than something a build can declare.
+
+Play names the setting itself, in as many words, when the upload tries to write to a form-factor track:
+
+```
+400 FAILED_PRECONDITION
+"Form factor 'wear' is not configured. Configure this form factor in 'Advanced settings' page on Play
+ Console."
+```
+
+**Play Console → Advanced settings → form factors → Wear OS.** Once, ever. There is no API for it, which
+is the only reason the CI cannot do it.
+
+After that, the upload creates the `wear:` tracks itself and the watch ships on every run next to the
+phone, on whichever track the run is for. Until then the watch step warns and stops, and the phone is
+unaffected — they are committed in separate edits, so one cannot roll the other back. The watch bundle
+still uploads on every run regardless, so the store's bundle library always holds a current one.
+
+Every upload prints the tracks Play has, at the start and again at the end. That is how you can tell
+from a log alone whether the form factor is configured yet.
+
 There is deliberately no semantic version. `versionCode` is the CI run number, which is monotonic by
 construction (all Play requires), and `versionName` reads `major 3 · build 812` on a major and
 `build 812` otherwise. The app is identified by which build it is; a major only says "this one is a

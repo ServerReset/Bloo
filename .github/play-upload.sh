@@ -62,7 +62,7 @@ call() {
     # STDERR, deliberately. On stdout this text gets captured by any `$(call ...)` and then silently
     # dropped, which has now happened twice: once eaten by jq as input, once held in a variable and
     # never printed. stderr cannot be swallowed by a command substitution.
-    echo "::error::HTTP $status from $method $url" >&2
+    echo "::warning::HTTP $status from $method $url" >&2
     echo "$body" >&2
     # RETURN, not exit. `call` is used as `call ... || handler` for the steps that are allowed to fail,
     # and `exit` inside a function tears the whole script down before that handler can run. That is why
@@ -122,7 +122,7 @@ for t in "${LIST[@]}"; do phone_tracks+=("$(echo "$t" | xargs)"); done
 
 # Create a form-factor track that does not exist yet. Play does not make one just because a bundle of
 # that form factor was uploaded: a write is what brings it into being, and the first write is refused
-# with "Track not found: wear:internal". So the order has to be create, then write.
+# with "Track not found: wear:alpha". So the order has to be create, then write.
 #
 # Creating takes a TrackConfig, NOT a Track, per Play's own discovery document:
 #
@@ -130,23 +130,22 @@ for t in "${LIST[@]}"; do phone_tracks+=("$(echo "$t" | xargs)"); done
 #   type        Required. TRACK_TYPE_UNSPECIFIED | CLOSED_TESTING
 #   formFactor  Required. FORM_FACTOR_UNSPECIFIED | DEFAULT | WEAR | AUTOMOTIVE
 #
-# and `type` documents "the only supported value is closedTesting". That one sentence settles the rest:
-# the API can create a closed-testing form-factor track (wear:alpha) and nothing else. An
-# internal-testing one (wear:internal) cannot be made here, and this says so instead of pretending.
+# `type` documents "the only supported value is closedTesting". And when the form factor is not set up,
+# Play answers with the exact remedy rather than a code:
+#
+#   400 FAILED_PRECONDITION
+#   "Form factor 'wear' is not configured. Configure this form factor in 'Advanced settings' page on
+#    Play Console."
+#
+# That is a one-time console setting and there is no API for it, so it is left to Play to say. Once the
+# form factor is configured, this call is what creates the track and the watch publishes with nothing
+# further.
 ensure_track() {
-  local edit_id="$1" track="$2" base="${2#*:}" form_factor body
+  local edit_id="$1" track="$2" form_factor body
   case "$track" in
     wear:*)       form_factor="WEAR" ;;
     automotive:*) form_factor="AUTOMOTIVE" ;;
     *)            form_factor="DEFAULT" ;;
-  esac
-  case "$base" in
-    internal|production)
-      echo "  Play can only create CLOSED_TESTING tracks, so '$track' cannot be made by the API." >&2
-      echo "  Enabling the Wear OS form factor for this app once, in the console, is what creates it;" >&2
-      echo "  every write from here works after that." >&2
-      return 1
-      ;;
   esac
   echo "  '$track' does not exist yet, so creating it (formFactor=$form_factor, CLOSED_TESTING)" >&2
   body="$(jq -c -n --arg t "$track" --arg ff "$form_factor" \
@@ -249,10 +248,11 @@ if [ "$watch_ok" = "1" ]; then
   echo "WATCH PUBLISHED: $PKG -> wear:<track> holds $(printf '%s,' "${wear_codes[@]}" | sed 's/,$//')"
 else
   echo "::warning::the watch did not publish. The phone release is unaffected."
-  echo "  Its bundle is uploaded and sits in the store's bundle library."
-  echo "  A form-factor track write (wear:<track>) is what failed -- see the messages above. If Play"
-  echo "  refuses to create the track, it has to be created once in the console, and this step then"
-  echo "  keeps it up to date from here."
+  echo "  Its bundle is uploaded and sits in the store's bundle library, so nothing is lost."
+  echo "  If Play's reason above is 'Form factor is not configured': set it once at Play Console ->"
+  echo "  Advanced settings -> form factors. There is no API for that setting, which is the only reason"
+  echo "  this step cannot do it. After it is set, this step publishes the watch on every run with"
+  echo "  nothing further to do."
 fi
 
 # What the tracks look like at the end. If a wear: track shows up here that was not there at the start,
