@@ -153,7 +153,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                 Spacer(Modifier.height(GapRow))
                 Box(Modifier.padding(start = CompanionIndent)) {
                     SettingsSegmentedRow(
-                        label = "Ask the watch for my PIN",
+                        label = "Get the PIN from your watch",
                         options = listOf(
                             SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OFF.wireKey, "Off", null),
                             SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OPEN.wireKey, "Opening", null),

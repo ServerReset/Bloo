@@ -51,6 +51,11 @@ like it needs marking:
 Same instructions, same emphasis, no shouting. A reader who is following steps is already paying
 attention.
 
+**9. The app speaks to the user, never as them.**
+It is *you* and *your*, all 58 times it addresses anyone -- and exactly one string said "Ask the watch
+for **my** PIN", which reads as though the app has a PIN and a watch of its own. Quote the user's words
+only when they are an example of what to type (*Try a command like "lock my car"*).
+
 ## Before adding a string
 
 Read it out loud next to its neighbours on the same screen. If two rows say the same word in two ways,

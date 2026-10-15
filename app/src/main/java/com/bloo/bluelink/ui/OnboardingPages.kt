@@ -198,7 +198,7 @@ internal fun OnboardingRestorePage(vm: AppViewModel) {
     OnboardingSetupCard(
         icon = Icons.Filled.CloudSync,
         title = "Restore from sync",
-        body = "Already use Bloo elsewhere? Pick the sync file that device uses and its theme, layout, alerts, presets and car setup come with it.",
+        body = "Coming from another device? Pick the file it syncs to, and its settings and car setup come with it.",
         done = false,
     ) {
         MorphActionButton(
