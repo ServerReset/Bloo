@@ -167,6 +167,17 @@ jobs:
           done
           exit $fail
 
+      # The two bundles, handed to the `play` job below. Not an APK-delivery path -- that stays the
+      # GitHub Release, for the reasons written further down -- and a bundle is never user-facing.
+      - name: Hand the bundles to the Play job
+        uses: actions/upload-artifact@v4
+        with:
+          name: play-bundles
+          path: |
+            app/build/outputs/bundle/playRelease/app-play-release.aab
+            wear/build/outputs/bundle/playRelease/wear-play-release.aab
+          if-no-files-found: error
+
       # Those release variants also run lintVitalRelease (AGP does this for release variants
       # only), whose FATAL-severity findings abort the build. Those reports are the one
       # diagnostic this workflow produces that cannot be reconstructed from the run
@@ -291,29 +302,6 @@ jobs:
             app/build/outputs/apk/sideload/release/Bloo.apk
             wear/build/outputs/apk/sideload/release/Bloo-watch.apk
 
-      # EVERY push goes to internal testing, so there is always a build on a phone that is minutes old.
-      # Only a `major-N` tag goes to the closed track: that is the one the 12-testers-for-14-days clock
-      # runs on, and it should hold releases rather than every push. A manual run can name a track.
-      #
-      # AFTER the GitHub release, which is the opposite of how this was ordered. The old order existed
-      # because a tag-triggered run could not create a release at all -- GitHub refuses that outright --
-      # so the Play upload had to happen before the step that would fail. Tags stopped publishing
-      # releases, that reason went with them, and now a Play hiccup on an ordinary push cannot cost
-      # sideload users their release, which is the failure actually worth avoiding.
-      - name: Upload the bundle to Google Play
-        if: github.event_name == 'push' || inputs.play_track != ''
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.bloo.bluelink
-          # One line, comma-separated. This input is a comma-delimited list -- unlike action-gh-release's
-          # `files` below, which is newline-separated. Getting the two the wrong way round fails as
-          # "unable to find any release file", which reads like a missing artifact and is not one.
-          releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab,wear/build/outputs/bundle/playRelease/wear-play-release.aab
-          tracks: ${{ inputs.play_track != '' && inputs.play_track || (startsWith(github.ref, 'refs/tags/major-') && 'alpha' || 'internal') }}
-          # Rolled out, not a draft. `internal` has always accepted this; `alpha` refused it for as long
-          # as Play classed the app as a draft, which the foreground-service declaration is what changed.
-          status: completed
 
 
   # Runs the app for real: boots an emulator and runs the instrumented tests in
@@ -373,6 +361,45 @@ jobs:
           name: androidTest-reports
           path: app/build/reports/androidTests/
           if-no-files-found: ignore
+
+  # The Play upload, in a job of its own for one reason: PLAY'S EDITS ARE SINGLE-WRITER.
+  #
+  # Two uploads at once and one of them fails -- "This edit has expired, please create a new Edit.", or
+  # a plain "Internal error encountered." -- because committing one edit invalidates the other's. The
+  # builds deliberately overlap in this repo (see the note about no concurrency group at the top), so
+  # without this the upload was a coin toss whenever two pushes landed close together, which is what
+  # happened: three runs raced and two of them died at the commit.
+  #
+  # A concurrency group with cancel-in-progress: false QUEUES this job instead of cancelling anything,
+  # so a burst of pushes still ends with every build published and the uploads taken one at a time.
+  play:
+    needs: [build]
+    if: always() && needs.build.result == 'success' && (github.event_name == 'push' || inputs.play_track != '')
+    concurrency:
+      group: play-upload
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the bundles
+        uses: actions/download-artifact@v4
+        with:
+          name: play-bundles
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.bloo.bluelink
+          # One line, comma-separated: this input is a comma-delimited list.
+          releaseFiles: app-play-release.aab,wear-play-release.aab
+          # EVERY push goes to internal testing, so there is always a build on a phone that is minutes
+          # old. Only a `major-N` tag goes to the closed track: that is the one the
+          # 12-testers-for-14-days clock runs on, and it should hold releases rather than every push.
+          # A manual run can name a track (or two).
+          tracks: ${{ inputs.play_track != '' && inputs.play_track || (startsWith(github.ref, 'refs/tags/major-') && 'alpha' || 'internal') }}
+          # Rolled out, not a draft. `internal` has always accepted this; `alpha` refused it for as long
+          # as Play classed the app as a draft, which the foreground-service declaration changed.
+          status: completed
 
   # Makes the build visible to the in-app updater (phone and watch) only once it is finished and the build
   # and the emulator tests both passed. Until then the release is a draft, which the updater cannot see.
