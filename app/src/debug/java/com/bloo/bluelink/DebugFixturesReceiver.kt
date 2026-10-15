@@ -17,6 +17,8 @@ import com.bloo.bluelink.ui.DebugSampleGarage
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd garage
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd lock
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd off
+ *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd light
+ *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd dark
  *
  * The flags are persisted, so the effect lands on the next cold start rather than needing the app
  * to already be running.
@@ -30,6 +32,10 @@ class DebugFixturesReceiver : BroadcastReceiver() {
             "lock" -> DebugSampleGarage.set(context, garage = true, lock = true)
             "unlock" -> DebugSampleGarage.set(context, garage = true, lock = false)
             "off" -> DebugSampleGarage.set(context, garage = false, lock = false)
+            // Display mode for the captures. The system night mode does not move this app, so the
+            // theme has to be written through its own store.
+            "light" -> DebugSampleGarage.setTheme(context, "light")
+            "dark" -> DebugSampleGarage.setTheme(context, "dark")
             else -> {
                 AppLog.log("DebugFixturesReceiver: unknown cmd '$cmd'")
                 return

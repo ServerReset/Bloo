@@ -3,6 +3,11 @@ package com.bloo.bluelink.ui
 import android.content.Context
 import com.bloo.bluelink.BuildConfig
 import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.setThemeMode
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.Battery12V
 import com.bloo.bluelink.data.Dte
 import com.bloo.bluelink.data.EvStatus
@@ -87,6 +92,31 @@ internal object DebugSampleGarage {
 
     /** Irrelevant — only the presence of a record matters, and the lock is never unlocked. */
     private const val SAMPLE_PIN = "1234"
+
+    /**
+     * Set the app's own display mode.
+     *
+     * The system night mode does NOT move this app: its stored theme is an explicit value (it was
+     * AMOLED here), so `cmd uimode night yes/no` changes nothing and two "different" captures come
+     * out byte-identical. Whatever the screenshots need, it has to be written here.
+     */
+    fun setTheme(context: Context, theme: String) {
+        if (!BuildConfig.DEBUG) return
+        val mode = when (theme.lowercase()) {
+            "light" -> ThemeMode.LIGHT
+            "dark" -> ThemeMode.DARK
+            "system" -> ThemeMode.SYSTEM
+            else -> null
+        } ?: return
+        // The setter is suspend; a receiver is not. One throwaway scope is enough for a debug switch
+        // whose whole job is "write a preference, then restart the app".
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                SettingsStore(context.applicationContext).setThemeMode(mode)
+                AppLog.log("DebugSampleGarage: theme set to $mode")
+            }
+        }
+    }
 
     /**
      * The fabricated state. No `locations` and no `placeNames` are set — that is what keeps the

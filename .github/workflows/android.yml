@@ -261,7 +261,7 @@ jobs:
       #
       # Testers install it within minutes (no review on a testing track). Promoting to open testing
       # or production stays a deliberate click in the console -- nothing here can ship to real users.
-      - name: Upload the bundle to Google Play (internal testing)
+      - name: Upload the bundle to Google Play (closed testing)
         if: startsWith(github.ref, 'refs/tags/major-')
         uses: r0adkll/upload-google-play@v1
         with:

@@ -1,5 +1,29 @@
 # Bloo
 
+<p align="center">
+  <img src="docs/img/icon.png" width="104" alt="Bloo">
+</p>
+
+<p align="center"><b>Lock, climate, charge and live status for your Hyundai, Genesis or Kia &mdash; without the slow official app.</b></p>
+
+<p align="center">
+  <img src="docs/img/garage.png" width="22%" alt="Garage">
+  <img src="docs/img/lock.png" width="22%" alt="App lock">
+  <img src="docs/img/garage-dark.png" width="22%" alt="Garage, dark">
+  <img src="docs/img/lock-dark.png" width="22%" alt="App lock, dark">
+</p>
+
+## Get it
+
+**On Google Play (closed test).** Anyone with the link can join — there's no email list to be added to:
+
+**&rarr; [Join the closed test](https://play.google.com/apps/testing/com.bloo.bluelink)**
+
+Open it on the phone you want Bloo on, tap **Become a tester**, then install from the Play Store link it
+gives you. Testing builds skip review, so new versions land the day they're built.
+
+**Or install the APK directly** — see [Install](#install) below. That path needs no Play account at all.
+
 A third-party Android app for **Hyundai**, **Genesis** and **Kia** vehicles (US, Canada, Hyundai Europe). Built with Jetpack Compose and Material 3 Expressive for phones, foldables and tablets. Every screen talks to live servers; nothing is simulated.
 
 ## What it does
@@ -21,7 +45,8 @@ A third-party Android app for **Hyundai**, **Genesis** and **Kia** vehicles (US,
 
 ## Install
 
-Bloo isn't on the Play Store, so you install it from a release (no GitHub sign-in needed).
+Bloo is in closed testing on Google Play (join above), or you can install it straight from a release —
+no Play account and no GitHub sign-in needed.
 
 1. On your phone, open the [latest release](https://github.com/ServerReset/Bloo/releases/latest) and, under **Assets**, download **`Bloo.apk`**. (Wear OS owners: `Bloo-watch.apk` is there too.)
 2. Open the downloaded file. If you can't find it, pull down your notifications and tap the finished download, or open **Downloads** — in your browser it's usually behind the **⋮** or **☰** menu, or use the **Files** app → **Downloads**.

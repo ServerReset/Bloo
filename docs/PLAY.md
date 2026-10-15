@@ -57,8 +57,21 @@ allowed to contain.
 3. **Play App Signing** — accept it. Google then holds the real app-signing key and yours becomes
    only an *upload* key, which means you can reset it from the console if it is ever lost. This is
    why losing the keystore below is survivable.
-4. **Internal testing → Testers** — add the Google accounts that should get the builds. Up to 100.
-   Internal testing has **no review wait**, so a build is installable minutes after upload.
+4. **Closed testing → Testers** — a **Google Group**, ideally set so anyone can join: the invitation
+   chore and the 100-address cap both disappear, and it still counts as a closed test. (An email list
+   of up to 100 addresses works too.)
+   Testing tracks have **no review wait**, so a build is installable minutes after upload.
+
+   The opt-in link is fixed by the package name, so nothing has to be generated for it:
+
+   ```
+   https://play.google.com/apps/testing/com.bloo.bluelink
+   ```
+
+   It is already linked from the Pages site and the README. **The closed test is the one that counts:**
+   a personal developer account needs **12+ testers opted in continuously for 14 days** before it can
+   apply for production access, and *internal testing does not count toward that*. The CI uploads
+   `major-` tag builds to this track (see section 4).
 5. **A service account for CI** — Setup → API access → create/link a Google Cloud project → create a
    service account → grant it **Release to testing tracks** (and *Manage testing tracks* if you want
    the CI to edit the track) → create a JSON key. That JSON is `PLAY_SERVICE_ACCOUNT_JSON` below.
@@ -112,8 +125,8 @@ git push origin major-1
 ```
 
 That builds both artifacts, publishes the GitHub Release exactly as a normal push does (so sideload
-users get the same build by the same route), and **additionally uploads the AAB to Play's internal
-testing track**. Nothing is promoted to production by the CI — that stays a deliberate click in the
+users get the same build by the same route), and **additionally uploads the AAB to Play's closed
+testing track** (the API calls it `alpha`). Nothing is promoted to production by the CI — that stays a deliberate click in the
 console.
 
 There is deliberately no semantic version. `versionCode` is the CI run number, which is monotonic by
@@ -125,7 +138,7 @@ release".
 
 ## 5. The store listing (you)
 
-Required before the app can go beyond internal testing. The icon, feature graphic, screenshots and
+Required before the app can go beyond testing. The icon, feature graphic, screenshots and
 description text are all in **`play/`** — see `play/README.md` for the two format rules Play enforces
 (8 bits per channel, and no alpha on screenshots; both bit the last set of captures).
 
