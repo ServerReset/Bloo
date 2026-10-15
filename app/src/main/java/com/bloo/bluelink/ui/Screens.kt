@@ -97,7 +97,6 @@ fun BlooApp(vm: AppViewModel) {
     // either.
     val searchHazeState = remember { HazeState() }
     val backdropHaze = remember { HazeState() }
-    val contentMotion = remember { ContentMotion() }
     // The one "is the user touching anything" clock the aurora reads; observed at the root below.
     val ambientActivity = remember { AmbientActivity() }
     val toasts = remember { ToastState() }
@@ -153,7 +152,6 @@ fun BlooApp(vm: AppViewModel) {
         LocalToasts provides toasts,
         LocalRefreshIndicator provides refreshIndicator,
         LocalBackdropHaze provides backdropHaze,
-        LocalContentMotion provides contentMotion,
         LocalAmbientActivity provides ambientActivity,
         LocalPowerPolicy provides powerPolicy,
         LocalHaptics provides haptics,

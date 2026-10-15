@@ -38,9 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -107,20 +105,28 @@ internal fun SearchPill(
     Box(
         modifier.size(width, height),
     ) {
-        // canBlur/pillShape are hoisted so the fill and the blur layer agree; the blur needs its
-        // own explicit clip because Surface's clip applies after the caller's modifier.
+        // canBlur/pillShape are hoisted so the fill and the blur layer agree.
         val pillShape = CircleShape
         val canBlur = hazeState != null && canBlurBackdrops()
-        val motion = LocalContentMotion.current
         if (canBlur) {
-            // The glass on its own layer under the pill, resting while the content beneath moves (see
-            // ContentMotion): only that gate is read in draw, so a swipe or scroll does not re-render the
-            // refraction on every frame.
+            // The glass, on its own layer under the pill, drawn in EVERY state.
+            //
+            // It used to be gated with `if (!motion.moving) drawContent()`, so a pager swipe or a car's
+            // pebble scroll skipped the refraction. While it moved this layer drew nothing at all, and
+            // the fill underneath is `glassTint(blurred = true)` -- two percent white, which only reads
+            // because a blur is doing the work behind it. So the search control went see-through for
+            // the length of every scroll. That is the whole bug.
+            //
+            // Removing the gate costs one small node's blur per frame of a scroll, and a scroll is the
+            // cheapest moment to pay it: while the pager moves, every glass CARD has already dropped
+            // its own blur (see LocalPagerBlur), so this is the only backdrop blur still running.
+            //
+            // No `.clip(pillShape)` any more, unlike the chain this replaced. appGlassEffect's
+            // GlassStyle carries the shape itself and Haze clips to it (GraphicsLayer.setClip), so that
+            // clip was a second render layer drawn around an identical outline.
             Box(
                 Modifier
                     .matchParentSize()
-                    .drawWithContent { if (!motion.moving) drawContent() }
-                    .clip(pillShape)
                     .appGlassEffect(hazeState, pillShape),
             )
         }
@@ -152,8 +158,6 @@ internal fun SearchPill(
                 // theme-aware shadow weight, so a change there reaches this pill too. shadow =
                 // !expanded: a full-width shadow on the expanded bar darkens the whole backdrop.
                 .glassEdge(pillShape, shadow = !expanded)
-                // appHazeEffect clipped to pillShape explicitly: this chain runs before Surface's
-                // own shape clip, so an unclipped blur would poke past the rounded outline.
                 .then(
                     if (onDrag != null) {
                         // Callbacks read via rememberUpdatedState: pointerInput(key) keeps the

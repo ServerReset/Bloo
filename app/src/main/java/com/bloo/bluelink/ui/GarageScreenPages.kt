@@ -74,10 +74,6 @@ internal fun CollapsedGaragePager(
         val pager = wrap.pager
         // The aurora leans with the page as it turns, and springs once each time a page settles.
         val aurora = LocalAuroraReactions.current
-        val motion = LocalContentMotion.current
-        LaunchedEffect(pager, motion) {
-            snapshotFlow { pager.isScrollInProgress }.collect { motion.pager.value = it }
-        }
         LaunchedEffect(pager, aurora) {
             if (aurora == null) return@LaunchedEffect
             // QUANTIZED (see AuroraLeanStep): the lean repaints the whole backdrop wherever it is read,

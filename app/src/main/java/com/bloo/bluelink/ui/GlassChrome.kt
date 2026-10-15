@@ -277,17 +277,3 @@ internal fun Modifier.themedDropShadow(
 @Composable
 internal fun Modifier.hazeWhenAble(state: HazeState?, progressive: Boolean = false): Modifier =
     if (state != null && canBlurBackdrops()) appHazeEffect(state, progressive) else this
-
-/**
- * Whether the garage's content is moving right now (the car pager swiping, a car's pebbles scrolling). The
- * floating glass (the search pill) samples that content, so while it moves its refraction would re-render on
- * every frame: it shows its plain tint meanwhile and the glass returns the moment things settle. Written by
- * the pager and the pages, read in the draw phase.
- */
-internal class ContentMotion {
-    val pager = androidx.compose.runtime.mutableStateOf(false)
-    val scroll = androidx.compose.runtime.mutableStateOf(false)
-    val moving: Boolean get() = pager.value || scroll.value
-}
-
-internal val LocalContentMotion = androidx.compose.runtime.staticCompositionLocalOf { ContentMotion() }
