@@ -91,13 +91,24 @@ for f in "${FILES[@]}"; do
   codes+=("$code")
 done
 
-# ONE release holding every version code, which is the opposite of what this did first.
+# THE FIRST BUNDLE IS THE ONE THAT GETS RELEASED. The rest are uploaded and left in the store's bundle
+# library for the console.
 #
-# Asking Play directly settled it: "Only one completed release is allowed." A track may only have a
-# single completed release, so the form factors live as separate VERSION CODES inside it -- which is
-# what "a watch build's version code must be unique across all form factors" means. Two releases per
-# track is not a shape Play has.
-release_json="$(printf '%s\n' "${codes[@]}" | jq -R . | jq -s --arg status "$STATUS" '{status: $status, versionCodes: .}')"
+# This is not a preference, it is the only shape that works. Asking Play directly, twice:
+#
+#   one release holding BOTH version codes -> HTTP 500 "Internal error encountered."  (the commit)
+#   two releases on the track              -> HTTP 400 "Only one completed release is allowed."
+#
+# So the API has no way to put two form factors on a track. The console does. The watch bundle is
+# uploaded every run so the console always has a fresh one to add, and it is deliberately NOT in the
+# release -- one version code per release is the only thing that commits.
+#
+# The workflow passes the phone bundle first, which is what makes this the phone's release.
+release_json="$(printf '%s\n' "${codes[0]}" | jq -R . | jq -s --arg status "$STATUS" '{status: $status, versionCodes: .}')"
+if [ "${#codes[@]}" -gt 1 ]; then
+  echo "  uploaded but NOT released (the API cannot put two form factors in one release):"
+  printf '    versionCode %s\n' "${codes[@]:1}"
+fi
 
 IFS=',' read -ra LIST <<< "$TRACKS"
 for t in "${LIST[@]}"; do
