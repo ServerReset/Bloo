@@ -140,6 +140,26 @@ fun WearGarageScreen(
                             if (connected) "No cars on your phone yet" else "Waiting for your phone…",
                         )
                     }
+                    // What to do about it, on the screen itself. This used to be one bare line, so
+                    // "Waiting for your phone…" was the whole answer: nothing said that the phone has
+                    // to be running Bloo, or that the two have to be paired, or that this is a state
+                    // the watch gets itself out of. `connected` is a live StateFlow fed by the Data
+                    // Layer, so this clears the moment the phone appears -- there is deliberately no
+                    // "Check again" button, because there is nothing a tap could do that waiting
+                    // will not.
+                    item {
+                        WearCenteredText(
+                            text = if (connected) {
+                                "Add a car in Bloo on your phone."
+                            } else {
+                                "Open Bloo on your phone and keep it near the watch."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = null,
+                            maxLines = 3,
+                        )
+                    }
                 }
             }
             return@AppScaffold
