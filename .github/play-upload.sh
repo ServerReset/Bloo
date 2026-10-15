@@ -65,7 +65,9 @@ call() {
 }
 
 echo; echo "--- opening an edit"
-edit="$(call POST "$api/edits" | jq -r .id)"
+edit_out="$(call POST "$api/edits")" || { echo "::error::could not open an edit"; echo "$edit_out"; exit 1; }
+edit="$(printf '%s' "$edit_out" | jq -r .id)"
+[ -n "$edit" ] && [ "$edit" != "null" ] || { echo "::error::no edit id in: $edit_out"; exit 1; }
 echo "edit $edit"
 
 # One bundle upload per file, collecting the version code Play assigns to each.
@@ -109,5 +111,32 @@ for t in "${LIST[@]}"; do
 done
 
 echo; echo "--- committing"
-call POST "$api/edits/$edit:commit" | jq -c . 2>/dev/null || true
-echo "committed: $PKG -> $TRACKS ($STATUS)"
+commit_out="$(call POST "$api/edits/$edit:commit")" || {
+  # call already printed Play's own message, and this time nothing eats it.
+  echo "::error::the commit failed, so NOTHING was published"
+  exit 1
+}
+echo "  commit response: ${commit_out:-<empty>}"
+
+# Read it back, because "committed" is a claim and this is the check. A new edit only ever sees the
+# LAST COMMITTED state -- so if the version codes are not there, the commit did not take, whatever the
+# previous line said. This is the check that was missing when the script said "committed" three times
+# and changed nothing.
+echo; echo "--- verifying against a fresh edit"
+verify_edit="$(call POST "$api/edits" | jq -r .id)"
+IFS=',' read -ra VERIFY_TRACKS <<< "$TRACKS"
+ok=1
+for t in "${VERIFY_TRACKS[@]}"; do
+  track="$(echo "$t" | xargs)"
+  seen="$(call GET "$api/edits/$verify_edit/tracks/$track" | jq -r '[(.releases // [])[] | (.versionCodes // [])[]] | join(",")')"
+  echo "  $track now holds: ${seen:-<nothing>}"
+  for c in "${codes[@]}"; do
+    case ",$seen," in
+      *",$c,"*) ;;
+      *) echo "::error::$track does NOT hold version code $c -- the commit did not take"; ok=0 ;;
+    esac
+  done
+done
+call DELETE "$api/edits/$verify_edit" >/dev/null || true
+[ "$ok" = "1" ] || exit 1
+echo "verified: $PKG -> $TRACKS now holds $(printf '%s,' "${codes[@]}" | sed 's/,$//')"
