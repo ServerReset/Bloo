@@ -12,13 +12,13 @@ talking to live servers.
 
 ## Join the test
 
-Bloo is in **closed testing on Google Play** while it goes through review. Anyone with the link can join
-— there is no email list to be added to.
+Bloo is in **closed testing on Google Play** while it goes through review. Access is by
+invitation: ask, and the Google account you use on your phone gets added to the tester list.
 
 ### **[→ Join the closed test](https://play.google.com/apps/testing/com.bloo.bluelink)**
 
-Open that on the phone you want Bloo on, tap **Become a tester**, then install from the Play Store link
-it gives you. Builds on a testing track skip review, so new versions arrive the day they are built.
+Once you're on the list, open that on the phone you want Bloo on, tap **Become a tester**, then install
+from the Play Store link it gives you. Builds on a testing track skip review, so new versions arrive the day they are built.
 
 **Not on Play, or a device without Play services?** Install the APK straight from the
 [latest release](https://github.com/ServerReset/Bloo/releases/latest) — `Bloo.apk` for the phone,

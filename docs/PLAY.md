@@ -57,10 +57,8 @@ allowed to contain.
 3. **Play App Signing** — accept it. Google then holds the real app-signing key and yours becomes
    only an *upload* key, which means you can reset it from the console if it is ever lost. This is
    why losing the keystore below is survivable.
-4. **Closed testing → Testers** — a **Google Group**, ideally set so anyone can join: the invitation
-   chore and the 100-address cap both disappear, and it still counts as a closed test. (An email list
-   of up to 100 addresses works too.)
-   Testing tracks have **no review wait**, so a build is installable minutes after upload.
+4. **Closed testing → Testers** — an email list of up to 100 Google accounts (or a Google Group, which
+   has no cap). Testing tracks have **no review wait**, so a build is installable minutes after upload.
 
    The opt-in link is fixed by the package name, so nothing has to be generated for it:
 
@@ -68,10 +66,13 @@ allowed to contain.
    https://play.google.com/apps/testing/com.bloo.bluelink
    ```
 
-   It is already linked from the Pages site and the README. **The closed test is the one that counts:**
-   a personal developer account needs **12+ testers opted in continuously for 14 days** before it can
-   apply for production access, and *internal testing does not count toward that*. The CI uploads
-   `major-` tag builds to this track (see section 4).
+   It is already linked from the Pages site and the README, which say access is by invitation — with an
+   email list that link only works for accounts ON the list, so those pages must not imply otherwise.
+
+   **The closed test is the one that counts:** a personal developer account needs **12+ testers opted in
+   continuously for 14 days** before it can apply for production access, and *internal testing does not
+   count toward that*. The CI uploads `major-` tag builds to this track (see section 4).
+
 5. **A service account for CI** — Setup → API access → create/link a Google Cloud project → create a
    service account → grant it **Release to testing tracks** (and *Manage testing tracks* if you want
    the CI to edit the track) → create a JSON key. That JSON is `PLAY_SERVICE_ACCOUNT_JSON` below.
