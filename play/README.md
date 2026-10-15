@@ -10,12 +10,14 @@ asset that exists nowhere is an asset nobody can re-upload.
 | `feature-graphic-1024x500.png` | Feature graphic | 1024×500, 8-bit RGB PNG |
 | `screenshots/01-garage.png` | Phone screenshot 1 | 1080×1920 (9:16), 8-bit RGB PNG |
 | `screenshots/02-lock.png` | Phone screenshot 2 | 1080×1920 (9:16), 8-bit RGB PNG |
+| `screenshots/03-garage-dark.png` | Phone screenshot 3 | 1080×1920 (9:16), 8-bit RGB PNG |
+| `screenshots/04-lock-dark.png` | Phone screenshot 4 | 1080×1920 (9:16), 8-bit RGB PNG |
 | `short-description.txt` | Short description | 80 characters or fewer |
 | `full-description.txt` | Full description | 4000 characters or fewer |
 
 ## Screenshots are currently short
 
-Both are captures of the real UI with a **fabricated car** — see "The sample garage" below. Earlier
+All four are captures of the real UI with a **fabricated car** — see "The sample garage" below. Earlier
 files were committed by mistake and removed: two were captures of the *emulator's homescreen*, and the
 first sign-in shot was replaced once there was a screen worth showing.
 
@@ -78,3 +80,9 @@ adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd off
 
 It is inert in a release build: the flag reads false at the single call site and R8 drops the object.
 Every capture is OCR-checked for an address, a coordinate, a plate or a VIN before it is committed.
+
+## Dark frames
+
+No fixture work was needed for these: the app's stored display default is `system`, so
+`adb shell cmd uimode night yes` followed by a force-stop and relaunch is the whole trick. Each frame
+is verified dark by measuring the mean luminance of its middle band, not by trusting the screenshot.
