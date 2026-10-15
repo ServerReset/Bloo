@@ -24,13 +24,14 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault">
-        <uses-library
-            android:name="com.google.android.wearable"
-            android:required="true" />
-
+        <!-- False, and it used to say true. This app waits for a snapshot from the phone and shows
+             nothing useful without one, so declaring it standalone told the system (and Play) that it
+             works on its own, which is exactly how "Waiting for your phone" reads as a broken app
+             rather than as a companion that has not been paired yet. -->
+        <!-- (No double hyphen in an XML comment. That is what broke this file the first time.) -->
         <meta-data
             android:name="com.google.android.wearable.standalone"
-            android:value="true" />
+            android:value="false" />
 
         <activity
             android:name=".WearMainActivity"

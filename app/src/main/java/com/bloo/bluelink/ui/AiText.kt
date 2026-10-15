@@ -28,14 +28,14 @@ internal fun summaryPrompt(v: Vehicle, status: VehicleStatus?, state: UiState): 
                 parts += if (mins != null) {
                     "It is charging, with about ${fmtTimeToFull(mins)} until fully charged."
                 } else {
-                    "It is currently charging."
+                    "It is charging."
                 }
             } else {
                 parts += "It is not charging."
             }
         }
         // Priority 3 — driving / parked.
-        state.drivingLabel(v)?.let { parts += "The car is currently ${it.lowercase(Locale.US)}." }
+        state.drivingLabel(v)?.let { parts += "The car is ${it.lowercase(Locale.US)}." }
         status.engine?.let { parts += "The engine is ${if (it) "on" else "off"}." }
         // Remaining status, most useful first.
         if (state.hasBattery(v)) status.evStatus?.batteryStatus?.let { parts += "The drive battery is at $it%." }

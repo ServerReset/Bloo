@@ -370,7 +370,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 )
                 Spacer(Modifier.height(GapHairline))
                 RevealText(
-                    "Please try opening Bloo again.",
+                    "Open Bloo again.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = lockFg.copy(alpha = 0.85f),
                 )
