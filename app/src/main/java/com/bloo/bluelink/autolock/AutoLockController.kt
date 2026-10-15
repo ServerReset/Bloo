@@ -5,15 +5,20 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.CarCommand
+import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Notifications
+import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.carContext
 import com.bloo.bluelink.data.notificationPrefs
+import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.runCarCommand
+import com.bloo.bluelink.data.toSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -197,22 +202,19 @@ object AutoLockController {
 
             // Read the CACHED status -- never wake the car for the pre-lock check, matching
             // AlertWorker's own refresh=false convention for background polls.
-            val v = SnapshotStore(context).current().vehicles.firstOrNull { it.vin == vin }?.toVehicle()
-            if (v == null) {
+            val snapshot = ensureVehicleCached(context, vin)
+            if (snapshot == null) {
                 // NOT "car no longer found", which is what this used to say -- and which sent the
-                // reader looking for a car that was there all along. The snapshot can simply be stale
-                // or empty (a fresh sign-in, or an app that has not been opened since). The lock
-                // command itself needs nothing but the VIN, so what is actually missing is the cached
-                // status the pre-lock check reads, and locking without that check is not something to
-                // do blind. (Fetching the account's car list here would need the Vehicle ->
-                // VehicleSnapshot conversion, which currently lives in the UI layer -- see
-                // ui/Snapshots.kt.)
+                // reader looking for a car that was there all along. A stale or empty snapshot (a
+                // fresh sign-in, or an app that has not been opened since) is the usual cause, and
+                // ensureVehicleCached has already gone to the account once before saying this.
                 fail(
                     vin,
-                    "AutoLock has no cached car list yet, so it cannot check $vin before locking. Open Bloo once and let the garage load.",
+                    "AutoLock can't find $vin in your account, so it can't check the car before locking.",
                 )
                 return@withLock
             }
+            val v = snapshot.toVehicle()
             val status = runCatching { statusFor(context, v) }.getOrElse {
                 fail(vin, "Could not read vehicle status: ${it.message}")
                 return@withLock
@@ -246,6 +248,34 @@ object AutoLockController {
                 }
             }
         }
+    }
+
+    /**
+     * The cached snapshot's entry for [vin], fetching and CACHING the account's car list once if it is
+     * not there.
+     *
+     * The evaluation used to fail here with "Car no longer found" whenever the snapshot was stale or
+     * empty -- a fresh sign-in, or an app that has not been opened since -- which disabled AutoLock for
+     * a car that was there all along. One fetch is cheap next to not locking the car.
+     *
+     * Cached, not just returned: the status read that follows resolves the car through the snapshot too
+     * ([carContext]), so a vehicle that only ever lived in a local would leave that failing anyway.
+     * [SnapshotStore.saveVehiclesKeepingStatus] rather than [SnapshotStore.saveVehicles], so any other
+     * car already in the store keeps the live status it has.
+     */
+    private suspend fun ensureVehicleCached(context: Context, vin: String): VehicleSnapshot? {
+        val store = SnapshotStore(context)
+        store.current().vehicles.firstOrNull { it.vin == vin }?.let { return it }
+        val sessions = SessionStore(context)
+        val credentials = CredentialStore(context)
+        for (brand in runCatching { sessions.loggedInBrands() }.getOrDefault(emptyList())) {
+            val fetched = runCatching { repositoryFor(brand, sessions, credentials).vehicles() }
+                .getOrDefault(emptyList())
+            if (fetched.isEmpty()) continue
+            runCatching { store.saveVehiclesKeepingStatus(fetched.map { it.toSnapshot() }) }
+            fetched.firstOrNull { it.vin == vin }?.let { return it.toSnapshot() }
+        }
+        return null
     }
 
     private suspend fun statusFor(context: Context, v: Vehicle): VehicleStatus? {
