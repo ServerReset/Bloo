@@ -250,12 +250,17 @@ jobs:
             app/build/outputs/apk/sideload/release/Bloo.apk
             wear/build/outputs/apk/release/Bloo-watch.apk
 
-      # Google Play, internal testing, and ONLY from a `major-N` tag: an ordinary push is a CI build,
-      # and a build is not a release. This is the whole trigger.
+      # Google Play, and ONLY from a `major-N` tag: an ordinary push is a CI build, and a build is
+      # not a release. This is the whole trigger.
       #
-      # Internal testing needs no review, so the build is installable by the testers within minutes.
-      # Promoting it to production (or to closed/open testing) stays a deliberate click in the
-      # console -- nothing here can ship to real users by itself.
+      # The CLOSED track (the API calls it `alpha`), not internal. A personal developer account
+      # created after 13 November 2023 has to run a closed test with at least 12 testers opted in
+      # continuously for 14 days before it can even apply for production access -- and internal
+      # testing does not count toward that. Uploading here is what starts the clock; the tester list
+      # itself is still a console step.
+      #
+      # Testers install it within minutes (no review on a testing track). Promoting to open testing
+      # or production stays a deliberate click in the console -- nothing here can ship to real users.
       - name: Upload the bundle to Google Play (internal testing)
         if: startsWith(github.ref, 'refs/tags/major-')
         uses: r0adkll/upload-google-play@v1
@@ -263,7 +268,7 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.bloo.bluelink
           releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab
-          track: internal
+          track: alpha
           status: completed
 
   # Runs the app for real: boots an emulator and runs the instrumented tests in
