@@ -8,16 +8,16 @@ asset that exists nowhere is an asset nobody can re-upload.
 |---|---|---|
 | `icon-512.png` | App icon | 512×512, 8-bit RGB PNG, no alpha |
 | `feature-graphic-1024x500.png` | Feature graphic | 1024×500, 8-bit RGB PNG |
-| `screenshots/03-login.png` | Phone screenshot | 1800×1012, 8-bit RGB PNG |
+| `screenshots/01-sign-in.png` | Phone screenshot | 1080×1920 (9:16), 8-bit RGB PNG |
 | `short-description.txt` | Short description | 80 characters or fewer |
 | `full-description.txt` | Full description | 4000 characters or fewer |
 
 ## Screenshots are currently short
 
-Play wants **at least two** phone screenshots and there is **one** here. Two earlier files were
-committed by mistake and have been removed: they were captures of the *emulator's homescreen*, not
-Bloo. The tell was in the OCR — they contained no text at all — and it should have been checked
-before they went in rather than after.
+Play wants **at least two** phone screenshots and there is **one** here, of the sign-in screen.
+Two earlier files were committed by mistake and removed: they were captures of the *emulator's
+homescreen*, not Bloo. The tell was in the OCR — they contained no text at all — and it should have
+been checked before they went in rather than after.
 
 What is missing, and where it has to come from:
 
