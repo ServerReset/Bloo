@@ -79,7 +79,18 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
-            isMinifyEnabled = false
+            // Shrinking ON, renaming OFF -- the same split the phone takes, and for the same reason
+            // written out at length in app/proguard-rules.pro: CI never RUNS a watch build, and
+            // renaming is the half of R8 whose failures land at runtime on a device this pipeline
+            // does not have. Shrinking's failures are overwhelmingly build-time, so it is the half
+            // that can be taken without a watch in the loop.
+            //
+            // It was off entirely, with no rules file at all, which is why the watch APK came out at
+            // 57 MB: Compose, Wear Compose, the Tiles runtime and material-icons-extended all shipped
+            // whole, and nothing was ever removed. The libraries that need keeps bring their own --
+            // play-services-wearable and protolayout each ship a proguard.txt, which AGP applies
+            // automatically -- and the rest is in wear/proguard-rules.pro.
+            isMinifyEnabled = true
             // No fallback, deliberately: the dev key used to sign every watch release, which meant a
             // released APK carried a certificate anyone can reproduce. Without the real key this
             // comes out UNSIGNED, which the watch's installer rejects outright (NO_CERTIFICATES) --
@@ -90,6 +101,10 @@ android {
             // installed from a build before this one cannot be updated in place -- it has to be
             // uninstalled on the watch once, and the phone re-pushes it.
             signingConfig = signingConfigs.findByName("upload")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
