@@ -20,8 +20,9 @@ import kotlin.math.roundToInt
 private val CollapseReturnMargin = 24.dp
 
 /**
- * A row of buttons where the pressed one takes ~15% more width and its neighbours give up exactly
- * that much, so the group's own width never changes and no parent remeasures.
+ * A row of buttons where the pressed one takes up to ~35% more width and its neighbours give up exactly
+ * that much, so the group's own width never changes and no parent remeasures. (The two numbers behind
+ * that: [RestingPressReserve] is what a neighbour can give up, [ExpressivePressGrowth] the ceiling.)
  */
 @Composable
 fun ExpressiveButtonGroup(

@@ -13,8 +13,8 @@ class ExpressiveButtonGroupMathTest {
     @Test
     fun seamReserveSizesEachHalfOffItsOwnContent() {
         val r = seamPressReserve(listOf(0, 1), intArrayOf(100, 200))
-        assertEquals(5, r[0]) // 0.10 * 100 / 2
-        assertEquals(10, r[1]) // 0.10 * 200 / 2
+        assertEquals(9, r[0]) // RestingPressReserve * 100 / 2
+        assertEquals(18, r[1]) // RestingPressReserve * 200 / 2
         assertEquals(2, r.size)
     }
 
@@ -40,15 +40,16 @@ class ExpressiveButtonGroupMathTest {
 
     @Test
     fun pressRedistributionConservesTheLineTotal() {
-        // b is stretched (130) above its content (100); pressing a takes only b's 30px slack.
+        // b is stretched (130) above its content (100), so it has 30px of slack to give; the seam's
+        // own capacity (ExpressivePressGrowth * 100 / 2 = 21) is what actually caps the take.
         val exact = redistributeForPress(
             memberIdx = listOf(0, 1),
             base = doubleArrayOf(100.0, 130.0),
             basis = intArrayOf(100, 100),
             press = floatArrayOf(1f, 0f),
         )
-        assertEquals(115.0, exact[0], 1e-3)
-        assertEquals(115.0, exact[1], 1e-3)
+        assertEquals(121.0, exact[0], 1e-3)
+        assertEquals(109.0, exact[1], 1e-3)
         assertEquals(230.0, exact[0] + exact[1], 1e-3, "seam delta must be zero-sum")
     }
 

@@ -19,11 +19,17 @@ internal fun seamPressReserve(memberIdx: List<Int>, basis: IntArray): IntArray {
 }
 
 /**
- * How much width, at rest, a button keeps beyond its content as room for a neighbour's press. Kept small: it
- * is visible as empty space inside every button of a row that is not stretched to fill (the press can still
- * borrow the stretch of a filled row).
+ * How much width, at rest, a button keeps beyond its content as room for a neighbour's press. This is
+ * the whole budget a press has to squash INTO: a seam's take is capped by the neighbour's slack, so a
+ * row that is not stretched to fill can only give up this reserve and nothing more.
+ *
+ * Raised from 0.10 to 0.18 -- together with [ExpressivePressGrowth], which is the ceiling above it.
+ * It is not free: it is visible as empty space inside every button of a row that is not stretched to
+ * fill. It costs no layout decisions, though: wrapping and label-dropping are decided from content
+ * widths ([chooseSymbolOnly]), never from this, and a line too tight to afford the reserve trims it
+ * away before it takes a pixel of anything visible.
  */
-internal const val RestingPressReserve = 0.10f
+internal const val RestingPressReserve = 0.18f
 
 /**
  * Each member's exact width once pressed. A pressed member draws only on the seams it shares with

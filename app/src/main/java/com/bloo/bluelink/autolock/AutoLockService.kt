@@ -86,6 +86,7 @@ class AutoLockService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Sealed after a phone restart (see BootGate): stand down until the user has signed in.
         if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) {
+            AppLog.log("AutoLock: service standing down — the app is sealed after a restart (BootGate).")
             stopSelf()
             return START_NOT_STICKY
         }

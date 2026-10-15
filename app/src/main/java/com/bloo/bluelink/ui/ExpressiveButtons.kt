@@ -32,7 +32,16 @@ import kotlinx.coroutines.launch
  * 1.0 -> 1.3: the pressed button claims 30% more. The single constant behind every press push and
  * squeeze.
  */
-internal const val ExpressivePressGrowth = 0.30f
+/**
+ * How far a pressed member's width is driven, as a fraction of its own basis. This is the ceiling:
+ * what it can actually take at a seam is capped by the neighbour's slack (see
+ * [RestingPressReserve]), so a tight row squashes as far as it is allowed to and no further.
+ *
+ * Raised from 0.30 to 0.42: a press read as a nudge rather than as the row squashing. It also drives
+ * the standalone press (SafeExpansiveButton's own growth), which is the same gesture on a button with
+ * no neighbour to push against.
+ */
+internal const val ExpressivePressGrowth = 0.42f
 
 /**
  * A group member's resting width is its content plus one reserve per neighbour it shares a seam
