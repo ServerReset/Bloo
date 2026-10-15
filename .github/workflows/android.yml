@@ -190,6 +190,14 @@ jobs:
             echo "Or sideload \`Bloo-watch.apk\` manually the same way as the phone (see above)."
             echo
             echo "### What's changed"
+            echo
+            # Plain text, no markdown on purpose: this block is not only the release page, it is ALSO
+            # what the app shows under "What's new" in its update tile, where it is rendered as-is.
+            # This is the surviving channel to installs that can no longer update -- their tile and
+            # their notification carry this release's own text, so a note here reaches them on every
+            # build, however long they take to notice.
+            echo "Installer saying \"App not installed\"? That copy was signed with Bloo's old key, and Android will not install any newer build over it. Nothing is wrong with the download. Export your settings first (Settings, Backup & sync, Export), uninstall Bloo, then install the newest Bloo.apk from this page and sign in again."
+            echo
             if [ -n "$prev_tag" ]; then
               git log --pretty=format:'- %s' "build-$prev_tag"..HEAD
             else
@@ -246,13 +254,20 @@ jobs:
       # swallowed the rest of the string literal, the expression never closed, and the whole workflow
       # failed to parse -- the run was created and instantly failed with no jobs at all. Here the #
       # lives in a shell string, where it is just a character.
+      #
+      # Ordinary builds carry the reinstall pointer in their NAME, and that is not decoration. The
+      # name is the one piece of text the app renders without the user opening the releases page: it
+      # is the whole body of the 12-hourly "update available" notification, and the summary line of
+      # the update tile. Installs signed with the pre-Play key cannot install ANY newer build, and
+      # the only symptom they get is the system installer saying "App not installed" -- so when they
+      # tap Update on their own, this is the only place that can tell them why before it happens.
       - name: Pick the release title
         id: title
         run: |
           if [ "${{ inputs.legacy_signing }}" = "true" ]; then
             echo "title=Build #${{ github.run_number }} — final for this signing key" >> "$GITHUB_OUTPUT"
           else
-            echo "title=Build #${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+            echo "title=Build #${{ github.run_number }} · reinstall if the update won't install" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish build as a GitHub Release (direct APK downloads)

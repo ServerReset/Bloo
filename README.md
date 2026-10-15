@@ -32,6 +32,17 @@ Bloo isn't on the Play Store, so you install it from a release (no GitHub sign-i
 
 After that the app updates itself: every push publishes a new release, and the build number is the version.
 
+### If an update says "App not installed"
+
+Bloo was signed with a new key in October 2026, and Android will not install an update signed with a
+different key than the copy already on your phone. A version installed before that change has to be
+replaced rather than updated — the download is fine, the installer just refuses it.
+
+Export your settings first (**Settings → Backup & sync → Export**), then uninstall Bloo, install the
+newest **`Bloo.apk`** from the [releases page](https://github.com/ServerReset/Bloo/releases), sign in
+again, and restore the backup. Until you do, the old copy keeps working exactly as it did — it just
+stops receiving updates.
+
 ## Build
 
 ```bash
