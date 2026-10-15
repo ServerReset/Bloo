@@ -64,7 +64,10 @@ call() {
     # never printed. stderr cannot be swallowed by a command substitution.
     echo "::error::HTTP $status from $method $url" >&2
     echo "$body" >&2
-    exit 1
+    # RETURN, not exit. `call` is used as `call ... || handler` for the steps that are allowed to fail,
+    # and `exit` inside a function tears the whole script down before that handler can run. That is why
+    # a best-effort cleanup reported itself as a fatal error: the `|| true` never got control.
+    return 1
   fi
   printf '%s' "$body"
 }
@@ -74,6 +77,13 @@ edit_out="$(call POST "$api/edits")" || { echo "::error::could not open an edit"
 edit="$(printf '%s' "$edit_out" | jq -r .id)"
 [ -n "$edit" ] && [ "$edit" != "null" ] || { echo "::error::no edit id in: $edit_out"; exit 1; }
 echo "edit $edit"
+
+# What Play already has, before anything is written. A form-factor track -- wear:internal, and so on --
+# is NOT created by uploading a bundle. It appears only once something is written to it, and a PUT to
+# one Play has never seen is a flat "Track not found: wear:internal". That is the 404 the watch kept
+# hitting, and it is why nothing has ever reached a watch track.
+echo "tracks Play already has:"
+call GET "$api/edits/$edit/tracks" | jq -r '.tracks[]? | "  \(.track)"' || true
 
 # One bundle upload per file, collecting the version code Play assigns to each.
 # Per FORM FACTOR, because those are separate tracks: Play prefixes form-factor track ids, e.g.
@@ -97,44 +107,10 @@ for f in "${FILES[@]}"; do
     *)      phone_codes+=("$code") ;;
   esac
 done
-codes=("${phone_codes[@]}")
-
-# assign one release, with its own version codes, to one track
-assign() {
-  local track="$1"; shift
-  local codes_json rel payload
-  codes_json="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
-  rel="$(jq -c -n --arg status "$STATUS" --argjson codes "$codes_json" '{status: $status, versionCodes: $codes}')"
-  payload="$(jq -c -n --arg track "$track" --argjson rel "$rel" '{track: $track, releases: [$rel]}')"
-  echo; echo "--- $track <- $(printf '%s,' "$@" | sed 's/,$//')"
-  echo "  $payload"
-  local out
-  out="$(call PUT "$api/edits/$edit/tracks/$track" -d "$payload")" || {
-    echo "::error::could not assign to '$track'"
-    [ -n "${out:-}" ] && echo "$out" >&2
-    exit 1
-  }
-  printf '%s' "$out" | jq -r '.releases[]? | "  release: status=\(.status) versionCodes=\((.versionCodes // [])|join(","))"' || true
-}
-
-# THE FIRST BUNDLE IS THE ONE THAT GETS RELEASED. The rest are uploaded and left in the store's bundle
-# library for the console.
-#
-# This is not a preference, it is the only shape that works. Asking Play directly, twice:
-#
-#   one release holding BOTH version codes -> HTTP 500 "Internal error encountered."  (the commit)
-#   two releases on the track              -> HTTP 400 "Only one completed release is allowed."
-#
-# So the API has no way to put two form factors on a track. The console does. The watch bundle is
-# uploaded every run so the console always has a fresh one to add, and it is deliberately NOT in the
-# release -- one version code per release is the only thing that commits.
-#
-# The workflow passes the phone bundle first, which is what makes this the phone's release.
-release_json="$(printf '%s\n' "${codes[0]}" | jq -R . | jq -s --arg status "$STATUS" '{status: $status, versionCodes: .}')"
-if [ "${#codes[@]}" -gt 1 ]; then
-  echo "  uploaded but NOT released (the API cannot put two form factors in one release):"
-  printf '    versionCode %s\n' "${codes[@]:1}"
-fi
+# One release, one version code. That is the only shape the API accepts: a release holding two form
+# factors 500s with "Internal error encountered", and two releases on one track 400s with "Only one
+# completed release is allowed". So the phone is released on <track> below, and the watch gets its own
+# edit and its own form-factor track, where a refusal cannot touch the phone.
 
 IFS=',' read -ra LIST <<< "$TRACKS"
 
@@ -144,6 +120,17 @@ IFS=',' read -ra LIST <<< "$TRACKS"
 phone_tracks=()
 for t in "${LIST[@]}"; do phone_tracks+=("$(echo "$t" | xargs)"); done
 
+# Create a form-factor track that does not exist yet. Play does not create one just because a bundle of
+# that form factor was uploaded: the write is what brings it into being, and the write is refused first
+# with "Track not found: wear:internal". So the order has to be create, then write.
+ensure_track() {
+  local edit_id="$1" track="$2"
+  echo "  '$track' does not exist yet, so creating it" >&2
+  call POST "$api/edits/$edit_id/tracks" \
+    -d "$(jq -c -n --arg t "$track" '{track: $t}')" >/dev/null
+}
+
+# assign one release, with its own version codes, to one track
 assign_to_edit() {
   local edit_id="$1" track="$2"; shift 2
   local codes_json rel payload out
@@ -151,11 +138,20 @@ assign_to_edit() {
   rel="$(jq -c -n --arg status "$STATUS" --argjson codes "$codes_json" '{status: $status, versionCodes: $codes}')"
   payload="$(jq -c -n --arg track "$track" --argjson rel "$rel" '{track: $track, releases: [$rel]}')"
   echo; echo "--- $track <- $(printf '%s,' "$@" | sed 's/,$//')"
-  out="$(call PUT "$api/edits/$edit_id/tracks/$track" -d "$payload")" || {
-    echo "::error::could not assign to '$track'"
-    [ -n "${out:-}" ] && echo "$out" >&2
-    return 1
-  }
+
+  if ! out="$(call PUT "$api/edits/$edit_id/tracks/$track" -d "$payload")"; then
+    # Only a form-factor track can be missing; the phone's four always exist.
+    if [[ "$track" == *:* ]] && ensure_track "$edit_id" "$track"; then
+      out="$(call PUT "$api/edits/$edit_id/tracks/$track" -d "$payload")" || {
+        echo "::error::could not assign to '$track' even after creating it"
+        return 1
+      }
+    else
+      echo "::error::could not assign to '$track'"
+      return 1
+    fi
+  fi
+
   printf '%s' "$out" | jq -r '.releases[]? | "  release: status=\(.status) versionCodes=\((.versionCodes // [])|join(","))"' >&2 || true
 }
 
@@ -227,6 +223,8 @@ if [ "$watch_ok" = "1" ]; then
   echo "WATCH PUBLISHED: $PKG -> wear:<track> holds $(printf '%s,' "${wear_codes[@]}" | sed 's/,$//')"
 else
   echo "::warning::the watch did not publish. The phone release is unaffected."
-  echo "  Its bundle is uploaded and sits in the store's bundle library; adding it to a release is a"
-  echo "  form-factor track write (wear:<track>), which is what just failed -- see the messages above."
+  echo "  Its bundle is uploaded and sits in the store's bundle library."
+  echo "  A form-factor track write (wear:<track>) is what failed -- see the messages above. If Play"
+  echo "  refuses to create the track, it has to be created once in the console, and this step then"
+  echo "  keeps it up to date from here."
 fi
