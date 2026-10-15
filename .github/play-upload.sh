@@ -59,7 +59,12 @@ call() {
   body="$(curl -sS -X "$method" "${auth[@]}" -H "Content-Type: application/json" -w $'\n%{http_code}' "$@" "$url")"
   status="${body##*$'\n'}"; body="${body%$'\n'*}"
   if [ "${status:0:1}" != "2" ]; then
-    echo "::error::HTTP $status from $method $url"; echo "$body" | head -20; exit 1
+    # STDERR, deliberately. On stdout this text gets captured by any `$(call ...)` and then silently
+    # dropped, which has now happened twice: once eaten by jq as input, once held in a variable and
+    # never printed. stderr cannot be swallowed by a command substitution.
+    echo "::error::HTTP $status from $method $url" >&2
+    echo "$body" >&2
+    exit 1
   fi
   printf '%s' "$body"
 }
@@ -112,8 +117,8 @@ done
 
 echo; echo "--- committing"
 commit_out="$(call POST "$api/edits/$edit:commit")" || {
-  # call already printed Play's own message, and this time nothing eats it.
   echo "::error::the commit failed, so NOTHING was published"
+  [ -n "${commit_out:-}" ] && echo "$commit_out" >&2
   exit 1
 }
 echo "  commit response: ${commit_out:-<empty>}"
