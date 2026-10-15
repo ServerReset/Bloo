@@ -84,15 +84,19 @@ for f in "${FILES[@]}"; do
   codes+=("$code")
 done
 
-# One RELEASE OBJECT per bundle. This is the whole point of the script: a single release holding both
-# is what Play refuses, and the two-bundle shape is what the console produces for two form factors.
-releases="$(printf '%s\n' "${codes[@]}" | jq -R . | jq -s '{releases: map({status: $status, versionCodes: [.]})}' --arg status "$STATUS")"
+# ONE release holding every version code, which is the opposite of what this did first.
+#
+# Asking Play directly settled it: "Only one completed release is allowed." A track may only have a
+# single completed release, so the form factors live as separate VERSION CODES inside it -- which is
+# what "a watch build's version code must be unique across all form factors" means. Two releases per
+# track is not a shape Play has.
+release_json="$(printf '%s\n' "${codes[@]}" | jq -R . | jq -s --arg status "$STATUS" '{status: $status, versionCodes: .}')"
 
 IFS=',' read -ra LIST <<< "$TRACKS"
 for t in "${LIST[@]}"; do
   track="$(echo "$t" | xargs)"
   echo; echo "--- assigning ${#codes[@]} release(s) to '$track'"
-  payload="$(printf '%s' "$releases" | jq -c --arg track "$track" '. + {track: $track}')"
+  payload="$(jq -c -n --arg track "$track" --argjson rel "$release_json" '{track: $track, releases: [$rel]}')"
   echo "  $payload"
   if ! out="$(call PUT "$api/edits/$edit/tracks/$track" -d "$payload" 2>&1)"; then
     # A failure here is worth reading rather than retrying: it is the shape Play objects to, or the
