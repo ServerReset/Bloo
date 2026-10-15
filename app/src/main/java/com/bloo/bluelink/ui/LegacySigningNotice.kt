@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,13 +30,19 @@ import com.bloo.bluelink.data.UpdateApi
  * shows on every launch rather than once: it is the entire reason the build exists, and a dismissal
  * that outlives the process would leave someone on a copy that can never move forward with no way to
  * find out why. "Later" is still there -- the old copy keeps working as well as it ever did.
+ *
+ * The ordering of the steps is deliberate. Uninstalling takes the saved Bluelink sign-in, every
+ * setting and the whole layout with it, so the export is put FIRST and has a button of its own:
+ * telling someone to back up after they have already uninstalled is telling them too late.
  */
 @Composable
-internal fun LegacySigningNotice() {
+internal fun LegacySigningNotice(onExport: () -> Unit) {
     // Per-process, so a dismissal is for this sitting only. Deliberately not persisted.
     var dismissed by remember { mutableStateOf(false) }
-    if (dismissed) return
     val context = LocalContext.current
+    val body = MaterialTheme.typography.bodySmall
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    if (dismissed) return
     GlassAlertDialog(
         onDismissRequest = { dismissed = true },
         title = "Last update for this copy",
@@ -48,36 +55,45 @@ internal fun LegacySigningNotice() {
                         "is the last one this copy can take — no update can get past that.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                RevealText("To move to the current version:", style = MaterialTheme.typography.bodyMedium)
                 RevealText(
-                    "To move to the current version:",
-                    style = MaterialTheme.typography.bodyMedium,
+                    "1. Export your settings. This is the one step that can't be undone later — " +
+                        "uninstalling takes your cars, colours and layout with it. Tap \"Export backup\" " +
+                        "below, or find it under Settings, Backup & sync.",
+                    style = body,
+                    color = muted,
                 )
                 RevealText(
-                    "1. Uninstall Bloo.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    "2. Uninstall Bloo.",
+                    style = body,
+                    color = muted,
                 )
                 RevealText(
-                    "2. Download Bloo.apk from the GitHub releases page.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    "3. Download the current Bloo.apk from the GitHub releases page.",
+                    style = body,
+                    color = muted,
                 )
                 RevealText(
-                    "3. Install it and sign in again. If you had Drive sync on, your cars and settings " +
-                        "come back with it.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    "4. Install it, sign in again, then restore the backup you exported in step 1.",
+                    style = body,
+                    color = muted,
                 )
                 RevealText(
-                    "This copy keeps working as it is — it just won't be updated again.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    "If you had Drive sync on, your settings come back on their own once you sign in. " +
+                        "This copy keeps working as it is — it just won't be updated again.",
+                    style = body,
+                    color = muted,
                 )
             }
         },
         buttons = {
             ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
                 SafeMorphTextButton(text = "Later", onClick = { dismissed = true })
+                MorphActionButton(
+                    label = "Export backup",
+                    icon = Icons.Filled.Share,
+                    onClick = onExport,
+                )
                 MorphActionButton(
                     label = "Releases page",
                     icon = Icons.AutoMirrored.Filled.OpenInNew,

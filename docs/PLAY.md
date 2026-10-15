@@ -244,6 +244,26 @@ Two things do **not** need the bridge:
 - **Play.** The Play artifact is published through Play App Signing; the upload key only signs what
   is sent there.
 
+### The rule the old installs actually apply
+
+This is what decides everything above, and it is frozen in builds that can no longer be changed:
+
+> the newest of the 10 most recent Releases that is not a draft and not a prerelease, whose tag
+> starts with `build-`, and which carries a **ready** asset named exactly **`Bloo.apk`**
+
+Two consequences follow, and they matter more than the code that produces it:
+
+1. **The asset name is what selects the release.** So `Bloo.apk` can only ever mean one thing. Today
+   it is the ordinary build, which is why an old install is offered every new build and the install
+   fails on all of them: it is not being offered the bridge, it is being offered the build.
+2. **It reads only the first page — ten releases.** So a bridge that is the newest release today stops
+   being found once ten more builds have been published. By itself, a one-off bridge is a window, not
+   a terminal.
+
+Making the bridge the *permanent* thing that lineage is offered therefore means changing what
+`Bloo.apk` refers to, or changing how releases are laid out. Both are visible changes, so it is a
+deliberate decision rather than a fix — see the release notes for the option chosen.
+
 ---
 
 ## 7. The two policy points to keep in mind

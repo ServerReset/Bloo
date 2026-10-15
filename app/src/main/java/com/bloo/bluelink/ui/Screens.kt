@@ -375,7 +375,11 @@ fun BlooApp(vm: AppViewModel) {
     // The migration bridge's notice, if this IS the migration bridge (see LegacySigningNotice and
     // `legacySigning` in app/build.gradle.kts). Composed unconditionally-adjacent to the layer that
     // draws dialogs, exactly as the install guide above is.
-    if (com.bloo.bluelink.BuildConfig.LEGACY_SIGNING) LegacySigningNotice()
+    if (com.bloo.bluelink.BuildConfig.LEGACY_SIGNING) {
+        // The export is offered here rather than only described: uninstalling is the step that
+        // destroys the setup, so the one thing worth doing first gets a button.
+        LegacySigningNotice(onExport = { vm.exportSettings(context) })
+    }
     // Every open dialog, above everything else.
     DialogLayer(dialogHost)
     }

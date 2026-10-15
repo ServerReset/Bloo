@@ -217,9 +217,10 @@ jobs:
             echo "when you open it, and it will not be updated again."
             echo
             echo "### Move to the current version"
-            echo "1. **Uninstall Bloo.** (The install is what is keyed to the old signature; nothing else can clear that.)"
-            echo "2. Download the newest **\`Bloo.apk\`** from this page."
-            echo "3. Install it and sign in again. If you had Drive sync on, your cars and settings come back with it."
+            echo "1. **Export your settings first.** Open Bloo, and on the notice tap **\"Export backup\"** — or go to **Settings → Backup & sync → Export**. This is the step that cannot be undone later: uninstalling takes your cars, colours and layout with it."
+            echo "2. **Uninstall Bloo.** (The install is what is keyed to the old signature; nothing else can clear that.)"
+            echo "3. Download the newest **\`Bloo.apk\`** from this page."
+            echo "4. Install it, sign in again, then restore the backup from step 1. (If you had Drive sync on, your settings come back on their own once you sign in.)"
             echo
             echo "Everything you have now keeps working until you do — it just stops receiving updates."
             echo

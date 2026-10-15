@@ -33,7 +33,7 @@ class LegacySigningNoticeTest {
             BlooTheme {
                 CompositionLocalProvider(LocalDialogHost provides host) {
                     Box(Modifier.fillMaxSize()) {
-                        LegacySigningNotice()
+                        LegacySigningNotice(onExport = {})
                         DialogLayer(host)
                     }
                 }
@@ -46,18 +46,45 @@ class LegacySigningNoticeTest {
         // The steps, not "displayed": the body scrolls, so a step can be present and below the fold.
         // Existence is what matters -- an instruction nobody can read is the failure being guarded.
         listOf(
-            "1. Uninstall Bloo.",
-            "2. Download Bloo.apk from the GitHub releases page.",
+            "1. Export your settings.",
+            "2. Uninstall Bloo.",
+            "3. Download the current Bloo.apk from the GitHub releases page.",
         ).forEach { step ->
             assertTrue(
                 "the notice does not say \"$step\"",
-                rule.onAllNodesWithText(step).fetchSemanticsNodes().isNotEmpty(),
+                rule.onAllNodesWithText(step, substring = true).fetchSemanticsNodes().isNotEmpty(),
             )
         }
         assertTrue(
             "the notice offers no way to reach the releases page",
             rule.onAllNodesWithText("Releases page").fetchSemanticsNodes().isNotEmpty(),
         )
+        assertTrue(
+            "the notice offers no way to make the backup it asks for",
+            rule.onAllNodesWithText("Export backup").fetchSemanticsNodes().isNotEmpty(),
+        )
+    }
+
+    @Test
+    fun theExportButtonCallsBack() {
+        val host = DialogHost(HazeState())
+        var exports = 0
+        rule.setContent {
+            BlooTheme {
+                CompositionLocalProvider(LocalDialogHost provides host) {
+                    Box(Modifier.fillMaxSize()) {
+                        LegacySigningNotice(onExport = { exports++ })
+                        DialogLayer(host)
+                    }
+                }
+            }
+        }
+        rule.waitUntil(5_000) {
+            rule.onAllNodesWithText("Export backup").fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithText("Export backup").performClick()
+        rule.waitForIdle()
+        assertTrue("the export button did not fire", exports == 1)
     }
 
     @Test
@@ -67,7 +94,7 @@ class LegacySigningNoticeTest {
             BlooTheme {
                 CompositionLocalProvider(LocalDialogHost provides host) {
                     Box(Modifier.fillMaxSize()) {
-                        LegacySigningNotice()
+                        LegacySigningNotice(onExport = {})
                         DialogLayer(host)
                     }
                 }
