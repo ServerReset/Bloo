@@ -21,6 +21,10 @@ on:
         description: "Just list the Play tracks and what is on them, and change nothing"
         type: boolean
         default: false
+      rollout:
+        description: "Promote the closed-testing draft release so testers can install it"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -50,4 +54,5 @@ jobs:
         env:
           PLAY_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
           PLAY_INSPECT: ${{ inputs.inspect_only && 'true' || 'false' }}
+          PLAY_ROLLOUT: ${{ inputs.rollout && 'true' || 'false' }}
         run: bash .github/play-listing.sh

@@ -71,6 +71,30 @@ call GET "$api/edits/$edit_id/listings" | jq -r '.listings[]? | "  \(.language):
 language="$(call GET "$api/edits/$edit_id/listings" | jq -r '.listings[0].language // "en-US"')"
 echo "  editing language: $language"
 
+# --- ROLLOUT mode: promote a track's draft release so testers can actually install it ---------------
+# On a draft app Play refuses to CREATE a release with status=completed ("Only releases with status
+# draft may be created on draft app"), which is why tag builds land as drafts. Creating and promoting
+# are different calls, so this takes the draft that already exists, flips its status, and updates the
+# track. If Play refuses that too, its own message says so and the console click remains.
+if [ "${PLAY_ROLLOUT:-false}" = "true" ]; then
+  track="${PLAY_TRACK:-alpha}"
+  echo; echo "--- ROLLOUT: promoting the draft on '$track'"
+  current="$(call GET "$api/edits/$edit_id/tracks/$track")"
+  echo "$current" | jq -r '.releases[]? | "  found: status=\(.status) versionCodes=\((.versionCodes // [])|join(",")) name=\(.name // "")"'
+  if ! echo "$current" | jq -e '.releases[]? | select(.status=="draft")' >/dev/null; then
+    echo "  nothing to promote: no draft release on '$track'"
+    call DELETE "$api/edits/$edit_id" >/dev/null || true
+    exit 0
+  fi
+  promoted="$(echo "$current" | jq -c '{track: .track, releases: [ .releases[] | if .status=="draft" then (.status="completed") else . end ] }')"
+  echo "  sending: $promoted"
+  call PUT "$api/edits/$edit_id/tracks/$track" -d "$promoted" >/dev/null
+  call POST "$api/edits/$edit_id:commit" >/dev/null
+  echo "  PROMOTED. The release is no longer a draft."
+  call GET "$api/edits/$(call POST "$api/edits" | jq -r .id)/tracks/$track" 2>/dev/null | jq -r '.releases[]? | "  now: status=\(.status) versionCodes=\((.versionCodes // [])|join(","))"' || true
+  exit 0
+fi
+
 # --- INSPECT mode: report what Play actually holds, then leave without changing anything -----------
 # Written because the CI said "Finished uploading to the Play Store" and the console showed nothing new.
 # When the two disagree, believe neither: list the tracks and the releases on them and read those.
