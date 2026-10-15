@@ -8,16 +8,16 @@ asset that exists nowhere is an asset nobody can re-upload.
 |---|---|---|
 | `icon-512.png` | App icon | 512×512, 8-bit RGB PNG, no alpha |
 | `feature-graphic-1024x500.png` | Feature graphic | 1024×500, 8-bit RGB PNG |
-| `screenshots/01-sign-in.png` | Phone screenshot | 1080×1920 (9:16), 8-bit RGB PNG |
+| `screenshots/01-garage.png` | Phone screenshot 1 | 1080×1920 (9:16), 8-bit RGB PNG |
+| `screenshots/02-lock.png` | Phone screenshot 2 | 1080×1920 (9:16), 8-bit RGB PNG |
 | `short-description.txt` | Short description | 80 characters or fewer |
 | `full-description.txt` | Full description | 4000 characters or fewer |
 
 ## Screenshots are currently short
 
-Play wants **at least two** phone screenshots and there is **one** here, of the sign-in screen.
-Two earlier files were committed by mistake and removed: they were captures of the *emulator's
-homescreen*, not Bloo. The tell was in the OCR — they contained no text at all — and it should have
-been checked before they went in rather than after.
+Both are captures of the real UI with a **fabricated car** — see "The sample garage" below. Earlier
+files were committed by mistake and removed: two were captures of the *emulator's homescreen*, and the
+first sign-in shot was replaced once there was a screen worth showing.
 
 What is missing, and where it has to come from:
 
@@ -55,3 +55,26 @@ ever changes, or the listing will advertise an icon the app no longer has.
 
 OCR it. That is how the junk above was caught, that is how the current one was checked for location
 text, and it is the only check available here — there is no vision tool in this session.
+
+## The sample garage
+
+The garage cannot be photographed on a device that has never signed in: `coldStartAutoLogin` sends any
+build with no saved login straight to `Screen.Login`, and a saved login lives in the Keystore-backed
+vault. Signing in, meanwhile, is the one thing that would put a real car — its name, its state and
+its location — on a public listing.
+
+So `DebugSampleGarage` (app/src/main, behind `BuildConfig.DEBUG`) fabricates the *state* instead: one
+car that belongs to nobody, and **no location at all** — `lat`/`lon` and `placeNames` are left unset,
+which is what leaves the Location pebble reading "Parked" with no address. The lock shot adds a sample
+PIN record through the app's own store, because the lock renders a dead end without one.
+
+Trigger it on a debug build (see the receiver's own doc):
+
+```sh
+adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd garage   # garage
+adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd lock     # + lock screen
+adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd off
+```
+
+It is inert in a release build: the flag reads false at the single call site and R8 drops the object.
+Every capture is OCR-checked for an address, a coordinate, a plate or a VIN before it is committed.

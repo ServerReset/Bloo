@@ -4,6 +4,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <application>
+        <!-- Debug-only switch for the fabricated sample garage used to photograph the app for its
+             store listing (see DebugSampleGarage). exported + no permission on purpose: an adb
+             `am broadcast` cannot hold a declared permission, so one here would make the trigger
+             unreachable. Debug build only, so it never ships. -->
+        <receiver
+            android:name=".DebugFixturesReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="com.bloo.bluelink.DEBUG_FIXTURES" />
+            </intent-filter>
+        </receiver>
         <!-- Developer trigger for AutoLock: lets an adb command exercise the whole
              background flow (countdown notification -> walk-away confirmation -> dry-run
              outcome notification) without physically leaving a car. See its own doc.

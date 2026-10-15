@@ -66,6 +66,18 @@ internal fun AppViewModel.bootstrapColdStart() {
  * runs again once the whole re-auth flow has passed.
  */
 internal fun AppViewModel.coldStartAutoLogin() {
+    // Debug-only sample garage. A store screenshot cannot sign in, and signing in is exactly what
+    // would put a real car's name and location on a public listing -- so the state is fabricated
+    // instead (see DebugSampleGarage). This is dead code in a release build: BuildConfig.DEBUG is
+    // false there, so the flag reads false and R8 drops the object entirely. It sits above every
+    // other check on purpose, because this function is the one place that decides Login vs Garage.
+    if (com.bloo.bluelink.ui.DebugSampleGarage.enabled(getApplication())) {
+        val sampleLocked = com.bloo.bluelink.ui.DebugSampleGarage.locked(getApplication())
+        if (sampleLocked) com.bloo.bluelink.ui.DebugSampleGarage.ensurePin(getApplication())
+        logStartup("Cold start: DEBUG SAMPLE GARAGE (locked=$sampleLocked) -- not a real account")
+        _state.update { com.bloo.bluelink.ui.DebugSampleGarage.apply(it, sampleLocked) }
+        return
+    }
     if (com.bloo.bluelink.data.BootGate.isLocked(getApplication())) {
         logStartup("Cold start: phone restarted -> re-auth required before anything runs")
         _state.update { it.copy(screen = Screen.Login, bootReauth = true) }
