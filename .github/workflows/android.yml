@@ -380,6 +380,12 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
+      # The repository, because the upload is a script in it. Without this the job ran as far as
+      # "bash: .github/play-upload.sh: No such file or directory" -- exit code 127, after the bundles
+      # had been downloaded and collected perfectly.
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download the bundles
         uses: actions/download-artifact@v4
         with:
