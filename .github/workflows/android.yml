@@ -272,59 +272,6 @@ jobs:
         run: |
           echo "title=Build #${{ github.run_number }} · reinstall if the update won't install" >> "$GITHUB_OUTPUT"
 
-      # The Play upload comes BEFORE the GitHub release on purpose. It used to come after, and a
-      # 403 from GitHub's release API -- which is what actually happened on the first major-2 run --
-      # failed the job one step short of this one, so nothing reached Play and the closed-testing
-      # track stayed empty. Publishing the version people test is not allowed to depend on a release
-      # page being created.
-      # Google Play, and ONLY from a `major-N` tag: an ordinary push is a CI build, and a build is
-      # not a release. This is the whole trigger.
-      #
-      # The CLOSED track (the API calls it `alpha`), not internal. A personal developer account
-      # created after 13 November 2023 has to run a closed test with at least 12 testers opted in
-      # continuously for 14 days before it can even apply for production access -- and internal
-      # testing does not count toward that. Uploading here is what starts the clock; the tester list
-      # itself is still a console step.
-      #
-      # Testers install it within minutes (no review on a testing track). Promoting to open testing
-      # or production stays a deliberate click in the console -- nothing here can ship to real users.
-      - name: Upload the bundle to Google Play
-        if: startsWith(github.ref, 'refs/tags/major-') || inputs.play_track != ''
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.bloo.bluelink
-          # BOTH bundles in one release: the phone app and the watch app. They share an
-          # applicationId and a listing, and Play routes them by the watch feature -- the watch bundle
-          # requires it, the phone one does not -- with the watch's higher version code settling the
-          # case where both are compatible.
-          # ONE line, comma-separated. The action parses this as a comma-delimited list, so the YAML
-          # block scalar this used to be handed it a single string containing a newline -- which it then
-          # looked for as a filename, and failed with "Unable to find any release file matching
-          # app-....aab\nwear-....aab". Both bundles were built correctly; only the format was wrong.
-          releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab,wear/build/outputs/bundle/playRelease/wear-play-release.aab
-          # `tracks`, not the deprecated `track` (the action warns about it on every run).
-          # BOTH tracks, and rolled out rather than left as a draft. `internal` is installable
-          # regardless and is where a build can be put on a phone immediately; `alpha` is the closed test
-          # the 12-testers-for-14-days clock runs on. A manual run can still name one track.
-          tracks: ${{ inputs.play_track != '' && inputs.play_track || 'internal,alpha' }}
-          # DRAFT, and this is not a preference. Play refuses anything else here:
-          #   "Only releases with status draft may be created on draft app."
-          # com.bloo.bluelink has never been published, so it is still a draft app, and on a
-          # public-facing track it will only accept a draft release. The AAB uploads perfectly either
-          # way -- it is the release object that is rejected, which is why the console showed an empty
-          # release and nothing else.
-          #
-          # What this means in practice: the build lands on the closed track as a draft, and someone
-          # clicks "Start rollout to closed testing" in the console. Once the app has gone live once
-          # (production, or any track that has been rolled out), change this back to `completed` and
-          # the upload will roll out by itself.
-          # Rolled out, not a draft. `internal` has always accepted `completed`; `alpha` refused it with
-          # "Only releases with status draft may be created on draft app" for as long as Play classed
-          # this app as a draft, which closing out the foreground-service declaration is what changed.
-          # If it is refusing again, this step fails and says so -- rather than quietly publishing a
-          # draft that nobody can install and that nothing announced.
-          status: completed
       # Branch pushes only. A `major-N` tag build gets its GitHub release from the branch push that
       # preceded it -- the same commit, published moments earlier -- and creating one from a TAG push
       # is what GitHub refuses: `Resource not accessible by integration`, reproducibly, on every tag,
@@ -343,6 +290,30 @@ jobs:
           files: |
             app/build/outputs/apk/sideload/release/Bloo.apk
             wear/build/outputs/apk/sideload/release/Bloo-watch.apk
+
+      # EVERY push goes to internal testing, so there is always a build on a phone that is minutes old.
+      # Only a `major-N` tag goes to the closed track: that is the one the 12-testers-for-14-days clock
+      # runs on, and it should hold releases rather than every push. A manual run can name a track.
+      #
+      # AFTER the GitHub release, which is the opposite of how this was ordered. The old order existed
+      # because a tag-triggered run could not create a release at all -- GitHub refuses that outright --
+      # so the Play upload had to happen before the step that would fail. Tags stopped publishing
+      # releases, that reason went with them, and now a Play hiccup on an ordinary push cannot cost
+      # sideload users their release, which is the failure actually worth avoiding.
+      - name: Upload the bundle to Google Play
+        if: github.event_name == 'push' || inputs.play_track != ''
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.bloo.bluelink
+          # One line, comma-separated. This input is a comma-delimited list -- unlike action-gh-release's
+          # `files` below, which is newline-separated. Getting the two the wrong way round fails as
+          # "unable to find any release file", which reads like a missing artifact and is not one.
+          releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab,wear/build/outputs/bundle/playRelease/wear-play-release.aab
+          tracks: ${{ inputs.play_track != '' && inputs.play_track || (startsWith(github.ref, 'refs/tags/major-') && 'alpha' || 'internal') }}
+          # Rolled out, not a draft. `internal` has always accepted this; `alpha` refused it for as long
+          # as Play classed the app as a draft, which the foreground-service declaration is what changed.
+          status: completed
 
 
   # Runs the app for real: boots an emulator and runs the instrumented tests in

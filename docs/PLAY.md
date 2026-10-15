@@ -126,8 +126,14 @@ git push origin major-1
 ```
 
 That builds both artifacts, publishes the GitHub Release exactly as a normal push does (so sideload
-users get the same build by the same route), and **additionally uploads the AAB to Play's closed
-testing track** (the API calls it `alpha`). Nothing is promoted to production by the CI — that stays a deliberate click in the
+users get the same build by the same route), and **additionally uploads the bundles to Play's closed
+testing track** (the API calls it `alpha`).
+
+**Every push goes somewhere on Play too**, which is the part worth knowing: an ordinary push publishes
+both bundles to **internal testing**, rolled out, so there is always a build on a phone that is minutes
+old. Only a `major-N` tag touches the **closed** track -- that is the one the 12-testers-for-14-days
+clock runs on, and it should hold releases rather than every push. A manual run can name a track
+(`play_track`), which is how a single build gets pushed somewhere on its own. Nothing is promoted to production by the CI — that stays a deliberate click in the
 console.
 
 There is deliberately no semantic version. `versionCode` is the CI run number, which is monotonic by
