@@ -298,9 +298,11 @@ jobs:
           # applicationId and a listing, and Play routes them by the watch feature -- the watch bundle
           # requires it, the phone one does not -- with the watch's higher version code settling the
           # case where both are compatible.
-          releaseFiles: |-
-            app/build/outputs/bundle/playRelease/app-play-release.aab
-            wear/build/outputs/bundle/playRelease/wear-play-release.aab
+          # ONE line, comma-separated. The action parses this as a comma-delimited list, so the YAML
+          # block scalar this used to be handed it a single string containing a newline -- which it then
+          # looked for as a filename, and failed with "Unable to find any release file matching
+          # app-....aab\nwear-....aab". Both bundles were built correctly; only the format was wrong.
+          releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab,wear/build/outputs/bundle/playRelease/wear-play-release.aab
           # `tracks`, not the deprecated `track` (the action warns about it on every run).
           tracks: ${{ inputs.play_track != '' && inputs.play_track || 'alpha' }}
           # DRAFT, and this is not a preference. Play refuses anything else here:
