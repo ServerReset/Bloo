@@ -41,7 +41,7 @@ fun AppViewModel.exportSettings(context: android.content.Context) = viewModelSco
         }.getOrNull()
     }
     if (uri == null) {
-        _state.update { it.copy(message = "Couldn't prepare the backup file") }
+        _state.update { it.copy(message = "Couldn't prepare the backup file.") }
         return@launch
     }
     runCatching {
@@ -57,7 +57,7 @@ fun AppViewModel.exportSettings(context: android.content.Context) = viewModelSco
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
         )
         AppLog.log("Settings exported")
-    }.onFailure { _state.update { s -> s.copy(message = "Couldn't open the share sheet") } }
+    }.onFailure { _state.update { s -> s.copy(message = "Couldn't open the share sheet.") } }
 }
 
 /** Restore a full settings backup from a user-picked JSON file. */
@@ -66,7 +66,7 @@ fun AppViewModel.importSettings(context: android.content.Context, uri: android.n
         runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.getOrNull()
     }
     if (json == null) {
-        _state.update { it.copy(message = "Couldn't read that file") }
+        _state.update { it.copy(message = "Couldn't read that file.") }
         AppLog.log("⚠ Settings import: could not read file")
         return@launch
     }
@@ -92,7 +92,7 @@ fun AppViewModel.setSyncUri(uri: android.net.Uri) = viewModelScope.launch {
         // Without a PERSISTED grant the picker's temporary access dies with the process and every
         // sync fails with a SecurityException; refuse to enable sync instead.
         AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
-        _state.update { it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = ToastKind.ERROR) }
+        _state.update { it.copy(message = "Couldn't keep access to that file. Try picking it again.", messageType = ToastKind.ERROR) }
         return@launch
     }
     AppLog.log("Drive auto-sync enabled")
@@ -145,14 +145,14 @@ internal suspend fun AppViewModel.importSettingsAndSyncSuspend(context: android.
         // Without a persisted grant sync fails once the process dies, so don't claim it is enabled.
         AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
         _state.update {
-            it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = ToastKind.ERROR)
+            it.copy(message = "Couldn't keep access to that file. Try picking it again.", messageType = ToastKind.ERROR)
         }
         return false
     }
     // Reset per-file gate state (synced_ever cleared) so join-adopt arms, then point sync at it.
     settingsStore.resetSyncStateForNewFile()
     settingsStore.setSyncUri(uri.toString())
-    _state.update { it.copy(syncUri = uri.toString(), message = "Auto-sync enabled", messageType = ToastKind.SUCCESS) }
+    _state.update { it.copy(syncUri = uri.toString(), message = "Auto-sync enabled.", messageType = ToastKind.SUCCESS) }
     runDriveSyncNow()
     if (_state.value.syncError == null) refreshLocalCarConfig()
     return true

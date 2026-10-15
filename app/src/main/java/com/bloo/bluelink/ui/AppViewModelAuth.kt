@@ -95,7 +95,7 @@ fun AppViewModel.kiaVerifyOtp(code: String) {
     val otp = _state.value.kiaOtp ?: return
     val creds = kiaPending ?: return
     if (code.isBlank()) {
-        _state.update { it.copy(message = "Enter the code you received", messageType = ToastKind.ERROR) }
+        _state.update { it.copy(message = "Enter the code you received.", messageType = ToastKind.ERROR) }
         return
     }
     launchBusy {
@@ -145,7 +145,7 @@ fun AppViewModel.canadaVerifyOtp(code: String) {
     val otp = _state.value.canadaOtp ?: return
     val creds = canadaPending ?: return
     if (code.isBlank()) {
-        _state.update { it.copy(message = "Enter the code you received", messageType = ToastKind.ERROR) }
+        _state.update { it.copy(message = "Enter the code you received.", messageType = ToastKind.ERROR) }
         return
     }
     launchBusy {

@@ -77,6 +77,10 @@ stops receiving updates.
 
 Needs JDK 17 and Android Studio Meerkat or newer.
 
+## Wording
+
+Every user-facing string follows one page of rules: **[docs/COPY.md](docs/COPY.md)**.
+
 ## Modules
 
 `:app` is the UI, workers and AutoLock. `:shared` holds the API clients, models and stores. `:uicommon` holds shared Compose components.

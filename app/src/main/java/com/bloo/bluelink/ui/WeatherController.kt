@@ -51,7 +51,7 @@ internal class WeatherController(
             }.getOrNull()
         }
         if (hit == null) {
-            state.update { it.copy(message = "Couldn't find \"$q\"") }
+            state.update { it.copy(message = "No matches for \"$q\".") }
             return@launch
         }
         val label = listOfNotNull(hit.locality ?: hit.subAdminArea, hit.adminArea)
@@ -64,7 +64,7 @@ internal class WeatherController(
     fun useDeviceLocationForWeather() = scope.launch {
         val ok = withContext(Dispatchers.IO) { settingsStore.setWeatherFromDeviceLocation() }
         if (!ok) {
-            state.update { it.copy(message = "No device location available. Try setting a place instead") }
+            state.update { it.copy(message = "No device location available. Try setting a place instead.") }
             return@launch
         }
         loadHomeWeather(force = true)

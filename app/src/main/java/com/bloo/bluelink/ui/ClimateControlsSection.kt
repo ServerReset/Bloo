@@ -55,7 +55,7 @@ internal fun ClimateControlsSection(
     onRearRight: (SeatLevel) -> Unit,
     onSaveAsPreset: () -> Unit,
 ) {
-    LockedControls(locked = locked, message = "Stop climate to change settings") {
+    LockedControls(locked = locked, message = "Stop climate to change settings.") {
         // No "Controls" heading: the pebble is already called Climate, so a heading that repeats it
         // was a word with no meaning.
 
