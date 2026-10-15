@@ -383,12 +383,26 @@ jobs:
         with:
           name: play-bundles
 
-      # Print what actually arrived. download-artifact recreates the paths the upload had, so these are
-      # NOT the bare filenames -- which is how the first version of this job failed with "unable to find
-      # any release file matching app-play-release.aab". A step that lists them makes that obvious in one
-      # line instead of one more round trip.
-      - name: List what arrived
-        run: find . -name '*.aab' -printf '%p  %s bytes\n' | sort
+      # Put the bundle where the upload expects it, wherever the artifact left it.
+      #
+      # download-artifact recreates the path structure of what was uploaded: one file lands at the
+      # root, two files land with the whole tree. That is how this job failed three times with
+      # "unable to find any release file matching <path>" -- twice with a path that was right for the
+      # other shape. Finding it and copying it removes the guessing, prints what it found, and fails
+      # with a sentence that says what is wrong instead of a filename that looks wrong.
+      - name: Collect the bundle
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          found=$(find . -name 'app-play-release.aab' -not -path './release/*')
+          echo "found: ${found:-nothing}"
+          if [ -z "$found" ]; then
+            echo "::error::the phone bundle is not in this artifact"
+            find . -name '*.aab' -printf '  %p\n'
+            exit 1
+          fi
+          cp $found release/
+          ls -la release
 
       - name: Upload to Google Play
         uses: r0adkll/upload-google-play@v1
@@ -405,7 +419,7 @@ jobs:
           # factor rather than one release holding both, which is a different shape of API call than
           # this action makes. That is the next piece of work, not a flag, and it is not worth stalling
           # the phone path behind it.
-          releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab
+          releaseFiles: release/app-play-release.aab
           # EVERY push goes to internal testing, so there is always a build on a phone that is minutes
           # old. Only a `major-N` tag goes to the closed track: that is the one the
           # 12-testers-for-14-days clock runs on, and it should hold releases rather than every push.
