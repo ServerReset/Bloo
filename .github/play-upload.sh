@@ -76,7 +76,11 @@ edit="$(printf '%s' "$edit_out" | jq -r .id)"
 echo "edit $edit"
 
 # One bundle upload per file, collecting the version code Play assigns to each.
-codes=()
+# Per FORM FACTOR, because those are separate tracks: Play prefixes form-factor track ids, e.g.
+# "wear:production". That prefix is the whole answer -- one release per track, one track per form
+# factor. The phone bundle is "app-play-release.aab", the watch one "wear-play-release.aab", and the
+# filenames are what say which is which.
+phone_codes=(); wear_codes=()
 for f in "${FILES[@]}"; do
   echo "uploading $(basename "$f")"
   resp="$(curl -sS -X POST "${auth[@]}" -H "Content-Type: application/octet-stream" \
@@ -88,8 +92,30 @@ for f in "${FILES[@]}"; do
   fi
   code="$(printf '%s' "$body" | jq -r .versionCode)"
   echo "  -> versionCode $code"
-  codes+=("$code")
+  case "$(basename "$f")" in
+    wear-*) wear_codes+=("$code") ;;
+    *)      phone_codes+=("$code") ;;
+  esac
 done
+codes=("${phone_codes[@]}")
+
+# assign one release, with its own version codes, to one track
+assign() {
+  local track="$1"; shift
+  local codes_json rel payload
+  codes_json="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
+  rel="$(jq -c -n --arg status "$STATUS" --argjson codes "$codes_json" '{status: $status, versionCodes: $codes}')"
+  payload="$(jq -c -n --arg track "$track" --argjson rel "$rel" '{track: $track, releases: [$rel]}')"
+  echo; echo "--- $track <- $(printf '%s,' "$@" | sed 's/,$//')"
+  echo "  $payload"
+  local out
+  out="$(call PUT "$api/edits/$edit/tracks/$track" -d "$payload")" || {
+    echo "::error::could not assign to '$track'"
+    [ -n "${out:-}" ] && echo "$out" >&2
+    exit 1
+  }
+  printf '%s' "$out" | jq -r '.releases[]? | "  release: status=\(.status) versionCodes=\((.versionCodes // [])|join(","))"' || true
+}
 
 # THE FIRST BUNDLE IS THE ONE THAT GETS RELEASED. The rest are uploaded and left in the store's bundle
 # library for the console.
@@ -113,17 +139,11 @@ fi
 IFS=',' read -ra LIST <<< "$TRACKS"
 for t in "${LIST[@]}"; do
   track="$(echo "$t" | xargs)"
-  echo; echo "--- assigning ${#codes[@]} release(s) to '$track'"
-  payload="$(jq -c -n --arg track "$track" --argjson rel "$release_json" '{track: $track, releases: [$rel]}')"
-  echo "  $payload"
-  if ! out="$(call PUT "$api/edits/$edit/tracks/$track" -d "$payload" 2>&1)"; then
-    # A failure here is worth reading rather than retrying: it is the shape Play objects to, or the
-    # draft-app rule, or a version code it already has.
-    echo "$out" | head -20
-    echo "::error::could not assign to '$track'"
-    exit 1
+  assign "$track" "${phone_codes[@]}"
+  if [ "${#wear_codes[@]}" -gt 0 ]; then
+    # The watch's own form factor track. Play creates it on first write.
+    assign "wear:$track" "${wear_codes[@]}"
   fi
-  printf '%s' "$out" | jq -r '.releases[]? | "  release: status=\(.status) versionCodes=\((.versionCodes // [])|join(","))"' || true
 done
 
 echo; echo "--- committing"
@@ -144,14 +164,20 @@ IFS=',' read -ra VERIFY_TRACKS <<< "$TRACKS"
 ok=1
 for t in "${VERIFY_TRACKS[@]}"; do
   track="$(echo "$t" | xargs)"
-  seen="$(call GET "$api/edits/$verify_edit/tracks/$track" | jq -r '[(.releases // [])[] | (.versionCodes // [])[]] | join(",")')"
-  echo "  $track now holds: ${seen:-<nothing>}"
-  for c in "${codes[@]}"; do
-    case ",$seen," in
-      *",$c,"*) ;;
-      *) echo "::error::$track does NOT hold version code $c -- the commit did not take"; ok=0 ;;
-    esac
-  done
+  check_track() {
+    local tr="$1"; shift
+    local seen
+    seen="$(call GET "$api/edits/$verify_edit/tracks/$tr" | jq -r '[(.releases // [])[] | (.versionCodes // [])[]] | join(",")')"
+    echo "  $tr now holds: ${seen:-<nothing>}"
+    for c in "$@"; do
+      case ",$seen," in
+        *",$c,"*) ;;
+        *) echo "::error::$tr does NOT hold version code $c -- the commit did not take"; ok=0 ;;
+      esac
+    done
+  }
+  check_track "$track" "${phone_codes[@]}"
+  [ "${#wear_codes[@]}" -gt 0 ] && check_track "wear:$track" "${wear_codes[@]}"
 done
 call DELETE "$api/edits/$verify_edit" >/dev/null || true
 [ "$ok" = "1" ] || exit 1
