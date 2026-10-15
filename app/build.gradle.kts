@@ -311,9 +311,9 @@ dependencies {
 
     // Play-free watch install: the phone pairs with the watch's Wireless debugging and sideloads
     // the watch APK (see WatchAdbInstaller). Conscrypt supplies TLS 1.3 below Android 10.
-    implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
-    implementation("org.conscrypt:conscrypt-android:2.5.3")
-    implementation("org.bouncycastle:bcpkix-jdk15to18:1.81")
+    "sideloadImplementation"("com.github.MuntashirAkon:libadb-android:3.1.1")
+    "sideloadImplementation"("org.conscrypt:conscrypt-android:2.5.3")
+    "sideloadImplementation"("org.bouncycastle:bcpkix-jdk15to18:1.81")
 
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")

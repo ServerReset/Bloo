@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -25,7 +26,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.UpdateApi
 import com.bloo.bluelink.data.WorkflowRun
 import com.bloo.bluelink.wear.PhoneWatchSyncService
-import com.bloo.bluelink.wear.WatchAdbInstaller
+import com.bloo.bluelink.wear.WatchInstall
+import com.bloo.bluelink.wear.newWatchInstaller
 import com.bloo.bluelink.wear.WatchPresence
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -46,6 +48,41 @@ private enum class WatchSetupStep { Prepare, Pair, Install, Done }
 @Composable
 internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    // The Play build has no phone-side installer at all: the ADB library is not in the APK, and neither
+    // are the permissions it needs. It does not want one either. On Play a paired watch gets Bloo from
+    // the Play Store by itself, and the release APK this dialog would otherwise push is signed with the
+    // sideload key, which a Play-signed watch app cannot accept. So the Play build shows the Play path.
+    if (com.bloo.bluelink.BuildConfig.PLAY_DISTRIBUTION) {
+        GlassAlertDialog(
+            onDismissRequest = onDismiss,
+            icon = Icons.Filled.Watch,
+            title = "Set up watch",
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                    BodyMediumText("Google Play installs Bloo on your watch.")
+                    BodySmallText(
+                        "Pair the watch in the Wear OS app first, then install Bloo on it from the Play " +
+                            "Store. On this phone it will appear under \"Apps on your devices\".",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            buttons = {
+                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
+                    SafeMorphTextButton("Close", onClick = onDismiss)
+                    MorphActionButton(
+                        label = "Play Store",
+                        icon = Icons.AutoMirrored.Filled.OpenInNew,
+                        onClick = {
+                            openUrl(context, "https://play.google.com/store/apps/details?id=" + context.packageName)
+                        },
+                        emphasis = ButtonEmphasis.Confirm,
+                    )
+                }
+            },
+        )
+        return
+    }
     val scope = rememberCoroutineScope()
     val watch by WatchPresence.watch.collectAsStateWithLifecycle()
     var update by remember { mutableStateOf<WorkflowRun?>(null) }
@@ -54,9 +91,9 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
 
     // The ADB key pair is made up fresh for this setup (RSA keygen, so off the main thread) and
     // dropped with the dialog.
-    var installer by remember { mutableStateOf<WatchAdbInstaller?>(null) }
+    var installer by remember { mutableStateOf<WatchInstall?>(null) }
     LaunchedEffect(Unit) {
-        installer = withContext(Dispatchers.Default) { runCatching { WatchAdbInstaller() }.getOrNull() }
+        installer = withContext(Dispatchers.Default) { newWatchInstaller() }
     }
 
     // Prefetched watch APK: downloaded in the background while the user is still pairing.

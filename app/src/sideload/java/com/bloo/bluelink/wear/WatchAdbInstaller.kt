@@ -21,7 +21,7 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
  * Installs the watch app from the phone without Google Play, over the watch's own Wireless
  * debugging.
  */
-internal class WatchAdbInstaller : AbsAdbConnectionManager() {
+internal class WatchAdbInstaller : AbsAdbConnectionManager(), WatchInstall {
     private val privateKey: PrivateKey
     private val certificate: Certificate
 
@@ -56,12 +56,12 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
      * Pair with the watch using the address, port and six-digit code on its "Pair new device"
      * screen.
      */
-    suspend fun pairWith(host: String, port: Int, code: String): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun pairWith(host: String, port: Int, code: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching { check(pair(host.trim(), port, code.trim())) { "The watch refused the code" } }
     }
 
     /** Connect to the watch's main Wireless debugging address, after [pairWith]. */
-    suspend fun connectTo(host: String, port: Int): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun connectTo(host: String, port: Int): Result<Unit> = withContext(Dispatchers.IO) {
         var last: Throwable? = null
         repeat(3) { attempt ->
             val result = runCatching {
@@ -80,7 +80,7 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
         )
     }
 
-    suspend fun download(url: String, onProgress: (Float) -> Unit = {}): Result<ByteArray> = withContext(Dispatchers.IO) {
+    override suspend fun download(url: String, onProgress: (Float) -> Unit): Result<ByteArray> = withContext(Dispatchers.IO) {
         runCatching {
             // The app's one shared OkHttp stack (ApiHttp), not a throwaway client per call -- same
             // connection pooling and timeouts every other network call uses.
@@ -122,7 +122,7 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
      * not report success -- the two use different code paths on the device, so a truncated-stream
      * failure on one can succeed on the other.
      */
-    suspend fun install(apk: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun install(apk: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             // Streaming a multi-MB APK over the watch's ADB pipe can break mid-write ("broken pipe")
             // when the watch drops the shell early; the two install paths use different device code,
@@ -173,7 +173,7 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
      * port is not left listening. Harmless if the setting doesn't exist -- the caller still shows the
      * manual reminder.
      */
-    suspend fun disableWirelessDebugging(): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun disableWirelessDebugging(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             openStream("shell:settings put global adb_wifi_enabled 0").use { it.openInputStream().readBytes() }
             Unit
