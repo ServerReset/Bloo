@@ -44,9 +44,17 @@ fun AppViewModel.setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolo
     }
 }
 
+/**
+ * Whether any OTHER car already has AutoLock configured. The prerequisites the first-car setup asks
+ * for are app-wide -- a permission, the background exemption, a hidden watcher notification -- so they
+ * are asked once, on the first car that turns AutoLock on, and every car after that goes straight to
+ * the settings.
+ */
+suspend fun AppViewModel.autoLockConfiguredElsewhere(vin: String): Boolean =
+    settingsStore.allAutoLockConfigs().any { (other, config) -> other != vin && config.isUsable }
+
 /** Re-attaches the low-power Bluetooth watcher when the app returns to the foreground. */
-fun AppViewModel.ensureAutoLockWatcher() {
-    viewModelScope.launch {
+fun AppViewModel.ensureAutoLockWatcher() {    viewModelScope.launch {
         val entry = settingsStore.allAutoLockConfigs().entries.firstOrNull { it.value.enabled }
             ?: return@launch
         runCatching {
