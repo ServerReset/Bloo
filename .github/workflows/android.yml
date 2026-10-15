@@ -169,7 +169,7 @@ jobs:
       # written into release_notes.md ourselves, is what UpdateApi actually
       # reads as this build's patch notes.
       - name: Generate changelog
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref_type == 'branch'
         run: |
           git fetch --tags --quiet
           prev_tag=$(git tag -l 'build-*' | sed 's/^build-//' | sort -n | tail -1)
@@ -233,6 +233,7 @@ jobs:
       # tap Update on their own, this is the only place that can tell them why before it happens.
       - name: Pick the release title
         id: title
+        if: github.event_name == 'push' && github.ref_type == 'branch'
         run: |
           echo "title=Build #${{ github.run_number }} · reinstall if the update won't install" >> "$GITHUB_OUTPUT"
 
@@ -261,9 +262,14 @@ jobs:
           releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab
           track: alpha
           status: completed
+      # Branch pushes only. A `major-N` tag build gets its GitHub release from the branch push that
+      # preceded it -- the same commit, published moments earlier -- and creating one from a TAG push
+      # is what GitHub refuses: `Resource not accessible by integration`, reproducibly, on every tag,
+      # while the identical call on a branch works. That refusal used to take the Play upload down
+      # with it. A tag run now does exactly one thing: publish to Play.
       - name: Publish build as a GitHub Release (direct APK downloads)
         id: release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref_type == 'branch'
         uses: softprops/action-gh-release@v2
         with:
           draft: true
@@ -343,7 +349,7 @@ jobs:
     # new build at all. A build that compiled and passed R8 is worth shipping; a slow emulator says
     # nothing about it either way.
     needs: [build]
-    if: always() && github.event_name == 'push' && needs.build.result == 'success'
+    if: always() && github.event_name == 'push' && github.ref_type == 'branch' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Publish the release
