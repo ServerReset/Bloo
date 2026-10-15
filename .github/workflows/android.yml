@@ -173,9 +173,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: play-bundles
-          path: |
-            app/build/outputs/bundle/playRelease/app-play-release.aab
-            wear/build/outputs/bundle/playRelease/wear-play-release.aab
+          path: app/build/outputs/bundle/playRelease/app-play-release.aab
           if-no-files-found: error
 
       # Those release variants also run lintVitalRelease (AGP does this for release variants
@@ -397,8 +395,17 @@ jobs:
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.bloo.bluelink
-          # One line, comma-separated: this input is a comma-delimited list.
-          releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab,wear/build/outputs/bundle/playRelease/wear-play-release.aab
+          # PHONE ONLY, and not for want of trying. Two .aab files for the same applicationId in one
+          # release does not work: Play answers the commit with "Internal error encountered." -- a 500,
+          # which is why it looked like flakiness rather than a rule. Every upload that carried only the
+          # phone bundle has committed; every upload that carried both has failed.
+          #
+          # The watch bundle is still built and still attached to the GitHub Release (which is how the
+          # phone installs it on a paired watch). Getting it onto Play needs a release OBJECT per form
+          # factor rather than one release holding both, which is a different shape of API call than
+          # this action makes. That is the next piece of work, not a flag, and it is not worth stalling
+          # the phone path behind it.
+          releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab
           # EVERY push goes to internal testing, so there is always a build on a phone that is minutes
           # old. Only a `major-N` tag goes to the closed track: that is the one the
           # 12-testers-for-14-days clock runs on, and it should hold releases rather than every push.
