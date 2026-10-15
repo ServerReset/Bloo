@@ -105,10 +105,16 @@ if [ "${PLAY_INSPECT:-false}" = "true" ]; then
       "      status=\(.status // "?")  versionCodes=\((.versionCodes // [])|join(","))  name=\(.name // "")  rollout=\(.userFraction // "n/a")" )'
   # Country availability is read-only in the API, but an app with no countries selected cannot roll a
   # release out at all, and the error it produces does not say so. Worth printing either way.
+  # Neither of these is reliable through the API (country availability answers with something that is
+  # not JSON here, and the testers endpoint only reports Google Groups, never an email list) -- so print
+  # whatever comes back, verbatim, and carry on. A diagnostic must not fail the run it is diagnosing,
+  # and it must not swallow the answer either: those are two different mistakes and this is neither.
   echo "  country availability (a release cannot roll out to nowhere):"
-  call GET "$api/edits/$edit_id/countryavailability" | jq -c .
-  echo "  testers (the API only reports Google Groups; an email list shows as nothing here):"
-  call GET "$api/edits/$edit_id/testers" | jq -c .
+  call GET "$api/edits/$edit_id/countryavailability" 2>&1 | head -c 400 || echo "    (unavailable via the API)"
+  echo
+  echo "  testers (Google Groups only; an email list shows as nothing here):"
+  call GET "$api/edits/$edit_id/testers" 2>&1 | head -c 300 || echo "    (unavailable via the API)"
+  echo
   echo "  app details (what Play considers setup):"
   call GET "$api/edits/$edit_id/details" | jq -r '
     "      defaultLanguage=\(.defaultLanguage // "MISSING")  contactEmail=\(.contactEmail // "MISSING")  contactWebsite=\(.contactWebsite // "-")  contactPhone=\(.contactPhone // "-")"' || true
