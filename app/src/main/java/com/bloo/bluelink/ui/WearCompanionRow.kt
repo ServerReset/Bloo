@@ -145,7 +145,7 @@ internal fun DriveSyncSetupDialog(
             DriveSyncChoiceRow(
                 icon = Icons.Filled.FileOpen,
                 title = "Open from Drive",
-                subtitle = "Join the file another device set up to share settings.",
+                subtitle = "Use the file another device already set up.",
                 emphasized = hasExistingSync,
                 onClick = onOpenFromDrive,
             )

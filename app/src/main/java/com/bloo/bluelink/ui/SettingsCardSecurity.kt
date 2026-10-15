@@ -132,7 +132,7 @@ internal fun AppLockRow(state: UiState, appearance: SettingsStore.Appearance, vm
                     showBiometricPrompt(
                         activity = activity,
                         title = "Enable biometric lock",
-                        subtitle = "Confirm to require it on launch",
+                        subtitle = "Confirm to require it when opening Bloo",
                         onSuccess = {
                             vm.setBiometricLock(true)
                             vm.setLockTiming(timing)

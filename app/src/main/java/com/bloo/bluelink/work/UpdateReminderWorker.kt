@@ -52,7 +52,7 @@ class UpdateReminderWorker(context: Context, params: WorkerParameters) : Corouti
             Notifications.post(
                 ctx,
                 id = NOTIF_ID,
-                title = "Reminder: Bloo update available",
+                title = "Bloo update available",
                 text = (run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${run.runNumber}") +
                     ". Open Bloo to download and install.",
                 channelId = Notifications.CHANNEL_UPDATES,
