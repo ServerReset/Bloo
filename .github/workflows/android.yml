@@ -4,8 +4,12 @@ on:
   push:
     branches: [ "**" ]
     # A `major-N` tag is the one thing that publishes to Google Play (see the upload step below).
-    # Pushing one also builds and releases on GitHub like any other push, which is deliberate: the
-    # sideload users get the same build, by the same route they always have.
+    #
+    # A tag does NOT create a GitHub release of its own, and that is deliberate rather than an
+    # oversight (see the publish job's `ref_type == 'branch'`). A tag points at a commit that was
+    # already pushed to a branch, and that push already published the release for it -- so a tag
+    # release would be a second copy of the same APKs under a second name, which is worse than
+    # nothing for anyone browsing the releases list.
     tags: [ "major-*" ]
   pull_request:
   # A manual run builds exactly what a push does, and can additionally hand the bundle to a Play track
