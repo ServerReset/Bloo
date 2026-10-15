@@ -71,6 +71,21 @@ call GET "$api/edits/$edit_id/listings" | jq -r '.listings[]? | "  \(.language):
 language="$(call GET "$api/edits/$edit_id/listings" | jq -r '.listings[0].language // "en-US"')"
 echo "  editing language: $language"
 
+# --- INSPECT mode: report what Play actually holds, then leave without changing anything -----------
+# Written because the CI said "Finished uploading to the Play Store" and the console showed nothing new.
+# When the two disagree, believe neither: list the tracks and the releases on them and read those.
+if [ "${PLAY_INSPECT:-false}" = "true" ]; then
+  echo; echo "--- INSPECT: what Play currently holds"
+  call GET "$api/edits/$edit_id/tracks" | jq -r '
+    .tracks[]? | "  track \(.track)", ( (.releases // [])[] |
+      "      status=\(.status // "?")  versionCodes=\((.versionCodes // [])|join(","))  name=\(.name // "")  rollout=\(.userFraction // "n/a")" )'
+  echo
+  echo "  (an empty release list above means the track exists but holds no release)"
+  call DELETE "$api/edits/$edit_id" >/dev/null || true
+  echo "  edit abandoned; nothing was changed"
+  exit 0
+fi
+
 echo; echo "--- replacing images (the API appends, so each type is emptied first)"
 image_type_for() {
   case "$1" in

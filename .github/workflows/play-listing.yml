@@ -17,6 +17,10 @@ on:
         description: "Rehearse everything but commit nothing (the listing is untouched)"
         type: boolean
         default: true
+      inspect_only:
+        description: "Just list the Play tracks and what is on them, and change nothing"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,4 +49,5 @@ jobs:
       - name: Push the listing
         env:
           PLAY_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          PLAY_INSPECT: ${{ inputs.inspect_only && 'true' || 'false' }}
         run: bash .github/play-listing.sh
