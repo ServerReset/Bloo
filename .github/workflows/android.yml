@@ -240,6 +240,20 @@ jobs:
       # Created as a DRAFT: a draft is invisible to the in-app updater, so a build that is still uploading,
       # or whose tests later fail, is never offered. The `publish` job below makes it public only once
       # the whole run has passed.
+      # The release title, built in a shell step rather than inline. It has to read "Build #2945",
+      # and a `#` INSIDE a ${{ }} expression is a comment character to GitHub's expression lexer: it
+      # swallowed the rest of the string literal, the expression never closed, and the whole workflow
+      # failed to parse -- the run was created and instantly failed with no jobs at all. Here the #
+      # lives in a shell string, where it is just a character.
+      - name: Pick the release title
+        id: title
+        run: |
+          if [ "${{ inputs.legacy_signing }}" = "true" ]; then
+            echo "title=Build #${{ github.run_number }} — final for this signing key" >> "$GITHUB_OUTPUT"
+          else
+            echo "title=Build #${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish build as a GitHub Release (direct APK downloads)
         id: release
         if: github.event_name == 'push' || inputs.legacy_signing
@@ -248,7 +262,7 @@ jobs:
           draft: true
           target_commitish: ${{ github.sha }}
           tag_name: build-${{ github.run_number }}
-          name: ${{ inputs.legacy_signing && format('Build #{0} — final for this signing key', github.run_number) || format('Build #{0}', github.run_number) }}
+          name: ${{ steps.title.outputs.title }}
           body_path: release_notes.md
           files: |
             app/build/outputs/apk/sideload/release/Bloo.apk
