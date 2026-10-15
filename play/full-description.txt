@@ -1,0 +1,26 @@
+Bloo is a fast, modern client for your car's Bluelink / Connected Car service — built for people who open the app to do one thing and want it done.
+
+<b>Everything you actually use, one swipe away</b>
+Your cars sit side by side: swipe between them and everything is on one scrolling page. Lock and unlock, start the climate, watch a charge, flash the lights, sound the horn. No menus, no loading screens in the way.
+
+<b>Live status at a glance</b>
+Lock state, charge and range, fuel, tyre pressures, doors and windows, odometer, and where the car is parked — pulled fresh each time you look, with the last update time always visible so you know how current it is.
+
+<b>A home screen widget that earns its place</b>
+Resize it from a small square up to a full panel. Show status, and put the controls you actually use on it — lock, climate, charge, lights. Every size is laid out properly, not just scaled.
+
+<b>On your wrist</b>
+A companion watch app with the same status and the same remote commands, plus a tile for the carousel. Your phone is not needed in your hand.
+
+<b>Made to be used every day</b>
+• Search across your settings, cars and commands
+• Alerts for charge, climate and lock events
+• AutoLock: lock your cars automatically when you walk away
+• PIN or biometric app lock, so your car keys are not in an unlocked app
+• Light and dark themes, and a widget and watch that match
+
+<b>Your account stays yours</b>
+Bloo talks to your car's own service with your own account, and stores those credentials encrypted on your device using the Android Keystore. There is no Bloo server, no analytics and no advertising — nothing is sent anywhere except the manufacturer's own service. Read the full policy at https://serverreset.github.io/Bloo/privacy.html
+
+<b>An independent app</b>
+Bloo is not affiliated with, endorsed by, or operated by Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries. Bluelink and Connected Car are their services; Bloo is a client for them.

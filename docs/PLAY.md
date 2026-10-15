@@ -116,7 +116,9 @@ release".
 
 ## 5. The store listing (you)
 
-Required before the app can go beyond internal testing:
+Required before the app can go beyond internal testing. The icon, feature graphic, screenshots and
+description text are all in **`play/`** — see `play/README.md` for the two format rules Play enforces
+(8 bits per channel, and no alpha on screenshots; both bit the last set of captures).
 
 - **App icon** — 512×512 PNG, 32-bit, no alpha.
 - **Feature graphic** — 1024×500 PNG or JPEG.
