@@ -223,10 +223,22 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
             ) {
                 Column {
                     Spacer(Modifier.height(GapGroup))
-                    // Both update sources share one row: the in-app checker (primary) and the
-                    // GitHub Releases page (works when the checker says up-to-date or GitHub's API
-                    // is flaky).
-                    ActionRow {
+                    // Which update row this is depends on how the app was distributed, and nothing
+                    // the user can do here changes that. A Play copy is updated by Play and cannot be
+                    // handed an APK, so the row is the store page. This one is updated by the app
+                    // itself, so it gets both sources: the CI checker (primary) and the GitHub
+                    // Releases page, which works when the checker says up-to-date or its API is flaky.
+                    if (com.bloo.bluelink.BuildConfig.PLAY_DISTRIBUTION) {
+                        BodySmallText("Google Play keeps this copy up to date.")
+                        Spacer(Modifier.height(GapHairline))
+                        SafeMorphTextButton(
+                            "Play Store",
+                            onClick = {
+                                openUrl(context, "https://play.google.com/store/apps/details?id=" + context.packageName)
+                            },
+                            icon = Icons.AutoMirrored.Filled.OpenInNew,
+                        )
+                    } else ActionRow {
                         SafeMorphTextButton(
                             "Check",
                             onClick = { vm.checkForUpdateManually() },
@@ -247,12 +259,15 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     // The Shizuku row is gated on Shizuku being present; the card and update
                     // controls are not. When it is NOT present, point the user at how to get it --
                     // silently hiding the whole seamless-install option left no way to discover it.
+                    // Neither branch in a Play build: it has no Shizuku and cannot self-install, so
+                    // the prompt to go and get Shizuku -- which is what this rendered, since
+                    // shizukuAvailable is false there -- was advice that led nowhere.
                     if (state.shizukuAvailable) {
                         Spacer(Modifier.height(GapHairline))
                         ToggleRow("Install seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
                             vm.setSeamlessInstallShizuku(it)
                         }
-                    } else {
+                    } else if (!com.bloo.bluelink.BuildConfig.PLAY_DISTRIBUTION) {
                         Spacer(Modifier.height(GapHairline))
                         BodySmallText(
                             "Update without tapping through Android's installer. " +
