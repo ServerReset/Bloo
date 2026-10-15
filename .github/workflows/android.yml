@@ -236,20 +236,11 @@ jobs:
         run: |
           echo "title=Build #${{ github.run_number }} · reinstall if the update won't install" >> "$GITHUB_OUTPUT"
 
-      - name: Publish build as a GitHub Release (direct APK downloads)
-        id: release
-        if: github.event_name == 'push'
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          target_commitish: ${{ github.sha }}
-          tag_name: build-${{ github.run_number }}
-          name: ${{ steps.title.outputs.title }}
-          body_path: release_notes.md
-          files: |
-            app/build/outputs/apk/sideload/release/Bloo.apk
-            wear/build/outputs/apk/release/Bloo-watch.apk
-
+      # The Play upload comes BEFORE the GitHub release on purpose. It used to come after, and a
+      # 403 from GitHub's release API -- which is what actually happened on the first major-2 run --
+      # failed the job one step short of this one, so nothing reached Play and the closed-testing
+      # track stayed empty. Publishing the version people test is not allowed to depend on a release
+      # page being created.
       # Google Play, and ONLY from a `major-N` tag: an ordinary push is a CI build, and a build is
       # not a release. This is the whole trigger.
       #
@@ -270,6 +261,20 @@ jobs:
           releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab
           track: alpha
           status: completed
+      - name: Publish build as a GitHub Release (direct APK downloads)
+        id: release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          target_commitish: ${{ github.sha }}
+          tag_name: build-${{ github.run_number }}
+          name: ${{ steps.title.outputs.title }}
+          body_path: release_notes.md
+          files: |
+            app/build/outputs/apk/sideload/release/Bloo.apk
+            wear/build/outputs/apk/release/Bloo-watch.apk
+
 
   # Runs the app for real: boots an emulator and runs the instrumented tests in
   # app/src/androidTest -- layouts measured, gestures performed, the launch actually happening.
