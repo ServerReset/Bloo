@@ -105,12 +105,10 @@ if [ "${PLAY_INSPECT:-false}" = "true" ]; then
       "      status=\(.status // "?")  versionCodes=\((.versionCodes // [])|join(","))  name=\(.name // "")  rollout=\(.userFraction // "n/a")" )'
   # Country availability is read-only in the API, but an app with no countries selected cannot roll a
   # release out at all, and the error it produces does not say so. Worth printing either way.
-  echo "  country availability:"
-  call GET "$api/edits/$edit_id/countryavailability" | jq -r '
-    "      " + (if ((.countryTargeting.countries // []) | length) == 0
-             then "NONE SELECTED (a release cannot roll out without them)"
-             else (((.countryTargeting.countries | length) | tostring) + " selected") end)
-    + (if .countryTargeting.restOfWorld then " + rest of world" else "" end)' || true
+  echo "  country availability (a release cannot roll out to nowhere):"
+  call GET "$api/edits/$edit_id/countryavailability" | jq -c .
+  echo "  testers (the API only reports Google Groups; an email list shows as nothing here):"
+  call GET "$api/edits/$edit_id/testers" | jq -c .
   echo "  app details (what Play considers setup):"
   call GET "$api/edits/$edit_id/details" | jq -r '
     "      defaultLanguage=\(.defaultLanguage // "MISSING")  contactEmail=\(.contactEmail // "MISSING")  contactWebsite=\(.contactWebsite // "-")  contactPhone=\(.contactPhone // "-")"' || true
