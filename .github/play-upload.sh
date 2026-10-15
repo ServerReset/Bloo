@@ -120,14 +120,38 @@ IFS=',' read -ra LIST <<< "$TRACKS"
 phone_tracks=()
 for t in "${LIST[@]}"; do phone_tracks+=("$(echo "$t" | xargs)"); done
 
-# Create a form-factor track that does not exist yet. Play does not create one just because a bundle of
-# that form factor was uploaded: the write is what brings it into being, and the write is refused first
+# Create a form-factor track that does not exist yet. Play does not make one just because a bundle of
+# that form factor was uploaded: a write is what brings it into being, and the first write is refused
 # with "Track not found: wear:internal". So the order has to be create, then write.
+#
+# Creating takes a TrackConfig, NOT a Track, per Play's own discovery document:
+#
+#   track       Required. Identifier of the new track.
+#   type        Required. TRACK_TYPE_UNSPECIFIED | CLOSED_TESTING
+#   formFactor  Required. FORM_FACTOR_UNSPECIFIED | DEFAULT | WEAR | AUTOMOTIVE
+#
+# and `type` documents "the only supported value is closedTesting". That one sentence settles the rest:
+# the API can create a closed-testing form-factor track (wear:alpha) and nothing else. An
+# internal-testing one (wear:internal) cannot be made here, and this says so instead of pretending.
 ensure_track() {
-  local edit_id="$1" track="$2"
-  echo "  '$track' does not exist yet, so creating it" >&2
-  call POST "$api/edits/$edit_id/tracks" \
-    -d "$(jq -c -n --arg t "$track" '{track: $t}')" >/dev/null
+  local edit_id="$1" track="$2" base="${2#*:}" form_factor body
+  case "$track" in
+    wear:*)       form_factor="WEAR" ;;
+    automotive:*) form_factor="AUTOMOTIVE" ;;
+    *)            form_factor="DEFAULT" ;;
+  esac
+  case "$base" in
+    internal|production)
+      echo "  Play can only create CLOSED_TESTING tracks, so '$track' cannot be made by the API." >&2
+      echo "  Enabling the Wear OS form factor for this app once, in the console, is what creates it;" >&2
+      echo "  every write from here works after that." >&2
+      return 1
+      ;;
+  esac
+  echo "  '$track' does not exist yet, so creating it (formFactor=$form_factor, CLOSED_TESTING)" >&2
+  body="$(jq -c -n --arg t "$track" --arg ff "$form_factor" \
+    '{track: $t, type: "CLOSED_TESTING", formFactor: $ff}')"
+  call POST "$api/edits/$edit_id/tracks" -d "$body" >/dev/null
 }
 
 # assign one release, with its own version codes, to one track
@@ -140,16 +164,18 @@ assign_to_edit() {
   echo; echo "--- $track <- $(printf '%s,' "$@" | sed 's/,$//')"
 
   if ! out="$(call PUT "$api/edits/$edit_id/tracks/$track" -d "$payload")"; then
-    # Only a form-factor track can be missing; the phone's four always exist.
-    if [[ "$track" == *:* ]] && ensure_track "$edit_id" "$track"; then
-      out="$(call PUT "$api/edits/$edit_id/tracks/$track" -d "$payload")" || {
-        echo "::error::could not assign to '$track' even after creating it"
-        return 1
-      }
-    else
+    if [[ "$track" != *:* ]]; then
       echo "::error::could not assign to '$track'"
       return 1
     fi
+    # Only a form-factor track can be missing. Bring it into being if that is possible at all, then
+    # write once more -- the retry happens regardless, because the form factor may have been enabled by
+    # something else since the last run.
+    ensure_track "$edit_id" "$track" || true
+    out="$(call PUT "$api/edits/$edit_id/tracks/$track" -d "$payload")" || {
+      echo "::error::could not assign to '$track'"
+      return 1
+    }
   fi
 
   printf '%s' "$out" | jq -r '.releases[]? | "  release: status=\(.status) versionCodes=\((.versionCodes // [])|join(","))"' >&2 || true
@@ -228,3 +254,10 @@ else
   echo "  refuses to create the track, it has to be created once in the console, and this step then"
   echo "  keeps it up to date from here."
 fi
+
+# What the tracks look like at the end. If a wear: track shows up here that was not there at the start,
+# the form factor has been enabled, and the next run publishes the watch with no further involvement.
+echo; echo "--- tracks now"
+final_edit="$(call POST "$api/edits" | jq -r .id)"
+call GET "$api/edits/$final_edit/tracks" | jq -r '.tracks[]? | "  \(.track)"' || true
+call DELETE "$api/edits/$final_edit" >/dev/null || true
