@@ -19,8 +19,17 @@ One codebase, two artifacts, selected by a `distribution` flavor:
 | Shizuku permission | yes | **no** |
 | `applicationId` | `com.bloo.bluelink` | `com.bloo.bluelink` |
 
-They share a package name and a signing key on purpose, so a user can move between them and back
-without uninstalling.
+They share a package name on purpose, so there is one app, one listing and one version sequence.
+They do **not** share a signing certificate once Play App Signing is on — Play re-signs every uploaded
+bundle with Google's app-signing key, so a Play-installed copy and a sideloaded copy are signed by
+different keys and cannot update each other. Moving between them costs one uninstall, in whichever
+direction. (This paragraph used to claim the two could move back and forth freely. That was true while
+both were signed by the same key, and it stopped being true the day the first bundle was uploaded.)
+
+The certificate matters beyond updates: the Wear OS Data Layer only connects apps that share both the
+package name **and** the signing certificate. So there are two pairs that can talk to each other —
+{Play phone, Play watch} on Google's key, and {sideload phone, sideload watch} on the upload key — and
+crossing them fails silently. That is what the watch sitting on "Waiting for your phone…" was.
 
 **But the artifact is not the whole story.** Play will happily *update* an app that was sideloaded
 when the package name and signature match — and here they do. A copy installed from GitHub can
@@ -119,6 +128,16 @@ release".
 Required before the app can go beyond internal testing. The icon, feature graphic, screenshots and
 description text are all in **`play/`** — see `play/README.md` for the two format rules Play enforces
 (8 bits per channel, and no alpha on screenshots; both bit the last set of captures).
+
+**These are pushed from the repo, not typed into the console.** The **Play listing** workflow
+(`.github/workflows/play-listing.sh` behind it) uploads everything in `play/` through the Play
+Developer API: icon, feature graphic, phone screenshots, title and both descriptions. It runs with
+`dry_run` on by default — a dry run does the whole thing inside an uncommitted edit, which is
+invisible on the listing, so it proves the key and the permission without touching anything live.
+Turn `dry_run` off to actually publish it.
+
+To run it, the service account needs the app-level **Manage store presence** permission. "Release to
+testing tracks" covers builds only; without Manage store presence every listing call returns 403.
 
 - **App icon** — 512×512 PNG, 32-bit, no alpha.
 - **Feature graphic** — 1024×500 PNG or JPEG.

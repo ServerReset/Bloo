@@ -1,0 +1,48 @@
+name: Play listing
+
+# Pushes play/ to the Google Play store listing: the icon, the feature graphic, the phone
+# screenshots, and the title + two descriptions.
+#
+# Deliberately NOT part of the build workflow. A build publishes a new version; this edits what the
+# listing *says*, and neither should ever happen as a side effect of the other. A listing edit is a
+# deliberate act, so it has a deliberate trigger: this button.
+#
+# Needs the repo secret PLAY_SERVICE_ACCOUNT_JSON, and that service account needs the app-level
+# "Manage store presence" permission on Google Play -- "Release to testing tracks" is not enough and
+# every call will come back 403 without it. See docs/PLAY.md.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Rehearse everything but commit nothing (the listing is untouched)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  listing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Fail loudly and early: without the key the script cannot do anything, and "no key" and
+      # "Play said no" should not look the same in the log.
+      - name: Require the service-account key
+        env:
+          SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON is not set, so the listing cannot be pushed."
+            echo "See docs/PLAY.md section 2 for creating the service account."
+            exit 1
+          fi
+          printf '%s' "$SA" > "$RUNNER_TEMP/play-sa.json"
+          echo "PLAY_SERVICE_ACCOUNT_JSON_FILE=$RUNNER_TEMP/play-sa.json" >> "$GITHUB_ENV"
+
+      - name: Push the listing
+        env:
+          PLAY_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        run: bash .github/play-listing.sh
