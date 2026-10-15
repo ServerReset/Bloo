@@ -385,13 +385,20 @@ jobs:
         with:
           name: play-bundles
 
+      # Print what actually arrived. download-artifact recreates the paths the upload had, so these are
+      # NOT the bare filenames -- which is how the first version of this job failed with "unable to find
+      # any release file matching app-play-release.aab". A step that lists them makes that obvious in one
+      # line instead of one more round trip.
+      - name: List what arrived
+        run: find . -name '*.aab' -printf '%p  %s bytes\n' | sort
+
       - name: Upload to Google Play
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.bloo.bluelink
           # One line, comma-separated: this input is a comma-delimited list.
-          releaseFiles: app-play-release.aab,wear-play-release.aab
+          releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab,wear/build/outputs/bundle/playRelease/wear-play-release.aab
           # EVERY push goes to internal testing, so there is always a build on a phone that is minutes
           # old. Only a `major-N` tag goes to the closed track: that is the one the
           # 12-testers-for-14-days clock runs on, and it should hold releases rather than every push.
