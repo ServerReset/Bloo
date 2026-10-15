@@ -83,8 +83,11 @@ be — `.gitignore` blocks `*.keystore`, `*.jks` and `play-service-account.json`
 committed by accident. If you do lose it, reset the upload key in the console; Play App Signing
 means that is an inconvenience, not a disaster.
 
-Without these secrets the release build still works: it falls back to the checked-in debug key and
-produces an installable APK. It just cannot be uploaded to Play.
+**There is no fallback.** A release artifact is signed with this key or it is not signed at all — the
+build comes out unsigned, which installs nowhere and uploads nowhere, and the workflow fails before it
+even starts rather than publishing one. It used to fall back to the checked-in debug key, and that is
+exactly what produced a release signed with a certificate anyone can reproduce, and every install of
+it becoming unupdatable. A build that cannot be signed correctly fails loudly now.
 
 ---
 
@@ -177,96 +180,83 @@ Wearable Data Layer work at all, so there is one package to register, not two.
    Until you have enrolled in Play App Signing there is no second key, and registering just the
    upload key is right.
 
-**What is currently signing the sideloaded builds** — the checked-in debug key, which is what a CI
-build without the upload secrets falls back to:
+**What is currently signing the sideloaded builds** — the upload key from section 3. There is no
+fallback to anything else any more:
 
-```
-SHA-256: 1D:38:A5:28:CB:A7:1C:34:D2:B5:95:B1:60:19:DF:89:2A:EE:56:6C:57:03:7A:15:D5:B6:D7:C4:0E:59:39:B1
+```bash
+keytool -list -v -keystore bloo-upload.jks -alias bloo-upload | grep SHA256
 ```
 
-Register it **only if you keep shipping sideloaded builds signed with it** — which is the case until
-you set the upload secrets. Once CI signs with your own upload key, that is the certificate to
-register for the sideload artifact instead, and this one can be dropped.
+The checked-in debug key (`1D:38:A5:28:…`) still signs **debug** builds, which is all it is for, and
+it no longer signs anything a user can install.
 
 Note the practical consequence: **a key that changes is a key that must be re-registered.** Whatever
-you end up signing with, register that fingerprint, and if you ever rotate the key, update the
-registration — a build whose certificate is not registered will not install on certified devices,
-even by sideload.
+you sign with, register that fingerprint, and if you ever rotate the key, update the registration — a
+build whose certificate is not registered will not install on certified devices, even by sideload.
 
 ---
 
-## 8. The signing-key change, and the one-off bridge build
+## 7. The signing-key change, and why the old installs cannot update
 
 Every Bloo build published before the upload key existed was signed with the **checked-in debug
-key** (`app/debug.keystore`):
+key** — the standard Android development key, published in every copy of the SDK:
 
 ```
 SHA-256: 1D:38:A5:28:CB:A7:1C:34:D2:B5:95:B1:60:19:DF:89:2A:EE:56:6C:57:03:7A:15:D5:B6:D7:C4:0E:59:39:B1
 ```
 
-Android will not install an update signed with a different key than the installed copy. So the day
-CI started signing with the upload key, **every install that predates it stopped being updatable** —
-and the symptom is not an error message anyone can act on: the download completes and the system
-installer just says *"App not installed"*, which reads as a broken update rather than a signature
-mismatch. Nothing on the app's side can work around it; the install has to be removed.
+Android will not install an update signed with a different key than the installed copy, so the day CI
+started signing with the upload key, **every install that predates it stopped being updatable**. The
+symptom is not something anyone can act on: the download completes, the system installer says *"App
+not installed"*, and it reads as a broken build rather than a signature mismatch. Nothing on the app's
+side can work around it, and only uninstalling clears it.
 
-The bridge exists so those installs find out why. It is built by dispatching the workflow with
-`legacy_signing`:
+**That can no longer happen, because there is no signing fallback left.** A release artifact is
+signed with the upload key or it is not signed at all, and the workflow refuses to publish an
+unsigned one (see the "Require the real signing key" step). The checked-in debug key is confined to
+debug builds, and the watch module — which used to sign its releases with that same public key — uses
+the upload key too. Changing the watch's key is itself a one-time break: a watch app installed from
+an earlier build has to be uninstalled **on the watch** once before the phone can push the new one.
 
-```bash
-gh workflow run android.yml --ref <branch> -f legacy_signing=true
-```
+---
 
-which does three things differently and nothing else:
+## 8. How an install on the old key is told what to do
 
-| | ordinary build | bridge (`legacy_signing=true`) |
-|---|---|---|
-| phone release signing | upload key (when the secrets are set) | **debug key, forced** |
-| `BuildConfig.LEGACY_SIGNING` | `false` | `true` |
-| release body | the usual install steps + changelog | the migration notice |
-
-`LEGACY_SIGNING` does two things in the app: it shows the migration notice on every launch
-(`LegacySigningNotice.kt`, deliberately not dismissible-forever — the build exists to say this), and
-it makes `UpdateChecker` report up-to-date **always**, so neither the tile nor the 12-hourly worker
-ever offers a build this key could not install.
-
-It is published as the ordinary rolling release — same `build-<run>` tag, same `Bloo.apk` name —
-because that rolling release is the only channel an already-installed copy reads. That also means:
-**the bridge is only the newest build until the next push to any branch.** Once something newer
-lands, an install on the old key goes back to being offered a build that will fail, which is the
-situation it was already in. Publishing the bridge cannot make that worse; it only gives anyone who
-takes it the explanation and a working route forward.
-
-Two things do **not** need the bridge:
-
-- **The watch app.** `wear/build.gradle.kts` signs every watch release with the same checked-in debug
-  key it always has, so its key never changed and its updates are unaffected.
-- **Play.** The Play artifact is published through Play App Signing; the upload key only signs what
-  is sent there.
-
-### The rule the old installs actually apply
-
-This is what decides everything above, and it is frozen in builds that can no longer be changed:
+Those installs read the Releases list with a rule compiled into them that cannot be changed:
 
 > the newest of the 10 most recent Releases that is not a draft and not a prerelease, whose tag
 > starts with `build-`, and which carries a **ready** asset named exactly **`Bloo.apk`**
 
-Two consequences follow, and they matter more than the code that produces it:
+Two consequences, and they are why this is a text problem rather than a build problem:
 
-1. **The asset name is what selects the release.** So `Bloo.apk` can only ever mean one thing. Today
-   it is the ordinary build, which is why an old install is offered every new build and the install
-   fails on all of them: it is not being offered the bridge, it is being offered the build.
-2. **It reads only the first page — ten releases.** So a bridge that is the newest release today stops
-   being found once ten more builds have been published. By itself, a one-off bridge is a window, not
-   a terminal.
+1. **The asset name is what selects the release**, so `Bloo.apk` can only ever mean one thing — and
+   it means the ordinary build. Those installs are therefore offered every new build, and every
+   install of one fails.
+2. **Only the first page is read** — ten releases. Anything older than ten pushes is invisible to
+   them, whatever it says.
 
-Making the bridge the *permanent* thing that lineage is offered therefore means changing what
-`Bloo.apk` refers to, or changing how releases are laid out. Both are visible changes, so it is a
-deliberate decision rather than a fix — see the release notes for the option chosen.
+What does reach them is the text. The frozen code renders *our* release strings in two places, on
+every build, with nothing to maintain:
+
+| Surface | Comes from | What it says |
+|---|---|---|
+| the 12-hourly "update available" notification | the release **name** | *"Build #2950 · reinstall if the update won't install. Open Bloo to download and install."* |
+| the update tile's headline | the release **name** | the same line |
+| the update tile's "What's new" | everything after `### What's changed` | export first, uninstall, install the newest APK, sign in, restore |
+
+Both are produced in `android.yml`: the "Pick the release title" step and the "Generate changelog"
+step. The changelog paragraph is deliberately markdown-free, because that same string is the release
+page *and* the tile body, and the tile renders it verbatim.
+
+The **bridge** is the graceful path whenever it happens to be the newest release: an install on the
+old key updates in place, and the app then walks the user through the export and the reinstall with a
+button. It is published and immutable. **It can no longer be rebuilt** — the build mode that forced
+the dev key is deliberately gone, because no build from this repo may be signed with the development
+key again. If that release were ever lost, the text channel above still reaches everyone.
 
 ---
 
-## 7. The two policy points to keep in mind
+## 9. The two policy points to keep in mind
 
 - **The self-updater must not reach the Play artifact.** That is what the `play` flavor and the
   runtime check above exist for. If a future change puts `REQUEST_INSTALL_PACKAGES` back into

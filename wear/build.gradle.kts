@@ -33,15 +33,25 @@ android {
     }
 
     signingConfigs {
-        // The SAME checked-in keystore the phone app uses, so every CI build of the watch is signed
-        // with one stable key -- an unsigned release APK cannot be installed at all (the phone hands
-        // it to the watch's installer and PackageManager rejects it with NO_CERTIFICATES), and a
-        // key that changed per build would make in-place updates impossible.
+        // Debug builds only. The phone's checked-in debug keystore -- the standard Android
+        // development key, published in every copy of the Android SDK -- has no business signing
+        // anything a user installs, and a release artifact that carries it can be impersonated by
+        // anyone. See the release block below.
         getByName("debug") {
             storeFile = file("../app/debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
+        }
+        // The real key, from the environment so it is never in the repo. The watch shares the app's
+        // identity (see applicationId above), so it uses the same key.
+        System.getenv("BLOO_UPLOAD_STORE_FILE")?.let { path ->
+            create("upload") {
+                storeFile = file(path)
+                storePassword = System.getenv("BLOO_UPLOAD_STORE_PASSWORD")
+                keyAlias = System.getenv("BLOO_UPLOAD_KEY_ALIAS")
+                keyPassword = System.getenv("BLOO_UPLOAD_KEY_PASSWORD")
+            }
         }
     }
 
@@ -51,7 +61,16 @@ android {
         }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            // No fallback, deliberately: the dev key used to sign every watch release, which meant a
+            // released APK carried a certificate anyone can reproduce. Without the real key this
+            // comes out UNSIGNED, which the watch's installer rejects outright (NO_CERTIFICATES) --
+            // a visible failure instead of a quietly impersonable artifact. The workflow refuses to
+            // publish either one (see the "Require the real signing key" step in android.yml).
+            //
+            // Consequence worth knowing: this CHANGED the watch's signing key, so a watch app
+            // installed from a build before this one cannot be updated in place -- it has to be
+            // uninstalled on the watch once, and the phone re-pushes it.
+            signingConfig = signingConfigs.findByName("upload")
         }
     }
 

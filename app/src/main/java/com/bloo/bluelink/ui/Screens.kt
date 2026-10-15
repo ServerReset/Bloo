@@ -372,14 +372,11 @@ fun BlooApp(vm: AppViewModel) {
             onContinue = { vm.confirmInstallUpdate() },
         )
     }
-    // The migration bridge's notice, if this IS the migration bridge (see LegacySigningNotice and
-    // `legacySigning` in app/build.gradle.kts). Composed unconditionally-adjacent to the layer that
-    // draws dialogs, exactly as the install guide above is.
-    if (com.bloo.bluelink.BuildConfig.LEGACY_SIGNING) {
-        // The export is offered here rather than only described: uninstalling is the step that
-        // destroys the setup, so the one thing worth doing first gets a button.
-        LegacySigningNotice(onExport = { vm.exportSettings(context) })
-    }
+    // The migration bridge's notice used to live here. It, and the whole dev-key signing path that
+    // produced the build it shipped in, is gone -- that build is published and immutable, and no
+    // build from this repo may be signed with the development key again. What reaches installs on
+    // the old key now is the release text itself: see the title and changelog steps in
+    // .github/workflows/android.yml.
     // Every open dialog, above everything else.
     DialogLayer(dialogHost)
     }
