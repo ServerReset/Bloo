@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The SIDELOAD flavor's permission, and only this flavor's.
+
+  This is the watch app the phone installs over Wireless debugging, which is why it may install a
+  package at all. The Play flavor carries no installer permission: Play updates it, and
+  REQUEST_INSTALL_PACKAGES is restricted there.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+</manifest>

@@ -25,11 +25,30 @@ android {
         targetSdk = 36
         // Same as the phone: the version IS the release (the CI run number), no marketing version.
         val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
-        versionCode = runNumber.coerceAtLeast(1)
+        // UNIQUE ACROSS FORM FACTORS, and deliberately higher than the phone's. Play rejects a second
+        // artifact for the same app with a version code it already has, and this ordering is also what
+        // routes the two: on a watch both bundles are compatible, so Play serves the higher code (this
+        // build), while on a phone only this one is incompatible -- it requires the watch feature -- and
+        // the phone bundle wins. One listing, one install each, no targeting rules to maintain.
+        versionCode = 10_000_000 + runNumber.coerceAtLeast(1)
         versionName = if (runNumber > 0) "build $runNumber" else "dev"
         // Same CI run number as the phone, so the watch can tell whether the phone is
         // advertising a newer watch build than the one it is running.
         buildConfigField("int", "BUILD_RUN_NUMBER", System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+    }
+
+    /**
+     * The same split the phone app makes, for the same reason.
+     *
+     * `sideload` is the watch app the phone pushes over Wireless debugging, and it carries
+     * REQUEST_INSTALL_PACKAGES because installing that APK is the whole point of it.
+     * `play` is the watch app Google Play installs, where Play owns the update and the permission is
+     * one Play treats as restricted -- so this flavor does not have it at all.
+     */
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("sideload") { dimension = "distribution" }
+        create("play") { dimension = "distribution" }
     }
 
     signingConfigs {
@@ -93,6 +112,20 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        // The phone's in-app updater and its watch-push both match the release asset by name
+        // (UpdateApi.WATCH_ASSET_NAME), so the sideload APK must keep the name the rolling release has
+        // always attached. The Play flavor is uploaded as a bundle, so its APK name only has to differ.
+        val name = if (variant.flavorName == "play") "Bloo-watch-play.apk" else "Bloo-watch.apk"
+        variant.outputs.forEach { output ->
+            if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
+                output.outputFileName = name
+            }
+        }
     }
 }
 

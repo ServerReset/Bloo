@@ -121,6 +121,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Embed native debug symbols in the bundle. Play warned that the bundle "contains native
+            // code, and you've not uploaded debug symbols" -- a dependency brings a .so (ML Kit), and
+            // without these every native crash or ANR arrives as an unreadable stack. One line here is
+            // the whole fix: Play reads them out of the AAB.
+            ndk { debugSymbolLevel = "SYMBOL_TABLE" }
         }
     }
 

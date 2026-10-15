@@ -138,7 +138,7 @@ jobs:
           BLOO_UPLOAD_STORE_PASSWORD: ${{ secrets.BLOO_UPLOAD_STORE_PASSWORD }}
           BLOO_UPLOAD_KEY_ALIAS: ${{ secrets.BLOO_UPLOAD_KEY_ALIAS }}
           BLOO_UPLOAD_KEY_PASSWORD: ${{ secrets.BLOO_UPLOAD_KEY_PASSWORD }}
-        run: ./gradlew testSideloadDebugUnitTest testPlayDebugUnitTest assembleSideloadRelease bundlePlayRelease :wear:assembleRelease --stacktrace
+        run: ./gradlew testSideloadDebugUnitTest testPlayDebugUnitTest assembleSideloadRelease bundlePlayRelease :wear:assembleSideloadRelease :wear:bundlePlayRelease --stacktrace
 
       # The Play artifact must never carry the restricted installer permissions. It does not today --
       # verified against the merged manifest, which is also what this checks on every run. Two things
@@ -294,7 +294,13 @@ jobs:
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.bloo.bluelink
-          releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab
+          # BOTH bundles in one release: the phone app and the watch app. They share an
+          # applicationId and a listing, and Play routes them by the watch feature -- the watch bundle
+          # requires it, the phone one does not -- with the watch's higher version code settling the
+          # case where both are compatible.
+          releaseFiles: |-
+            app/build/outputs/bundle/playRelease/app-play-release.aab
+            wear/build/outputs/bundle/playRelease/wear-play-release.aab
           # `tracks`, not the deprecated `track` (the action warns about it on every run).
           tracks: ${{ inputs.play_track != '' && inputs.play_track || 'alpha' }}
           # DRAFT, and this is not a preference. Play refuses anything else here:
@@ -329,7 +335,7 @@ jobs:
           body_path: release_notes.md
           files: |
             app/build/outputs/apk/sideload/release/Bloo.apk
-            wear/build/outputs/apk/release/Bloo-watch.apk
+            wear/build/outputs/apk/sideload/release/Bloo-watch.apk
 
 
   # Runs the app for real: boots an emulator and runs the instrumented tests in

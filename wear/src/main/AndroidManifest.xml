@@ -11,7 +11,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Seamless in-watch update: the phone pushes the watch APK and the watch hands it to the
          system installer (see WatchDataListenerService). -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <uses-feature android:name="android.hardware.type.watch" />
 
