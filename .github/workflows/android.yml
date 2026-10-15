@@ -132,6 +132,25 @@ jobs:
           BLOO_UPLOAD_KEY_PASSWORD: ${{ secrets.BLOO_UPLOAD_KEY_PASSWORD }}
         run: ./gradlew testSideloadDebugUnitTest testPlayDebugUnitTest assembleSideloadRelease bundlePlayRelease :wear:assembleRelease --stacktrace
 
+      # The Play artifact must never carry the restricted installer permissions. It does not today --
+      # verified against the merged manifest, which is also what this checks on every run. Two things
+      # put them back: REQUEST_INSTALL_PACKAGES via src/main, and the Shizuku runtime permission via
+      # the provider AAR, which is exactly why src/play removes it explicitly. Both are rejections from
+      # Play rather than warnings, and this is the cheapest possible way to never find that out late.
+      #
+      # Checked on the MERGED manifest, which the bundle task above already produced -- so this costs
+      # no extra build and tests what is actually shipped, not what a source file says.
+      - name: The Play artifact carries no installer permissions
+        run: |
+          m=$(find app/build/intermediates/merged_manifests -path '*playRelease*' -name AndroidManifest.xml | head -1)
+          if [ -z "$m" ]; then echo "::error::no merged play manifest found to check"; exit 1; fi
+          echo "checking $m"
+          fail=0
+          for p in android.permission.REQUEST_INSTALL_PACKAGES moe.shizuku.manager.permission.API_V23; do
+            if grep -q "$p" "$m"; then echo "::error::$p is in the Play artifact"; fail=1; else echo "  absent: $p"; fi
+          done
+          exit $fail
+
       # Those release variants also run lintVitalRelease (AGP does this for release variants
       # only), whose FATAL-severity findings abort the build. Those reports are the one
       # diagnostic this workflow produces that cannot be reconstructed from the run
