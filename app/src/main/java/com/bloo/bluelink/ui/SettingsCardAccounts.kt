@@ -45,7 +45,7 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                 )
             }
             if (accounts.any { it.brand.requiresPin }) {
-                BodySmallText("Wrong-PIN attempts lock the service PIN for a few minutes. Fix it here if commands fail.")
+                BodySmallText("Wrong-PIN attempts lock it for a few minutes.")
             }
         }
     }

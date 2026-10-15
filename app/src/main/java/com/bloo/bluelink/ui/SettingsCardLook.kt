@@ -54,7 +54,7 @@ internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: 
                     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                         TempUnitRow(appearance, vm)
                         DistanceUnitRow(appearance, vm)
-                        BodySmallText("Auto follows the system default, so you can mix them: Celsius with miles, say.")
+                        BodySmallText("Auto follows the system default. Units mix freely.")
                     }
                 }
             }
@@ -63,7 +63,7 @@ internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: 
                 SettingsGroup("Size") { UiScaleSlider(appearance, vm) }
             }
             SettingsGroup("Welcome cards") {
-                BodySmallText("The cards you swipe through when you first open Bloo. Bring them back whenever you like.")
+                BodySmallText("The cards you swipe through on first open.")
                 SafeMorphTextButton("Show welcome cards", onClick = { vm.showWelcomeCards() }, icon = Icons.Filled.Style)
             }
         }

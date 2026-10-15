@@ -95,7 +95,7 @@ internal fun BackupSyncCardContent(
             )
 
             if (!configured) {
-                BodySmallText("Keep your settings, layout and car setup the same on every device you use, through one file in your Google Drive.")
+                BodySmallText("One file in your Google Drive, shared by every device.")
                 SafeMorphTextButton("Set up auto-sync", onClick = { showDriveDialog = true }, icon = Icons.Filled.CloudSync, emphasis = ButtonEmphasis.Confirm)
             } else {
                 SafeMorphTextButton("Sync now", onClick = { vm.syncNow() }, icon = Icons.Filled.CloudSync, emphasis = ButtonEmphasis.Confirm)

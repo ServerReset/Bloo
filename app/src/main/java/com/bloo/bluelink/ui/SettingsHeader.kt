@@ -255,8 +255,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     } else {
                         Spacer(Modifier.height(GapHairline))
                         BodySmallText(
-                            "Install Shizuku to update without tapping through Android's installer each time. " +
-                                "It runs the install as a local ADB service, no root needed.",
+                            "Update without tapping through Android's installer. " +
+                                "No root needed.",
                         )
                         Spacer(Modifier.height(GapHairline))
                         SafeMorphTextButton(

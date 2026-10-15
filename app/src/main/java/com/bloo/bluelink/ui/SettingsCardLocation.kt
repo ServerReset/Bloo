@@ -45,7 +45,7 @@ internal fun WeatherPlaceControls(appearance: SettingsStore.Appearance, vm: AppV
     }
     Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
         if (place == null) {
-            BodySmallText("\"My location\" follows your device until you set a place below.")
+            BodySmallText("Follows your device until you set a place below.")
         } else {
             IconLeadRow(
                 Icons.Filled.LocationOn,
