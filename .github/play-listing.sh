@@ -88,7 +88,7 @@ if [ "${PLAY_ROLLOUT:-false}" = "true" ]; then
   fi
   promoted="$(echo "$current" | jq -c '{track: .track, releases: [ .releases[] | if .status=="draft" then (.status="completed") else . end ] }')"
   echo "  sending: $promoted"
-  call PUT "$api/edits/$edit_id/tracks/$track" -d "$promoted" >/dev/null
+  call PUT "$api/edits/$edit_id/tracks/$track" -d "$promoted"
   call POST "$api/edits/$edit_id:commit" >/dev/null
   echo "  PROMOTED. The release is no longer a draft."
   call GET "$api/edits/$(call POST "$api/edits" | jq -r .id)/tracks/$track" 2>/dev/null | jq -r '.releases[]? | "  now: status=\(.status) versionCodes=\((.versionCodes // [])|join(","))"' || true
@@ -103,6 +103,9 @@ if [ "${PLAY_INSPECT:-false}" = "true" ]; then
   call GET "$api/edits/$edit_id/tracks" | jq -r '
     .tracks[]? | "  track \(.track)", ( (.releases // [])[] |
       "      status=\(.status // "?")  versionCodes=\((.versionCodes // [])|join(","))  name=\(.name // "")  rollout=\(.userFraction // "n/a")" )'
+  echo "  app details (what Play considers setup):"
+  call GET "$api/edits/$edit_id/details" | jq -r '
+    "      defaultLanguage=\(.defaultLanguage // "MISSING")  contactEmail=\(.contactEmail // "MISSING")  contactWebsite=\(.contactWebsite // "-")  contactPhone=\(.contactPhone // "-")"' || true
   echo
   echo "  (an empty release list above means the track exists but holds no release)"
   call DELETE "$api/edits/$edit_id" >/dev/null || true
