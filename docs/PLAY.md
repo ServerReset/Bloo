@@ -261,6 +261,32 @@ an earlier build has to be uninstalled **on the watch** once before the phone ca
 
 ---
 
+## 7b. Which build leans on what
+
+One codebase, two builds, and the rule between them: **the Play build uses Google's services where they
+are better, and the sideload build uses what is open and installable without them.** The flavor decides,
+so the two cannot drift at runtime.
+
+| | Play build | Sideload build |
+|---|---|---|
+| Updates | Play In-App Updates (`app-update-ktx`) | the CI-build check, its own installer, Shizuku |
+| Watch install | Google Play installs it on the watch | the phone sideloads it over Wireless debugging |
+| Non-SDK reflection | absent (`hiddenapibypass` is not in the artifact) | present, for the installer's `PackageInstaller` calls |
+| Maps | Google Maps (once a key is supplied) | key-free OpenStreetMap tiles, hand-rolled (`CarMap`) |
+| Location | Play services fused location | Play services fused location |
+
+Two things are deliberately the same in both:
+
+- **The AI.** Gemini Nano via ML Kit runs on-device and sends nothing anywhere. It is Google's library
+  rather than an open one, and there is no phone-sized open equivalent, so splitting it would mean
+  deleting a feature rather than replacing it. It stays in both.
+- **The watch's data link.** The Wearable Data Layer is a Google service, and replacing it means
+  Bluetooth or Wi-Fi Direct and a rewrite of everything that crosses between the two devices.
+
+And one Google service is deliberately in neither: **crash reporting.** Firebase Crashlytics would be
+the obvious pick, and it collects crash data -- which the app's privacy policy and its Play Data safety
+answers both say it does not do.
+
 ## 8. How an install on the old key is told what to do
 
 Those installs read the Releases list with a rule compiled into them that cannot be changed:
