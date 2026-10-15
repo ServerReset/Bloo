@@ -32,6 +32,14 @@ permissions:
 jobs:
   listing:
     runs-on: ubuntu-latest
+    # The SAME group as the upload, deliberately. A Play edit is single-writer per app: this job opens
+    # one to read the tracks, and an upload holding one has it invalidated underneath it -- "This edit
+    # has expired, please create a new Edit." -- which fails the upload mid-flight. It is not a
+    # hypothetical: an inspect run fired to check the tracks is what broke a real upload. Serialising
+    # them costs a queue and removes the whole class.
+    concurrency:
+      group: play-upload
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
