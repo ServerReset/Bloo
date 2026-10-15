@@ -260,8 +260,20 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.bloo.bluelink
           releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab
-          track: alpha
-          status: completed
+          # `tracks`, not the deprecated `track` (the action warns about it on every run).
+          tracks: alpha
+          # DRAFT, and this is not a preference. Play refuses anything else here:
+          #   "Only releases with status draft may be created on draft app."
+          # com.bloo.bluelink has never been published, so it is still a draft app, and on a
+          # public-facing track it will only accept a draft release. The AAB uploads perfectly either
+          # way -- it is the release object that is rejected, which is why the console showed an empty
+          # release and nothing else.
+          #
+          # What this means in practice: the build lands on the closed track as a draft, and someone
+          # clicks "Start rollout to closed testing" in the console. Once the app has gone live once
+          # (production, or any track that has been rolled out), change this back to `completed` and
+          # the upload will roll out by itself.
+          status: draft
       # Branch pushes only. A `major-N` tag build gets its GitHub release from the branch push that
       # preceded it -- the same commit, published moments earlier -- and creating one from a TAG push
       # is what GitHub refuses: `Resource not accessible by integration`, reproducibly, on every tag,
