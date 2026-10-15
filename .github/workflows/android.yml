@@ -304,7 +304,10 @@ jobs:
           # app-....aab\nwear-....aab". Both bundles were built correctly; only the format was wrong.
           releaseFiles: app/build/outputs/bundle/playRelease/app-play-release.aab,wear/build/outputs/bundle/playRelease/wear-play-release.aab
           # `tracks`, not the deprecated `track` (the action warns about it on every run).
-          tracks: ${{ inputs.play_track != '' && inputs.play_track || 'alpha' }}
+          # BOTH tracks, and rolled out rather than left as a draft. `internal` is installable
+          # regardless and is where a build can be put on a phone immediately; `alpha` is the closed test
+          # the 12-testers-for-14-days clock runs on. A manual run can still name one track.
+          tracks: ${{ inputs.play_track != '' && inputs.play_track || 'internal,alpha' }}
           # DRAFT, and this is not a preference. Play refuses anything else here:
           #   "Only releases with status draft may be created on draft app."
           # com.bloo.bluelink has never been published, so it is still a draft app, and on a
@@ -316,10 +319,12 @@ jobs:
           # clicks "Start rollout to closed testing" in the console. Once the app has gone live once
           # (production, or any track that has been rolled out), change this back to `completed` and
           # the upload will roll out by itself.
-          # `internal` will take a completed release even while Play classes the app as a draft --
-          # its release from major 1 is completed -- and a completed one is installable immediately.
-          # The public-facing closed track refuses it at commit time, so a tag keeps using draft there.
-          status: ${{ startsWith(github.ref, 'refs/tags/major-') && 'draft' || 'completed' }}
+          # Rolled out, not a draft. `internal` has always accepted `completed`; `alpha` refused it with
+          # "Only releases with status draft may be created on draft app" for as long as Play classed
+          # this app as a draft, which closing out the foreground-service declaration is what changed.
+          # If it is refusing again, this step fails and says so -- rather than quietly publishing a
+          # draft that nobody can install and that nothing announced.
+          status: completed
       # Branch pushes only. A `major-N` tag build gets its GitHub release from the branch push that
       # preceded it -- the same commit, published moments earlier -- and creating one from a TAG push
       # is what GitHub refuses: `Resource not accessible by integration`, reproducibly, on every tag,
