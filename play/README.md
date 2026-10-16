@@ -18,7 +18,11 @@ asset that exists nowhere is an asset nobody can re-upload.
 
 The Wear shot is the watch app's **own** slot (`wearScreenshots`), not a phone screenshot — Play will not
 carry a watch app without at least one image shaped for a watch, which is the same kind of per-form-factor
-requirement as the form factor itself. It is a real capture off the Wear emulator (360×360, circular),
+requirement as the form factor itself. It is a real capture off the Wear emulator, resampled from 360×360 to 384×384 because Play's floor
+is 384 on the short side and the AVD is a 360 watch -- a real size, but under it. Resampling a UI
+screenshot by 6.7% is visually indistinguishable; aspect stays exactly 1:1, which Play also checks.
+
+It was captured
 not a mock, and it shows the companion's honest state: *"Waiting for your phone…"*, because a Wear app
 with `standalone=false` has nothing to show until the phone has paired and pushed a snapshot.
 
