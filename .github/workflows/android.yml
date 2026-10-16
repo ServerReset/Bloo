@@ -464,7 +464,15 @@ jobs:
       - name: Build the Play patch notes
         run: |
           set -euo pipefail
-          prev="$(git tag -l 'build-*' | sed 's/^build-//' | sort -n | tail -1)"
+          # The previous BUILD TAG THAT IS NOT THIS COMMIT. Naively taking the newest `build-*` tag
+          # finds the one this very run created -- the release step tags HEAD before this job runs -- so
+          # `build-$prev..HEAD` was always empty and the notes came out as the build number and nothing
+          # else. 12 bytes, on every revision, looking like it worked.
+          head_sha="$(git rev-parse HEAD)"
+          prev=""
+          for n in $(git tag -l 'build-*' | sed 's/^build-//' | sort -rn); do
+            if [ "$(git rev-parse "build-$n^{commit}" 2>/dev/null)" != "$head_sha" ]; then prev="$n"; break; fi
+          done
           {
             echo "Build ${{ github.run_number }}"
             echo
@@ -474,7 +482,7 @@ jobs:
               git log --pretty=format:'- %s' -n 10
             fi
           } > "$RUNNER_TEMP/play-notes.txt"
-          echo "--- Play patch notes ($(wc -c < "$RUNNER_TEMP/play-notes.txt") bytes)"
+          echo "--- Play patch notes ($(wc -c < "$RUNNER_TEMP/play-notes.txt") bytes, since build ${prev:-none})"
           cat "$RUNNER_TEMP/play-notes.txt"
 
       - name: Upload to Google Play
