@@ -53,6 +53,8 @@ import com.bloo.bluelink.ui.SettingsGroup
 import com.bloo.bluelink.update.shizukuInstall
 import com.bloo.bluelink.update.UpdateCheckResult
 import com.bloo.bluelink.update.UpdateChecker
+import com.bloo.bluelink.update.UpdateRuntime
+import com.bloo.bluelink.ui.tryStart
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -144,6 +146,34 @@ class CrashActivity : ComponentActivity() {
     @Composable
     private fun UpdateRecoveryPanel(apkFile: File) {
         val context = LocalContext.current
+        // A copy Google Play installed, or a build with no installer in it, must not be offered a
+        // GitHub download at all. The CHECK was already guarded -- UpdateChecker.checkPhone returns
+        // UpToDate for a Play copy -- but this PANEL and its "Open GitHub instead" link were not, so a
+        // Play copy still showed a GitHub update box on every crash, with a link straight to the
+        // releases page. Same rule as SettingsHeader's card, same two questions: who installed this,
+        // and can this artifact install anything itself (see UpdateRuntime).
+        if (UpdateRuntime.fromPlayStore(context) || !UpdateRuntime.canSelfInstall) {
+            SettingsGroup("Update") {
+                Text(
+                    "Google Play keeps this copy up to date.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                MorphTextButton(
+                    "Play Store",
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        context.tryStart(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                "https://play.google.com/store/apps/details?id=${context.packageName}".toUri(),
+                            ),
+                        )
+                    },
+                )
+            }
+            return
+        }
         val scope = rememberCoroutineScope()
         var checking by remember { mutableStateOf(false) }
         var checkResult by remember { mutableStateOf<UpdateCheckResult?>(null) }

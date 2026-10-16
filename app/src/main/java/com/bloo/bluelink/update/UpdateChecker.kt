@@ -67,13 +67,12 @@ object UpdateChecker {
      *    -- the user asked to not be reminded until a later time, so a due
      *    background/cold-start check silently no-ops (also [UpdateCheckResult.Skipped])
      *    during that window too.
-     * 4. Otherwise, actually fetches the latest successful CI run for the
-     *    build's own branch (falling back to [UpdateApi.DEFAULT_BRANCH] if this
-     *    build didn't record one) via [UpdateApi.fetchLatestSuccessfulRun], and
-     *    unconditionally records "checked now" via [UpdateStore.setLastCheckedAt]
-     *    regardless of whether the fetch succeeded -- so the 1-minute debounce
-     *    above applies even after a failed attempt, rather than retrying every
-     *    call in a tight loop.
+     * 4. Otherwise, actually fetches the newest published build release via
+     *    [UpdateApi.fetchLatestSuccessfulRun], and unconditionally records "checked now" via
+     *    [UpdateStore.setLastCheckedAt] regardless of whether the fetch succeeded -- so the 1-minute
+     *    debounce above applies even after a failed attempt, rather than retrying every call in a
+     *    tight loop. (It is NOT scoped to this build's branch, and never was: the releases it reads
+     *    are not branch-scoped, so a branch parameter here was a promise the code did not keep.)
      * 5. A null result means the fetch itself failed (network/rate limit) and
      *    is reported as [UpdateCheckResult.Failed]. Otherwise the fetched run's
      *    number is compared against this build's own
@@ -103,7 +102,7 @@ object UpdateChecker {
             )
         ) return UpdateCheckResult.Skipped
 
-        val run = UpdateApi.fetchLatestSuccessfulRun(UpdateGate.resolveBranch(BuildConfig.BUILD_BRANCH))
+        val run = UpdateApi.fetchLatestSuccessfulRun()
         // Stamp unconditionally -- even a failed fetch counts against the debounce, so a
         // rate-limited call doesn't retry in a tight loop.
         store.setLastCheckedAt(now)

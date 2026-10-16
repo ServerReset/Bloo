@@ -44,9 +44,14 @@ object WearUpdateChecker {
      * as-is, so a flaky network never shows a spurious update or an error on open.
      */
     suspend fun check() {
+        // Play owns the update for a Play copy of the watch app, exactly as it does for the phone. The
+        // phone app has had this guard in three places for a while; the WATCH did not have it at all,
+        // so a Play-installed watch was offered a GitHub download -- the last surface in the app still
+        // pulling from GitHub. See the wear flavors' PLAY_DISTRIBUTION.
+        if (BuildConfig.PLAY_DISTRIBUTION) return
         if (BuildConfig.BUILD_RUN_NUMBER <= 0) return
         val run = runCatching {
-            UpdateApi.fetchLatestSuccessfulRun(UpdateApi.DEFAULT_BRANCH)
+            UpdateApi.fetchLatestSuccessfulRun()
         }.getOrNull() ?: return
         _available.value = run.takeIf {
             it.watchApkUrl != null && UpdateGate.isNewer(it, BuildConfig.BUILD_RUN_NUMBER)

@@ -108,8 +108,14 @@ object UpdateApi {
         val assets: List<ReleaseAsset> = emptyList(),
     )
 
-    /** The latest published build release (from an ordinary push), or null on any failure. */
-    suspend fun fetchLatestSuccessfulRun(branch: String): WorkflowRun? = withContext(Dispatchers.IO) {
+    /**
+     * The latest published build release (from an ordinary push), or null on any failure.
+     *
+     * Takes no branch, deliberately. It used to: the parameter implied this was scoped to the build's
+     * own branch, and it never was -- the body reads the repository's RELEASES, which are not
+     * branch-scoped at all. A caller passing a branch was reading a promise the code did not keep.
+     */
+    suspend fun fetchLatestSuccessfulRun(): WorkflowRun? = withContext(Dispatchers.IO) {
         runCatching {
             val url = "https://api.github.com/repos/$OWNER/$REPO/releases"
                 .toHttpUrl()
@@ -263,9 +269,6 @@ object UpdateGate {
 
         return false
     }
-
-    /** This build's branch, falling back to [UpdateApi.DEFAULT_BRANCH] when unstamped. */
-    fun resolveBranch(buildBranch: String): String = buildBranch.ifBlank { UpdateApi.DEFAULT_BRANCH }
 
     /** Whether [run] is strictly newer than the installed [buildRunNumber]. */
     fun isNewer(run: WorkflowRun, buildRunNumber: Int): Boolean = run.runNumber > buildRunNumber

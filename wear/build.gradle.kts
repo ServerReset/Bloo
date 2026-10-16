@@ -47,8 +47,19 @@ android {
      */
     flavorDimensions += "distribution"
     productFlavors {
-        create("sideload") { dimension = "distribution" }
-        create("play") { dimension = "distribution" }
+        create("sideload") {
+            dimension = "distribution"
+            // The same flag the phone app's flavors carry, for the same reason: the phone pushes this
+            // one, and it updates itself from the GitHub release.
+            buildConfigField("boolean", "PLAY_DISTRIBUTION", "false")
+        }
+        create("play") {
+            dimension = "distribution"
+            // Play owns the update for this one. The watch's own GitHub update checker has to stand
+            // down for it -- see WearUpdateChecker, which was offering a GitHub download on a
+            // Play-installed watch.
+            buildConfigField("boolean", "PLAY_DISTRIBUTION", "true")
+        }
     }
 
     signingConfigs {

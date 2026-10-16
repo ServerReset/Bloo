@@ -86,7 +86,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val watch by WatchPresence.watch.collectAsStateWithLifecycle()
     var update by remember { mutableStateOf<WorkflowRun?>(null) }
-    LaunchedEffect(Unit) { update = UpdateApi.fetchLatestSuccessfulRun(UpdateApi.DEFAULT_BRANCH) }
+    LaunchedEffect(Unit) { update = UpdateApi.fetchLatestSuccessfulRun() }
     val apkUrl = update?.watchApkUrl
 
     // The ADB key pair is made up fresh for this setup (RSA keygen, so off the main thread) and
