@@ -12,8 +12,19 @@ asset that exists nowhere is an asset nobody can re-upload.
 | `screenshots/02-lock.png` | Phone screenshot 2 | 1080×1920 (9:16), 8-bit RGB PNG |
 | `screenshots/03-garage-dark.png` | Phone screenshot 3 | 1080×1920 (9:16), 8-bit RGB PNG |
 | `screenshots/04-lock-dark.png` | Phone screenshot 4 | 1080×1920 (9:16), 8-bit RGB PNG |
+| `screenshots-wear/01-watch.png` | **Wear OS screenshot** | 360×360 (1:1), 8-bit RGB PNG |
 | `short-description.txt` | Short description | 80 characters or fewer |
 | `full-description.txt` | Full description | 4000 characters or fewer |
+
+The Wear shot is the watch app's **own** slot (`wearScreenshots`), not a phone screenshot — Play will not
+carry a watch app without at least one image shaped for a watch, which is the same kind of per-form-factor
+requirement as the form factor itself. It is a real capture off the Wear emulator (360×360, circular),
+not a mock, and it shows the companion's honest state: *"Waiting for your phone…"*, because a Wear app
+with `standalone=false` has nothing to show until the phone has paired and pushed a snapshot.
+
+**Worth replacing** the moment there is a paired watch to capture: the same command against a real
+device, with the phone app signed in, gives the populated screen instead. A "waiting" shot satisfies the
+requirement but does not sell anything.
 
 ## Screenshots are currently short
 

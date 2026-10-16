@@ -20,7 +20,7 @@ ASSETS="${PLAY_ASSETS_DIR:-play}"
 PACKAGE="${PLAY_PACKAGE:-com.bloo.bluelink}"
 
 for f in "$SA"; do [ -f "$f" ] || { echo "::error::service account json not found at $f"; exit 1; }; done
-for t in icon-512.png feature-graphic-1024x500.png screenshots; do
+for t in icon-512.png feature-graphic-1024x500.png screenshots screenshots-wear; do
   [ -e "$ASSETS/$t" ] || { echo "::error::$ASSETS/$t is missing"; exit 1; }
 done
 
@@ -131,6 +131,9 @@ image_type_for() {
     icon) echo "icon" ;;
     feature) echo "featureGraphic" ;;
     shot) echo "phoneScreenshots" ;;
+    # The Wear OS form factor's own slot. Play will not carry a watch app without at least one
+    # screenshot shaped for a watch, and this is the type it wants them under.
+    wear) echo "wearScreenshots" ;;
   esac
 }
 clear_type() {
@@ -160,6 +163,8 @@ for pair in "icon:$ASSETS/icon-512.png" "feature:$ASSETS/feature-graphic-1024x50
 done
 clear_type "$(image_type_for shot)"
 for shot in "$ASSETS"/screenshots/*.png; do put_image "$(image_type_for shot)" "$shot"; done
+clear_type "$(image_type_for wear)"
+for shot in "$ASSETS"/screenshots-wear/*.png; do put_image "$(image_type_for wear)" "$shot"; done
 
 echo; echo "--- the description text"
 title="$(cat "$ASSETS/title.txt" 2>/dev/null || echo Bloo)"
