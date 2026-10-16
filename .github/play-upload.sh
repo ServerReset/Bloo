@@ -171,7 +171,17 @@ assign_to_edit() {
   local edit_id="$1" track="$2"; shift 2
   local codes_json rel payload out
   codes_json="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
-  rel="$(jq -c -n --arg status "${ASSIGN_STATUS:-$STATUS}" --argjson codes "$codes_json" '{status: $status, versionCodes: $codes}')"
+  # Patch notes, when the workflow has generated them. Play takes them PER LANGUAGE on the release, and
+  # they are the one thing GitHub gets and Play never did: the release object here carried only a status
+  # and version codes, so every Play revision shipped with an empty "What's new" while the GitHub release
+  # for the same build carried the changelog. Same text, same build number, both stores.
+  local notes_json="[]"
+  if [ -n "${PLAY_NOTES_FILE:-}" ] && [ -f "$PLAY_NOTES_FILE" ]; then
+    # Play caps this at 500 characters; trimmed here rather than refused by the API.
+    notes_json="$(jq -c -n --rawfile t "$PLAY_NOTES_FILE" '[{language: "en-US", text: ($t | .[0:480])}]')"
+  fi
+  rel="$(jq -c -n --arg status "${ASSIGN_STATUS:-$STATUS}" --argjson codes "$codes_json" --argjson notes "$notes_json" \
+    '{status: $status, versionCodes: $codes, releaseNotes: $notes}')"
   payload="$(jq -c -n --arg track "$track" --argjson rel "$rel" '{track: $track, releases: [$rel]}')"
   echo; echo "--- $track <- $(printf '%s,' "$@" | sed 's/,$//')"
 

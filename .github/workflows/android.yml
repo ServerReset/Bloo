@@ -419,8 +419,14 @@ jobs:
       # The repository, because the upload is a script in it. Without this the job ran as far as
       # "bash: .github/play-upload.sh: No such file or directory" -- exit code 127, after the bundles
       # had been downloaded and collected perfectly.
+      #
+      # fetch-depth 0: full history and tags, because the patch notes below are the commit messages
+      # since the previous "build-N" tag. A shallow clone has neither, and the notes would silently
+      # come out as the fallback every time.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Download the bundles
         uses: actions/download-artifact@v4
@@ -452,9 +458,33 @@ jobs:
       # packaging docs say a watch build's version code "must be unique across all form factors", which
       # only means something if each form factor is its own release. So the script does exactly that:
       # one bundle upload each, one release object each, per track.
+      # The notes GitHub already gets, written for Play: the same commit messages, with the build number
+      # at the top. A separate step because this job does not have the build job's release_notes.md --
+      # it checks the repository out itself and can read the log.
+      - name: Build the Play patch notes
+        run: |
+          set -euo pipefail
+          prev="$(git tag -l 'build-*' | sed 's/^build-//' | sort -n | tail -1)"
+          {
+            echo "Build ${{ github.run_number }}"
+            echo
+            if [ -n "$prev" ] && git rev-parse "build-$prev" >/dev/null 2>&1; then
+              git log --pretty=format:'- %s' "build-$prev"..HEAD
+            else
+              git log --pretty=format:'- %s' -n 10
+            fi
+          } > "$RUNNER_TEMP/play-notes.txt"
+          echo "--- Play patch notes ($(wc -c < "$RUNNER_TEMP/play-notes.txt") bytes)"
+          cat "$RUNNER_TEMP/play-notes.txt"
+
       - name: Upload to Google Play
         env:
           SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          # Patch notes for this revision, from the same commit messages the GitHub release carries.
+          # Play has a 500-character cap, so the script trims; and they go on EVERY track, because they
+          # are part of the release object the script builds per track rather than something a track
+          # opts into.
+          PLAY_NOTES_FILE: ${{ runner.temp }}/play-notes.txt
           # EVERY push goes to internal testing, so there is always a build on a phone that is minutes
           # old. Only a `major-N` tag goes to the closed track: that is the one the
           # 12-testers-for-14-days clock runs on, and it should hold releases rather than every push.
