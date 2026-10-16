@@ -50,7 +50,11 @@ class OnboardingDeckTest {
         rule.onNodeWithText("Quick setup").assertIsDisplayed()
         nextTo("Look and feel")
         nextTo("What to tell you")
-        nextTo("Your watch")
+        // The watch card is GATED, not gone (see WatchInstallableFromPlay): the deck carries it only
+        // when Play can install the watch app. Walk whichever deck the flag says exists rather than
+        // the one this test was written against -- otherwise flipping the flag changes what the test
+        // should expect, and it fails instead of the app changing.
+        if (WatchInstallableFromPlay) nextTo("Your watch")
         // The trailing information cards swipe instead of tapping Next; the bar animates away.
         nextTo("Getting around")
         rule.onRoot().performTouchInput { swipeLeft() }
