@@ -6,18 +6,21 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -46,6 +49,9 @@ import kotlinx.coroutines.launch
 @Composable
 private fun textRevealAllowed(): Boolean =
     !LocalReduceMotion.current && !LocalPowerPolicy.current.batterySaver
+
+/** How long a changed value takes to fade in. Short: a change is not an entrance. */
+private const val TextChangeMs = 180
 
 /** One line's own beat. Short -- the lines should trip out quickly, not crawl. */
 private const val MsPerLine = 110
@@ -128,6 +134,26 @@ internal fun RevealText(
     // composition only to decide whether the clip node exists at all: once a text has settled, its
     // draw lambda is gone -- and it is not free to keep, because every text's draw lambda otherwise
     // runs (and reads two states) on every frame of a scroll, ~150 of them.
+    // --- The change animation ---------------------------------------------------------------------
+    // Every text in the app comes through here, so this is the one place a text CHANGE can be animated
+    // for all of them, with no call site involved. "Appears" is the line-by-line reveal below; this is
+    // "changes": the new value fades in rather than hard-swapping.
+    //
+    // NOT on the first composition -- that is the reveal's job, and doing both reads as a flicker. And
+    // not on the frames of a reveal already in flight, which would fight it.
+    val changeFade = remember { Animatable(1f) }
+    var seenOnce by remember { mutableStateOf(false) }
+    LaunchedEffect(text) {
+        if (!seenOnce) {
+            seenOnce = true
+            return@LaunchedEffect
+        }
+        changeFade.snapTo(0f)
+        changeFade.animateTo(1f, tween(TextChangeMs))
+    }
+    // On the LAYER, so a frame of the fade costs a re-composite rather than a recomposition -- across
+    // every text in the app at once, which is what "universally" has to mean here.
+    val motion = Modifier.graphicsLayer { alpha = changeFade.value }
     val settled by remember { derivedStateOf { progress.value >= 1f } }
     // ONE path, reused for the whole reveal: it is rebuilt every frame the clip runs, and a page of
     // texts revealing together was otherwise allocating (and then collecting) a Path per text per
@@ -137,7 +163,7 @@ internal fun RevealText(
     val callerOnTextLayout by rememberUpdatedState(onTextLayout)
     Text(
         text = text,
-        modifier = if (settled) {
+        modifier = (if (settled) {
             // Done: the plain modifier, so nothing of the reveal is even a node any more.
             modifier
         } else {
@@ -159,7 +185,7 @@ internal fun RevealText(
                 }
                 clipPath(revealPath) { this@drawWithContent.drawContent() }
             }
-        },
+        }).then(motion),
         color = color,
         fontSize = fontSize,
         fontStyle = fontStyle,
