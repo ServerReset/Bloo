@@ -228,13 +228,13 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     // handed an APK, so the row is the store page. This one is updated by the app
                     // itself, so it gets both sources: the CI checker (primary) and the GitHub
                     // Releases page, which works when the checker says up-to-date or its API is flaky.
-                    if (com.bloo.bluelink.BuildConfig.PLAY_DISTRIBUTION) {
+                    if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(context)) {
                         BodySmallText("Google Play keeps this copy up to date.")
                         Spacer(Modifier.height(GapHairline))
                         SafeMorphTextButton(
                             "Play Store",
                             onClick = {
-                                openUrl(context, "https://play.google.com/store/apps/details?id=" + context.packageName)
+                                openUrl(context, com.bloo.bluelink.update.UpdateRuntime.PLAY_URL)
                             },
                             icon = Icons.AutoMirrored.Filled.OpenInNew,
                         )
@@ -267,7 +267,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                         ToggleRow("Install seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
                             vm.setSeamlessInstallShizuku(it)
                         }
-                    } else if (!com.bloo.bluelink.BuildConfig.PLAY_DISTRIBUTION) {
+                    } else if (com.bloo.bluelink.update.UpdateRuntime.usesGitHub(context)) {
                         Spacer(Modifier.height(GapHairline))
                         BodySmallText(
                             "Update without tapping through Android's installer. " +

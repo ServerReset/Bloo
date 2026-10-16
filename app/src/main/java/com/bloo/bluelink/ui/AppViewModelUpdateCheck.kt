@@ -22,7 +22,7 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
         // tile to show and nothing the app is allowed to do itself. PlayUpdates runs instead, from
         // MainActivity.onStart. See UpdateRuntime for why this is decided from the installer rather
         // than from the flavor.
-        if (com.bloo.bluelink.update.UpdateRuntime.fromPlayStore(getApplication())) {
+        if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(getApplication())) {
             if (surfaceResult) _state.update {
                 it.copy(message = "Updates come from Google Play.", messageType = ToastKind.INFO)
             }

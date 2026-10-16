@@ -119,7 +119,7 @@ class MainActivity : FragmentActivity() {
             AlertWorker.schedule(applicationContext)
             MainToMainSyncWorker.schedule(applicationContext)
             // A copy Play installed has no CI-build check to run -- Play updates it (see UpdateRuntime).
-            if (!com.bloo.bluelink.update.UpdateRuntime.fromPlayStore(applicationContext)) {
+            if (com.bloo.bluelink.update.UpdateRuntime.usesGitHub(applicationContext)) {
                 UpdateCheckWorker.schedule(applicationContext)
             }
         }
@@ -218,7 +218,7 @@ class MainActivity : FragmentActivity() {
      * signatures match, and that copy must stop updating itself the moment it does.
      */
     private fun refreshUpdates() {
-        if (com.bloo.bluelink.update.UpdateRuntime.fromPlayStore(this)) {
+        if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(this)) {
             com.bloo.bluelink.update.PlayUpdates.onForeground(this)
         }
     }

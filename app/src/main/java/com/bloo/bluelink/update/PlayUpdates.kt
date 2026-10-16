@@ -19,6 +19,7 @@ import com.google.android.play.core.install.model.UpdateAvailability
  * Shizuku's -- are absent from the Play artifact by construction.
  */
 internal object PlayUpdates {
+
     /** Only ever used to tell Play's own flow apart from another caller's; never surfaced. */
     private const val REQUEST_CODE = 0x8170
 

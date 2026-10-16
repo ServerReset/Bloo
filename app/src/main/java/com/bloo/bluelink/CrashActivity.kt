@@ -152,7 +152,7 @@ class CrashActivity : ComponentActivity() {
         // Play copy still showed a GitHub update box on every crash, with a link straight to the
         // releases page. Same rule as SettingsHeader's card, same two questions: who installed this,
         // and can this artifact install anything itself (see UpdateRuntime).
-        if (UpdateRuntime.fromPlayStore(context) || !UpdateRuntime.canSelfInstall) {
+        if (!UpdateRuntime.usesGitHub(context)) {
             SettingsGroup("Update") {
                 Text(
                     "Google Play keeps this copy up to date.",
@@ -163,12 +163,7 @@ class CrashActivity : ComponentActivity() {
                     "Play Store",
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
-                        context.tryStart(
-                            Intent(
-                                Intent.ACTION_VIEW,
-                                "https://play.google.com/store/apps/details?id=${context.packageName}".toUri(),
-                            ),
-                        )
+                        context.tryStart(Intent(Intent.ACTION_VIEW, UpdateRuntime.PLAY_URL.toUri()))
                     },
                 )
             }

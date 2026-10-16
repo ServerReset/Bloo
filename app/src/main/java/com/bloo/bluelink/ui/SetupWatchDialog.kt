@@ -52,7 +52,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
     // are the permissions it needs. It does not want one either. On Play a paired watch gets Bloo from
     // the Play Store by itself, and the release APK this dialog would otherwise push is signed with the
     // sideload key, which a Play-signed watch app cannot accept. So the Play build shows the Play path.
-    if (com.bloo.bluelink.BuildConfig.PLAY_DISTRIBUTION) {
+    if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(context)) {
         GlassAlertDialog(
             onDismissRequest = onDismiss,
             icon = Icons.Filled.Watch,
@@ -74,7 +74,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                         label = "Play Store",
                         icon = Icons.AutoMirrored.Filled.OpenInNew,
                         onClick = {
-                            openUrl(context, "https://play.google.com/store/apps/details?id=" + context.packageName)
+                            openUrl(context, com.bloo.bluelink.update.UpdateRuntime.PLAY_URL)
                         },
                         emphasis = ButtonEmphasis.Confirm,
                     )
