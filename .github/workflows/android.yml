@@ -234,8 +234,8 @@ jobs:
             echo "| \`Bloo-watch.apk\` | The Wear OS companion. Only if you have a paired watch. |"
             echo
             echo "### Install — phone"
-            echo "1. Download **\`Bloo.apk\`** from the Assets below."
-            echo "2. Open it from your notification shade or the Downloads app."
+            echo "Download **[Bloo.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk)** — or grab it from the Assets below."
+            echo "1. Open it from your notification shade or the Downloads app."
             echo "3. If Android shows **\\\"Blocked by Play Protect\\\"**, tap **\\\"More details\\\"**, then **\\\"Install anyway\\\"**, and confirm with biometrics or your device password."
             echo
             echo "Already have Bloo? Just open it and pull to refresh — it offers to download and install this build for you."
@@ -255,7 +255,18 @@ jobs:
             echo "1. Join the testing group: https://groups.google.com/g/bloo-testing -- this is what puts you on the tester list."
             echo "2. Open https://play.google.com/apps/testing/com.bloo.bluelink on the phone you want Bloo on, tap **Become a tester**, and install from the Play Store link it then gives you."
             echo
-            echo "The opt-in only works for accounts in the group. Testing tracks skip review, so new builds arrive the day they are built, and Play keeps the app up to date from there with no APK to download. The APKs above are the same builds, for anyone not using Play at all."
+            echo "The opt-in only works for accounts in the group. Testing tracks skip review, so new builds arrive the day they are built."
+            echo
+            echo "### Play or APK?"
+            echo "The same app either way, and either can replace the other -- same package name, same signing key. What differs is how each updates and how the watch gets its app:"
+            echo
+            echo "| | Google Play | The APK |"
+            echo "| --- | --- | --- |"
+            echo "| **Updates** | Play installs them | the app does it itself, silently with Shizuku |"
+            echo "| **Watch app** | Play installs it on the watch | the phone pushes it over wireless debugging |"
+            echo "| **Needs** | a Google account on the tester list | nothing but the file |"
+            echo
+            echo "The APK is the fuller one: it carries its own installer, which is exactly why it cannot go on Play -- Play does not allow an app to install other apps. Neither is a test build in the unfinished sense; both are the same release, published at the same moment."
             echo
             echo "### What's changed"
             echo

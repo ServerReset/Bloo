@@ -24,7 +24,28 @@
 
 Testing builds skip review, so new versions land the day they're built.
 
-**Or install the APK directly** — see [Install](#install) below. That path needs no Play account at all.
+**Or install the APK directly** — the same app, built for installing by hand:
+
+- **[Bloo.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk)** — the phone app.
+- **[Bloo-watch.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo-watch.apk)** — the watch app.
+
+Both are always the newest build. Step-by-step instructions are under [Install](#install) below.
+
+### Which one?
+
+The same app either way, and either can replace the other — same package name, same signing key. They
+differ in **how they update, and how the watch gets its app**:
+
+| | Google Play | The APK |
+|---|---|---|
+| **Updates** | Play downloads and installs them | the app does it itself — silently if you have [Shizuku](https://shizuku.rikka.app/), otherwise through Android's installer |
+| **Watch app** | Play installs it on the watch | the phone pairs with the watch's wireless debugging and pushes it across |
+| **Needs** | a Google account on the tester list | nothing but the file |
+| **Size** | smaller: no installer of its own | larger: it carries one |
+
+The APK is the fuller of the two, and that is the whole reason it exists: it installs the watch app and
+updates itself, and Play does not allow an app to install other apps. Neither is a test build in the
+"unfinished" sense — both are the same release, published by the same pipeline at the same moment.
 
 A third-party Android app for **Hyundai**, **Genesis** and **Kia** vehicles (US, Canada, Hyundai Europe). Built with Jetpack Compose and Material 3 Expressive for phones, foldables and tablets. Every screen talks to live servers; nothing is simulated.
 

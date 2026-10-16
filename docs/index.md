@@ -26,10 +26,24 @@ Google account you use on your phone.
 Tap **Become a tester**, then install from the Play Store link it gives you. Builds on a testing track
 skip review, so new versions arrive the day they are built.
 
-**Not on Play, or a device without Play services?** Install the APK straight from the
-[latest release](https://github.com/ServerReset/Bloo/releases/latest) — `Bloo.apk` for the phone,
-`Bloo-watch.apk` for the watch. Instructions are in the
-[install notes](https://github.com/ServerReset/Bloo#install).
+**Not on Play, or a device without Play services?** Install the APK straight from the newest release —
+**[Bloo.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk)** for the phone,
+**[Bloo-watch.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo-watch.apk)** for the
+watch. Instructions are in the [install notes](https://github.com/ServerReset/Bloo#install).
+
+### Which one should I use?
+
+Both are the same app, and either can replace the other — same package name, same signing key. What
+differs is how each one updates and how the watch gets its app:
+
+| | Google Play | The APK |
+|---|---|---|
+| **Updates** | Play installs them | the app does it itself, silently with [Shizuku](https://shizuku.rikka.app/) |
+| **Watch app** | Play installs it on the watch | the phone pushes it over wireless debugging |
+| **Needs** | a Google account on the tester list | nothing but the file |
+
+The APK is the fuller one: it carries its own installer, which is exactly why it cannot go on Play —
+Play does not allow an app to install other apps. Neither is a test build in the "unfinished" sense.
 
 ---
 
