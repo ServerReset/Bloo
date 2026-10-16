@@ -465,19 +465,17 @@ jobs:
                | tee "$RUNNER_TEMP/play.log"; then
             exit 0
           fi
-          # Retried: an expired edit (something else held one), and a TRANSIENT Play failure -- a 503
-          # "The service is currently unavailable.", or a 500 with no validation message. Those are
-          # the same kind of thing: the request was fine and Play was not. A run died on a bare 503
-          # while opening an edit and declined to retry, because the message did not match this grep.
-          #
-          # NOT retried: everything else. A refusal that comes with a REASON -- a version code already
-          # used, a track with no countries -- is deterministic. A second attempt would either do
-          # nothing or, worse, re-upload a release that had already committed.
-          if grep -qE "edit has expired|service is currently unavailable|Internal error encountered|HTTP 5[0-9][0-9]" "$RUNNER_TEMP/play.log"; then
-            echo "::warning::a transient Play failure (or an expired edit); retrying once with a fresh edit"
+          # Retried ONLY when nothing committed: an expired edit, or a transient Play failure (a 503
+          # "The service is currently unavailable.", a bare 500) -- and the phone release must NOT have
+          # committed. Re-running the whole script after it has is worse than not retrying: the phone
+          # bundle is uploaded again and refused with "Version code N has already been used.", so a
+          # success becomes a louder failure. A 503 during the phone's own read-back did exactly that.
+          if ! grep -q "PHONE PUBLISHED" "$RUNNER_TEMP/play.log" && \
+             grep -qE "edit has expired|service is currently unavailable|Internal error encountered|HTTP 5[0-9][0-9]" "$RUNNER_TEMP/play.log"; then
+            echo "::warning::a transient Play failure before anything committed; retrying once with a fresh edit"
             PLAY_SERVICE_ACCOUNT_JSON_FILE="$RUNNER_TEMP/play-sa.json" bash .github/play-upload.sh
           else
-            echo "::error::the upload failed for a reason a retry would not change; not retrying"
+            echo "::error::the upload failed for a reason a retry would not fix (or would make worse); not retrying"
             exit 1
           fi
   # Makes the build visible to the in-app updater (phone and watch) only once it is finished and the build

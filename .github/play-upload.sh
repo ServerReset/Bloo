@@ -203,7 +203,22 @@ echo "  commit response: ${commit_out:-<empty>}"
 # committed state.
 echo; echo "--- verifying the phone against a fresh edit"
 verify_edit="$(call POST "$api/edits" | jq -r .id)"
-read_track_in() { call GET "$api/edits/$1/tracks/$2" | jq -r '[(.releases // [])[] | (.versionCodes // [])[]] | join(",")'; }
+# The read-back, with a few tries. A transient 503 HERE used to fail the whole run AFTER the release
+# had committed -- so the watch step, which runs next, never ran at all. That is why wear:alpha sat at
+# 10003052 for several builds while the phone on the same track was current: the phone kept committing,
+# the read-back kept hitting a 503, and the run kept dying before the watch.
+read_track_in() {
+  local e="$1" t="$2" out i
+  for i in 1 2 3; do
+    if out="$(call GET "$api/edits/$e/tracks/$t" 2>/dev/null)"; then
+      printf '%s' "$out" | jq -r '[(.releases // [])[] | (.versionCodes // [])[]] | join(",")'
+      return 0
+    fi
+    [ "$i" -lt 3 ] && sleep 2
+  done
+  echo "::warning::could not read back '$t' -- Play returned an error three times" >&2
+  return 1
+}
 read_track() { read_track_in "$verify_edit" "$1"; }
 ok=1
 for track in "${phone_tracks[@]}"; do
