@@ -319,6 +319,14 @@ jobs:
       - name: Publish build as a GitHub Release (direct APK downloads)
         id: release
         if: github.event_name == 'push' && github.ref_type == 'branch'
+        # NOT fatal, deliberately. GitHub refuses this call with `Resource not accessible by
+        # integration` often enough to matter (it is reproducible from a tag ref, and it happens
+        # intermittently on a branch), and when it did, the whole `build` job failed -- which SKIPPED
+        # the Play upload, so a run whose release had actually published put nothing on internal
+        # testing. The release is verified downstream instead: the `publish` job promotes the draft,
+        # and if the release really did not get created, THAT fails, loudly, with the release itself
+        # named.
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           draft: true
