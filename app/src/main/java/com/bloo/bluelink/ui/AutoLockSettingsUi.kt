@@ -37,9 +37,16 @@ import com.bloo.bluelink.data.requestBackgroundUnrestricted
 import com.bloo.bluelink.data.setAutoLockConfig
 import kotlin.math.roundToInt
 
-/** The AutoLock countdown's own bounds: low to start (see the Gen5W note), and no long waits. */
-private const val GraceMinSeconds = 5
-private const val GraceMaxSeconds = 45
+/**
+ * The AutoLock countdown's own bounds: 0 (lock the moment the walk-away is confirmed) up to 30, in 5s
+ * steps -- 0, 5, 10, 15, 20, 25, 30.
+ *
+ * Was 5..45. The long end was never useful -- 45s of standing there -- and the short end excluded the
+ * people who want no wait at all, which the evaluation handles cleanly: a countdown of 0 simply does
+ * not run (see AutoLockController's `for (remaining in graceSeconds downTo 1)`).
+ */
+private const val GraceMinSeconds = 0
+private const val GraceMaxSeconds = 30
 
 /**
  * AutoLock's per-car Settings section, in two shapes.
@@ -364,6 +371,14 @@ private fun AutoLockSettings(
                 )
             }
 
+            // The two waits are separate, and the user only ever sees the SECOND one. That is why this
+            // is spelled out: the confirmation happens first -- Android's own walk-away detection,
+            // usually 10 to 15 seconds and up to 20 -- and the grace period below is ADDITIONAL time
+            // on top of it. "Waits 15s" read as the whole delay when it was only half of it.
+            BodySmallText(
+                "First Bloo waits for Android to confirm you have actually walked away from the car. " +
+                    "That usually takes 10 to 15 seconds, and up to 20.",
+            )
             StepRow("Grace period", "${grace.roundToInt()}s")
             AnimatedSlider(
                 value = grace,
@@ -373,9 +388,14 @@ private fun AutoLockSettings(
                 // 5s steps across the (short) range, so every stop is a distinct, low delay.
                 steps = (GraceMaxSeconds - GraceMinSeconds) / 5 - 1,
             )
+            val graceNow = grace.roundToInt()
             BodySmallText(
-                "Waits ${grace.roundToInt()}s after you walk away, then locks. \"Lock now\" skips " +
-                    "the countdown.",
+                if (graceNow == 0) {
+                    "Then it locks as soon as that confirmation lands — no extra wait."
+                } else {
+                    "Then it waits ${graceNow}s more before locking, on top of the confirmation. " +
+                        "\"Lock now\" skips this part."
+                },
             )
             if (gen5w) {
                 BodySmallText(
