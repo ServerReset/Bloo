@@ -234,7 +234,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                         SafeMorphTextButton(
                             "Play Store",
                             onClick = {
-                                openUrl(context, com.bloo.bluelink.update.UpdateRuntime.PLAY_URL)
+                                openUrl(context, com.bloo.bluelink.update.UpdateRuntime.playUrl(context))
                             },
                             icon = Icons.AutoMirrored.Filled.OpenInNew,
                         )

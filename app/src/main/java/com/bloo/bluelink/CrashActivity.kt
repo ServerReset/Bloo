@@ -163,7 +163,7 @@ class CrashActivity : ComponentActivity() {
                     "Play Store",
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
-                        context.tryStart(Intent(Intent.ACTION_VIEW, UpdateRuntime.PLAY_URL.toUri()))
+                        context.tryStart(Intent(Intent.ACTION_VIEW, UpdateRuntime.playUrl(context).toUri()))
                     },
                 )
             }

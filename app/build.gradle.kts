@@ -41,6 +41,10 @@ android {
         // Releases, so this - not versionCode - is what "is there a newer build"
         // actually compares.
         buildConfigField("int", "BUILD_RUN_NUMBER", System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+        // The major this build was cut for, 0 for an ordinary push. It rides in versionName for Play
+        // to show, and it is ALSO the app's only signal for which testing track it came from: a major
+        // build is published to CLOSED testing, an ordinary one to INTERNAL. See UpdateRuntime.playUrl.
+        buildConfigField("int", "BLOO_MAJOR", "$major")
         // The branch this build came from, so the update checker compares against
         // builds of the SAME branch. run_number increments globally across all
         // branches, so checking a fixed branch both missed newer builds of the

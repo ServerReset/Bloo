@@ -19,8 +19,8 @@
 
 1. **Join the testing group** — **[groups.google.com/g/bloo-testing](https://groups.google.com/g/bloo-testing)**.
    This is what puts you on the tester list; the opt-in below only works for accounts in it.
-2. **Opt in, then install** — open **[play.google.com/apps/testing/com.bloo.bluelink](https://play.google.com/apps/testing/com.bloo.bluelink)**,
-   tap **Become a tester**, and install from the Play Store link it gives you.
+2. **Install from Google Play** — **[play.google.com/store/apps/details?id=com.bloo.bluelink](https://play.google.com/store/apps/details?id=com.bloo.bluelink)**.
+   Once you are in the group it resolves, and Play keeps the app up to date from there.
 
 Testing builds skip review, so new versions land the day they're built.
 

@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -75,22 +73,29 @@ internal fun SyncDeviceRow(
                     Modifier
                 },
             )
-            .clip(shape)
-            .background(if (isPrimary) scheme.primaryContainer.copy(alpha = 0.40f) else Color.Transparent)
-            .border(1.dp, if (isPrimary) scheme.primary.copy(alpha = 0.45f) else hairlineColor(), shape)
-            .padding(horizontal = GapRow, vertical = GapRow),
+            // The app's ONE inner-glass panel for something sitting inside a card
+            // (SettingsPrimitives), not a per-row outline: four outlined boxes in a card read as four
+            // boxes nested in a box, which is exactly the drift the onboarding section had.
+            .innerGlassPanel(GapSection)
+            .then(
+                // The primary device is marked ONCE, by its chip and this tint. It used to be four
+                // signals for one fact -- a star icon, a tag, this tint AND a border -- which made the
+                // row busier than the thing it was saying.
+                if (isPrimary) Modifier.background(scheme.primaryContainer.copy(alpha = 0.35f), shape) else Modifier,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             Icons.Filled.DragHandle,
             contentDescription = "Drag to reorder",
-            tint = scheme.onSurfaceVariant,
+            tint = scheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = modifier.size(20.dp),
         )
         Spacer(Modifier.width(GapGroup))
+        // One icon per row: the device itself. The star was a second signal for what the chip says.
         Icon(
-            if (isPrimary) Icons.Filled.Star else Icons.Filled.Smartphone,
-            contentDescription = if (isPrimary) "Primary device" else null,
+            Icons.Filled.Smartphone,
+            contentDescription = null,
             tint = if (isPrimary) scheme.primary else scheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp),
         )

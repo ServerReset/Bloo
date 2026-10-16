@@ -13,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -24,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
@@ -48,16 +46,14 @@ fun WearCompanionRow(
     Row(
         modifier
             .fillMaxWidth()
-            .outlinedPanel(10.dp),
+            // The same inner-glass panel the phone rows use, one step down in size, rather than the
+            // outlinedPanel(10.dp) it had: a watch is part of its phone's row, not a different kind of
+            // box.
+            .innerGlassPanel(GapGroup),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            Icons.Filled.SubdirectoryArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(ButtonIconSize),
-        )
-        Spacer(Modifier.width(GapRow))
+        // No SubdirectoryArrowRight: the indent IS the "belongs to the phone above" signal, and the
+        // Watch icon says what it is. Two leading icons for one row was one too many.
         Icon(
             Icons.Filled.Watch,
             contentDescription = null,
@@ -99,13 +95,8 @@ fun WearCompanionRow(
 @Composable
 fun CompanionActionRow(label: String, caption: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Icons.Filled.SubdirectoryArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(ButtonIconSize),
-        )
-        Spacer(Modifier.width(GapRow))
+        // No leading arrow, matching WearCompanionRow: the indent carries the relationship, and the
+        // button already wears the watch glyph.
         Column(Modifier.weight(1f)) {
             SafeMorphTextButton(label, onClick = onClick, icon = Icons.Filled.Watch)
             BodySmallText(caption)

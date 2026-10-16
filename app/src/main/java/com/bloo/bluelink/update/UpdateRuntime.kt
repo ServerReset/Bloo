@@ -29,14 +29,37 @@ internal object UpdateRuntime {
     private const val PLAY_STORE_PACKAGE = "com.android.vending"
 
     /**
-     * Bloo's own Play Store page.
+     * Bloo's own Play Store page — the LISTING.
      *
-     * The PUBLIC listing, not the `/apps/testing/` opt-in page. It resolves for anyone who can see the
-     * app -- which is testers, who are the only people running this build -- and it is the page that
-     * keeps working unchanged when the app goes to production. The opt-in page is a step in joining,
-     * not a destination to send someone who has already joined.
+     * This is the link for anywhere that has to work for someone who can already see the app, which is
+     * testers on either track: it resolves for them, and it stays correct when the app goes to
+     * production. It is what the GitHub pages use.
      */
-    const val PLAY_URL = "https://play.google.com/store/apps/details?id=com.bloo.bluelink"
+    const val PLAY_LISTING_URL = "https://play.google.com/store/apps/details?id=com.bloo.bluelink"
+
+    /** The opt-in page: where someone who has NOT joined yet goes to become a tester. */
+    private const val PLAY_OPT_IN_URL = "https://play.google.com/apps/testing/com.bloo.bluelink"
+
+    /**
+     * Whether this build was cut for a major, and so published to CLOSED testing. An ordinary push
+     * build goes to INTERNAL testing.
+     *
+     * The app cannot ask Play which track installed it -- there is no API for that -- so this is the
+     * signal it has: the version the pipeline stamped. See app/build.gradle.kts's BLOO_MAJOR.
+     */
+    val isClosedTesting: Boolean get() = BuildConfig.BLOO_MAJOR > 0
+
+    /**
+     * The Play page for THIS copy, for every button in the app that opens one.
+     *
+     * A closed-testing build links the listing, because its testers are on the track the listing
+     * belongs to and they can already see it. An internal build links the opt-in page instead: internal
+     * testers are a hand-picked list rather than a public opt-in, and the opt-in page is what resolves
+     * for an account that has been added to one. Both are one call so no screen has to decide, and so
+     * the rule is written down once.
+     */
+    fun playUrl(context: Context): String =
+        if (isClosedTesting || !fromPlayStore(context)) PLAY_LISTING_URL else PLAY_OPT_IN_URL
 
     @Volatile
     private var fromPlay: Boolean? = null

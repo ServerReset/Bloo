@@ -253,7 +253,7 @@ jobs:
             echo "Bloo is in closed testing there. Two steps, both with the Google account you use on your phone:"
             echo
             echo "1. Join the testing group: https://groups.google.com/g/bloo-testing -- this is what puts you on the tester list."
-            echo "2. Open https://play.google.com/apps/testing/com.bloo.bluelink on the phone you want Bloo on, tap **Become a tester**, and install from the Play Store link it then gives you."
+            echo "2. Then install from Google Play: https://play.google.com/store/apps/details?id=com.bloo.bluelink -- it resolves once you are in the group, and Play keeps the app up to date from there."
             echo
             echo "The opt-in only works for accounts in the group. Testing tracks skip review, so new builds arrive the day they are built."
             echo

@@ -74,7 +74,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                         label = "Play Store",
                         icon = Icons.AutoMirrored.Filled.OpenInNew,
                         onClick = {
-                            openUrl(context, com.bloo.bluelink.update.UpdateRuntime.PLAY_URL)
+                            openUrl(context, com.bloo.bluelink.update.UpdateRuntime.playUrl(context))
                         },
                         emphasis = ButtonEmphasis.Confirm,
                     )

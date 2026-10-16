@@ -19,9 +19,10 @@ Google account you use on your phone.
 
 ### **[→ Join the group](https://groups.google.com/g/bloo-testing)**
 
-**2. Opt in, then install.** The link below only works for accounts in the group.
+**2. Install from Google Play.** Once you are in the group the listing below resolves, and Play keeps
+the app up to date from there.
 
-### **[→ Join the closed test](https://play.google.com/apps/testing/com.bloo.bluelink)**
+### **[→ Get Bloo on Google Play](https://play.google.com/store/apps/details?id=com.bloo.bluelink)**
 
 Tap **Become a tester**, then install from the Play Store link it gives you. Builds on a testing track
 skip review, so new versions arrive the day they are built.
