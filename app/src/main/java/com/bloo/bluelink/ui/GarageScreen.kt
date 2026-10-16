@@ -127,6 +127,12 @@ internal fun GarageScreen(
             expandedT = expandedT,
             multiColumn = multiColumn,
             fullScreen = fullScreen,
+            // ONE COLUMN's width, not the page's. ReflowPair measures both blocks at this and moves
+            // the second from under the first to beside it -- so handing it the whole page made each
+            // block full-width, the two could not fit, and the pebble column was placed off-screen.
+            // The hero then stretched to fill and the pebbles stacked underneath, which is what a
+            // single car expanded to full screen looked like.
+            carColumns = if (twoColumn) 2 else 1,
             onToggleFullScreen = { real ->
                 if (fullScreen) {
                     fullScreen = false

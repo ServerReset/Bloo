@@ -55,6 +55,12 @@ internal fun CollapsedGaragePager(
     expandedT: State<Float>,
     /** True when the grid shows more than one car column: the hero's full-screen button appears. */
     multiColumn: Boolean,
+    /**
+     * How many columns THIS car's page is laid out in: 2 when it is wide enough to reflow (the hero
+     * beside its pebbles), 1 otherwise. The page width is divided by it to get one column's width,
+     * which is what the reflow measures both of its blocks at.
+     */
+    carColumns: Int,
     /** One car is filling the whole window instead of sharing it with its neighbours. */
     fullScreen: Boolean,
     /** Expand the car at this index to full screen, or leave full screen. */
@@ -228,7 +234,12 @@ internal fun CollapsedGaragePager(
                         }
                         ExpandedCar(
                             vehicles[real], state, vm,
-                            pageColumnWidth = columnWidth,
+                            // ONE COLUMN's width, not the page's. ExpandedCar derives the reflow's block
+                            // width from this by subtracting the gutters -- so the whole page width made
+                            // each block full-width, the two could not sit side by side, and the pebble
+                            // column landed off-screen. A single car expanded to full screen showed a
+                            // stretched hero with the pebbles stacked under it.
+                            pageColumnWidth = columnWidth / carColumns.coerceAtLeast(1),
                             expandedT = expandedT,
                             hazeState = hazeState,
                             heroAction = heroAction,
