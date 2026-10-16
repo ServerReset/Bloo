@@ -244,6 +244,20 @@ jobs:
             echo "Pair your watch to the phone first. Bloo then pushes the watch update to it for you: on the watch, open Bloo and tap **Update now**."
             echo "Or sideload \`Bloo-watch.apk\` manually the same way as the phone (see above)."
             echo
+            # The Play join link belongs HERE, on the release page, because this is where people
+            # arriving from a search or a link actually land -- and it was the one GitHub surface
+            # without it (the README and the Pages site have both had it for a while). Above
+            # "### What's changed" deliberately: everything below that marker is also what the app
+            # shows under "What's new", and a "how to join" section is not a changelog.
+            echo "### Or get it from Google Play (closed test)"
+            echo "Bloo is in closed testing there, by invitation. Once you have asked to be added:"
+            echo
+            echo "1. Open https://play.google.com/apps/testing/com.bloo.bluelink on the phone you want Bloo on."
+            echo "2. Tap **Become a tester**."
+            echo "3. Install Bloo from the Play Store link it then gives you. Play keeps it up to date from there, with no APK to download."
+            echo
+            echo "Testing tracks skip review, so new builds arrive the day they are built. The APKs above are the same builds, for anyone not using Play at all."
+            echo
             echo "### What's changed"
             echo
             # Plain text, no markdown on purpose: this block is not only the release page, it is ALSO
