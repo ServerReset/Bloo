@@ -15,13 +15,14 @@
 
 ## Get it
 
-**On Google Play (closed test).** Access is by invitation — ask, and the Google account you use on
-your phone gets added to the tester list:
+**On Google Play (closed test).** Two steps, and both use the Google account you use on your phone:
 
-**&rarr; [Join the closed test](https://play.google.com/apps/testing/com.bloo.bluelink)**
+1. **Join the testing group** — **[groups.google.com/g/bloo-testing](https://groups.google.com/g/bloo-testing)**.
+   This is what puts you on the tester list; the opt-in below only works for accounts in it.
+2. **Opt in, then install** — open **[play.google.com/apps/testing/com.bloo.bluelink](https://play.google.com/apps/testing/com.bloo.bluelink)**,
+   tap **Become a tester**, and install from the Play Store link it gives you.
 
-Once you're on the list, open that on the phone you want Bloo on, tap **Become a tester**, then install
-from the Play Store link it gives you. Testing builds skip review, so new versions land the day they're built.
+Testing builds skip review, so new versions land the day they're built.
 
 **Or install the APK directly** — see [Install](#install) below. That path needs no Play account at all.
 

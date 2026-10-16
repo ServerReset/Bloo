@@ -57,8 +57,12 @@ allowed to contain.
 3. **Play App Signing** — accept it. Google then holds the real app-signing key and yours becomes
    only an *upload* key, which means you can reset it from the console if it is ever lost. This is
    why losing the keystore below is survivable.
-4. **Closed testing → Testers** — an email list of up to 100 Google accounts (or a Google Group, which
-   has no cap). Testing tracks have **no review wait**, so a build is installable minutes after upload.
+4. **Closed testing → Testers** — a **Google Group**: <https://groups.google.com/g/bloo-testing>. A
+   group has no cap on testers, and joining it is something a person can do themselves — which an email
+   list is not, since that needs you to add each account by hand. The opt-in link below only works for
+   accounts in the group, so the group is step one everywhere it is written down (the README, the Pages
+   site and every release page say so). Testing tracks have **no review wait**, so a build is
+   installable minutes after upload.
 
    The opt-in link is fixed by the package name, so nothing has to be generated for it:
 
@@ -66,8 +70,9 @@ allowed to contain.
    https://play.google.com/apps/testing/com.bloo.bluelink
    ```
 
-   It is already linked from the Pages site and the README, which say access is by invitation — with an
-   email list that link only works for accounts ON the list, so those pages must not imply otherwise.
+   The **group link is step one** on all three surfaces that say how to get in — the README, the Pages
+   site and every release page — because the opt-in only works for accounts in the group. Anything that
+   links the opt-in without the group is a dead end for whoever follows it.
 
    **The closed test is the one that counts:** a personal developer account needs **12+ testers opted in
    continuously for 14 days** before it can apply for production access, and *internal testing does not
