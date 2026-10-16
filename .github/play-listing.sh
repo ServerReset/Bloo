@@ -119,6 +119,16 @@ if [ "${PLAY_INSPECT:-false}" = "true" ]; then
   call GET "$api/edits/$edit_id/details" | jq -r '
     "      defaultLanguage=\(.defaultLanguage // "MISSING")  contactEmail=\(.contactEmail // "MISSING")  contactWebsite=\(.contactWebsite // "-")  contactPhone=\(.contactPhone // "-")"' || true
   echo
+  # The images, by type. Worth printing because "uploaded and committed" is the upload's own word, and
+  # the Wear form factor is the one slot a phone-only listing silently lacks: a watch app cannot be
+  # carried without at least one image shaped for a watch, and Play's error for it arrives at upload
+  # time, long after the listing looked complete.
+  echo "  store images per type:"
+  for t in icon featureGraphic phoneScreenshots wearScreenshots; do
+    n="$(call GET "$api/edits/$edit_id/listings/${language:-en-US}/$t" 2>/dev/null | jq -r '.images | length' 2>/dev/null || echo '?')"
+    echo "      $t: ${n:-?}"
+  done
+  echo
   echo "  (an empty release list above means the track exists but holds no release)"
   call DELETE "$api/edits/$edit_id" >/dev/null || true
   echo "  edit abandoned; nothing was changed"
