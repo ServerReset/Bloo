@@ -14,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.PinCrypto
 
 // --- The reusable onboarding setup cards (used by the setup deck and Settings) ---
@@ -103,9 +102,14 @@ internal fun OnboardingSetupCard(
     Column(
         Modifier
             .fillMaxWidth()
-            .onboardingPanel(14.dp)
+            // GapSection, not 14.dp: this is the app's one inner-glass padding for a panel inside a
+            // card (SettingsPrimitives names onboarding as a user of it), and a literal here meant
+            // this card's inset did not match the alerts and seat panels beside it in the same deck.
+            .onboardingPanel(GapSection)
             .animateContentSize(),
-        verticalArrangement = Arrangement.spacedBy(GapGroup),
+        // GapRow, not GapGroup: every other stack of rows inside a card in this app -- SettingsGroup,
+        // the seat list, the PIN form -- spaces at GapRow.
+        verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         IconLeadRow(
             if (done) AppIcons.CheckCircle else icon,

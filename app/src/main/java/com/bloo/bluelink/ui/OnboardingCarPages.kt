@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.setPlatform
@@ -21,7 +20,9 @@ internal fun OnboardingPowertrainPage(
     state: UiState,
     vm: AppViewModel,
 ) {
-    BodySmallText("Sets the right status tiles: battery for an EV, fuel for gas, both for a plug-in hybrid. Pick what your ${vehicle.name} is.")
+    // No intro line on any of the three car cards: the card's own summary carries the question
+    // ("Gas, hybrid, plug-in or electric?"), and the body used to open by restating it at length.
+    // One card, one line, then the control.
     PowertrainPicker(current = state.powertrainOf(vehicle)) { pt ->
         vm.setPowertrain(vehicle, pt)
     }
@@ -36,7 +37,6 @@ internal fun OnboardingPlatformPage(
     state: UiState,
     vm: AppViewModel,
 ) {
-    BodySmallText("Confirm the ${vehicle.name}'s head unit. Some features only show when the car supports them.")
     PlatformPicker(current = state.platformOf(vehicle)) { pt ->
         vm.setPlatform(vehicle, pt)
     }
@@ -53,10 +53,11 @@ internal fun OnboardingClimatePage(
     vm: AppViewModel,
 ) {
     val sc = state.seatConfigs[vehicle.vin] ?: com.bloo.bluelink.data.SeatConfig()
-    BodySmallText("Switch on what your ${vehicle.name} actually has. Leave a seat off if it can't heat or cool.")
-    Column(Modifier.fillMaxWidth().outlinedPanel(12.dp)) {
+    // innerGlassPanel(GapSection) and a 0.5 divider, matching the alerts list and SettingsGroup: this
+    // panel was the last outlinedPanel(12.dp) in the deck, and its divider was the only 0.35 in the app.
+    Column(Modifier.fillMaxWidth().innerGlassPanel(GapSection)) {
         SeatPositions.forEachIndexed { i: Int, pos: SeatPosition ->
-            if (i > 0) SectionDivider(alpha = 0.35f)
+            if (i > 0) SectionDivider(alpha = 0.5f)
             SeatConfigRow(
                 pos.label,
                 pos.heat(sc),

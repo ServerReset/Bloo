@@ -233,7 +233,7 @@ internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppVie
         selectedKey = appearance.unitSystem,
         onSelect = { vm.setUnitSystem(it) },
     )
-    BodySmallText("Both live in Settings whenever you want to change them.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    BodySmallText("Both live in Settings as well.", color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 /**
@@ -242,8 +242,17 @@ internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppVie
  */
 @Composable
 internal fun OnboardingAlertsPage(notif: SettingsStore.NotificationPrefs, vm: AppViewModel) {
-    BodySmallText("Choose what Bloo tells you about. You can change any of these later in Settings.")
-    Column(Modifier.fillMaxWidth().outlinedPanel(12.dp)) {
+    // No intro line: the card's own summary already says "Which alerts reach you", and the line that
+    // used to open this body said the same thing a second time in different words -- the exact
+    // duplication COPY.md's closing rule is about. The list starts where the summary stops.
+    //
+    // innerGlassPanel(GapSection), not outlinedPanel(12.dp): this is the app's ONE inner-glass panel
+    // for a group of things inside a card, and SettingsPrimitives names onboarding items among its
+    // users. The literal 12.dp is why this panel's inset did not match the setup cards beside it.
+    Column(
+        Modifier.fillMaxWidth().innerGlassPanel(GapSection),
+        verticalArrangement = Arrangement.spacedBy(GapRow),
+    ) {
         ToggleRow("Live charging updates", notif.charging, description = "Progress and a Stop button while a car charges.") { vm.setNotifyCharging(it) }
         ToggleRow("Charge complete", notif.chargeComplete) { vm.setNotifyChargeComplete(it) }
         ToggleRow("Left unlocked", notif.unlocked) { vm.setNotifyUnlocked(it) }

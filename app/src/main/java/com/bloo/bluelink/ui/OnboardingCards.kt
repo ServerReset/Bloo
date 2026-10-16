@@ -49,23 +49,26 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
     )
     OnboardingStepKind.SETUP -> OnboardingCardSpec(
         Icons.Filled.Tune, "Quick setup",
-        "Let Bloo reach you, and lock the app.",
+        "Notifications, and a lock on the app.",
     )
     OnboardingStepKind.LOOK -> OnboardingCardSpec(
         Icons.Filled.Palette, "Look and feel",
-        "How Bloo looks and which units it speaks.",
+        "Theme, and the units distances use.",
     )
     OnboardingStepKind.ALERTS -> OnboardingCardSpec(
         Icons.Filled.Notifications, "What to tell you",
-        "Pick the alerts you want. Change them any time in Settings.",
+        "Which alerts reach you.",
     )
     OnboardingStepKind.WATCH -> OnboardingCardSpec(
         Icons.Filled.Watch, "Your watch",
         "Quick actions, a Tile and notifications on your wrist.",
     )
     OnboardingStepKind.CAR_POWERTRAIN -> OnboardingCardSpec(
-        AppIcons.DirectionsCar, if (newCar) "Meet ${carName ?: "your new car"}" else "${carName ?: "Your car"}: what powers it",
-        if (newCar) "A new car just joined your garage. First: what powers it?" else "Gas, hybrid, plug-in or electric.",
+        // One shape for every car card -- "Car: aspect" -- including the new-car case, which used to
+        // be the only card in the deck whose TITLE changed form ("Meet Ioniq 5"). The friendliness
+        // lives in the summary instead, where it does not break the pattern the other two follow.
+        AppIcons.DirectionsCar, "${carName ?: "Your car"}: what powers it",
+        if (newCar) "A new car joined your garage. Gas, hybrid, plug-in or electric?" else "Gas, hybrid, plug-in or electric?",
     )
     OnboardingStepKind.CAR_PLATFORM -> OnboardingCardSpec(
         Icons.Filled.Memory, "${carName ?: "Your car"}: head unit",
@@ -73,15 +76,15 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
     )
     OnboardingStepKind.CAR_CLIMATE -> OnboardingCardSpec(
         Icons.Filled.AcUnit, "${carName ?: "Your car"}: seats and climate",
-        "Heated and ventilated seats, heated wheel.",
+        "Which seats heat or cool, and whether the wheel does.",
     )
     OnboardingStepKind.TIPS -> OnboardingCardSpec(
         Icons.Filled.TouchApp, "Getting around",
-        "A few things that make Bloo quick to use.",
+        "The gestures worth knowing.",
     )
     OnboardingStepKind.FEATURES -> OnboardingCardSpec(
         AppIcons.AutoAwesome, "More Bloo can do",
-        "Worth knowing about, whenever you're ready for them.",
+        "Things Bloo can do that you have not met yet.",
     )
 }
 

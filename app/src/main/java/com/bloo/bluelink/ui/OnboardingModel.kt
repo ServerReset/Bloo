@@ -15,6 +15,20 @@ internal enum class OnboardingStepKind {
 internal fun OnboardingStepKind.isInfoSwipe(): Boolean =
     this == OnboardingStepKind.TIPS || this == OnboardingStepKind.FEATURES
 
+/**
+ * Whether the watch app can be installed from Google Play yet.
+ *
+ * It cannot. Play will not carry a watch app until the Wear OS form factor is configured for the
+ * application in the console, and until then there is no `wear:` track to publish to -- so a Play
+ * copy of Bloo has no watch app to offer at all. The card promised one, which made onboarding the
+ * first place a new user met a feature they could not have.
+ *
+ * So the step is not emitted. The card, its copy and its setup dialog all stay, one flag away from
+ * returning: flip this the moment the form factor is live and the deck carries it again, in the same
+ * place, with no other change.
+ */
+internal const val WatchInstallableFromPlay = false
+
 internal data class OnboardingStep(val kind: OnboardingStepKind, val vin: String? = null)
 
 /** Which deck of cards is showing. One component runs all three. */
@@ -84,6 +98,11 @@ internal fun buildOnboardingSteps(
         if (v.platformOverridable) add(OnboardingStep(OnboardingStepKind.CAR_PLATFORM, v.vin))
         add(OnboardingStep(OnboardingStepKind.CAR_CLIMATE, v.vin))
     }
+    // Gated, not deleted: see WatchInstallableFromPlay. A Play copy has no watch app to offer yet, so
+    // the card is not in any deck.
+    fun watchCard() {
+        if (WatchInstallableFromPlay) add(OnboardingStep(OnboardingStepKind.WATCH))
+    }
     when (mode) {
         is OnboardingMode.NewCars -> vehicles.filter { it.vin in mode.vins }.forEach(::carCards)
         OnboardingMode.Replay -> {
@@ -92,7 +111,7 @@ internal fun buildOnboardingSteps(
             add(OnboardingStep(OnboardingStepKind.LOOK))
             add(OnboardingStep(OnboardingStepKind.ALERTS))
             vehicles.forEach(::carCards)
-            add(OnboardingStep(OnboardingStepKind.WATCH))
+            watchCard()
             add(OnboardingStep(OnboardingStepKind.TIPS))
             add(OnboardingStep(OnboardingStepKind.FEATURES))
         }
@@ -103,7 +122,7 @@ internal fun buildOnboardingSteps(
             add(OnboardingStep(OnboardingStepKind.LOOK))
             add(OnboardingStep(OnboardingStepKind.ALERTS))
             vehicles.filter { it.vin !in preConfiguredVins }.forEach(::carCards)
-            add(OnboardingStep(OnboardingStepKind.WATCH))
+            watchCard()
             add(OnboardingStep(OnboardingStepKind.TIPS))
             add(OnboardingStep(OnboardingStepKind.FEATURES))
         }
