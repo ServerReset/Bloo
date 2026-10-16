@@ -176,18 +176,12 @@ assign_to_edit() {
   echo; echo "--- $track <- $(printf '%s,' "$@" | sed 's/,$//')"
 
   if ! out="$(call PUT "$api/edits/$edit_id/tracks/$track" -d "$payload")"; then
-    if [[ "$track" != *:* ]]; then
-      echo "::error::could not assign to '$track'"
-      return 1
-    fi
-    # Only a form-factor track can be missing. Bring it into being if that is possible at all, then
-    # write once more -- the retry happens regardless, because the form factor may have been enabled by
-    # something else since the last run.
-    ensure_track "$track" || true
-    out="$(call PUT "$api/edits/$edit_id/tracks/$track" -d "$payload")" || {
-      echo "::error::could not assign to '$track'"
-      return 1
-    }
+    # No attempt to CREATE the track here, deliberately: creating one means committing another edit,
+    # and committing any edit invalidates this one -- so the retry would answer "This Edit has been
+    # deleted." The caller ensures its form-factor tracks exist BEFORE opening the edit it writes
+    # releases into (see the watch section).
+    echo "::error::could not assign to '$track'"
+    return 1
   fi
 
   printf '%s' "$out" | jq -r '.releases[]? | "  release: status=\(.status) versionCodes=\((.versionCodes // [])|join(","))"' >&2 || true
@@ -233,6 +227,13 @@ if [ "${#wear_codes[@]}" -eq 0 ]; then
 fi
 
 echo; echo "=== the watch, in its own edit ==="
+# The form-factor tracks FIRST, each in its own committed edit -- and only then the edit that holds the
+# releases. Order matters: committing an edit invalidates every other open one, so an edit opened
+# before this would be dead by the time a release was written to it. (That is exactly what happened:
+# the create succeeded, and the assignment answered "This Edit has been deleted.")
+for track in "${phone_tracks[@]}"; do
+  ensure_track "wear:$track" || true
+done
 watch_edit="$(call POST "$api/edits" | jq -r .id)"
 watch_ok=1
 for track in "${phone_tracks[@]}"; do
