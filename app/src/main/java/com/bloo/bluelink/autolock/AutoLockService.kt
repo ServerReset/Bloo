@@ -90,7 +90,7 @@ class AutoLockService : Service() {
         // Sealed after a phone restart (see BootGate): stand down until the user has signed in.
         if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) {
             AppLog.log("AutoLock: service standing down — the app is sealed after a restart (BootGate).")
-            stopSelf()
+            promoteThenStop()
             return START_NOT_STICKY
         }
         // A STICKY RESTART arrives with a NULL intent. That is the watcher coming back from a process
@@ -210,9 +210,41 @@ class AutoLockService : Service() {
         }
     }
 
+    /**
+     * Stand down WITHOUT tripping Android's five-second rule.
+     *
+     * After `startForegroundService()` a service MUST call `startForeground()` within a few seconds, or
+     * the whole PROCESS is killed with `ForegroundServiceDidNotStartInTimeException`. `stopSelf()` does
+     * NOT satisfy that contract -- and this service crashed the app exactly that way: on a phone that
+     * had just restarted, BootGate had it stand down, it called `stopSelf()` without ever promoting,
+     * and Android killed Bloo. The crash is in the report as
+     * `ForegroundServiceDidNotStartInTimeException ... AutoLockService`.
+     *
+     * So a stand-down promotes first, with the quietest notification this service has, and stops
+     * immediately after. A notification that exists for one frame is a far better outcome than the app
+     * dying on a phone that has just booted.
+     */
+    private fun promoteThenStop() {
+        val vin = AutoLockAddresses.anyVin(applicationContext) ?: ""
+        runCatching {
+            ServiceCompat.startForeground(
+                this,
+                AutoLockNotification.notificationId(vin),
+                AutoLockNotification.build(this, vin, "", DetectionState.IDLE, 0),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                } else {
+                    0
+                },
+            )
+        }.onFailure {
+            AppLog.log("⚠ AutoLock: could not promote while standing down (${it.javaClass.simpleName}).")
+        }
+        stopSelf()
+    }
+
     /** Drops a finished (or cancelled) car's own notification and live-state collector, then
-     *  stops the service entirely once nothing else is being tracked. */
-    private fun finishTracking(vin: String) {
+     *  stops the service entirely once nothing else is being tracked. */    private fun finishTracking(vin: String) {
         observeJobs.remove(vin)?.cancel()
         carNames.remove(vin)
         // Out of the foreground set too, or a later evaluation for this car would take the `notify`
@@ -297,7 +329,13 @@ class AutoLockService : Service() {
          *  refuses a background foreground-service start (the norm on Android 12+), which is
          *  fine now -- the evaluation itself runs in AutoLockController's own scope, started by
          *  the trigger, and does not depend on this. */
-        fun start(context: Context, vin: String): Boolean {
+        fun start(context: Context, vin: String, action: String? = null): Boolean {
+            // SEALED AFTER A RESTART: nothing may run, and starting this service at all is what made
+            // the app CRASH -- see promoteThenStop. Refusing here is the first of three guards.
+            if (com.bloo.bluelink.data.BootGate.isLocked(context)) {
+                AppLog.log("AutoLock: not starting the service — the app is sealed after a restart (BootGate).")
+                return false
+            }
             // The connectedDevice type needs a prerequisite permission (BLUETOOTH_CONNECT on 31+), and
             // startForeground() throws SecurityException without it. Catching that AFTER
             // startForegroundService() is too late: Android has already armed the five-second rule, so
@@ -308,6 +346,7 @@ class AutoLockService : Service() {
                 return false
             }
             val intent = Intent(context, AutoLockService::class.java).putExtra(EXTRA_VIN, vin)
+            if (action != null) intent.action = action
             return try {
                 context.startForegroundService(intent)
                 true

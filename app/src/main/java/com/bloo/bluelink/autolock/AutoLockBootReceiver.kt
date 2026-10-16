@@ -40,13 +40,10 @@ class AutoLockBootReceiver : BroadcastReceiver() {
                 val entry = com.bloo.bluelink.data.SettingsStore(ctx).allAutoLockConfigs()
                     .entries.firstOrNull { it.value.enabled }
                 if (entry != null) {
-                    runCatching {
-                        ctx.startForegroundService(
-                            Intent(ctx, AutoLockService::class.java)
-                                .setAction(AutoLockService.ACTION_START_WATCH)
-                                .putExtra(AutoLockService.EXTRA_VIN, entry.key),
-                        )
-                    }
+                    // Through the funnel: it refuses when the app is sealed, which is the case this
+                    // receiver runs in right after a restart -- and a raw startForegroundService there
+                    // is what crashed the app (see AutoLockService.promoteThenStop).
+                    AutoLockService.start(ctx, entry.key, AutoLockService.ACTION_START_WATCH)
                 }
             }
         }

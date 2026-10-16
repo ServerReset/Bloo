@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import android.app.Application
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Vehicle
@@ -29,19 +28,10 @@ fun AppViewModel.setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolo
         } else {
             com.bloo.bluelink.autolock.AutoLockService.ACTION_STOP_WATCH
         }
-        runCatching {
-            getApplication<android.app.Application>().startForegroundService(
-                android.content.Intent(
-                    getApplication(),
-                    com.bloo.bluelink.autolock.AutoLockService::class.java,
-                ).setAction(action).putExtra(
-                    com.bloo.bluelink.autolock.AutoLockService.EXTRA_VIN,
-                    vin,
-                ),
-            )
-        }.onFailure {
-            com.bloo.bluelink.data.AppLog.log("AutoLock watcher start failed: ${it.javaClass.simpleName}")
-        }
+        // Through AutoLockService.start, not startForegroundService directly: that funnel refuses when
+        // the app is sealed or the permission is missing, and a raw startForegroundService here is how
+        // the sealed case reached the service and crashed the app (see AutoLockService.promoteThenStop).
+        com.bloo.bluelink.autolock.AutoLockService.start(getApplication(), vin, action)
     }
 }
 
@@ -78,17 +68,12 @@ fun AppViewModel.ensureAutoLockWatcher() {
         refreshAutoLockAddresses()
         val entry = settingsStore.allAutoLockConfigs().entries.firstOrNull { it.value.enabled }
             ?: return@launch
-        runCatching {
-            getApplication<android.app.Application>().startForegroundService(
-                android.content.Intent(
-                    getApplication(),
-                    com.bloo.bluelink.autolock.AutoLockService::class.java,
-                ).setAction(com.bloo.bluelink.autolock.AutoLockService.ACTION_START_WATCH)
-                    .putExtra(com.bloo.bluelink.autolock.AutoLockService.EXTRA_VIN, entry.key),
-            )
-        }.onFailure {
-            com.bloo.bluelink.data.AppLog.log("AutoLock watcher recovery failed: ${it.javaClass.simpleName}")
-        }
+        // Through the funnel, like every other caller -- see the note in setAutoLockConfig.
+        com.bloo.bluelink.autolock.AutoLockService.start(
+            getApplication(),
+            entry.key,
+            com.bloo.bluelink.autolock.AutoLockService.ACTION_START_WATCH,
+        )
     }
 }
 
