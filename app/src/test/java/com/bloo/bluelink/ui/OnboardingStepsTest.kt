@@ -48,7 +48,16 @@ class OnboardingStepsTest {
         OnboardingStepKind.WELCOME, OnboardingStepKind.RESTORE, OnboardingStepKind.SETUP,
         OnboardingStepKind.LOOK, OnboardingStepKind.ALERTS,
     )
-    private val tail = listOf(OnboardingStepKind.WATCH, OnboardingStepKind.TIPS, OnboardingStepKind.FEATURES)
+    /**
+     * The trailing cards. The watch card is GATED rather than gone (see [WatchInstallableFromPlay]),
+     * so the expectation follows the flag instead of hard-coding the deck: flipping the flag back
+     * should change what these tests expect, not break them.
+     */
+    private val tail = buildList {
+        if (WatchInstallableFromPlay) add(OnboardingStepKind.WATCH)
+        add(OnboardingStepKind.TIPS)
+        add(OnboardingStepKind.FEATURES)
+    }
 
     @Test
     fun firstRun_asksEveryCarForPowertrainHeadUnitAndSeats() {
@@ -91,9 +100,9 @@ class OnboardingStepsTest {
         assertEquals(
             listOf(
                 OnboardingStepKind.WELCOME, OnboardingStepKind.SETUP, OnboardingStepKind.LOOK, OnboardingStepKind.ALERTS,
-                *buildOnboardingSteps(OnboardingMode.NewCars(listOf(usHyundai.vin, usKia.vin)), listOf(usHyundai, usKia)).map { it.kind }.toTypedArray(),
-                OnboardingStepKind.WATCH, OnboardingStepKind.TIPS, OnboardingStepKind.FEATURES,
-            ),
+            ) +
+                buildOnboardingSteps(OnboardingMode.NewCars(listOf(usHyundai.vin, usKia.vin)), listOf(usHyundai, usKia)).map { it.kind } +
+                tail,
             kinds(buildOnboardingSteps(OnboardingMode.Replay, listOf(usHyundai, usKia))),
         )
     }
