@@ -1,11 +1,9 @@
 package com.bloo.bluelink.ui
 
 import android.os.Build
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -23,11 +21,16 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bloo.bluelink.data.SyncMerge
+import com.bloo.bluelink.data.WatchLockTiming
+import com.bloo.bluelink.data.relativeLabel
 import com.bloo.bluelink.data.removeSyncedDevice
 import com.bloo.bluelink.data.setPrimaryDevice
 import com.bloo.bluelink.data.setWatchLockTiming
 import com.bloo.bluelink.data.syncDeviceName
 import com.bloo.bluelink.data.watchLockTiming
+import com.bloo.bluelink.wear.WatchPresence
+import com.bloo.bluelink.wear.WatchSignIn
 import com.bloo.uicommon.ReorderColumn
 import kotlinx.coroutines.delay
 
@@ -63,7 +66,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     // stay in lockstep.
     val ordered = remember(devices, state.syncPrimaryId) {
         devices.sortedWith(
-            compareByDescending<com.bloo.bluelink.data.SyncMerge.SyncDevice> { it.id == state.syncPrimaryId }
+            compareByDescending<SyncMerge.SyncDevice> { it.id == state.syncPrimaryId }
                 .thenByDescending { it.lastSeenMs },
         )
     }
@@ -71,17 +74,22 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     val primaryName = ordered.firstOrNull { it.id == state.syncPrimaryId }?.name?.ifBlank { null }
     val phones = remember(ordered) { ordered.filter { !it.isWatch } }
     val registryWatches = remember(ordered) { ordered.filter { it.isWatch } }
+    // Two lines, not one. The count and who is primary is a status readout; how to change it is an
+    // instruction. They were a single 20-word sentence, which made the status half read as a command
+    // and buried the one thing worth knowing -- that the top phone is what every other device adopts.
     BodySmallText(
-        "${phones.size} phone${if (phones.size == 1) "" else "s"}" +
-            (primaryName?.let { " · $it is primary" } ?: "") +
-            ". Drag to reorder: the top device is primary, and a paired watch rides under its phone.",
+        buildString {
+            append("${phones.size} phone${if (phones.size == 1) "" else "s"}")
+            primaryName?.let { append(" · $it is primary") }
+        },
     )
+    BodySmallText("Drag to reorder. The top phone is the one every other device adopts.")
     val watchHost = phones.firstOrNull { it.id == state.syncPrimaryId } ?: phones.firstOrNull()
     val context = LocalContext.current
-    val liveWatch by com.bloo.bluelink.wear.WatchPresence.watch.collectAsStateWithLifecycle()
+    val liveWatch by WatchPresence.watch.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         while (true) {
-            com.bloo.bluelink.wear.WatchPresence.refresh(context)
+            WatchPresence.refresh(context)
             delay(WATCH_REFRESH_MS)
         }
     }
@@ -97,7 +105,10 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     ) { device, itemDragHandle, dragging ->
         // A Column, not loose children: a ReorderColumn item slot stacks its children on top of
         // each other, which drew the watch row and "Set up watch" straight over the phone row.
-        Column(Modifier.fillMaxWidth()) {
+        //
+        // spacedBy(GapRow), not a Spacer between each pair: that is how every other stack of rows in
+        // this app is spaced (SettingsGroup, the seat list, the PIN form), and it was six Spacers here.
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             val isSelf = device.id == state.thisDeviceId
             SyncDeviceRow(
                 device = device,
@@ -112,26 +123,23 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             val live = liveWatch.takeIf { isSelf }
             val registered = registryWatches.takeIf { device.id == watchHost?.id && live == null }.orEmpty()
             live?.let { watch ->
-                Spacer(Modifier.height(GapRow))
                 WearCompanionRow(
                     name = watch.name,
                     detail = "Connected to this phone",
                     modifier = Modifier.padding(start = CompanionIndent),
                     onRemove = null,
                 )
-                Spacer(Modifier.height(GapRow))
                 CompanionActionRow(
                     label = "Sign watch in",
                     caption = "Lets it run your car without this phone",
                     modifier = Modifier.padding(start = CompanionIndent),
-                    onClick = { com.bloo.bluelink.wear.WatchSignIn.offer(context) },
+                    onClick = { WatchSignIn.offer(context) },
                 )
             }
             registered.forEach { watch ->
-                Spacer(Modifier.height(GapRow))
                 WearCompanionRow(
                     name = watch.name,
-                    detail = listOf(watch.model, com.bloo.bluelink.data.relativeLabel(watch.lastSeenMs))
+                    detail = listOf(watch.model, relativeLabel(watch.lastSeenMs))
                         .filter { it.isNotBlank() }.joinToString(" · "),
                     modifier = Modifier.padding(start = CompanionIndent),
                     onRemove = { vm.removeSyncedDevice(watch.id) },
@@ -140,7 +148,6 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             if (isSelf && live == null && registered.isEmpty()) {
                 // Under THIS phone on purpose: setting a watch up connects it to the device you are
                 // holding, and the placement says so.
-                Spacer(Modifier.height(GapRow))
                 CompanionActionRow(
                     label = "Set up watch",
                     caption = "Connects to ${device.name.ifBlank { "this phone" }}",
@@ -150,21 +157,19 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             }
             // The watch PIN gate: nothing to lock unless a watch is present.
             if (isSelf && (live != null || registered.isNotEmpty())) {
-                Spacer(Modifier.height(GapRow))
-                Box(Modifier.padding(start = CompanionIndent)) {
-                    SettingsSegmentedRow(
-                        label = "Get the PIN from your watch",
-                        options = listOf(
-                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OFF.wireKey, "Off", null),
-                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OPEN.wireKey, "Opening", null),
-                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.COMMANDS.wireKey, "Commands", null),
-                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.BOTH.wireKey, "Both", null),
-                        ),
-                        selectedKey = state.watchLockTiming.wireKey,
-                        description = "Uses your app PIN.",
-                        onSelect = { vm.setWatchLockTiming(com.bloo.bluelink.data.WatchLockTiming.fromWire(it)) },
-                    )
-                }
+                SettingsSegmentedRow(
+                    label = "Get the PIN from your watch",
+                    options = listOf(
+                        SegmentOption(WatchLockTiming.OFF.wireKey, "Off", null),
+                        SegmentOption(WatchLockTiming.OPEN.wireKey, "Opening", null),
+                        SegmentOption(WatchLockTiming.COMMANDS.wireKey, "Commands", null),
+                        SegmentOption(WatchLockTiming.BOTH.wireKey, "Both", null),
+                    ),
+                    selectedKey = state.watchLockTiming.wireKey,
+                    description = "Uses your app PIN.",
+                    onSelect = { vm.setWatchLockTiming(WatchLockTiming.fromWire(it)) },
+                    modifier = Modifier.padding(start = CompanionIndent),
+                )
             }
         }
     }
