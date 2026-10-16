@@ -171,7 +171,7 @@ assign_to_edit() {
   local edit_id="$1" track="$2"; shift 2
   local codes_json rel payload out
   codes_json="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
-  rel="$(jq -c -n --arg status "$STATUS" --argjson codes "$codes_json" '{status: $status, versionCodes: $codes}')"
+  rel="$(jq -c -n --arg status "${ASSIGN_STATUS:-$STATUS}" --argjson codes "$codes_json" '{status: $status, versionCodes: $codes}')"
   payload="$(jq -c -n --arg track "$track" --argjson rel "$rel" '{track: $track, releases: [$rel]}')"
   echo; echo "--- $track <- $(printf '%s,' "$@" | sed 's/,$//')"
 
@@ -241,7 +241,7 @@ for track in "${phone_tracks[@]}"; do
 done
 if [ "$watch_ok" = "1" ]; then
   echo; echo "--- committing the watch release"
-  if wout="$(call POST "$api/edits/$watch_edit:commit")"; then
+  if wout="$(call POST "$api/edits/$watch_edit:commit" 2>&1)"; then
     echo "  commit response: ${wout:-<empty>}"
     # A FRESH edit for THIS read-back. The commit above invalidated the edit the phone verification
     # used -- Play is single-writer per app -- so reading through that one answered "This Edit has
@@ -257,8 +257,32 @@ if [ "$watch_ok" = "1" ]; then
     done
     call DELETE "$api/edits/$watch_verify_edit" >/dev/null || true
   else
-    echo "::warning::the watch commit was refused -- the phone is published, the watch is not"
-    watch_ok=0
+    # A form-factor track CREATED through the API has no country availability, and
+    # edits.countryAvailability is read-only -- there is no API to set it. Play refuses a COMPLETED
+    # release on such a track ("Release in track targeting no countries"), but a DRAFT release is not
+    # served, so it is accepted. That puts the watch ON the track, one "roll out" from the console,
+    # rather than not there at all.
+    if printf '%s' "${wout:-}" | grep -qi "targeting no countries"; then
+      echo "::warning::a track with no country availability cannot take a completed release. Publishing the watch as a DRAFT instead: roll it out from the console, or set that track's countries once (Test and release -> the track -> the Wear OS form factor -> Countries/regions) and it completes itself from then on."
+      ASSIGN_STATUS=draft
+      draft_edit="$(call POST "$api/edits" | jq -r .id)"
+      draft_ok=1
+      for track in "${phone_tracks[@]}"; do
+        assign_to_edit "$draft_edit" "wear:$track" "${wear_codes[@]}" || { draft_ok=0; continue; }
+      done
+      ASSIGN_STATUS=
+      if [ "$draft_ok" = "1" ] && call POST "$api/edits/$draft_edit:commit" >/dev/null 2>&1; then
+        echo "WATCH PUBLISHED AS A DRAFT: $PKG -> $(printf 'wear:%s,' "${phone_tracks[@]}" | sed 's/,$//') holds $(printf '%s,' "${wear_codes[@]}" | sed 's/,$//')"
+        watch_ok=1
+      else
+        echo "::warning::the draft was refused too -- the phone is published, the watch is not"
+        watch_ok=0
+      fi
+      call DELETE "$api/edits/$draft_edit" >/dev/null 2>&1 || true
+    else
+      echo "::warning::the watch commit was refused -- the phone is published, the watch is not"
+      watch_ok=0
+    fi
   fi
 else
   call DELETE "$api/edits/$watch_edit" >/dev/null || true
