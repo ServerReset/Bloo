@@ -141,16 +141,29 @@ for t in "${LIST[@]}"; do phone_tracks+=("$(echo "$t" | xargs)"); done
 # form factor is configured, this call is what creates the track and the watch publishes with nothing
 # further.
 ensure_track() {
-  local edit_id="$1" track="$2" form_factor body
+  local track="$1" form_factor body e out
   case "$track" in
     wear:*)       form_factor="WEAR" ;;
     automotive:*) form_factor="AUTOMOTIVE" ;;
     *)            form_factor="DEFAULT" ;;
   esac
-  echo "  '$track' does not exist yet, so creating it (formFactor=$form_factor, CLOSED_TESTING)" >&2
   body="$(jq -c -n --arg t "$track" --arg ff "$form_factor" \
     '{track: $t, type: "CLOSED_TESTING", formFactor: $ff}')"
-  call POST "$api/edits/$edit_id/tracks" -d "$body" >/dev/null
+  # ITS OWN EDIT, COMMITTED, before the release is written anywhere. That is the whole point: creating
+  # a track and committing a release onto it in the SAME edit is a 500 from Play -- "Internal error
+  # encountered.", no validation message -- which is what wear:alpha hit while wear:internal (made by
+  # Play when the form factor was configured) committed fine. A custom closed-testing track has no
+  # wear counterpart until something asks for one, and this is that ask.
+  e="$(call POST "$api/edits" | jq -r .id)"
+  if out="$(call POST "$api/edits/$e/tracks" -d "$body" 2>&1)"; then
+    echo "  '$track' did not exist: created it (formFactor=$form_factor) and committed that first" >&2
+    call POST "$api/edits/$e:commit" >/dev/null 2>&1 || true
+  else
+    # The expected case on every run after the first, so it is a note rather than an error -- but it
+    # still says what Play said, because "already exists" and "refused" are different things.
+    echo "  '$track' was not created; Play said: $(printf '%s' "$out" | grep -o '"message":[^,]*' | head -1)" >&2
+  fi
+  call DELETE "$api/edits/$e" >/dev/null 2>&1 || true
 }
 
 # assign one release, with its own version codes, to one track
@@ -170,7 +183,7 @@ assign_to_edit() {
     # Only a form-factor track can be missing. Bring it into being if that is possible at all, then
     # write once more -- the retry happens regardless, because the form factor may have been enabled by
     # something else since the last run.
-    ensure_track "$edit_id" "$track" || true
+    ensure_track "$track" || true
     out="$(call PUT "$api/edits/$edit_id/tracks/$track" -d "$payload")" || {
       echo "::error::could not assign to '$track'"
       return 1
