@@ -196,7 +196,8 @@ echo "  commit response: ${commit_out:-<empty>}"
 # committed state.
 echo; echo "--- verifying the phone against a fresh edit"
 verify_edit="$(call POST "$api/edits" | jq -r .id)"
-read_track() { call GET "$api/edits/$verify_edit/tracks/$1" | jq -r '[(.releases // [])[] | (.versionCodes // [])[]] | join(",")'; }
+read_track_in() { call GET "$api/edits/$1/tracks/$2" | jq -r '[(.releases // [])[] | (.versionCodes // [])[]] | join(",")'; }
+read_track() { read_track_in "$verify_edit" "$1"; }
 ok=1
 for track in "${phone_tracks[@]}"; do
   seen="$(read_track "$track")"
@@ -228,13 +229,19 @@ if [ "$watch_ok" = "1" ]; then
   echo; echo "--- committing the watch release"
   if wout="$(call POST "$api/edits/$watch_edit:commit")"; then
     echo "  commit response: ${wout:-<empty>}"
+    # A FRESH edit for THIS read-back. The commit above invalidated the edit the phone verification
+    # used -- Play is single-writer per app -- so reading through that one answered "This Edit has
+    # been deleted.", which made a completely good watch publish report itself as a failure. (And the
+    # retry that followed then re-uploaded an already-committed version code.)
+    watch_verify_edit="$(call POST "$api/edits" | jq -r .id)"
     for track in "${phone_tracks[@]}"; do
-      seen="$(read_track "wear:$track")"
+      seen="$(read_track_in "$watch_verify_edit" "wear:$track")"
       echo "  wear:$track now holds: ${seen:-<nothing>}"
       for c in "${wear_codes[@]}"; do
         case ",$seen," in *",$c,"*) ;; *) echo "::warning::wear:$track does not hold $c"; watch_ok=0 ;; esac
       done
     done
+    call DELETE "$api/edits/$watch_verify_edit" >/dev/null || true
   else
     echo "::warning::the watch commit was refused -- the phone is published, the watch is not"
     watch_ok=0

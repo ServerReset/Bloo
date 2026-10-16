@@ -439,13 +439,25 @@ jobs:
             exit 1
           fi
           printf '%s' "$SA" > "$RUNNER_TEMP/play-sa.json"
-          # ONE retry. A Play edit is single-writer per app, so anything else holding one -- a
-          # concurrent run, the listing workflow, a stale edit left behind by a failed run -- makes
-          # ours expire mid-upload: "This edit has expired, please create a new Edit." A second
-          # attempt opens a fresh edit, and because the expired one was never committed, nothing is
-          # registered twice by re-uploading into it.
-          PLAY_SERVICE_ACCOUNT_JSON_FILE="$RUNNER_TEMP/play-sa.json" bash .github/play-upload.sh \
-            || PLAY_SERVICE_ACCOUNT_JSON_FILE="$RUNNER_TEMP/play-sa.json" bash .github/play-upload.sh
+          # A retry, but ONLY for an expired edit -- and the distinction matters more than the retry.
+          # A Play edit is single-writer per app, so anything else holding one (a concurrent run, the
+          # listing workflow, a stale edit) makes ours expire mid-flight, and a second attempt opens a
+          # fresh one and succeeds.
+          #
+          # Retrying anything else is actively harmful: a run whose release already COMMITTED and then
+          # failed on some later step would re-upload the same version code and be refused with
+          # "Version code N has already been used." -- turning a success into a louder failure.
+          if PLAY_SERVICE_ACCOUNT_JSON_FILE="$RUNNER_TEMP/play-sa.json" bash .github/play-upload.sh 2>&1 \
+               | tee "$RUNNER_TEMP/play.log"; then
+            exit 0
+          fi
+          if grep -q "edit has expired" "$RUNNER_TEMP/play.log"; then
+            echo "::warning::the edit expired mid-upload; retrying once with a fresh one"
+            PLAY_SERVICE_ACCOUNT_JSON_FILE="$RUNNER_TEMP/play-sa.json" bash .github/play-upload.sh
+          else
+            echo "::error::the upload failed for a reason other than an expired edit; not retrying"
+            exit 1
+          fi
   # Makes the build visible to the in-app updater (phone and watch) only once it is finished and the build
   # and the emulator tests both passed. Until then the release is a draft, which the updater cannot see.
   publish:
