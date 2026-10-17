@@ -101,8 +101,10 @@ internal fun Modifier.glassEdgeFocus(): Modifier {
             val bottom = top + h
             val topGate = (scroll.value / fadePx).coerceIn(0f, 1f)
             val bottomGate = ((scroll.maxValue - scroll.value) / fadePx).coerceIn(0f, 1f)
-            val intoTop = ((fadePx - top) / fadePx).coerceIn(0f, 1f) * topGate
-            val intoBottom = ((bottom - (vp - fadePx)) / fadePx).coerceIn(0f, 1f) * bottomGate
+            // A row bends only as its trailing edge slides off the top or its leading edge enters at the
+            // bottom, so a tall block stays crisp until it is almost gone, not for its whole length.
+            val intoTop = ((fadePx - bottom) / fadePx).coerceIn(0f, 1f) * topGate
+            val intoBottom = ((top - (vp - fadePx)) / fadePx).coerceIn(0f, 1f) * bottomGate
             val t = maxOf(intoTop, intoBottom)
             alpha = 1f - 0.55f * t
             // The pane bends the row as it slides under the edge: it flattens toward that edge and narrows a
