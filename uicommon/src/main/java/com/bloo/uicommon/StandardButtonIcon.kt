@@ -1,4 +1,6 @@
-package com.bloo.bluelink.ui
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
+package com.bloo.uicommon
 
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.animation.core.tween
@@ -49,6 +51,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.material3.MaterialTheme
 
 /**
  * The standard glyph for a button label, keyed on the user-facing string so one decision ("Copy
@@ -140,6 +144,12 @@ fun MorphButtonLabel(
     pending: Boolean,
     iconSize: Dp = ButtonIconSize,
     spinning: Boolean = false,
+    /**
+     * The label's type. A parameter rather than the constant because the same label layout is used by
+     * surfaces with their own type scale -- the watch has one, and a phone-sized button label is far
+     * too large on a 227dp face. Default unchanged, so no call site moves.
+     */
+    style: TextStyle = ButtonLabelStyle,
 ) {
     // Icon only: skip the Layout so no gap is reserved and the glyph stays centred.
     if (label.isEmpty()) {
@@ -153,7 +163,7 @@ fun MorphButtonLabel(
             // The one button label style, shared with MorphTextButton.
             RevealText(
                 label,
-                style = ButtonLabelStyle,
+                style = style,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 softWrap = false,
@@ -218,3 +228,16 @@ fun MorphButtonLabel(
 }
 
 // --- Pebble (expandable, reorderable section) -----------------------------
+
+/** Every button in the app is this tall, so a row of them lines up whatever it contains. */
+val ButtonTargetHeight = 56.dp
+
+/** The glyph beside a label. One size for push buttons, chips and icon buttons alike. */
+val ButtonIconSize = 18.dp
+
+/** The glyph in a label-less button (the expand chevron); larger because the icon IS the button. */
+val ButtonIconOnlySize = 24.dp
+
+/** The one label style every button uses. */
+val ButtonLabelStyle: TextStyle
+    @Composable get() = MaterialTheme.typography.titleMedium

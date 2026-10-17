@@ -62,6 +62,9 @@ dependencies {
     // between compose.material3 and the Wear OS companion's own wear.compose.material3. That
     // neutrality is spent: the watch app depends on the phone Material3 itself, so a shared component
     // can use it without either side having to change what it is.
-    implementation("androidx.compose.material3:material3")
+    // The SAME version :app pins. This module resolved material3 from the Compose BOM, which is
+    // older, so anything moved here that uses a newer Material3 API failed to resolve at all --
+    // LoadingIndicator did. Aligned before moving anything else across.
+    implementation("androidx.compose.material3:material3:1.5.0-alpha29")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
 }

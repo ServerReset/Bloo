@@ -25,6 +25,7 @@ import com.bloo.bluelink.data.chargerLabel
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.isPluggedOrCharging
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
 
 /**
  * Charge pebble: collapsed shows the charge start/stop control; expand to set the charge limits.

@@ -18,6 +18,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.MotionLong
+import com.bloo.uicommon.ButtonIconSize
 
 /**
  * The app's one inert (disabled) treatment: soften and fade whatever is inert, leaving its own

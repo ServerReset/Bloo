@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.layout.VerticalAlignmentLine
+import com.bloo.uicommon.MotionShort
 
 /**
  * Shared animation tokens and helpers: springs, expand/collapse transitions and the per-row
@@ -161,28 +162,4 @@ fun pebbleRowOvershoot(t: Float): Float {
     val c3 = overshoot + 1f
     val x = t - 1f
     return 1f + c3 * x * x * x + overshoot * x * x
-}
-
-/**
- * The app's one "working" spin, for any icon that turns while something loads: the first turn
- * accelerates from rest, then it holds a steady fast spin, and when [spinning] ends it decelerates
- * to the next full turn and resets. The Animatable only runs while spinning, so idle icons hold no
- * live animation.
- */
-@androidx.compose.runtime.Composable
-internal fun rememberSpinAngle(spinning: Boolean): androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D> {
-    val angle = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
-    androidx.compose.runtime.LaunchedEffect(spinning) {
-        if (spinning) {
-            angle.animateTo(angle.value + 360f, androidx.compose.animation.core.tween(850, easing = androidx.compose.animation.core.FastOutLinearInEasing))
-            while (true) {
-                angle.animateTo(angle.value + 360f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.LinearEasing))
-            }
-        } else if (angle.value != 0f) {
-            val target = kotlin.math.ceil(angle.value / 360f) * 360f
-            angle.animateTo(target, androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
-            angle.snapTo(0f)
-        }
-    }
-    return angle
 }

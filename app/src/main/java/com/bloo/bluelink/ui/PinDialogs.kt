@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.onClick
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
 
 // --- App PIN dialogs ------------------------------------------------------
 

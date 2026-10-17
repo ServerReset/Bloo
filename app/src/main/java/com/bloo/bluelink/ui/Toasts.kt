@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
+import com.bloo.uicommon.MotionShort
 
 private const val MaxToasts = 4
 

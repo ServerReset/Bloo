@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.update.UpdateInfo
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
 
 /**
  * Standalone update tile pinned below the hero whenever the checker finds a newer build (Bloo is

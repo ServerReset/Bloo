@@ -23,6 +23,7 @@ import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.openDeveloperOptions
 import com.bloo.bluelink.data.requestBackgroundUnrestricted
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
 
 /**
  * Ordered troubleshooting steps covering the two different ways this bar can fail to show

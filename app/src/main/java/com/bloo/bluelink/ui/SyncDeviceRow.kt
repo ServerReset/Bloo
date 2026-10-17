@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SyncMerge
 import com.bloo.uicommon.rememberConfirmArm
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.ButtonIconSize
 
 private const val ACTIVE_DEVICE_MS = 10L * 60 * 1000
 

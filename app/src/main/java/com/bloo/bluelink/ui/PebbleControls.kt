@@ -55,6 +55,9 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.MorphButtonLabel
+import com.bloo.uicommon.ButtonTargetHeight
 
 /** Hero image + gauge (expanded view). */
 @Composable

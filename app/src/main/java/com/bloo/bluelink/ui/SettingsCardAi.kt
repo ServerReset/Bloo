@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.runtime.Composable
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.setAiEnabled
+import com.bloo.uicommon.AppIcons
 
 /** The "AI" card: one switch, and what it does. */
 @Composable

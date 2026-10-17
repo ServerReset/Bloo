@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.ButtonIconOnlySize
 
 /** How long the chevron's one-shot easter-egg spin runs. */
 private const val ChevronSpinMs = 500

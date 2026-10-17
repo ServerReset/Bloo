@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.AppIcons
 
 /**
  * Command index for the search system: intent-based commands that act on vehicles or app state, as

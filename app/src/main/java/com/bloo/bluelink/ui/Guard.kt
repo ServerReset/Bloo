@@ -53,6 +53,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.MotionMedium
+import com.bloo.uicommon.MotionLong
+import com.bloo.uicommon.MorphButtonLabel
+import com.bloo.uicommon.ButtonTargetHeight
 
 @Composable
 internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {

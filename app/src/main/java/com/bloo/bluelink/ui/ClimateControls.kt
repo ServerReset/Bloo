@@ -63,6 +63,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.MotionShort
+import com.bloo.uicommon.MotionMedium
+import com.bloo.uicommon.ButtonTargetHeight
+import com.bloo.uicommon.ButtonIconSize
+import com.bloo.uicommon.ButtonIconGap
 
 /**
  * Reusable climate-control pieces: seat/wheel heat controls, preset pills and the charge-limit pill

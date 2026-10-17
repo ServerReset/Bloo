@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.GeoLocation
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.rememberSpinAngle
 
 /**
  * The "Me" button's action: centre the map on the phone. With no fix yet it asks for location (see

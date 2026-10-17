@@ -362,7 +362,7 @@ private fun WearCarPage(
                     tint = v.heroTint(),
                     progress = v.percent?.let { it / 100f },
                     ring = Modifier.fillMaxWidth().aspectRatio(1f),
-                    body = { WearQuickActions(actions, compact = true) },
+                    body = { WearQuickActions(actions) },
                 )
             }
             // The state and freshness lines sit UNDER the ring, not inside it: the circle holds the

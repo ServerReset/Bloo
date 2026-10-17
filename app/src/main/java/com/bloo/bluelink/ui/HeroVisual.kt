@@ -42,6 +42,7 @@ import coil.request.ImageRequest
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import kotlinx.coroutines.delay
+import com.bloo.uicommon.MotionLong
 
 /**
  * The hero's car-photo rendering: tonal fallback brush, photo backdrop, and the shared charge/fuel

@@ -39,6 +39,7 @@ import com.bloo.bluelink.data.syncUri
 import com.bloo.bluelink.data.syncWifiOnly
 import com.bloo.uicommon.rememberConfirmArm
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.ButtonIconSize
 
 /**
  * The "Backup & sync" card. Two ways to keep a setup safe: automatic Drive sync across devices (the

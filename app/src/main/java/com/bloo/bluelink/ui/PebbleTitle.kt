@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.MotionShort
 
 /**
  * The pebble header's title line: the title itself (which can swell on expand for the hero) with an

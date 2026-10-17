@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import com.bloo.bluelink.data.PinCrypto
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
 
 // --- The reusable onboarding setup cards (used by the setup deck and Settings) ---
 

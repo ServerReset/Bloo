@@ -27,6 +27,7 @@ import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
 
 /** Dialog to create or edit a [CustomPaletteData]. */
 @Composable

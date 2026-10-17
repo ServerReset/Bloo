@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.uicommon.SegmentOption
 import dev.chrisbanes.haze.HazeState
+import com.bloo.uicommon.ButtonTargetHeight
+import com.bloo.uicommon.ButtonLabelStyle
 
 /**
  * True while the Activity is in multi-window/split-screen/freeform mode. Set from

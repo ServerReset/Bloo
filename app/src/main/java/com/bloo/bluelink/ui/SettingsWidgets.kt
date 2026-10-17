@@ -55,6 +55,11 @@ import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.collapsedSections
 import kotlin.math.max
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.ButtonTargetHeight
+import com.bloo.uicommon.ButtonIconSize
+import com.bloo.uicommon.ButtonLabelStyle
+import com.bloo.uicommon.ButtonIconGap
 
 /** One option in a [MorphSegmented] control; re-exported from :uicommon. */
 typealias SegmentOption = com.bloo.uicommon.SegmentOption

@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
 
 /** The search bar itself (SearchPill) and its suggestions list (SearchSuggestions). */
 

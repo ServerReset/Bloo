@@ -167,24 +167,6 @@ internal val ExtraLargeShape = RoundedCornerShape(28.dp) // Modal dialogs
 // ---- Icons ----------------------------------------------------------------------
 //
 // Commonly used icons centralized to avoid duplicate imports.
-object AppIcons {
-  // Icons.Filled.X, not a bare `X`: these are extension properties, and a bare name would resolve
-  // to this very property (self-referencing initializer).
-  val Settings = Icons.Filled.Settings
-  val Lock = Icons.Filled.Lock
-  val Bolt = Icons.Filled.Bolt
-  val Close = Icons.Filled.Close
-  val ArrowForward = Icons.AutoMirrored.Filled.ArrowForward
-  val Search = Icons.Filled.Search
-  val Check = Icons.Filled.Check
-  val CheckCircle = Icons.Filled.CheckCircle
-  val Info = Icons.Filled.Info
-  val DirectionsCar = Icons.Filled.DirectionsCar
-  val AutoAwesome = Icons.Filled.AutoAwesome
-  val Warning = Icons.Filled.Warning
-  val Fullscreen = Icons.Filled.Fullscreen
-  val FullscreenExit = Icons.Filled.FullscreenExit
-}
 
 // ---- Blur -----------------------------------------------------------------------
 //
@@ -232,6 +214,3 @@ internal fun hairlineColor(): androidx.compose.ui.graphics.Color =
 // The handful of tween lengths the UI uses, so the same kind of transition takes the same time
 // everywhere. Springs set their own timing; these are for fades, slides and colour changes.
 internal const val MotionFast = 140    // micro feedback, hints leaving
-internal const val MotionShort = 180   // fades and small slides
-internal const val MotionMedium = 320  // panels, cards, colour sweeps
-internal const val MotionLong = 400    // large or emphasised moves

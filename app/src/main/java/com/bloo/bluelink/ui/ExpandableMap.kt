@@ -51,6 +51,8 @@ import com.bloo.bluelink.data.GeoLocation
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.MotionMedium
 
 /**
  * One entry in the full-screen map's bottom toolbar -- an icon, a label and an action, nothing

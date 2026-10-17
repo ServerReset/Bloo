@@ -3,6 +3,7 @@ package com.bloo.bluelink.wear
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.MorphButtonCore
+import com.bloo.uicommon.MorphButtonLabel
+import com.bloo.uicommon.standardButtonIcon
 import com.bloo.uicommon.RevealText
 
 /**
@@ -99,18 +102,26 @@ private fun IconBadge(icon: ImageVector, tint: Color = MaterialTheme.colorScheme
 @Composable
 fun WearActionRow(
     label: String,
-    icon: ImageVector,
+    /** Null asks the app's own vocabulary for the glyph this label uses (see [standardButtonIcon]). */
+    icon: ImageVector? = null,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     active: Boolean = false,
     switch: Boolean = false,
+    /** The command is in flight: the glyph becomes the app's shared spinner. */
+    pending: Boolean = false,
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
     val tint = if (active) scheme.onPrimary else scheme.onSecondaryContainer
+    // The app's glyph for this label when the caller has none, and the app's own icon+label layout --
+    // the one that drops the label rather than truncating a word, and swaps the glyph for the shared
+    // in-flight spinner. Boxed because the label has to take the row's spare width here, so the
+    // trailing switch indicator stays on the end.
+    val glyph = icon ?: standardButtonIcon(label)
     WearButton(
         active = active,
-        enabled = enabled,
+        enabled = enabled && !pending,
         modifier = modifier
             .fillMaxWidth()
             .then(
@@ -126,17 +137,32 @@ fun WearActionRow(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         onClick = onClick,
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        RevealText(
-            label,
-            fontWeight = FontWeight.SemiBold,
-            style = MaterialTheme.typography.labelLarge,
-            color = tint,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            if (glyph != null) {
+                // The shared label draws its glyph from LocalContentColor, so it has to be told which
+                // tone this row is in.
+                androidx.compose.runtime.CompositionLocalProvider(
+                    androidx.compose.material3.LocalContentColor provides tint,
+                ) {
+                    MorphButtonLabel(
+                        icon = glyph,
+                        label = label,
+                        pending = pending,
+                        iconSize = 18.dp,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            } else {
+                RevealText(
+                    label,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = tint,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
         if (switch) {
             Spacer(Modifier.width(8.dp))
             // A filled dot when on, a hollow ring when off -- drawn rather than an icon so it reads at

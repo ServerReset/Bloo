@@ -34,6 +34,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.MorphButtonCore
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.standardButtonIcon
+import com.bloo.uicommon.MorphButtonLabel
+import com.bloo.uicommon.ButtonTargetHeight
+import com.bloo.uicommon.ButtonLabelStyle
 
 /**
  * The one button style used across the app: rests as a **pill**, becomes a **rounded rectangle**
@@ -341,7 +345,6 @@ fun MorphActionButton(
 )
 
 /** Every button in the app is this tall, so a row of them lines up whatever it contains. */
-val ButtonTargetHeight = 56.dp
 
 /**
  * A lone button never grows wider than this, even when pressed to fill its row: a single action
@@ -350,10 +353,8 @@ val ButtonTargetHeight = 56.dp
 internal val MaxSingleButtonWidth = 480.dp
 
 /** The glyph beside a label. One size for push buttons, chips and icon buttons alike. */
-val ButtonIconSize = 18.dp
 
 /** The glyph in a label-less button (the expand chevron); larger because the icon IS the button. */
-val ButtonIconOnlySize = 24.dp
 
 /**
  * The smallest a standalone glyph control may be, in both axes: the glyph plus a comfortable tap
@@ -393,5 +394,3 @@ internal fun ButtonLabelText(text: String) {
 }
 
 /** The one label style every button uses. */
-val ButtonLabelStyle: TextStyle
-    @Composable get() = MaterialTheme.typography.titleMedium

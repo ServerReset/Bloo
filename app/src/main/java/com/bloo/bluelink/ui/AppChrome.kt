@@ -77,6 +77,7 @@ import kotlin.math.max
 import kotlinx.coroutines.delay
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.LocalPowerPolicy
+import com.bloo.uicommon.MotionMedium
 
 /** Shared app-wide chrome: the glass dialog shell and the animated aurora background. */
 

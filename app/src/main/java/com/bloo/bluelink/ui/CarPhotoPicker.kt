@@ -11,6 +11,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.flow.update
+import com.bloo.uicommon.MotionShort
+import com.bloo.uicommon.MotionMedium
 
 /** Ask for the photo picker for one car, from anywhere: Settings, search, or a plain-language request. */
 fun AppViewModel.requestPhotoPick(vin: String) = _state.update { it.copy(photoPickRequest = vin) }

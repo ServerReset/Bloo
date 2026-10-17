@@ -28,6 +28,7 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.isBackgroundUnrestricted
 import com.bloo.bluelink.data.openLiveUpdateSettings
 import com.bloo.bluelink.data.requestBackgroundUnrestricted
+import com.bloo.uicommon.AppIcons
 
 /**
  * Simple mode is the handful of switches most people want. Advanced adds the timing thresholds, the

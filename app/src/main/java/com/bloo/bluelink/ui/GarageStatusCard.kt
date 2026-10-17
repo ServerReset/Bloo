@@ -39,6 +39,8 @@ import dev.chrisbanes.haze.HazeState
 import kotlin.math.max
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.MotionLong
 
 // --- Garage status card -----------------------------------------------
 

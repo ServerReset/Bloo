@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.uicommon.AppIcons
 
 /**
  * The car's hero card: photo/visual on top, [ChargeFuelBar] below. Corner radius eases 24dp-40dp

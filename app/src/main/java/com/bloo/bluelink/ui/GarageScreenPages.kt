@@ -21,6 +21,8 @@ import androidx.compose.ui.platform.LocalDensity
 import com.bloo.bluelink.data.Vehicle
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.MotionMedium
 
 /**
  * True while the car pager is at rest (not being dragged or flung). Page content that is expensive to

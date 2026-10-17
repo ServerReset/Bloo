@@ -45,6 +45,7 @@ import com.bloo.bluelink.data.setSyncUri
 import com.bloo.bluelink.data.syncUri
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.AppIcons
 
 /**
  * Step 1: a short welcome + feature highlights, sharing [OnboardingTipListPage]'s shape (no

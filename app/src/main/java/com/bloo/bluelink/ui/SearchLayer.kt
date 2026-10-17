@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
 import dev.chrisbanes.haze.HazeState
+import com.bloo.uicommon.MotionMedium
 
 /** Which shape the search control is in: a bubble, a pill, or the full bar. */
 internal enum class SearchForm { BUBBLE, PILL, BAR }
