@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.WatchPinPolicy
 import com.bloo.bluelink.data.ensureNotificationChannel
 import com.bloo.bluelink.ioScope
 import kotlinx.coroutines.launch
@@ -76,22 +77,39 @@ object WearNotifier {
         val prefs = WearNotificationPrefs(app)
         ensureChannels(app)
         val manager = app.getSystemService(NotificationManager::class.java)
+        // A notification's action button CANNOT ask for a PIN -- there is nowhere to ask, and the
+        // shade is reachable without opening the app. So when the user has asked for a PIN before
+        // commands, the button is not offered at all: tapping the notification opens the app, which
+        // does ask. Showing a button that quietly skips the gate would make the gate advisory, and
+        // the whole reason someone turns it on is that the watch may not be on their wrist.
+        val pin = WatchPinStore(app)
+        val showStopAction = !(pin.hasPin && WatchPinPolicy.locksOnCommand(pin.timing))
         new.forEach { now ->
             val before = old.firstOrNull { it.vin == now.vin }
             val plan = planWearAlerts(before, now, prefs.current())
             val pct = now.percent
-            val id = now.vin.hashCode()
-            if (plan.chargingCard) manager.notify(id, chargingCard(app, now)) else manager.cancel(id)
+            val cardId = idFor(now.vin, "charging")
+            if (plan.chargingCard) manager.notify(cardId, chargingCard(app, now, showStopAction)) else manager.cancel(cardId)
             if (plan.chargeComplete) {
-                manager.notify(id + 1, alert(app, now, "${now.name} is charged", "Battery at $pct%", null))
+                manager.notify(idFor(now.vin, "complete"), alert(app, "${now.name} is charged", "Battery at $pct%"))
             }
             if (plan.lowBattery) {
-                manager.notify(id + 2, alert(app, now, "${now.name} battery is low", "$pct% left" + (now.rangeMi?.let { " · $it mi" } ?: ""), null))
+                manager.notify(idFor(now.vin, "low"), alert(app, "${now.name} battery is low", "$pct% left" + (now.rangeMi?.let { " · $it mi" } ?: "")))
             }
         }
     }
 
-    private fun chargingCard(app: Context, v: VehicleSnapshot) =
+    /**
+     * A notification id per (car, kind).
+     *
+     * These used to be `vin.hashCode()`, `+ 1` and `+ 2` -- ids that OVERLAP across cars: one car's
+     * "charged" alert lands on the same id as another car's charging card whenever the two hashes
+     * happen to be adjacent, so one silently replaces the other. Hashing the pair makes a collision as
+     * unlikely as it is for any single key, rather than near-certain for adjacent ones.
+     */
+    private fun idFor(vin: String, kind: String): Int = (vin + kind).hashCode()
+
+    private fun chargingCard(app: Context, v: VehicleSnapshot, showStopAction: Boolean) =
         NotificationCompat.Builder(app, CHANNEL_CHARGING)
             .setSmallIcon(R.drawable.ic_stat_bloo)
             .setContentTitle("${v.name} charging")
@@ -100,11 +118,18 @@ object WearNotifier {
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setContentIntent(openApp(app))
-            .apply { v.percent?.let { setProgress(100, it.coerceIn(0, 100), false) } }
-            .addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CHARGE_OFF))
+            .apply {
+                v.percent?.let { setProgress(100, it.coerceIn(0, 100), false) }
+                // No button when the user asked for a PIN before commands -- see onVehicles.
+                if (showStopAction) addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CHARGE_OFF))
+            }
             .build()
 
-    private fun alert(app: Context, v: VehicleSnapshot, title: String, text: String, action: String?) =
+    /**
+     * A one-shot alert. It takes no action button, and no longer takes an unused `action` parameter
+     * either: both call sites passed null, so the button it could have drawn never appeared.
+     */
+    private fun alert(app: Context, title: String, text: String) =
         NotificationCompat.Builder(app, CHANNEL_ALERTS)
             .setSmallIcon(R.drawable.ic_stat_bloo)
             .setContentTitle(title)
@@ -112,7 +137,6 @@ object WearNotifier {
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setContentIntent(openApp(app))
-            .apply { action?.let { addAction(0, "Do it", actionIntent(app, v.vin, it)) } }
             .build()
 
     private fun openApp(app: Context): PendingIntent = PendingIntent.getActivity(
