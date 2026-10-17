@@ -68,6 +68,10 @@ fun WearGarageScreen(
     modifier: Modifier = Modifier,
     /** Called once the post-restart PIN has opened the watch, so the activity can start its work. */
     onBootUnlocked: () -> Unit = {},
+    /** An action chosen on the watch's Tile, to run through the same gate as a tap on the face. */
+    tileRequest: WearMainActivity.TileRequest? = null,
+    /** Called once that action has been run, so the activity stops holding it. */
+    onTileRequestHandled: () -> Unit = {},
 ) {
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     var bootLocked by remember { mutableStateOf(WearBootGate.isLocked(appContext)) }
@@ -174,6 +178,10 @@ fun WearGarageScreen(
                 WearCarPage(
                     repo = repo,
                     v = v,
+                    // A Tile action belongs to the car the tile was showing, so only the page actually
+                    // on screen takes it: the pager composes its neighbours, and they would run it too.
+                    tileRequest = tileRequest?.takeIf { page == pagerState.currentPage },
+                    onTileRequestHandled = onTileRequestHandled,
                     requestCommand = { action ->
                         // Route every command through the PIN gate first.
                         val gated = pinStore.hasPin && WatchPinPolicy.requiresUnlock(
@@ -200,6 +208,8 @@ private fun WearCarPage(
     repo: WearSnapshotRepository,
     v: VehicleSnapshot,
     requestCommand: (((() -> Unit)) -> Unit),
+    tileRequest: WearMainActivity.TileRequest? = null,
+    onTileRequestHandled: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -207,12 +217,28 @@ private fun WearCarPage(
     val signedIn by WearCredentialSync.signedIn.collectAsStateWithLifecycle()
     val pendingCommands by WearCommands.pending.collectAsStateWithLifecycle()
     var confirmUnlock by remember { mutableStateOf(false) }
+    // An action chosen on the Tile. It runs through requestCommand, so the PIN gate, the pending
+    // state and the haptic result are the same as a tap on the face -- the tile is a second door into
+    // the same room, not a second room.
+    LaunchedEffect(tileRequest) {
+        val key = tileRequest?.key ?: return@LaunchedEffect
+        when (key) {
+            // Unlock is the one command that opens the car, so it asks once more, exactly as the button does.
+            WearMainActivity.ACTION_LOCK ->
+                if (v.locked == true) confirmUnlock = true else requestCommand { repo.lock(v.vin) }
+            WearMainActivity.ACTION_CLIMATE -> requestCommand { repo.climate(v.vin) }
+            WearMainActivity.ACTION_CHARGE -> requestCommand { repo.charge(v.vin) }
+            WearMainActivity.ACTION_FLASH -> requestCommand { repo.flashLights(v.vin) }
+        }
+        onTileRequestHandled()
+    }
     val lastResult by repo.lastCommandResult.collectAsStateWithLifecycle(initialValue = null)
     val updateAdvice by WearDataLayerSync.updateAdvice.collectAsStateWithLifecycle(initialValue = null)
-    // The update checker's own error, which was WRITTEN AND NEVER READ. It set "Download failed",
-    // "Allow installing apps, then tap again" and the exception text, and no screen collected it -- so
-    // a watch update that failed to download, or that needed the unknown-sources toggle, showed
-    // nothing at all. Exactly the silent failure the checker's own comments say they were avoiding.
+    // The update checker's own error, which used to be written and never read. It set "Download
+    // failed", "Allow installing apps, then tap again" and the exception text, and no screen collected
+    // it -- so a watch update that failed to download, or that needed the unknown-sources toggle,
+    // showed nothing at all. Exactly the silent failure the checker's own comments say they exist to
+    // avoid, with the plumbing already in place.
     val updateError by WearUpdateChecker.error.collectAsStateWithLifecycle(initialValue = null)
     val selfUpdate by WearUpdateChecker.available.collectAsStateWithLifecycle(initialValue = null)
     val downloading by WearUpdateChecker.downloading.collectAsStateWithLifecycle(initialValue = false)
@@ -289,10 +315,11 @@ private fun WearCarPage(
                 }
             }
 
-            // HERO, FULL SCREEN: the circle IS the page. The car's state and its four quick actions
+            // HERO, FULL SCREEN: the circle IS the page. The car's value and its four quick actions
             // live INSIDE it, so what the car is doing and the things you do about it are one object
             // rather than a badge with a list underneath. The ring takes the display's own width, so
-            // on a round watch the stroke sits at the bezel and everything else is inside it.
+            // on a round watch the stroke sits at the bezel. The state lines stay outside it: the
+            // circle holds the value and four 48dp targets and little else on a 227dp face.
             item {
                 val actions = buildList {
                     val locked = v.locked == true
