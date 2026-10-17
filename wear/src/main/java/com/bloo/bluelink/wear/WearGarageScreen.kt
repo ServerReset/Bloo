@@ -132,6 +132,9 @@ fun WearGarageScreen(
                 ScalingLazyColumn(state = rememberScalingLazyListState(), modifier = Modifier.fillMaxSize()) {
                     item { WearCenteredText("Sign in from your phone") }
                     item { WearHero(value = code, caption = "Confirm this code", tint = MaterialTheme.colorScheme.primary) }
+                    // The way out. Without it, cancelling on the phone left this screen covering the
+                    // whole watch with nothing to press.
+                    item { WearActionRow("Cancel", Icons.Filled.Close) { WearCredentialSync.cancel() } }
                 }
             }
             return@AppScaffold

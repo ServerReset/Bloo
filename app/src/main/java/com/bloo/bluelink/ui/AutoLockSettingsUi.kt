@@ -258,7 +258,7 @@ private fun AutoLockSetup(
             "Four things first. AutoLock does nothing at all until they are done, so none of its " +
                 "settings are here yet.",
         )
-        SectionDivider(alpha = 0.5f)
+        SectionDivider()
 
         StepRow("1. Bluetooth permission", if (bluetoothOk) "Granted" else "Not granted")
         BodySmallText("Lets Bloo recognise your car's head unit. Without it, a disconnect cannot be matched to a car.")
@@ -292,7 +292,7 @@ private fun AutoLockSetup(
             onClick = onChooseDevice,
         )
 
-        SectionDivider(alpha = 0.5f)
+        SectionDivider()
 
         // Optional on purpose, and last: the watcher notification is a real feature (it is the only
         // sign AutoLock is running), so hiding it is the user's call, not a prerequisite. Hiding it
@@ -416,7 +416,7 @@ private fun AutoLockSettings(
             ) { update(current.copy(dryRun = it)) }
 
             // Trying it out lives with the settings it exercises.
-            SectionDivider(alpha = 0.5f)
+            SectionDivider()
             SafeMorphTextButton(
                 "Simulate leaving",
                 enabled = current.isUsable,

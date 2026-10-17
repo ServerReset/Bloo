@@ -79,9 +79,20 @@ object WearCredentialSync {
         refresh(app)
     }
 
+    /**
+     * Give up on a sign-in the phone started.
+     *
+     * This is the way out of the code screen, and there was none: cancelling on the phone left the
+     * watch sitting on a code nobody was going to confirm, covering the entire UI, with no button and
+     * no timeout. The only escape was killing the app. The one-use transfer key goes with it.
+     */
+    fun cancel() {
+        _signInCode.value = null
+        runCatching { keyStore().deleteEntry(ALIAS) }
+    }
+
     /** Whether this watch holds a session of its own (and so can work without the phone). */
-    suspend fun hasSession(context: Context): Boolean =
-        runCatching { SessionStore(context.applicationContext).loggedInBrands().isNotEmpty() }
+    suspend fun hasSession(context: Context): Boolean =        runCatching { SessionStore(context.applicationContext).loggedInBrands().isNotEmpty() }
             .getOrDefault(false).also { _signedIn.value = it }
 
     /**

@@ -110,7 +110,7 @@ internal fun CarSettingsCard(
             ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
             PopVisible(visible = advanced) {
                 Column {
-                    SectionDivider(alpha = 0.5f)
+                    SectionDivider()
                     Spacer(Modifier.height(GapRow))
                     LabelText("Default start")
                     BodySmallText("What the Start button runs: smart climate, or one of your presets.")
@@ -142,7 +142,7 @@ internal fun CarSettingsCard(
             }
             BodySmallText("When the car was last serviced, and how often it is due.")
             if (advanced) {
-                SectionDivider(alpha = 0.5f)
+                SectionDivider()
                 SelectionContainer { StatusRow("VIN", v.vin) }
                 BlooTextField(
                     value = state.licensePlates[v.vin] ?: "",

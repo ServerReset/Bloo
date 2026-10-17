@@ -57,7 +57,7 @@ internal fun OnboardingClimatePage(
     // panel was the last outlinedPanel(12.dp) in the deck, and its divider was the only 0.35 in the app.
     Column(Modifier.fillMaxWidth().innerGlassPanel(GapSection)) {
         SeatPositions.forEachIndexed { i: Int, pos: SeatPosition ->
-            if (i > 0) SectionDivider(alpha = 0.5f)
+            if (i > 0) SectionDivider()
             SeatConfigRow(
                 pos.label,
                 pos.heat(sc),

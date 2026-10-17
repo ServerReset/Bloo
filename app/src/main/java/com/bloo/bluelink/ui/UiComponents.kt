@@ -177,7 +177,15 @@ internal fun IconLeadRow(
 
 /** A [HorizontalDivider] at the app's standard faint weight. */
 @Composable
-internal fun SectionDivider(modifier: Modifier = Modifier, alpha: Float = 0.3f) {
+/**
+ * The hairline between sections.
+ *
+ * 0.5 is the default because it is what every caller was passing by hand: the default used to be 0.3,
+ * which NOTHING used -- so the "default" was a value that never appeared on screen, and the divider's
+ * actual look was decided separately at six call sites. One caller still passes 0.35 for a
+ * deliberately lighter rule inside a panel.
+ */
+internal fun SectionDivider(modifier: Modifier = Modifier, alpha: Float = 0.5f) {
     HorizontalDivider(modifier = modifier, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = alpha))
 }
 

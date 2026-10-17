@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -55,7 +54,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
 import dev.chrisbanes.haze.HazeState
@@ -290,7 +288,7 @@ internal fun LoginScreen(
                                         Brand.KIA_CA -> "https://www.kia.ca/en/owners"
                                         Brand.HYUNDAI_EU -> "https://www.hyundai.com/eu/en/owners.html"
                                     }
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, forgotUrl.toUri()))
+                                    openUrl(context, forgotUrl)
                                 },
                             )
                             if (onCancel != null) {
@@ -326,7 +324,7 @@ internal fun LoginScreen(
                                 onClick = {
                                     val url = updateAvailableUrl
                                     if (url != null) {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                                        openUrl(context, url)
                                     } else {
                                         onCheckForUpdates()
                                     }
