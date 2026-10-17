@@ -45,8 +45,8 @@ internal fun Modifier.outlinedPanel(padding: Dp = 12.dp): Modifier =
 @Composable
 internal fun Modifier.innerGlassPanel(padding: Dp = GapSection): Modifier =
     this.clip(StandardShape)
-        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.30f), StandardShape)
-        .glassRim(StandardShape)
+        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.38f), StandardShape)
+        .liquidRim(StandardShape)
         .padding(padding)
 
 /**

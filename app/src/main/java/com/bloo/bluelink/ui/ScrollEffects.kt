@@ -80,6 +80,7 @@ internal val LocalEdgeScroll = androidx.compose.runtime.staticCompositionLocalOf
 @Composable
 internal fun Modifier.glassEdgeFocus(): Modifier {
     val edge = LocalEdgeScroll.current ?: return this
+    val motion = LocalContentMotion.current
     var y by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     var h by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -87,7 +88,11 @@ internal fun Modifier.glassEdgeFocus(): Modifier {
     val maxBlurPx = with(density) { 4.dp.toPx() }
     val blurOk = canBlurBackdrops()
     return this
-        .onGloballyPositioned { y = it.positionInWindow().y; h = it.size.height.toFloat() }
+        .onGloballyPositioned {
+            // Not while the car pager is swiping: the page's window position moves with the swipe, and every
+            // write would redraw every row for nothing (rows near an edge only matter once it rests).
+            if (!motion.pager.value) { y = it.positionInWindow().y; h = it.size.height.toFloat() }
+        }
         .graphicsLayer {
             val vp = edge.viewportPx.value.toFloat()
             val scroll = edge.scroll

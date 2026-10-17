@@ -136,8 +136,26 @@ internal fun ExpandedCar(
         // Read only in the hot seat's offset (layout phase): as composition state it recomposed this whole
         // page on every swipe frame, since the window position moves with the pager.
         val pageOrigin = remember { arrayOf(Offset.Zero) }
+        // The page's scrolling edges, for the liquid-glass distortion of anything sliding under the status bar
+        // or the bottom bar: the viewport is the page less the two insets, in window coordinates.
+        val edgeViewportPx = remember { androidx.compose.runtime.mutableIntStateOf(0) }
+        val edgeWindowTop = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+        val edgeScroll = remember(pebblesScroll) { EdgeScroll(pebblesScroll, edgeViewportPx, edgeWindowTop) }
+        val edgeDensity = androidx.compose.ui.platform.LocalDensity.current
+        val edgeTopPx = with(edgeDensity) { topInset.toPx() }
+        val edgeBottomPx = with(edgeDensity) { bottomInset.toPx() }
+        val contentMotion = LocalContentMotion.current
+        androidx.compose.runtime.CompositionLocalProvider(LocalEdgeScroll provides edgeScroll) {
         Box(
-            Modifier.fillMaxSize().onGloballyPositioned { pageOrigin[0] = it.localToWindow(Offset.Zero) },
+            Modifier.fillMaxSize().onGloballyPositioned {
+                val origin = it.localToWindow(Offset.Zero)
+                pageOrigin[0] = origin
+                // Not mid-swipe: the page's window position moves with the swipe (see glassEdgeWarp).
+                if (!contentMotion.pager.value) {
+                    edgeWindowTop.floatValue = origin.y + edgeTopPx
+                    edgeViewportPx.intValue = (it.size.height - edgeTopPx - edgeBottomPx).toInt().coerceAtLeast(0)
+                }
+            },
             contentAlignment = Alignment.TopCenter,
         ) {
             Column(
@@ -157,7 +175,7 @@ internal fun ExpandedCar(
                             // every horizontal swipe (the columns scroll vertically only, so a
                             // horizontal drag falls through to it).
                             CarHeaderRow(v, state, hazeState = hazeState)
-                            CriticalContent(v, state, vm, heroAction = heroAction)
+                            Box(Modifier.glassEdgeWarp()) { CriticalContent(v, state, vm, heroAction = heroAction) }
                             // The hot seat lives only in the full-screen two-column view; collapsed,
                             // its pinned pebbles are ordinary members of the stack below. Its reveal
                             // rides the reflow fraction itself (measure/draw only, never recomposed).
@@ -195,6 +213,7 @@ internal fun ExpandedCar(
                     },
                 )
             }
+        }
         }
     }
     }

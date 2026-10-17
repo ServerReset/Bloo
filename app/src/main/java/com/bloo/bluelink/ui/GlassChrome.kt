@@ -5,9 +5,9 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Box
 import dev.chrisbanes.haze.HazePerformanceMode
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -82,9 +82,44 @@ internal fun Modifier.pebbleCardEdge(shape: Shape): Modifier {
     val dark = appIsDarkTheme()
     // The outline is always on. Dark adds the drop shadow and a firmer line; light has no shadow at all and
     // a light hairline, so a pale pebble on a pale page still has an edge without anything sticking out.
-    val rim = MaterialTheme.colorScheme.outline.copy(alpha = if (dark) 0.55f else 0.30f)
-    return (if (dark) this.dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp) else this)
-        .border(BorderStroke(if (dark) 1.dp else 0.75.dp, rim), shape)
+    return (if (dark) this.dropShadow(shape, blurRadius = 14.dp, offsetY = 5.dp) else this)
+        .liquidRim(shape, dark)
+}
+
+/**
+ * The liquid-glass edge: a thin line brightest where light would catch it (the top-left), fading through the
+ * middle to a fainter catch at the bottom-right, plus a soft inner glow along the top lip. It is what makes a
+ * frosted card read as a pane of glass lying OVER the page, and it is a static draw (one stroke, one gradient
+ * per size), so every card can wear it.
+ */
+@Composable
+internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()): Modifier {
+    val scheme = MaterialTheme.colorScheme
+    val highlight = Color.White
+    val edge = scheme.outline
+    return this.drawWithCache {
+        val outline = shape.createOutline(size, layoutDirection, this)
+        val line = 1.25.dp.toPx()
+        val rim = androidx.compose.ui.graphics.Brush.linearGradient(
+            0f to highlight.copy(alpha = if (dark) 0.62f else 0.9f),
+            0.38f to edge.copy(alpha = if (dark) 0.22f else 0.20f),
+            0.62f to edge.copy(alpha = if (dark) 0.14f else 0.16f),
+            1f to highlight.copy(alpha = if (dark) 0.28f else 0.55f),
+            start = androidx.compose.ui.geometry.Offset.Zero,
+            end = androidx.compose.ui.geometry.Offset(size.width, size.height),
+        )
+        val lip = androidx.compose.ui.graphics.Brush.verticalGradient(
+            0f to highlight.copy(alpha = if (dark) 0.14f else 0.35f),
+            1f to Color.Transparent,
+            endY = minOf(size.height, 28.dp.toPx()),
+        )
+        onDrawWithContent {
+            drawContent()
+            // The lip is clipped to the shape's outline by drawing it as the outline's own fill.
+            drawOutline(outline, lip)
+            drawOutline(outline, rim, style = androidx.compose.ui.graphics.drawscope.Stroke(line))
+        }
+    }
 }
 
 // ---- One floating-glass surface, everywhere -------------------------------
@@ -146,7 +181,7 @@ internal val LocalBackdropHaze = androidx.compose.runtime.staticCompositionLocal
 /**
  * Tint kept by a glass card over the blur: enough to read text on, little enough to look frosted.
  */
-private const val GlassCardTintAlpha = 0.26f
+private const val GlassCardTintAlpha = 0.34f
 
 /**
  * The one glass-sheen brush: light from the top-left fading across, so a surface reads as glass
@@ -237,7 +272,7 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
 private val StandardBlurRadius = 20.dp
 
 /** The blur radius cards use; see [appHazeEffect]'s `cheap`. */
-private val CardBlurRadius = 12.dp
+private val CardBlurRadius = 22.dp
 
 /**
  * A drop shadow at the weight the current theme can carry: full strength in dark, a soft contact

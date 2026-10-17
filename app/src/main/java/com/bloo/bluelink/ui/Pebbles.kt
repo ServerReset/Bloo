@@ -198,11 +198,11 @@ internal fun PebbleList(
         Box(
             // Only where there is a hot seat to fly to (the full-screen view): elsewhere this was a callback per
             // row on every scroll frame, doing nothing.
-            if (hotDrag != null) {
+            (if (hotDrag != null) {
                 Modifier.onGloballyPositioned { coords -> hotDrag.stackSlot[section] = coords.localToWindow(Offset.Zero) }
             } else {
                 Modifier
-            },
+            }).glassEdgeWarp(),
         ) {
             val rowVisible = section in sections && (section !in pinned || hotDrag?.returning == section)
             val rowState = remember(section) { MutableTransitionState(!columnSettled && rowVisible) }
