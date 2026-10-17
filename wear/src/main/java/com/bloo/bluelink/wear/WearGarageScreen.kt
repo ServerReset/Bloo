@@ -3,7 +3,9 @@ package com.bloo.bluelink.wear
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -287,38 +289,10 @@ private fun WearCarPage(
                 }
             }
 
-            // HERO: the car, at a glance. Name as the caption, the one thing you look at a watch
-            // for as the big value.
-            item {
-                WearHero(
-                    value = v.bigValue(),
-                    caption = v.name,
-                    tint = v.heroTint(),
-                    progress = v.percent?.let { it / 100f },
-                )
-            }
-            v.stateLine()?.let { line ->
-                item {
-                    WearCenteredText(
-                        line,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Normal,
-                    )
-                }
-            }
-
-            v.updatedLabel()?.let { updated ->
-                item {
-                    WearCenteredText(
-                        "Updated $updated",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (v.isStale()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Normal,
-                    )
-                }
-            }
-
+            // HERO, FULL SCREEN: the circle IS the page. The car's state and its four quick actions
+            // live INSIDE it, so what the car is doing and the things you do about it are one object
+            // rather than a badge with a list underneath. The ring takes the display's own width, so
+            // on a round watch the stroke sits at the bezel and everything else is inside it.
             item {
                 val actions = buildList {
                     val locked = v.locked == true
@@ -342,7 +316,37 @@ private fun WearCarPage(
                         add(WearQuickAction("Flash", Icons.Filled.FlashOn, pending = WearCommands.key(v.vin, CarAction.FLASH_LIGHTS) in pendingCommands) { requestCommand { repo.flashLights(v.vin) } })
                     }
                 }
-                WearQuickActions(actions)
+                WearHero(
+                    value = v.bigValue(),
+                    caption = v.name,
+                    tint = v.heroTint(),
+                    progress = v.percent?.let { it / 100f },
+                    ring = Modifier.fillMaxWidth().aspectRatio(1f),
+                    body = { WearQuickActions(actions, compact = true) },
+                )
+            }
+            // The state and freshness lines sit UNDER the ring, not inside it: the circle holds the
+            // value and four 48dp targets and little else on a 227dp face, and these two read fine as
+            // the first thing past the fold.
+            v.stateLine()?.let { line ->
+                item {
+                    WearCenteredText(
+                        line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Normal,
+                    )
+                }
+            }
+            v.updatedLabel()?.let { updated ->
+                item {
+                    WearCenteredText(
+                        "Updated $updated",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (v.isStale()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Normal,
+                    )
+                }
             }
             if (signedIn) {
                 item { WearActionRow(label = "Refresh", icon = Icons.Filled.Refresh) { repo.refresh() } }

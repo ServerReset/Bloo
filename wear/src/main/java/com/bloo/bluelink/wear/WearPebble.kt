@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -175,9 +177,23 @@ fun WearHero(
     caption: String,
     tint: Color = MaterialTheme.colorScheme.primary,
     progress: Float? = null,
+    /**
+     * The ring's own size. A parameter rather than a constant because the SAME hero is the page's
+     * small at-a-glance readout and, in full screen, the whole display: the caller passes
+     * `Modifier.fillMaxWidth().aspectRatio(1f)` and the circle becomes the watch's face.
+     */
+    ring: Modifier = Modifier.size(136.dp),
+    /**
+     * What goes INSIDE the ring, under the value. The full-screen hero puts the quick actions here, so
+     * the circle is the page rather than a badge above it.
+     */
+    body: (@Composable () -> Unit)? = null,
 ) {
     val text: @Composable () -> Unit = {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             // The standard rolling value, entered through :uicommon's AnimatedValue so the watch's
             // hero (battery %, lock state) rolls like the phone's.
             com.bloo.uicommon.AnimatedValue(
@@ -200,6 +216,7 @@ fun WearHero(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            body?.invoke()
         }
     }
     if (progress == null) {
@@ -216,16 +233,14 @@ fun WearHero(
     val track = tint.copy(alpha = 0.18f)
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Box(
-            Modifier
-                .size(136.dp)
-                .drawBehind {
-                    val stroke = 9.dp.toPx()
-                    val inset = stroke / 2
-                    val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
-                    val topLeft = androidx.compose.ui.geometry.Offset(inset, inset)
-                    drawArc(track, -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
-                    drawArc(tint, -90f, 360f * sweep, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
-                },
+            ring.drawBehind {
+                val stroke = 9.dp.toPx()
+                val inset = stroke / 2
+                val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
+                val topLeft = androidx.compose.ui.geometry.Offset(inset, inset)
+                drawArc(track, -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+                drawArc(tint, -90f, 360f * sweep, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+            },
             contentAlignment = Alignment.Center,
         ) { text() }
     }
@@ -247,8 +262,57 @@ data class WearQuickAction(
  * button.
  */
 @Composable
-fun WearQuickActions(actions: List<WearQuickAction>, modifier: Modifier = Modifier) {
+fun WearQuickActions(
+    actions: List<WearQuickAction>,
+    modifier: Modifier = Modifier,
+    /**
+     * Icon-only circles rather than labelled pills, for use INSIDE the full-screen hero ring.
+     *
+     * The hero's ring fills the display's bounding square, and a round display only fills the circle
+     * inside it. A labelled 2x2 grid sits in that square's lower half, so its outer corners land
+     * outside the bezel; the same grid as 52dp circles is 114dp across, which stays within the circle
+     * with the value above it. The label is not lost -- it becomes the button's spoken description.
+     */
+    compact: Boolean = false,
+) {
     val scheme = MaterialTheme.colorScheme
+    if (compact) {
+        Column(
+            modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            actions.chunked(2).forEach { row ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    row.forEach { a ->
+                        Surface(
+                            onClick = a.onClick,
+                            enabled = !a.pending,
+                            shape = CircleShape,
+                            color = if (a.active) scheme.primary else scheme.secondaryContainer,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .semantics { contentDescription = a.label },
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                val tint = if (a.active) scheme.onPrimary else scheme.onSecondaryContainer
+                                Icon(
+                                    a.icon,
+                                    contentDescription = null,
+                                    tint = tint.copy(alpha = if (a.pending) 0.4f else 1f),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
     Column(modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         actions.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
