@@ -23,6 +23,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.launch
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -52,19 +54,32 @@ fun WearPinScreen(
 ) {
     var entered by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
+    // A wrist is often not looked at: a right PIN buzzes yes, a wrong one buzzes no, and the dots shake.
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val shake = remember { androidx.compose.animation.core.Animatable(0f) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    fun reject() {
+        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Reject)
+        scope.launch {
+            for (x in listOf(10f, -8f, 6f, -4f, 0f)) shake.animateTo(x, androidx.compose.animation.core.tween(45))
+        }
+    }
 
     fun submit(pin: String) {
         when (val result = store.verify(pin)) {
             is PinVerifyResult.Ok -> {
+                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
                 entered = ""
                 message = null
                 onUnlocked()
             }
             is PinVerifyResult.Wrong -> {
+                reject()
                 entered = ""
                 message = "Wrong PIN"
             }
             is PinVerifyResult.LockedOut -> {
+                reject()
                 entered = ""
                 message = "Locked. Try again in ${com.bloo.bluelink.data.formatLockoutSeconds(result.remainingMs)}"
             }
@@ -95,7 +110,7 @@ fun WearPinScreen(
             )
             // Dots for the entered digits -- never the digits themselves. A fixed height so the keypad
             // does not jump down when the first digit lands.
-            Row(Modifier.height(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.height(12.dp).graphicsLayer { translationX = shake.value * density }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 repeat(entered.length.coerceAtMost(8)) {
                     Box(Modifier.size(10.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
                 }
