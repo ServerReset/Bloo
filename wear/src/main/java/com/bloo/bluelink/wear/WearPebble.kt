@@ -14,10 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,17 +70,6 @@ fun WearPebble(
             )
         }
         body()
-    }
-}
-
-/**
- * The small tinted circle a pebble's leading glyph sits in -- the phone's own card-header language
- * (a tonal icon badge) at watch scale, so a pebble reads the same on both surfaces.
- */
-@Composable
-private fun IconBadge(icon: ImageVector, tint: Color = MaterialTheme.colorScheme.primary) {
-    Surface(shape = CircleShape, color = tint.copy(alpha = 0.18f), modifier = Modifier.size(28.dp)) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.padding(6.dp))
     }
 }
 

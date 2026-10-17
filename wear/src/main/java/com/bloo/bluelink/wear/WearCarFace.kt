@@ -199,7 +199,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
     MorphButton(
         onClick = action.onClick,
         modifier = modifier.semantics { contentDescription = action.label }
-            .quarterRim(quadrant, shape(0f)),
+            .wearGlassRim(shape(0f)),
         enabled = !action.pending,
         frostWhenDisabled = false,
         active = action.active,
@@ -321,13 +321,3 @@ fun faceTint(percent: Int?, charging: Boolean, fallback: Color): Color = when {
 const val LowLevel = 15
 const val WarnLevel = 30
 
-/** The glass rim of a quarter: a hairline brighter toward the outer corner, like the phone's cards. */
-private fun Modifier.quarterRim(quadrant: Int, shape: RoundedCornerShape): Modifier =
-    this.border(
-        1.dp,
-        androidx.compose.ui.graphics.Brush.linearGradient(
-            if (quadrant == 0 || quadrant == 1) listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.04f))
-            else listOf(Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.22f)),
-        ),
-        shape,
-    )
