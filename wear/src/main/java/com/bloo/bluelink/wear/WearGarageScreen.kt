@@ -14,6 +14,9 @@ import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FlashOn
@@ -127,47 +130,27 @@ fun WearGarageScreen(
             return@AppScaffold
         }
         signInCode?.let { code ->
-            ScreenScaffold(timeText = { TimeText() }) {
-                ScalingLazyColumn(state = rememberScalingLazyListState(), modifier = Modifier.fillMaxSize()) {
-                    item { WearCenteredText("Sign in from your phone") }
-                    item { WearHero(value = code, caption = "Confirm this code", tint = MaterialTheme.colorScheme.primary) }
-                    // The way out. Without it, cancelling on the phone left this screen covering the
-                    // whole watch with nothing to press.
-                    item { WearActionRow("Cancel", Icons.Filled.Close) { WearCredentialSync.cancel() } }
-                }
+            // The way out is the ✕ beside the code: cancelling on the phone alone left this screen covering the
+            // whole watch with nothing to press.
+            WearMessageScreen(
+                icon = Icons.Filled.Watch,
+                title = "Sign in from your phone",
+                detail = "Check this code matches the phone.",
+            ) {
+                WearHero(value = code, caption = "", tint = MaterialTheme.colorScheme.primary)
+                WearActionRow("Cancel", Icons.Filled.Close) { WearCredentialSync.cancel() }
             }
             return@AppScaffold
         }
         if (vehicles.isEmpty()) {
-            ScreenScaffold(timeText = { TimeText() }) {
-                ScalingLazyColumn(state = rememberScalingLazyListState(), modifier = Modifier.fillMaxSize()) {
-                    item {
-                        WearCenteredText(
-                            if (connected) "No cars on your phone yet" else "Waiting for your phone…",
-                        )
-                    }
-                    // What to do about it, on the screen itself. This used to be one bare line, so
-                    // "Waiting for your phone…" was the whole answer: nothing said that the phone has
-                    // to be running Bloo, or that the two have to be paired, or that this is a state
-                    // the watch gets itself out of. `connected` is a live StateFlow fed by the Data
-                    // Layer, so this clears the moment the phone appears -- there is deliberately no
-                    // "Check again" button, because there is nothing a tap could do that waiting
-                    // will not.
-                    item {
-                        WearCenteredText(
-                            text = if (connected) {
-                                "Add a car in Bloo on your phone."
-                            } else {
-                                "Open Bloo on your phone and keep it near the watch."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = null,
-                            maxLines = 3,
-                        )
-                    }
-                }
-            }
+            // What to do about it, on the screen itself. `connected` is a live StateFlow fed by the Data Layer,
+            // so this clears the moment the phone appears; there is no "Check again", because a tap could do
+            // nothing that waiting will not.
+            WearMessageScreen(
+                icon = if (connected) Icons.Filled.DirectionsCar else Icons.Filled.PhoneAndroid,
+                title = if (connected) "No cars yet" else "Waiting for your phone",
+                detail = if (connected) "Add a car in Bloo on your phone." else "Open Bloo on your phone and keep it near the watch.",
+            )
             return@AppScaffold
         }
         val pagerState = rememberPagerState(pageCount = { vehicles.size })
@@ -279,18 +262,15 @@ private fun WearCarPage(
 
     // Unlocking is the one command that opens the car, so it asks once more.
     if (confirmUnlock) {
-        ScreenScaffold(timeText = { TimeText() }) {
-            ScalingLazyColumn(state = rememberScalingLazyListState(), modifier = Modifier.fillMaxSize()) {
-                item { WearCenteredText("Unlock ${v.name}?") }
-                item {
-                    WearActionRow("Unlock", Icons.Filled.LockOpen) {
-                        confirmUnlock = false
-                        requestCommand { repo.lock(v.vin) }
-                    }
-                }
-                item { WearActionRow("Cancel", Icons.Filled.Close) { confirmUnlock = false } }
-            }
-        }
+        WearConfirmScreen(
+            icon = Icons.Filled.LockOpen,
+            title = "Unlock ${v.name}?",
+            detail = "The doors open for anyone nearby.",
+            confirmLabel = "Unlock",
+            destructive = true,
+            onConfirm = { confirmUnlock = false; requestCommand { repo.lock(v.vin) } },
+            onCancel = { confirmUnlock = false },
+        )
         return
     }
     ScreenScaffold(scrollState = listState, timeText = { TimeText() }) {
