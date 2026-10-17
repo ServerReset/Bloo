@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -59,8 +58,8 @@ import com.bloo.uicommon.standardButtonIcon
  */
 
 /** The ring's stroke and the gap between it and the tiles inside it. */
-private val RingStroke = 10.dp
-private val RingGap = 6.dp
+private val RingStroke = 8.dp
+private val RingGap = 5.dp
 
 /** The gap between the four quarter tiles (the cross through the middle of the face). */
 private val TileGap = 6.dp
@@ -87,13 +86,22 @@ fun WearCarFace(
     stale: Boolean = false,
     /** A short line that takes the caption's place for a moment ("Sending…", "Done", "Updated 2 h ago"). */
     status: FaceStatus? = null,
+    /** A refresh is in flight: the light travels the ring as it does while charging. */
+    refreshing: Boolean = false,
 ) {
-    Box(modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+    // The aurora, at watch scale: a soft wash of the level's colour behind the tiles, as the phone's
+    // background washes behind its cards. Drawn once, no animation.
+    Box(
+        modifier.background(androidx.compose.ui.graphics.Brush.radialGradient(
+            listOf(tint.copy(alpha = 0.22f), Color.Transparent),
+        )),
+        contentAlignment = Alignment.Center,
+    ) {
         WearEdgeRing(
             progress = progress,
             tint = tint,
             modifier = Modifier.fillMaxSize().alpha(if (stale) 0.5f else 1f),
-            charging = charging,
+            charging = charging || refreshing,
         )
         Box(Modifier.fillMaxSize().padding(RingStroke + RingGap), contentAlignment = Alignment.Center) {
             WearQuadrantGrid(actions = actions, modifier = Modifier.fillMaxSize())

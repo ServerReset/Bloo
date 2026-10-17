@@ -273,32 +273,18 @@ private fun WearCarPage(
         )
         return
     }
-    ScreenScaffold(scrollState = listState, timeText = { TimeText() }) {
-        ScalingLazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .pullToRefresh(isRefreshing = refreshing, state = pullState, onRefresh = { repo.refresh() }),
-            // THE round-display mechanic, and it is the standard component rather than something
-            // hand-rolled: ScalingLazyColumn scales each item by where it sits on the circle -- full
-            // size at the centre, shrinking toward the edges -- so a pebble grows as the crown brings
-            // it in and shrinks as it leaves.
-            //
-            // These are the DEFAULTS, written out and turned up. Default scaling is gentle enough that
-            // on a full-width pebble you cannot see it; 0.62 at the edge against 1.0 at the centre is
-            // the same mechanic with the effect actually legible. maxElementScale stays at 1f so the
-            // centred item is never enlarged past its own size, which on a round screen would push its
-            // corners under the bezel.
-            scalingParams = ScalingLazyColumnDefaults.scalingParams(
-                edgeScale = 0.62f,
-            ),
-            // Generous vertical inset so the hero and the top pebble clear the bezel; Wear's
-            // auto-centring then keeps the focused item centred as the crown scrolls.
-            contentPadding = PaddingValues(vertical = 18.dp),
-        ) {
-            // THE FACE: the charge (or fuel) as a ring at the display's edge, and the car's four actions as
-            // quarter circles inside it, with the value where they meet (WearCarFace).
-            item {
+    val pageState = androidx.wear.compose.foundation.pager.rememberPagerState(pageCount = { 2 })
+    // Page 0 is the face, full-bleed so its ring IS the display's edge and is centred on it; page 1 is the
+    // car's details. The pull-down refresh lives on the pager, so it works from the face (nothing above it
+    // to scroll) exactly the way the phone's does.
+    androidx.wear.compose.foundation.pager.VerticalPager(
+        state = pageState,
+        modifier = Modifier
+            .fillMaxSize()
+            .pullToRefresh(isRefreshing = refreshing, state = pullState, onRefresh = { repo.refresh() }),
+    ) { index ->
+        if (index == 0) {
+            ScreenScaffold(timeText = { TimeText() }) {
                 val actions = buildList {
                     val locked = v.locked == true
                     add(WearQuickAction(
@@ -322,6 +308,7 @@ private fun WearCarPage(
                     }
                 }
                 WearCarFace(
+                    modifier = Modifier.fillMaxSize(),
                     value = v.bigValue(),
                     caption = v.name,
                     progress = v.percent?.let { it / 100f },
@@ -329,9 +316,18 @@ private fun WearCarPage(
                     actions = actions,
                     charging = v.charging == true,
                     stale = v.isStale(),
-                    status = faceStatus,
+                    status = if (refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
+                    refreshing = refreshing,
                 )
             }
+        } else {
+    ScreenScaffold(scrollState = listState, timeText = { TimeText() }) {
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 0.62f),
+            contentPadding = PaddingValues(vertical = 18.dp),
+        ) {
             // The car's details, one pebble past the face, with the refresh where the freshness is.
             item { WearStatusPebble(v, refreshing = refreshing, canRefresh = signedIn, onRefresh = { repo.refresh() }) }
             // The update error, shown where the update lives. It used to go nowhere at all.
@@ -372,6 +368,8 @@ private fun WearCarPage(
                     )
                 }
             }
+        }
+    }
         }
     }
 }
