@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,7 +28,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -44,12 +42,10 @@ import androidx.wear.compose.material3.HorizontalPageIndicator
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
-import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.isStale
-import com.bloo.bluelink.data.stateLine
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.data.WatchPinPolicy
 import com.bloo.bluelink.data.supportsHornLights
@@ -261,6 +257,22 @@ private fun WearCarPage(
             haptics.performHapticFeedback(if (it.ok) HapticFeedbackType.Confirm else HapticFeedbackType.Reject)
         }
     }
+    // The hub's moment line: "Sending…" while a command is out, the result for a few seconds after, and
+    // otherwise a warning when the reading is old -- the face says what is happening without a toast.
+    var recentResult by remember { mutableStateOf<com.bloo.bluelink.data.WatchCommandResult?>(null) }
+    LaunchedEffect(lastResult) {
+        val r = lastResult?.takeIf { it.vin == v.vin } ?: return@LaunchedEffect
+        recentResult = r
+        kotlinx.coroutines.delay(FaceResultMs)
+        if (recentResult == r) recentResult = null
+    }
+    val sending = pendingCommands.any { it.startsWith("${v.vin}:") }
+    val faceStatus = when {
+        sending -> FaceStatus("Sending…")
+        recentResult != null -> if (recentResult!!.ok) FaceStatus("Done") else FaceStatus("Didn't go through", error = true)
+        v.isStale() -> v.updatedLabel()?.let { FaceStatus("Updated $it", error = true) }
+        else -> null
+    }
     val updateRun = selfUpdate ?: updateAdvice?.let {
         com.bloo.bluelink.data.WorkflowRun(it.runNumber, htmlUrl = "", watchApkUrl = it.apkUrl)
     }
@@ -333,36 +345,15 @@ private fun WearCarPage(
                     value = v.bigValue(),
                     caption = v.name,
                     progress = v.percent?.let { it / 100f },
-                    tint = v.heroTint(),
+                    tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
                     actions = actions,
+                    charging = v.charging == true,
+                    stale = v.isStale(),
+                    status = faceStatus,
                 )
             }
-            // The state and freshness lines sit UNDER the ring, not inside it: the circle holds the
-            // value and four 48dp targets and little else on a 227dp face, and these two read fine as
-            // the first thing past the fold.
-            v.stateLine()?.let { line ->
-                item {
-                    WearCenteredText(
-                        line,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Normal,
-                    )
-                }
-            }
-            v.updatedLabel()?.let { updated ->
-                item {
-                    WearCenteredText(
-                        // The pull has no spinner on a round face -- a top-centred one lands under
-                        // the bezel -- so the freshness line IS the feedback: it is the line that
-                        // refresh changes, and it is already where the eye is after a pull.
-                        if (refreshing) "Refreshing…" else "Updated $updated",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (v.isStale()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Normal,
-                    )
-                }
-            }
+            // The car's details, one pebble past the face, with the refresh where the freshness is.
+            item { WearStatusPebble(v, refreshing = refreshing, canRefresh = signedIn, onRefresh = { repo.refresh() }) }
             // The update error, shown where the update lives. It used to go nowhere at all.
             updateError?.let { message ->
                 item {
@@ -386,9 +377,6 @@ private fun WearCarPage(
                 }
             }
 
-            if (signedIn) {
-                item { WearActionRow(label = "Refresh", icon = Icons.Filled.Refresh) { repo.refresh() } }
-            }
             item { WearAlertsPebble() }
             item { WearAutoLockPebble() }
 
@@ -408,10 +396,8 @@ private fun WearCarPage(
     }
 }
 
-/** Charge/fuel reads in the brand accent; a lock-only car reads in the plain on-background tone. */
-@Composable
-private fun VehicleSnapshot.heroTint(): Color =
-    if (percent != null) Color(BlooColors.chargeGreen) else MaterialTheme.colorScheme.onBackground
-
 // The watch's settings pebbles -- Watch alerts and Auto lock -- are in WearSettingsPebbles.kt. They
 // are the watch's settings rather than the car page's furniture, and this file is the car page.
+
+/** How long a command's result stays in the face's hub. */
+private const val FaceResultMs = 4_000L

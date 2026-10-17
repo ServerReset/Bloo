@@ -29,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
@@ -79,13 +80,24 @@ fun WearCarFace(
     tint: Color,
     actions: List<WearQuickAction>,
     modifier: Modifier = Modifier,
+    /** Charging: a soft light travels along the filled part of the ring. */
+    charging: Boolean = false,
+    /** The reading is old enough to doubt: the ring dims, so a glance does not trust it. */
+    stale: Boolean = false,
+    /** A short line that takes the caption's place for a moment ("Sending…", "Done", "Updated 2 h ago"). */
+    status: FaceStatus? = null,
 ) {
     Box(modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
-        WearEdgeRing(progress = progress, tint = tint, modifier = Modifier.fillMaxSize())
+        WearEdgeRing(
+            progress = progress,
+            tint = tint,
+            modifier = Modifier.fillMaxSize().alpha(if (stale) 0.5f else 1f),
+            charging = charging,
+        )
         Box(Modifier.fillMaxSize().padding(RingStroke + RingGap), contentAlignment = Alignment.Center) {
             WearQuadrantGrid(actions = actions, modifier = Modifier.fillMaxSize())
             BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                WearFaceHub(value = value, caption = caption, tint = tint, size = maxWidth * HubFraction)
+                WearFaceHub(value = value, caption = caption, tint = tint, size = maxWidth * HubFraction, status = status)
             }
         }
     }
@@ -96,8 +108,25 @@ fun WearCarFace(
  * from 12 o'clock clockwise. Springs to a new level; under the watch's lean mode it jumps.
  */
 @Composable
-fun WearEdgeRing(progress: Float?, tint: Color, modifier: Modifier = Modifier, stroke: Dp = RingStroke) {
+fun WearEdgeRing(
+    progress: Float?,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    stroke: Dp = RingStroke,
+    /** A short light travels along the filled arc while charging (not under the watch's lean mode). */
+    charging: Boolean = false,
+) {
     val policy by DeviceStatus.policy.collectAsState()
+    val sheenOn = charging && policy.ambientMotion && progress != null
+    val sheen = if (sheenOn) {
+        androidx.compose.animation.core.rememberInfiniteTransition(label = "chargeSheen").animateFloat(
+            0f, 1f,
+            androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1800, easing = androidx.compose.animation.core.LinearEasing)),
+            label = "chargeSheenPhase",
+        )
+    } else {
+        null
+    }
     val sweep by animateFloatAsState(
         (progress ?: 0f).coerceIn(0f, 1f),
         animationSpec = if (policy.bouncySprings) spring() else snap(),
@@ -112,6 +141,12 @@ fun WearEdgeRing(progress: Float?, tint: Color, modifier: Modifier = Modifier, s
             drawArc(track, -90f, 360f, false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
             if (progress != null && sweep > 0f) {
                 drawArc(tint, -90f, 360f * sweep, false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
+                // Read in the draw phase only: the sheen repaints the ring, nothing recomposes.
+                sheen?.value?.let { phase ->
+                    val span = minOf(28f, 360f * sweep)
+                    val start = -90f + (360f * sweep - span) * phase
+                    drawArc(Color.White.copy(alpha = 0.45f), start, span, false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
+                }
             }
         },
     )
@@ -218,7 +253,7 @@ private fun quarterShape(quadrant: Int, innerCorner: Dp): RoundedCornerShape {
 
 /** The value where the four quarters meet: the charge or fuel (or the lock state), and the car's name under it. */
 @Composable
-fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp) {
+fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp, status: FaceStatus? = null) {
     val scheme = MaterialTheme.colorScheme
     Box(
         Modifier
@@ -241,9 +276,13 @@ fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp) {
                 reduceMotion = false,
             )
             RevealText(
-                caption,
+                status?.text ?: caption,
                 style = MaterialTheme.typography.labelSmall,
-                color = scheme.onSurfaceVariant,
+                color = when {
+                    status == null -> scheme.onSurfaceVariant
+                    status.error -> scheme.error
+                    else -> scheme.primary
+                },
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -252,3 +291,22 @@ fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp) {
         }
     }
 }
+
+/** A moment's line in the hub, in place of the car's name: what just happened, or why to doubt the reading. */
+data class FaceStatus(val text: String, val error: Boolean = false)
+
+/**
+ * The ring's colour, from the level: red when low, amber when getting there, green otherwise, and the
+ * charging blue while it charges. A car with no level reads in [fallback].
+ */
+fun faceTint(percent: Int?, charging: Boolean, fallback: Color): Color = when {
+    percent == null -> fallback
+    charging -> Color(com.bloo.bluelink.data.BlooColors.chargeBlue)
+    percent < LowLevel -> Color(com.bloo.bluelink.data.BlooColors.heat)
+    percent < WarnLevel -> Color(com.bloo.bluelink.data.BlooColors.warn)
+    else -> Color(com.bloo.bluelink.data.BlooColors.chargeGreen)
+}
+
+/** Levels below which the ring warns (amber) and then alarms (red). */
+const val LowLevel = 15
+const val WarnLevel = 30
