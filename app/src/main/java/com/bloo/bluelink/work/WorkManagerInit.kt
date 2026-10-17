@@ -2,6 +2,7 @@ package com.bloo.bluelink.work
 
 import android.content.Context
 import androidx.work.WorkManager
+import com.bloo.uicommon.content
 
 /**
  * Thin wrapper around `WorkManager.getInstance(context)`.

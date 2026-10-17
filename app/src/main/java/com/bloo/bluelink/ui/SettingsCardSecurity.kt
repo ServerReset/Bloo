@@ -18,6 +18,12 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.setBiometricLock
 import com.bloo.bluelink.data.setLockTiming
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphActionButton
+import com.bloo.uicommon.SegmentOption
+import com.bloo.uicommon.content
 
 /** The "Security" card: the app lock and the PIN that backs it up. */
 @Composable

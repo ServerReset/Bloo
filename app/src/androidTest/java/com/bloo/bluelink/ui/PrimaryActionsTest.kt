@@ -19,6 +19,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import com.bloo.uicommon.ButtonTargetHeight
 
 /**
  * The lock/unlock control, rebuilt on the new button family ([PrimaryActions]) now that the legacy

@@ -30,6 +30,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
+import com.bloo.uicommon.GapBlock
+import com.bloo.uicommon.canBlurBackdrops
+import com.bloo.uicommon.content
 
 /** How dark the page behind a dialog gets once the dialog is fully up. */
 internal const val DialogScrimAlpha = 0.34f

@@ -18,6 +18,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.reduceMotionCached
+import com.bloo.uicommon.LocalSpaceScale
+import com.bloo.uicommon.spaceScaleFor
+import com.bloo.uicommon.MaxFontScale
+import com.bloo.uicommon.LocalIsDarkTheme
+import com.bloo.uicommon.content
 
 @Composable
 fun BlooTheme(
@@ -111,6 +116,9 @@ fun BlooTheme(
         CompositionLocalProvider(
             LocalDensity provides scaledDensity,
             LocalReduceMotion provides reduceMotion,
+            // The shared tones read this rather than the system, because the app honours its own
+            // Light/Dark override and the components have to agree with the theme around them.
+            LocalIsDarkTheme provides appIsDarkTheme(),
             // The gap scale follows the damped display scale (see spaceScaleFor).
             LocalSpaceScale provides spaceScaleFor(effectiveFontScale),
             LocalContentColor provides scheme.onBackground,

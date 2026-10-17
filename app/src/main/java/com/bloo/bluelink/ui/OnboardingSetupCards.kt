@@ -17,6 +17,12 @@ import androidx.compose.ui.unit.Dp
 import com.bloo.bluelink.data.PinCrypto
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.GapSection
+import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.MorphActionButton
+import com.bloo.uicommon.content
 
 // --- The reusable onboarding setup cards (used by the setup deck and Settings) ---
 

@@ -11,6 +11,7 @@ import coil.imageLoader
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import com.bloo.uicommon.content
 
 /**
  * Per-car photos as they travel inside a settings backup: encode local files to downscaled base64

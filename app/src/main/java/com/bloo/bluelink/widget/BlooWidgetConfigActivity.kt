@@ -107,6 +107,7 @@ import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.imageUrl
 import com.bloo.bluelink.data.stateLineOrParked
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.content
 
 /**
  * The widget's settings: a live preview at the top that changes as you choose, then the car (as photo cards),

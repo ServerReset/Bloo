@@ -42,6 +42,9 @@ import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import kotlin.math.roundToInt
 import com.bloo.uicommon.MotionMedium
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.lowPowerAwareSpring
+import com.bloo.uicommon.content
 
 /** Immutable and compared by value, so the hero's readout and numbers skip recomposing when nothing changed. */
 @androidx.compose.runtime.Immutable

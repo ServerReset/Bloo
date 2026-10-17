@@ -24,6 +24,10 @@ import com.bloo.bluelink.data.openDeveloperOptions
 import com.bloo.bluelink.data.requestBackgroundUnrestricted
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.SafeMorphTextButton
 
 /**
  * Ordered troubleshooting steps covering the two different ways this bar can fail to show

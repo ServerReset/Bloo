@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.setAiEnabled
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapGroup
 
 /** The "AI" card: one switch, and what it does. */
 @Composable

@@ -29,6 +29,12 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.layout.VerticalAlignmentLine
 import com.bloo.uicommon.MotionShort
+import com.bloo.uicommon.lowPowerAwareSpring
+import com.bloo.uicommon.MorphedCornerPercent
+import com.bloo.uicommon.PillCornerPercent
+import com.bloo.uicommon.SoftDamping
+import com.bloo.uicommon.container
+import com.bloo.uicommon.content
 
 /**
  * Shared animation tokens and helpers: springs, expand/collapse transitions and the per-row

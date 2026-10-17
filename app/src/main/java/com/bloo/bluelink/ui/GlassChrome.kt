@@ -23,6 +23,8 @@ import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.hazeBlur
+import com.bloo.uicommon.canBlurBackdrops
+import com.bloo.uicommon.content
 
 /**
  * Unified glass system: every floating surface takes its tint, blur, rim and shadow from here.
@@ -93,9 +95,7 @@ internal fun Modifier.pebbleCardEdge(shape: Shape): Modifier {
  * battery saver), a lighter one for when a real blur is doing the legibility work. Theme only
  * changes the base colour.
  */
-internal const val GlassTintAlpha = 0.10f
 
-internal const val GlassBlurredTintAlpha = 0.02f
 
 /**
  * Resolves [GlassSurface]'s own fill color -- also called directly by places that can't host
@@ -103,21 +103,6 @@ internal const val GlassBlurredTintAlpha = 0.02f
  * platform composable or a `Modifier.background()`.
  */
 @Composable
-internal fun glassTint(blurred: Boolean): Color {
-    // Resolve dark via the app's override (Theme.kt), not the system setting.
-    val dark = appIsDarkTheme()
-    return if (dark) {
-        val alpha = if (blurred) GlassBlurredTintAlpha else GlassTintAlpha
-        Color.White.copy(alpha = alpha)
-    } else {
-        // Theme-aware surface colour keeps floating buttons from reading as black overlays.
-        val scheme = MaterialTheme.colorScheme
-        // Blurred needs less alpha; unblurred needs more visual weight.
-        val surfaceColor = scheme.surfaceContainer
-        val alpha = if (blurred) 0.06f else 0.09f
-        surfaceColor.copy(alpha = alpha)
-    }
-}
 
 internal fun Modifier.appHazeEffect(
     state: HazeState,

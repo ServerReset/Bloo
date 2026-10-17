@@ -1,4 +1,4 @@
-package com.bloo.bluelink.ui
+package com.bloo.uicommon
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -41,7 +41,7 @@ import kotlinx.coroutines.launch
  * the standalone press (SafeExpansiveButton's own growth), which is the same gesture on a button with
  * no neighbour to push against.
  */
-internal const val ExpressivePressGrowth = 0.42f
+const val ExpressivePressGrowth = 0.42f
 
 /**
  * A group member's resting width is its content plus one reserve per neighbour it shares a seam
@@ -56,7 +56,7 @@ private const val PressDamping = 0.88f
  * still runs the push to completion before the release runs it back.
  */
 @Composable
-internal fun expressivePressFraction(interactionSource: InteractionSource, enabled: Boolean): State<Float> {
+fun expressivePressFraction(interactionSource: InteractionSource, enabled: Boolean): State<Float> {
     val anim = remember { Animatable(0f) }
     // Tracks whether a press is CURRENTLY held, shared with the enabled-watching effect below.
     // Needed because a tap's own onClick routinely disables the button as its direct side effect
@@ -222,7 +222,7 @@ fun SafeExpansiveButton(
  * True inside an [ExpressiveButtonGroup]: [SafeExpansiveButton] hands its press fraction to the
  * group.
  */
-internal val LocalExpressiveGroup = staticCompositionLocalOf { false }
+val LocalExpressiveGroup = staticCompositionLocalOf { false }
 
 /**
  * True for content that [SafeExpansiveButton] is already smoothly resizing on press -- either
@@ -234,7 +234,7 @@ internal val LocalExpressiveGroup = staticCompositionLocalOf { false }
  * `expressivePressFraction`'s own doc on why that spring specifically does not ring) -- two
  * different springs chasing the same width at once, which read as the button wobbling on press.
  */
-internal val LocalExpressiveGrowth = staticCompositionLocalOf { false }
+val LocalExpressiveGrowth = staticCompositionLocalOf { false }
 
 /**
  * Renders [content]; when disabled, wraps it in a Box that merges semantics and reports disabled so

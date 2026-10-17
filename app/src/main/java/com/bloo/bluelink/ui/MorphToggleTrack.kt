@@ -27,6 +27,9 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.lowPowerAwareSpring
+import com.bloo.uicommon.SoftDamping
 
 /**
  * Purely visual -- [ToggleRow]'s own toggleable() modifier owns the real click target and

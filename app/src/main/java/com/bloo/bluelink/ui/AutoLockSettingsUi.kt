@@ -37,6 +37,10 @@ import com.bloo.bluelink.data.requestBackgroundUnrestricted
 import com.bloo.bluelink.data.setAutoLockConfig
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.AnimatedSlider
+import com.bloo.uicommon.content
 
 /**
  * The AutoLock countdown's own bounds: 0 (lock the moment the walk-away is confirmed) up to 30, in 5s

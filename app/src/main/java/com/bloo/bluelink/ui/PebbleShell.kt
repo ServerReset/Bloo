@@ -40,6 +40,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.settingsMode
+import com.bloo.uicommon.GapHairline
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapSection
+import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.lowPowerAwareSpring
+import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.SoftDamping
+import com.bloo.uicommon.content
 
 /**
  * A collapsible "pebble" - a titled section that springs open/closed with a playful bounce.

@@ -30,6 +30,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.GapHairline
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.lowPowerAwareSpring
+import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.container
+import com.bloo.uicommon.content
 
 /**
  * Small status-chip widgets: MetaChip, StatusChip, the update-available chip/dot/badge family,

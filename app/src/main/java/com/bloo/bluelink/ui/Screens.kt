@@ -51,6 +51,11 @@ import kotlinx.coroutines.launch
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.MotionMedium
+import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.FieldShape
+import com.bloo.uicommon.Haptics
+import com.bloo.uicommon.SoftDamping
+import com.bloo.uicommon.content
 
 /**
  * Root composable for the phone app: a gradient backdrop, a [Scaffold] that switches top-level

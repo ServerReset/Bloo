@@ -12,6 +12,7 @@ import com.bloo.bluelink.data.setEnabledShortcuts
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.content
 
 // --- App-icon shortcuts and OEM app launch (extracted from AppViewModel) --
 

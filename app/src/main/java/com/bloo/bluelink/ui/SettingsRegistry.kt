@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import com.bloo.bluelink.data.SettingsCatalog
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.SegmentOption
+import com.bloo.uicommon.content
 
 /**
  * The searchable settings that are not plain on/off switches -- the ranges (sliders and minute

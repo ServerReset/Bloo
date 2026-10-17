@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import com.bloo.uicommon.content
 
 /**
  * Every rebuilt settings card renders, opens when its title is tapped, and shows its content.

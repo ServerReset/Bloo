@@ -2,6 +2,7 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.uicommon.SegmentOption
 
 /** The unit pickers, defined once for the Look card and for Settings search. */
 @Composable

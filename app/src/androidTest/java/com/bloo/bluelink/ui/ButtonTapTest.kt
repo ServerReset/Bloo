@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.content
 
 /**
  * A tap on a button must reach its click handler, whether the label fits or has shrunk to its symbol.

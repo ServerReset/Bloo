@@ -40,6 +40,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.LocalHaptics
 
 /**
  * The reorderable pebble stack for a car. [pinHotspot] defaults to true (exclude "controls" + any

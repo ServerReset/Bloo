@@ -1,4 +1,4 @@
-package com.bloo.bluelink.ui
+package com.bloo.uicommon
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
@@ -38,6 +38,12 @@ import com.bloo.uicommon.standardButtonIcon
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.ButtonTargetHeight
 import com.bloo.uicommon.ButtonLabelStyle
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.ButtonPaddingH
+import com.bloo.uicommon.canBlurBackdrops
+import com.bloo.uicommon.inertButtonFrost
+import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.SafeExpansiveButton
 
 /**
  * The one button style used across the app: rests as a **pill**, becomes a **rounded rectangle**
@@ -188,25 +194,7 @@ fun MorphButton(
 /** How far a disabled button's label is muted; the fill is neutral glass of its own. */
 private const val DisabledContentAlpha = 0.55f
 
-/**
- * How a button speaks, resolved to colours in one place. [Tonal]: the standard button. [Confirm]: go ahead
- * (green). [Deny]: remove, sign out, stop (red).
- */
-enum class ButtonEmphasis { Tonal, Confirm, Deny }
 
-@Composable
-internal fun ButtonEmphasis.container(): Color = when (this) {
-    ButtonEmphasis.Tonal -> MaterialTheme.colorScheme.secondaryContainer
-    ButtonEmphasis.Confirm -> confirmTone().container
-    ButtonEmphasis.Deny -> denyTone().container
-}
-
-@Composable
-internal fun ButtonEmphasis.content(): Color = when (this) {
-    ButtonEmphasis.Tonal -> MaterialTheme.colorScheme.onSecondaryContainer
-    ButtonEmphasis.Confirm -> confirmTone().content
-    ButtonEmphasis.Deny -> denyTone().content
-}
 
 /**
  * A text-only [MorphButton] used wherever a plain labelled button is needed (dialogs, settings).
@@ -350,7 +338,7 @@ fun MorphActionButton(
  * A lone button never grows wider than this, even when pressed to fill its row: a single action
  * stretched across a whole phone (or tablet) row reads as a slab, not a button. (2x the previous cap.)
  */
-internal val MaxSingleButtonWidth = 480.dp
+val MaxSingleButtonWidth = 480.dp
 
 /** The glyph beside a label. One size for push buttons, chips and icon buttons alike. */
 
@@ -364,8 +352,6 @@ internal val MaxSingleButtonWidth = 480.dp
 val IconButtonMinWidth = 48.dp
 
 /** The standard horizontal padding inside a labelled button, and inside a chip or list button. */
-val ButtonPaddingH = 18.dp
-val ChipPaddingH = 16.dp
 
 /**
  * The one content padding for a labelled button, used by every labelled button in the app.
@@ -382,7 +368,7 @@ val StandardButtonPadding: PaddingValues
  * Used wherever a button shows a bare label with no glyph ([MorphTextButton], [MorphChip]).
  */
 @Composable
-internal fun ButtonLabelText(text: String) {
+fun ButtonLabelText(text: String) {
     RevealText(
         text,
         style = ButtonLabelStyle,

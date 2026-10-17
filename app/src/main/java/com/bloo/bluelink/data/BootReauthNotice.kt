@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import com.bloo.bluelink.MainActivity
+import com.bloo.uicommon.content
 
 /**
  * The one notification that is allowed to appear while the app is sealed after a restart (see

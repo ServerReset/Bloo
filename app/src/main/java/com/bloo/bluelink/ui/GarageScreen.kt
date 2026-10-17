@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
+import com.bloo.uicommon.LocalHaptics
 
 /**
  * Top-level garage screen: picks between two fundamentally different layouts based on screen size

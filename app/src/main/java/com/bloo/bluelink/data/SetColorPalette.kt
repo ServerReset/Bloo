@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import com.bloo.uicommon.content
 
 suspend fun SettingsStore.setColorPalette(palette: ColorPalette) {
     editTracked { it[SettingsStore.Keys.PALETTE] = palette.name }

@@ -20,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import com.bloo.uicommon.SafeMorphTextButton
 
 /**
  * The button-group behaviour, measured on a real layout: lines of buttons fill their width edge to

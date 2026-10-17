@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.MotionShort
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.lowPowerAwareSpring
 
 private const val MaxToasts = 4
 

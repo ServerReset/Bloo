@@ -1,14 +1,15 @@
-package com.bloo.bluelink.ui
+package com.bloo.uicommon
 
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.unit.Density
+import com.bloo.uicommon.SafeExpansiveButton
 
 /**
  * Cache of resting child widths for one [ExpressiveButtonGroup]; a plain object, not snapshot
  * state.
  */
-internal class NaturalWidths {
+class NaturalWidths {
     /**
      * The per-line choice of which members show only their symbol, made from a resting pass and reused
      * through every press (so a press can never add or drop a label); made again when the room changes.
@@ -33,7 +34,7 @@ internal class NaturalWidths {
  * Carries a child's live press fraction to the group's measure policy; a lambda so the group reads
  * it during layout without the child recomposing.
  */
-internal data class ExpressiveGroupData(
+data class ExpressiveGroupData(
     val pressFraction: () -> Float,
     /**
      * Share of the row's leftover space this member takes, 0 to opt out. The group's own answer to
@@ -50,7 +51,7 @@ internal data class ExpressiveGroupData(
  * default for every labelled button ([MorphTextButton], [MorphActionButton]); icon-only buttons
  * keep 0 and therefore their size.
  */
-internal const val GroupWeightProportional = -1f
+const val GroupWeightProportional = -1f
 
 /** Receiver for [ExpressiveButtonGroup]'s children. */
 @Stable
@@ -62,7 +63,7 @@ object ExpressiveButtonGroupScope {
  * like a FlowRow first, then balanced: same line count, break points moved so lines are as even as
  * possible.
  */
-internal fun balancedLineBreaks(widths: IntArray, gap: Int, maxWidth: Int): List<IntArray> {
+fun balancedLineBreaks(widths: IntArray, gap: Int, maxWidth: Int): List<IntArray> {
     fun breakInto(cap: Int): List<IntArray> {
         val result = ArrayList<IntArray>()
         var cur = ArrayList<Int>()

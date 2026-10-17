@@ -37,6 +37,10 @@ import com.bloo.bluelink.data.settingsMode
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.MotionShort
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.MorphSegmented
+import com.bloo.uicommon.SegmentOption
 
 /** One reorderable car entry in Settings; tap to expand its setup + photo. */
 @Composable

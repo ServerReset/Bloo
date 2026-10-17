@@ -14,6 +14,8 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.canBlurBackdrops
+import com.bloo.uicommon.content
 
 // --- Soft scroll edges and edge bleed for horizontal strips ---
 

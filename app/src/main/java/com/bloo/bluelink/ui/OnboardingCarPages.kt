@@ -9,6 +9,7 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.setPlatform
 import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setSeatFlag
+import com.bloo.uicommon.GapSection
 
 /**
  * Card 1 of a car: what powers it, which decides whether it shows a battery, a fuel gauge, or both.

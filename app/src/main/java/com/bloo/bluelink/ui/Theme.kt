@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.R
 import kotlinx.serialization.Serializable
+import com.bloo.uicommon.content
 
 /** User-selectable appearance. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }

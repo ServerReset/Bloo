@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.ButtonIconSize
+import com.bloo.uicommon.GapRow
 
 /**
  * The version jump at a glance, shared by the update pebble and the Settings update card: the build

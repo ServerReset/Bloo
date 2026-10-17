@@ -43,6 +43,10 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import dev.chrisbanes.haze.HazeState
 import kotlin.math.roundToInt
+import com.bloo.uicommon.GapHairline
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.content
 
 // --- Full detail ----------------------------------------------------------
 

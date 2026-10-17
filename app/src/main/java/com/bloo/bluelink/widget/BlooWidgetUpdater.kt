@@ -10,6 +10,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.content
 
 /**
  * Keeps the widget in step with the app: whenever the car snapshot changes (a refresh, a command, an

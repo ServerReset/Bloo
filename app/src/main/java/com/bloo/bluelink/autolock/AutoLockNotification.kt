@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.bloo.bluelink.R
 import com.bloo.bluelink.data.ensureNotificationChannel
+import com.bloo.uicommon.content
 
 /** Builds the short-lived foreground notification AutoLock shows while an evaluation is in
  *  flight -- countdown, a "Lock now" shortcut, and a Cancel that aborts (the car reconnect

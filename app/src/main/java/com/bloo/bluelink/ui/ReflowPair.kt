@@ -5,6 +5,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Dp
 import kotlin.math.roundToInt
+import com.bloo.uicommon.GapSection
+import com.bloo.uicommon.content
 
 /**
  * The garage's in-place expand/collapse reflow. Two content blocks -- a "lead" block (header, hero,

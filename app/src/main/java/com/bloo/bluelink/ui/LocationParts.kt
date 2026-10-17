@@ -36,6 +36,14 @@ import com.bloo.bluelink.data.formatSpeed
 import com.bloo.bluelink.data.weatherTemp
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.GapHairline
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.GapSection
+import com.bloo.uicommon.canBlurBackdrops
+import com.bloo.uicommon.content
+import com.bloo.uicommon.weatherIcon
+import com.bloo.uicommon.weatherTint
 
 /** The icon for a condition, picking a sun/moon variant by day vs night. */
 internal fun weatherIcon(code: WeatherCode, isDay: Boolean): ImageVector =

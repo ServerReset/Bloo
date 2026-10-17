@@ -37,6 +37,9 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlin.math.max
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.content
 
 // --- Settings -------------------------------------------------------------
 

@@ -22,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import com.bloo.uicommon.content
 
 /**
  * The Drive pipeline end to end on a real device: the real [SettingsStore] (DataStore, dirty tracking,

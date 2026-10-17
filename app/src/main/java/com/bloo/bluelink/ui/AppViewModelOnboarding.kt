@@ -7,6 +7,7 @@ import com.bloo.bluelink.data.snapshot
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.content
 
 // --- Onboarding completion and sync-restore choice (extracted from AppViewModel) --
 

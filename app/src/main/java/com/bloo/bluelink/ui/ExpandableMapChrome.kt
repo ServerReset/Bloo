@@ -46,6 +46,11 @@ import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.rememberSpinAngle
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.GapPage
+import com.bloo.uicommon.MorphActionButton
+import com.bloo.uicommon.Haptics
 
 /**
  * The "Me" button's action: centre the map on the phone. With no fix yet it asks for location (see

@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapSection
 
 /**
  * Extracted after finding it hand-written three times over -- the pages differ only in their copy,

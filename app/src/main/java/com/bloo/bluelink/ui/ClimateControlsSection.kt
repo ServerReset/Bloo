@@ -28,6 +28,12 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.LocalReduceMotion
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.AnimatedSlider
+import com.bloo.uicommon.AnimatedValue
+import com.bloo.uicommon.tempColor
 
 /**
  * The climate pebble's controls -- temperature, run time, defrost, steering-wheel and seat heat,

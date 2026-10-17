@@ -3,6 +3,7 @@ package com.bloo.bluelink.update
 import android.content.Context
 import android.os.Build
 import com.bloo.bluelink.BuildConfig
+import com.bloo.uicommon.content
 
 /**
  * How THIS copy of the app gets its updates -- decided from how it was INSTALLED, not from how it

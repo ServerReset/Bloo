@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.content
 
 // --- In-app update tile: dismiss/snooze, background download, and install (extracted from AppViewModel) --
 //

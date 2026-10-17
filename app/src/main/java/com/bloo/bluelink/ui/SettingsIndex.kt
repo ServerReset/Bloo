@@ -19,6 +19,7 @@ import com.bloo.bluelink.data.setNotifyService
 import com.bloo.bluelink.data.setNotifyUnlocked
 import com.bloo.bluelink.data.setSeamlessInstallShizuku
 import com.bloo.bluelink.data.setSeatFlag
+import com.bloo.uicommon.content
 
 internal class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit) {
     // Memoized lowercase title; avoids recomputing per score call.

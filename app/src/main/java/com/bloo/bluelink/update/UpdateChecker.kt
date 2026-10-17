@@ -7,6 +7,7 @@ import com.bloo.bluelink.data.UpdateApi
 import com.bloo.bluelink.data.UpdateGate
 import com.bloo.bluelink.data.UpdateStore
 import com.bloo.bluelink.data.WorkflowRun
+import com.bloo.uicommon.content
 
 /** A newer CI build than what's installed. */
 data class UpdateInfo(val run: WorkflowRun)

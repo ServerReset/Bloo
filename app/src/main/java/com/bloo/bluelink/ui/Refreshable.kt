@@ -10,6 +10,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.content
 
 /** Wraps content with the pull-to-refresh gesture -- no visual indicator at all, app-wide. */
 @Composable

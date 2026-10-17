@@ -29,6 +29,9 @@ import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.FieldShape
+import com.bloo.uicommon.content
 
 /**
  * Every searchable setting as a [SearchEntry]: its title, the words that find it, and the control

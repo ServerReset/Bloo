@@ -124,6 +124,8 @@ private fun WearTheme(content: @Composable () -> Unit) {
     val policy by com.bloo.bluelink.data.DeviceStatus.policy.collectAsState()
     CompositionLocalProvider(
         LocalReduceMotion provides reduceMotion,
+        // The watch theme is dark, and the shared tones need to know that.
+        com.bloo.uicommon.LocalIsDarkTheme provides true,
         LocalPowerPolicy provides policy,
         // RevealText draws with the PHONE Material3's Text, which resolves an unspecified colour from
         // ITS LocalContentColor -- black by default, and therefore invisible on this theme. Setting it

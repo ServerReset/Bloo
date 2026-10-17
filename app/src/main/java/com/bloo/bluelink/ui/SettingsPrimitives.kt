@@ -23,6 +23,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapSection
+import com.bloo.uicommon.hairlineColor
+import com.bloo.uicommon.content
 
 /**
  * A hairline-outlined box, for the few things that need a visible edge on a glass card (a log, an

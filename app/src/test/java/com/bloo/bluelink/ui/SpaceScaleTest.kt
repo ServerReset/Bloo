@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.bloo.uicommon.spaceScaleFor
 
 /**
  * Pins the display-scale → gap-scale mapping. The gap tokens are all multiples of a single base

@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toUri
 import com.bloo.bluelink.R
+import com.bloo.uicommon.content
 
 /**
  * Android 16's "Live Update" notification for an actively-charging car -- the ongoing progress bar

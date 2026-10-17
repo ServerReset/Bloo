@@ -46,6 +46,14 @@ import com.bloo.bluelink.data.syncUri
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapSection
+import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphActionButton
+import com.bloo.uicommon.SegmentOption
+import com.bloo.uicommon.content
 
 /**
  * Step 1: a short welcome + feature highlights, sharing [OnboardingTipListPage]'s shape (no

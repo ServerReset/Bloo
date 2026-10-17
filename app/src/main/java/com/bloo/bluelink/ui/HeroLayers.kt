@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.bloo.bluelink.data.Vehicle
 import kotlin.math.roundToInt
+import com.bloo.uicommon.GapRow
 
 /*
  * The hero card's two layers: the photo with the charge readout over it, and the numbers that fly

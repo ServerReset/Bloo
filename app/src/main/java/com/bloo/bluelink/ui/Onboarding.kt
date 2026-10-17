@@ -45,6 +45,10 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.MotionLong
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.GapPage
+import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.content
 
 /**
  * Every setup flow in the app: first run, newly detected cars, and the welcome cards summoned again

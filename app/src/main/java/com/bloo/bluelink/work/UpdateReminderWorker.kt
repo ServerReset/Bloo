@@ -10,6 +10,7 @@ import com.bloo.bluelink.data.UpdateStore
 import com.bloo.bluelink.update.UpdateCheckResult
 import com.bloo.bluelink.update.UpdateChecker
 import java.util.concurrent.TimeUnit
+import com.bloo.uicommon.content
 
 /**
  * The "Remind me" follow-up on the update tile. [snoozeUpdate] hides the tile and

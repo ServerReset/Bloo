@@ -10,6 +10,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphActionButton
 
 /**
  * Shown before the system installer runs when Shizuku (seamless install) is off.

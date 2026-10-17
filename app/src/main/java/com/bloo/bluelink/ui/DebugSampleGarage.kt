@@ -14,6 +14,7 @@ import com.bloo.bluelink.data.EvStatus
 import com.bloo.bluelink.data.TempValue
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.uicommon.content
 
 /**
  * A sample garage, for store screenshots and nothing else.

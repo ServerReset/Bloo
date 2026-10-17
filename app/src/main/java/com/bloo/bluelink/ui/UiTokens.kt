@@ -27,6 +27,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.LocalPowerPolicy
+import com.bloo.uicommon.LocalSpaceScale
+import com.bloo.uicommon.spaceScaleFor
+import com.bloo.uicommon.SpaceUnit
+import com.bloo.uicommon.content
 
 /**
  * The phone UI's shared design vocabulary: the sizes, colours and motion that more than one screen
@@ -53,21 +57,6 @@ internal val UpdateAvailableAmber = Color(com.bloo.bluelink.data.BlooColors.warn
  */
 internal val ChargeBlue = Color(com.bloo.bluelink.data.BlooColors.chargeBlue)
 internal val ChargeBlueDark = Color(com.bloo.bluelink.data.BlooColors.chargeBlueDark)
-
-/**
- * The app's two action colours: green confirms (go ahead, save, sign in, start), red denies (remove, sign out,
- * stop, discard). One pair each, tuned per theme, used by every button that commits or reverses something.
- */
-@androidx.compose.runtime.Immutable
-internal class ActionTone(val container: Color, val content: Color)
-
-@Composable
-internal fun confirmTone(): ActionTone =
-    if (appIsDarkTheme()) ActionTone(Color(0xFF7BD389), Color(0xFF06290E)) else ActionTone(Color(0xFF1E7B34), Color.White)
-
-@Composable
-internal fun denyTone(): ActionTone =
-    if (appIsDarkTheme()) ActionTone(Color(0xFFFF8A80), Color(0xFF4A0507)) else ActionTone(Color(0xFFC62828), Color.White)
 
 /** The app's muted/secondary-text alpha over LocalContentColor. 0.86: strong enough to clear contrast on busy glass, still a step below full so a value can stand out beside its label. */
 internal const val MutedContentAlpha = 0.86f
@@ -136,22 +125,6 @@ internal val ChromeBarHeight = 62.dp
  * Scales at half the display scale (see [spaceScaleFor]); provided by [BlooTheme], read via
  * [LocalSpaceScale].
  */
-internal val LocalSpaceScale = androidx.compose.runtime.compositionLocalOf { 1f }
-
-/** Display scale → gap scale: gaps breathe with the app's display scale at half its swing. */
-internal fun spaceScaleFor(scale: Float): Float = 1f + (scale - 1f) * 0.5f
-
-internal const val MaxFontScale = 1.8f
-
-/** The one spacing unit (4dp at 1.0 scale). Everything below is a multiple of it. */
-internal val SpaceUnit: Dp @Composable get() = 4.dp * LocalSpaceScale.current
-internal val GapHairline: Dp @Composable get() = SpaceUnit
-internal val GapRow: Dp @Composable get() = SpaceUnit * 2
-internal val GapGroup: Dp @Composable get() = SpaceUnit * 3
-internal val GapSection: Dp @Composable get() = SpaceUnit * 4
-internal val GapPage: Dp @Composable get() = SpaceUnit * 5
-internal val GapBlock: Dp @Composable get() = SpaceUnit * 6
-internal val GapHero: Dp @Composable get() = SpaceUnit * 8
 
 /** The seam between the two halves of a split button (action + chevron, preset + menu). */
 internal val SplitSeam = 3.dp
@@ -172,22 +145,7 @@ internal val ExtraLargeShape = RoundedCornerShape(28.dp) // Modal dialogs
 //
 // Shared Haze backdrop-blur gate and progressive-blur instances used by every blur site.
 
-/** Real backdrop blur: API 31+ (Haze's RenderEffect; no-op below) and the policy allows it. */
-@Composable
-internal fun canBlurBackdrops(): Boolean =
-    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && LocalPowerPolicy.current.blurBackdrops
 
-/**
- * Battery-saver-aware replacement for a bouncy [spring]: the real spring normally, a short
- * critically-damped [tween] (no overshoot, fewer frames) under battery saver.
- */
-@Composable
-internal fun <T> lowPowerAwareSpring(dampingRatio: Float, stiffness: Float) =
-    if (!LocalPowerPolicy.current.bouncySprings) {
-        tween<T>(durationMillis = 140, easing = androidx.compose.animation.core.FastOutSlowInEasing)
-    } else {
-        spring<T>(dampingRatio = dampingRatio, stiffness = stiffness)
-    }
 
 /**
  * The shape every full-height scrim's blur uses: strong at its edge, tapering to none by the far
@@ -200,14 +158,6 @@ internal val StandardBlurProgressive
         endIntensity = 0f
     )
 
-/**
- * The one hairline: the outline of an inner box, a disabled button's rim, a divider-weight edge.
- */
-internal const val HairlineAlpha = 0.14f
-
-@androidx.compose.runtime.Composable
-internal fun hairlineColor(): androidx.compose.ui.graphics.Color =
-    androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = HairlineAlpha)
 
 // ---- Motion durations (ms) -------------------------------------------------------
 //

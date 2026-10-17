@@ -17,6 +17,8 @@ import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapHairline
+import com.bloo.uicommon.GapRow
 
 /** Optional on-device Gemini Nano summary of the car's last-refreshed status. */
 @Composable

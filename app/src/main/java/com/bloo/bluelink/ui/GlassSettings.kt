@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.bloo.bluelink.data.SettingsStore
 import kotlin.math.roundToInt
+import com.bloo.uicommon.AnimatedSlider
 
 /**
  * How clear the liquid glass is, from heavily frosted (an opaque, soft backing) to nearly clear

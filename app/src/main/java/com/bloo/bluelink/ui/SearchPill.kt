@@ -57,6 +57,13 @@ import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.GapSection
+import com.bloo.uicommon.canBlurBackdrops
+import com.bloo.uicommon.glassTint
+import com.bloo.uicommon.container
+import com.bloo.uicommon.content
+import com.bloo.uicommon.dropShadow
 
 /** The search bar itself (SearchPill) and its suggestions list (SearchSuggestions). */
 

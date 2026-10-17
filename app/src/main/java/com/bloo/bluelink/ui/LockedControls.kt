@@ -15,6 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.inertButtonFrost
+import com.bloo.uicommon.content
 
 /**
  * A group of controls that can be locked out. The glass swallows taps, so nothing underneath can be

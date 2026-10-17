@@ -33,7 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.MorphButtonCore
+import com.bloo.uicommon.MorphButton
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.standardButtonIcon
 import com.bloo.uicommon.RevealText
@@ -178,10 +178,14 @@ fun WearActionRow(
 }
 
 /**
- * The watch's own [MorphButtonCore]: a heavy haptic on tap and the watch's container roles
- * (secondaryContainer idle, primary active). Shared by [WearActionRow] and [WearQuickActions] so the
- * two can't drift on either -- internal rather than private because those two now live in their own
- * files, which is the point of the split.
+ * The watch's buttons ARE the app's buttons now, not a second set built on the same core: this
+ * delegates to [MorphButton], so the pill-to-rounded-square morph, the inert frost and the press
+ * feedback are the ones every phone button uses.
+ *
+ * Two things are the watch's own, and both are about a 227dp round face: no minimum height
+ * (ButtonTargetHeight is 56dp, most of the screen) and no press-grow, which widens a button into its
+ * row -- on a watch that means into the bezel. The heavy haptic is passed explicitly because the app's
+ * is provided through LocalHaptics, which the watch does not set up.
  */
 @Composable
 internal fun WearButton(
@@ -194,17 +198,21 @@ internal fun WearButton(
 ) {
     val scheme = MaterialTheme.colorScheme
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    MorphButtonCore(
-        onClick = {
-            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-            onClick()
-        },
+    MorphButton(
+        onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         active = active,
         containerColor = scheme.secondaryContainer,
+        contentColor = scheme.onSecondaryContainer,
         activeContainerColor = scheme.primary,
+        activeContentColor = scheme.onPrimary,
         contentPadding = contentPadding,
+        minHeight = 0.dp,
+        expressive = false,
+        onClickHaptic = {
+            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+        },
         content = content,
     )
 }

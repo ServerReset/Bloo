@@ -19,6 +19,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import dev.chrisbanes.haze.HazeState
+import com.bloo.uicommon.canBlurBackdrops
+import com.bloo.uicommon.glassTint
+import com.bloo.uicommon.content
+import com.bloo.uicommon.dropShadow
 
 /**
  * The app's one floating-glass surface: a Haze backdrop blur of [hazeState] (when given and

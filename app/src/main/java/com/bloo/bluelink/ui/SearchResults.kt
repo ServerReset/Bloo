@@ -31,6 +31,11 @@ import com.bloo.bluelink.data.settingsMode
 import com.bloo.bluelink.rethrowIfCancellation
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapHairline
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.content
 
 /**
  * Live search over app settings and per-car data/fields. Tokenises the query (dropping filler

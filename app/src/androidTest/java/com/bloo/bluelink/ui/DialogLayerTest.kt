@@ -17,6 +17,7 @@ import dev.chrisbanes.haze.HazeState
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import com.bloo.uicommon.SafeMorphTextButton
 
 /** The glass dialog layer: a dialog rises into view, takes taps, and is fully gone after it leaves. */
 class DialogLayerTest {

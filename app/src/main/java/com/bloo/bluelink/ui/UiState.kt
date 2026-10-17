@@ -23,6 +23,7 @@ import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.platformOverridable
 import kotlinx.coroutines.flow.update
+import com.bloo.uicommon.content
 
 /**
  * Keeps UiState STABLE for Compose: its List/Map/Set fields are interfaces, so without this every

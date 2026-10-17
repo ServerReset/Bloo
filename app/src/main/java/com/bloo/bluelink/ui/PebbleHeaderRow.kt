@@ -38,6 +38,9 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.max
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.ButtonIconGap
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.LocalHaptics
 
 /**
  * Minimum width the header leaves for the title before the action button may take the rest. Zero on

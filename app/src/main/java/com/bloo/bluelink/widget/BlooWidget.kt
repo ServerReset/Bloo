@@ -55,6 +55,8 @@ import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.stateLineOrParked
 import com.bloo.bluelink.data.updatedLabel
+import com.bloo.uicommon.container
+import com.bloo.uicommon.content
 
 /** What the widget draws from: the saved cars, and whether the app is sealed after a restart. */
 private data class WidgetData(val sealed: Boolean, val cars: List<VehicleSnapshot>)

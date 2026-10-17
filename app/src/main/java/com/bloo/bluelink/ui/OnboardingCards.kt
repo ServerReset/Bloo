@@ -36,6 +36,12 @@ import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.GapPage
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphActionButton
+import com.bloo.uicommon.content
 
 /** What an onboarding card's header says: the same icon / title / summary a pebble carries. */
 internal data class OnboardingCardSpec(val icon: ImageVector, val title: String, val summary: String)

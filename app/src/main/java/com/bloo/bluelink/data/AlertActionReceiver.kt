@@ -7,6 +7,7 @@ import androidx.core.app.NotificationManagerCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.content
 
 /**
  * Handles an action button tapped on a Bloo alert notification. Runs the

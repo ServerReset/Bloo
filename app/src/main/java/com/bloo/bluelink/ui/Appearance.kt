@@ -54,6 +54,9 @@ import androidx.compose.ui.unit.round
 import androidx.core.graphics.toColorInt
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapHairline
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.FieldShape
 
 /**
  * The round colour disc shared by every palette swatch: the colour, a ring + check and a small pop

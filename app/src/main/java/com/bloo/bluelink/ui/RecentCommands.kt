@@ -2,6 +2,7 @@ package com.bloo.bluelink.ui
 
 import android.content.Context
 import androidx.core.content.edit
+import com.bloo.uicommon.content
 
 /**
  * Tracks recently used commands for quick access in the search interface. Stores a list of command

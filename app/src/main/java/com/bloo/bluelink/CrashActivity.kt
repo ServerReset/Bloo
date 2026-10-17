@@ -47,8 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.bloo.bluelink.data.UpdateApi
 import com.bloo.bluelink.data.installDownloadedApk
-import com.bloo.bluelink.ui.GapSection
-import com.bloo.bluelink.ui.MorphTextButton
 import com.bloo.bluelink.ui.SettingsGroup
 import com.bloo.bluelink.update.shizukuInstall
 import com.bloo.bluelink.update.UpdateCheckResult
@@ -59,6 +57,11 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.bloo.uicommon.GapSection
+import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.LocalExpressiveGrowth
+import com.bloo.uicommon.content
 
 /**
  * Shown instead of silently restarting into [MainActivity] after an uncaught

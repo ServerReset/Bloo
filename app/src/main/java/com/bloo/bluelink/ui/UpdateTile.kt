@@ -32,6 +32,12 @@ import com.bloo.bluelink.update.UpdateInfo
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapHairline
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.confirmTone
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.container
+import com.bloo.uicommon.content
 
 /**
  * Standalone update tile pinned below the hero whenever the checker finds a newer build (Bloo is

@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import com.bloo.uicommon.SafeMorphTextButton
 
 /**
  * A button group sharing a row with a weighted label (the Logs card header) must leave the label

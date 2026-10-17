@@ -59,6 +59,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.update.UpdateInfo
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.lowPowerAwareSpring
+import com.bloo.uicommon.SoftDamping
+import com.bloo.uicommon.content
 
 /**
  * A full-width glass panel nested inside an already-elevated card: `shadow = false` so it does not

@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.BuildConfig
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
 
 /** A debug information item shown in DebugSettingsPanel; [copyable] lets a tap copy the value. */
 data class DebugInfo(

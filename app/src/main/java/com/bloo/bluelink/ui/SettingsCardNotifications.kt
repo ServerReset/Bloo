@@ -29,6 +29,11 @@ import com.bloo.bluelink.data.isBackgroundUnrestricted
 import com.bloo.bluelink.data.openLiveUpdateSettings
 import com.bloo.bluelink.data.requestBackgroundUnrestricted
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapHairline
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.container
+import com.bloo.uicommon.content
 
 /**
  * Simple mode is the handful of switches most people want. Advanced adds the timing thresholds, the

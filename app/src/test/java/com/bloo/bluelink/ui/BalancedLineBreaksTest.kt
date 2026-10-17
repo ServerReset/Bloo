@@ -2,6 +2,7 @@ package com.bloo.bluelink.ui
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import com.bloo.uicommon.balancedLineBreaks
 
 /** Pins for how a group of buttons breaks into lines: as many as fit, then evened out. */
 class BalancedLineBreaksTest {

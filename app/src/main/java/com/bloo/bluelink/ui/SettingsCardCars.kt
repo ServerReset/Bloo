@@ -9,6 +9,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.content
 
 /** "Cars" section content -- see the call site in [SettingsScreen] for context. */
 @Composable

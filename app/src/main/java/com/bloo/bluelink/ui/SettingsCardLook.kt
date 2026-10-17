@@ -29,6 +29,10 @@ import com.bloo.bluelink.data.setFontChoice
 import com.bloo.bluelink.data.setHapticsEnabled
 import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.unitSystem
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.content
 
 /**
  * The "Visuals" card: theme and colour, font, units, text scale, the search bubble, and the welcome

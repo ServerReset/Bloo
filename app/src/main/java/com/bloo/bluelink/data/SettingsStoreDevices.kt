@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.first
+import com.bloo.uicommon.content
 
 // --- Sync identity, device registry, and shortcut selection (extracted from SettingsStore) --
 
