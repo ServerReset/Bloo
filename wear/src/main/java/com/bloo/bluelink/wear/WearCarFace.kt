@@ -93,9 +93,7 @@ fun WearCarFace(
     // The aurora, at watch scale: a soft wash of the level's colour behind the tiles, as the phone's
     // background washes behind its cards. Drawn once, no animation.
     Box(
-        modifier.background(androidx.compose.ui.graphics.Brush.radialGradient(
-            listOf(tint.copy(alpha = 0.22f), Color.Transparent),
-        )),
+        modifier.wearAuroraWash(tint),
         contentAlignment = Alignment.Center,
     ) {
         WearEdgeRing(

@@ -48,7 +48,7 @@ fun WearMessageScreen(
     extra: (@Composable () -> Unit)? = null,
 ) {
     ScreenScaffold(timeText = { TimeText() }) {
-        Box(Modifier.fillMaxSize().padding(horizontal = 22.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().wearAuroraWash(tint).padding(horizontal = 22.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ScreenBadge(icon, tint)
                 RevealText(
@@ -91,7 +91,7 @@ fun WearConfirmScreen(
     val scheme = MaterialTheme.colorScheme
     WearMessageScreen(icon = icon, title = title, detail = detail, tint = if (destructive) scheme.error else scheme.primary) {
         Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            RoundChoice(Icons.Filled.Close, "Cancel", scheme.secondaryContainer, scheme.onSecondaryContainer, onCancel)
+            RoundChoice(Icons.Filled.Close, "Cancel", scheme.surfaceContainerHigh.copy(alpha = 0.6f), scheme.onSurface, onCancel)
             RoundChoice(
                 Icons.Filled.Check, confirmLabel,
                 if (destructive) scheme.error else scheme.primary,
@@ -107,7 +107,7 @@ fun WearConfirmScreen(
 private fun RoundChoice(icon: ImageVector, label: String, container: Color, content: Color, onClick: () -> Unit) {
     MorphButton(
         onClick = onClick,
-        modifier = Modifier.size(52.dp).semantics { contentDescription = label },
+        modifier = Modifier.size(52.dp).semantics { contentDescription = label }.wearGlassRim(CircleShape),
         containerColor = container,
         contentColor = content,
         contentPadding = PaddingValues(0.dp),
@@ -126,7 +126,7 @@ private fun RoundChoice(icon: ImageVector, label: String, container: Color, cont
 /** The tinted circle a full screen's icon sits in. */
 @Composable
 private fun ScreenBadge(icon: ImageVector, tint: Color) {
-    Box(Modifier.size(44.dp).clip(CircleShape).background(tint.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(44.dp).clip(CircleShape).background(tint.copy(alpha = 0.2f)).wearGlassRim(CircleShape), contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
     }
 }

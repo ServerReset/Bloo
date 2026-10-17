@@ -90,7 +90,7 @@ fun WearPinScreen(
     val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("del", "0", "ok"))
     val gap = 6.dp
 
-    BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    BoxWithConstraints(modifier.fillMaxSize().wearAuroraWash(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
         val sizing = pinPadSizing(maxWidth, maxHeight, gap)
         val key = sizing.key
 
@@ -188,10 +188,11 @@ private fun WearKey(label: String, size: Dp, onClick: () -> Unit) {    // A spok
     }
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(size * 0.33f),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
         modifier = Modifier
             .size(size)
+            .wearGlassRim(CircleShape)
             .semantics { contentDescription = spoken },
     ) {
         Box(contentAlignment = Alignment.Center) {
