@@ -1,10 +1,16 @@
 # The foreground-service declaration
 
+> **Not needed as things stand.** Bloo ships on Play's **testing tracks only** and is not submitted for
+> production review, and this declaration is required for exactly one thing: submitting a build for
+> **review**. Until that happens the form does not appear in the console at all — which is why it cannot
+> be found — and nothing is blocked by its absence. This page is kept because it is correct and complete
+> if that ever changes.
+
 Play asks for this once, for any foreground-service type with policy attached. Bloo uses exactly one:
 `connectedDevice`, on `autolock.AutoLockService`. Everything below is written to be pasted rather than
 thought about.
 
-This is the last thing standing between the app and production. Testing tracks do not need it.
+Testing tracks do not need it; production does.
 
 ---
 

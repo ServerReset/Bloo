@@ -33,8 +33,11 @@ Both are always the newest build. Step-by-step instructions are under [Install](
 
 ### Which one?
 
-The same app either way, and either can replace the other — same package name, same signing key. They
-differ in **how they update, and how the watch gets its app**:
+The same app either way, but **not interchangeable**. The package name is the same; the **signing key is
+not** — Play re-signs every upload with Google's app-signing key, so a Play-installed copy and an APK copy
+cannot update each other. Moving between them costs one uninstall, and an uninstall takes the app's data
+with it: export first, from Settings → Export. They differ in **how they update, and how the watch gets
+its app**:
 
 | | Google Play | The APK |
 |---|---|---|

@@ -34,8 +34,10 @@ watch. Instructions are in the [install notes](https://github.com/ServerReset/Bl
 
 ### Which one should I use?
 
-Both are the same app, and either can replace the other — same package name, same signing key. What
-differs is how each one updates and how the watch gets its app:
+Both are the same features, but they are **not interchangeable** — the package name is the same and the
+**signing key is not**, because Play re-signs every upload with Google's app-signing key. A Play copy and
+an APK copy cannot update each other, so moving between them costs one uninstall, and an uninstall takes
+the app's data with it. What differs is how each one updates and how the watch gets its app:
 
 | | Google Play | The APK |
 |---|---|---|

@@ -258,7 +258,7 @@ jobs:
             echo "The opt-in only works for accounts in the group. Testing tracks skip review, so new builds arrive the day they are built."
             echo
             echo "### Play or APK?"
-            echo "The same app either way, and either can replace the other -- same package name, same signing key. What differs is how each updates and how the watch gets its app:"
+            echo "The same features either way, but they are NOT interchangeable: the package name is the same and the signing key is not, because Play re-signs every upload with Google's app-signing key. A Play copy and an APK copy cannot update each other, so moving between them costs one uninstall -- and an uninstall takes the app's data with it. What differs is how each updates and how the watch gets its app:"
             echo
             echo "| | Google Play | The APK |"
             echo "| --- | --- | --- |"

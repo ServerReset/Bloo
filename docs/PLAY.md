@@ -1,5 +1,10 @@
 # Publishing Bloo to Google Play
 
+> **Status: testing tracks only.** Bloo is published to **internal** on every push and to **closed**
+> (`alpha`) on request, and is **not submitted for production review** — a deliberate choice, not an
+> unfinished task. Everything below that is marked *production only* is therefore documented for the day
+> that changes, and is not something to action now. See the README's disclaimer.
+
 Everything the app and the CI need is in the repo. Everything that needs *your* account is in the
 console, and is listed below as a checklist — none of it can be done from here, and none of it
 should be: the Data safety form, the content rating and the "app access" answers are attestations
@@ -76,7 +81,9 @@ allowed to contain.
 
    **The closed test is the one that counts:** a personal developer account needs **12+ testers opted in
    continuously for 14 days** before it can apply for production access, and *internal testing does not
-   count toward that*. The CI uploads `major-` tag builds to this track (see section 4).
+   count toward that*. The CI uploads `major-` tag builds to this track (see section 4). (Production
+   only — there is nothing to action while the project stays on testing tracks, though keeping the
+   closed track fed costs nothing and is what the clock would run on if that changed.)
 
 5. **A service account for CI** — Setup → API access → create/link a Google Cloud project → create a
    service account → grant it **Release to testing tracks** (and *Manage testing tracks* if you want
@@ -87,10 +94,12 @@ allowed to contain.
    the phone is unaffected. After it, the watch ships on every run with nothing further. See
    section 4.
 
-7. **App content → Foreground service permissions.** Bloo uses one foreground service type,
-   `connectedDevice`, for the walk-away auto-lock. The description and the shot list for the required
-   30–60 second video are written out in **[FGS.md](FGS.md)** — it is a paste and a five-minute
-   recording, not a form to think about. Testing tracks do not need this; production does.
+7. **(Production only.)** **App content → Foreground service permissions.** Bloo uses one foreground
+   service type, `connectedDevice`, for the walk-away auto-lock. The description and the shot list for
+   the required 30–60 second video are written out in **[FGS.md](FGS.md)** — it is a paste and a
+   five-minute recording, not a form to think about. The form appears in the console only once a build
+   is submitted for review, so while the project stays on testing tracks there is nothing to find and
+   nothing to fill in.
 
 ---
 
@@ -184,8 +193,9 @@ release".
 
 ## 5. The store listing (you)
 
-Required before the app can go beyond testing. The icon, feature graphic, screenshots and
-description text are all in **`play/`** — see `play/README.md` for the two format rules Play enforces
+Needed for the listing testers see, and required in full before the app could go beyond testing. The
+icon, feature graphic, screenshots and description text are all in **`play/`** — see `play/README.md`
+for the two format rules Play enforces
 (8 bits per channel, and no alpha on screenshots; both bit the last set of captures).
 
 **These are pushed from the repo, not typed into the console.** The **Play listing** workflow
