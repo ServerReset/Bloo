@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.HorizontalPageIndicator
@@ -241,6 +242,19 @@ private fun WearCarPage(
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
+            // THE round-display mechanic, and it is the standard component rather than something
+            // hand-rolled: ScalingLazyColumn scales each item by where it sits on the circle -- full
+            // size at the centre, shrinking toward the edges -- so a pebble grows as the crown brings
+            // it in and shrinks as it leaves.
+            //
+            // These are the DEFAULTS, written out and turned up. Default scaling is gentle enough that
+            // on a full-width pebble you cannot see it; 0.62 at the edge against 1.0 at the centre is
+            // the same mechanic with the effect actually legible. maxElementScale stays at 1f so the
+            // centred item is never enlarged past its own size, which on a round screen would push its
+            // corners under the bezel.
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(
+                edgeScale = 0.62f,
+            ),
             // Generous vertical inset so the hero and the top pebble clear the bezel; Wear's
             // auto-centring then keeps the focused item centred as the crown scrolls.
             contentPadding = PaddingValues(vertical = 18.dp),
