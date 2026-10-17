@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import kotlin.math.roundToInt
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -73,7 +74,8 @@ internal fun HeroHeader(
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "heroMorph",
     )
-    val heroT by heroTState
+    // NOT read in this body: every per-frame use reads heroTState inside its own slot (background,
+    // foreground, trailing), so a frame of the morph recomposes only those slots, never the whole card.
     // Read as thresholds, so the slots that only switch at a point in the morph change once, not per frame.
     val trailingGone by remember { androidx.compose.runtime.derivedStateOf { heroTState.value > 0.35f } }
 
@@ -81,9 +83,9 @@ internal fun HeroHeader(
     // doesn't look like it's still finishing an entrance while it closes. This is a real wall-clock
     // delay (tween + delayMillis), not a fraction of heroT, because heroT is spring-driven with no
     // fixed duration to carve a fraction out of.
-    val statusAlpha = run {
+    fun statusAlpha(heroT: Float): Float {
         val t = ((heroT - 0.15f) / 0.5f).coerceIn(0f, 1f)
-        t * t * (3f - 2f * t)
+        return t * t * (3f - 2f * t)
     }
 
     // ---- The travelling numbers -------------------------------------------
@@ -114,7 +116,9 @@ internal fun HeroHeader(
 
     // Follows the morph: the name travels from the surface colour to the light one the scrim is
     // built for; snapping would flash a white name on a white card.
-    val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, heroOnPhoto(), heroT)
+    // In eighths: the card itself recomposes eight times over the morph for its title colour, not every frame.
+    val titleStep by remember { androidx.compose.runtime.derivedStateOf { (heroTState.value * 8f).roundToInt() / 8f } }
+    val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, heroOnPhoto(), titleStep)
     PebbleShell(
         expanded = heroShown,
         onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -133,12 +137,14 @@ internal fun HeroHeader(
         // No `summary`: the bar is the summary. The photo is the card's BACKGROUND, running behind
         // the header row, with the title and chevron overlaid.
         background = {
-            HeroBackground(cardCoords, v, imageUrl, heroShown, height, heroT, false, readout, hoisted, statusAlpha, report(expandedNumbers))
+            val t = heroTState.value
+            HeroBackground(cardCoords, v, imageUrl, heroShown, height, t, false, readout, hoisted, statusAlpha(t), report(expandedNumbers))
         },
         // The travelling numbers: a plain lerp between the two anchors in this Box's space.
         // Rendered as `foreground` so they cross the header row above its buttons, not under.
         foreground = {
-            HeroForeground(collapsedNumbers, expandedNumbers, hoisted, heroT, readout, statusAlpha)
+            val t = heroTState.value
+            HeroForeground(collapsedNumbers, expandedNumbers, hoisted, t, readout, statusAlpha(t))
         },
         // Collapsed: name, percentage and range on one row, with the bar directly under it. No
         // shared element: SharedTransitionLayout is a LookaheadScope, which adds a lookahead pass
@@ -146,7 +152,7 @@ internal fun HeroHeader(
         titleTrailing = if (trailingGone && !hoisted) null else {
             {
                 HeroCollapsedNumbers(
-                    readout, heroT,
+                    readout, heroTState.value,
                     onPositioned = report(collapsedNumbers),
                     hoisted = hoisted,
                 )
