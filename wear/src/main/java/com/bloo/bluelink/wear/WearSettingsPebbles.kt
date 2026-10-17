@@ -67,3 +67,17 @@ internal fun WearAutoLockPebble() {
         )
     }
 }
+
+/** Shown in place of Auto lock until the phone has handed this watch the car's sign-in. */
+@Composable
+internal fun WearPairPebble() {
+    WearPebble(title = "Pair with phone", icon = Icons.Filled.Lock) {
+        WearCenteredText(
+            "Auto lock needs your car's sign-in. In Bloo on the phone, open Settings and set up the watch.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Normal,
+            maxLines = 4,
+        )
+    }
+}

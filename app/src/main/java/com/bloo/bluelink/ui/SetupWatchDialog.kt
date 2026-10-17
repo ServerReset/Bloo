@@ -167,7 +167,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                     if (watch != null) {
                         BodyMediumText("${watch?.name?.ifBlank { "Your watch" }} is already connected to $phoneName. Bloo can send the latest watch app straight to it.")
                     } else {
-                        BodyMediumText("Bloo for Wear isn't on Google Play, so $phoneName installs it over the watch's own Wireless debugging. Do this ON THE WATCH:")
+                        BodyMediumText("On this copy, installed from a file, the watch app doesn't come from Google Play, so $phoneName installs it over the watch's own Wireless debugging. Do this ON THE WATCH:")
                         BodyMediumText("1. Swipe down from the watch face → tap the gear (Settings).")
                         BodyMediumText("2. Settings → System → About → tap \"Build number\" 7 times, until it says you're a developer.")
                         BodyMediumText("3. Go back → Developer options → turn on \"Wireless debugging\".")

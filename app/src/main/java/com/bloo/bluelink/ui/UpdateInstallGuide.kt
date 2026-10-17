@@ -43,7 +43,7 @@ internal fun UpdateInstallGuideDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 RevealText(
-                    "2. If it says \"Blocked by Play Protect\" (Bloo does not come from the Play Store), tap \"More details\", then \"Install anyway\".",
+                    "2. If it says \"Blocked by Play Protect\" (this copy was installed from a file, not from Google Play), tap \"More details\", then \"Install anyway\".",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
