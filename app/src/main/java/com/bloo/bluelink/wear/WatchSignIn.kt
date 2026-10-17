@@ -94,8 +94,30 @@ object WatchSignIn {
         if (_state.value == State.Sending) _state.value = State.Done
     }
 
-    fun dismiss() {
+    /**
+     * The user closed the dialog, or the exchange failed.
+     *
+     * This tells the WATCH too, and that is the point. Dismissing here used to leave the watch showing
+     * a confirmation code for a sign-in nobody was going to finish: that screen covers the whole watch
+     * and has no timeout, so it stayed up until the app was killed. The watch can cancel it itself now
+     * (see [WearCredentialSync.cancel]), but a user who cancelled HERE should not then have to go and
+     * cancel there as well.
+     */
+    fun dismiss(context: Context) {
+        val node = (_state.value as? State.Confirm)?.nodeId
         _state.value = State.Idle
+        val app = context.applicationContext
+        scope.launch {
+            runCatching {
+                // A known node when we got as far as the code; otherwise whoever is connected.
+                val targets = if (node != null) listOf(node)
+                else Wearable.getNodeClient(app).connectedNodes.await().map { it.id }
+                targets.forEach {
+                    Wearable.getMessageClient(app)
+                        .sendMessage(it, WatchSyncProtocol.PATH_CRED_CANCEL, ByteArray(0)).await()
+                }
+            }
+        }
     }
 
     private fun fail(message: String) {

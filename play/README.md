@@ -12,7 +12,7 @@ asset that exists nowhere is an asset nobody can re-upload.
 | `screenshots/02-lock.png` | Phone screenshot 2 | 1080×1920 (9:16), 8-bit RGB PNG |
 | `screenshots/03-garage-dark.png` | Phone screenshot 3 | 1080×1920 (9:16), 8-bit RGB PNG |
 | `screenshots/04-lock-dark.png` | Phone screenshot 4 | 1080×1920 (9:16), 8-bit RGB PNG |
-| `screenshots-wear/01-watch.png` | **Wear OS screenshot** | 360×360 (1:1), 8-bit RGB PNG |
+| `screenshots-wear/01-watch.png` | **Wear OS screenshot** | 384×384 (1:1), 8-bit RGB PNG |
 | `short-description.txt` | Short description | 80 characters or fewer |
 | `full-description.txt` | Full description | 4000 characters or fewer |
 

@@ -24,7 +24,7 @@ internal fun WatchSignInDialog() {
     if (state == WatchSignIn.State.Idle) return
     val current = state
     GlassAlertDialog(
-        onDismissRequest = WatchSignIn::dismiss,
+        onDismissRequest = { WatchSignIn.dismiss(context) },
         icon = Icons.Filled.Watch,
         title = "Sign watch in",
         text = {
@@ -47,7 +47,7 @@ internal fun WatchSignInDialog() {
             }
             MorphTextButton(
                 if (current == WatchSignIn.State.Done) "Done" else "Cancel",
-                onClick = WatchSignIn::dismiss,
+                onClick = { WatchSignIn.dismiss(context) },
                 modifier = Modifier.fillMaxWidth(),
                 emphasis = if (current == WatchSignIn.State.Done) ButtonEmphasis.Confirm else ButtonEmphasis.Deny,
             )

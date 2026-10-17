@@ -81,6 +81,12 @@ object WatchSyncProtocol {
      */
     const val PATH_CRED_PAYLOAD = "/bloo/cred_payload"
     const val PATH_CRED_ACK = "/bloo/cred_ack"
+    /**
+     * Phone → watch message: "forget that sign-in". Sent when the user dismisses or cancels the
+     * dialog on the phone, so the code screen clears itself instead of waiting for someone to press
+     * Cancel on the watch as well.
+     */
+    const val PATH_CRED_CANCEL = "/bloo/cred_cancel"
 }
 
 /** A command request the watch sends to the phone to run. */

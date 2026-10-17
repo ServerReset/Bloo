@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -86,6 +87,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -466,7 +468,16 @@ private fun CarCard(car: VehicleSnapshot, photoUrl: String?, selected: Boolean, 
 @Composable
 private fun OptionRow(icon: ImageVector, label: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { onChange(!checked) }.padding(vertical = 8.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            // The WHOLE row is the switch, not just the little control on the right. `toggleable`
+            // rather than `clickable` because it merges the row's label, its subtitle and its state
+            // into ONE node that announces itself as a switch and says which way it is set. As a
+            // plain clickable it read as an unlabelled button with a separate switch sitting next to
+            // it, and a tap on the row toggled a control that a screen reader never connected to it.
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -479,7 +490,9 @@ private fun OptionRow(icon: ImageVector, label: String, subtitle: String, checke
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(8.dp))
-        Switch(checked = checked, onCheckedChange = onChange)
+        // null, not onChange: the row owns the toggle now, and a handler here would be a second node
+        // reading the same state.
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

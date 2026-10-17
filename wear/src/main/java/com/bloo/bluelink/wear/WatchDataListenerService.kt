@@ -66,6 +66,9 @@ class WatchDataListenerService : WearableListenerService() {
             WatchSyncProtocol.PATH_CRED_OFFER -> scope.launch { WearCredentialSync.onOffer(applicationContext, phone) }
             WatchSyncProtocol.PATH_CRED_PAYLOAD ->
                 scope.launch { WearCredentialSync.onPayload(applicationContext, phone, messageEvent.data) }
+            // The user cancelled on the phone: clear the code, so the watch is not left showing one
+            // nobody is going to confirm.
+            WatchSyncProtocol.PATH_CRED_CANCEL -> WearCredentialSync.cancel()
         }
     }
 }
