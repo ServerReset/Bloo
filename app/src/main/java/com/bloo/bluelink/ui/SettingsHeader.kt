@@ -11,7 +11,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -141,10 +139,8 @@ internal fun staggeredAdvancedVisible(advanced: Boolean, index: Int): Boolean {
 internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, status: String) {
     val animTint by androidx.compose.animation.animateColorAsState(tint, label = "statusHeaderTint")
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(40.dp).background(animTint.copy(alpha = 0.15f), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
+        // The standard badge container; only the glyph inside it animates between icons.
+        IconBadgeContainer(containerColor = animTint.copy(alpha = 0.15f)) {
             AnimatedContent(targetState = icon, label = "statusHeaderIcon") { i ->
                 Icon(i, contentDescription = null, tint = animTint, modifier = Modifier.size(22.dp))
             }
