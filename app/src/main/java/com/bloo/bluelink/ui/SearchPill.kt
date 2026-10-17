@@ -38,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.bloo.bluelink.data.SettingsCatalog
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -302,9 +303,15 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
     }
     if (!compact) {
         ResultGroup("Settings") {
-            listOf("Haptic feedback", "Text scale", "Glass style").forEach { label ->
+            // Titles read from the catalog, never typed here: these were literals ("Text scale", "Glass style") that
+            // matched nothing, so the first suggestion a person tapped was "No matches". A unit test now checks
+            // every one of these finds itself.
+            SuggestedSettingKeys.mapNotNull { SettingsCatalog.titleOf(it) }.forEach { label ->
                 ResultRow(AppIcons.Settings, scheme.primary, caption = null, onClick = { onPick(label, false) }) { TitleSmallText(label) }
             }
         }
     }
 }
+
+/** The settings offered as examples in the empty search: catalog keys, so each is a real, findable setting. */
+internal val SuggestedSettingKeys = listOf("haptics_enabled", "font_choice", "glass_clarity")
