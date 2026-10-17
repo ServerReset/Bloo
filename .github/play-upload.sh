@@ -198,7 +198,14 @@ assign_to_edit() {
 }
 
 for track in "${phone_tracks[@]}"; do
-  assign_to_edit "$edit" "$track" "${phone_codes[@]}"
+  # BOTH FORM FACTORS IN ONE RELEASE. That is the documented shape: a watch build's version code "must
+  # be unique across all form factors", which only means anything if one release holds them. The 500
+  # that made me split them happened BEFORE the Wear OS form factor was configured -- exactly what Play
+  # answers when it is handed a watch bundle it has no form factor for -- and I routed around it
+  # permanently instead of retrying it once the form factor existed. Which is why the watch was live on
+  # its own track and still never offered next to the phone: a companion is associated with its phone
+  # app by being in the same release.
+  assign_to_edit "$edit" "$track" "${phone_codes[@]}" "${wear_codes[@]}"
 done
 
 echo; echo "--- committing the phone release"
@@ -234,100 +241,21 @@ ok=1
 for track in "${phone_tracks[@]}"; do
   seen="$(read_track "$track")"
   echo "  $track now holds: ${seen:-<nothing>}"
-  for c in "${phone_codes[@]}"; do
+  for c in "${phone_codes[@]}" "${wear_codes[@]}"; do
     case ",$seen," in *",$c,"*) ;; *) echo "::error::$track does NOT hold $c -- the commit did not take"; ok=0 ;; esac
   done
 done
 [ "$ok" = "1" ] || exit 1
 echo "PHONE PUBLISHED: $PKG -> $(printf '%s,' "${phone_tracks[@]}" | sed 's/,$//') holds $(printf '%s,' "${phone_codes[@]}" | sed 's/,$//')"
 
-# ---------------------------------------------------------------------------------------------------
-# The watch, in a SECOND edit, deliberately: its own commit, so a refused form-factor track cannot
-# undo the phone's. Play would roll the whole thing back if this shared an edit, and the phone is what
-# everyone actually asked for.
-if [ "${#wear_codes[@]}" -eq 0 ]; then
-  echo; echo "no watch bundle in this run"
-  call DELETE "$api/edits/$verify_edit" >/dev/null || true
-  exit 0
+# The watch rides in the SAME release as the phone, above -- see the note on that assignment. There is
+# no separate watch edit and no wear:<track> write any more: a companion is associated with its phone app
+# by sharing its release, and a release on a form-factor track of its own is what a STANDALONE watch app
+# gets, which this is not.
+#
+# Everything below is what remains when Play refuses the combined release, so it says which refusal it
+# was rather than leaving the phone's success looking like the watch's.
+if [ "${#wear_codes[@]}" -gt 0 ]; then
+  echo
+  echo "WATCH: in the same release as the phone, above (version code $(printf '%s,' "${wear_codes[@]}" | sed 's/,$//'))."
 fi
-
-echo; echo "=== the watch, in its own edit ==="
-# The form-factor tracks FIRST, each in its own committed edit -- and only then the edit that holds the
-# releases. Order matters: committing an edit invalidates every other open one, so an edit opened
-# before this would be dead by the time a release was written to it. (That is exactly what happened:
-# the create succeeded, and the assignment answered "This Edit has been deleted.")
-for track in "${phone_tracks[@]}"; do
-  ensure_track "wear:$track" || true
-done
-watch_edit="$(call POST "$api/edits" | jq -r .id)"
-watch_ok=1
-for track in "${phone_tracks[@]}"; do
-  assign_to_edit "$watch_edit" "wear:$track" "${wear_codes[@]}" || { watch_ok=0; continue; }
-done
-if [ "$watch_ok" = "1" ]; then
-  echo; echo "--- committing the watch release"
-  if wout="$(call POST "$api/edits/$watch_edit:commit" 2>&1)"; then
-    echo "  commit response: ${wout:-<empty>}"
-    # A FRESH edit for THIS read-back. The commit above invalidated the edit the phone verification
-    # used -- Play is single-writer per app -- so reading through that one answered "This Edit has
-    # been deleted.", which made a completely good watch publish report itself as a failure. (And the
-    # retry that followed then re-uploaded an already-committed version code.)
-    watch_verify_edit="$(call POST "$api/edits" | jq -r .id)"
-    for track in "${phone_tracks[@]}"; do
-      seen="$(read_track_in "$watch_verify_edit" "wear:$track")"
-      echo "  wear:$track now holds: ${seen:-<nothing>}"
-      for c in "${wear_codes[@]}"; do
-        case ",$seen," in *",$c,"*) ;; *) echo "::warning::wear:$track does not hold $c"; watch_ok=0 ;; esac
-      done
-    done
-    call DELETE "$api/edits/$watch_verify_edit" >/dev/null || true
-  else
-    # A form-factor track CREATED through the API has no country availability, and
-    # edits.countryAvailability is read-only -- there is no API to set it. Play refuses a COMPLETED
-    # release on such a track ("Release in track targeting no countries"), but a DRAFT release is not
-    # served, so it is accepted. That puts the watch ON the track, one "roll out" from the console,
-    # rather than not there at all.
-    if printf '%s' "${wout:-}" | grep -qi "targeting no countries"; then
-      echo "::warning::a track with no country availability cannot take a completed release. Publishing the watch as a DRAFT instead: roll it out from the console, or set that track's countries once (Test and release -> the track -> the Wear OS form factor -> Countries/regions) and it completes itself from then on."
-      ASSIGN_STATUS=draft
-      draft_edit="$(call POST "$api/edits" | jq -r .id)"
-      draft_ok=1
-      for track in "${phone_tracks[@]}"; do
-        assign_to_edit "$draft_edit" "wear:$track" "${wear_codes[@]}" || { draft_ok=0; continue; }
-      done
-      ASSIGN_STATUS=
-      if [ "$draft_ok" = "1" ] && call POST "$api/edits/$draft_edit:commit" >/dev/null 2>&1; then
-        echo "WATCH PUBLISHED AS A DRAFT: $PKG -> $(printf 'wear:%s,' "${phone_tracks[@]}" | sed 's/,$//') holds $(printf '%s,' "${wear_codes[@]}" | sed 's/,$//')"
-        watch_ok=1
-      else
-        echo "::warning::the draft was refused too -- the phone is published, the watch is not"
-        watch_ok=0
-      fi
-      call DELETE "$api/edits/$draft_edit" >/dev/null 2>&1 || true
-    else
-      echo "::warning::the watch commit was refused -- the phone is published, the watch is not"
-      watch_ok=0
-    fi
-  fi
-else
-  call DELETE "$api/edits/$watch_edit" >/dev/null || true
-fi
-call DELETE "$api/edits/$verify_edit" >/dev/null || true
-
-if [ "$watch_ok" = "1" ]; then
-  echo "WATCH PUBLISHED: $PKG -> wear:<track> holds $(printf '%s,' "${wear_codes[@]}" | sed 's/,$//')"
-else
-  echo "::warning::the watch did not publish. The phone release is unaffected."
-  echo "  Its bundle is uploaded and sits in the store's bundle library, so nothing is lost."
-  echo "  If Play's reason above is 'Form factor is not configured': set it once at Play Console ->"
-  echo "  Advanced settings -> form factors. There is no API for that setting, which is the only reason"
-  echo "  this step cannot do it. After it is set, this step publishes the watch on every run with"
-  echo "  nothing further to do."
-fi
-
-# What the tracks look like at the end. If a wear: track shows up here that was not there at the start,
-# the form factor has been enabled, and the next run publishes the watch with no further involvement.
-echo; echo "--- tracks now"
-final_edit="$(call POST "$api/edits" | jq -r .id)"
-call GET "$api/edits/$final_edit/tracks" | jq -r '.tracks[]? | "  \(.track)"' || true
-call DELETE "$api/edits/$final_edit" >/dev/null || true
