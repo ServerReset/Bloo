@@ -3,9 +3,7 @@ package com.bloo.bluelink.wear
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 // The PULL-TO-REFRESH comes from the phone Material3, not the Wear one: wear-compose-material3 has no
 // pull-to-refresh, and the modifier is theme-agnostic -- it is a nested-scroll offset and nothing else.
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -219,7 +217,8 @@ private fun WearCarPage(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val listState = rememberScalingLazyListState()
+    // The face is the first item and the one centred on arrival, so opening the app lands on it.
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val signedIn by WearCredentialSync.signedIn.collectAsStateWithLifecycle()
     val pendingCommands by WearCommands.pending.collectAsStateWithLifecycle()
     var confirmUnlock by remember { mutableStateOf(false) }
@@ -305,34 +304,8 @@ private fun WearCarPage(
             // auto-centring then keeps the focused item centred as the crown scrolls.
             contentPadding = PaddingValues(vertical = 18.dp),
         ) {
-            // The update error, shown where the update lives. It used to go nowhere at all.
-            updateError?.let { message ->
-                item {
-                    WearPebble(title = "Watch update", icon = Icons.Filled.SystemUpdate) {
-                        WearCenteredText(message, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-
-            updateRun?.let { run ->
-                item {
-                    WearPebble(title = "Update available", icon = Icons.Filled.SystemUpdate) {
-                        if (downloading) {
-                            WearCenteredText("Downloading… ${(progress * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
-                        } else {
-                            WearActionRow(label = "Update now", icon = Icons.Filled.Download) {
-                                scope.launch { WearUpdateChecker.downloadAndInstall(context) }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // HERO, FULL SCREEN: the circle IS the page. The car's value and its four quick actions
-            // live INSIDE it, so what the car is doing and the things you do about it are one object
-            // rather than a badge with a list underneath. The ring takes the display's own width, so
-            // on a round watch the stroke sits at the bezel. The state lines stay outside it: the
-            // circle holds the value and four 48dp targets and little else on a 227dp face.
+            // THE FACE: the charge (or fuel) as a ring at the display's edge, and the car's four actions as
+            // quarter circles inside it, with the value where they meet (WearCarFace).
             item {
                 val actions = buildList {
                     val locked = v.locked == true
@@ -356,13 +329,12 @@ private fun WearCarPage(
                         add(WearQuickAction("Flash", Icons.Filled.FlashOn, pending = WearCommands.key(v.vin, CarAction.FLASH_LIGHTS) in pendingCommands) { requestCommand { repo.flashLights(v.vin) } })
                     }
                 }
-                WearHero(
+                WearCarFace(
                     value = v.bigValue(),
                     caption = v.name,
-                    tint = v.heroTint(),
                     progress = v.percent?.let { it / 100f },
-                    ring = Modifier.fillMaxWidth().aspectRatio(1f),
-                    body = { WearQuickActions(actions) },
+                    tint = v.heroTint(),
+                    actions = actions,
                 )
             }
             // The state and freshness lines sit UNDER the ring, not inside it: the circle holds the
@@ -391,6 +363,29 @@ private fun WearCarPage(
                     )
                 }
             }
+            // The update error, shown where the update lives. It used to go nowhere at all.
+            updateError?.let { message ->
+                item {
+                    WearPebble(title = "Watch update", icon = Icons.Filled.SystemUpdate) {
+                        WearCenteredText(message, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+
+            updateRun?.let { run ->
+                item {
+                    WearPebble(title = "Update available", icon = Icons.Filled.SystemUpdate) {
+                        if (downloading) {
+                            WearCenteredText("Downloading… ${(progress * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+                        } else {
+                            WearActionRow(label = "Update now", icon = Icons.Filled.Download) {
+                                scope.launch { WearUpdateChecker.downloadAndInstall(context) }
+                            }
+                        }
+                    }
+                }
+            }
+
             if (signedIn) {
                 item { WearActionRow(label = "Refresh", icon = Icons.Filled.Refresh) { repo.refresh() } }
             }

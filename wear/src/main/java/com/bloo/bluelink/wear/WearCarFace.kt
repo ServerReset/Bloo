@@ -1,0 +1,254 @@
+package com.bloo.bluelink.wear
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.bloo.bluelink.data.DeviceStatus
+import com.bloo.uicommon.MorphButton
+import com.bloo.uicommon.MorphButtonLabel
+import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.standardButtonIcon
+
+/*
+ * The watch face for one car: the charge (or fuel) as a ring around the very edge of the display, and inside
+ * it the car's four actions as quarter circles, with the value in a small hub where they meet.
+ *
+ * Built from three pieces that each stand alone -- [WearEdgeRing], [WearQuadrantGrid] and [WearFaceHub] --
+ * so a screen that wants only the ring (a loading state) or only the grid can use just that piece.
+ */
+
+/** The ring's stroke and the gap between it and the tiles inside it. */
+private val RingStroke = 10.dp
+private val RingGap = 6.dp
+
+/** The gap between the four quarter tiles (the cross through the middle of the face). */
+private val TileGap = 6.dp
+
+/** The hub's share of the inner circle's diameter. */
+private const val HubFraction = 0.36f
+
+/**
+ * The whole face. Fills its square (on a round watch, the display); everything inside is sized from it, so the
+ * same face works on a 192dp and a 240dp watch.
+ */
+@Composable
+fun WearCarFace(
+    value: String,
+    caption: String,
+    /** 0..1, or null for a car that reports no charge or fuel (the ring then shows its track only). */
+    progress: Float?,
+    tint: Color,
+    actions: List<WearQuickAction>,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+        WearEdgeRing(progress = progress, tint = tint, modifier = Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize().padding(RingStroke + RingGap), contentAlignment = Alignment.Center) {
+            WearQuadrantGrid(actions = actions, modifier = Modifier.fillMaxSize())
+            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                WearFaceHub(value = value, caption = caption, tint = tint, size = maxWidth * HubFraction)
+            }
+        }
+    }
+}
+
+/**
+ * The charge or fuel as a ring that hugs the display's edge: a soft track all the way round, and the level
+ * from 12 o'clock clockwise. Springs to a new level; under the watch's lean mode it jumps.
+ */
+@Composable
+fun WearEdgeRing(progress: Float?, tint: Color, modifier: Modifier = Modifier, stroke: Dp = RingStroke) {
+    val policy by DeviceStatus.policy.collectAsState()
+    val sweep by animateFloatAsState(
+        (progress ?: 0f).coerceIn(0f, 1f),
+        animationSpec = if (policy.bouncySprings) spring() else snap(),
+        label = "edgeRing",
+    )
+    val track = tint.copy(alpha = 0.18f)
+    Box(
+        modifier.drawBehind {
+            val w = stroke.toPx()
+            val arc = androidx.compose.ui.geometry.Size(size.width - w, size.height - w)
+            val topLeft = androidx.compose.ui.geometry.Offset(w / 2, w / 2)
+            drawArc(track, -90f, 360f, false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
+            if (progress != null && sweep > 0f) {
+                drawArc(tint, -90f, 360f * sweep, false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
+            }
+        },
+    )
+}
+
+/**
+ * Up to four actions as the four quarters of a circle: each is a square whose OUTER corner is rounded by its
+ * whole width (which makes it a quarter disc) and whose inner corner, where the four meet, is a soft corner the
+ * hub sits over. Order: top-left, top-right, bottom-left, bottom-right. A missing action leaves a quiet,
+ * inactive quarter, so the circle stays whole.
+ *
+ * Each quarter is the app's own [MorphButton] -- its press feedback, haptic, frost and pending spinner -- given
+ * the quarter shape; a press softens the inner corner a little more, the way every button squares off.
+ */
+@Composable
+fun WearQuadrantGrid(actions: List<WearQuickAction>, modifier: Modifier = Modifier) {
+    val slots = (0 until 4).map { actions.getOrNull(it) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(TileGap)) {
+        for (row in 0..1) {
+            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(TileGap)) {
+                for (col in 0..1) {
+                    val q = row * 2 + col
+                    QuarterTile(q, slots[q], Modifier.weight(1f).fillMaxSize())
+                }
+            }
+        }
+    }
+}
+
+/** One quarter of the face. [quadrant]: 0 top-left, 1 top-right, 2 bottom-left, 3 bottom-right. */
+@Composable
+private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = { morph: Float -> quarterShape(quadrant, innerCorner = (14f + 10f * morph).dp) }
+    if (action == null) {
+        Box(modifier.clip(shape(0f)).background(scheme.surfaceContainer.copy(alpha = 0.5f)))
+        return
+    }
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val tint = if (action.active) scheme.onPrimary else scheme.onSecondaryContainer
+    val glyph = action.icon ?: standardButtonIcon(action.label)
+    MorphButton(
+        onClick = action.onClick,
+        modifier = modifier.semantics { contentDescription = action.label },
+        enabled = !action.pending,
+        frostWhenDisabled = false,
+        active = action.active,
+        containerColor = scheme.secondaryContainer,
+        contentColor = scheme.onSecondaryContainer,
+        activeContainerColor = scheme.primary,
+        activeContentColor = scheme.onPrimary,
+        contentPadding = PaddingValues(0.dp),
+        minHeight = 0.dp,
+        shapeForCorner = { morph, _ -> shape(morph) },
+        onClickHaptic = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) },
+    ) {
+        // The glyph sits in the middle of the quarter's visible area, a little away from the hub.
+        val toward = when (quadrant) {
+            0 -> Alignment.TopStart
+            1 -> Alignment.TopEnd
+            2 -> Alignment.BottomStart
+            else -> Alignment.BottomEnd
+        }
+        Box(Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.Center) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.align(androidx.compose.ui.BiasAlignment(biasX(toward), biasY(toward))),
+            ) {
+                glyph?.let {
+                    CompositionLocalProvider(LocalContentColor provides tint) {
+                        MorphButtonLabel(icon = it, label = "", pending = action.pending, iconSize = 24.dp)
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                RevealText(
+                    action.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = tint,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** A little toward the outer corner: the hub covers the inner one. */
+private fun biasX(a: Alignment) = when (a) { Alignment.TopStart, Alignment.BottomStart -> -0.12f; else -> 0.12f }
+private fun biasY(a: Alignment) = when (a) { Alignment.TopStart, Alignment.TopEnd -> -0.12f; else -> 0.12f }
+
+/** The quarter-disc: the outer corner rounded by the tile's whole width, the inner corner by [innerCorner]. */
+private fun quarterShape(quadrant: Int, innerCorner: Dp): RoundedCornerShape {
+    val outer = CornerSize(100)
+    val inner = CornerSize(innerCorner)
+    val none = CornerSize(4.dp)
+    return when (quadrant) {
+        0 -> RoundedCornerShape(topStart = outer, topEnd = none, bottomEnd = inner, bottomStart = none)
+        1 -> RoundedCornerShape(topStart = none, topEnd = outer, bottomEnd = none, bottomStart = inner)
+        2 -> RoundedCornerShape(topStart = none, topEnd = inner, bottomEnd = none, bottomStart = outer)
+        else -> RoundedCornerShape(topStart = inner, topEnd = none, bottomEnd = outer, bottomStart = none)
+    }
+}
+
+/** The value where the four quarters meet: the charge or fuel (or the lock state), and the car's name under it. */
+@Composable
+fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(scheme.background)
+            .padding(4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            com.bloo.uicommon.AnimatedValue(
+                value = value,
+                style = androidx.compose.ui.text.TextStyle(
+                    fontWeight = FontWeight.Bold,
+                    color = tint,
+                    textAlign = TextAlign.Center,
+                    fontSize = (size.value * 0.26f).coerceIn(14f, 26f).sp,
+                ),
+                maxLines = 1,
+                reduceMotion = false,
+            )
+            RevealText(
+                caption,
+                style = MaterialTheme.typography.labelSmall,
+                color = scheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.width(size * 0.8f),
+            )
+        }
+    }
+}

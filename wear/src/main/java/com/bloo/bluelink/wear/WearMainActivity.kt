@@ -23,7 +23,6 @@ import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.reduceMotionCached
 import kotlinx.coroutines.launch
-import com.bloo.uicommon.RevealText
 
 /**
  * The watch's only Activity. Hosts [WearGarageScreen]; everything else lives in the repository +
