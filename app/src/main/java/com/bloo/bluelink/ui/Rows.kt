@@ -48,6 +48,23 @@ import com.bloo.uicommon.AnimatedValue
 
 // --- Small reusable pieces ------------------------------------------------
 
+/**
+ * The label of a label/value row, in the muted tone every such row uses (a status row, the account's password
+ * row): bodyMedium at [MutedContentAlpha] -- 0.92 in a forced-open context (LocalForceExpanded) so the pair
+ * stays distinguishable -- on one line, so a long label clips instead of wrapping per character.
+ */
+@Composable
+internal fun RowLabel(label: String, modifier: Modifier = Modifier) {
+    RevealText(
+        label,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodyMedium,
+        color = LocalContentColor.current.copy(alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
 @Composable
 internal fun StatusRow(label: String, value: String, valueMono: Boolean = false) {
     Row(
@@ -55,21 +72,9 @@ internal fun StatusRow(label: String, value: String, valueMono: Boolean = false)
         // Top-align so a wrapped value leaves the label on the first line.
         verticalAlignment = Alignment.Top,
     ) {
-        RevealText(
-            label,
-            // Natural width, not weight(1f): a 50/50 split starved the value (the long side) into
-            // wrapping. The value below is the row's one weighted child.
-            style = MaterialTheme.typography.bodyMedium,
-            // MutedContentAlpha reads as a secondary label; 0.92 in a forced-open context
-            // (LocalForceExpanded) so the pair stays distinguishable.
-            color = LocalContentColor.current.copy(
-                alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
-            ),
-            // Capped defensively so a long label clips to one line instead of wrapping per
-            // character.
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // Natural width, not weight(1f): a 50/50 split starved the value (the long side) into
+        // wrapping. The value below is the row's one weighted child.
+        RowLabel(label)
         Spacer(Modifier.width(GapRow))
         // Right-aligning Box owns the label's leftover width: short values sit flush right, long
         // ones (coordinates, VIN, email) use the extra width. A filling Box gives textAlign=End

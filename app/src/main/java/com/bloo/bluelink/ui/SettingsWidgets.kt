@@ -271,13 +271,7 @@ internal fun SecretRow(label: String, value: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        RevealText(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        RowLabel(label, Modifier.weight(1f))
         Spacer(Modifier.width(GapGroup))
         RevealText(
             if (show) value else "•".repeat(value.length.coerceIn(4, 10)),
