@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -67,11 +68,14 @@ internal fun HeroHeader(
     // spring would overshoot type size.
     // The hero's body is open when the user's own choice says so.
     val heroShown = photoExpanded
-    val heroT by animateFloatAsState(
+    val heroTState = animateFloatAsState(
         targetValue = if (heroShown) 1f else 0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "heroMorph",
     )
+    val heroT by heroTState
+    // Read as thresholds, so the slots that only switch at a point in the morph change once, not per frame.
+    val trailingGone by remember { androidx.compose.runtime.derivedStateOf { heroTState.value > 0.35f } }
 
     // Delayed only going IN (photoExpanded true); collapsing fades it out immediately, so the card
     // doesn't look like it's still finishing an entrance while it closes. This is a real wall-clock
@@ -139,7 +143,7 @@ internal fun HeroHeader(
         // Collapsed: name, percentage and range on one row, with the bar directly under it. No
         // shared element: SharedTransitionLayout is a LookaheadScope, which adds a lookahead pass
         // per placement and costs car-swipe frames.
-        titleTrailing = if (heroT > 0.35f && !hoisted) null else {
+        titleTrailing = if (trailingGone && !hoisted) null else {
             {
                 HeroCollapsedNumbers(
                     readout, heroT,
@@ -158,10 +162,17 @@ internal fun HeroHeader(
             // CONTENT and then sits HeroReadoutBottomInset above the card's edge, so reserving only
             // the content left the reservation one gap short and the readout's top edge crossed
             // into the title's row.
-            val h = lerp(collapsedReadoutHeight + HeroReadoutBottomInset, 0.dp, heroT)
-            // No graphicsLayer: there is nothing here to fade any more. An alpha on an empty Box is
-            // a layer allocation per frame for no pixels.
-            Spacer(Modifier.fillMaxWidth().height(h))
+            val full = collapsedReadoutHeight + HeroReadoutBottomInset
+            // The reservation shrinks in the LAYOUT phase (the morph is read there, not in this slot's
+            // composition), so the header content is re-measured per frame but never recomposed. No
+            // graphicsLayer: an alpha on an empty Box is a layer allocation per frame for no pixels.
+            Spacer(
+                Modifier.fillMaxWidth().layout { measurable, constraints ->
+                    val h = lerp(full, 0.dp, heroTState.value).roundToPx().coerceAtLeast(0)
+                    val p = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
+                    layout(p.width, h) { p.place(0, 0) }
+                },
+            )
         },
     ) {
         // Empty by design. Everything the expanded state adds -- the photo and the readout over its
