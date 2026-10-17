@@ -220,6 +220,13 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <!-- MESSAGE_RECEIVED as well, and it was missing. Commands travel as DATA items, so
+                     the Data Layer worked without it, but the whole watch SIGN-IN handshake is
+                     messages (offer, key, payload, ack), so the watch received the offer and showed
+                     its code while the phone never received the key back: no confirm dialog, and a
+                     fresh code on every press because each press makes a new key on the watch. The
+                     watch's own service had both actions all along; this one had only the first. -->
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
                 <data
                     android:scheme="wear"
                     android:host="*"

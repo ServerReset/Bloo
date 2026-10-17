@@ -55,9 +55,19 @@ object WatchSignIn {
         }
     }
 
-    /** The watch's public key arrived. */
+    /**
+     * The watch's public key arrived.
+     *
+     * Accepted from [State.Failed] as well as [State.WaitingForWatch], and that is the whole point:
+     * [offer] gives up after WAIT_MS and shows "The watch didn't answer", but the watch's reply can
+     * arrive just after that -- its app has to be opened, or the message simply lags. Refusing a late
+     * key left the user with a code on the watch, no dialog on the phone, and a NEW code every time
+     * they pressed Sign in, because each press makes a fresh key on the watch. A late answer is a
+     * good answer; it only has to be newer than the press.
+     */
     fun onKey(nodeId: String, publicKey: ByteArray) {
-        if (_state.value != State.WaitingForWatch) return
+        val current = _state.value
+        if (current != State.WaitingForWatch && current !is State.Failed) return
         _state.value = State.Confirm(WatchCredentialTransfer.confirmationCode(publicKey), nodeId, publicKey)
     }
 
