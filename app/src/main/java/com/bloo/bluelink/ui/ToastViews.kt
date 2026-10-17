@@ -59,20 +59,31 @@ import com.bloo.uicommon.canBlurBackdrops
 
 // --- The toast slot and card that ToastHost lays out ---
 
-/** The stack's motion: a bouncy rise in, a quick retreat out, a damped reflow between slots. */
-private val EnterSpring = spring<Float>(dampingRatio = 0.68f, stiffness = Spring.StiffnessMediumLow)
+/**
+ * The toasts' motion, one family with the search bar's own springs: a toast pops up from behind the bar with
+ * an overshoot (so it visibly jumps, then settles), a quick no-bounce retreat back behind it, and a damped
+ * reflow when the slots around it change.
+ */
+private val EnterSpring = spring<Float>(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow)
 private val ExitSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
-private val ReflowSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
+private val ReflowSpring = spring<Float>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
+
+/** How much of each older toast peeks out above the newest while the pile is folded. */
+private val PeekHeight = 9.dp
+
+/** How far a vertical drag must go to fan the pile out (up) or fold it (down). */
+private val StackSwipe = 36.dp
 
 /**
- * One toast: it owns its expiry clock, rises out of the search bar into its slot and retreats back
- * into it on the way out, and drops itself from the stack the moment its exit finishes.
+ * One toast: it owns its expiry clock, pops up from behind the search bar into its slot and drops back
+ * behind it on the way out, and removes itself from the stack the moment its exit finishes.
  *
- * It is laid out once, full-width at the bottom of the stack, and its whole motion is a
- * `graphicsLayer` translation: [slot] is the slot index it currently occupies (animated, so older
- * toasts glide up as newer ones arrive), and [enter] is how far it has risen out of the search.
- * Only the horizontal insets change a measured size, and only while the search settles somewhere
- * new.
+ * It is laid out once, full-width at the bottom of the stack, and its whole motion is a `graphicsLayer`
+ * transform read in the draw phase: [slot] is the slot it currently occupies (animated, so older toasts glide
+ * as newer ones arrive), [enter] is how far it has come out from behind the search bar (it overshoots past
+ * 1, which is the jump), and [expandFrac] is how far the folded pile is fanned out. Folded, the toasts behind
+ * the newest are shrunken slivers peeking above it, sharing its width -- which beside a docked search is the
+ * gap next to it.
  */
 @Composable
 internal fun BoxScope.ToastSlot(
@@ -85,6 +96,12 @@ internal fun BoxScope.ToastSlot(
     searchRect: Rect?,
     toastWidthPx: Float,
     windowWidthPx: Float,
+    expandFrac: () -> Float,
+    stackSize: Int,
+    contentBottomPx: Float,
+    edgePx: Float,
+    onToggleStack: () -> Unit,
+    onSetExpanded: (Boolean) -> Unit,
     hazeState: HazeState,
     onCopy: (String) -> Unit,
     onExpand: () -> Unit,
@@ -93,8 +110,8 @@ internal fun BoxScope.ToastSlot(
     onGone: () -> Unit,
 ) {
     // Its own clock, re-armed whenever the expiry moves (a repeat of the same message).
-    // Not while paused (search covering the stack, app in the background, a finger on a toast): the
-    // clock restarts from the extended expiry when the pause ends.
+    // Not while paused (search covering the stack, app in the background, a finger on a toast, the pile
+    // fanned out): the clock restarts from the extended expiry when the pause ends.
     LaunchedEffect(toast.id, toast.expireAt, toast.hardExpireAt, paused) {
         if (paused) return@LaunchedEffect
         delay((minOf(toast.expireAt, toast.hardExpireAt) - SystemClock.elapsedRealtime()).coerceAtLeast(0L))
@@ -107,7 +124,7 @@ internal fun BoxScope.ToastSlot(
     // The slot it rests in, animated toward [index]. Starts AT its index (no initial glide).
     val slot = remember(toast.id) { Animatable(index.toFloat()) }
     LaunchedEffect(index) { slot.animateTo(index.toFloat(), ReflowSpring) }
-    // 0 = merged with the search bar, 1 = resting in its slot.
+    // 0 = hidden behind the search bar, 1 = resting in its slot; overshoots past 1 on the way up.
     val enter = remember(toast.id) { Animatable(0f) }
     LaunchedEffect(toast.id) { enter.animateTo(1f, EnterSpring) }
     LaunchedEffect(toast.leaving) {
@@ -124,23 +141,56 @@ internal fun BoxScope.ToastSlot(
     val startInset = with(density) { startInsetPx.coerceAtLeast(0f).toDp() }
     val endInset = with(density) { endInsetPx.coerceAtLeast(0f).toDp() }
     val lift = liftPx.coerceAtLeast(0f)
+    val peekPx = with(density) { PeekHeight.toPx() }
+    val barPx = with(density) { ChromeBarHeight.toPx() }
+    val maxCardPx = with(density) { MaxToastWidth.toPx() }
+    val swipePx = with(density) { StackSwipe.toPx() }
+    val folded = expandFrac() < 0.5f
+    val foldedNow by androidx.compose.runtime.rememberUpdatedState(folded)
+    val toggle by androidx.compose.runtime.rememberUpdatedState(onSetExpanded)
+    var vDrag by remember(toast.id) { androidx.compose.runtime.mutableFloatStateOf(0f) }
     Box(
         Modifier
             .align(Alignment.BottomStart)
             .fillMaxWidth()
             .padding(start = startInset, end = endInset)
             .graphicsLayer {
-                val merge = 1f - enter.value.coerceIn(0f, 1f)
-                // Rise out of the search's own row and settle into the slot; retreat on the way out.
-                translationY = -slot.value * stepPx - lift + merge * ChromeBarHeight.toPx()
-                // While still merged, sit over the search element itself: centred on it and squeezed
-                // to its width, so each toast looks like it grew out of the search bubble and split
-                // off, and on the way out merges back into it.
-                if (searchRect != null && toastWidthPx > 0f) {
-                    translationX = merge * (searchRect.center.x - windowWidthPx / 2f)
-                    val grow = (searchRect.width / toastWidthPx).coerceIn(0.12f, 1f)
-                    scaleX = 1f - merge * (1f - grow)
+                val e = expandFrac()
+                val s = slot.value
+                val enterV = enter.value
+                // Folded, each older toast peeks a sliver above the one in front (two at most); fanned out,
+                // each takes its own full slot.
+                val depth = minOf(s, 2f)
+                val stackY = -depth * peekPx + (-s * stepPx + depth * peekPx) * e
+                val baseY = stackY - lift
+                val merge = 1f - enterV
+                var ty = baseY
+                var tx = 0f
+                var sx = 1f
+                if (merge > 0f && searchRect != null && toastWidthPx > 0f) {
+                    // Behind the search bar: centred on it and squeezed to its width, so the toast is hidden
+                    // until it jumps up and widens into its slot.
+                    val boxW = (windowWidthPx - 2f * edgePx - startInsetPx - endInsetPx).coerceAtLeast(1f)
+                    val boxCx = edgePx + startInsetPx.coerceAtLeast(0f) + boxW / 2f
+                    val restCy = contentBottomPx - barPx / 2f + baseY
+                    tx = merge * (searchRect.center.x - boxCx)
+                    ty = baseY + merge * (searchRect.center.y - restCy)
+                    val cardW = minOf(boxW, maxCardPx)
+                    sx = 1f - merge * (1f - (searchRect.width / cardW).coerceIn(0.1f, 1f))
+                } else if (merge < 0f) {
+                    // The overshoot of the jump: a touch past the slot, then settling.
+                    ty = baseY + merge * barPx * 0.6f
                 }
+                // Stretches tall in flight (a quick squash-and-stretch), shrinks as it sits deeper in the pile.
+                val stretch = 1f + 0.09f * kotlin.math.sin(Math.PI.toFloat() * enterV.coerceIn(0f, 1f))
+                val shrink = 1f - 0.05f * depth * (1f - e)
+                translationX = tx
+                translationY = ty
+                scaleX = sx * shrink
+                scaleY = stretch * shrink
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                // Deeper than two behind the newest, a folded toast is not there at all.
+                alpha = 1f - (1f - e) * (s - 2f).coerceIn(0f, 1f)
             }
             .pointerInput(toast.id) {
                 // Observes only (Initial pass, never consumes), so the swipe and the buttons still work.
@@ -153,12 +203,27 @@ internal fun BoxScope.ToastSlot(
                     onHold(false)
                 }
             }
-            .then(swipe),
+            .then(swipe)
+            // Up fans the pile out, down folds it back: the same gesture a notification stack answers to.
+            .pointerInput(toast.id, stackSize > 1) {
+                if (stackSize > 1) {
+                    androidx.compose.foundation.gestures.detectVerticalDragGestures(
+                        onDragStart = { vDrag = 0f },
+                        onVerticalDrag = { change, amount -> change.consume(); vDrag += amount },
+                        onDragEnd = {
+                            if (vDrag < -swipePx && foldedNow) toggle(true)
+                            else if (vDrag > swipePx && !foldedNow) toggle(false)
+                            vDrag = 0f
+                        },
+                        onDragCancel = { vDrag = 0f },
+                    )
+                }
+            },
     ) {
-        // The card stops at MaxToastWidth in the stack above the search, centred in the stack; beside the search it takes the whole gap. The width BLENDS between the
-        // two (driven by the same spring as the insets), so moving the search never snaps a toast to
-        // full width before it animates.
-        val beside = index == 0 && (startInsetPx > 1f || endInsetPx > 1f)
+        // The card stops at MaxToastWidth in the stack above the search, centred in the stack; beside the
+        // search it takes the whole gap. The width BLENDS between the two (driven by the same spring as the
+        // insets), so moving the search never snaps a toast to full width before it animates.
+        val beside = startInsetPx > 1f || endInsetPx > 1f
         val besideFrac = animateFloatAsState(if (beside) 1f else 0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow), label = "toastBeside")
         Box(
             Modifier.layout { measurable, constraints ->
@@ -171,13 +236,21 @@ internal fun BoxScope.ToastSlot(
         ) {
             ToastCard(
                 toast = toast,
-                // Fade the CONTENT, not the glass: the pill stays a solid piece of the bar while it
-                // peels off, and an alpha on the glass layer would clip its shadow.
-                contentAlpha = { enter.value.coerceIn(0f, 1f) },
+                // Fade the CONTENT, not the glass: the pill stays a solid piece of the bar while it peels
+                // off, and a toast folded behind the newest shows only its edge.
+                contentAlpha = {
+                    val behind = slot.value.coerceIn(0f, 1f) * (1f - expandFrac())
+                    enter.value.coerceIn(0f, 1f) * (1f - behind)
+                },
                 onDismiss = { toast.leaving = true },
                 hazeState = hazeState,
                 onCopy = onCopy,
-                onExpand = onExpand,
+                // A repeat count opens into its separate cards; otherwise a tap fans the pile out or folds it.
+                onTap = when {
+                    toast.count > 1 -> onExpand
+                    stackSize > 1 -> onToggleStack
+                    else -> null
+                },
             )
         }
     }
@@ -190,7 +263,7 @@ private fun ToastCard(
     onDismiss: () -> Unit,
     hazeState: HazeState,
     onCopy: (String) -> Unit,
-    onExpand: () -> Unit,
+    onTap: (() -> Unit)?,
 ) {
     val scheme = MaterialTheme.colorScheme
     val (icon, accent) = when (toast.type) {
@@ -202,8 +275,8 @@ private fun ToastCard(
         // A pill, like the search bar it emerges from; mostly clear glass with just enough tint to read.
         shape = CircleShape,
         hazeState = hazeState,
-        // A grouped toast (×N) opens into its individual cards when tapped.
-        onClick = if (toast.count > 1) onExpand else null,
+        // A grouped toast (×N) opens into its cards when tapped; a pile fans out or folds.
+        onClick = onTap,
         tint = scheme.surface.copy(alpha = if (canBlurBackdrops()) 0.16f else 0.96f),
         modifier = Modifier
             .fillMaxWidth()

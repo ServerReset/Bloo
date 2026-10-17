@@ -5,6 +5,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.ui.layout.layout
 import android.os.SystemClock
 import androidx.compose.animation.core.animateFloatAsState
@@ -42,6 +44,9 @@ private const val MaxToasts = 4
 private const val ExpiryStaggerMs = 450L
 
 /** How far past its expiry a toast may linger before it is treated as stale (its clock never ran). */
+/** How long a fanned-out pile stays open untouched before it folds back. */
+private const val ExpandedIdleMs = 7_000L
+
 private const val StaleAfterMs = 3_000L
 
 /** How much longer than its own duration a repeating toast may live before it is dismissed regardless. */
@@ -101,6 +106,17 @@ internal class ToastState {
         private set
     private var pausedAt = 0L
 
+    /** True while the collapsed pile is fanned out into one card per toast. */
+    var expanded by mutableStateOf(false)
+        private set
+
+    /** Bumps whenever a message arrives, so the search bar can answer it with a little bounce. */
+    var pulse by mutableIntStateOf(0)
+        private set
+
+    fun setExpanded(value: Boolean) { expanded = value }
+    fun toggleStack() { expanded = !expanded }
+
     /** The expiry a new toast gets: its own duration, but never before the last live one plus a stagger. */
     private fun nextExpiry(now: Long, durationMs: Long): Long {
         val lastLive = items.filter { !it.leaving }.maxOfOrNull { it.expireAt } ?: 0L
@@ -124,9 +140,11 @@ internal class ToastState {
         if (existing != null) {
             existing.expireAt = expire
             existing.count += 1
+            pulse++
             return
         }
         items += Toast(nextId++, message, type, expire, now + toastDurationMs(message, type) + MaxLifetimeExtraMs)
+        pulse++
         trimToLimit()
     }
 
@@ -211,12 +229,31 @@ internal fun ToastHost(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     var held by remember { mutableIntStateOf(0) }
-    val shouldPause = anchor.searchOpen || !resumed || held > 0
+    val visible = state.items
+    // More than one live toast collapses into a pile behind the newest; it fans out on a tap or an upward
+    // swipe, and folds back on a swipe down, a second tap, or after a few idle seconds.
+    val liveCount = visible.count { !it.leaving }
+    val canExpand = liveCount > 1
+    val expandedNow = state.expanded && canExpand
+    LaunchedEffect(canExpand) { if (!canExpand) state.setExpanded(false) }
+    LaunchedEffect(expandedNow, liveCount) {
+        if (expandedNow) {
+            kotlinx.coroutines.delay(ExpandedIdleMs)
+            state.setExpanded(false)
+        }
+    }
+    // The pile's openness, read per frame by each slot's layer.
+    val expandFrac = animateFloatAsState(
+        if (expandedNow) 1f else 0f,
+        spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow),
+        label = "toastExpand",
+    )
+    // Fanned out, the clocks stand still so the toasts can be read.
+    val shouldPause = anchor.searchOpen || !resumed || held > 0 || expandedNow
     LaunchedEffect(shouldPause) { state.pauseClocks(shouldPause) }
     // Leaving the host (a screen swap) must not leave the clocks stopped for good.
     DisposableEffect(state) { onDispose { state.pauseClocks(false) } }
 
-    val visible = state.items
     // The newest toast is the one that shares the search element's own row; the older ones stack
     // above it.
     val newest = visible.lastOrNull { !it.leaving }
@@ -285,8 +322,15 @@ internal fun ToastHost(
                     liftPx = lift,
                     // Only the newest toast shares the search element's row, so only it is inset to
                     // slot beside a corner-docked search; the ones above keep their full width.
-                    startInsetPx = if (index == 0) startInset else 0f,
-                    endInsetPx = if (index == 0) endInset else 0f,
+                    // The pile behind it shares that inset while folded and widens to full as it fans out.
+                    startInsetPx = if (index == 0) startInset else startInset * (1f - expandFrac.value),
+                    endInsetPx = if (index == 0) endInset else endInset * (1f - expandFrac.value),
+                    expandFrac = { expandFrac.value },
+                    stackSize = liveCount,
+                    contentBottomPx = window.height.toFloat() - maxOf(imeBottomPx, navBottomPx) - edgePx,
+                    edgePx = edgePx,
+                    onToggleStack = { state.toggleStack() },
+                    onSetExpanded = { state.setExpanded(it) },
                     searchRect = searchRect,
                     toastWidthPx = contentWidthPx,
                     windowWidthPx = window.width.toFloat(),
@@ -299,5 +343,25 @@ internal fun ToastHost(
                 )
             }
         }
+    }
+}
+
+/**
+ * The search element's answer to a message arriving: it squashes a little as the toast pushes off from behind it,
+ * then springs back, so the two read as one piece of chrome.
+ */
+@Composable
+internal fun Modifier.toastBump(): Modifier {
+    val toasts = LocalToasts.current ?: return this
+    val bump = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(toasts.pulse) {
+        if (toasts.pulse == 0) return@LaunchedEffect
+        bump.snapTo(1f)
+        bump.animateTo(0f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium))
+    }
+    return this.graphicsLayer {
+        val b = bump.value
+        scaleX = 1f + 0.06f * b
+        scaleY = 1f - 0.08f * b
     }
 }

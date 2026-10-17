@@ -309,6 +309,17 @@ fun BlooApp(vm: AppViewModel) {
             }
             }
         }
+        // Toasts pop up from BEHIND the search element, so they are drawn before it (and after the page).
+        Box(Modifier.fillMaxSize()) {
+            ToastHost(
+                state = toasts,
+                hazeState = searchHazeState,
+                onCopy = { text ->
+                    scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo", text))) }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
         // Search lives above the AnimatedContent so one element survives the transition (corner
         // bubble morphing into the settings pill). Only the garage is searchable.
         val searchable = target == Screen.Garage
@@ -336,23 +347,12 @@ fun BlooApp(vm: AppViewModel) {
     // The status bar's own strip: a blur of what is behind it, strongest at the top and nearly gone
     // by the bottom of the strip. It is the ONLY edge treatment in the app.
     StatusBarScrim(searchHazeState)
-    // Toasts sit inside the outer Box after SearchLayer so they stack above search; the lock
-    // overlay and dialogs sit above them. The app-wide pull-to-refresh disc, drawn above content
-    // and below toasts/dialogs; refracts searchHazeState.
+    // The app-wide pull-to-refresh disc, drawn above content; refracts searchHazeState. The lock overlay
+    // and dialogs sit above it.
     PullRefreshIndicatorHost(
         state = refreshIndicator,
         hazeState = searchHazeState,
     )
-    Box(Modifier.fillMaxSize()) {
-        ToastHost(
-            state = toasts,
-            hazeState = searchHazeState,
-            onCopy = { text ->
-                scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo", text))) }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
-    }
     }
     }
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
