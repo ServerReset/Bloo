@@ -216,7 +216,9 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
         }
         WidgetArrangement.STACK -> Column(root) {
             Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = plan.nameSp.sp)
-            Spacer(GlanceModifier.height(WidgetGap))
+            // Spare height is shared between the sections (each Spacer takes an equal share), so a tall
+            // widget is evenly spaced rather than empty in one band.
+            Spacer(GlanceModifier.defaultWeight())
             Text(car.bigValue(), maxLines = 1, style = valueStyle)
             if (plan.showStatus) StatusText(car, note, plan.statusSp.sp)
             if (plan.showDetails) {
@@ -233,7 +235,6 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
                 Spacer(GlanceModifier.height(WidgetGap))
                 StatusChips(car)
             }
-            // Whatever the budget left over sits above the controls, which hug the bottom edge.
             Spacer(GlanceModifier.defaultWeight())
             Actions(car, pending, armed, opts, labels = plan.labels, maxActions = plan.maxActions, heightDp = plan.buttonHeightDp)
         }

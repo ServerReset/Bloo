@@ -96,6 +96,8 @@ private const val VALUE_LINE = 1.15f
 private const val VALUE_GLYPH = 0.62f
 private const val MIN_VALUE_SP = 24f
 private const val GAP = 8f
+/** What a launcher takes off the span it reports (its own padding and corner rounding), per axis. */
+private const val LAUNCHER_INSET = 8f
 
 internal fun widgetPad(compact: Boolean) = if (compact) 10f else 16f
 
@@ -110,8 +112,10 @@ internal fun planWidget(
     actionCount: Int,
 ): WidgetPlan {
     val pad = widgetPad(compact)
-    val innerW = (widthDp - 2 * pad).coerceAtLeast(1f)
-    val innerH = (heightDp - 2 * pad).coerceAtLeast(1f)
+    // A launcher draws the widget inside its own inset and rounds the corners, so the span it reports is a
+    // little bigger than what is visible: budget against less, so nothing is ever clipped at an edge.
+    val innerW = (widthDp - 2 * pad - LAUNCHER_INSET).coerceAtLeast(1f)
+    val innerH = (heightDp - 2 * pad - LAUNCHER_INSET).coerceAtLeast(1f)
     val fs = fontScale.coerceAtLeast(0.5f)
     val small = minOf(widthDp, heightDp)
     val nameSp = (small * 0.085f).coerceIn(13f, 19f)
@@ -122,7 +126,7 @@ internal fun planWidget(
     fun valueByWidth(w: Float) = w / (chars * VALUE_GLYPH * fs)
     val actions = actionCount.coerceIn(1, 4)
 
-    val buttonH = if (innerH >= 230f) 56f else 46f
+    val buttonH = when { innerH >= 300f -> 64f; innerH >= 230f -> 56f; else -> 46f }
     val stackNeed = line(nameSp) + GAP + MIN_VALUE_SP * fs * VALUE_LINE + GAP + buttonH
 
     // SIDE: wide and too short for a control row under the readout -- the controls stand in a grid beside it.
