@@ -29,7 +29,7 @@ fun Modifier.inertButtonFrost(inert: Boolean): Modifier {
         val a = amount.value
         if (a > 0.001f) {
             val r = InertBlurRadius.toPx() * a
-            renderEffect = if (canBlur) androidx.compose.ui.graphics.BlurEffect(r, r, androidx.compose.ui.graphics.TileMode.Decal) else null
+            renderEffect = if (canBlur) softBlur(r) else null
             alpha = 1f - (if (canBlur) 0.08f else 0.4f) * a
         } else {
             renderEffect = null
@@ -40,3 +40,7 @@ fun Modifier.inertButtonFrost(inert: Boolean): Modifier {
 
 /** The small blur an inert control wears: enough to read as "off", not enough to be unreadable. */
 private val InertBlurRadius = 1.2.dp
+
+/** A uniform blur of [radiusPx] that fades to nothing at the layer's edge, shared by every focus/frost effect. */
+fun softBlur(radiusPx: Float): androidx.compose.ui.graphics.RenderEffect =
+    androidx.compose.ui.graphics.BlurEffect(radiusPx, radiusPx, androidx.compose.ui.graphics.TileMode.Decal)

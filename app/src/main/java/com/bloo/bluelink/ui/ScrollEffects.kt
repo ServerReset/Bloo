@@ -15,6 +15,7 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.canBlurBackdrops
+import com.bloo.uicommon.softBlur
 
 // --- Soft scroll edges and edge bleed for horizontal strips ---
 
@@ -47,7 +48,7 @@ internal fun Modifier.scrollEdgeBlur(scroll: ScrollState, viewportPx: androidx.c
             val t = maxOf(intoLeft, intoRight)
             alpha = 1f - 0.5f * t
             renderEffect = if (blur && t > 0.03f) {
-                androidx.compose.ui.graphics.BlurEffect(maxBlurPx * t, maxBlurPx * t, androidx.compose.ui.graphics.TileMode.Decal)
+                softBlur(maxBlurPx * t)
             } else {
                 null
             }
@@ -113,7 +114,7 @@ internal fun Modifier.glassEdgeFocus(): Modifier {
             scaleX = 1f - 0.07f * t
             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, if (intoTop >= intoBottom) 0f else 1f)
             renderEffect = if (blurOk && t > 0.03f) {
-                androidx.compose.ui.graphics.BlurEffect(maxBlurPx * t, maxBlurPx * t, androidx.compose.ui.graphics.TileMode.Decal)
+                softBlur(maxBlurPx * t)
             } else {
                 null
             }
