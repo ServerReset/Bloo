@@ -1,6 +1,9 @@
 package com.bloo.bluelink.wear
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -60,7 +63,15 @@ internal fun WearStatusPebble(v: VehicleSnapshot, refreshing: Boolean, canRefres
 @Composable
 internal fun WearStatRow(label: String, value: String, valueColor: Color? = null) {
     val scheme = MaterialTheme.colorScheme
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    // A glass pill, like the phone's status rows.
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(scheme.surfaceContainerHigh.copy(alpha = 0.5f))
+            .padding(horizontal = 16.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         RevealText(
             label,
             style = MaterialTheme.typography.bodySmall,

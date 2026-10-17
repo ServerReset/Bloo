@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -195,16 +196,18 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
         return
     }
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    val tint = if (action.active) scheme.onPrimary else scheme.onSecondaryContainer
+    val tint = if (action.active) scheme.onPrimary else scheme.onSurface
     val glyph = action.icon ?: standardButtonIcon(action.label)
     MorphButton(
         onClick = action.onClick,
-        modifier = modifier.semantics { contentDescription = action.label },
+        modifier = modifier.semantics { contentDescription = action.label }
+            .quarterRim(quadrant, shape(0f)),
         enabled = !action.pending,
         frostWhenDisabled = false,
         active = action.active,
-        containerColor = scheme.secondaryContainer,
-        contentColor = scheme.onSecondaryContainer,
+        // Glass with the phone's rim: a translucent quarter that lets the wash behind it through.
+        containerColor = scheme.surfaceContainerHigh.copy(alpha = 0.55f),
+        contentColor = scheme.onSurface,
         activeContainerColor = scheme.primary,
         activeContentColor = scheme.onPrimary,
         contentPadding = PaddingValues(0.dp),
@@ -319,3 +322,14 @@ fun faceTint(percent: Int?, charging: Boolean, fallback: Color): Color = when {
 /** Levels below which the ring warns (amber) and then alarms (red). */
 const val LowLevel = 15
 const val WarnLevel = 30
+
+/** The glass rim of a quarter: a hairline brighter toward the outer corner, like the phone's cards. */
+private fun Modifier.quarterRim(quadrant: Int, shape: RoundedCornerShape): Modifier =
+    this.border(
+        1.dp,
+        androidx.compose.ui.graphics.Brush.linearGradient(
+            if (quadrant == 0 || quadrant == 1) listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.04f))
+            else listOf(Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.22f)),
+        ),
+        shape,
+    )

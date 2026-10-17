@@ -50,39 +50,28 @@ fun WearPebble(
     modifier: Modifier = Modifier,
     body: @Composable () -> Unit,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f),
-        // The phone's glass-card rim at watch scale: bright at the top-left, faint through the middle,
-        // bright again at the bottom-right.
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            androidx.compose.ui.graphics.Brush.linearGradient(
-                listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.05f), Color.White.copy(alpha = 0.2f)),
-            ),
-        ),
-    ) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+    // No card around it: on the phone a section is a quiet heading over its own pills, so on the watch the
+    // pebble is a small heading and the rows beneath it carry the shape.
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconBadge(icon)
-                Spacer(Modifier.width(10.dp))
-                RevealText(
-                    title,
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.titleSmall,
-                    // Explicit: the shared component draws with the phone Material3's Text, whose
-                    // unspecified colour is its own LocalContentColor rather than this theme's.
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            body()
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(6.dp))
+            RevealText(
+                title,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelMedium,
+                // Explicit: the shared component draws with the phone Material3's Text, whose
+                // unspecified colour is its own LocalContentColor rather than this theme's.
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
+        body()
     }
 }
 
@@ -120,7 +109,7 @@ fun WearActionRow(
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val tint = if (active) scheme.onPrimary else scheme.onSecondaryContainer
+    val tint = if (active) scheme.onPrimary else scheme.onSurface
     // The app's glyph for this label when the caller has none, and the app's own icon+label layout --
     // the one that drops the label rather than truncating a word, and swaps the glyph for the shared
     // in-flight spinner. Boxed because the label has to take the row's spare width here, so the
@@ -210,8 +199,10 @@ internal fun WearButton(
         modifier = modifier,
         enabled = enabled,
         active = active,
-        containerColor = scheme.secondaryContainer,
-        contentColor = scheme.onSecondaryContainer,
+        // Glass, as on the phone: a translucent pill that lets the aurora through; the filled primary is
+        // kept for a switch that is on.
+        containerColor = scheme.surfaceContainerHigh.copy(alpha = 0.6f),
+        contentColor = scheme.onSurface,
         activeContainerColor = scheme.primary,
         activeContentColor = scheme.onPrimary,
         contentPadding = contentPadding,
