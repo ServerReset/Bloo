@@ -40,8 +40,21 @@ class WearSnapshotRepository(private val context: Context) {
 
     /** Pull fresh status when the watch has its own session. */
     fun refresh() {
-        scope.launch { WearCredentialSync.refresh(context) }
+        if (_refreshing.value) return
+        _refreshing.value = true
+        scope.launch {
+            try {
+                WearCredentialSync.refresh(context)
+            } finally {
+                _refreshing.value = false
+            }
+        }
     }
+
+    private val _refreshing = MutableStateFlow(false)
+
+    /** True while a refresh is in flight, so a pull-to-refresh indicator can spin. */
+    val refreshing: StateFlow<Boolean> = _refreshing
 
     private fun run(vin: String, action: String) {
         scope.launch { WearCommands.track(vin, action) { runWatchCommand(context, vin, action) } }

@@ -6,6 +6,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+// The PULL-TO-REFRESH comes from the phone Material3, not the Wear one: wear-compose-material3 has no
+// pull-to-refresh, and the modifier is theme-agnostic -- it is a nested-scroll offset and nothing else.
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -203,6 +208,7 @@ fun WearGarageScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WearCarPage(
     repo: WearSnapshotRepository,
@@ -240,6 +246,11 @@ private fun WearCarPage(
     // showed nothing at all. Exactly the silent failure the checker's own comments say they exist to
     // avoid, with the plumbing already in place.
     val updateError by WearUpdateChecker.error.collectAsStateWithLifecycle(initialValue = null)
+    // Pull-to-refresh: the standard Material pull, applied to the column. The gesture only fires when
+    // the list is already at the very top -- mid-scroll pulls belong to the list -- which is what
+    // "pull down from the top of the car" means.
+    val refreshing by repo.refreshing.collectAsStateWithLifecycle(initialValue = false)
+    val pullState = rememberPullToRefreshState()
     val selfUpdate by WearUpdateChecker.available.collectAsStateWithLifecycle(initialValue = null)
     val downloading by WearUpdateChecker.downloading.collectAsStateWithLifecycle(initialValue = false)
     val progress by WearUpdateChecker.progress.collectAsStateWithLifecycle(initialValue = 0f)
@@ -274,7 +285,9 @@ private fun WearCarPage(
     ScreenScaffold(scrollState = listState, timeText = { TimeText() }) {
         ScalingLazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .pullToRefresh(isRefreshing = refreshing, state = pullState, onRefresh = { repo.refresh() }),
             // THE round-display mechanic, and it is the standard component rather than something
             // hand-rolled: ScalingLazyColumn scales each item by where it sits on the circle -- full
             // size at the centre, shrinking toward the edges -- so a pebble grows as the crown brings
@@ -368,7 +381,10 @@ private fun WearCarPage(
             v.updatedLabel()?.let { updated ->
                 item {
                     WearCenteredText(
-                        "Updated $updated",
+                        // The pull has no spinner on a round face -- a top-centred one lands under
+                        // the bezel -- so the freshness line IS the feedback: it is the line that
+                        // refresh changes, and it is already where the eye is after a pull.
+                        if (refreshing) "Refreshing…" else "Updated $updated",
                         style = MaterialTheme.typography.bodySmall,
                         color = if (v.isStale()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Normal,

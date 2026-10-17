@@ -47,6 +47,15 @@ object WearDataLayerSync {
     private val _selectedVin = MutableStateFlow<String?>(null)
     val selectedVin: StateFlow<String?> = _selectedVin
 
+    /**
+     * True once the phone has pushed a snapshot this session.
+     *
+     * Only ever set true, and that is correct rather than a gap in the plumbing. It is consulted in
+     * exactly one place -- the empty state -- and the empty state is only reachable when the phone
+     * pushed an EMPTY car list, which means the phone is right there and reachable. There is also no
+     * way to observe the opposite: NodeClient exposes getConnectedNodes() and no listener, so a flag
+     * that claimed to know about a disconnect would be guessing.
+     */
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected
 
@@ -77,6 +86,10 @@ object WearDataLayerSync {
         val app = context.applicationContext
         pendingStore = WatchPinStore(app)
         runCatching {
+            // Deliberately empty, and NOT the delivery path: the manifest-registered
+            // WatchDataListenerService receives everything, running or not. Kept rather than deleted
+            // because removing a Data Layer listener registration is a device-only question, and the
+            // cost of being wrong is that the watch stops hearing the phone at all.
             Wearable.getDataClient(app).addListener { }
         }
         // Seed once from anything already on the Data Layer.

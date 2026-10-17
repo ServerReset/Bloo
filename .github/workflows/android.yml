@@ -37,7 +37,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      release_id: ${{ steps.release.outputs.id }}
+      release_id: ${{ steps.release.outputs.id || steps.release_retry.outputs.id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -338,6 +338,27 @@ jobs:
             app/build/outputs/apk/sideload/release/Bloo.apk
             wear/build/outputs/apk/sideload/release/Bloo-watch.apk
 
+      # The same call again, and the whole reason it is here is that the first one FAILS SOMETIMES for
+      # no reason anyone can act on. GitHub returns `Resource not accessible by integration` -- on
+      # every tag ref, and intermittently on a branch -- and the result is a run that built, passed R8,
+      # uploaded to Play, and shipped nothing to the releases list, so the in-app updater never saw the
+      # build and `releases/latest/download/Bloo.apk` kept serving the previous one. A retry costs a
+      # second when the first attempt worked (it is skipped) and rescues the run when it did not.
+      - name: Publish build as a GitHub Release (second attempt)
+        id: release_retry
+        if: steps.release.outcome == 'failure' && github.event_name == 'push' && github.ref_type == 'branch'
+        continue-on-error: true
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          target_commitish: ${{ github.sha }}
+          tag_name: build-${{ github.run_number }}
+          name: ${{ steps.title.outputs.title }}
+          body_path: release_notes.md
+          files: |
+            app/build/outputs/apk/sideload/release/Bloo.apk
+            wear/build/outputs/apk/sideload/release/Bloo-watch.apk
+
 
 
   # Runs the app for real: boots an emulator and runs the instrumented tests in
@@ -550,8 +571,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          ID="${{ needs.build.outputs.release_id }}"
+          # Name the failure. A bare `curl: (22) ... 404` is what this job used to produce, and it says
+          # nothing about what went wrong or what it cost -- the URL simply loses its last path segment
+          # when the id is empty. The comment above promises the release is "named" when this fails; it
+          # was not.
+          if [ -z "$ID" ]; then
+            echo "::error::No release was created for this build, so there is nothing to publish. Both attempts in the 'build' job failed -- look for 'Resource not accessible by integration' there. The previous release is still the newest, so releases/latest/download still serves it, and nothing is broken for users; this build simply is not on the releases list."
+            exit 1
+          fi
           curl -fsS -X PATCH \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/${{ needs.build.outputs.release_id }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/$ID" \
             -d '{"draft":false,"make_latest":"true"}'
