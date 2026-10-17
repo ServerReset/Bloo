@@ -37,8 +37,6 @@ import com.bloo.bluelink.data.formatDistance
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapGroup
-import com.bloo.uicommon.weatherIcon
-import com.bloo.uicommon.weatherTint
 
 /**
  * Asks for the phone's position so the map can draw "you are here". [ask] always asks; [askOnce]

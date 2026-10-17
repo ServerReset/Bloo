@@ -38,7 +38,6 @@ import com.bloo.bluelink.work.UpdateCheckWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.bloo.bluelink.update.shizukuInstall
-import com.bloo.uicommon.content
 
 /**
  * The app's single Activity: hosts the Compose UI tree ([BlooApp]) and owns the process-wide setup

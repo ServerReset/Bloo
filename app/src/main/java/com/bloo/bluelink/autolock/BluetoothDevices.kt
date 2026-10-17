@@ -4,7 +4,6 @@ import android.Manifest
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import com.bloo.bluelink.ui.hasPermission
-import com.bloo.uicommon.content
 
 data class PairedDevice(val name: String, val address: String)
 

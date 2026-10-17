@@ -64,7 +64,6 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.GroupWeightProportional
 import com.bloo.uicommon.lowPowerAwareSpring
-import com.bloo.uicommon.container
 
 /** Hero image + gauge (expanded view). */
 @Composable

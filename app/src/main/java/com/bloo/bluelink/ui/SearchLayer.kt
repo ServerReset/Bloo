@@ -63,8 +63,6 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.lowPowerAwareSpring
-import com.bloo.uicommon.Haptics
-import com.bloo.uicommon.content
 
 /** Which shape the search control is in: a bubble, a pill, or the full bar. */
 internal enum class SearchForm { BUBBLE, PILL, BAR }

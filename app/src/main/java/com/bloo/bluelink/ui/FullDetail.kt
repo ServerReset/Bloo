@@ -46,7 +46,6 @@ import kotlin.math.roundToInt
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
-import com.bloo.uicommon.content
 
 // --- Full detail ----------------------------------------------------------
 

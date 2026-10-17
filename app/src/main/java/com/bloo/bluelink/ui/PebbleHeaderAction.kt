@@ -35,7 +35,6 @@ import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.ButtonTargetHeight
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.lowPowerAwareSpring
-import com.bloo.uicommon.content
 
 /**
  * The pebble header action model and its split-button control. Split out of PebbleShell.kt --

@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -252,7 +251,11 @@ fun MorphTextButton(
     }
 }
 
-/** [MorphTextButton] that owns its interaction source and wraps itself in [SafeExpansiveButton]. */
+/**
+ * [MorphTextButton] with the press-grow feedback: the same button with `expressive = true`, kept as a name
+ * only because 77 call sites use it. One implementation, so the two can never drift (this one had stopped
+ * forwarding `active` once already).
+ */
 @Composable
 fun SafeMorphTextButton(
     text: String,
@@ -273,34 +276,22 @@ fun SafeMorphTextButton(
      * of widening.
      */
     fillOnPress: Boolean = true,
-) {
-    val source = remember { MutableInteractionSource() }
-    SafeExpansiveButton(
-        interactionSource = source,
-        enabled = enabled,
-        // The wrapper is what the group reads, so the weight has to be declared HERE -- passed only
-        // to the inner button it was silently dropped and every labelled button sat at width zero
-        // weight, never filling its line.
-        groupWeight = groupWeight,
-        fillOnPress = fillOnPress,
-    ) {
-        MorphTextButton(
-            text = text,
-            onClick = onClick,
-            modifier = modifier,
-            enabled = enabled,
-            active = active,
-            emphasis = emphasis,
-            containerColor = containerColor,
-            contentColor = contentColor,
-            interactionSource = source,
-            icon = icon,
-            showIcon = showIcon,
-            pending = pending,
-            groupWeight = groupWeight,
-        )
-    }
-}
+) = MorphTextButton(
+    text = text,
+    onClick = onClick,
+    modifier = modifier,
+    enabled = enabled,
+    emphasis = emphasis,
+    containerColor = containerColor,
+    contentColor = contentColor,
+    icon = icon,
+    showIcon = showIcon,
+    pending = pending,
+    groupWeight = groupWeight,
+    active = active,
+    expressive = true,
+    fillOnPress = fillOnPress,
+)
 
 /** The standard action button: a glyph, a label and a tonal fill. [MorphTextButton] with the glyph required. */
 @Composable

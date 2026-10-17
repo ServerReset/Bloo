@@ -3,7 +3,6 @@ package com.bloo.bluelink.update
 import android.content.Context
 import com.bloo.bluelink.data.AppLog
 import java.io.File
-import com.bloo.uicommon.content
 
 /**
  * Housekeeping for the update download cache.

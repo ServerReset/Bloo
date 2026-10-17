@@ -24,7 +24,6 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.hazeBlur
 import com.bloo.uicommon.canBlurBackdrops
-import com.bloo.uicommon.content
 
 /**
  * Unified glass system: every floating surface takes its tint, blur, rim and shadow from here.

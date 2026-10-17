@@ -8,7 +8,6 @@ import androidx.core.graphics.drawable.IconCompat
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.links
-import com.bloo.uicommon.content
 
 /** App-icon long-press shortcuts: per-car quick actions and navigation. */
 object Shortcuts {

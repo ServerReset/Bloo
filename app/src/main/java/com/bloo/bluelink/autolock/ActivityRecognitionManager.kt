@@ -11,7 +11,6 @@ import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.ActivityTransitionRequest
 import com.google.android.gms.location.DetectedActivity
-import com.bloo.uicommon.content
 
 /**
  * Registers Activity Recognition transition updates so a driving -> walking transition can

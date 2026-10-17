@@ -58,10 +58,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.bloo.uicommon.GapSection
-import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.LocalExpressiveGrowth
-import com.bloo.uicommon.content
 
 /**
  * Shown instead of silently restarting into [MainActivity] after an uncaught

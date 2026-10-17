@@ -17,7 +17,6 @@ import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
-import com.bloo.uicommon.content
 
 /**
  * Thin wrapper around on-device Gemini Nano via ML Kit GenAI summarization. All ML Kit usage is

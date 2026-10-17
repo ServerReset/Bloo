@@ -23,7 +23,6 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.SegmentOption
-import com.bloo.uicommon.content
 
 /** The "Security" card: the app lock and the PIN that backs it up. */
 @Composable

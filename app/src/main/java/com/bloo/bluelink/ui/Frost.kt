@@ -1,7 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -14,12 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
-import com.bloo.uicommon.MotionLong
 import com.bloo.uicommon.ButtonIconSize
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection

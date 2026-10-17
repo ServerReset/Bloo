@@ -3,7 +3,6 @@ package com.bloo.bluelink.work
 import android.content.Context
 import androidx.core.content.edit
 import com.bloo.bluelink.data.DeviceStatus
-import com.bloo.uicommon.content
 
 /**
  * The periodic workers are scheduled once at a fixed interval, so the device's lean mode (see

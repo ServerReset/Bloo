@@ -27,7 +27,6 @@ import androidx.compose.ui.layout.layout
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.SoftDamping
-import com.bloo.uicommon.content
 
 /**
  * The hero's segmented charge bar and its layout math. Split out of HeroReadout.kt to separate this

@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
 import com.bloo.uicommon.LocalHaptics
-import com.bloo.uicommon.content
 
 /**
  * The app's ONE pull-to-refresh indicator, drawn as a single floating overlay at the app root

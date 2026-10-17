@@ -14,7 +14,6 @@ import com.bloo.bluelink.data.CarCommand
 import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.SnapshotStore
 import kotlinx.coroutines.delay
-import com.bloo.uicommon.content
 
 internal object WidgetKeys {
     /** The car this widget shows (unset: the first car). */

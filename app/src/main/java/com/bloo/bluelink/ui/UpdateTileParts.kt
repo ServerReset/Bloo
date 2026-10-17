@@ -172,7 +172,7 @@ internal fun UpdateDismissRow(
     modifier: Modifier = Modifier,
 ) {
     val busy = state.updateDownloading || state.updateInstalling
-    ExpressiveButtonRow(modifier = modifier.fillMaxWidth(), spacing = GapRow) {
+    ActionRow(modifier) {
         MorphTextButton(
             "Remind me",
             onClick = { vm.snoozeUpdate() },

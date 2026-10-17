@@ -32,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -45,7 +44,6 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.lowPowerAwareSpring
-import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.SoftDamping
 import com.bloo.uicommon.content
 

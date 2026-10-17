@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
-import com.bloo.uicommon.content
 
 /**
  * App appearance preferences, kept separate from the session so sign-out keeps them. A thin typed

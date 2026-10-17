@@ -12,7 +12,6 @@ import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.ensureNotificationChannel
 import com.bloo.bluelink.data.postBuilt
-import com.bloo.uicommon.content
 
 /**
  * The lasting notification AutoLock posts when it ACTS: "Locked <car>" after a real lock, or

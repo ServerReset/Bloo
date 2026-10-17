@@ -10,7 +10,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
-import com.bloo.uicommon.content
 
 /**
  * The app's backdrop: a vertical surface gradient with two soft radial glows of the theme's own

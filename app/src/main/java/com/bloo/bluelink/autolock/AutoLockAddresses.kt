@@ -2,7 +2,6 @@ package com.bloo.bluelink.autolock
 
 import android.content.Context
 import androidx.core.content.edit
-import com.bloo.uicommon.content
 
 /**
  * A synchronous answer to "is this Bluetooth address one of our cars, and which one?".

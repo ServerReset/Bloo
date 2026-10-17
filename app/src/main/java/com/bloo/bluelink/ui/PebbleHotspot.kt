@@ -57,8 +57,6 @@ import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapPage
 import com.bloo.uicommon.LocalHaptics
-import com.bloo.uicommon.ReorderColumn
-import com.bloo.uicommon.content
 
 /** How far right the pinned pebble must be dragged before releasing unpins it. */
 private val UnpinTravel = 88.dp

@@ -2,7 +2,6 @@ package com.bloo.bluelink.autolock
 
 import android.content.Context
 import com.bloo.bluelink.data.AppLog
-import com.bloo.uicommon.content
 
 /**
  * What happens when a car's Bluetooth link goes away (and when it comes back), shared by the

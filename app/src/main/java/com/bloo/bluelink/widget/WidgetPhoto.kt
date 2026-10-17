@@ -9,7 +9,6 @@ import com.bloo.bluelink.data.imageUrl
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.bloo.uicommon.content
 
 /**
  * The car's own photo, softened into a backdrop for the widget. A widget cannot run a live blur, so the

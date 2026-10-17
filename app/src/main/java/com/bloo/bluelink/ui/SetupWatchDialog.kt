@@ -74,7 +74,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                 }
             },
             buttons = {
-                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
+                ActionRow(spacing = GapGroup) {
                     SafeMorphTextButton("Close", onClick = onDismiss)
                     MorphActionButton(
                         label = "Play Store",

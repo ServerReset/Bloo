@@ -10,7 +10,6 @@ import com.bloo.bluelink.data.UpdateStore
 import com.bloo.bluelink.update.UpdateCheckResult
 import com.bloo.bluelink.update.UpdateChecker
 import java.util.concurrent.TimeUnit
-import com.bloo.uicommon.content
 
 /**
  * Bloo isn't on the Play Store, so it has to check for its own updates. This is

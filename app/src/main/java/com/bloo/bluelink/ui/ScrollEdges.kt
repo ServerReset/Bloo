@@ -10,7 +10,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.content
 
 /** How far the soft edge reaches in from a scroll bound, by default. */
 private val ScrollEdgeLength = 36.dp

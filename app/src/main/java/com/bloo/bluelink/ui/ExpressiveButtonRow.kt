@@ -7,7 +7,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.GapRow
-import com.bloo.uicommon.SafeExpansiveButton
 import com.bloo.uicommon.content
 
 /**
@@ -47,5 +46,5 @@ fun ExpressiveButtonRow(
  * to the next when they do not fit. (Connected clusters are for pebble header controls: see [ButtonCluster].)
  */
 @Composable
-fun ActionRow(modifier: Modifier = Modifier, content: @Composable () -> Unit) =
-    ExpressiveButtonRow(modifier = modifier.fillMaxWidth(), spacing = GapRow, content = content)
+fun ActionRow(modifier: Modifier = Modifier, spacing: Dp = GapRow, content: @Composable () -> Unit) =
+    ExpressiveButtonRow(modifier = modifier.fillMaxWidth(), spacing = spacing, content = content)

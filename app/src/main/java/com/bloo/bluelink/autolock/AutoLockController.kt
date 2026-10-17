@@ -35,7 +35,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import com.bloo.uicommon.content
 
 /** Snapshot the UI/notification observe for one car's in-flight (or last) evaluation. */
 data class AutoLockEvalState(

@@ -6,7 +6,6 @@ import android.content.Intent
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.ActivityTransitionResult
 import com.google.android.gms.location.DetectedActivity
-import com.bloo.uicommon.content
 
 /** Receives Activity Recognition transitions and confirms "walking" to every evaluation
  *  currently waiting on it. Ported from i5-AutoLock's `ActivityTransitionReceiver`. */

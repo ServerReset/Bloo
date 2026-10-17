@@ -24,7 +24,6 @@ import dev.chrisbanes.haze.hazeSource
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.LocalHaptics
-import com.bloo.uicommon.content
 
 /**
  * True while the car pager is at rest (not being dragged or flung). Page content that is expensive to

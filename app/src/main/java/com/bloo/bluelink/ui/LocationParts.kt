@@ -41,7 +41,6 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.canBlurBackdrops
-import com.bloo.uicommon.content
 import com.bloo.uicommon.weatherIcon
 import com.bloo.uicommon.weatherTint
 

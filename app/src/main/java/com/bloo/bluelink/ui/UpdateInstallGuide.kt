@@ -2,12 +2,10 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapRow
@@ -57,7 +55,7 @@ internal fun UpdateInstallGuideDialog(
             }
         },
         buttons = {
-            ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
+            ActionRow(spacing = GapGroup) {
                 SafeMorphTextButton(text = "Cancel", onClick = onDismiss)
                 MorphActionButton(
                     label = "Continue",

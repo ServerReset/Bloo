@@ -34,8 +34,6 @@ import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.lowPowerAwareSpring
-import com.bloo.uicommon.ReorderColumn
-import com.bloo.uicommon.container
 import com.bloo.uicommon.content
 
 /**

@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.ui.hasPermission
-import com.bloo.uicommon.content
 
 /**
  * The "left the car" trigger: fires when the phone disconnects from a car's paired Bluetooth device

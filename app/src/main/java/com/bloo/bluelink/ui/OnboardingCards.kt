@@ -195,7 +195,7 @@ internal fun OnboardingBottomBar(
                     )
                 }
             }
-            ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
+            ActionRow(spacing = GapGroup) {
                 onBack?.let { back -> SafeMorphTextButton(text = "Back", onClick = back) }
                 MorphActionButton(
                     label = nextLabel,

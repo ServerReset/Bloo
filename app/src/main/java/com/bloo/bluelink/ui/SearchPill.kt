@@ -61,9 +61,6 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.glassTint
-import com.bloo.uicommon.container
-import com.bloo.uicommon.content
-import com.bloo.uicommon.dropShadow
 
 /** The search bar itself (SearchPill) and its suggestions list (SearchSuggestions). */
 

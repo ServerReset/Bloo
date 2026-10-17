@@ -33,7 +33,6 @@ import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.MorphedCornerPercent
 import com.bloo.uicommon.PillCornerPercent
 import com.bloo.uicommon.SoftDamping
-import com.bloo.uicommon.container
 import com.bloo.uicommon.content
 
 /**

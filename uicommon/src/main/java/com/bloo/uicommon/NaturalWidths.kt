@@ -3,7 +3,6 @@ package com.bloo.uicommon
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.unit.Density
-import com.bloo.uicommon.SafeExpansiveButton
 
 /**
  * Cache of resting child widths for one [ExpressiveButtonGroup]; a plain object, not snapshot

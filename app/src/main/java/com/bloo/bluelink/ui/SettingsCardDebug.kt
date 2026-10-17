@@ -56,7 +56,6 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.SafeMorphTextButton
-import com.bloo.uicommon.content
 
 /**
  * The "Debug" card: this device's diagnostics and the activity log, one place for support

@@ -15,7 +15,6 @@ import com.bloo.bluelink.data.DeviceStatus
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.content
 
 /**

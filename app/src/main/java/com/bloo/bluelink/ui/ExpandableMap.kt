@@ -57,7 +57,6 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.SoftDamping
-import com.bloo.uicommon.content
 
 /**
  * One entry in the full-screen map's bottom toolbar -- an icon, a label and an action, nothing

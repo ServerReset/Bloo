@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.ui.geometry.Rect
-import com.bloo.uicommon.content
 
 /** The newest toast's inset and the stack's lift, from where the search element is. */
 internal data class ToastClearance(val startInsetPx: Float, val endInsetPx: Float, val bottomLiftPx: Float)

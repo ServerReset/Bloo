@@ -45,7 +45,6 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.SegmentOption
-import com.bloo.uicommon.content
 
 /**
  * The "Backup & sync" card. Two ways to keep a setup safe: automatic Drive sync across devices (the

@@ -13,7 +13,6 @@ import com.bloo.bluelink.data.CarCommand
 import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
 import java.util.concurrent.TimeUnit
-import com.bloo.uicommon.content
 
 /**
  * Auto-extends a remote climate run past the vendor API's single-command cap
