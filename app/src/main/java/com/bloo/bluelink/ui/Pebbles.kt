@@ -202,7 +202,7 @@ internal fun PebbleList(
                 Modifier.onGloballyPositioned { coords -> hotDrag.stackSlot[section] = coords.localToWindow(Offset.Zero) }
             } else {
                 Modifier
-            }).glassEdgeWarp(),
+            }).glassEdgeFocus(),
         ) {
             val rowVisible = section in sections && (section !in pinned || hotDrag?.returning == section)
             val rowState = remember(section) { MutableTransitionState(!columnSettled && rowVisible) }

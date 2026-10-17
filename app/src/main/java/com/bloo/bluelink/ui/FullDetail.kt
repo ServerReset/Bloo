@@ -144,14 +144,14 @@ internal fun ExpandedCar(
         val edgeDensity = androidx.compose.ui.platform.LocalDensity.current
         val edgeTopPx = with(edgeDensity) { topInset.toPx() }
         val edgeBottomPx = with(edgeDensity) { bottomInset.toPx() }
-        val contentMotion = LocalContentMotion.current
+        val pagerIdle = LocalPagerIdle.current
         androidx.compose.runtime.CompositionLocalProvider(LocalEdgeScroll provides edgeScroll) {
         Box(
             Modifier.fillMaxSize().onGloballyPositioned {
                 val origin = it.localToWindow(Offset.Zero)
                 pageOrigin[0] = origin
-                // Not mid-swipe: the page's window position moves with the swipe (see glassEdgeWarp).
-                if (!contentMotion.pager.value) {
+                // Not mid-swipe: the page's window position moves with the swipe (see glassEdgeFocus).
+                if (pagerIdle?.value != false) {
                     edgeWindowTop.floatValue = origin.y + edgeTopPx
                     edgeViewportPx.intValue = (it.size.height - edgeTopPx - edgeBottomPx).toInt().coerceAtLeast(0)
                 }
@@ -175,7 +175,7 @@ internal fun ExpandedCar(
                             // every horizontal swipe (the columns scroll vertically only, so a
                             // horizontal drag falls through to it).
                             CarHeaderRow(v, state, hazeState = hazeState)
-                            Box(Modifier.glassEdgeWarp()) { CriticalContent(v, state, vm, heroAction = heroAction) }
+                            Box(Modifier.glassEdgeFocus()) { CriticalContent(v, state, vm, heroAction = heroAction) }
                             // The hot seat lives only in the full-screen two-column view; collapsed,
                             // its pinned pebbles are ordinary members of the stack below. Its reveal
                             // rides the reflow fraction itself (measure/draw only, never recomposed).

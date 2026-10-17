@@ -73,14 +73,14 @@ internal class EdgeScroll(
 internal val LocalEdgeScroll = androidx.compose.runtime.staticCompositionLocalOf<EdgeScroll?> { null }
 
 /**
- * A row of a vertically scrolling glass list that goes soft as it nears an edge with more content past
- * it: it blurs and fades, then comes back into focus toward the middle. The vertical counterpart of
+ * A row of a vertically scrolling glass list that bends as it nears an edge with more content past
+ * it: it flattens, narrows, blurs and fades, then straightens toward the middle. The vertical counterpart of
  * [scrollEdgeBlur].
  */
 @Composable
 internal fun Modifier.glassEdgeFocus(): Modifier {
     val edge = LocalEdgeScroll.current ?: return this
-    val motion = LocalContentMotion.current
+    val pagerIdle = LocalPagerIdle.current
     var y by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     var h by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -91,7 +91,7 @@ internal fun Modifier.glassEdgeFocus(): Modifier {
         .onGloballyPositioned {
             // Not while the car pager is swiping: the page's window position moves with the swipe, and every
             // write would redraw every row for nothing (rows near an edge only matter once it rests).
-            if (!motion.pager.value) { y = it.positionInWindow().y; h = it.size.height.toFloat() }
+            if (pagerIdle?.value != false) { y = it.positionInWindow().y; h = it.size.height.toFloat() }
         }
         .graphicsLayer {
             val vp = edge.viewportPx.value.toFloat()
@@ -105,6 +105,11 @@ internal fun Modifier.glassEdgeFocus(): Modifier {
             val intoBottom = ((bottom - (vp - fadePx)) / fadePx).coerceIn(0f, 1f) * bottomGate
             val t = maxOf(intoTop, intoBottom)
             alpha = 1f - 0.55f * t
+            // The pane bends the row as it slides under the edge: it flattens toward that edge and narrows a
+            // little, so it reads as curving away like glass, not as being cropped or just going out of focus.
+            scaleY = 1f - 0.22f * t
+            scaleX = 1f - 0.07f * t
+            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, if (intoTop >= intoBottom) 0f else 1f)
             renderEffect = if (blurOk && t > 0.03f) {
                 androidx.compose.ui.graphics.BlurEffect(maxBlurPx * t, maxBlurPx * t, androidx.compose.ui.graphics.TileMode.Decal)
             } else {
