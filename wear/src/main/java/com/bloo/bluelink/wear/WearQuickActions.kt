@@ -1,15 +1,13 @@
 package com.bloo.bluelink.wear
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -18,6 +16,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.MorphButton
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.standardButtonIcon
 
@@ -55,6 +54,7 @@ fun WearQuickActions(
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     Column(
         modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -67,22 +67,36 @@ fun WearQuickActions(
             ) {
                 row.forEach { a ->
                     val tint = if (a.active) scheme.onPrimary else scheme.onSecondaryContainer
-                    Surface(
+                    val glyph = a.icon ?: standardButtonIcon(a.label)
+                    // The app's own button, with both corner percentages at 50 -- which is a circle
+                    // that never morphs. It used to be a raw Material Surface, which is a different
+                    // button that happened to look round: it had none of the press feedback, the frost
+                    // or the haptic every other button has.
+                    MorphButton(
                         onClick = a.onClick,
-                        enabled = !a.pending,
-                        shape = CircleShape,
-                        color = if (a.active) scheme.primary else scheme.secondaryContainer,
                         modifier = Modifier
                             .size(48.dp)
                             .semantics { contentDescription = a.label },
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            (a.icon ?: standardButtonIcon(a.label))?.let { glyph ->
+                        enabled = !a.pending,
+                        containerColor = scheme.secondaryContainer,
+                        contentColor = scheme.onSecondaryContainer,
+                        activeContainerColor = scheme.primary,
+                        activeContentColor = scheme.onPrimary,
+                        contentPadding = PaddingValues(0.dp),
+                        minHeight = 0.dp,
+                        expressive = false,
+                        pillCornerPercent = 50f,
+                        morphedCornerPercent = 50f,
+                        onClickHaptic = {
+                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        },
+                        content = {
+                            glyph?.let {
                                 // The shared label draws its glyph from LocalContentColor, so it has to
                                 // be told which tone this button is in.
                                 CompositionLocalProvider(LocalContentColor provides tint) {
                                     MorphButtonLabel(
-                                        icon = glyph,
+                                        icon = it,
                                         // Empty: glyph only, no gap reserved, centred.
                                         label = "",
                                         pending = a.pending,
@@ -90,8 +104,8 @@ fun WearQuickActions(
                                     )
                                 }
                             }
-                        }
-                    }
+                        },
+                    )
                 }
             }
         }
