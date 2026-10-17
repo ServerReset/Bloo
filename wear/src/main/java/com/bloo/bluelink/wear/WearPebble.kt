@@ -53,7 +53,15 @@ fun WearPebble(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f),
+        // The phone's glass-card rim at watch scale: bright at the top-left, faint through the middle,
+        // bright again at the bottom-right.
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            androidx.compose.ui.graphics.Brush.linearGradient(
+                listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.05f), Color.White.copy(alpha = 0.2f)),
+            ),
+        ),
     ) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
