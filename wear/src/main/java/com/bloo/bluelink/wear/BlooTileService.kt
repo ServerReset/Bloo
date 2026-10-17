@@ -20,7 +20,6 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.stateLine
-import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.ioScope
 import com.google.common.util.concurrent.ListenableFuture
@@ -134,7 +133,7 @@ class BlooTileService : TileService() {
             .addContent(glance.build())
 
         if (car != null) {
-            val actions = tileActions(car)
+            val actions = WearTileActions.forCar(car)
             if (actions.isNotEmpty()) {
                 outer.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(10f)).build())
                 outer.addContent(actionRow(actions))
@@ -160,7 +159,6 @@ class BlooTileService : TileService() {
      */
     private fun ring(car: VehicleSnapshot): LayoutElementBuilders.LayoutElement {
         val pct = car.percent
-        val charging = car.charging == true
         val value = LayoutElementBuilders.Column.Builder()
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .addContent(text(car.bigValue(), 30f, if (pct != null) GREEN else WHITE, bold = true))
@@ -197,35 +195,7 @@ class BlooTileService : TileService() {
             .build()
 
     /** The actions worth a tap from the carousel, in the order they are reached for. */
-    private fun tileActions(car: VehicleSnapshot): List<TileAction> = buildList {
-        add(
-            TileAction(
-                label = if (car.locked == true) "Unlock" else "Lock",
-                key = WearMainActivity.ACTION_LOCK,
-                active = car.locked != true,
-            ),
-        )
-        add(
-            TileAction(
-                label = "Climate",
-                key = WearMainActivity.ACTION_CLIMATE,
-                active = car.climateOn == true,
-            ),
-        )
-        if (car.hasBattery) {
-            add(
-                TileAction(
-                    label = if (car.charging == true) "Stop" else "Charge",
-                    key = WearMainActivity.ACTION_CHARGE,
-                    active = car.charging == true,
-                ),
-            )
-        } else if (car.toVehicle().supportsHornLights) {
-            add(TileAction(label = "Flash", key = WearMainActivity.ACTION_FLASH, active = false))
-        }
-    }
-
-    private fun actionRow(actions: List<TileAction>): LayoutElementBuilders.Row {
+    private fun actionRow(actions: List<WearTileAction>): LayoutElementBuilders.Row {
         val row = LayoutElementBuilders.Row.Builder()
             .setWidth(expand())
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
@@ -244,7 +214,7 @@ class BlooTileService : TileService() {
      * extras -- the app owns the PIN gate and the command layer, and duplicating either here would
      * give the watch two places where a command can be authorised.
      */
-    private fun actionButton(action: TileAction): LayoutElementBuilders.Box =
+    private fun actionButton(action: WearTileAction): LayoutElementBuilders.Box =
         LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
             .setHeight(dp(44f))
@@ -306,8 +276,6 @@ class BlooTileService : TileService() {
             )
             .setMaxLines(1)
             .build()
-
-    private data class TileAction(val label: String, val key: String, val active: Boolean)
 
     private companion object {
         const val RESOURCES_VERSION = "2"

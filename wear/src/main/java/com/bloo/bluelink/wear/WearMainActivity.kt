@@ -93,10 +93,6 @@ class WearMainActivity : ComponentActivity() {
     companion object {
         /** The extra a Tile button sets; read by [readTileRequest]. */
         const val EXTRA_ACTION = "bloo_action"
-        const val ACTION_LOCK = "lock"
-        const val ACTION_CLIMATE = "climate"
-        const val ACTION_CHARGE = "charge"
-        const val ACTION_FLASH = "flash"
     }
 }
 

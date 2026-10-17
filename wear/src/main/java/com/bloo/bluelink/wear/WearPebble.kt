@@ -1,9 +1,8 @@
 package com.bloo.bluelink.wear
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,23 +19,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.MorphButtonCore
 
-/** One watch "pebble": a small round-friendly card with a title row (icon + title) and a body. */
+/**
+ * The watch's small card: a round-friendly container with a title row (icon + title) and a body.
+ *
+ * The body is a slot rather than a fixed layout, so a pebble is whatever the caller puts in it -- a
+ * row of switches, a block of text, a status readout. [WearPebble] owns the card, nothing else.
+ */
 @Composable
 fun WearPebble(
     title: String,
@@ -83,6 +86,11 @@ private fun IconBadge(icon: ImageVector, tint: Color = MaterialTheme.colorScheme
 /**
  * A single action inside a [WearPebble] -- the shared phone [MorphButtonCore], so the watch's tap
  * target morphs and presses exactly like every other Bloo button.
+ *
+ * [switch] marks the row as an on/off setting rather than a one-shot action, and it changes two
+ * things. A trailing indicator, because a filled container is a weak signal for "on" when every row
+ * in the pebble is a filled container. And the spoken role, because a screen reader otherwise
+ * announces a toggle as a plain button and never says which way it is set.
  */
 @Composable
 fun WearActionRow(
@@ -91,36 +99,62 @@ fun WearActionRow(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     active: Boolean = false,
+    switch: Boolean = false,
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val tint = if (active) scheme.onPrimary else scheme.onSecondaryContainer
     WearButton(
         active = active,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (switch) {
+                    Modifier.semantics {
+                        role = Role.Switch
+                        toggleableState = if (active) ToggleableState.On else ToggleableState.Off
+                    }
+                } else {
+                    Modifier
+                },
+            ),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         onClick = onClick,
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text(
             label,
             fontWeight = FontWeight.SemiBold,
             style = MaterialTheme.typography.labelLarge,
-            color = if (active) scheme.onPrimary else scheme.onSecondaryContainer,
+            color = tint,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
+        if (switch) {
+            Spacer(Modifier.width(8.dp))
+            // A filled dot when on, a hollow ring when off -- drawn rather than an icon so it reads at
+            // 16dp, where a glyph-based switch icon turns to mud.
+            Spacer(
+                Modifier
+                    .size(16.dp)
+                    .background(if (active) tint else Color.Transparent, CircleShape)
+                    .border(2.dp, tint, CircleShape),
+            )
+        }
     }
 }
 
 /**
  * The watch's own [MorphButtonCore]: a heavy haptic on tap and the watch's container roles
  * (secondaryContainer idle, primary active). Shared by [WearActionRow] and [WearQuickActions] so the
- * two can't drift on either.
+ * two can't drift on either -- internal rather than private because those two now live in their own
+ * files, which is the point of the split.
  */
 @Composable
-private fun WearButton(
+internal fun WearButton(
     active: Boolean,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -168,179 +202,4 @@ fun WearCenteredText(
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
     )
-}
-
-/** The car's at-a-glance state, used as the page's hero value. */
-@Composable
-fun WearHero(
-    value: String,
-    caption: String,
-    tint: Color = MaterialTheme.colorScheme.primary,
-    progress: Float? = null,
-    /**
-     * The ring's own size. A parameter rather than a constant because the SAME hero is the page's
-     * small at-a-glance readout and, in full screen, the whole display: the caller passes
-     * `Modifier.fillMaxWidth().aspectRatio(1f)` and the circle becomes the watch's face.
-     */
-    ring: Modifier = Modifier.size(136.dp),
-    /**
-     * What goes INSIDE the ring, under the value. The full-screen hero puts the quick actions here, so
-     * the circle is the page rather than a badge above it.
-     */
-    body: (@Composable () -> Unit)? = null,
-) {
-    val text: @Composable () -> Unit = {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            // The standard rolling value, entered through :uicommon's AnimatedValue so the watch's
-            // hero (battery %, lock state) rolls like the phone's.
-            com.bloo.uicommon.AnimatedValue(
-                value = value,
-                style = MaterialTheme.typography.displaySmall.merge(
-                    androidx.compose.ui.text.TextStyle(
-                        fontWeight = FontWeight.Bold,
-                        color = tint,
-                        textAlign = TextAlign.Center,
-                    ),
-                ),
-                maxLines = 1,
-                reduceMotion = false,
-            )
-            Text(
-                caption,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            body?.invoke()
-        }
-    }
-    if (progress == null) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { text() }
-        return
-    }
-    // Lean (the watch's Battery Saver or a throttling watch, see PowerPolicy): the ring jumps instead of sweeping.
-    val bouncy by com.bloo.bluelink.data.DeviceStatus.policy.collectAsState()
-    val sweep by animateFloatAsState(
-        progress.coerceIn(0f, 1f),
-        animationSpec = if (bouncy.bouncySprings) androidx.compose.animation.core.spring() else androidx.compose.animation.core.snap(),
-        label = "heroRing",
-    )
-    val track = tint.copy(alpha = 0.18f)
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Box(
-            ring.drawBehind {
-                val stroke = 9.dp.toPx()
-                val inset = stroke / 2
-                val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
-                val topLeft = androidx.compose.ui.geometry.Offset(inset, inset)
-                drawArc(track, -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
-                drawArc(tint, -90f, 360f * sweep, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
-            },
-            contentAlignment = Alignment.Center,
-        ) { text() }
-    }
-}
-
-/** One round-friendly quick action: a glyph over a short label, filling its share of a row. */
-data class WearQuickAction(
-    val label: String,
-    val icon: ImageVector,
-    val active: Boolean = false,
-    /** The command is in flight: shows "Sending…" and ignores taps. */
-    val pending: Boolean = false,
-    val onClick: () -> Unit,
-)
-
-/**
- * The car's everyday actions as a grid of big tap targets, two to a row so each stays thumb-sized
- * on a small round face, all the shared [MorphButtonCore] so they press like every other Bloo
- * button.
- */
-@Composable
-fun WearQuickActions(
-    actions: List<WearQuickAction>,
-    modifier: Modifier = Modifier,
-    /**
-     * Icon-only circles rather than labelled pills, for use INSIDE the full-screen hero ring.
-     *
-     * The hero's ring fills the display's bounding square, and a round display only fills the circle
-     * inside it. A labelled 2x2 grid sits in that square's lower half, so its outer corners land
-     * outside the bezel; the same grid as 52dp circles is 114dp across, which stays within the circle
-     * with the value above it. The label is not lost -- it becomes the button's spoken description.
-     */
-    compact: Boolean = false,
-) {
-    val scheme = MaterialTheme.colorScheme
-    if (compact) {
-        Column(
-            modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            actions.chunked(2).forEach { row ->
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    row.forEach { a ->
-                        Surface(
-                            onClick = a.onClick,
-                            enabled = !a.pending,
-                            shape = CircleShape,
-                            color = if (a.active) scheme.primary else scheme.secondaryContainer,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .semantics { contentDescription = a.label },
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                val tint = if (a.active) scheme.onPrimary else scheme.onSecondaryContainer
-                                Icon(
-                                    a.icon,
-                                    contentDescription = null,
-                                    tint = tint.copy(alpha = if (a.pending) 0.4f else 1f),
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return
-    }
-    Column(modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        actions.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { a ->
-                    WearButton(
-                        active = a.active,
-                        enabled = !a.pending,
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
-                        onClick = a.onClick,
-                    ) {
-                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            val tint = if (a.active) scheme.onPrimary else scheme.onSecondaryContainer
-                            Icon(a.icon, contentDescription = null, tint = tint.copy(alpha = if (a.pending) 0.5f else 1f), modifier = Modifier.size(22.dp))
-                            Text(
-                                if (a.pending) "Sending…" else a.label,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = tint,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-                // An odd last action keeps its half width rather than stretching across the row.
-                if (row.size == 1) Spacer(Modifier.weight(1f))
-            }
-        }
-    }
 }

@@ -10,15 +10,12 @@ import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
-import androidx.compose.material.icons.filled.BatteryAlert
-import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
@@ -224,11 +221,11 @@ private fun WearCarPage(
         val key = tileRequest?.key ?: return@LaunchedEffect
         when (key) {
             // Unlock is the one command that opens the car, so it asks once more, exactly as the button does.
-            WearMainActivity.ACTION_LOCK ->
+            WearTileActions.KEY_LOCK ->
                 if (v.locked == true) confirmUnlock = true else requestCommand { repo.lock(v.vin) }
-            WearMainActivity.ACTION_CLIMATE -> requestCommand { repo.climate(v.vin) }
-            WearMainActivity.ACTION_CHARGE -> requestCommand { repo.charge(v.vin) }
-            WearMainActivity.ACTION_FLASH -> requestCommand { repo.flashLights(v.vin) }
+            WearTileActions.KEY_CLIMATE -> requestCommand { repo.climate(v.vin) }
+            WearTileActions.KEY_CHARGE -> requestCommand { repo.charge(v.vin) }
+            WearTileActions.KEY_FLASH -> requestCommand { repo.flashLights(v.vin) }
         }
         onTileRequestHandled()
     }
@@ -402,41 +399,5 @@ private fun WearCarPage(
 private fun VehicleSnapshot.heroTint(): Color =
     if (percent != null) Color(BlooColors.chargeGreen) else MaterialTheme.colorScheme.onBackground
 
-/** The watch's notification switches: a pebble of three toggles, kept deliberately short. */
-@Composable
-private fun WearAlertsPebble() {
-    val context = LocalContext.current
-    val prefs = remember { WearNotificationPrefs(context) }
-    var charging by remember { mutableStateOf(prefs.charging) }
-    var complete by remember { mutableStateOf(prefs.chargeComplete) }
-    var low by remember { mutableStateOf(prefs.lowBattery) }
-    WearPebble(title = "Watch alerts", icon = Icons.Filled.Notifications) {
-        WearActionRow("Charging card", Icons.Filled.Bolt, active = charging) { charging = !charging; prefs.charging = charging; prefs.sendToPhone(context) }
-        WearActionRow("Charged", Icons.Filled.BatteryFull, active = complete) { complete = !complete; prefs.chargeComplete = complete; prefs.sendToPhone(context) }
-        WearActionRow("Low battery", Icons.Filled.BatteryAlert, active = low) { low = !low; prefs.lowBattery = low; prefs.sendToPhone(context) }
-    }
-}
-
-/**
- * The watch's own AutoLock, tagged **beta**: lock the car when the wearer walks away. Off by
- * default, and honest about what beta means -- the phone does not need to be nearby, and the watch
- * only ever locks a car it has data for and that is not already locked.
- */
-@Composable
-private fun WearAutoLockPebble() {
-    val context = LocalContext.current
-    var enabled by remember { mutableStateOf(WearAutoLock.isEnabled(context)) }
-    WearPebble(title = if (WearAutoLock.BETA) "Auto lock · Beta" else "Auto lock", icon = Icons.Filled.Lock) {
-        WearActionRow("Lock when I walk away", Icons.Filled.Lock, active = enabled) {
-            enabled = !enabled
-            WearAutoLock.setEnabled(context, enabled)
-        }
-        WearCenteredText(
-            if (enabled) "On: the watch locks the car about a minute after it feels you set off."
-            else "Beta: the watch locks the car when it feels you leave. Off by default.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Normal,
-        )
-    }
-}
+// The watch's settings pebbles -- Watch alerts and Auto lock -- are in WearSettingsPebbles.kt. They
+// are the watch's settings rather than the car page's furniture, and this file is the car page.
