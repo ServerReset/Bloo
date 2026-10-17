@@ -68,6 +68,12 @@ object WearAutoLock {
         val app = context.applicationContext
         val mgr = app.getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
         val sig = mgr.getDefaultSensor(Sensor.TYPE_SIGNIFICANT_MOTION) ?: return
+        // Cancel any registration already held BEFORE adding one, because arm() runs on every app
+        // open (WearMainActivity.startWork) as well as on enable and after a reboot. Re-arming used to
+        // overwrite the `listener` field and leave the old registration live: two triggers per motion,
+        // then four, and each one schedules its own grace alarm -- so a single walk-away could fire
+        // several locks. Cancelling is a no-op once a trigger has fired, which is the common case.
+        listener?.let { runCatching { mgr.cancelTriggerSensor(it, armedSensor) } }
         val l = object : TriggerEventListener() {
             override fun onTrigger(event: TriggerEvent?) {
                 // Trigger sensors are one-shot: re-arm first, then start the grace countdown.

@@ -3,9 +3,10 @@ package com.bloo.bluelink.wear
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,12 +27,20 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
- * The watch's PIN entry. A 3x4 keypad, sized for a round watch face. On a correct PIN [onUnlocked]
+ * The watch's PIN entry: a 3x4 keypad that FITS the face it is on. On a correct PIN [onUnlocked]
  * fires; the caller owns the session state and the policy (see [WatchPinStore] and the shared
  * `WatchPinPolicy`).
+ *
+ * The keys are sized from the space actually available, and that is a fix rather than a flourish.
+ * Four rows of the old fixed 48dp keys are 210dp on a face that is 227dp at its widest -- before the
+ * title, the entry dots, the error line and the "which PIN" line, which are another ~100dp. The
+ * screen overflowed by about the height of its last row, and its last row is del/0/ok: the PIN could
+ * be typed and never confirmed. Sizing from the real constraints means it fits on every face.
  */
 @Composable
 fun WearPinScreen(
@@ -61,58 +70,101 @@ fun WearPinScreen(
         }
     }
 
-    Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(title, style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
-        // Dots for the entered digits -- never the digits themselves.
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            repeat(entered.length.coerceAtMost(8)) {
-                Box(Modifier.size(10.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+    // Keypad 1-9, then 0 and delete. Three per row.
+    val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("del", "0", "ok"))
+    val gap = 6.dp
+
+    BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        val sizing = pinPadSizing(maxWidth, maxHeight, gap)
+        val key = sizing.key
+
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(gap),
+        ) {
+            // One slot for both. The error is what matters when there is one; the title is context the
+            // user has already read by then.
+            Text(
+                message ?: title,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (message != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+            )
+            // Dots for the entered digits -- never the digits themselves. A fixed height so the keypad
+            // does not jump down when the first digit lands.
+            Row(Modifier.height(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(entered.length.coerceAtMost(8)) {
+                    Box(Modifier.size(10.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+                }
             }
-        }
-        message?.let {
-            Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-        }
-        // Keypad 1-9, then 0 and delete. Three per row.
-        val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("del", "0", "ok"))
-        for (row in rows) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (key in row) {
-                    WearKey(key) {
-                        when (key) {
-                            "del" -> entered = entered.dropLast(1)
-                            "ok" -> if (entered.isNotEmpty()) submit(entered)
-                            else -> {
-                                val remaining = store.lockoutRemainingSeconds()
-                                if (remaining > 0) {
-                                    message = "Locked. Try again in ${com.bloo.bluelink.data.formatLockoutSeconds(remaining * 1000)}"
-                                } else if (entered.length < 8) {
-                                    entered += key
+            rows.forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    row.forEach { k ->
+                        WearKey(k, key) {
+                            when (k) {
+                                "del" -> entered = entered.dropLast(1)
+                                "ok" -> if (entered.isNotEmpty()) submit(entered)
+                                else -> {
+                                    val remaining = store.lockoutRemainingSeconds()
+                                    if (remaining > 0) {
+                                        message = "Locked. Try again in ${com.bloo.bluelink.data.formatLockoutSeconds(remaining * 1000)}"
+                                    } else if (entered.length < 8) {
+                                        entered += k
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+            if (sizing.showCaption) {
+                Text(
+                    "The PIN you set on your phone",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
+            }
         }
-        Spacer(Modifier.height(2.dp))
-        Text(
-            "Unlocks with the PIN set on your phone",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 
+/** The keypad's answer for a given space: the key size, and whether the "which PIN" line fits too. */
+internal data class PinPadSizing(val key: Dp, val showCaption: Boolean)
+
+/** What the text above and below the keypad needs. Generous on purpose: UNDER-reserving is what puts
+ *  a key under the bezel. The title slot is two lines because a lockout message wraps. */
+internal val PIN_PAD_TEXT = 28.dp + 12.dp
+internal val PIN_PAD_CAPTION = 14.dp
+internal val PIN_PAD_GAP = 6.dp
+
+/**
+ * The keypad's arithmetic, out of the composable so it can be tested -- which is the point, because
+ * the version that shipped had no arithmetic at all: the keys were a constant 48dp and the pad was
+ * taller than the watch. Keys are square and as large as BOTH the width (three to a row) and the
+ * height left over after the text allows.
+ *
+ * The "which PIN" line is the least important thing on this screen, so it is the first to go: on a
+ * small face, dropping it buys back ~5dp on every key, and a key that can be pressed matters more
+ * than a sentence that is only needed once.
+ */
+internal fun pinPadSizing(maxWidth: Dp, maxHeight: Dp, gap: Dp = PIN_PAD_GAP): PinPadSizing {
+    val byWidth = (maxWidth - gap * 2) / 3
+    val text = PIN_PAD_TEXT + gap * 5
+    val caption = PIN_PAD_CAPTION + gap
+    val showCaption = minOf(byWidth, (maxHeight - text - caption) / 4) >= 34.dp
+    val key = minOf(byWidth, (maxHeight - text - if (showCaption) caption else 0.dp) / 4)
+        .coerceIn(1.dp, 52.dp)
+    return PinPadSizing(key, showCaption)
+}
+
 @Composable
-private fun WearKey(label: String, onClick: () -> Unit) {
-    // 48dp, not 44: this is the watch's most frequent interaction and the minimum touch target is 48.
-    // And a spoken label, because the key's only label is the glyph it draws -- a digit, a backspace
-    // or a tick -- which a screen reader reads as punctuation or nothing at all.
+private fun WearKey(label: String, size: Dp, onClick: () -> Unit) {    // A spoken label, because a key's only label is the glyph it draws -- a digit, a backspace or a
+    // tick -- which a screen reader reads as punctuation or as nothing at all. The glyph and the
+    // corner scale with the key, so a small key is a small key rather than a cropped big one.
     val spoken = when (label) {
         "del" -> "Delete"
         "ok" -> "Confirm"
@@ -120,10 +172,10 @@ private fun WearKey(label: String, onClick: () -> Unit) {
     }
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(size * 0.33f),
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier
-            .size(48.dp)
+            .size(size)
             .semantics { contentDescription = spoken },
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -134,6 +186,7 @@ private fun WearKey(label: String, onClick: () -> Unit) {
                     else -> label
                 },
                 style = MaterialTheme.typography.titleMedium,
+                fontSize = (size * 0.42f).value.sp,
                 fontWeight = FontWeight.SemiBold,
             )
         }
