@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.LocalPowerPolicy
 
 /**
  * The phone UI's shared design vocabulary: the sizes, colours and motion that more than one screen
@@ -188,17 +189,6 @@ object AppIcons {
 // ---- Blur -----------------------------------------------------------------------
 //
 // Shared Haze backdrop-blur gate and progressive-blur instances used by every blur site.
-
-/**
- * The device-resource policy (battery saver, thermal throttling), collected ONCE at the app root and
- * read here. [com.bloo.bluelink.data.PowerPolicy] is the single place that says what changes when the
- * device is short on power: every visual or animated "lean" decision below reads it, never the system
- * directly. Collected once because every call site used to collect the flow itself: about ten per
- * pebble, hundreds of live collectors across the pages in the pager, all created mid-swipe.
- */
-internal val LocalPowerPolicy = androidx.compose.runtime.compositionLocalOf {
-    com.bloo.bluelink.data.PowerPolicy.of(com.bloo.bluelink.data.DeviceState())
-}
 
 /** Real backdrop blur: API 31+ (Haze's RenderEffect; no-op below) and the policy allows it. */
 @Composable

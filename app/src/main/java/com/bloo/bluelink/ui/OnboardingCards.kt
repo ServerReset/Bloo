@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
+import com.bloo.uicommon.RevealText
 
 /** What an onboarding card's header says: the same icon / title / summary a pebble carries. */
 internal data class OnboardingCardSpec(val icon: ImageVector, val title: String, val summary: String)

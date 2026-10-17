@@ -1,4 +1,4 @@
-package com.bloo.bluelink.ui
+package com.bloo.uicommon
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -78,7 +78,7 @@ private const val MaxRevealChars = 320
  * [RollingNumber] for values, `AnimatedContent` for a swap -- already provide it around their text.
  */
 @Composable
-internal fun RevealText(
+fun RevealText(
     text: String,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,

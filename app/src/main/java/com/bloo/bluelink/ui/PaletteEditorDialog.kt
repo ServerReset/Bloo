@@ -26,6 +26,7 @@ import com.bloo.uicommon.rememberConfirmArm
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.bloo.uicommon.RevealText
 
 /** Dialog to create or edit a [CustomPaletteData]. */
 @Composable

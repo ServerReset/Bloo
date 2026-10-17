@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import com.bloo.uicommon.RevealText
 
 /**
  * The Screen.Loading bootstrapping placeholder -- see that state's own doc (AppViewModel.kt) for

@@ -26,6 +26,8 @@ import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.degLabel
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
+import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.LocalReduceMotion
 
 /**
  * The climate pebble's controls -- temperature, run time, defrost, steering-wheel and seat heat,

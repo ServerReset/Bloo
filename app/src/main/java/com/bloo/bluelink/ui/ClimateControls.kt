@@ -62,6 +62,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.RevealText
 
 /**
  * Reusable climate-control pieces: seat/wheel heat controls, preset pills and the charge-limit pill

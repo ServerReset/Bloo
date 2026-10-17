@@ -54,6 +54,7 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.collapsedSections
 import kotlin.math.max
+import com.bloo.uicommon.RevealText
 
 /** One option in a [MorphSegmented] control; re-exported from :uicommon. */
 typealias SegmentOption = com.bloo.uicommon.SegmentOption

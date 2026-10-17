@@ -33,6 +33,7 @@ import com.bloo.bluelink.wear.WatchPresence
 import com.bloo.bluelink.wear.WatchSignIn
 import com.bloo.uicommon.ReorderColumn
 import kotlinx.coroutines.delay
+import com.bloo.uicommon.RevealText
 
 /**
  * Multi-device Drive sync UI: the device list/reorder section, per-device row, and the setup dialog

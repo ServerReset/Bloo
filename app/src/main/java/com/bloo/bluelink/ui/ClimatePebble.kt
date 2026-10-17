@@ -39,6 +39,7 @@ import com.bloo.bluelink.data.smartClimateIsCooling
 import com.bloo.bluelink.data.smartClimateTargetF
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
+import com.bloo.uicommon.RevealText
 
 // --- Climate --------------------------------------------------------------
 

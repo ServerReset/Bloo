@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.RevealText
 
 /**
  * A hairline-outlined box, for the few things that need a visible edge on a glass card (a log, an

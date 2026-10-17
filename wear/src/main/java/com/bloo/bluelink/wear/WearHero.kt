@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.RevealText
 
 /**
  * The car's at-a-glance state, used as the page's hero value.
@@ -66,7 +67,7 @@ fun WearHero(
                 maxLines = 1,
                 reduceMotion = false,
             )
-            Text(
+            RevealText(
                 caption,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -16,6 +16,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.bloo.uicommon.LocalReduceMotion
+import com.bloo.uicommon.reduceMotionCached
 
 @Composable
 fun BlooTheme(
@@ -116,9 +118,6 @@ fun BlooTheme(
         )
     }
 }
-
-/** True when the user has disabled animations in Accessibility settings. */
-val LocalReduceMotion = staticCompositionLocalOf { false }
 
 /**
  * Honours the app's Light/Dark override; only SYSTEM falls through to the phone. Never read

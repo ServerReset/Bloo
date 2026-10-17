@@ -52,6 +52,7 @@ import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import com.bloo.uicommon.RevealText
 
 @Composable
 internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {

@@ -46,6 +46,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
+import com.bloo.uicommon.LocalPowerPolicy
 
 /**
  * A small slippy map centred on the car, assembled from key-free OpenStreetMap raw tiles. We

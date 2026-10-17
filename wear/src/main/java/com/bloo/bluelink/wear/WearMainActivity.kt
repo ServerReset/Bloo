@@ -9,13 +9,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.lifecycleScope
+import com.bloo.uicommon.LocalPowerPolicy
+import com.bloo.uicommon.LocalReduceMotion
+import com.bloo.uicommon.reduceMotionCached
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.RevealText
 
 /**
  * The watch's only Activity. Hosts [WearGarageScreen]; everything else lives in the repository +
@@ -99,16 +107,29 @@ class WearMainActivity : ComponentActivity() {
 /** The watch theme: a dark, high-contrast scheme for a small AMOLED watch face. */
 @Composable
 private fun WearTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = darkColorScheme(
-            primary = Color(com.bloo.bluelink.data.BlooColors.brandAccent),
-            onPrimary = Color.White,
-            secondaryContainer = Color(0xFF2A2A33),
-            onSecondaryContainer = Color.White,
-            surfaceContainer = Color(0xFF1C1C22),
-            background = Color.Black,
-            onBackground = Color.White,
-        ),
-        content = content,
+    val scheme = darkColorScheme(
+        primary = Color(com.bloo.bluelink.data.BlooColors.brandAccent),
+        onPrimary = Color.White,
+        secondaryContainer = Color(0xFF2A2A33),
+        onSecondaryContainer = Color.White,
+        surfaceContainer = Color(0xFF1C1C22),
+        background = Color.Black,
+        onBackground = Color.White,
     )
+    // The same device-condition locals the phone provides at its root, so the SHARED text component
+    // behaves identically here: the line-by-line entrance is off under reduce-motion and off under
+    // battery saver, exactly as on the phone -- and the watch is the device most likely to be in both.
+    val context = LocalContext.current
+    val reduceMotion = remember(context.contentResolver) { reduceMotionCached(context) }
+    val policy by com.bloo.bluelink.data.DeviceStatus.policy.collectAsState()
+    CompositionLocalProvider(
+        LocalReduceMotion provides reduceMotion,
+        LocalPowerPolicy provides policy,
+        // RevealText draws with the PHONE Material3's Text, which resolves an unspecified colour from
+        // ITS LocalContentColor -- black by default, and therefore invisible on this theme. Setting it
+        // here means a call site that forgets a colour is merely bland rather than unreadable.
+        androidx.compose.material3.LocalContentColor provides scheme.onBackground,
+    ) {
+        MaterialTheme(colorScheme = scheme, content = content)
+    }
 }

@@ -356,10 +356,3 @@ fun blooColorScheme(
  * The app's root theme wrapper, applied once around the whole Compose tree (see
  * [com.bloo.bluelink.MainActivity]).
  */
-/** Process-wide cache for the animator-duration-scale probe -- see its use in BlooTheme. */
-private var reduceMotionCache: Boolean? = null
-
-fun reduceMotionCached(context: android.content.Context): Boolean =
-    reduceMotionCache ?: runCatching {
-        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    }.getOrDefault(false).also { reduceMotionCache = it }

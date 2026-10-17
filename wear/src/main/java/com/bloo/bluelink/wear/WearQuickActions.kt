@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.RevealText
 
 /** One round-friendly quick action: a glyph over a short label, filling its share of a row. */
 data class WearQuickAction(
@@ -107,7 +108,7 @@ fun WearQuickActions(
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                             val tint = if (a.active) scheme.onPrimary else scheme.onSecondaryContainer
                             Icon(a.icon, contentDescription = null, tint = tint.copy(alpha = if (a.pending) 0.5f else 1f), modifier = Modifier.size(22.dp))
-                            Text(
+                            RevealText(
                                 if (a.pending) "Sending…" else a.label,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,

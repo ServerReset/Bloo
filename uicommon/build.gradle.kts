@@ -57,5 +57,11 @@ dependencies {
     // Icons needed for weatherIcon(); the material-icons artifact is pure ImageVector
     // data — no Material theme dependency — so it's safe to add here.
     implementation("androidx.compose.material:material-icons-extended")
+    // Material3, for exactly one thing: the Text that RevealText draws with. The boundary this module
+    // kept -- foundation only, colours and specs passed in as parameters -- existed to stay neutral
+    // between compose.material3 and the Wear OS companion's own wear.compose.material3. That
+    // neutrality is spent: the watch app depends on the phone Material3 itself, so a shared component
+    // can use it without either side having to change what it is.
+    implementation("androidx.compose.material3:material3")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
 }

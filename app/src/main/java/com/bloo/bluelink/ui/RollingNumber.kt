@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import com.bloo.uicommon.AnimatedValue
+import com.bloo.uicommon.LocalReduceMotion
 
 /**
  * The big-headline alias of [com.bloo.uicommon.AnimatedValue], the app's one rolling component:

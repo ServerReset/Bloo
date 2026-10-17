@@ -35,6 +35,7 @@ import com.bloo.bluelink.data.fmtMinutes
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.rangeMiFor
+import com.bloo.uicommon.RevealText
 
 // --- Diagnostics ----------------------------------------------------------
 

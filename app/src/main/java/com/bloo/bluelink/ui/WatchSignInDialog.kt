@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.wear.WatchSignIn
+import com.bloo.uicommon.RevealText
 
 /**
  * Signs the watch in so it works on its own. Shows whatever step [WatchSignIn] is on; renders

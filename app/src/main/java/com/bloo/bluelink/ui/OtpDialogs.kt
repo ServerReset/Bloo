@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import com.bloo.uicommon.RevealText
 
 // --- One-time-code dialogs for the region-specific sign-in challenges ---
 

@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.RevealText
 
 /**
  * Every setup flow in the app: first run, newly detected cars, and the welcome cards summoned again

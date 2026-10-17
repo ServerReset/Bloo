@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.supportsHornLights
+import com.bloo.uicommon.RevealText
 
 /** Hero image + gauge (expanded view). */
 @Composable

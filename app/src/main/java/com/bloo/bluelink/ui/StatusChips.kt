@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
+import com.bloo.uicommon.RevealText
 
 /**
  * Small status-chip widgets: MetaChip, StatusChip, the update-available chip/dot/badge family,

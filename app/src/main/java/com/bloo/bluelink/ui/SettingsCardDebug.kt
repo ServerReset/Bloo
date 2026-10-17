@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.max
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.RevealText
 
 /**
  * The "Debug" card: this device's diagnostics and the activity log, one place for support

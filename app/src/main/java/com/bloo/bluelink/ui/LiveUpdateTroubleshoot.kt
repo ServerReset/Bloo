@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.openDeveloperOptions
 import com.bloo.bluelink.data.requestBackgroundUnrestricted
+import com.bloo.uicommon.RevealText
 
 /**
  * Ordered troubleshooting steps covering the two different ways this bar can fail to show

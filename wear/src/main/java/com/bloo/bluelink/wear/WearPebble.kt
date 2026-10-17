@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.MorphButtonCore
+import com.bloo.uicommon.RevealText
 
 /**
  * The watch's small card: a round-friendly container with a title row (icon + title) and a body.
@@ -59,10 +60,13 @@ fun WearPebble(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconBadge(icon)
                 Spacer(Modifier.width(10.dp))
-                Text(
+                RevealText(
                     title,
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleSmall,
+                    // Explicit: the shared component draws with the phone Material3's Text, whose
+                    // unspecified colour is its own LocalContentColor rather than this theme's.
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -124,7 +128,7 @@ fun WearActionRow(
     ) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text(
+        RevealText(
             label,
             fontWeight = FontWeight.SemiBold,
             style = MaterialTheme.typography.labelLarge,
@@ -192,7 +196,7 @@ fun WearCenteredText(
     fontWeight: FontWeight? = FontWeight.SemiBold,
     maxLines: Int = 2,
 ) {
-    Text(
+    RevealText(
         text,
         modifier = modifier.fillMaxWidth().padding(horizontal = 20.dp),
         textAlign = TextAlign.Center,

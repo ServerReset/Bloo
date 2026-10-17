@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.update.UpdateInfo
+import com.bloo.uicommon.RevealText
 
 /**
  * A full-width glass panel nested inside an already-elevated card: `shadow = false` so it does not

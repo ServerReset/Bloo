@@ -75,6 +75,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.bloo.bluelink.data.SettingsStore
 import kotlin.math.max
 import kotlinx.coroutines.delay
+import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.LocalPowerPolicy
 
 /** Shared app-wide chrome: the glass dialog shell and the animated aurora background. */
 

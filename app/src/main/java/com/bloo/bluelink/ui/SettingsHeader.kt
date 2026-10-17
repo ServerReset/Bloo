@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.collapsedSections
 import com.bloo.bluelink.data.setSeamlessInstallShizuku
 import kotlinx.coroutines.delay
+import com.bloo.uicommon.RevealText
 
 /**
  * Delays an advanced-only card's own entrance by `index * STAGGER_STEP_MS` once [advanced] flips

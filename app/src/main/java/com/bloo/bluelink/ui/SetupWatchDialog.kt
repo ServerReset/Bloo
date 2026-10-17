@@ -34,6 +34,7 @@ import java.net.NetworkInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.bloo.uicommon.RevealText
 
 private enum class WatchSetupStep { Prepare, Pair, Install, Done }
 

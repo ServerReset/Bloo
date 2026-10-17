@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.RevealText
 
 /**
  * A Wear OS companion shown UNDER the phone it belongs to, not as a peer row. Deliberately not a

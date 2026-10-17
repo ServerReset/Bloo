@@ -26,6 +26,7 @@ import androidx.compose.ui.text.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import com.bloo.uicommon.RevealText
 
 /**
  * The hero's readout as one set of components that morphs between collapsed and expanded. [t] is 0

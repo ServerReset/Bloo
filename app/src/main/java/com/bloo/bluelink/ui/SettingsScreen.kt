@@ -36,6 +36,7 @@ import com.bloo.bluelink.data.settingsMode
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlin.math.max
+import com.bloo.uicommon.RevealText
 
 // --- Settings -------------------------------------------------------------
 

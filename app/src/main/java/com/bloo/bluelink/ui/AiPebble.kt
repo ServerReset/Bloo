@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.RevealText
 
 /** Optional on-device Gemini Nano summary of the car's last-refreshed status. */
 @Composable

@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import kotlin.math.max
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.RevealText
 
 // --- Garage status card -----------------------------------------------
 

@@ -50,6 +50,7 @@ import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.serviceDue
 import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.targetForCurrentPlug
+import com.bloo.uicommon.RevealText
 
 // --- Car info (status + service + links combined) -------------------------
 

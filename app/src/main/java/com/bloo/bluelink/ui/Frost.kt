@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.RevealText
 
 /**
  * The app's one inert (disabled) treatment: soften and fade whatever is inert, leaving its own

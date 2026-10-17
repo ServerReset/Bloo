@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.bluelink.rethrowIfCancellation
+import com.bloo.uicommon.RevealText
 
 /**
  * Live search over app settings and per-car data/fields. Tokenises the query (dropping filler

@@ -46,6 +46,7 @@ import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.bloo.uicommon.RevealText
 
 // --- Photo crop editor ---
 

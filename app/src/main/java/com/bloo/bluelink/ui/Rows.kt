@@ -35,6 +35,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.LocalReduceMotion
 
 // --- Settings -------------------------------------------------------------
 // (The settings screen lives in SettingsScreen.kt's family.)

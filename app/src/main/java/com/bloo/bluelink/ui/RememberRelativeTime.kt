@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.delay
+import com.bloo.uicommon.LocalReduceMotion
 
 /**
  * Holds the LABEL in state rather than a clock, which is the whole efficiency of it. Under a minute

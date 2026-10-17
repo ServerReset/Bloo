@@ -16,6 +16,7 @@ import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.SettingsCatalog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.RevealText
 
 /**
  * Search controls for the settings that are layout rather than a switch or a slider: car order, saved

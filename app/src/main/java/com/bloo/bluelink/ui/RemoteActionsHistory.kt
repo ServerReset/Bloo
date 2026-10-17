@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.RevealText
 
 /**
  * Represents a single remote action taken on a vehicle. Used for displaying action history in

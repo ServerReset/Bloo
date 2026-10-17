@@ -48,6 +48,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.LocalPowerPolicy
 
 /**
  * Root composable for the phone app: a gradient backdrop, a [Scaffold] that switches top-level

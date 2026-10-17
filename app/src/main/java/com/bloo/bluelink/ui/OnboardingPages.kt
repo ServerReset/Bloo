@@ -44,6 +44,7 @@ import com.bloo.bluelink.data.setBiometricLock
 import com.bloo.bluelink.data.setSyncUri
 import com.bloo.bluelink.data.syncUri
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.RevealText
 
 /**
  * Step 1: a short welcome + feature highlights, sharing [OnboardingTipListPage]'s shape (no

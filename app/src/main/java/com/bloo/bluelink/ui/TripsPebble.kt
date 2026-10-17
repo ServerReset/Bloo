@@ -26,6 +26,7 @@ import com.bloo.bluelink.data.formatSpeedMph
 import com.bloo.bluelink.data.formatTripDistance
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.tripDate
+import com.bloo.uicommon.RevealText
 
 /**
  * Recent drives from the Hyundai/Genesis US trip-details feed: distance, time, speeds and (EVs) the

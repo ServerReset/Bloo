@@ -28,6 +28,7 @@ import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.links
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.RevealText
 
 // --- The AI-answer and command-action cards shown under search results ---
 

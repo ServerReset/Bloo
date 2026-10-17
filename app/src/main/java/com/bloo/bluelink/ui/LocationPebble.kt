@@ -35,6 +35,7 @@ import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.distanceMilesTo
 import com.bloo.bluelink.data.formatDistance
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.RevealText
 
 /**
  * Asks for the phone's position so the map can draw "you are here". [ask] always asks; [askOnce]

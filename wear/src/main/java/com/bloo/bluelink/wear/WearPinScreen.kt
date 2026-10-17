@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bloo.uicommon.RevealText
 
 /**
  * The watch's PIN entry: a 3x4 keypad that FITS the face it is on. On a correct PIN [onUnlocked]
@@ -85,7 +86,7 @@ fun WearPinScreen(
         ) {
             // One slot for both. The error is what matters when there is one; the title is context the
             // user has already read by then.
-            Text(
+            RevealText(
                 message ?: title,
                 style = MaterialTheme.typography.titleSmall,
                 color = if (message != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground,
@@ -120,7 +121,7 @@ fun WearPinScreen(
                 }
             }
             if (sizing.showCaption) {
-                Text(
+                RevealText(
                     "The PIN you set on your phone",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

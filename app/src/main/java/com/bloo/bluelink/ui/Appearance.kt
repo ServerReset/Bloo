@@ -52,6 +52,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
 import androidx.core.graphics.toColorInt
+import com.bloo.uicommon.RevealText
 
 /**
  * The round colour disc shared by every palette swatch: the colour, a ring + check and a small pop

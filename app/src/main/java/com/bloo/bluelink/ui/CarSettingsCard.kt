@@ -34,6 +34,7 @@ import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.settingsMode
+import com.bloo.uicommon.RevealText
 
 /** One reorderable car entry in Settings; tap to expand its setup + photo. */
 @Composable

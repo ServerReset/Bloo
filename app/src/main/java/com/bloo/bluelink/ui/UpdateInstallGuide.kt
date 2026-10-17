@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.bloo.uicommon.RevealText
 
 /**
  * Shown before the system installer runs when Shizuku (seamless install) is off.

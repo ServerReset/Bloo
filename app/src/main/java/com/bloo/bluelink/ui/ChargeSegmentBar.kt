@@ -24,6 +24,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
+import com.bloo.uicommon.LocalPowerPolicy
 
 /**
  * The hero's segmented charge bar and its layout math. Split out of HeroReadout.kt to separate this
