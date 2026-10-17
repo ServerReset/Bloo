@@ -207,6 +207,11 @@ private fun WearCarPage(
     var confirmUnlock by remember { mutableStateOf(false) }
     val lastResult by repo.lastCommandResult.collectAsStateWithLifecycle(initialValue = null)
     val updateAdvice by WearDataLayerSync.updateAdvice.collectAsStateWithLifecycle(initialValue = null)
+    // The update checker's own error, which was WRITTEN AND NEVER READ. It set "Download failed",
+    // "Allow installing apps, then tap again" and the exception text, and no screen collected it -- so
+    // a watch update that failed to download, or that needed the unknown-sources toggle, showed
+    // nothing at all. Exactly the silent failure the checker's own comments say they were avoiding.
+    val updateError by WearUpdateChecker.error.collectAsStateWithLifecycle(initialValue = null)
     val selfUpdate by WearUpdateChecker.available.collectAsStateWithLifecycle(initialValue = null)
     val downloading by WearUpdateChecker.downloading.collectAsStateWithLifecycle(initialValue = false)
     val progress by WearUpdateChecker.progress.collectAsStateWithLifecycle(initialValue = 0f)
@@ -259,6 +264,15 @@ private fun WearCarPage(
             // auto-centring then keeps the focused item centred as the crown scrolls.
             contentPadding = PaddingValues(vertical = 18.dp),
         ) {
+            // The update error, shown where the update lives. It used to go nowhere at all.
+            updateError?.let { message ->
+                item {
+                    WearPebble(title = "Watch update", icon = Icons.Filled.SystemUpdate) {
+                        WearCenteredText(message, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+
             updateRun?.let { run ->
                 item {
                     WearPebble(title = "Update available", icon = Icons.Filled.SystemUpdate) {

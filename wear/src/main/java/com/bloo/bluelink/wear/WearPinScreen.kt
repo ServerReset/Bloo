@@ -22,6 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -108,11 +110,21 @@ fun WearPinScreen(
 
 @Composable
 private fun WearKey(label: String, onClick: () -> Unit) {
+    // 48dp, not 44: this is the watch's most frequent interaction and the minimum touch target is 48.
+    // And a spoken label, because the key's only label is the glyph it draws -- a digit, a backspace
+    // or a tick -- which a screen reader reads as punctuation or nothing at all.
+    val spoken = when (label) {
+        "del" -> "Delete"
+        "ok" -> "Confirm"
+        else -> label
+    }
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.size(44.dp),
+        modifier = Modifier
+            .size(48.dp)
+            .semantics { contentDescription = spoken },
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
