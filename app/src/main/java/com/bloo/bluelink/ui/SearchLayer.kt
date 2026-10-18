@@ -298,6 +298,9 @@ private fun BoxScope.SearchElement(
     val minX = SearchEdge
     val maxX = (containerWidth - bubble - SearchEdge).coerceAtLeast(SearchEdge)
     val bubbleX = if (dock == SearchDock.LEFT) minX else maxX
+    // How far right a drag may take the element's left edge: by ITS width. The pill is wider than the bubble, and
+    // clamping it by the bubble's width let its right edge be dragged off the screen.
+    val dragMaxX = (containerWidth - (if (form == SearchForm.PILL) pillWidth else bubble) - SearchEdge).coerceAtLeast(minX)
     val bubbleY = (containerHeight - bubble - SearchEdge - bottomInset).coerceAtLeast(SearchEdge)
     val barX = (containerWidth - targetW) / 2
     val barY = containerHeight - targetH - SearchEdge - bottomInset
@@ -319,7 +322,7 @@ private fun BoxScope.SearchElement(
     val posSpec = if (dragging) snap<Dp>() else {
         lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
     }
-    val targetX = if (dragging && !dragX.isNaN()) dragX.dp.coerceIn(minX, maxX) else restX
+    val targetX = if (dragging && !dragX.isNaN()) dragX.dp.coerceIn(minX, dragMaxX) else restX
     val x = animateDpAsState(targetX, posSpec, label = "searchX").value
     val y = animateDpAsState(restY, posSpec, label = "searchY").value
 
@@ -347,7 +350,7 @@ private fun BoxScope.SearchElement(
         onSubmit = onSubmit,
         onDrag = if (form != SearchForm.BAR) {
             { dx, _ ->
-                dragX = ((if (dragX.isNaN()) x else dragX.dp) + dx).coerceIn(minX, maxX).value
+                dragX = ((if (dragX.isNaN()) x else dragX.dp) + dx).coerceIn(minX, dragMaxX).value
                 lastDx = dx.value
             }
         } else null,
