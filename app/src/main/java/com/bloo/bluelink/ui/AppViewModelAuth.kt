@@ -39,7 +39,7 @@ fun AppViewModel.login(username: String, password: String, pin: String, brand: B
         (repoFor(brand) as BlueLinkRepository).login(username.trim(), password, pin.trim())
         credentialStore.save(Credentials(username.trim(), password, pin.trim(), brand))
         AppLog.log("Signed in as ${maskEmail(username.trim())} (${brand.label})")
-        _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
+        finishSignIn()
         loadGarageInternal()
     }
 }
@@ -54,7 +54,7 @@ private fun AppViewModel.loginEurope(username: String, password: String, pin: St
         (repoFor(brand) as EuRepository).login(username, password, pin)
         credentialStore.save(Credentials(username, password, pin, brand))
         AppLog.log("Signed in as ${maskEmail(username)} (${brand.label})")
-        _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
+        finishSignIn()
         loadGarageInternal()
     }
 }
@@ -118,7 +118,7 @@ fun AppViewModel.kiaCancelOtp() {
 private suspend fun AppViewModel.finishKiaLogin(creds: Credentials) {
     credentialStore.save(creds)
     AppLog.log("Signed in as ${maskEmail(creds.email)} (Kia)")
-    _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
+    finishSignIn()
     loadGarageInternal()
 }
 
@@ -172,7 +172,7 @@ fun AppViewModel.canadaCancelOtp() {
 private suspend fun AppViewModel.finishCanadaLogin(creds: Credentials) {
     credentialStore.save(creds)
     AppLog.log("Signed in as ${maskEmail(creds.email)} (${creds.brand.label})")
-    _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
+    finishSignIn()
     loadGarageInternal()
 }
 
@@ -187,4 +187,15 @@ fun AppViewModel.cancelAddAccount() = _state.update { s ->
     // app — not silently return them to the already-loaded garage.
     if (s.lockedToLogin) s.copy(addingAccount = false, locked = true, lockedToLogin = false)
     else s.copy(addingAccount = false)
+}
+
+/**
+ * After any successful sign-in: record the accounts and leave the add-account form. If the user got to the form by
+ * backing out of the lock screen, the app goes back to LOCKED rather than open: signing in with any valid account of
+ * one's own must not be a way past the owner's biometric or PIN (it used to leave the app unlocked, with the owner's
+ * cars already loaded behind it).
+ */
+internal fun AppViewModel.finishSignIn() {
+    val accounts = credentialStore.loadAll()
+    _state.update { it.copy(accounts = accounts, addingAccount = false, locked = it.locked || it.lockedToLogin, lockedToLogin = false) }
 }

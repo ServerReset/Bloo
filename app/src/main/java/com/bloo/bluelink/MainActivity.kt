@@ -256,7 +256,7 @@ class MainActivity : FragmentActivity() {
         val vin = intent.getStringExtra(Shortcuts.EXTRA_VIN) ?: return
         val cmd = intent.getStringExtra(Shortcuts.EXTRA_CMD) ?: return
         reportShortcutUsage(vin, cmd)
-        viewModel.handleShortcut(vin, cmd)
+        viewModel.handleShortcut(vin, cmd, backgroundedAt, screenOffAt > backgroundedAt)
     }
 
     /**

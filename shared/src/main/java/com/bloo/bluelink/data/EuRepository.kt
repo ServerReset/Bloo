@@ -140,7 +140,7 @@ class EuRepository(
             // request" is terminal here — retrying it would just refresh/duplicate.
             if (e.code != 401) throw e
             AppLog.log("${brand.label} session expired; refreshing")
-            val refreshed = runCatching { api.refresh(stored.toEu()) }.getOrNull()
+            val refreshed = runCatching { api.refresh(stored.toEu()) }.onFailure { rethrowIfCancellation(it) }.getOrNull()
             val session = refreshed ?: reLogin() ?: throw BlueLinkException(
                 "Session expired — please sign out and sign in again", code = e.code,
             )
@@ -156,6 +156,6 @@ class EuRepository(
         val deviceId = store.load(brand)?.deviceId ?: EuApi.newDeviceId()
         return runCatching {
             api.login(creds.email, creds.password, deviceId, creds.pin)
-        }.getOrNull()
+        }.onFailure { rethrowIfCancellation(it) }.getOrNull()
     }
 }

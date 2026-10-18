@@ -40,6 +40,8 @@ fun AppViewModel.updatePin(brand: Brand, pin: String) {
  */
 fun AppViewModel.unlocked() {
     _state.update { it.copy(locked = false, lockedToLogin = false, pinAttemptRejected = false) }
+    // A launcher shortcut that arrived while the lock was up waits for this moment (see tryRunPendingShortcut).
+    tryRunPendingShortcut()
     if (pendingBootUnlock) {
         // The last step of the post-restart flow: the app lock passed, so the boot is open and the
         // normal start (auto-login, garage, background work) can run.
@@ -80,20 +82,27 @@ fun AppViewModel.setLockTiming(value: LockTiming) {
     viewModelScope.launch { settingsStore.setLockTiming(value) }
 }
 
+/**
+ * Locks the app again if it was in the background long enough (per the user's lock timing). Suspending, so a caller
+ * that must act AFTER the decision (a launcher shortcut) can wait for it.
+ */
+internal suspend fun AppViewModel.relockIfDue(backgroundedAtMs: Long, screenTurnedOff: Boolean) {
+    if (_state.value.locked) return
+    val a = settingsStore.appearance.first()
+    // Either mechanism re-arms the lock: the biometric lock when the device has usable
+    // biometrics, or the app PIN when one is set. The PIN half reads the encrypted prefs, so
+    // the whole check is taken on IO.
+    val armed = withContext(Dispatchers.IO) { (a.biometricLock && canUseBiometrics()) || appPinInstalled() }
+    if (!armed) return
+    val elapsed = System.currentTimeMillis() - backgroundedAtMs
+    // See LockTiming.wireKey (exhaustive, so a new enum value must be mapped) and
+    // shouldRelockAfter's own doc for the legacy wire keys it still honours.
+    if (shouldRelockAfter(elapsed, a.lockTiming.wireKey, screenTurnedOff)) _state.update { it.copy(locked = true) }
+}
+
 fun AppViewModel.maybeRelock(backgroundedAtMs: Long, screenTurnedOff: Boolean = false) {
     if (_state.value.locked) return
-    viewModelScope.launch {
-        val a = settingsStore.appearance.first()
-        // Either mechanism re-arms the lock: the biometric lock when the device has usable
-        // biometrics, or the app PIN when one is set. The PIN half reads the encrypted prefs, so
-        // the whole check is taken on IO.
-        val armed = withContext(Dispatchers.IO) { (a.biometricLock && canUseBiometrics()) || appPinInstalled() }
-        if (!armed) return@launch
-        val elapsed = System.currentTimeMillis() - backgroundedAtMs
-        // See LockTiming.wireKey (exhaustive, so a new enum value must be mapped) and
-        // shouldRelockAfter's own doc for the legacy wire keys it still honours.
-        if (shouldRelockAfter(elapsed, a.lockTiming.wireKey, screenTurnedOff)) _state.update { it.copy(locked = true) }
-    }
+    viewModelScope.launch { relockIfDue(backgroundedAtMs, screenTurnedOff) }
     // Prompt to refresh if data is stale after returning from background.
     if (backgroundedAtMs > 0 && System.currentTimeMillis() - backgroundedAtMs > STALE_STATUS_MS) {
         val anyStale = _state.value.lastFetched.values.any { System.currentTimeMillis() - it > STALE_STATUS_MS }

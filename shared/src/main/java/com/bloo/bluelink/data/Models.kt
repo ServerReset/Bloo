@@ -42,7 +42,9 @@ data class EnrolledVehicle(
 @Serializable
 data class VehicleDetails(
     val vin: String,
-    val regid: String,
+    // Defaulted: the enrollment request asks for non-connected vehicles too, and those have no regid; a required field
+    // made one such car fail the whole list's decode and hide every car on the account.
+    val regid: String = "",
     val nickName: String? = null,
     val modelName: String? = null,
     val modelYear: String? = null,

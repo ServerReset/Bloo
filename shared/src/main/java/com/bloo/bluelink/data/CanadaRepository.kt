@@ -143,7 +143,7 @@ class CanadaRepository(
             AppLog.log("${brand.label} session expired; re-authenticating silently")
             val auth = runCatching {
                 api.authUser(creds.email, creds.password, stored.deviceId ?: CanadaApi.newDeviceId(), stored.pin)
-            }.getOrNull()
+            }.onFailure { rethrowIfCancellation(it) }.getOrNull()
             if (auth !is CanadaAuth.LoggedIn) {
                 throw BlueLinkException("Session expired — please sign out and sign in again", code = e.code)
             }

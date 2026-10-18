@@ -20,13 +20,21 @@ import com.bloo.uicommon.content
  * Handle an app-icon shortcut. If the garage isn't loaded yet the request is queued and run once it
  * is.
  */
-fun AppViewModel.handleShortcut(vin: String, cmd: String) {
+fun AppViewModel.handleShortcut(vin: String, cmd: String, backgroundedAtMs: Long = 0L, screenTurnedOff: Boolean = false) {
     pendingShortcut = vin to cmd
-    tryRunPendingShortcut()
+    viewModelScope.launch {
+        // A shortcut tapped on a backgrounded app arrives before the activity's own re-lock check: decide the lock
+        // first, so the shortcut is never run while the app is due to be locked.
+        if (backgroundedAtMs > 0L) relockIfDue(backgroundedAtMs, screenTurnedOff)
+        tryRunPendingShortcut()
+    }
 }
 
 internal fun AppViewModel.tryRunPendingShortcut() {
     val (vin, cmd) = pendingShortcut ?: return
+    // Locked: it waits (unlocked() runs it). A shortcut can lock, unlock or start the car, and the app lock must come first;
+    // it used to run behind the lock screen.
+    if (_state.value.locked) return
     val v = _state.value.vehicles.firstOrNull { it.vin == vin } ?: return
     pendingShortcut = null
     val idx = _state.value.vehicles.indexOf(v)
