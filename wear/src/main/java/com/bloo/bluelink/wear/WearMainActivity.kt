@@ -52,7 +52,9 @@ class WearMainActivity : ComponentActivity() {
         val pinStore = WatchPinStore(this)
         // Sealed after a restart until the PIN is entered (see WearBootGate): nothing starts before that.
         if (!WearBootGate.isLocked(this)) startWork()
-        readTileRequest(intent)
+        // Only on a fresh start: a recreated activity (a font or locale change) is handed the SAME intent again, and
+        // would run the tile's action a second time.
+        if (savedInstanceState == null) readTileRequest(intent)
         setContent {
             WearTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -61,7 +63,11 @@ class WearMainActivity : ComponentActivity() {
                         pinStore = pinStore,
                         onBootUnlocked = { startWork() },
                         tileRequest = tileRequest,
-                        onTileRequestHandled = { tileRequest = null },
+                        onTileRequestHandled = {
+                            tileRequest = null
+                            // Done with it: it must not come back with the intent.
+                            intent?.removeExtra(EXTRA_ACTION)
+                        },
                     )
                 }
             }
