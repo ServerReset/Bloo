@@ -57,7 +57,10 @@ class WearSnapshotRepository(private val context: Context) {
     val refreshing: StateFlow<Boolean> = _refreshing
 
     /** Send any of the app's command names for [vin]; the face's controls all go through here. */
-    fun command(vin: String, action: String) = run(vin, action)
+    fun command(vin: String, action: String) {
+        // Refresh is not a car command (the runner has no such action): it pulls fresh status, like the pull-down.
+        if (action == CarAction.REFRESH) refresh() else run(vin, action)
+    }
 
     private fun run(vin: String, action: String) {
         scope.launch { WearCommands.track(vin, action) { runWatchCommand(context, vin, action) } }
