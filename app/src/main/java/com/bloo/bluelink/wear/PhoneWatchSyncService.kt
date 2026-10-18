@@ -47,6 +47,9 @@ class PhoneWatchSyncService : WearableListenerService() {
     private val json = BlooJson
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
+        // Sealed after a restart: nothing runs until the user signs in, and that includes a command from the watch
+        // (the credential messages below already stop here; the command path did not).
+        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return
         for (event in dataEvents) {
             if (event.type != DataEvent.TYPE_CHANGED) continue
             val path = event.dataItem.uri.path ?: continue
