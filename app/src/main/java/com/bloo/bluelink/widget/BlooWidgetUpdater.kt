@@ -37,6 +37,9 @@ object BlooWidgetUpdater {
         runCatching {
             if (GlanceAppWidgetManager(app).getGlanceIds(BlooWidget::class.java).isNotEmpty()) BlooWidget().updateAll(app)
         }
+        runCatching {
+            if (GlanceAppWidgetManager(app).getGlanceIds(BlooStripWidget::class.java).isNotEmpty()) BlooStripWidget().updateAll(app)
+        }
     }
 
     /** [updateNow] from code that is not suspending. */

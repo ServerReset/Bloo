@@ -71,7 +71,9 @@ class CarActionCallback : ActionCallback {
         val vin = parameters[WidgetKeys.PARAM_VIN] ?: return
         val action = parameters[WidgetKeys.PARAM_ACTION] ?: return
         if (BootGate.isLocked(context)) return
-        val widget = BlooWidget()
+        // The strip widget runs these commands too: redraw whichever widget this tap came from.
+        val widget: androidx.glance.appwidget.GlanceAppWidget =
+            if (androidx.glance.appwidget.GlanceAppWidgetManager(context).getGlanceIds(BlooStripWidget::class.java).contains(glanceId)) BlooStripWidget() else BlooWidget()
 
         suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
             updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { it.toMutablePreferences().also(block) }

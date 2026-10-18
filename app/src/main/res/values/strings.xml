@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">Bloo</string>
+    <string name="widget_strip_label">Bloo strip</string>
+    <string name="widget_strip_description">A slim row: your car's charge, with lock, climate and charge buttons.</string>
     <string name="widget_description">Your car at a glance: charge, range and lock, with lock, climate and charge buttons.</string>
 </resources>

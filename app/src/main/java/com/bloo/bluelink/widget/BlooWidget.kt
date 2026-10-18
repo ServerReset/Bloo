@@ -430,7 +430,7 @@ private fun lockLabel(car: VehicleSnapshot): String = if (car.locked == true) "U
  * Unlock asks "Confirm" first.
  */
 @Composable
-private fun ActionButton(
+internal fun ActionButton(
     car: VehicleSnapshot,
     action: String,
     pending: String?,
@@ -510,7 +510,7 @@ private fun actionFor(car: VehicleSnapshot, action: String, busy: Boolean): Acti
     }
 
 /** The gap between the widget's controls and lines (its padding is [widgetPad]). */
-private val WidgetGap = 8.dp
+internal val WidgetGap = 8.dp
 
 // --- The car's words ---------------------------------------------------------------------------
 

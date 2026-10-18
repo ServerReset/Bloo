@@ -193,6 +193,14 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/bloo_widget_info" />
         </receiver>
+        <!-- The slim strip version: one row, the same commands. -->
+        <receiver android:name=".widget.BlooStripWidgetReceiver" android:exported="true"
+            android:label="@string/widget_strip_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/bloo_strip_widget_info" />
+        </receiver>
         <activity android:name=".widget.BlooWidgetConfigActivity" android:exported="true"
             android:theme="@style/Theme.Bloo">
             <intent-filter>
