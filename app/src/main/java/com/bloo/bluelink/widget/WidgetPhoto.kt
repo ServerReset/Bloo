@@ -2,6 +2,7 @@ package com.bloo.bluelink.widget
 
 import android.content.Context
 import android.graphics.Bitmap
+import coil.imageLoader
 import android.graphics.BitmapFactory
 import androidx.core.graphics.drawable.toBitmap
 import com.bloo.bluelink.data.SettingsStore
@@ -42,7 +43,9 @@ internal object WidgetPhoto {
 
     private suspend fun fetch(context: Context, url: String): Bitmap? {
         val request = coil.request.ImageRequest.Builder(context).data(url).size(256).allowHardware(false).build()
-        val result = coil.ImageLoader(context).execute(request)
+        // The app's own shared loader (BlooApplication): a fresh one per redraw built a whole new HTTP client and
+        // cache every time the widget updated, and shared none of the photo cache the app has already filled.
+        val result = context.applicationContext.imageLoader.execute(request)
         return (result as? coil.request.SuccessResult)?.drawable?.toBitmap()
     }
 
