@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -79,5 +80,20 @@ internal fun WearPairPebble() {
             fontWeight = FontWeight.Normal,
             maxLines = 4,
         )
+    }
+}
+
+/** Choose what each quarter of the face does: tapping a row steps that quarter through the controls. */
+@Composable
+internal fun WearFaceControlsPebble() {
+    val context = LocalContext.current
+    var slots by remember { mutableStateOf(WearFacePrefs.load(context)) }
+    WearPebble(title = "Face controls", icon = Icons.Filled.Tune) {
+        slots.forEachIndexed { i, key ->
+            WearActionRow("${WearFacePrefs.positions[i]}: ${WearFacePrefs.label(key)}", Icons.Filled.Tune) {
+                slots = slots.toMutableList().also { it[i] = WearFacePrefs.next(key) }
+                WearFacePrefs.save(context, slots)
+            }
+        }
     }
 }

@@ -79,7 +79,7 @@ fun WearCarFace(
     /** 0..1, or null for a car that reports no charge or fuel (the ring then shows its track only). */
     progress: Float?,
     tint: Color,
-    actions: List<WearQuickAction>,
+    actions: List<WearQuickAction?>,
     modifier: Modifier = Modifier,
     /** Charging: a soft light travels along the filled part of the ring. */
     charging: Boolean = false,
@@ -104,6 +104,8 @@ fun WearCarFace(
         )
         Box(Modifier.fillMaxSize().padding(RingStroke + RingGap), contentAlignment = Alignment.Center) {
             WearQuadrantGrid(actions = actions, modifier = Modifier.fillMaxSize())
+            // The labels run round the inside of the ring, each along its own quarter's outer edge.
+            WearRingLabels(actions)
             BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 WearFaceHub(value = value, caption = caption, tint = tint, size = maxWidth * HubFraction, status = status)
             }
@@ -170,7 +172,7 @@ fun WearEdgeRing(
  * the quarter shape; a press softens the inner corner a little more, the way every button squares off.
  */
 @Composable
-fun WearQuadrantGrid(actions: List<WearQuickAction>, modifier: Modifier = Modifier) {
+fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifier = Modifier) {
     val slots = (0 until 4).map { actions.getOrNull(it) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(TileGap)) {
         for (row in 0..1) {
@@ -227,26 +229,50 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
             ) {
                 glyph?.let {
                     CompositionLocalProvider(LocalContentColor provides tint) {
-                        MorphButtonLabel(icon = it, label = "", pending = action.pending, iconSize = 24.dp)
+                        MorphButtonLabel(icon = it, label = "", pending = action.pending, iconSize = 28.dp)
                     }
                 }
-                Spacer(Modifier.height(2.dp))
-                RevealText(
+            }
+        }
+    }
+}
+
+/**
+ * The four labels, curved to the ring: anchored at each quarter's middle (clockwise from 3 o'clock: top-left 225,
+ * top-right 315, bottom-right 45, bottom-left 135), the bottom two reversed so they still read left to right.
+ */
+@Composable
+private fun WearRingLabels(actions: List<WearQuickAction?>) {
+    val scheme = MaterialTheme.colorScheme
+    val anchors = floatArrayOf(225f, 315f, 135f, 45f)
+    Box(Modifier.fillMaxSize()) {
+        for (q in 0 until 4) {
+            val action = actions.getOrNull(q) ?: continue
+            val color = if (action.active) scheme.onPrimary else scheme.onSurface
+            androidx.wear.compose.foundation.CurvedLayout(
+                modifier = Modifier.fillMaxSize(),
+                anchor = anchors[q],
+                angularDirection = if (q >= 2) androidx.wear.compose.foundation.CurvedDirection.Angular.Reversed
+                else androidx.wear.compose.foundation.CurvedDirection.Angular.Normal,
+            ) {
+                androidx.wear.compose.foundation.basicCurvedText(
                     action.label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = tint,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    style = {
+                        androidx.wear.compose.foundation.CurvedTextStyle(
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = color,
+                        )
+                    },
                 )
             }
         }
     }
 }
 
-/** A little toward the outer corner: the hub covers the inner one. */
-private fun biasX(a: Alignment) = when (a) { Alignment.TopStart, Alignment.BottomStart -> -0.12f; else -> 0.12f }
-private fun biasY(a: Alignment) = when (a) { Alignment.TopStart, Alignment.TopEnd -> -0.12f; else -> 0.12f }
+/** A little toward the hub: the curved label takes the outer edge. */
+private fun biasX(a: Alignment) = when (a) { Alignment.TopStart, Alignment.BottomStart -> 0.1f; else -> -0.1f }
+private fun biasY(a: Alignment) = when (a) { Alignment.TopStart, Alignment.TopEnd -> 0.1f; else -> -0.1f }
 
 /** The quarter-disc: the outer corner rounded by the tile's whole width, the inner corner by [innerCorner]. */
 private fun quarterShape(quadrant: Int, innerCorner: Dp): RoundedCornerShape {

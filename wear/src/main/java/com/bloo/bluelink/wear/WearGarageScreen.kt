@@ -2,13 +2,15 @@ package com.bloo.bluelink.wear
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 // The PULL-TO-REFRESH comes from the phone Material3, not the Wear one: wear-compose-material3 has no
 // pull-to-refresh, and the modifier is theme-agnostic -- it is a nested-scroll offset and nothing else.
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.pullToRefresh
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -185,7 +187,6 @@ fun WearGarageScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WearCarPage(
     repo: WearSnapshotRepository,
@@ -228,7 +229,6 @@ private fun WearCarPage(
     // the list is already at the very top -- mid-scroll pulls belong to the list -- which is what
     // "pull down from the top of the car" means.
     val refreshing by repo.refreshing.collectAsStateWithLifecycle(initialValue = false)
-    val pullState = rememberPullToRefreshState()
     val selfUpdate by WearUpdateChecker.available.collectAsStateWithLifecycle(initialValue = null)
     val downloading by WearUpdateChecker.downloading.collectAsStateWithLifecycle(initialValue = false)
     val progress by WearUpdateChecker.progress.collectAsStateWithLifecycle(initialValue = 0f)
@@ -279,32 +279,69 @@ private fun WearCarPage(
     // to scroll) exactly the way the phone's does.
     androidx.wear.compose.foundation.pager.VerticalPager(
         state = pageState,
-        modifier = Modifier
-            .fillMaxSize()
-            .pullToRefresh(isRefreshing = refreshing, state = pullState, onRefresh = { repo.refresh() }),
+        modifier = Modifier.fillMaxSize(),
     ) { index ->
         if (index == 0) {
             ScreenScaffold(timeText = { TimeText() }) {
-                val actions = buildList {
+                // Pulling down on the face refreshes, felt as the whole face following the finger a little.
+                val pull = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+                val pullShown by androidx.compose.animation.core.animateFloatAsState(pull.floatValue, label = "facePull")
+                val refreshHaptics = LocalHapticFeedback.current
+                val pullTrigger = with(androidx.compose.ui.platform.LocalDensity.current) { 56.dp.toPx() }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { translationY = pullShown.coerceAtMost(pullTrigger) * 0.4f }
+                        .pointerInput(v.vin) {
+                            // Watches the drag without taking it, so the tiles, the pager and the crown all still work.
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                var dx = 0f
+                                var dy = 0f
+                                var fired = false
+                                do {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    dx += change.positionChange().x
+                                    dy += change.positionChange().y
+                                    pull.floatValue = if (dy > 0f && dy > 2f * kotlin.math.abs(dx)) dy else 0f
+                                    if (!fired && pull.floatValue > pullTrigger) {
+                                        fired = true
+                                        refreshHaptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                                        repo.refresh()
+                                    }
+                                } while (event.changes.any { it.pressed })
+                                pull.floatValue = 0f
+                            }
+                        },
+                ) {
+                val faceContext = LocalContext.current
+                val slotKeys = remember { WearFacePrefs.load(faceContext) }
+                val actions: List<WearQuickAction?> = slotKeys.map { key ->
                     val locked = v.locked == true
-                    add(WearQuickAction(
-                        if (locked) "Unlock" else "Lock", if (locked) Icons.Filled.LockOpen else Icons.Filled.Lock,
-                        pending = WearCommands.key(v.vin, CarAction.TOGGLE_LOCK) in pendingCommands,
-                    ) {
-                        if (locked) confirmUnlock = true else requestCommand { repo.lock(v.vin) }
-                    })
-                    val on = v.climateOn == true
-                    add(WearQuickAction(if (on) "Climate off" else "Climate", Icons.Filled.AcUnit, active = on, pending = WearCommands.key(v.vin, CarAction.TOGGLE_CLIMATE) in pendingCommands) {
-                        requestCommand { repo.climate(v.vin) }
-                    })
-                    if (v.hasBattery) {
-                        val charging = v.charging == true
-                        add(WearQuickAction(if (charging) "Stop charge" else "Charge", Icons.Filled.Bolt, active = charging, pending = WearCommands.key(v.vin, CarAction.TOGGLE_CHARGE) in pendingCommands) {
-                            requestCommand { repo.charge(v.vin) }
-                        })
-                    }
-                    if (v.toVehicle().supportsHornLights) {
-                        add(WearQuickAction("Flash", Icons.Filled.FlashOn, pending = WearCommands.key(v.vin, CarAction.FLASH_LIGHTS) in pendingCommands) { requestCommand { repo.flashLights(v.vin) } })
+                    when (key) {
+                        WearFacePrefs.LOCK -> WearQuickAction(
+                            if (locked) "Unlock" else "Lock", if (locked) Icons.Filled.LockOpen else Icons.Filled.Lock,
+                            pending = WearCommands.key(v.vin, CarAction.TOGGLE_LOCK) in pendingCommands,
+                        ) {
+                            if (locked) confirmUnlock = true else requestCommand { repo.lock(v.vin) }
+                        }
+                        WearFacePrefs.CLIMATE -> {
+                            val on = v.climateOn == true
+                            WearQuickAction(if (on) "Climate off" else "Climate", Icons.Filled.AcUnit, active = on, pending = WearCommands.key(v.vin, CarAction.TOGGLE_CLIMATE) in pendingCommands) {
+                                requestCommand { repo.climate(v.vin) }
+                            }
+                        }
+                        WearFacePrefs.CHARGE -> if (v.hasBattery) {
+                            val charging = v.charging == true
+                            WearQuickAction(if (charging) "Stop charge" else "Charge", Icons.Filled.Bolt, active = charging, pending = WearCommands.key(v.vin, CarAction.TOGGLE_CHARGE) in pendingCommands) {
+                                requestCommand { repo.charge(v.vin) }
+                            }
+                        } else null
+                        WearFacePrefs.FLASH -> if (v.toVehicle().supportsHornLights) {
+                            WearQuickAction("Flash", Icons.Filled.FlashOn, pending = WearCommands.key(v.vin, CarAction.FLASH_LIGHTS) in pendingCommands) { requestCommand { repo.flashLights(v.vin) } }
+                        } else null
+                        else -> null
                     }
                 }
                 WearCarFace(
@@ -319,6 +356,7 @@ private fun WearCarPage(
                     status = if (refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
                     refreshing = refreshing,
                 )
+                }
             }
         } else {
     ScreenScaffold(scrollState = listState, timeText = { TimeText() }) {
@@ -353,6 +391,7 @@ private fun WearCarPage(
                 }
             }
 
+            item { WearFaceControlsPebble() }
             item { WearAlertsPebble() }
             // Auto lock needs the car's credentials on the watch, which only the pairing step in Settings on
             // the phone hands over; until then the pebble is a pointer to that step, not a switch.

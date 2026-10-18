@@ -50,7 +50,8 @@ fun WearPebble(
 ) {
     // No card around it: on the phone a section is a quiet heading over its own pills, so on the watch the
     // pebble is a small heading and the rows beneath it carry the shape.
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // Inset from both edges: on a round face a full-width row is cut by the bezel at the top and bottom.
+    Column(modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
