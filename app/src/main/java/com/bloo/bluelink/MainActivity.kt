@@ -1,5 +1,6 @@
 package com.bloo.bluelink
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -142,7 +143,7 @@ class MainActivity : FragmentActivity() {
         StartupTrace.mark("MainActivity: AppViewModel constructed (the `viewModel` deref)")
         StartupTrace.mark("MainActivity: setContent begin")
         setContent {
-            val appearance by viewModel.appearance.collectAsState()
+            val appearance by viewModel.appearance.collectAsStateWithLifecycle()
             // Memoize palette lookup to avoid repeated linear search through custom palettes
             val activeCustom = remember(
                 appearance.dynamicColor, appearance.customPalettes, appearance.activeCustomPaletteId

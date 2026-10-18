@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -24,7 +25,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -126,7 +126,7 @@ fun WearEdgeRing(
     /** A short light travels along the filled arc while charging (not under the watch's lean mode). */
     charging: Boolean = false,
 ) {
-    val policy by DeviceStatus.policy.collectAsState()
+    val policy by DeviceStatus.policy.collectAsStateWithLifecycle()
     val sheenOn = charging && policy.ambientMotion && progress != null
     val sheen = if (sheenOn) {
         androidx.compose.animation.core.rememberInfiniteTransition(label = "chargeSheen").animateFloat(

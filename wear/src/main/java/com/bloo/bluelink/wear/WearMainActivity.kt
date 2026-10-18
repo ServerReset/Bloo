@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -10,7 +11,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -120,7 +120,7 @@ private fun WearTheme(content: @Composable () -> Unit) {
     // battery saver, exactly as on the phone -- and the watch is the device most likely to be in both.
     val context = LocalContext.current
     val reduceMotion = remember(context.contentResolver) { reduceMotionCached(context) }
-    val policy by com.bloo.bluelink.data.DeviceStatus.policy.collectAsState()
+    val policy by com.bloo.bluelink.data.DeviceStatus.policy.collectAsStateWithLifecycle()
     CompositionLocalProvider(
         LocalReduceMotion provides reduceMotion,
         // The watch theme is dark, and the shared tones need to know that.
