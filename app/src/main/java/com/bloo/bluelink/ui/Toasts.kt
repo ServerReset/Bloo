@@ -114,7 +114,7 @@ internal class ToastState {
     var pulse by mutableIntStateOf(0)
         private set
 
-    fun setExpanded(value: Boolean) { expanded = value }
+    fun fan(open: Boolean) { expanded = open }
     fun toggleStack() { expanded = !expanded }
 
     /** The expiry a new toast gets: its own duration, but never before the last live one plus a stagger. */
@@ -235,11 +235,11 @@ internal fun ToastHost(
     val liveCount = visible.count { !it.leaving }
     val canExpand = liveCount > 1
     val expandedNow = state.expanded && canExpand
-    LaunchedEffect(canExpand) { if (!canExpand) state.setExpanded(false) }
+    LaunchedEffect(canExpand) { if (!canExpand) state.fan(false) }
     LaunchedEffect(expandedNow, liveCount) {
         if (expandedNow) {
             kotlinx.coroutines.delay(ExpandedIdleMs)
-            state.setExpanded(false)
+            state.fan(false)
         }
     }
     // The pile's openness, read per frame by each slot's layer.
@@ -330,7 +330,7 @@ internal fun ToastHost(
                     contentBottomPx = window.height.toFloat() - maxOf(imeBottomPx, navBottomPx) - edgePx,
                     edgePx = edgePx,
                     onToggleStack = { state.toggleStack() },
-                    onSetExpanded = { state.setExpanded(it) },
+                    onSetExpanded = { state.fan(it) },
                     searchRect = searchRect,
                     toastWidthPx = contentWidthPx,
                     windowWidthPx = window.width.toFloat(),
