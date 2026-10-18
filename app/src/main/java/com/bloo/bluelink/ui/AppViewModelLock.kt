@@ -187,8 +187,14 @@ fun AppViewModel.removeAppPin() {
  * wrong PIN records a failure and every fifth failure opens a window that doubles per batch (30s,
  * 1m, 2m, ...).
  */
+/** One PIN check at a time: concurrent ones all read the same failure count, so N guesses cost one strike. */
+private val pinVerifyMutex = kotlinx.coroutines.sync.Mutex()
+
 fun AppViewModel.verifyAppPin(pin: String) {
     viewModelScope.launch {
+        // A second attempt while one is checking is dropped (the user taps again); it cannot be counted from a stale read.
+        if (!pinVerifyMutex.tryLock()) return@launch
+        try {
         val record = PinRecord.decode(credentialStore.getPinRecord()) ?: return@launch
         val now = System.currentTimeMillis()
         val nowElapsed = android.os.SystemClock.elapsedRealtime()
@@ -215,6 +221,9 @@ fun AppViewModel.verifyAppPin(pin: String) {
             lockout = lockout.onFailure(now, nowElapsed)
             credentialStore.setPinLockout(lockout)
             _state.update { it.copy(pinLockout = lockout, pinAttemptRejected = true) }
+        }
+        } finally {
+            pinVerifyMutex.unlock()
         }
     }
 }
