@@ -37,7 +37,22 @@ class EuRepository(
     }
 
     private suspend fun save(session: EuSession, username: String, pin: String) {
-        store.saveLogin(session.accessToken, session.refreshToken, session.deviceId, username, pin, brand)
+        store.save(
+            SessionStore.Session(
+                accessToken = session.accessToken,
+                refreshToken = session.refreshToken,
+                username = username,
+                pin = pin,
+                brand = brand,
+                deviceId = session.deviceId,
+                cciAccessToken = session.cciAccessToken,
+                exchangeableToken = session.exchangeableToken,
+                exchangeableRefreshToken = session.exchangeableRefreshToken,
+                nonCcsToken = session.nonCcsToken,
+                nonCcsRefreshToken = session.nonCcsRefreshToken,
+                idToken = session.idToken,
+            ),
+        )
     }
 
     override suspend fun logout() {
@@ -108,7 +123,17 @@ class EuRepository(
             ?: throw BlueLinkException("Vehicle not found on this account")
 
     private fun SessionStore.Session.toEu() =
-        EuSession(accessToken, refreshToken, deviceId ?: EuApi.newDeviceId(), pin)
+        EuSession(
+            accessToken, refreshToken, deviceId ?: EuApi.newDeviceId(), pin,
+            // The OneApp/CCI token set a refresh needs. It used to be dropped here (and never saved below), so every
+            // token expiry fell through to a full password sign-in through the WAF-prone flow.
+            cciAccessToken = cciAccessToken,
+            exchangeableToken = exchangeableToken,
+            exchangeableRefreshToken = exchangeableRefreshToken,
+            nonCcsToken = nonCcsToken,
+            nonCcsRefreshToken = nonCcsRefreshToken,
+            idToken = idToken,
+        )
 
     /** Runs [block] with a fresh control token for [v], fetching it via
      *  [EuApi.controlToken] if not cached, and retrying once with a freshly
