@@ -7,6 +7,8 @@ import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.wear.compose.material3.EdgeButton
+import androidx.wear.compose.material3.Text
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -35,9 +37,18 @@ internal fun WearDetailsPage(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    WearListScreen(contentPadding = PaddingValues(vertical = 18.dp)) {
-        // The refresh button sits with the freshness in the status pebble.
-        item { WearStatusPebble(v, refreshing = refreshing, canRefresh = signedIn, onRefresh = { repo.refresh() }) }
+    WearListScreen(
+        contentPadding = PaddingValues(vertical = 18.dp),
+        // Refresh is the page's one primary action, so it is Wear OS's own edge button at the bottom.
+        edgeButton = if (signedIn) {
+            {
+                EdgeButton(onClick = { repo.refresh() }) {
+                    Text(if (refreshing) "Refreshing…" else "Refresh")
+                }
+            }
+        } else null,
+    ) {
+        item { WearStatusPebble(v, refreshing = refreshing, canRefresh = false, onRefresh = {}) }
         // The update error, shown where the update lives. It used to go nowhere at all.
         updateError?.let { message ->
             item {
