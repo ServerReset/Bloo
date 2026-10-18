@@ -208,6 +208,9 @@ commit_out="$(call POST "$api/edits/$edit:commit")" || {
   exit 1
 }
 echo "  commit response: ${commit_out:-<empty>}"
+# Said the moment the commit lands, before the read-back below can fail: the workflow's retry looks for this
+# line, and a 503 in the read-back must not read as "nothing committed" (a re-run re-uploads a used version code).
+echo "PHONE COMMITTED: $PKG"
 
 # Read it back. "Committed" is a claim; this is the check. A fresh edit only ever sees the last
 # committed state.

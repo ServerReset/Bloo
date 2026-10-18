@@ -550,7 +550,7 @@ jobs:
           # committed. Re-running the whole script after it has is worse than not retrying: the phone
           # bundle is uploaded again and refused with "Version code N has already been used.", so a
           # success becomes a louder failure. A 503 during the phone's own read-back did exactly that.
-          if ! grep -q "PHONE PUBLISHED" "$RUNNER_TEMP/play.log" && \
+          if ! grep -qE "PHONE (COMMITTED|PUBLISHED)" "$RUNNER_TEMP/play.log" && \
              grep -qE "edit has expired|service is currently unavailable|Internal error encountered|HTTP 5[0-9][0-9]" "$RUNNER_TEMP/play.log"; then
             echo "::warning::a transient Play failure before anything committed; retrying once with a fresh edit"
             PLAY_SERVICE_ACCOUNT_JSON_FILE="$RUNNER_TEMP/play-sa.json" bash .github/play-upload.sh
