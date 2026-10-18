@@ -316,7 +316,8 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
         }
         "controls" -> {
             val controlsState = stateSlice(state, v) { s ->
-                listOf(s.statuses[v.vin], s.isPending(v.vin, "doors"), s.isPending(v.vin, "hornLights"))
+                // The history too: ControlsPebble draws it, and a slice only sees what its key lists.
+                listOf(s.statuses[v.vin], s.isPending(v.vin, "doors"), s.isPending(v.vin, "hornLights"), s.remoteActionHistory[v.vin])
             }
             ControlsPebble(v, controlsState, vm, modifier)
         }
