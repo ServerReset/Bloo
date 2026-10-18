@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.wear.compose.foundation.basicCurvedText
 import com.bloo.bluelink.data.DeviceStatus
 import com.bloo.uicommon.MorphButton
 import com.bloo.uicommon.MorphButtonLabel
@@ -255,7 +256,7 @@ private fun WearRingLabels(actions: List<WearQuickAction?>) {
                 angularDirection = if (q >= 2) androidx.wear.compose.foundation.CurvedDirection.Angular.Reversed
                 else androidx.wear.compose.foundation.CurvedDirection.Angular.Normal,
             ) {
-                androidx.wear.compose.foundation.basicCurvedText(
+                basicCurvedText(
                     action.label,
                     style = {
                         androidx.wear.compose.foundation.CurvedTextStyle(
