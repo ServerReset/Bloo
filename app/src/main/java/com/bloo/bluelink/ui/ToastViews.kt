@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -207,7 +208,7 @@ internal fun BoxScope.ToastSlot(
             // Up fans the pile out, down folds it back: the same gesture a notification stack answers to.
             .pointerInput(toast.id, stackSize > 1) {
                 if (stackSize > 1) {
-                    androidx.compose.foundation.gestures.detectVerticalDragGestures(
+                    detectVerticalDragGestures(
                         onDragStart = { vDrag = 0f },
                         onVerticalDrag = { change, amount -> change.consume(); vDrag += amount },
                         onDragEnd = {
