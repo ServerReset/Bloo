@@ -98,6 +98,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // One repository per signed-in brand (any mix of brands can be active).
     internal val repos = mutableMapOf<Brand, VehicleRepository>()
 
+    /** How many busy operations ([launchBusy]) are in flight: the spinner stays up until the LAST of them ends. */
+    internal val busyCount = java.util.concurrent.atomic.AtomicInteger(0)
+
     internal fun repoFor(brand: Brand): VehicleRepository =
         repos.getOrPut(brand) { com.bloo.bluelink.data.repositoryFor(brand, store, credentialStore) }
 

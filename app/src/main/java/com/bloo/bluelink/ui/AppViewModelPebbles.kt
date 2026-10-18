@@ -171,6 +171,7 @@ fun AppViewModel.setDefaultClimatePreset(vin: String, id: String?) = viewModelSc
  */
 internal fun AppViewModel.launchBusy(block: suspend () -> Unit) {
     viewModelScope.launch {
+        busyCount.incrementAndGet()
         _state.update { it.copy(loading = true, message = null) }
         try {
             block()
@@ -180,7 +181,9 @@ internal fun AppViewModel.launchBusy(block: suspend () -> Unit) {
             AppLog.log("⚠ $msg")
             _state.update { it.copy(message = msg, messageType = ToastKind.ERROR) }
         } finally {
-            _state.update { it.copy(loading = false) }
+            // Only the last of overlapping operations lowers the spinner: the first to finish used to clear it
+            // while another (a garage load already running) was still going.
+            if (busyCount.decrementAndGet() <= 0) _state.update { it.copy(loading = false) }
         }
     }
 }
