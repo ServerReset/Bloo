@@ -50,7 +50,7 @@ class ToastStackTest {
     }
 
     @Test
-    fun aStackIsExpandedByDefaultWithNoTap() {
+    fun aPileIsFoldedByDefaultAndFansOutWhenOpened() {
         val state = ToastState()
         rule.setContent { BlooTheme { ToastHost(state, HazeState(), onCopy = {}) } }
         rule.runOnUiThread {
@@ -58,10 +58,14 @@ class ToastStackTest {
             state.show("Second", ToastKind.INFO)
         }
         rule.waitUntil(8_000) { exists("First") && exists("Second") }
-        val first = rule.onNodeWithText("First").getBoundsInRoot().top.value
-        val second = rule.onNodeWithText("Second").getBoundsInRoot().top.value
-        // Already a full slot apart (ChromeBarHeight + gap), no tap needed.
-        assertTrue("the stack is expanded with no tap (${second - first}px)", second - first > 40f)
+        rule.waitForIdle()
+        val folded = rule.onNodeWithText("Second").getBoundsInRoot().top.value - rule.onNodeWithText("First").getBoundsInRoot().top.value
+        // Folded, the older toast only peeks out above the newest.
+        assertTrue("the pile is folded until opened ($folded)", folded < 40f)
+        rule.runOnUiThread { state.fan(true) }
+        rule.waitUntil(8_000) {
+            rule.onNodeWithText("Second").getBoundsInRoot().top.value - rule.onNodeWithText("First").getBoundsInRoot().top.value > 40f
+        }
     }
 
     @Test
