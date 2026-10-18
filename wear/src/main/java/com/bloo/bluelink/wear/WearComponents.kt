@@ -30,12 +30,10 @@ import androidx.wear.compose.material3.TimeText
 fun WearListScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(vertical = 28.dp),
-    /** Wear OS's edge button, the round-screen way to put one primary action at the bottom (null for none). */
-    edgeButton: (@Composable () -> Unit)? = null,
     content: ScalingLazyListScope.() -> Unit,
 ) {
     val listState = rememberScalingLazyListState()
-    ScreenScaffold(scrollState = listState, timeText = { TimeText() }, edgeButton = edgeButton, modifier = modifier) {
+    ScreenScaffold(scrollState = listState, timeText = { TimeText() }, modifier = modifier) {
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
