@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
@@ -334,12 +335,16 @@ data class FaceStatus(val text: String, val error: Boolean = false)
  * The ring's colour, from the level: red when low, amber when getting there, green otherwise, and the
  * charging blue while it charges. A car with no level reads in [fallback].
  */
-fun faceTint(percent: Int?, charging: Boolean, fallback: Color): Color = when {
+fun faceTint(percent: Int?, charging: Boolean, fallback: Color): Color =
+    Color(levelColorArgb(percent, charging, fallback.toArgb()))
+
+/** [faceTint] as a plain ARGB int, so the Tile (which draws without Compose) colours its ring the same way. */
+fun levelColorArgb(percent: Int?, charging: Boolean, fallback: Int): Int = when {
     percent == null -> fallback
-    charging -> Color(com.bloo.bluelink.data.BlooColors.chargeBlue)
-    percent < LowLevel -> Color(com.bloo.bluelink.data.BlooColors.heat)
-    percent < WarnLevel -> Color(com.bloo.bluelink.data.BlooColors.warn)
-    else -> Color(com.bloo.bluelink.data.BlooColors.chargeGreen)
+    charging -> com.bloo.bluelink.data.BlooColors.chargeBlue
+    percent < LowLevel -> com.bloo.bluelink.data.BlooColors.heat
+    percent < WarnLevel -> com.bloo.bluelink.data.BlooColors.warn
+    else -> com.bloo.bluelink.data.BlooColors.chargeGreen
 }
 
 /** Levels below which the ring warns (amber) and then alarms (red). */

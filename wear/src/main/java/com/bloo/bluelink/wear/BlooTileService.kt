@@ -100,9 +100,9 @@ class BlooTileService : TileService() {
                     .build(),
             )
         } else {
-            glance.addContent(ring(car))
+            glance.addContent(text(car.name, 12f, MUTED))
+            glance.addContent(text(car.bigValue(), 34f, tint(car), bold = true))
             car.stateLine()?.let { line ->
-                glance.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(6f)).build())
                 glance.addContent(text(line, 13f, MUTED))
             }
             car.updatedLabel()?.let { updated ->
@@ -140,56 +140,44 @@ class BlooTileService : TileService() {
             }
         }
 
-        return LayoutElementBuilders.Box.Builder()
+        val tile = LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
             .setHeight(expand())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .setModifiers(open)
-            .addContent(outer.build())
-            .build()
+        // The charge runs round the very edge of the display, the same ring the watch face has.
+        if (car?.percent != null) tile.addContent(edgeRing(car))
+        return tile.addContent(outer.build()).build()
     }
 
+    /** The ring's colour from the level, shared with the watch face ([levelColorArgb]). */
+    private fun tint(car: VehicleSnapshot): Int =
+        levelColorArgb(car.percent, car.charging == true, WHITE)
+
     /**
-     * The car's charge as a ring with the value inside it -- the app's hero, at tile scale.
+     * The car's charge as a ring round the display's edge -- the app's hero, at tile scale.
      *
-     * Two arc lines rather than one: a full-circle track under a partial sweep, both anchored at the
-     * top and running clockwise, so the drawn part reads as "how full" against a visible remainder.
-     * A car with no battery gets the value alone, because a ring with nothing to say is a decoration.
+     * Two arc lines rather than one: a full-circle track under a partial sweep, both anchored at the top and
+     * running clockwise, so the drawn part reads as "how full" against a visible remainder. A car with no
+     * battery gets no ring, because a ring with nothing to say is a decoration.
      */
-    private fun ring(car: VehicleSnapshot): LayoutElementBuilders.LayoutElement {
-        val pct = car.percent
-        val value = LayoutElementBuilders.Column.Builder()
-            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-            .addContent(text(car.bigValue(), 30f, if (pct != null) GREEN else WHITE, bold = true))
-            .addContent(text(car.name, 12f, MUTED))
+    private fun edgeRing(car: VehicleSnapshot): LayoutElementBuilders.LayoutElement {
+        val color = tint(car)
+        val pct = (car.percent ?: 0).coerceIn(0, 100)
+        return LayoutElementBuilders.Arc.Builder()
+            .setAnchorAngle(degrees(0f))
+            .setAnchorType(LayoutElementBuilders.ARC_ANCHOR_START)
+            .setArcDirection(LayoutElementBuilders.ARC_DIRECTION_CLOCKWISE)
+            .addContent(arcLine(360f, TRACK))
+            .addContent(arcLine(360f * (pct / 100f), color))
             .build()
-
-        val box = LayoutElementBuilders.Box.Builder()
-            .setWidth(dp(112f))
-            .setHeight(dp(112f))
-            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
-
-        if (pct != null) {
-            box.addContent(
-                LayoutElementBuilders.Arc.Builder()
-                    .setAnchorAngle(degrees(-90f))
-                    .setAnchorType(LayoutElementBuilders.ARC_ANCHOR_START)
-                    .setArcDirection(LayoutElementBuilders.ARC_DIRECTION_CLOCKWISE)
-                    .addContent(arcLine(360f, TRACK))
-                    .addContent(arcLine(360f * (pct.coerceIn(0, 100) / 100f), GREEN))
-                    .build(),
-            )
-        }
-        box.addContent(value)
-        return box.build()
     }
 
     private fun arcLine(sweepDegrees: Float, color: Int): LayoutElementBuilders.ArcLine =
         LayoutElementBuilders.ArcLine.Builder()
             .setLength(degrees(sweepDegrees))
-            .setThickness(dp(7f))
+            .setThickness(dp(8f))
             .setColor(argb(color))
             .setStrokeCap(LayoutElementBuilders.STROKE_CAP_ROUND)
             .build()
