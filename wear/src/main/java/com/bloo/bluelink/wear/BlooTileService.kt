@@ -52,7 +52,7 @@ class BlooTileService : TileService() {
                 // Sealed after a restart: the tile shows nothing about the car until the PIN is entered.
                 val snapshot = if (WearBootGate.isLocked(applicationContext)) null
                 else runCatching { SnapshotStore(applicationContext).current() }.getOrNull()
-                val car = snapshot?.vehicles?.let { all -> all.firstOrNull { it.vin == snapshot.selectedVin } ?: all.firstOrNull() }
+                val car = snapshot?.selected
                 val tile = TileBuilders.Tile.Builder()
                     .setResourcesVersion(RESOURCES_VERSION)
                     // Refresh about once a minute while it is on screen.

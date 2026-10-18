@@ -34,8 +34,7 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         if (WearBootGate.isLocked(applicationContext)) return NoDataComplicationData()
         val snapshot = runCatching { SnapshotStore(applicationContext).current() }.getOrNull() ?: return NoDataComplicationData()
-        val car: VehicleSnapshot = snapshot.vehicles.let { all -> all.firstOrNull { it.vin == snapshot.selectedVin } ?: all.firstOrNull() }
-            ?: return NoDataComplicationData()
+        val car: VehicleSnapshot = snapshot.selected ?: return NoDataComplicationData()
         val description = "${car.name}, ${car.bigValue()}"
         return when (request.complicationType) {
             ComplicationType.RANGED_VALUE -> car.percent?.let { ranged(it.coerceIn(0, 100).toFloat(), car.bigValue(), description) }
