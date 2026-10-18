@@ -39,6 +39,12 @@ class WidgetPlanTest {
 
     @Test fun neverMoreControlsThanTheWidthHolds() {
         val plan = planWidget(150f, 250f, 1f, false, valueChars = 4, actionCount = 4)
-        assertTrue(plan.maxActions * 46f + (plan.maxActions - 1) * 8f <= 150f - 32f + 0.5f, "$plan")
+        val perRow = if (plan.gridColumns > 0) plan.gridColumns else plan.maxActions
+        assertTrue(perRow * 46f + (perRow - 1) * 8f <= 150f - 32f + 0.5f, "$plan")
+    }
+
+    @Test fun aNarrowTallWidgetWrapsItsControlsInsteadOfDroppingThem() {
+        val plan = planWidget(110f, 300f, 1f, false, valueChars = 3, actionCount = 4)
+        assertTrue(plan.arrangement == WidgetArrangement.STACK && plan.gridColumns == 2 && plan.maxActions == 4, "$plan")
     }
 }

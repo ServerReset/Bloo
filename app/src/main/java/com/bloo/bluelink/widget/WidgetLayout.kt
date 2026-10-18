@@ -85,6 +85,9 @@ internal data class WidgetPlan(
     val gridColumns: Int = 0,
 ) {
     val minimal: Boolean get() = arrangement == WidgetArrangement.MINIMAL
+
+    /** Rows of controls in a STACK: one along the width, or the two-column grid's rows. */
+    fun stackRows(): Int = if (gridColumns > 0) (maxActions + gridColumns - 1) / gridColumns else 1
 }
 
 internal const val WIDGET_UPDATED_SP = 11f
@@ -118,9 +121,11 @@ internal fun planWidget(
     val innerH = (heightDp - 2 * pad - LAUNCHER_INSET).coerceAtLeast(1f)
     val fs = fontScale.coerceAtLeast(0.5f)
     val small = minOf(widthDp, heightDp)
-    val nameSp = (small * 0.085f).coerceIn(13f, 19f)
-    val statusSp = (small * 0.075f).coerceIn(12f, 17f)
-    val detailSp = (small * 0.062f).coerceIn(11f, 15f)
+    // Text shrinks with a narrow width (a 2-cell-wide widget is ~110dp), never below a readable floor.
+    val ws = (innerW / 160f).coerceIn(0.8f, 1f)
+    val nameSp = ((small * 0.085f).coerceIn(13f, 19f) * ws).coerceAtLeast(11.5f)
+    val statusSp = ((small * 0.075f).coerceIn(12f, 17f) * ws).coerceAtLeast(10.5f)
+    val detailSp = ((small * 0.062f).coerceIn(11f, 15f) * ws).coerceAtLeast(10f)
     fun line(sp: Float) = sp * fs * LINE
     val chars = valueChars.coerceAtLeast(3)
     fun valueByWidth(w: Float) = w / (chars * VALUE_GLYPH * fs)
@@ -161,10 +166,19 @@ internal fun planWidget(
         )
     }
 
-    // STACK: as many controls as the width holds (at least a circle each), labels where each gets a word's width.
+    // STACK: the controls run along one row while they fit (at least a circle each); a narrow widget wraps them
+    // into two columns instead of dropping any, as long as the height holds the extra row.
     val fit = ((innerW + GAP) / (buttonH + GAP)).toInt()
-    val maxActions = minOf(actions, fit).coerceAtLeast(1)
-    val labels = !compact && (innerW - GAP * (maxActions - 1)) / maxActions >= 84f
+    val gridRows = (actions + 1) / 2
+    val gridH = gridRows * buttonH + (gridRows - 1) * GAP
+    val gridNeed = line(nameSp) + GAP + MIN_VALUE_SP * fs * VALUE_LINE + GAP + gridH
+    val useGrid = fit < actions && actions > 1 && innerH >= gridNeed
+    val cols = if (useGrid) 2 else 0
+    val rows = if (useGrid) gridRows else 1
+    val maxActions = if (useGrid) actions else minOf(actions, fit).coerceAtLeast(1)
+    val controlsH = rows * buttonH + (rows - 1) * GAP
+    val cellW = if (useGrid) (innerW - GAP) / 2 else (innerW - GAP * (maxActions - 1)) / maxActions
+    val labels = !compact && cellW >= 84f
 
     var showStatus = true
     var showUpdated = widthDp >= 180f
@@ -172,7 +186,7 @@ internal fun planWidget(
     fun fixed(): Float =
         line(nameSp) + (if (showUpdated) line(WIDGET_UPDATED_SP) else 0f) + GAP +
             (if (showStatus) line(statusSp) else 0f) +
-            (if (showDetails) 4f + line(detailSp) else 0f) + GAP + buttonH
+            (if (showDetails) 4f + line(detailSp) else 0f) + GAP + controlsH
     fun valueRoom() = (innerH - fixed()) / (fs * VALUE_LINE)
     val wanted = 34f
     if (valueRoom() < wanted) showDetails = false
@@ -187,7 +201,7 @@ internal fun planWidget(
     return WidgetPlan(
         arrangement = WidgetArrangement.STACK, valueSp = value, nameSp = nameSp, statusSp = statusSp, detailSp = detailSp,
         showUpdated = showUpdated, showStatus = showStatus, showDetails = showDetails, showBar = showBar, showChips = showChips,
-        labels = labels, buttonHeightDp = buttonH, maxActions = maxActions,
+        labels = labels, buttonHeightDp = buttonH, maxActions = maxActions, gridColumns = cols,
     )
 }
 
@@ -204,6 +218,6 @@ internal fun WidgetPlan.heightDp(fontScale: Float): Float {
         WidgetArrangement.STACK -> line(nameSp) + (if (showUpdated) line(WIDGET_UPDATED_SP) else 0f) + GAP + value +
             (if (showStatus) line(statusSp) else 0f) + (if (showDetails) 4f + line(detailSp) else 0f) +
             (if (showBar) WIDGET_BAR_DP + 2 * GAP else 0f) + (if (showChips) WIDGET_CHIP_DP * fontScale.coerceAtLeast(1f) + GAP else 0f) +
-            GAP + buttonHeightDp
+            GAP + stackRows() * buttonHeightDp + (stackRows() - 1) * GAP
     }
 }

@@ -236,7 +236,7 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
                 StatusChips(car)
             }
             Spacer(GlanceModifier.defaultWeight())
-            Actions(car, pending, armed, opts, labels = plan.labels, maxActions = plan.maxActions, heightDp = plan.buttonHeightDp)
+            Actions(car, pending, armed, opts, labels = plan.labels, maxActions = plan.maxActions, heightDp = plan.buttonHeightDp, gridColumns = plan.gridColumns)
         }
     }
 }
@@ -376,7 +376,7 @@ private fun RefreshButton(car: VehicleSnapshot, pending: String?) {
  * left to right, so a narrow widget never pushes a button off the edge.
  */
 @Composable
-private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts: WidgetOptions, labels: Boolean, maxActions: Int, heightDp: Float) {
+private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts: WidgetOptions, labels: Boolean, maxActions: Int, heightDp: Float, gridColumns: Int = 0) {
     val actions = buildList {
         add(WidgetAction(CarAction.TOGGLE_LOCK, if (labels) lockLabel(car) else null))
         if (opts.climate) add(WidgetAction(CarAction.TOGGLE_CLIMATE, if (labels) "Climate" else null))
@@ -385,6 +385,22 @@ private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts
     }.take(maxActions)
     // The controls SHARE the row, each an equal slice: no empty run beside them, and every tap target is as
     // big as the widget allows (never under the 44dp the row is tall).
+    if (gridColumns > 0) {
+        // A narrow widget: the controls wrap into rows of [gridColumns], every cell an equal slice and a
+        // lone last control taking its whole row.
+        Column(GlanceModifier.fillMaxWidth()) {
+            actions.chunked(gridColumns).forEachIndexed { r, rowActions ->
+                if (r > 0) Spacer(GlanceModifier.height(WidgetGap))
+                Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    rowActions.forEachIndexed { i, a ->
+                        if (i > 0) Spacer(GlanceModifier.width(WidgetGap))
+                        ActionButton(car, a.action, pending, armed, label = a.label, modifier = GlanceModifier.defaultWeight(), heightDp = heightDp)
+                    }
+                }
+            }
+        }
+        return
+    }
     Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         actions.forEachIndexed { i, a ->
             if (i > 0) Spacer(GlanceModifier.width(WidgetGap))
