@@ -40,6 +40,7 @@ internal fun WearStatusPebble(v: VehicleSnapshot, refreshing: Boolean, canRefres
         }
         v.climateOn?.let { add("Climate" to (if (it) "On" else "Off")) }
         v.odometer?.takeIf { it.isNotBlank() }?.let { add("Odometer" to it) }
+        v.licensePlate?.takeIf { it.isNotBlank() }?.let { add("Plate" to it) }
     }
     WearPebble(title = v.name, icon = Icons.Filled.DirectionsCar) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
