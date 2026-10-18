@@ -203,7 +203,15 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
             fullAdopt = fullAdopt,
             fileAlreadyCarriesUs = fileAlreadyCarriesUs,
         )
-        if (nothingToUpload) {
+        // A file that has content this version cannot read as a Bloo sync file (a plain exported backup with no sync
+        // header, or one written by a NEWER Bloo) is left alone: the upload half used to overwrite it with this
+        // device's own settings, destroying the backup or the newer format's data. Only an empty file is written to.
+        val remoteUnrecognised = remoteJson != null && !remoteHasContent
+        if (remoteUnrecognised) {
+            uploaded = false
+            uploadError = "The Drive file isn't a Bloo sync file this version can read, so it was left as it is."
+            AppLog.log("⚠ Drive sync: remote file not recognised; not overwriting it")
+        } else if (nothingToUpload) {
             uploaded = false
             // The file already carries our content: record the revision we just saw, so the next
             // poll's change check is a no-op instead of re-reading the file every few seconds.
