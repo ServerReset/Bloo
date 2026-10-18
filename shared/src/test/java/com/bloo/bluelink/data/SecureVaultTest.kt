@@ -80,4 +80,25 @@ class SecureVaultTest {
         sealed = false
         assertEquals("secret", v.getString("HYUNDAI_password"))
     }
+
+    @Test fun aKeystoreHiccup_isRetriedRatherThanFrozenForTheProcess() {
+        val f = file(); val w = FakeWrapper()
+        SecureVault(f, w, pinIterations = 10).edit { put("pw", "secret") }
+        val good = w.key
+        w.key = ByteArray(32) { 5 } // the key is briefly unavailable
+        val v = SecureVault(f, w, pinIterations = 10)
+        assertNull(v.getString("pw"))
+        w.key = good // and comes back
+        assertEquals("secret", v.getString("pw"))
+    }
+
+    @Test fun writingOverAVaultTheDeviceCannotOpen_keepsTheOldFile() {
+        val f = file(); val w = FakeWrapper()
+        val first = SecureVault(f, w, pinIterations = 10)
+        first.edit { put("pw", "secret") }
+        first.bindPin("246810")
+        w.key = ByteArray(32) { 7 } // the device key is gone for good
+        SecureVault(f, w, pinIterations = 10).edit { put("new", "value") }
+        assertTrue(File(f.parentFile, f.name + ".lost").exists(), "the unopenable vault was kept, not destroyed")
+    }
 }

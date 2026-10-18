@@ -54,7 +54,15 @@ class PhoneWatchSyncService : WearableListenerService() {
             if (event.type != DataEvent.TYPE_CHANGED) continue
             val path = event.dataItem.uri.path ?: continue
             if (path != WatchSyncProtocol.PATH_COMMAND) continue
-            val bytes = DataMapItem.fromDataItem(event.dataItem).dataMap.getByteArray(KEY_PAYLOAD) ?: continue
+            val map = DataMapItem.fromDataItem(event.dataItem).dataMap
+            // A command that sat in the Data Layer while the phone was unreachable must not run hours later: an unlock
+            // delivered then would open a car the wearer has long since left. The watch stamps each one (_ts).
+            val sentAt = map.getLong("_ts")
+            if (sentAt > 0L && System.currentTimeMillis() - sentAt > MAX_COMMAND_AGE_MS) {
+                AppLog.log("WatchSync: dropped a stale command (${(System.currentTimeMillis() - sentAt) / 1000}s old)")
+                continue
+            }
+            val bytes = map.getByteArray(KEY_PAYLOAD) ?: continue
             val request = runCatching {
                 json.decodeFromString(WatchCommandRequest.serializer(), bytes.decodeToString())
             }.getOrNull() ?: continue
@@ -90,7 +98,7 @@ class PhoneWatchSyncService : WearableListenerService() {
             // Not a car command: the watch is asking for fresh status. Fetch it, and the snapshot write pushes it back.
             val ok = runCatching { CarCommandRunner.refresh(applicationContext, vin = request.command.vin, force = false) }.getOrDefault(false)
             com.bloo.bluelink.data.CarCommandResult(request.command.vin, request.command.action, ok = ok, message = if (ok) null else "Couldn't refresh")
-        } else runCatching { CarCommandRunner.execute(applicationContext, request.command) }
+        } else runCatching { com.bloo.bluelink.data.runCarCommand(applicationContext, request.command) }
             .getOrElse {
                 com.bloo.bluelink.data.CarCommandResult(request.command.vin, request.command.action, ok = false, message = it.message)
             }
@@ -114,6 +122,9 @@ class PhoneWatchSyncService : WearableListenerService() {
 
     companion object {
         private const val KEY_PAYLOAD = "payload"
+
+        /** How old a watch command may be and still run: a few minutes covers a slow link, not a day offline. */
+        private const val MAX_COMMAND_AGE_MS = 3 * 60_000L
 
         /**
          * Download the watch APK at [url] on a background thread and push it to any paired watch as

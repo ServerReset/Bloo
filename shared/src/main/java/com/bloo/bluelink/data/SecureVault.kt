@@ -113,15 +113,16 @@ class SecureVault(
 
     private fun ensureLoaded() {
         if (loaded) return
-        loaded = true
-        if (!file.exists()) return
+        if (!file.exists()) { loaded = true; return }
         val root = runCatching { JSONObject(file.readText()) }.getOrNull() ?: return
         deviceSlot = root.optString("device").takeIf { it.isNotEmpty() }
         pinSlot = root.optJSONObject("pin")
         val key = deviceSlot?.let { wrapper.unwrap(b64d(it)) }
         if (key != null) {
             val text = runCatching { decryptData(key, root) }.getOrNull()
-            if (text != null) { dek = key; values = text }
+            // Loaded ONLY once it has opened. A failure (a Keystore hiccup, a read error) is not remembered: it used to
+            // freeze an empty vault for the whole process, and the next edit then wrote that empty vault over the file.
+            if (text != null) { dek = key; values = text; loaded = true }
         }
     }
 
@@ -135,7 +136,12 @@ class SecureVault(
 
     private fun persist() {
         var key = dek
-        if (key == null) { key = newKey(); dek = key }
+        if (key == null) {
+            // About to write a vault this device could not open over the one on disk. Keep the old file once, beside
+            // it, so what the PIN slot could still recover is not destroyed by this write.
+            if (file.exists()) runCatching { file.copyTo(File(file.parentFile, file.name + ".lost"), overwrite = false) }
+            key = newKey(); dek = key
+        }
         val obj = JSONObject()
         values.forEach { (k, v) -> obj.put(k, v) }
         val root = JSONObject()

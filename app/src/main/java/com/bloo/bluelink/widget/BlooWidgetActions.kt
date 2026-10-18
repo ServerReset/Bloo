@@ -11,7 +11,6 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.CarCommand
-import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.SnapshotStore
 import kotlinx.coroutines.delay
 
@@ -102,7 +101,7 @@ class CarActionCallback : ActionCallback {
         }
 
         edit { it[WidgetKeys.PENDING] = "$vin:$action"; it.remove(WidgetKeys.NOTE) }
-        val result = runCatching { CarCommandRunner.execute(context, CarCommand(vin, action)) }.getOrNull()
+        val result = runCatching { com.bloo.bluelink.data.runCarCommand(context, CarCommand(vin, action)) }.getOrNull()
         edit {
             it.remove(WidgetKeys.PENDING)
             if (result == null || !result.ok) {

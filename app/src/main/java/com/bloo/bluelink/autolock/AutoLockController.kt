@@ -269,7 +269,9 @@ object AutoLockController {
         val sessions = SessionStore(context)
         val credentials = CredentialStore(context)
         for (brand in runCatching { sessions.loggedInBrands() }.getOrDefault(emptyList())) {
-            val fetched = runCatching { repositoryFor(brand, sessions, credentials).vehicles() }
+            // Inside the shared request lock like every other car request: BlueLink answers 502 to overlapping
+            // ones, and an empty result here would read as "car not found" and skip the lock.
+            val fetched = runCatching { BlueLinkGate.statusMutex.withLock { repositoryFor(brand, sessions, credentials).vehicles() } }
                 .getOrDefault(emptyList())
             if (fetched.isEmpty()) continue
             runCatching { store.saveVehiclesKeepingStatus(fetched.map { it.toSnapshot() }) }
