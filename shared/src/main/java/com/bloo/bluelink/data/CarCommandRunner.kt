@@ -15,6 +15,13 @@ object CarCommandRunner {
      * propagating.
      */
     suspend fun execute(context: Context, command: CarCommand): CarCommandResult {
+        // REFRESH is a command in name (the widget's button and the watch send it like one) but not a car action:
+        // it pulls fresh status, and takes the same lock itself, so it must run before this function's own.
+        // It used to fall through to "Unknown action", so the widget's Refresh button always reported a failure.
+        if (command.action == CarAction.REFRESH) {
+            val ok = runCatching { refresh(context, command.vin, force = false) }.getOrDefault(false)
+            return CarCommandResult(command.vin, command.action, ok = ok, message = if (ok) null else "Couldn't refresh")
+        }
         val store = SnapshotStore(context)
         // Same lock refresh() and the phone UI's own command path already use -- BlueLink 502s on
         // overlapping requests for the same account, and this was the one command-executing path
