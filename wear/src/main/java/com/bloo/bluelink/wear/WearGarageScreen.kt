@@ -30,7 +30,6 @@ import androidx.wear.compose.material3.HorizontalPageIndicator
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
-import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
@@ -191,13 +190,10 @@ private fun WearCarPage(
     // the same room, not a second room.
     LaunchedEffect(tileRequest) {
         val key = tileRequest?.key ?: return@LaunchedEffect
-        when (key) {
-            // Unlock is the one command that opens the car, so it asks once more, exactly as the button does.
-            WearTileActions.KEY_LOCK ->
-                if (v.locked == true) confirmAction = com.bloo.bluelink.data.CarAction.TOGGLE_LOCK else requestCommand { repo.lock(v.vin) }
-            WearTileActions.KEY_CLIMATE -> requestCommand { repo.climate(v.vin) }
-            WearTileActions.KEY_CHARGE -> requestCommand { repo.charge(v.vin) }
-            WearTileActions.KEY_FLASH -> requestCommand { repo.flashLights(v.vin) }
+        // The tile's button is one of the face's own controls, so it runs exactly as a tap on the face would.
+        WearFaceControls.byKey(key)?.takeIf { it.available(v) }?.let { control ->
+            if (control.confirm(v)) confirmAction = control.action
+            else requestCommand { repo.command(v.vin, control.action) }
         }
         onTileRequestHandled()
     }
@@ -264,6 +260,8 @@ private fun WearCarPage(
             car = v,
             onPick = { key ->
                 slotKeys = slotKeys.toMutableList().also { it[slot] = key }.also { WearFacePrefs.save(faceContext, it) }
+                // The tile shows the same controls: ask it to redraw.
+                androidx.wear.tiles.TileService.getUpdater(faceContext).requestUpdate(BlooTileService::class.java)
                 choosingSlot = null
             },
         )

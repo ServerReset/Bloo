@@ -37,41 +37,44 @@ class WearTileActionsTest {
     )
 
     @Test
-    fun `an EV gets lock, climate and charge`() {
+    fun `an EV gets the four everyday controls`() {
         val actions = WearTileActions.forCar(car(locked = false))
-        assertEquals(listOf("Lock", "Climate", "Charge"), actions.map { it.label })
-        assertEquals(
-            listOf(WearTileActions.KEY_LOCK, WearTileActions.KEY_CLIMATE, WearTileActions.KEY_CHARGE),
-            actions.map { it.key },
-        )
+        assertEquals(listOf("Lock", "Climate", "Charge", "Flash"), actions.map { it.label })
+        assertEquals(listOf("lock", "climate", "charge", "flash"), actions.map { it.key })
     }
 
     @Test
     fun `the label says what a tap will do, and the fill says what is true`() {
         val actions = WearTileActions.forCar(car(locked = true, charging = true, climateOn = true))
-        assertEquals(listOf("Unlock", "Climate", "Stop"), actions.map { it.label })
-        // Locked, charging and climate-on: all three are lit. A lit "Unlock" means the car IS locked --
+        assertEquals(listOf("Unlock", "Climate", "Stop", "Flash"), actions.map { it.label })
+        // Locked, charging and climate-on are lit; Flash never is. A lit "Unlock" means the car IS locked --
         // if the fill followed the button's verb instead, it would read as "already unlocked".
-        assertEquals(listOf(true, true, true), actions.map { it.active })
+        assertEquals(listOf(true, true, true, false), actions.map { it.active })
     }
 
     @Test
     fun `nothing is lit on a car that is unlocked, idle and off`() {
         val actions = WearTileActions.forCar(car(locked = false, charging = false, climateOn = false))
-        assertEquals(listOf(false, false, false), actions.map { it.active })
+        assertEquals(listOf(false, false, false, false), actions.map { it.active })
     }
 
     @Test
-    fun `a car with no battery gets flash instead of charge`() {
+    fun `a car with no battery gets no charge button`() {
         val actions = WearTileActions.forCar(car(isEv = false, percent = null))
         assertEquals(listOf("Lock", "Climate", "Flash"), actions.map { it.label })
-        assertFalse(actions.any { it.key == WearTileActions.KEY_CHARGE })
+        assertFalse(actions.any { it.key == "charge" })
     }
 
     @Test
-    fun `a Kia gets two buttons, because its US API has no horn or lights`() {
+    fun `a Kia gets no flash, because its US API has no horn or lights`() {
         val actions = WearTileActions.forCar(car(isEv = false, percent = null, brandIndicator = "K"))
         assertEquals(listOf("Lock", "Climate"), actions.map { it.label })
-        assertFalse(actions.any { it.key == WearTileActions.KEY_FLASH })
+        assertFalse(actions.any { it.key == "flash" })
+    }
+
+    @Test
+    fun `the tile follows the controls chosen for the face`() {
+        val actions = WearTileActions.forCar(car(locked = false), listOf("refresh", "lock", "none", "horn"))
+        assertEquals(listOf("Refresh", "Lock", "Horn"), actions.map { it.label })
     }
 }

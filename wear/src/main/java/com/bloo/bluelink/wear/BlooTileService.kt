@@ -133,7 +133,7 @@ class BlooTileService : TileService() {
             .addContent(glance.build())
 
         if (car != null) {
-            val actions = WearTileActions.forCar(car)
+            val actions = WearTileActions.forCar(car, WearFacePrefs.load(applicationContext))
             if (actions.isNotEmpty()) {
                 outer.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(10f)).build())
                 outer.addContent(actionRow(actions))
@@ -182,18 +182,28 @@ class BlooTileService : TileService() {
             .setStrokeCap(LayoutElementBuilders.STROKE_CAP_ROUND)
             .build()
 
-    /** The actions worth a tap from the carousel, in the order they are reached for. */
-    private fun actionRow(actions: List<WearTileAction>): LayoutElementBuilders.Row {
-        val row = LayoutElementBuilders.Row.Builder()
-            .setWidth(expand())
-            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
-        actions.forEachIndexed { index, action ->
-            if (index > 0) {
-                row.addContent(LayoutElementBuilders.Spacer.Builder().setWidth(dp(6f)).build())
+    /**
+     * The actions worth a tap from the carousel, in the order the wearer chose them: one row for up to three,
+     * two rows of two for four, so no label is squeezed.
+     */
+    private fun actionRow(actions: List<WearTileAction>): LayoutElementBuilders.LayoutElement {
+        fun row(chunk: List<WearTileAction>, height: Float): LayoutElementBuilders.Row {
+            val row = LayoutElementBuilders.Row.Builder()
+                .setWidth(expand())
+                .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            chunk.forEachIndexed { index, action ->
+                if (index > 0) row.addContent(LayoutElementBuilders.Spacer.Builder().setWidth(dp(6f)).build())
+                row.addContent(actionButton(action, height))
             }
-            row.addContent(actionButton(action))
+            return row.build()
         }
-        return row.build()
+        if (actions.size <= 3) return row(actions, 44f)
+        val column = LayoutElementBuilders.Column.Builder().setWidth(expand())
+        actions.chunked(2).forEachIndexed { i, chunk ->
+            if (i > 0) column.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(6f)).build())
+            column.addContent(row(chunk, 38f))
+        }
+        return column.build()
     }
 
     /**
@@ -202,10 +212,10 @@ class BlooTileService : TileService() {
      * extras -- the app owns the PIN gate and the command layer, and duplicating either here would
      * give the watch two places where a command can be authorised.
      */
-    private fun actionButton(action: WearTileAction): LayoutElementBuilders.Box =
+    private fun actionButton(action: WearTileAction, heightDp: Float): LayoutElementBuilders.Box =
         LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
-            .setHeight(dp(44f))
+            .setHeight(dp(heightDp))
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .setModifiers(
@@ -213,7 +223,7 @@ class BlooTileService : TileService() {
                     .setBackground(
                         ModifiersBuilders.Background.Builder()
                             .setColor(argb(if (action.active) GREEN else BUTTON))
-                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(22f)).build())
+                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(heightDp / 2f)).build())
                             .build(),
                     )
                     .setClickable(
