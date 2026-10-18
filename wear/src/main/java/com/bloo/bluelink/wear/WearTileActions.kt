@@ -30,7 +30,7 @@ object WearTileActions {
                 // Climate means the climate is running. The label says what a tap will do, the fill says what is
                 // true -- and these two must not be the same thing, or a lit "Unlock" would read as "already
                 // unlocked".
-                active = control.active(car),
+                active = control.active(car) || (control.key == "lock" && car.locked == true),
             )
         }
 
