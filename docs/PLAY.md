@@ -2,7 +2,7 @@
 
 > **Status: testing tracks only.** Bloo is published to Play only for a `major-N` tag (**closed**, `alpha`) or a
 > manual run that names a track; ordinary pushes build and publish the GitHub release but no longer upload to
-> Play, because the daily save quota was exhausted. It is and is **not submitted for production review** — a deliberate choice, not an
+> Play, because the daily save quota was exhausted. It is **not submitted for production review** — a deliberate choice, not an
 > unfinished task. Everything below that is marked *production only* is therefore documented for the day
 > that changes, and is not something to action now. See the README's disclaimer.
 
