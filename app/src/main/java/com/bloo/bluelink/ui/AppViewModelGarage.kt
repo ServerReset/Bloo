@@ -111,7 +111,8 @@ suspend fun AppViewModel.loadGarageInner() {
     // .toList() first: the loop suspends, and logout()/repoFor() may mutate `repos` meanwhile
     // (ConcurrentModificationException). A snapshot also keeps a mid-load sign-out's vehicles out.
     val vehiclesFetchStartedAt = System.currentTimeMillis()
-    val fetched = repos.values.toList().flatMap { r ->
+    val failedBrands = mutableListOf<com.bloo.bluelink.data.Brand>()
+    val answered = repos.entries.toList().flatMap { (brand, r) ->
         runCatching {
             // Cold-start diagnostic: separates time waiting for statusMutex from r.vehicles()
             // itself.
@@ -133,9 +134,15 @@ suspend fun AppViewModel.loadGarageInner() {
                 ?: "Couldn't load vehicles"
             AppLog.log("⚠ $msg")
             lastError = msg
+            failedBrands += brand
             emptyList()
         }
     }
+    // When SOME brand answered, a brand that failed keeps the cars already on screen: rebuilding from only the brands
+    // that answered made its cars vanish (and drop out of the saved list the widgets and workers read) on one timeout.
+    // When none answered, the empty path below already keeps everything and shows the error.
+    val fetched = if (answered.isEmpty()) answered
+    else answered + failedBrands.flatMap { b -> _state.value.vehicles.filter { brandOf(it) == b } }
     logStartup(
         "loadGarageInner: vehicle list fetched in " +
             "${System.currentTimeMillis() - vehiclesFetchStartedAt}ms: ${fetched.size} vehicle(s)",
@@ -186,7 +193,8 @@ suspend fun AppViewModel.loadGarageInner() {
         cfg.apply(it).copy(
             vehicles = vehicles,
             screen = screen,
-            garageLoadError = null,
+            // A brand that failed while others answered still says so (its cars are kept above), not silently.
+            garageLoadError = lastError,
             defaultClimatePresets = defaultPresets,
         )
     }
