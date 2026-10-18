@@ -79,7 +79,7 @@
             android:name=".BlooComplicationService"
             android:exported="true"
             android:icon="@drawable/ic_stat_bloo"
-            android:label="@string/app_name"
+            android:label="@string/complication_charge_label"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -92,12 +92,46 @@
                 android:value="300" />
         </service>
 
-        <!-- The car's lock state on any watch face; a tap opens the app on the lock control. -->
+        <!-- More complications: lock state, range and climate, as short text. A tap on lock or climate opens the app on that control. -->
         <service
             android:name=".BlooLockComplicationService"
             android:exported="true"
             android:icon="@drawable/ic_stat_bloo"
             android:label="@string/complication_lock_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="300" />
+        </service>
+
+        <service
+            android:name=".BlooRangeComplicationService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_bloo"
+            android:label="@string/complication_range_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="300" />
+        </service>
+
+        <service
+            android:name=".BlooClimateComplicationService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_bloo"
+            android:label="@string/complication_climate_label"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />

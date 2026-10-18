@@ -131,6 +131,17 @@ private fun WearTheme(content: @Composable () -> Unit) {
         // here means a call site that forgets a colour is merely bland rather than unreadable.
         androidx.compose.material3.LocalContentColor provides scheme.onBackground,
     ) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        // The Wear OS theme under it too, with Bloo's colours, so the platform's own pieces (the clock, the
+        // scroll and page indicators, the edge button) are Bloo-coloured rather than stock.
+        androidx.wear.compose.material3.MaterialTheme(
+            colorScheme = androidx.wear.compose.material3.ColorScheme(
+                primary = Color(com.bloo.bluelink.data.BlooColors.brandAccent),
+                onPrimary = Color.White,
+                background = Color.Black,
+                onBackground = Color.White,
+            ),
+        ) {
+            MaterialTheme(colorScheme = scheme, content = content)
+        }
     }
 }

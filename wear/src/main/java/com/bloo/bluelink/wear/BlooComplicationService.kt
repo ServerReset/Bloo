@@ -62,32 +62,57 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
 }
 
 /**
- * The car's lock state on any watch face, as short text ("Locked" or "Open"). Tapping it opens the watch app on
- * the lock control, so it runs through the same PIN gate and, for an unlock, the same "are you sure" as the face.
+ * One short-text complication from the selected car: [text] returns what to show and how to say it aloud (null when
+ * the car has nothing to report), and [tapKey] is the face control a tap opens the app on (null just opens the app).
+ * A tap on a control goes through the same PIN gate and, for an unlock, the same "are you sure" as the face.
  */
-class BlooLockComplicationService : SuspendingComplicationDataSourceService() {
+abstract class BlooTextComplication(
+    private val preview: Pair<String, String>,
+    private val requestCode: Int,
+    private val tapKey: String?,
+) : SuspendingComplicationDataSourceService() {
+
+    /** The text and its spoken form for [car], or null for no data. */
+    protected abstract fun text(car: VehicleSnapshot): Pair<String, String>?
 
     override fun getPreviewData(type: ComplicationType): ComplicationData? =
-        if (type == ComplicationType.SHORT_TEXT) lockText("Locked", "Car locked") else null
+        if (type == ComplicationType.SHORT_TEXT) build(preview) else null
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         if (request.complicationType != ComplicationType.SHORT_TEXT) return NoDataComplicationData()
         if (WearBootGate.isLocked(applicationContext)) return NoDataComplicationData()
         val car = runCatching { SnapshotStore(applicationContext).current().selected }.getOrNull() ?: return NoDataComplicationData()
-        val locked = car.locked ?: return NoDataComplicationData()
-        return lockText(if (locked) "Locked" else "Open", "${car.name} is ${if (locked) "locked" else "unlocked"}")
+        return text(car)?.let(::build) ?: NoDataComplicationData()
     }
 
-    private fun lockText(shown: String, description: String): ComplicationData =
-        ShortTextComplicationData.Builder(PlainComplicationText.Builder(shown).build(), PlainComplicationText.Builder(description).build())
-            .setTapAction(
-                PendingIntent.getActivity(
-                    applicationContext, 1,
-                    Intent(applicationContext, WearMainActivity::class.java).putExtra(WearMainActivity.EXTRA_ACTION, "lock"),
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-                ),
-            )
+    private fun build(shown: Pair<String, String>): ComplicationData {
+        val intent = Intent(applicationContext, WearMainActivity::class.java)
+        tapKey?.let { intent.putExtra(WearMainActivity.EXTRA_ACTION, it) }
+        return ShortTextComplicationData.Builder(
+            PlainComplicationText.Builder(shown.first).build(), PlainComplicationText.Builder(shown.second).build(),
+        )
+            .setTapAction(PendingIntent.getActivity(applicationContext, requestCode, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             .build()
+    }
+}
+
+/** The lock state ("Locked" or "Open"); a tap runs the lock control. */
+class BlooLockComplicationService : BlooTextComplication(("Locked" to "Car locked"), 1, "lock") {
+    override fun text(car: VehicleSnapshot) = car.locked?.let { locked ->
+        (if (locked) "Locked" else "Open") to "${car.name} is ${if (locked) "locked" else "unlocked"}"
+    }
+}
+
+/** The range ("248 mi"); a tap opens the app. */
+class BlooRangeComplicationService : BlooTextComplication(("248 mi" to "Range 248 miles"), 2, null) {
+    override fun text(car: VehicleSnapshot) = car.rangeMi?.let { "$it mi" to "${car.name} range $it miles" }
+}
+
+/** The climate ("On" or "Off"); a tap runs the climate control. */
+class BlooClimateComplicationService : BlooTextComplication(("Off" to "Climate off"), 3, "climate") {
+    override fun text(car: VehicleSnapshot) = car.climateOn?.let { on ->
+        (if (on) "On" else "Off") to "${car.name} climate is ${if (on) "on" else "off"}"
+    }
 }
 
 /** Asks the watch's glanceable surfaces (the Tile and the complication) to redraw from the latest snapshot. */
@@ -95,7 +120,10 @@ internal object WearSurfaces {
     fun refresh(context: Context) {
         val app = context.applicationContext
         runCatching { TileService.getUpdater(app).requestUpdate(BlooTileService::class.java) }
-        listOf(BlooComplicationService::class.java, BlooLockComplicationService::class.java).forEach { service ->
+        listOf(
+            BlooComplicationService::class.java, BlooLockComplicationService::class.java,
+            BlooRangeComplicationService::class.java, BlooClimateComplicationService::class.java,
+        ).forEach { service ->
             runCatching {
                 ComplicationDataSourceUpdateRequester.create(app, ComponentName(app, service)).requestUpdateAll()
             }

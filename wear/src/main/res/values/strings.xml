@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Bloo</string>
+    <string name="complication_charge_label">Bloo charge</string>
     <string name="complication_lock_label">Bloo lock</string>
+    <string name="complication_range_label">Bloo range</string>
+    <string name="complication_climate_label">Bloo climate</string>
 </resources>
