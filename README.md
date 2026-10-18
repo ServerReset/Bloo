@@ -60,6 +60,8 @@ A third-party Android app for **Hyundai**, **Genesis** and **Kia** vehicles (US,
 - **Sync**: settings and photos sync across your devices through Google Drive.
 - **Layouts**: adaptive for foldables and tablets, with reorderable pebbles, custom palettes and an animated background.
 - **Multiple accounts**, signed in at once.
+- **Widgets**: a full homescreen widget (car photo background, corner shape, text size, colour by level, any size from 2x2 to 5x5) and a slim 4x1 strip, both with lock, climate and charge buttons.
+- **Watch app**: the charge as a ring round the display with four controls you choose from a dozen (lock, climate, charge, flash, horn, refresh and more), pull down to refresh, a Tile, and a complication for any watch face.
 
 ## Security
 
