@@ -2,7 +2,6 @@ package com.bloo.bluelink.wear
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 // The PULL-TO-REFRESH comes from the phone Material3, not the Wear one: wear-compose-material3 has no
 // pull-to-refresh, and the modifier is theme-agnostic -- it is a nested-scroll offset and nothing else.
@@ -13,9 +12,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Watch
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,8 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.HorizontalPageIndicator
@@ -37,11 +32,9 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
-import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.data.WatchPinPolicy
-import kotlinx.coroutines.launch
 
 /**
  * The whole watch UI, built for a round face: swipe left/right between cars, scroll up/down a car's
@@ -285,83 +278,17 @@ private fun WearCarPage(
         modifier = Modifier.fillMaxSize(),
     ) { index ->
         if (index == 0) {
-            ScreenScaffold(timeText = { TimeText() }) {
-                // Pull down from the top of the face, as on the phone: a disc drops in, arms at a point (a tick),
-                // and refreshes when you let go.
-                val pullState = remember { WearPullState() }
-                Box(Modifier.fillMaxSize().wearPullToRefresh(pullState) { repo.refresh() }) {
-                val actions: List<WearQuickAction?> = slotKeys.map { key ->
-                    val control = WearFaceControls.byKey(key)?.takeIf { it.available(v) } ?: return@map null
-                    WearQuickAction(
-                        control.label(v), control.icon(v),
-                        active = control.active(v),
-                        pending = WearCommands.key(v.vin, control.action) in pendingCommands,
-                    ) {
-                        if (control.confirm(v)) confirmAction = control.action
-                        else requestCommand { repo.command(v.vin, control.action) }
-                    }
-                }
-                WearCarFace(
-                    modifier = Modifier.fillMaxSize(),
-                    value = v.bigValue(),
-                    caption = v.name,
-                    progress = v.percent?.let { it / 100f },
-                    tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
-                    actions = actions,
-                    charging = v.charging == true,
-                    stale = v.isStale(),
-                    status = if (refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
-                    refreshing = refreshing,
-                )
-                WearPullIndicator(pullState, refreshing)
-                }
-            }
+            WearFacePage(
+                repo = repo, v = v, slotKeys = slotKeys, pendingCommands = pendingCommands,
+                faceStatus = faceStatus, refreshing = refreshing,
+                onConfirm = { confirmAction = it }, requestCommand = requestCommand,
+            )
         } else {
-    WearListScreen(contentPadding = PaddingValues(vertical = 18.dp)) {
-            // The car's details, one pebble past the face, with the refresh where the freshness is.
-            item { WearStatusPebble(v, refreshing = refreshing, canRefresh = signedIn, onRefresh = { repo.refresh() }) }
-            // The update error, shown where the update lives. It used to go nowhere at all.
-            updateError?.let { message ->
-                item {
-                    WearPebble(title = "Watch update", icon = Icons.Filled.SystemUpdate) {
-                        WearCenteredText(message, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-
-            updateRun?.let { run ->
-                item {
-                    WearPebble(title = "Update available", icon = Icons.Filled.SystemUpdate) {
-                        if (downloading) {
-                            WearCenteredText("Downloading… ${(progress * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
-                        } else {
-                            WearActionRow(label = "Update now", icon = Icons.Filled.Download) {
-                                scope.launch { WearUpdateChecker.downloadAndInstall(context) }
-                            }
-                        }
-                    }
-                }
-            }
-
-            item { WearFaceControlsPebble(slotKeys) { choosingSlot = it } }
-            item { WearAlertsPebble() }
-            // Auto lock needs the car's credentials on the watch, which only the pairing step in Settings on
-            // the phone hands over; until then the pebble is a pointer to that step, not a switch.
-            item { if (signedIn) WearAutoLockPebble() else WearPairPebble() }
-
-            val failure = lastResult?.takeIf { it.vin == v.vin && !it.ok }
-            if (failure != null) {
-                item {
-                    WearCenteredText(
-                        failure.message ?: "Command failed",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 3,
-                    )
-                }
-            }
-    }
+            WearDetailsPage(
+                repo = repo, v = v, slotKeys = slotKeys, refreshing = refreshing, signedIn = signedIn,
+                updateError = updateError, updateRun = updateRun, downloading = downloading, progress = progress,
+                lastResult = lastResult, onChooseSlot = { choosingSlot = it },
+            )
         }
     }
 }
