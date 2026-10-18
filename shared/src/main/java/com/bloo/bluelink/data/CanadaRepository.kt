@@ -1,5 +1,7 @@
 package com.bloo.bluelink.data
 
+import com.bloo.bluelink.rethrowIfCancellation
+
 /** [VehicleRepository] for Hyundai/Genesis/Kia Canada. */
 class CanadaRepository(
     private val api: CanadaApi,

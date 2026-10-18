@@ -1,5 +1,7 @@
 package com.bloo.bluelink.data
 
+import com.bloo.bluelink.rethrowIfCancellation
+
 /**
  * [VehicleRepository] for Hyundai Bluelink Europe (CCAPI / CCS2), served by
  * [EuApi]. Structurally identical to [CanadaRepository]:
