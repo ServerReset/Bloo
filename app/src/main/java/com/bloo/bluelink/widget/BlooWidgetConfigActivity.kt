@@ -4,7 +4,6 @@ import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,8 +19,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -36,7 +33,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -46,29 +42,13 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.TouchApp
-import androidx.compose.material.icons.filled.ViewCompact
 import androidx.compose.material.icons.filled.Widgets
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -84,10 +64,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -99,6 +77,22 @@ import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import coil.compose.AsyncImage
+import com.bloo.bluelink.ui.ActionRow
+import com.bloo.bluelink.ui.BlooTheme
+import com.bloo.bluelink.ui.EnumSegmented
+import com.bloo.bluelink.ui.IconBadge
+import com.bloo.bluelink.ui.ScreenGutter
+import com.bloo.bluelink.ui.SettingsCaption
+import com.bloo.bluelink.ui.SettingsGroup
+import com.bloo.bluelink.ui.SettingsSegmentedRow
+import com.bloo.bluelink.ui.ToggleRow
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapSection
+import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.SegmentOption
 import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
@@ -107,7 +101,6 @@ import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.imageUrl
 import com.bloo.bluelink.data.stateLineOrParked
 import kotlinx.coroutines.launch
-import com.bloo.uicommon.content
 
 /**
  * The widget's settings: a live preview at the top that changes as you choose, then the car (as photo cards),
@@ -128,13 +121,8 @@ class BlooWidgetConfigActivity : ComponentActivity() {
 
         setContent {
             val context = LocalContext.current
-            val dark = isSystemInDarkTheme()
-            val scheme = when {
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-                dark -> darkColorScheme()
-                else -> lightColorScheme()
-            }
-            MaterialTheme(colorScheme = scheme) {
+            // The app's own theme, like every other screen, instead of a hand-rolled dynamic-colour scheme.
+            BlooTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
                     val loaded by produceState<Loaded?>(null) {
                         value = runCatching { loadConfig(context, widgetId) }.getOrDefault(Loaded.empty())
@@ -217,7 +205,6 @@ private suspend fun loadConfig(context: Context, widgetId: Int): Loaded {
     )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
     val context = LocalContext.current
@@ -228,23 +215,15 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
 
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = ScreenGutter),
+            verticalArrangement = Arrangement.spacedBy(GapSection),
         ) {
-            Spacer(Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.Widgets, null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }
-                Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.height(GapRow))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapGroup)) {
+                IconBadge(icon = Icons.Filled.Widgets, tint = MaterialTheme.colorScheme.primary, size = 44.dp, iconSize = 24.dp)
                 Column {
-                    Text("Your Bloo widget", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(
-                        "Make it yours. You can change all of this later.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    RevealText("Your Bloo widget", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    SettingsCaption("Make it yours. You can change all of this later.", bottomGap = 0.dp)
                 }
             }
 
@@ -252,10 +231,10 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
             WidgetPreview(car, photoUrl, choice)
 
             when {
-                loaded.sealed -> Hint("Open Bloo and sign in to see your car. The widget can still be added and fills in once you do.")
-                loaded.cars.isEmpty() -> Hint("No cars yet. Add one in Bloo and the widget picks it up by itself.")
-                else -> Section("Car", Icons.Filled.DirectionsCar) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                loaded.sealed -> NoteGroup("Open Bloo and sign in to see your car. The widget can still be added and fills in once you do.")
+                loaded.cars.isEmpty() -> NoteGroup("No cars yet. Add one in Bloo and the widget picks it up by itself.")
+                else -> SettingsGroup("Car") {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(GapGroup)) {
                         items(loaded.cars, key = { it.vin }) { c ->
                             CarCard(c, loaded.photos[c.vin], selected = c.vin == car?.vin) { choice = choice.copy(vin = c.vin) }
                         }
@@ -263,76 +242,63 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
                 }
             }
 
-            Section("Look", Icons.Filled.Palette) {
-                OptionRow(
-                    Icons.Filled.Photo, "Photo background",
-                    if (photoUrl == null && car != null) "Add a photo of ${car.name} in Bloo to use it here" else "Your car's photo, softly blurred",
+            SettingsGroup("Look") {
+                ToggleRow(
+                    "Photo background",
                     choice.photo,
+                    description = if (photoUrl == null && car != null) "Add a photo of ${car.name} in Bloo to use it here" else "Your car's photo, softly blurred",
                 ) { choice = choice.copy(photo = it) }
                 if (choice.photo) {
-                    Text("Softness", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    val options = listOf("Light" to WidgetPhoto.BLUR_LIGHT, "Medium" to WidgetPhoto.BLUR_MEDIUM, "Strong" to WidgetPhoto.BLUR_STRONG)
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        options.forEachIndexed { i, (label, level) ->
-                            SegmentedButton(
-                                selected = choice.blur == level,
-                                onClick = { choice = choice.copy(blur = level) },
-                                shape = SegmentedButtonDefaults.itemShape(i, options.size),
-                            ) { Text(label) }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
+                    SettingsSegmentedRow(
+                        label = "Softness",
+                        options = listOf(
+                            SegmentOption(WidgetPhoto.BLUR_LIGHT.toString(), "Light"),
+                            SegmentOption(WidgetPhoto.BLUR_MEDIUM.toString(), "Medium"),
+                            SegmentOption(WidgetPhoto.BLUR_STRONG.toString(), "Strong"),
+                        ),
+                        selectedKey = choice.blur.toString(),
+                    ) { choice = choice.copy(blur = it.toInt()) }
                 }
-            }
-
-            Section("Shape and text", Icons.Filled.ViewCompact) {
-                ChoiceRow("Corners", WidgetCorner.entries, choice.corner, { it.label }) { choice = choice.copy(corner = it) }
-                Spacer(Modifier.height(12.dp))
-                ChoiceRow("Text size", WidgetTextSize.entries, choice.textSize, { it.label }) { choice = choice.copy(textSize = it) }
-                OptionRow(Icons.Filled.ViewCompact, "Compact", "Tighter spacing and fewer lines", choice.compact) {
-                    choice = choice.copy(compact = it)
-                }
-            }
-
-            Section("What it shows", Icons.Filled.Bolt) {
-                OptionRow(Icons.Filled.Bolt, "Charge bar and status", "Shown on taller widgets where there is room", choice.extras) {
-                    choice = choice.copy(extras = it)
-                }
-                OptionRow(Icons.Filled.Palette, "Colour by level", "Red when low, amber, green, blue while charging", choice.levelTint) {
+                ToggleRow("Colour by level", choice.levelTint, description = "Red when low, amber, green, blue while charging") {
                     choice = choice.copy(levelTint = it)
                 }
             }
 
-            Section("Controls", Icons.Filled.TouchApp) {
-                Text(
-                    "Tap to choose what the widget can do. Unlock always asks for a second tap.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(10.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ControlChip("Lock", Icons.Filled.Lock, selected = true, enabled = false) {}
-                    ControlChip("Climate", Icons.Filled.AcUnit, choice.climate) { choice = choice.copy(climate = !choice.climate) }
-                    ControlChip("Charge", Icons.Filled.Bolt, choice.charge) { choice = choice.copy(charge = !choice.charge) }
-                    ControlChip("Flash", Icons.Filled.FlashOn, choice.flash) { choice = choice.copy(flash = !choice.flash) }
-                    ControlChip("Refresh", Icons.Filled.Refresh, choice.refresh) { choice = choice.copy(refresh = !choice.refresh) }
+            SettingsGroup("Shape and text") {
+                EnumSegmented(WidgetCorner.entries, choice.corner, { it.label }, { choice = choice.copy(corner = it) })
+                EnumSegmented(WidgetTextSize.entries, choice.textSize, { it.label }, { choice = choice.copy(textSize = it) })
+                ToggleRow("Compact", choice.compact, description = "Tighter spacing and fewer lines") { choice = choice.copy(compact = it) }
+                ToggleRow("Charge bar and status", choice.extras, description = "Shown on taller widgets where there is room") {
+                    choice = choice.copy(extras = it)
                 }
             }
-            Spacer(Modifier.height(8.dp))
+
+            SettingsGroup("Controls") {
+                SettingsCaption("Tap to choose what the widget can do. Unlock always asks for a second tap.", bottomGap = 0.dp)
+                ActionRow {
+                    SafeMorphTextButton("Lock", onClick = {}, icon = Icons.Filled.Lock, active = true, enabled = false)
+                    SafeMorphTextButton("Climate", onClick = { choice = choice.copy(climate = !choice.climate) }, icon = Icons.Filled.AcUnit, active = choice.climate)
+                    SafeMorphTextButton("Charge", onClick = { choice = choice.copy(charge = !choice.charge) }, icon = Icons.Filled.Bolt, active = choice.charge)
+                    SafeMorphTextButton("Flash", onClick = { choice = choice.copy(flash = !choice.flash) }, icon = Icons.Filled.FlashOn, active = choice.flash)
+                    SafeMorphTextButton("Refresh", onClick = { choice = choice.copy(refresh = !choice.refresh) }, icon = Icons.Filled.Refresh, active = choice.refresh)
+                }
+            }
+            Spacer(Modifier.height(GapRow))
         }
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            TextButton(onClick = { finish(Activity.RESULT_CANCELED) }, modifier = Modifier.weight(1f).height(52.dp)) { Text("Cancel") }
-            Button(
+        ActionRow(Modifier.padding(horizontal = ScreenGutter, vertical = GapGroup)) {
+            SafeMorphTextButton("Cancel", onClick = { finish(Activity.RESULT_CANCELED) })
+            SafeMorphTextButton(
+                if (loaded.cars.isEmpty()) "Add widget" else "Done",
                 onClick = { saveAndFinish(context, scope, widgetId, choice, finish) },
-                modifier = Modifier.weight(1f).height(52.dp),
-            ) { Text(if (loaded.cars.isEmpty()) "Add widget" else "Done", fontWeight = FontWeight.Bold) }
+                emphasis = ButtonEmphasis.Confirm,
+            )
         }
     }
 }
+
+/** A note where a group's controls would be (no cars, or sealed): the app's standard group with one caption. */
+@Composable
+private fun NoteGroup(text: String) = SettingsGroup { SettingsCaption(text, bottomGap = 0.dp) }
 
 /**
  * A stand-in of the widget as it will look (a medium size), drawn with ordinary Compose so it can change live
@@ -428,41 +394,6 @@ private fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Choi
     }
 }
 
-/** A labelled segmented choice over any list of options (corners, text size). */
-@Composable
-private fun <T> ChoiceRow(title: String, options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
-    Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Spacer(Modifier.height(8.dp))
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        options.forEachIndexed { i, option ->
-            SegmentedButton(
-                selected = option == selected,
-                onClick = { onSelect(option) },
-                shape = SegmentedButtonDefaults.itemShape(i, options.size),
-            ) { Text(label(option)) }
-        }
-    }
-}
-
-/** A titled group: an icon, a heading, and its options on a soft panel. */
-@Composable
-private fun Section(title: String, icon: ImageVector, content: @Composable () -> Unit) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp)) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        }
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(16.dp),
-        ) { content() }
-    }
-}
-
 /** A car to show, as a card with its photo (or the palette when it has none); the chosen one is ringed. */
 @Composable
 private fun CarCard(car: VehicleSnapshot, photoUrl: String?, selected: Boolean, onSelect: () -> Unit) {
@@ -500,59 +431,6 @@ private fun CarCard(car: VehicleSnapshot, photoUrl: String?, selected: Boolean, 
             Text(car.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(car.bigValue(), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, maxLines = 1)
         }
-    }
-}
-
-@Composable
-private fun OptionRow(icon: ImageVector, label: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            // The WHOLE row is the switch, not just the little control on the right. `toggleable`
-            // rather than `clickable` because it merges the row's label, its subtitle and its state
-            // into ONE node that announces itself as a switch and says which way it is set. As a
-            // plain clickable it read as an unlabelled button with a separate switch sitting next to
-            // it, and a tap on the row toggled a control that a screen reader never connected to it.
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
-            contentAlignment = Alignment.Center,
-        ) { Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(18.dp)) }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Spacer(Modifier.width(8.dp))
-        // null, not onChange: the row owns the toggle now, and a handler here would be a second node
-        // reading the same state.
-        Switch(checked = checked, onCheckedChange = null)
-    }
-}
-
-@Composable
-private fun ControlChip(label: String, icon: ImageVector, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        enabled = enabled,
-        label = { Text(label, fontWeight = FontWeight.Medium) },
-        leadingIcon = { Icon(icon, null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
-        shape = CircleShape,
-        modifier = Modifier.height(40.dp),
-    )
-}
-
-@Composable
-private fun Hint(text: String) {
-    Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(16.dp),
-    ) {
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

@@ -30,9 +30,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.HorizontalPageIndicator
 import androidx.wear.compose.material3.MaterialTheme
@@ -188,7 +185,6 @@ private fun WearCarPage(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     // The face is the first item and the one centred on arrival, so opening the app lands on it.
-    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val signedIn by WearCredentialSync.signedIn.collectAsStateWithLifecycle()
     val pendingCommands by WearCommands.pending.collectAsStateWithLifecycle()
     // The command waiting on an "are you sure": anything that opens the car. Null when none is.
@@ -321,14 +317,7 @@ private fun WearCarPage(
                 }
             }
         } else {
-    ScreenScaffold(scrollState = listState, timeText = { TimeText() }) {
-        ScalingLazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            // No per-item scaling here: every element fits the round display on its own ([fitRound]).
-            scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
-            contentPadding = PaddingValues(vertical = 18.dp),
-        ) {
+    WearListScreen(contentPadding = PaddingValues(vertical = 18.dp)) {
             // The car's details, one pebble past the face, with the refresh where the freshness is.
             item { WearStatusPebble(v, refreshing = refreshing, canRefresh = signedIn, onRefresh = { repo.refresh() }) }
             // The update error, shown where the update lives. It used to go nowhere at all.
@@ -372,7 +361,6 @@ private fun WearCarPage(
                     )
                 }
             }
-        }
     }
         }
     }
