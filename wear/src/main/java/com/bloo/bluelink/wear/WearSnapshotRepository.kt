@@ -44,7 +44,17 @@ class WearSnapshotRepository(private val context: Context) {
         _refreshing.value = true
         scope.launch {
             try {
-                WearCredentialSync.refresh(context)
+                if (WearCredentialSync.hasSession(context)) {
+                    WearCredentialSync.refresh(context)
+                } else {
+                    // A watch the phone has not signed in has nothing to fetch with: ask the phone for fresh status,
+                    // and hold the pull's spinner until its answer arrives (or a few seconds pass).
+                    val before = WearDataLayerSync.lastCommandResult.value
+                    WearDataLayerSync.sendCommand(context, "", CarAction.REFRESH)
+                    withTimeoutOrNull(10_000L) {
+                        WearDataLayerSync.lastCommandResult.first { it != before && it?.action == CarAction.REFRESH }
+                    }
+                }
             } finally {
                 _refreshing.value = false
             }
