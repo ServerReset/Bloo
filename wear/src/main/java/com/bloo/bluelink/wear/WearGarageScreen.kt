@@ -261,7 +261,7 @@ private fun WearCarPage(
             onPick = { key ->
                 slotKeys = slotKeys.toMutableList().also { it[slot] = key }.also { WearFacePrefs.save(faceContext, it) }
                 // The tile shows the same controls: ask it to redraw.
-                androidx.wear.tiles.TileService.getUpdater(faceContext).requestUpdate(BlooTileService::class.java)
+                WearSurfaces.refresh(faceContext)
                 choosingSlot = null
             },
         )

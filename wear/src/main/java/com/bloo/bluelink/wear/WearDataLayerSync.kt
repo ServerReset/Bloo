@@ -133,6 +133,8 @@ object WearDataLayerSync {
             }
         // Mirror into the shared store so anything reading SnapshotStore sees the same data.
         runCatching { SnapshotStore(app).saveVehicles(payload.vehicles) }
+        // The tile and the complication read that store: have them redraw from it now rather than at their next poll.
+        WearSurfaces.refresh(app)
         // PIN + timing.
         pendingStore?.let { store ->
             store.timing = com.bloo.bluelink.data.WatchLockTiming.fromWire(payload.lockTiming)
@@ -149,6 +151,7 @@ object WearDataLayerSync {
         if (snapshot.vehicles.isNotEmpty()) {
             WearNotifier.onVehicles(context, _vehicles.value, snapshot.vehicles)
             _vehicles.value = snapshot.vehicles
+            WearSurfaces.refresh(context)
         }
         result?.let {
             _lastCommandResult.value = com.bloo.bluelink.data.WatchCommandResult(
