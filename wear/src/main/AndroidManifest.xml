@@ -92,6 +92,24 @@
                 android:value="300" />
         </service>
 
+        <!-- The car's lock state on any watch face; a tap opens the app on the lock control. -->
+        <service
+            android:name=".BlooLockComplicationService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_bloo"
+            android:label="@string/complication_lock_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="300" />
+        </service>
+
         <!-- Runs the action buttons on the watch's own notifications (Stop charging). -->
         <receiver android:name=".WearActionReceiver" android:exported="false" />
 

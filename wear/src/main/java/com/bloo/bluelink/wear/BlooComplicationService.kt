@@ -61,15 +61,44 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
             .build()
 }
 
+/**
+ * The car's lock state on any watch face, as short text ("Locked" or "Open"). Tapping it opens the watch app on
+ * the lock control, so it runs through the same PIN gate and, for an unlock, the same "are you sure" as the face.
+ */
+class BlooLockComplicationService : SuspendingComplicationDataSourceService() {
+
+    override fun getPreviewData(type: ComplicationType): ComplicationData? =
+        if (type == ComplicationType.SHORT_TEXT) lockText("Locked", "Car locked") else null
+
+    override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
+        if (request.complicationType != ComplicationType.SHORT_TEXT) return NoDataComplicationData()
+        if (WearBootGate.isLocked(applicationContext)) return NoDataComplicationData()
+        val car = runCatching { SnapshotStore(applicationContext).current().selected }.getOrNull() ?: return NoDataComplicationData()
+        val locked = car.locked ?: return NoDataComplicationData()
+        return lockText(if (locked) "Locked" else "Open", "${car.name} is ${if (locked) "locked" else "unlocked"}")
+    }
+
+    private fun lockText(shown: String, description: String): ComplicationData =
+        ShortTextComplicationData.Builder(PlainComplicationText.Builder(shown).build(), PlainComplicationText.Builder(description).build())
+            .setTapAction(
+                PendingIntent.getActivity(
+                    applicationContext, 1,
+                    Intent(applicationContext, WearMainActivity::class.java).putExtra(WearMainActivity.EXTRA_ACTION, "lock"),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
+            .build()
+}
+
 /** Asks the watch's glanceable surfaces (the Tile and the complication) to redraw from the latest snapshot. */
 internal object WearSurfaces {
     fun refresh(context: Context) {
         val app = context.applicationContext
         runCatching { TileService.getUpdater(app).requestUpdate(BlooTileService::class.java) }
-        runCatching {
-            ComplicationDataSourceUpdateRequester
-                .create(app, ComponentName(app, BlooComplicationService::class.java))
-                .requestUpdateAll()
+        listOf(BlooComplicationService::class.java, BlooLockComplicationService::class.java).forEach { service ->
+            runCatching {
+                ComplicationDataSourceUpdateRequester.create(app, ComponentName(app, service)).requestUpdateAll()
+            }
         }
     }
 }
