@@ -284,38 +284,10 @@ private fun WearCarPage(
     ) { index ->
         if (index == 0) {
             ScreenScaffold(timeText = { TimeText() }) {
-                // Pulling down on the face refreshes, felt as the whole face following the finger a little.
-                val pull = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
-                val pullShown by androidx.compose.animation.core.animateFloatAsState(pull.floatValue, label = "facePull")
-                val refreshHaptics = LocalHapticFeedback.current
-                val pullTrigger = with(androidx.compose.ui.platform.LocalDensity.current) { 56.dp.toPx() }
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { translationY = pullShown.coerceAtMost(pullTrigger) * 0.4f }
-                        .pointerInput(v.vin) {
-                            // Watches the drag without taking it, so the tiles, the pager and the crown all still work.
-                            awaitEachGesture {
-                                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                                var dx = 0f
-                                var dy = 0f
-                                var fired = false
-                                do {
-                                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                    dx += change.positionChange().x
-                                    dy += change.positionChange().y
-                                    pull.floatValue = if (dy > 0f && dy > 2f * kotlin.math.abs(dx)) dy else 0f
-                                    if (!fired && pull.floatValue > pullTrigger) {
-                                        fired = true
-                                        refreshHaptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                                        repo.refresh()
-                                    }
-                                } while (event.changes.any { it.pressed })
-                                pull.floatValue = 0f
-                            }
-                        },
-                ) {
+                // Pull down from the top of the face, as on the phone: a disc drops in, arms at a point (a tick),
+                // and refreshes when you let go.
+                val pullState = remember { WearPullState() }
+                Box(Modifier.fillMaxSize().wearPullToRefresh(pullState) { repo.refresh() }) {
                 val faceContext = LocalContext.current
                 val slotKeys = remember { WearFacePrefs.load(faceContext) }
                 val actions: List<WearQuickAction?> = slotKeys.map { key ->
@@ -357,6 +329,7 @@ private fun WearCarPage(
                     status = if (refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
                     refreshing = refreshing,
                 )
+                WearPullIndicator(pullState, refreshing)
                 }
             }
         } else {
@@ -364,7 +337,8 @@ private fun WearCarPage(
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 0.62f),
+            // No per-item scaling here: every element fits the round display on its own ([fitRound]).
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
             contentPadding = PaddingValues(vertical = 18.dp),
         ) {
             // The car's details, one pebble past the face, with the refresh where the freshness is.

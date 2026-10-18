@@ -53,7 +53,7 @@ fun WearPebble(
     // Inset from both edges: on a round face a full-width row is cut by the bezel at the top and bottom.
     Column(modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().fitRound(),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -108,6 +108,7 @@ fun WearActionRow(
         enabled = enabled && !pending,
         modifier = modifier
             .fillMaxWidth()
+            .fitRound()
             .then(
                 if (switch) {
                     Modifier.semantics {
@@ -218,7 +219,7 @@ fun WearCenteredText(
 ) {
     RevealText(
         text,
-        modifier = modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 20.dp).fitRound(),
         textAlign = TextAlign.Center,
         style = style,
         color = color,

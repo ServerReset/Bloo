@@ -67,6 +67,7 @@ internal fun WearStatRow(label: String, value: String, valueColor: Color? = null
     Row(
         Modifier
             .fillMaxWidth()
+            .fitRound()
             .clip(androidx.compose.foundation.shape.CircleShape)
             .background(scheme.surfaceContainerHigh.copy(alpha = 0.5f))
             .padding(horizontal = 16.dp, vertical = 9.dp),
