@@ -126,8 +126,10 @@ object WearDataLayerSync {
         _selectedVin.value = payload.selectedVin
         _connected.value = true
         // Offer an update only when the phone advertises a NEWER watch build than this one.
+        // Never on a Play copy: Play updates it, and a GitHub APK is signed with a different key, so installing
+        // one over it fails (the checker's own check() stops at the same flag).
         _updateAdvice.value = payload.watchUpdateRunNumber
-            ?.takeIf { it > com.bloo.bluelink.wear.BuildConfig.BUILD_RUN_NUMBER }
+            ?.takeIf { !com.bloo.bluelink.wear.BuildConfig.PLAY_DISTRIBUTION && it > com.bloo.bluelink.wear.BuildConfig.BUILD_RUN_NUMBER }
             ?.let { run ->
                 payload.watchUpdateApkUrl?.let { url -> UpdateAdvice(run, url, payload.watchUpdateNotes) }
             }

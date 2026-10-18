@@ -35,6 +35,8 @@ class WatchDataListenerService : WearableListenerService() {
                 WatchSyncProtocol.PATH_COMMAND_RESULT ->
                     WearDataLayerSync.applyCommandResult(applicationContext, map.getByteArray("payload"))
                 WatchSyncProtocol.PATH_WATCH_APK -> {
+                    // A Play copy is updated by Play; a pushed GitHub APK has a different signing key and cannot replace it.
+                    if (BuildConfig.PLAY_DISTRIBUTION) continue
                     val asset = map.getAsset("apk") ?: continue
                     scope.launch { installPushedApk(asset) }
                 }
