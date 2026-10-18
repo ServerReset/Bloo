@@ -184,7 +184,7 @@ private fun WearCarPage(
     // The quarter whose control is being chosen (index), or null; and the saved choice for each.
     var choosingSlot by remember { mutableStateOf<Int?>(null) }
     val faceContext = LocalContext.current
-    var slotKeys by remember { mutableStateOf(WearFacePrefs.load(faceContext)) }
+    val slotKeys by WearFacePrefs.flow(faceContext).collectAsStateWithLifecycle()
     // An action chosen on the Tile. It runs through requestCommand, so the PIN gate, the pending
     // state and the haptic result are the same as a tap on the face -- the tile is a second door into
     // the same room, not a second room.
@@ -259,7 +259,7 @@ private fun WearCarPage(
             current = slotKeys[slot],
             car = v,
             onPick = { key ->
-                slotKeys = slotKeys.toMutableList().also { it[slot] = key }.also { WearFacePrefs.save(faceContext, it) }
+                WearFacePrefs.save(faceContext, slotKeys.toMutableList().also { it[slot] = key })
                 // The tile shows the same controls: ask it to redraw.
                 WearSurfaces.refresh(faceContext)
                 choosingSlot = null

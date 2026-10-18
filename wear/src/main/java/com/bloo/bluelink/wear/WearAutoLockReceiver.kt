@@ -15,18 +15,21 @@ import kotlinx.coroutines.launch
  *
  * It reads the PERSISTED snapshot, not the live Data Layer: this can run with the app cold, woken
  * only by the alarm, and the local mirror is exactly the last thing the phone pushed. The lock runs
- * through the watch's own command path, so it works with or without its own session.
+ * through the watch's own command path, so it works with or without its own session. It sends LOCK, not a toggle:
+ * the persisted snapshot can be older than the car, and a toggle on a car that was locked meanwhile would UNLOCK it.
  */
 class WearAutoLockReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (!WearAutoLock.isEnabled(context)) return
+        // Sealed after a restart: nothing runs until the PIN has been entered.
+        if (WearBootGate.isLocked(context)) return
         val app = context.applicationContext
         val result = goAsync()
         CoroutineScope(Dispatchers.Default).launch {
             try {
                 val vehicles = runCatching { SnapshotStore(app).current().vehicles }.getOrDefault(emptyList())
                 for (vin in WearAutoLock.targets(vehicles)) {
-                    runCatching { runWatchCommand(app, vin, CarAction.TOGGLE_LOCK) }
+                    runCatching { runWatchCommand(app, vin, CarAction.LOCK) }
                 }
             } finally {
                 result.finish()

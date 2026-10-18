@@ -70,6 +70,7 @@ class WearBootReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         if (WearBootGate.isLocked(context)) WearBootNotice.post(context)
         // The AutoLock trigger registration does not survive a reboot.
-        WearAutoLock.rearmIfEnabled(context)
+        // Not while sealed: nothing runs until the PIN is entered (startWork arms it then).
+        if (!WearBootGate.isLocked(context)) WearAutoLock.rearmIfEnabled(context)
     }
 }

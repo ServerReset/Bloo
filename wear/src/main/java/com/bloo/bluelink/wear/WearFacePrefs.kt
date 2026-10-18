@@ -2,6 +2,8 @@ package com.bloo.bluelink.wear
 
 import android.content.Context
 import androidx.core.content.edit
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Which control sits in each quarter of the watch face: top-left, top-right, bottom-left, bottom-right. The
@@ -16,6 +18,16 @@ object WearFacePrefs {
 
     fun load(context: Context): List<String> = parse(prefs(context).getString("slots", null))
 
+    private var live: MutableStateFlow<List<String>>? = null
+
+    /**
+     * The choice as a live value, shared by every car's page. Each car is its own page and the pager keeps its
+     * neighbours composed, so a choice read once per page left the other cars on the old controls until the app
+     * restarted; one flow, updated by [save], keeps them all in step.
+     */
+    fun flow(context: Context): StateFlow<List<String>> =
+        live ?: synchronized(this) { live ?: MutableStateFlow(load(context)).also { live = it } }
+
     /** The four stored choices, or the defaults when nothing is stored or what is stored is not four known keys. */
     internal fun parse(saved: String?): List<String> {
         val slots = saved?.split(",")
@@ -25,5 +37,6 @@ object WearFacePrefs {
 
     fun save(context: Context, slots: List<String>) {
         prefs(context).edit { putString("slots", slots.joinToString(",")) }
+        live?.value = slots
     }
 }
