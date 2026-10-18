@@ -67,7 +67,9 @@ object WearUpdateChecker {
         _progress.value = 0f
         _error.value = null
         try {
-            val dest = File(context.cacheDir, "bloo-watch.apk")
+            // In updates/, the one folder the watch's FileProvider exposes (res/xml/file_paths.xml): anywhere else the
+            // installer URI cannot be made, and every tap on Update ended in "Allow installing apps".
+            val dest = File(File(context.cacheDir, "updates"), "bloo-watch.apk")
             val ok = withContext(Dispatchers.IO) {
                 UpdateApi.downloadApk(url, dest) { _progress.value = it }
             }

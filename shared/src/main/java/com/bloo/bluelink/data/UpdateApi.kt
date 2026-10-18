@@ -138,10 +138,12 @@ object UpdateApi {
                 // Only a FINISHED release counts: published (not a draft or prerelease -- CI publishes it after
                 // the build and tests pass) and carrying a completely uploaded phone APK. A release that is
                 // still uploading is skipped in favour of the previous finished one.
-                val release = releases.firstOrNull { r ->
+                // The HIGHEST build among them, not whichever the list happens to return first: overlapping runs can
+                // publish out of order, and the first-listed release can be the older build.
+                val release = releases.filter { r ->
                     !r.draft && !r.prerelease && r.tagName.startsWith("build-") &&
                         r.assets.any { it.name == PHONE_ASSET_NAME && it.ready }
-                } ?: return@use null
+                }.maxByOrNull { it.tagName.removePrefix("build-").toIntOrNull() ?: -1 } ?: return@use null
                 val runNumber = release.tagName.removePrefix("build-").toIntOrNull() ?: return@use null
                 if (release.htmlUrl.isBlank()) return@use null
                 WorkflowRun(
@@ -211,6 +213,14 @@ object UpdateApi {
                             }
                         }
                     }
+                    // A 200 that is not the APK (a proxy's error page, a captive portal) or a short read must not be
+                    // staged as ready: check it is a zip (APKs start "PK") and, when the server said how long, complete.
+                    val complete = (total <= 0 || tmp.length() == total) &&
+                        tmp.inputStream().use { it.read() == 'P'.code && it.read() == 'K'.code }
+                    if (!complete) {
+                        tmp.delete()
+                        return@use false
+                    }
                     tmp.renameTo(destination)
                 }
             }.getOrDefault(false)
@@ -229,7 +239,9 @@ fun installDownloadedApk(context: Context, apk: File): Boolean = runCatching {
             "package:${context.packageName}".toUri(),
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(settingsIntent)
-        return@runCatching
+        // False: the installer did NOT launch, only the settings page. Returning success here made every caller's
+        // "allow installing apps, then tap again" branch dead code, so the user was left on that page with no word.
+        return@runCatching false
     }
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
     val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -237,7 +249,8 @@ fun installDownloadedApk(context: Context, apk: File): Boolean = runCatching {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     context.startActivity(intent)
-}.isSuccess
+    true
+}.getOrDefault(false)
 
 /**
  * Only the pure predicates live here -- the caller keeps its own store reads/writes, its own

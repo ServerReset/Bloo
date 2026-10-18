@@ -147,7 +147,11 @@ private fun AppViewModel.seamlessInstall(dest: java.io.File) {
  */
 private fun AppViewModel.fallbackInstall(dest: java.io.File) {
     if (!com.bloo.bluelink.data.installDownloadedApk(getApplication<Application>(), dest)) {
-        _state.update { it.copy(message = "Couldn't open the installer. Find Bloo.apk in Downloads.") }
+        // False also means "sent to the unknown-sources page": then it is that permission, not the installer.
+        val needsPermission = !getApplication<Application>().packageManager.canRequestPackageInstalls()
+        _state.update {
+            it.copy(message = if (needsPermission) "Allow installing apps for Bloo, then tap Install again." else "Couldn't open the installer. Find Bloo.apk in Downloads.")
+        }
     }
 }
 
