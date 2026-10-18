@@ -169,14 +169,21 @@ internal fun planWidget(
     // STACK: the controls run along one row while they fit (at least a circle each); a narrow widget wraps them
     // into two columns instead of dropping any, as long as the height holds the extra row.
     val fit = ((innerW + GAP) / (buttonH + GAP)).toInt()
+    // Every control on one row, each shrunk to fit (but never under a 40dp circle), before wrapping at all.
+    val perButton = (innerW - GAP * (actions - 1)) / actions
+    val singleRow = perButton >= 40f
+    val rowButtonH = if (singleRow) minOf(buttonH, perButton) else buttonH
     val gridRows = (actions + 1) / 2
     val gridH = gridRows * buttonH + (gridRows - 1) * GAP
     val gridNeed = line(nameSp) + GAP + MIN_VALUE_SP * fs * VALUE_LINE + GAP + gridH
-    val useGrid = fit < actions && actions > 1 && innerH >= gridNeed
+    val useGrid = !singleRow && actions > 1 && innerH >= gridNeed
     val cols = if (useGrid) 2 else 0
     val rows = if (useGrid) gridRows else 1
-    val maxActions = if (useGrid) actions else minOf(actions, fit).coerceAtLeast(1)
-    val controlsH = rows * buttonH + (rows - 1) * GAP
+    val maxActions = when {
+        useGrid || singleRow -> actions
+        else -> minOf(actions, fit).coerceAtLeast(1)
+    }
+    val controlsH = rows * rowButtonH + (rows - 1) * GAP
     val cellW = if (useGrid) (innerW - GAP) / 2 else (innerW - GAP * (maxActions - 1)) / maxActions
     val labels = !compact && cellW >= 84f
 
@@ -201,7 +208,7 @@ internal fun planWidget(
     return WidgetPlan(
         arrangement = WidgetArrangement.STACK, valueSp = value, nameSp = nameSp, statusSp = statusSp, detailSp = detailSp,
         showUpdated = showUpdated, showStatus = showStatus, showDetails = showDetails, showBar = showBar, showChips = showChips,
-        labels = labels, buttonHeightDp = buttonH, maxActions = maxActions, gridColumns = cols,
+        labels = labels, buttonHeightDp = rowButtonH, maxActions = maxActions, gridColumns = cols,
     )
 }
 
