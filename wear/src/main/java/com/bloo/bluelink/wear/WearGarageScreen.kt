@@ -2,12 +2,6 @@ package com.bloo.bluelink.wear
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 // The PULL-TO-REFRESH comes from the phone Material3, not the Wear one: wear-compose-material3 has no
@@ -15,15 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Watch
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
@@ -54,7 +44,6 @@ import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.data.WatchPinPolicy
-import com.bloo.bluelink.data.supportsHornLights
 import kotlinx.coroutines.launch
 
 /**
@@ -202,7 +191,12 @@ private fun WearCarPage(
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val signedIn by WearCredentialSync.signedIn.collectAsStateWithLifecycle()
     val pendingCommands by WearCommands.pending.collectAsStateWithLifecycle()
-    var confirmUnlock by remember { mutableStateOf(false) }
+    // The command waiting on an "are you sure": anything that opens the car. Null when none is.
+    var confirmAction by remember { mutableStateOf<String?>(null) }
+    // The quarter whose control is being chosen (index), or null; and the saved choice for each.
+    var choosingSlot by remember { mutableStateOf<Int?>(null) }
+    val faceContext = LocalContext.current
+    var slotKeys by remember { mutableStateOf(WearFacePrefs.load(faceContext)) }
     // An action chosen on the Tile. It runs through requestCommand, so the PIN gate, the pending
     // state and the haptic result are the same as a tap on the face -- the tile is a second door into
     // the same room, not a second room.
@@ -211,7 +205,7 @@ private fun WearCarPage(
         when (key) {
             // Unlock is the one command that opens the car, so it asks once more, exactly as the button does.
             WearTileActions.KEY_LOCK ->
-                if (v.locked == true) confirmUnlock = true else requestCommand { repo.lock(v.vin) }
+                if (v.locked == true) confirmAction = com.bloo.bluelink.data.CarAction.TOGGLE_LOCK else requestCommand { repo.lock(v.vin) }
             WearTileActions.KEY_CLIMATE -> requestCommand { repo.climate(v.vin) }
             WearTileActions.KEY_CHARGE -> requestCommand { repo.charge(v.vin) }
             WearTileActions.KEY_FLASH -> requestCommand { repo.flashLights(v.vin) }
@@ -262,15 +256,27 @@ private fun WearCarPage(
     }
 
     // Unlocking is the one command that opens the car, so it asks once more.
-    if (confirmUnlock) {
+    confirmAction?.let { pendingAction ->
         WearConfirmScreen(
             icon = Icons.Filled.LockOpen,
             title = "Unlock ${v.name}?",
             detail = "The doors open for anyone nearby.",
             confirmLabel = "Unlock",
             destructive = true,
-            onConfirm = { confirmUnlock = false; requestCommand { repo.lock(v.vin) } },
-            onCancel = { confirmUnlock = false },
+            onConfirm = { confirmAction = null; requestCommand { repo.command(v.vin, pendingAction) } },
+            onCancel = { confirmAction = null },
+        )
+        return
+    }
+    choosingSlot?.let { slot ->
+        WearControlPicker(
+            position = WearFacePrefs.positions[slot],
+            current = slotKeys[slot],
+            car = v,
+            onPick = { key ->
+                slotKeys = slotKeys.toMutableList().also { it[slot] = key }.also { WearFacePrefs.save(faceContext, it) }
+                choosingSlot = null
+            },
         )
         return
     }
@@ -288,33 +294,15 @@ private fun WearCarPage(
                 // and refreshes when you let go.
                 val pullState = remember { WearPullState() }
                 Box(Modifier.fillMaxSize().wearPullToRefresh(pullState) { repo.refresh() }) {
-                val faceContext = LocalContext.current
-                val slotKeys = remember { WearFacePrefs.load(faceContext) }
                 val actions: List<WearQuickAction?> = slotKeys.map { key ->
-                    val locked = v.locked == true
-                    when (key) {
-                        WearFacePrefs.LOCK -> WearQuickAction(
-                            if (locked) "Unlock" else "Lock", if (locked) Icons.Filled.LockOpen else Icons.Filled.Lock,
-                            pending = WearCommands.key(v.vin, CarAction.TOGGLE_LOCK) in pendingCommands,
-                        ) {
-                            if (locked) confirmUnlock = true else requestCommand { repo.lock(v.vin) }
-                        }
-                        WearFacePrefs.CLIMATE -> {
-                            val on = v.climateOn == true
-                            WearQuickAction(if (on) "Climate off" else "Climate", Icons.Filled.AcUnit, active = on, pending = WearCommands.key(v.vin, CarAction.TOGGLE_CLIMATE) in pendingCommands) {
-                                requestCommand { repo.climate(v.vin) }
-                            }
-                        }
-                        WearFacePrefs.CHARGE -> if (v.hasBattery) {
-                            val charging = v.charging == true
-                            WearQuickAction(if (charging) "Stop charge" else "Charge", Icons.Filled.Bolt, active = charging, pending = WearCommands.key(v.vin, CarAction.TOGGLE_CHARGE) in pendingCommands) {
-                                requestCommand { repo.charge(v.vin) }
-                            }
-                        } else null
-                        WearFacePrefs.FLASH -> if (v.toVehicle().supportsHornLights) {
-                            WearQuickAction("Flash", Icons.Filled.FlashOn, pending = WearCommands.key(v.vin, CarAction.FLASH_LIGHTS) in pendingCommands) { requestCommand { repo.flashLights(v.vin) } }
-                        } else null
-                        else -> null
+                    val control = WearFaceControls.byKey(key)?.takeIf { it.available(v) } ?: return@map null
+                    WearQuickAction(
+                        control.label(v), control.icon(v),
+                        active = control.active(v),
+                        pending = WearCommands.key(v.vin, control.action) in pendingCommands,
+                    ) {
+                        if (control.confirm(v)) confirmAction = control.action
+                        else requestCommand { repo.command(v.vin, control.action) }
                     }
                 }
                 WearCarFace(
@@ -366,7 +354,7 @@ private fun WearCarPage(
                 }
             }
 
-            item { WearFaceControlsPebble() }
+            item { WearFaceControlsPebble(slotKeys) { choosingSlot = it } }
             item { WearAlertsPebble() }
             // Auto lock needs the car's credentials on the watch, which only the pairing step in Settings on
             // the phone hands over; until then the pebble is a pointer to that step, not a switch.

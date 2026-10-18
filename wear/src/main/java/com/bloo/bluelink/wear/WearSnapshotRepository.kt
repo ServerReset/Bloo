@@ -56,6 +56,9 @@ class WearSnapshotRepository(private val context: Context) {
     /** True while a refresh is in flight, so a pull-to-refresh indicator can spin. */
     val refreshing: StateFlow<Boolean> = _refreshing
 
+    /** Send any of the app's command names for [vin]; the face's controls all go through here. */
+    fun command(vin: String, action: String) = run(vin, action)
+
     private fun run(vin: String, action: String) {
         scope.launch { WearCommands.track(vin, action) { runWatchCommand(context, vin, action) } }
     }

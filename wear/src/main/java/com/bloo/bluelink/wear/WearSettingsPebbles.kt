@@ -83,17 +83,12 @@ internal fun WearPairPebble() {
     }
 }
 
-/** Choose what each quarter of the face does: tapping a row steps that quarter through the controls. */
+/** What each quarter of the face does: a row per quarter, and a tap opens the chooser for it. */
 @Composable
-internal fun WearFaceControlsPebble() {
-    val context = LocalContext.current
-    var slots by remember { mutableStateOf(WearFacePrefs.load(context)) }
+internal fun WearFaceControlsPebble(slots: List<String>, onChoose: (Int) -> Unit) {
     WearPebble(title = "Face controls", icon = Icons.Filled.Tune) {
         slots.forEachIndexed { i, key ->
-            WearActionRow("${WearFacePrefs.positions[i]}: ${WearFacePrefs.label(key)}", Icons.Filled.Tune) {
-                slots = slots.toMutableList().also { it[i] = WearFacePrefs.next(key) }
-                WearFacePrefs.save(context, slots)
-            }
+            WearActionRow("${WearFacePrefs.positions[i]}: ${WearFaceControls.choiceName(key)}", Icons.Filled.Tune) { onChoose(i) }
         }
     }
 }
