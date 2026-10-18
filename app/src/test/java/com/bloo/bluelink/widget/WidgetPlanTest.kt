@@ -47,4 +47,22 @@ class WidgetPlanTest {
         val plan = planWidget(110f, 300f, 1f, false, valueChars = 3, actionCount = 4)
         assertTrue(plan.arrangement == WidgetArrangement.STACK && plan.gridColumns == 2 && plan.maxActions == 4, "$plan")
     }
+
+    @Test fun aSideGridNeverTakesTheReadoutsWidth() {
+        for (w in sizes) for (h in sizes) for (compact in listOf(false, true)) for (actions in 2..4) {
+            val plan = planWidget(w, h, 1f, compact, valueChars = 4, actionCount = actions)
+            if (plan.arrangement != WidgetArrangement.SIDE) continue
+            val pad = if (compact) 10f else 16f
+            val innerW = w - 2 * pad - 8f
+            val gridW = plan.gridColumns * plan.buttonHeightDp + (plan.gridColumns - 1) * 8f
+            assertTrue(innerW - gridW - 12f >= 90f - 0.01f, "w=$w h=$h actions=$actions plan=$plan")
+        }
+    }
+
+    @Test fun theHeaderCountsTheRefreshButton() {
+        // A 2x2 with the refresh button budgets the 32dp button, not just a line of name.
+        val withButton = planWidget(110f, 110f, 1f, false, valueChars = 3, actionCount = 3, refreshButton = true)
+        val without = planWidget(110f, 110f, 1f, false, valueChars = 3, actionCount = 3, refreshButton = false)
+        assertTrue(withButton.valueSp <= without.valueSp, "$withButton vs $without")
+    }
 }

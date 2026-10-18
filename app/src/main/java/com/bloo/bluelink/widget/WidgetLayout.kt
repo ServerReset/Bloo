@@ -83,6 +83,8 @@ internal data class WidgetPlan(
     val maxActions: Int,
     /** SIDE only: how many columns the control grid has. */
     val gridColumns: Int = 0,
+    /** Whether the header carries the 32dp refresh button (it is taller than its text). */
+    val refresh: Boolean = true,
 ) {
     val minimal: Boolean get() = arrangement == WidgetArrangement.MINIMAL
 
@@ -99,6 +101,10 @@ private const val VALUE_LINE = 1.15f
 private const val VALUE_GLYPH = 0.62f
 private const val MIN_VALUE_SP = 24f
 private const val GAP = 8f
+/** The header's refresh button, which makes the header at least this tall. */
+private const val REFRESH_DP = 32f
+/** The least width the readout beside a SIDE control grid keeps. */
+private const val MIN_INFO_W = 90f
 /** What a launcher takes off the span it reports (its own padding and corner rounding), per axis. */
 private const val LAUNCHER_INSET = 8f
 
@@ -113,6 +119,8 @@ internal fun planWidget(
     valueChars: Int,
     /** How many controls the options allow. */
     actionCount: Int,
+    /** Whether the header has the refresh button (on by default). */
+    refreshButton: Boolean = true,
 ): WidgetPlan {
     val pad = widgetPad(compact)
     // A launcher draws the widget inside its own inset and rounds the corners, so the span it reports is a
@@ -131,38 +139,51 @@ internal fun planWidget(
     fun valueByWidth(w: Float) = w / (chars * VALUE_GLYPH * fs)
     val actions = actionCount.coerceIn(1, 4)
 
-    val buttonH = when { innerH >= 300f -> 64f; innerH >= 230f -> 56f; else -> 46f }
-    val stackNeed = line(nameSp) + GAP + MIN_VALUE_SP * fs * VALUE_LINE + GAP + buttonH
+    // The header is its text column or the refresh button, whichever is taller -- the button is 32dp and a line of
+    // name is often shorter, so budgeting only the text let the rows below be pushed past the bottom.
+    fun header(updated: Boolean) =
+        maxOf(line(nameSp) + (if (updated) line(WIDGET_UPDATED_SP) else 0f), if (refreshButton) REFRESH_DP else 0f)
 
-    // SIDE: wide and too short for a control row under the readout -- the controls stand in a grid beside it.
+    val buttonH = when { innerH >= 300f -> 64f; innerH >= 230f -> 56f; else -> 46f }
+    val stackNeed = header(false) + GAP + MIN_VALUE_SP * fs * VALUE_LINE + GAP + buttonH
+
+    // SIDE: wide and too short for a control row under the readout -- the controls stand in a grid beside it. The grid
+    // takes as many columns as the width can spare while the readout keeps at least MIN_INFO_W; when no layout leaves
+    // it that, the widget is not SIDE at all (it would clip the name and value to a sliver).
     if (innerH < stackNeed + 24f && widthDp >= heightDp * 1.6f && actions >= 2) {
-        val rows = if (actions > 2 && innerH >= 2 * 40f + GAP) 2 else 1
-        val cols = minOf(actions, if (rows == 2) 2 else 3)
-        val diameter = minOf(56f, (innerH - GAP * (rows - 1)) / rows).coerceAtLeast(36f)
-        val gridW = cols * diameter + (cols - 1) * GAP
-        val infoW = (innerW - gridW - 12f).coerceAtLeast(60f)
-        var showStatus = true
-        var showUpdated = infoW >= 150f
-        fun room() = (innerH - line(nameSp) - (if (showUpdated) line(WIDGET_UPDATED_SP) else 0f) - GAP -
-            (if (showStatus) line(statusSp) else 0f)) / (fs * VALUE_LINE)
-        if (room() < 30f) showUpdated = false
-        if (room() < MIN_VALUE_SP) showStatus = false
-        val value = minOf(room(), valueByWidth(infoW), 72f).coerceAtLeast(20f)
-        return WidgetPlan(
-            arrangement = WidgetArrangement.SIDE, valueSp = value, nameSp = nameSp, statusSp = statusSp, detailSp = detailSp,
-            showUpdated = showUpdated, showStatus = showStatus, showDetails = false, showBar = false, showChips = false,
-            labels = false, buttonHeightDp = diameter, maxActions = rows * cols, gridColumns = cols,
-        )
+        for (cols in minOf(actions, 3) downTo 1) {
+            val rows = (actions + cols - 1) / cols
+            if (rows > 2) continue
+            val diameter = minOf(56f, (innerH - GAP * (rows - 1)) / rows)
+            if (diameter < 36f) continue
+            val gridW = cols * diameter + (cols - 1) * GAP
+            val infoW = innerW - gridW - 12f
+            if (infoW < MIN_INFO_W) continue
+            var showStatus = true
+            var showUpdated = infoW >= 150f
+            fun room() = (innerH - header(showUpdated) - GAP - (if (showStatus) line(statusSp) else 0f)) / (fs * VALUE_LINE)
+            if (room() < 30f) showUpdated = false
+            if (room() < MIN_VALUE_SP) showStatus = false
+            val value = minOf(room(), valueByWidth(infoW), 72f).coerceAtLeast(20f)
+            return WidgetPlan(
+                arrangement = WidgetArrangement.SIDE, valueSp = value, nameSp = nameSp, statusSp = statusSp, detailSp = detailSp,
+                showUpdated = showUpdated, showStatus = showStatus, showDetails = false, showBar = false, showChips = false,
+                labels = false, buttonHeightDp = diameter, maxActions = minOf(actions, rows * cols), gridColumns = cols,
+                refresh = refreshButton,
+            )
+        }
     }
 
     // MINIMAL: no room for a row or a grid of controls -- the value and the lock share one row.
     if (innerH < stackNeed) {
-        val rowH = innerH - line(nameSp) - GAP
-        val v = minOf(rowH / (fs * VALUE_LINE), valueByWidth(innerW - 46f - GAP), 56f).coerceAtLeast(20f)
+        val rowH = innerH - header(false) - GAP
+        // The lock circle shrinks to the room left (never under 30dp) instead of overflowing it.
+        val lock = rowH.coerceIn(30f, 46f)
+        val v = minOf(rowH / (fs * VALUE_LINE), valueByWidth(innerW - lock - GAP), 56f).coerceAtLeast(20f)
         return WidgetPlan(
             arrangement = WidgetArrangement.MINIMAL, valueSp = v, nameSp = nameSp, statusSp = statusSp, detailSp = detailSp,
             showUpdated = false, showStatus = false, showDetails = false, showBar = false, showChips = false,
-            labels = false, buttonHeightDp = 46f, maxActions = 1,
+            labels = false, buttonHeightDp = lock, maxActions = 1, refresh = refreshButton,
         )
     }
 
@@ -175,7 +196,7 @@ internal fun planWidget(
     val rowButtonH = if (singleRow) minOf(buttonH, perButton) else buttonH
     val gridRows = (actions + 1) / 2
     val gridH = gridRows * buttonH + (gridRows - 1) * GAP
-    val gridNeed = line(nameSp) + GAP + MIN_VALUE_SP * fs * VALUE_LINE + GAP + gridH
+    val gridNeed = header(false) + GAP + MIN_VALUE_SP * fs * VALUE_LINE + GAP + gridH
     val useGrid = !singleRow && actions > 1 && innerH >= gridNeed
     val cols = if (useGrid) 2 else 0
     val rows = if (useGrid) gridRows else 1
@@ -191,7 +212,7 @@ internal fun planWidget(
     var showUpdated = widthDp >= 180f
     var showDetails = !compact
     fun fixed(): Float =
-        line(nameSp) + (if (showUpdated) line(WIDGET_UPDATED_SP) else 0f) + GAP +
+        header(showUpdated) + GAP +
             (if (showStatus) line(statusSp) else 0f) +
             (if (showDetails) 4f + line(detailSp) else 0f) + GAP + controlsH
     fun valueRoom() = (innerH - fixed()) / (fs * VALUE_LINE)
@@ -208,7 +229,7 @@ internal fun planWidget(
     return WidgetPlan(
         arrangement = WidgetArrangement.STACK, valueSp = value, nameSp = nameSp, statusSp = statusSp, detailSp = detailSp,
         showUpdated = showUpdated, showStatus = showStatus, showDetails = showDetails, showBar = showBar, showChips = showChips,
-        labels = labels, buttonHeightDp = rowButtonH, maxActions = maxActions, gridColumns = cols,
+        labels = labels, buttonHeightDp = rowButtonH, maxActions = maxActions, gridColumns = cols, refresh = refreshButton,
     )
 }
 
@@ -216,13 +237,14 @@ internal fun planWidget(
 internal fun WidgetPlan.heightDp(fontScale: Float): Float {
     fun line(sp: Float) = sp * fontScale * LINE
     val value = valueSp * fontScale * VALUE_LINE
+    val header = maxOf(line(nameSp) + (if (showUpdated) line(WIDGET_UPDATED_SP) else 0f), if (refresh) REFRESH_DP else 0f)
     return when (arrangement) {
-        WidgetArrangement.MINIMAL -> line(nameSp) + GAP + maxOf(value, buttonHeightDp)
+        WidgetArrangement.MINIMAL -> maxOf(line(nameSp), if (refresh) REFRESH_DP else 0f) + GAP + maxOf(value, buttonHeightDp)
         WidgetArrangement.SIDE -> maxOf(
-            line(nameSp) + (if (showUpdated) line(WIDGET_UPDATED_SP) else 0f) + GAP + value + (if (showStatus) line(statusSp) else 0f),
+            header + GAP + value + (if (showStatus) line(statusSp) else 0f),
             buttonHeightDp * (if (maxActions > gridColumns) 2 else 1) + (if (maxActions > gridColumns) GAP else 0f),
         )
-        WidgetArrangement.STACK -> line(nameSp) + (if (showUpdated) line(WIDGET_UPDATED_SP) else 0f) + GAP + value +
+        WidgetArrangement.STACK -> header + GAP + value +
             (if (showStatus) line(statusSp) else 0f) + (if (showDetails) 4f + line(detailSp) else 0f) +
             (if (showBar) WIDGET_BAR_DP + 2 * GAP else 0f) + (if (showChips) WIDGET_CHIP_DP * fontScale.coerceAtLeast(1f) + GAP else 0f) +
             GAP + stackRows() * buttonHeightDp + (stackRows() - 1) * GAP

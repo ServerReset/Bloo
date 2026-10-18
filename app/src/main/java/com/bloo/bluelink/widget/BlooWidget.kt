@@ -198,6 +198,7 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
         compact = opts.compact,
         valueChars = car.bigValue().length,
         actionCount = actionCount,
+        refreshButton = opts.refresh,
     )
     // The wearer's text size multiplies every size the plan chose; the plan was budgeted with it, so it still fits.
     val us = opts.textSize.scale
@@ -462,13 +463,18 @@ internal fun ActionButton(
         CarAction.FLASH_LIGHTS -> "Flash lights"
         else -> action
     }
+    // Armed is the pending UNLOCK: only the lock button is waiting on it. (It used to colour every button, so tapping
+    // Unlock lit Climate, Charge and Flash too.)
+    val armedHere = armed && action == CarAction.TOGGLE_LOCK
     val text = when {
         busy -> "…"
-        action == CarAction.TOGGLE_LOCK && armed -> "Confirm"
+        // An icon-only circle has no room for a word: it asks "OK?" and stays a circle.
+        armedHere -> if (label == null) "OK?" else "Confirm"
         else -> label
     }
-    val container: ColorProvider = if (active || armed) GlanceTheme.colors.primary else GlanceTheme.colors.secondaryContainer
-    val content: ColorProvider = if (active || armed) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSecondaryContainer
+    val lit = active || armedHere
+    val container: ColorProvider = if (lit) GlanceTheme.colors.primary else GlanceTheme.colors.secondaryContainer
+    val content: ColorProvider = if (lit) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSecondaryContainer
     val h = if (compact) 40.dp else heightDp.dp
     val tall = heightDp >= 56f
     Box(
@@ -477,7 +483,9 @@ internal fun ActionButton(
             .then(
                 when {
                     modifier != null -> GlanceModifier
-                    text == null -> GlanceModifier.width(h)
+                    // An icon-only button is a circle whatever it says ("…", "OK?"): it must keep the width the plan
+                    // reserved. Only a labelled button, which already is a pill, sizes to its word.
+                    label == null -> GlanceModifier.width(h)
                     else -> GlanceModifier.padding(horizontal = 14.dp)
                 },
             )
