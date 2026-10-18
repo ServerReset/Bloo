@@ -431,7 +431,10 @@ jobs:
   # so a burst of pushes still ends with every build published and the uploads taken one at a time.
   play:
     needs: [build]
-    if: always() && needs.build.result == 'success' && (github.event_name == 'push' || inputs.play_track != '')
+    # NOT on every branch push for now: Google's daily save quota was exhausted by the volume of pushes. It
+    # uploads for a `major-N` tag (closed track) or a manual run with a play_track; an ordinary push builds and
+    # publishes the GitHub release only. Put `github.event_name == 'push' ||` back to upload every push again.
+    if: always() && needs.build.result == 'success' && (inputs.play_track != '' || startsWith(github.ref, 'refs/tags/major-'))
     concurrency:
       group: play-upload
       cancel-in-progress: false
