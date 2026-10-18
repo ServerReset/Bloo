@@ -50,14 +50,21 @@ class BlooTileService : TileService() {
         CallbackToFutureAdapter.getFuture { completer ->
             scope.launch {
                 // Sealed after a restart: the tile shows nothing about the car until the PIN is entered.
-                val snapshot = if (WearBootGate.isLocked(applicationContext)) null
+                val sealed = WearBootGate.isLocked(applicationContext)
+                val snapshot = if (sealed) null
                 else runCatching { SnapshotStore(applicationContext).current() }.getOrNull()
                 val car = snapshot?.selected
+                // Whatever goes wrong while drawing, the request is answered: an unset completer leaves the tile
+                // spinning for good, so a failure draws the plain "open Bloo" layout instead.
+                val layout = runCatching { layoutFor(car, sealed) }.getOrElse { layoutFor(null, sealed) }
+                val freshness = runCatching {
+                    60_000L * com.bloo.bluelink.data.DeviceStatus.policy(applicationContext).pollIntervalMultiplier
+                }.getOrDefault(60_000L)
                 val tile = TileBuilders.Tile.Builder()
                     .setResourcesVersion(RESOURCES_VERSION)
                     // Refresh about once a minute while it is on screen.
-                    .setFreshnessIntervalMillis(60_000L * com.bloo.bluelink.data.DeviceStatus.policy(applicationContext).pollIntervalMultiplier)
-                    .setTileTimeline(TimelineBuilders.Timeline.fromLayoutElement(layoutFor(car)))
+                    .setFreshnessIntervalMillis(freshness)
+                    .setTileTimeline(TimelineBuilders.Timeline.fromLayoutElement(layout))
                     .build()
                 completer.set(tile)
             }
@@ -70,7 +77,7 @@ class BlooTileService : TileService() {
             "BlooTileResources"
         }
 
-    private fun layoutFor(car: VehicleSnapshot?): LayoutElementBuilders.LayoutElement {
+    private fun layoutFor(car: VehicleSnapshot?, sealed: Boolean = false): LayoutElementBuilders.LayoutElement {
         // The whole tile opens the app. The buttons below are separate clickables inside this one, and
         // the system routes the innermost hit, so a tap on "Charge" charges and a tap anywhere else
         // opens Bloo.
@@ -88,13 +95,15 @@ class BlooTileService : TileService() {
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
 
         if (car == null) {
+            // A sealed watch has been set up; it is only waiting for its PIN. Saying "add a car" read as not set up.
+            val line = if (sealed) "Enter your PIN in Bloo" else "Add a car in Bloo on your phone"
             glance.addContent(text("Bloo", 22f, WHITE, bold = true))
-            glance.addContent(text("Add a car in Bloo on your phone", 13f, MUTED))
+            glance.addContent(text(line, 13f, MUTED))
             glance.setModifiers(
                 ModifiersBuilders.Modifiers.Builder()
                     .setSemantics(
                         ModifiersBuilders.Semantics.Builder()
-                            .setContentDescription("Bloo. Add a car in Bloo on your phone.")
+                            .setContentDescription(if (sealed) "Bloo. Enter your PIN in Bloo." else "Bloo. Add a car in Bloo on your phone.")
                             .build(),
                     )
                     .build(),

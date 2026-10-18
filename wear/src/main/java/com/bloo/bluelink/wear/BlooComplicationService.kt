@@ -37,8 +37,10 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
         val car: VehicleSnapshot = snapshot.selected ?: return NoDataComplicationData()
         val description = "${car.name}, ${car.bigValue()}"
         return when (request.complicationType) {
+            // A request is answered in the type it asked for: no level means no data for a ranged one (the system
+            // rejects another type), not a text fallback.
             ComplicationType.RANGED_VALUE -> car.percent?.let { ranged(it.coerceIn(0, 100).toFloat(), car.bigValue(), description) }
-                ?: text(car.bigValue(), description)
+                ?: NoDataComplicationData()
             ComplicationType.SHORT_TEXT -> text(car.bigValue(), description)
             else -> NoDataComplicationData()
         }

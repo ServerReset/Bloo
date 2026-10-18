@@ -59,6 +59,8 @@ private val RestTop = 30.dp
 /** The pull's progress: 0..1 up to the arm point, past 1 beyond it (resisted below). */
 class WearPullState {
     var pull by mutableFloatStateOf(0f)
+    /** Where the pull was when the finger lifted, so the disc can carry on from there instead of restarting. */
+    var lastPull by mutableFloatStateOf(0f)
     /** Set the instant a release arms a refresh, before the repository's own flag flips, so the disc stays put. */
     var requested by mutableStateOf(false)
 }
@@ -74,6 +76,14 @@ fun Modifier.wearPullToRefresh(state: WearPullState, onRefresh: () -> Unit): Mod
     return pointerInput(state) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            // A pull starts in the upper part of the face (the tiles below are for tapping); a drag that begins low
+            // is left alone, so scrolling down from a bottom tile cannot refresh by accident.
+            if (down.position.y > size.height * 0.65f) {
+                do {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                } while (event.changes.any { it.pressed })
+                return@awaitEachGesture
+            }
             var dx = 0f
             var dy = 0f
             var armed = false
@@ -88,6 +98,7 @@ fun Modifier.wearPullToRefresh(state: WearPullState, onRefresh: () -> Unit): Mod
                 if (nowArmed && !armed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 armed = nowArmed
             } while (event.changes.any { it.pressed })
+            state.lastPull = state.pull
             if (state.pull >= 1f) {
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                 state.requested = true
@@ -110,20 +121,33 @@ fun BoxScope.WearPullIndicator(state: WearPullState, refreshing: Boolean) {
         }
     }
     LaunchedEffect(refreshing) { if (refreshing) state.requested = false }
+    fun fingerOf(p: Float): Float {
+        val over = (p - 1f).coerceAtLeast(0f)
+        return p.coerceIn(0f, 1f) + over / (1f + over) * 0.35f
+    }
     val raw = state.pull.coerceIn(0f, 1f)
     val over = (state.pull - 1f).coerceAtLeast(0f)
-    val finger = raw + over / (1f + over) * 0.35f
+    val finger = fingerOf(state.pull)
+    val dragging = state.pull > 0f
     val settle = remember { Animatable(0f) }
     LaunchedEffect(active) {
         if (active) {
-            if (settle.value < 0.01f) settle.snapTo(finger)
+            // From where the finger left it (it is already back to 0 by now), not from the top.
+            if (settle.value < 0.01f) settle.snapTo(fingerOf(state.lastPull))
             settle.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow))
         } else if (settle.value > 0.01f) {
             settle.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
         }
     }
-    // Driven by the finger 1:1 while pulling; by the spring once released into a refresh (or retracting).
-    val t = if (active || settle.isRunning) settle.value else finger
+    // A pull let go before the arm point springs back from where the finger left it.
+    LaunchedEffect(dragging) {
+        if (!dragging && !active && state.lastPull > 0.01f) {
+            settle.snapTo(fingerOf(state.lastPull))
+            settle.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+        }
+    }
+    // Driven by the finger 1:1 while pulling; by the spring otherwise (a refresh, or springing back).
+    val t = if (dragging && !active) finger else settle.value
     if (t <= 0.01f) return
     val density = LocalDensity.current
     val sizePx = with(density) { DiscSize.toPx() }
