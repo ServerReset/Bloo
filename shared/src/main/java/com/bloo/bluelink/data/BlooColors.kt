@@ -18,4 +18,21 @@ object BlooColors {
     const val tempHot         = 0xFFFF5722.toInt() // high temperature alert color
     const val warn            = 0xFFF5A623.toInt() // generic warning/caution color
     const val brandAccent     = 0xFF7B83EB.toInt() // Bloo brand accent: notification tint
+
+    /** Levels below which a charge or fuel reading warns (amber) and then alarms (red). */
+    const val LOW_LEVEL = 15
+    const val WARN_LEVEL = 30
+
+    /**
+     * The colour a charge or fuel level reads in, as ARGB: red when low, amber getting there, green otherwise, and
+     * the charging blue while it charges. A car with no level reads in [fallback]. One rule for the watch face, the
+     * watch tile and the phone widget.
+     */
+    fun levelColor(percent: Int?, charging: Boolean, fallback: Int): Int = when {
+        percent == null -> fallback
+        charging -> chargeBlue
+        percent < LOW_LEVEL -> heat
+        percent < WARN_LEVEL -> warn
+        else -> chargeGreen
+    }
 }

@@ -179,6 +179,9 @@ private data class Choice(
     val photo: Boolean = true,
     val blur: Int = WidgetPhoto.BLUR_MEDIUM,
     val extras: Boolean = true,
+    val corner: WidgetCorner = WidgetCorner.MEDIUM,
+    val textSize: WidgetTextSize = WidgetTextSize.NORMAL,
+    val levelTint: Boolean = false,
 )
 
 private suspend fun loadConfig(context: Context, widgetId: Int): Loaded {
@@ -207,6 +210,9 @@ private suspend fun loadConfig(context: Context, widgetId: Int): Loaded {
             photo = prefs[WidgetKeys.SHOW_PHOTO] ?: true,
             blur = prefs[WidgetKeys.PHOTO_BLUR] ?: WidgetPhoto.BLUR_MEDIUM,
             extras = prefs[WidgetKeys.SHOW_EXTRAS] ?: true,
+            corner = WidgetCorner.entries.getOrElse(prefs[WidgetKeys.CORNER] ?: WidgetCorner.MEDIUM.ordinal) { WidgetCorner.MEDIUM },
+            textSize = WidgetTextSize.entries.getOrElse(prefs[WidgetKeys.TEXT_SIZE] ?: WidgetTextSize.NORMAL.ordinal) { WidgetTextSize.NORMAL },
+            levelTint = prefs[WidgetKeys.LEVEL_TINT] ?: false,
         ),
     )
 }
@@ -278,11 +284,23 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
                     }
                     Spacer(Modifier.height(8.dp))
                 }
+            }
+
+            Section("Shape and text", Icons.Filled.ViewCompact) {
+                ChoiceRow("Corners", WidgetCorner.entries, choice.corner, { it.label }) { choice = choice.copy(corner = it) }
+                Spacer(Modifier.height(12.dp))
+                ChoiceRow("Text size", WidgetTextSize.entries, choice.textSize, { it.label }) { choice = choice.copy(textSize = it) }
+                OptionRow(Icons.Filled.ViewCompact, "Compact", "Tighter spacing and fewer lines", choice.compact) {
+                    choice = choice.copy(compact = it)
+                }
+            }
+
+            Section("What it shows", Icons.Filled.Bolt) {
                 OptionRow(Icons.Filled.Bolt, "Charge bar and status", "Shown on taller widgets where there is room", choice.extras) {
                     choice = choice.copy(extras = it)
                 }
-                OptionRow(Icons.Filled.ViewCompact, "Compact", "Tighter spacing and fewer lines", choice.compact) {
-                    choice = choice.copy(compact = it)
+                OptionRow(Icons.Filled.Palette, "Colour by level", "Red when low, amber, green, blue while charging", choice.levelTint) {
+                    choice = choice.copy(levelTint = it)
                 }
             }
 
@@ -341,7 +359,7 @@ private fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Choi
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f)
-                .clip(RoundedCornerShape(26.dp))
+                .clip(RoundedCornerShape(choice.corner.dp.dp))
                 .background(scheme.surfaceContainer),
         ) {
             if (choice.photo && photoUrl != null) {
@@ -367,7 +385,10 @@ private fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Choi
                 Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.Bottom) {
                     Column(Modifier.weight(1f)) {
-                        Text(car?.bigValue() ?: "80%", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = scheme.onSurface)
+                        Text(
+                            car?.bigValue() ?: "80%", fontSize = (34 * choice.textSize.scale).sp, fontWeight = FontWeight.Bold,
+                            color = if (choice.levelTint) Color(com.bloo.bluelink.data.BlooColors.levelColor(car?.percent ?: 80, car?.charging == true, 0xFF888888.toInt())) else scheme.onSurface,
+                        )
                         Text(
                             car?.stateLineOrParked() ?: "Locked · 210 mi",
                             style = MaterialTheme.typography.bodySmall,
@@ -403,6 +424,22 @@ private fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Choi
                     }
                 }
             }
+        }
+    }
+}
+
+/** A labelled segmented choice over any list of options (corners, text size). */
+@Composable
+private fun <T> ChoiceRow(title: String, options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
+    Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(8.dp))
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        options.forEachIndexed { i, option ->
+            SegmentedButton(
+                selected = option == selected,
+                onClick = { onSelect(option) },
+                shape = SegmentedButtonDefaults.itemShape(i, options.size),
+            ) { Text(label(option)) }
         }
     }
 }
@@ -543,6 +580,9 @@ private fun saveAndFinish(
                     m[WidgetKeys.SHOW_PHOTO] = choice.photo
                     m[WidgetKeys.PHOTO_BLUR] = choice.blur
                     m[WidgetKeys.SHOW_EXTRAS] = choice.extras
+                    m[WidgetKeys.CORNER] = choice.corner.ordinal
+                    m[WidgetKeys.TEXT_SIZE] = choice.textSize.ordinal
+                    m[WidgetKeys.LEVEL_TINT] = choice.levelTint
                 }
             }
             BlooWidget().update(context, glanceId)

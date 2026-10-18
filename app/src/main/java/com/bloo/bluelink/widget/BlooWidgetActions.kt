@@ -36,12 +36,24 @@ internal object WidgetKeys {
     val SHOW_PHOTO = booleanPreferencesKey("show_photo")
     /** How soft that photo is: [WidgetPhoto.BLUR_LIGHT], MEDIUM or STRONG. */
     val PHOTO_BLUR = androidx.datastore.preferences.core.intPreferencesKey("photo_blur")
+    /** The widget's corner roundness: [WidgetCorner] index (medium by default). */
+    val CORNER = androidx.datastore.preferences.core.intPreferencesKey("corner")
+    /** The widget's text size: [WidgetTextSize] index (normal by default). */
+    val TEXT_SIZE = androidx.datastore.preferences.core.intPreferencesKey("text_size")
+    /** Colour the value and the charge bar by level (red low, amber, green, blue charging); off follows the theme. */
+    val LEVEL_TINT = booleanPreferencesKey("level_tint")
     /** Show the charge bar and status chips when there is room (on by default). */
     val SHOW_EXTRAS = booleanPreferencesKey("show_extras")
 
     val PARAM_VIN = ActionParameters.Key<String>("vin")
     val PARAM_ACTION = ActionParameters.Key<String>("action")
 }
+
+/** How round the widget's corners are: small, medium (the default), large. */
+internal enum class WidgetCorner(val label: String, val dp: Int) { SMALL("Small", 16), MEDIUM("Medium", 28), LARGE("Large", 40) }
+
+/** How big the widget's text is relative to the layout's own sizing. */
+internal enum class WidgetTextSize(val label: String, val scale: Float) { SMALL("Small", 0.9f), NORMAL("Normal", 1f), LARGE("Large", 1.12f) }
 
 /** How long the "tap again to unlock" prompt stays live. */
 internal const val UNLOCK_CONFIRM_MS = 6_000L

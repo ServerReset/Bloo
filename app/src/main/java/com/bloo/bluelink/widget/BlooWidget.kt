@@ -75,6 +75,9 @@ private data class WidgetOptions(
     val photo: Boolean,
     val blur: Int,
     val extras: Boolean,
+    val corner: WidgetCorner,
+    val textSize: WidgetTextSize,
+    val levelTint: Boolean,
 ) {
     companion object {
         fun of(prefs: Preferences) = WidgetOptions(
@@ -86,6 +89,9 @@ private data class WidgetOptions(
             photo = prefs[WidgetKeys.SHOW_PHOTO] ?: true,
             blur = prefs[WidgetKeys.PHOTO_BLUR] ?: WidgetPhoto.BLUR_MEDIUM,
             extras = prefs[WidgetKeys.SHOW_EXTRAS] ?: true,
+            corner = WidgetCorner.entries.getOrElse(prefs[WidgetKeys.CORNER] ?: WidgetCorner.MEDIUM.ordinal) { WidgetCorner.MEDIUM },
+            textSize = WidgetTextSize.entries.getOrElse(prefs[WidgetKeys.TEXT_SIZE] ?: WidgetTextSize.NORMAL.ordinal) { WidgetTextSize.NORMAL },
+            levelTint = prefs[WidgetKeys.LEVEL_TINT] ?: false,
         )
     }
 }
@@ -130,7 +136,7 @@ private fun WidgetContent(data: WidgetData) {
     }
     val pad = widgetPad(opts.compact).dp
     Box(
-        GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(28.dp).clickable(open),
+        GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(opts.corner.dp.dp).clickable(open),
     ) {
         photo?.let { bmp ->
             Image(ImageProvider(bmp), null, modifier = GlanceModifier.fillMaxSize(), contentScale = androidx.glance.layout.ContentScale.Crop)
@@ -188,16 +194,19 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
     val plan = planWidget(
         widthDp = size.width.value,
         heightDp = size.height.value,
-        fontScale = context.resources.configuration.fontScale,
+        fontScale = context.resources.configuration.fontScale * opts.textSize.scale,
         compact = opts.compact,
         valueChars = car.bigValue().length,
         actionCount = actionCount,
     )
-    val valueStyle = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = plan.valueSp.sp, fontWeight = FontWeight.Bold)
+    // The wearer's text size multiplies every size the plan chose; the plan was budgeted with it, so it still fits.
+    val us = opts.textSize.scale
+    val levelColor = if (opts.levelTint && car.percent != null) levelTint(car) else null
+    val valueStyle = TextStyle(color = levelColor ?: GlanceTheme.colors.onSurface, fontSize = (plan.valueSp * us).sp, fontWeight = FontWeight.Bold)
 
     when (plan.arrangement) {
         WidgetArrangement.MINIMAL -> Column(root) {
-            Header(car, showUpdated = false, opts = opts, pending = pending, nameSp = plan.nameSp.sp)
+            Header(car, showUpdated = false, opts = opts, pending = pending, nameSp = (plan.nameSp * us).sp)
             Spacer(GlanceModifier.defaultWeight())
             Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(car.bigValue(), maxLines = 1, modifier = GlanceModifier.defaultWeight(), style = valueStyle)
@@ -206,30 +215,30 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
         }
         WidgetArrangement.SIDE -> Row(root, verticalAlignment = Alignment.CenterVertically) {
             Column(GlanceModifier.defaultWeight().fillMaxHeight()) {
-                Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = plan.nameSp.sp)
+                Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = (plan.nameSp * us).sp)
                 Spacer(GlanceModifier.defaultWeight())
                 Text(car.bigValue(), maxLines = 1, style = valueStyle)
-                if (plan.showStatus) StatusText(car, note, plan.statusSp.sp)
+                if (plan.showStatus) StatusText(car, note, (plan.statusSp * us).sp)
             }
             Spacer(GlanceModifier.width(12.dp))
             ControlGrid(car, pending, armed, opts, plan)
         }
         WidgetArrangement.STACK -> Column(root) {
-            Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = plan.nameSp.sp)
+            Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = (plan.nameSp * us).sp)
             // Spare height is shared between the sections (each Spacer takes an equal share), so a tall
             // widget is evenly spaced rather than empty in one band.
             Spacer(GlanceModifier.defaultWeight())
             Text(car.bigValue(), maxLines = 1, style = valueStyle)
-            if (plan.showStatus) StatusText(car, note, plan.statusSp.sp)
+            if (plan.showStatus) StatusText(car, note, (plan.statusSp * us).sp)
             if (plan.showDetails) {
                 car.detailLine()?.let { line ->
                     Spacer(GlanceModifier.height(4.dp))
-                    Text(line, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = plan.detailSp.sp))
+                    Text(line, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = (plan.detailSp * us).sp))
                 }
             }
             if (plan.showBar && opts.extras) {
                 Spacer(GlanceModifier.height(WidgetGap * 2))
-                ChargeBar(car)
+                ChargeBar(car, levelColor)
             }
             if (plan.showChips && opts.extras) {
                 Spacer(GlanceModifier.height(WidgetGap))
@@ -243,12 +252,12 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
 
 /** The charge (or fuel) as a bar, with the charge limit's share in a lighter tone when it is known. */
 @Composable
-private fun ChargeBar(car: VehicleSnapshot) {
+private fun ChargeBar(car: VehicleSnapshot, tint: androidx.glance.unit.ColorProvider? = null) {
     val pct = car.percent ?: return
     androidx.glance.appwidget.LinearProgressIndicator(
         progress = (pct / 100f).coerceIn(0f, 1f),
         modifier = GlanceModifier.fillMaxWidth().height(WIDGET_BAR_DP.dp).cornerRadius((WIDGET_BAR_DP / 2).dp),
-        color = GlanceTheme.colors.primary,
+        color = tint ?: GlanceTheme.colors.primary,
         backgroundColor = GlanceTheme.colors.secondaryContainer,
     )
 }
@@ -511,3 +520,9 @@ private fun VehicleSnapshot.detailLine(): String? = listOfNotNull(
     odometer?.takeIf { it.isNotBlank() }?.let { "Odo $it" },
     lastServiceMiles?.let { "Service ${it} mi" },
 ).joinToString("   ·   ").ifBlank { null }
+
+/** The value's and the bar's colour by level (red low, amber, green, blue charging), shared with the watch. */
+private fun levelTint(car: VehicleSnapshot): androidx.glance.unit.ColorProvider =
+    androidx.glance.unit.ColorProvider(
+        androidx.compose.ui.graphics.Color(com.bloo.bluelink.data.BlooColors.levelColor(car.percent, car.charging == true, 0xFF888888.toInt())),
+    )
