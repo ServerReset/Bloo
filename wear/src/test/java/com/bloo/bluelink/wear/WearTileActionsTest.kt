@@ -77,4 +77,11 @@ class WearTileActionsTest {
         val actions = WearTileActions.forCar(car(locked = false), listOf("refresh", "lock", "none", "horn"))
         assertEquals(listOf("Refresh", "Lock", "Horn"), actions.map { it.label })
     }
+
+    @Test
+    fun `a long label keeps its first word on the tile`() {
+        assertEquals("Climate", WearTileActions.tileLabel("Climate off"))
+        assertEquals("Stop", WearTileActions.tileLabel("Stop charge"))
+        assertEquals("Unlock", WearTileActions.tileLabel("Unlock"))
+    }
 }
