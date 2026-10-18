@@ -241,13 +241,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(context)) {
                         BodySmallText("Google Play keeps this copy up to date.")
                         Spacer(Modifier.height(GapHairline))
-                        SafeMorphTextButton(
-                            "Play Store",
-                            onClick = {
-                                openUrl(context, com.bloo.bluelink.update.UpdateRuntime.playUrl(context))
-                            },
-                            icon = Icons.AutoMirrored.Filled.OpenInNew,
-                        )
+                        PlayStoreLinks()
                     } else ActionRow {
                         SafeMorphTextButton(
                             "Check",

@@ -159,13 +159,7 @@ class CrashActivity : ComponentActivity() {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                MorphTextButton(
-                    "Play Store",
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        context.tryStart(Intent(Intent.ACTION_VIEW, UpdateRuntime.playUrl(context).toUri()))
-                    },
-                )
+                com.bloo.bluelink.ui.PlayStoreLinks()
             }
             return
         }

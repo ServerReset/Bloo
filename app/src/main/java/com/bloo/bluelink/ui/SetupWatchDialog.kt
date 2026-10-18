@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -74,16 +73,9 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                 }
             },
             buttons = {
-                ActionRow(spacing = GapGroup) {
-                    SafeMorphTextButton("Close", onClick = onDismiss)
-                    MorphActionButton(
-                        label = "Play Store",
-                        icon = Icons.AutoMirrored.Filled.OpenInNew,
-                        onClick = {
-                            openUrl(context, com.bloo.bluelink.update.UpdateRuntime.playUrl(context))
-                        },
-                        emphasis = ButtonEmphasis.Confirm,
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                    PlayStoreLinks()
+                    ActionRow(spacing = GapGroup) { SafeMorphTextButton("Close", onClick = onDismiss) }
                 }
             },
         )

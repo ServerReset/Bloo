@@ -37,8 +37,11 @@ internal object UpdateRuntime {
      */
     const val PLAY_LISTING_URL = "https://play.google.com/store/apps/details?id=com.bloo.bluelink"
 
-    /** The opt-in page: where someone who has NOT joined yet goes to become a tester. */
-    private const val PLAY_OPT_IN_URL = "https://play.google.com/apps/testing/com.bloo.bluelink"
+    /**
+     * Where someone who has NOT joined the testing yet signs up: the testers' Google Group. Being in it is
+     * what puts an account on the tester list; the listing above only resolves for accounts that are.
+     */
+    const val JOIN_TESTING_URL = "https://groups.google.com/g/bloo-testing"
 
     /**
      * Whether this build was cut for a major, and so published to CLOSED testing. An ordinary push
@@ -48,18 +51,6 @@ internal object UpdateRuntime {
      * signal it has: the version the pipeline stamped. See app/build.gradle.kts's BLOO_MAJOR.
      */
     val isClosedTesting: Boolean get() = BuildConfig.BLOO_MAJOR > 0
-
-    /**
-     * The Play page for THIS copy, for every button in the app that opens one.
-     *
-     * A closed-testing build links the listing, because its testers are on the track the listing
-     * belongs to and they can already see it. An internal build links the opt-in page instead: internal
-     * testers are a hand-picked list rather than a public opt-in, and the opt-in page is what resolves
-     * for an account that has been added to one. Both are one call so no screen has to decide, and so
-     * the rule is written down once.
-     */
-    fun playUrl(context: Context): String =
-        if (isClosedTesting || !fromPlayStore(context)) PLAY_LISTING_URL else PLAY_OPT_IN_URL
 
     @Volatile
     private var fromPlay: Boolean? = null
