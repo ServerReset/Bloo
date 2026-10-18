@@ -455,6 +455,13 @@ internal fun ActionButton(
         CarAction.FLASH_LIGHTS -> R.drawable.ic_widget_flash
         else -> R.drawable.ic_widget_bolt
     }
+    val spoken = when (action) {
+        CarAction.TOGGLE_LOCK -> if (locked) "Unlock" else "Lock"
+        CarAction.TOGGLE_CLIMATE -> "Climate"
+        CarAction.TOGGLE_CHARGE -> "Charge"
+        CarAction.FLASH_LIGHTS -> "Flash lights"
+        else -> action
+    }
     val text = when {
         busy -> "…"
         action == CarAction.TOGGLE_LOCK && armed -> "Confirm"
@@ -484,7 +491,8 @@ internal fun ActionButton(
             // glyph keeps four of them inside a wide widget, which icon+label never fit.
             if (text == null) {
                 Image(
-                    ImageProvider(icon), null,
+                    // Said aloud by a screen reader: the button's only content is this glyph.
+                    ImageProvider(icon), spoken,
                     modifier = GlanceModifier.size(if (tall) 24.dp else if (compact) 18.dp else 20.dp),
                     colorFilter = ColorFilter.tint(content),
                 )
