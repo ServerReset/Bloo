@@ -146,7 +146,8 @@ internal fun BoxScope.ToastSlot(
     val barPx = with(density) { ChromeBarHeight.toPx() }
     val maxCardPx = with(density) { MaxToastWidth.toPx() }
     val swipePx = with(density) { StackSwipe.toPx() }
-    val folded = expandFrac() < 0.5f
+    // Read through derivedStateOf: composition only hears the fold/fan flip, not every frame of the animation.
+    val folded by androidx.compose.runtime.remember { androidx.compose.runtime.derivedStateOf { expandFrac() < 0.5f } }
     val foldedNow by androidx.compose.runtime.rememberUpdatedState(folded)
     val toggle by androidx.compose.runtime.rememberUpdatedState(onSetExpanded)
     var vDrag by remember(toast.id) { androidx.compose.runtime.mutableFloatStateOf(0f) }

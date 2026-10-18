@@ -77,10 +77,15 @@ private fun StripContent(cars: List<VehicleSnapshot>) {
         val armed = prefs[WidgetKeys.ARMED]?.split("|")?.takeIf {
             it.size == 2 && it[0] == car.vin && now - (it[1].toLongOrNull() ?: 0L) < UNLOCK_CONFIRM_MS
         } != null
+        // A failed command's note (the full widget's red line) takes the name's place for a few seconds, so a refused
+        // lock or unlock is not silent on the strip.
+        val note = prefs[WidgetKeys.NOTE]?.split("|")?.takeIf {
+            it.size == 2 && now - (it[1].toLongOrNull() ?: 0L) < NOTE_MS
+        }?.get(0)
         Column(GlanceModifier.defaultWeight()) {
             Text(
-                car.name, maxLines = 1,
-                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                note ?: car.name, maxLines = 1,
+                style = TextStyle(color = if (note != null) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium),
             )
             Text(
                 car.bigValue(), maxLines = 1,
