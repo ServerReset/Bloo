@@ -279,8 +279,10 @@ fun ExpressiveButtonGroup(
                     if (press[i] > 0f) {
                         // At most 1.25x its resting width: a lone button widening toward the whole
                         // row reads as a slab.
+                        // Never below its resting width: a lone button already stretched to the whole line (a wrapped row
+                        // that handed it the full width) used to SHRINK toward 1.25x its content on press.
                         val fill = minOf(room.toDouble(), maxSinglePx.toDouble(), basis[i] * 1.25)
-                            .coerceAtLeast(basis[i].toDouble())
+                            .coerceAtLeast(maxOf(basis[i].toDouble(), base[i]))
                         exact[i] = base[i] + (fill - base[i]) * press[i]
                     }
                 }
