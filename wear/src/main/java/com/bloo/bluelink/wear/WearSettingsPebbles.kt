@@ -60,11 +60,21 @@ internal fun WearAutoLockPebble() {
             WearAutoLock.setEnabled(context, enabled)
         }
         WearCenteredText(
-            if (enabled) "On: the watch locks the car about a minute after it feels you set off."
-            else "Beta: the watch locks the car when it feels you leave. Off by default.",
+            if (enabled) "On. The watch locks the car about a minute after it feels you walk away."
+            else "Beta. The watch locks the car when it feels you walk away. Off by default.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Normal,
+            maxLines = 4,
+        )
+        // Said plainly: the watch has no Bluetooth link to the car. That pairing (the car's own Bluetooth) belongs to the
+        // phone's AutoLock, so it is set up there; this one runs from the watch's motion sensor alone.
+        WearCenteredText(
+            "Uses the watch's motion sensor. To lock by the car's Bluetooth, set up AutoLock in Bloo on your phone.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Normal,
+            maxLines = 5,
         )
     }
 }

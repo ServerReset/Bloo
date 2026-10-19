@@ -3,7 +3,6 @@ package com.bloo.bluelink.wear
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -122,31 +121,27 @@ fun WearActionRow(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         onClick = onClick,
     ) {
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+        // The glyph (or the in-flight spinner) and the label side by side, the label taking the row and wrapping to a
+        // second line before it is ever cut. The shared icon-and-label layout DROPPED the label when it did not fit,
+        // which left long rows ("Lock when I walk away", "Top left: Lock / unlock") as an icon and nothing else.
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             if (glyph != null) {
-                // The shared label draws its glyph from LocalContentColor, so it has to be told which
-                // tone this row is in.
                 androidx.compose.runtime.CompositionLocalProvider(
                     androidx.compose.material3.LocalContentColor provides tint,
                 ) {
-                    MorphButtonLabel(
-                        icon = glyph,
-                        label = label,
-                        pending = pending,
-                        iconSize = 18.dp,
-                        style = MaterialTheme.typography.labelLarge,
-                    )
+                    MorphButtonLabel(icon = glyph, label = "", pending = pending, iconSize = 18.dp)
                 }
-            } else {
-                RevealText(
-                    label,
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = tint,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Spacer(Modifier.width(10.dp))
             }
+            RevealText(
+                label,
+                modifier = Modifier.weight(1f),
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge,
+                color = tint,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         if (switch) {
             Spacer(Modifier.width(8.dp))

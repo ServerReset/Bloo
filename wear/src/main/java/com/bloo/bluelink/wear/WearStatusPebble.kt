@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
@@ -31,20 +32,21 @@ import com.bloo.uicommon.RevealText
 @Composable
 internal fun WearStatusPebble(v: VehicleSnapshot, refreshing: Boolean, canRefresh: Boolean, onRefresh: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    val rows = buildList {
-        v.locked?.let { add("Doors" to (if (it) "Locked" else "Unlocked")) }
-        v.rangeMi?.let { add("Range" to "$it mi") }
-        if (v.hasBattery) {
-            v.charging?.let { add("Charging" to (if (it) "Yes" else "No")) }
-            v.chargeLimitPct?.let { add("Limit" to "$it%") }
-        }
-        v.climateOn?.let { add("Climate" to (if (it) "On" else "Off")) }
-        v.odometer?.takeIf { it.isNotBlank() }?.let { add("Odometer" to it) }
-        v.licensePlate?.takeIf { it.isNotBlank() }?.let { add("Plate" to it) }
-    }
+    // The car's state now, from [WearCarFacts]; the care and freshness group is its own pebble below it.
     WearPebble(title = v.name, icon = Icons.Filled.DirectionsCar) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            rows.forEach { (label, value) -> WearStatRow(label, value) }
+            WearCarFacts.status(v).forEach { (label, value) -> WearStatRow(label, value) }
+        }
+    }
+}
+
+/** Odometer, service, plate, how fresh the reading is, and the refresh button where the freshness is. */
+@Composable
+internal fun WearCarCarePebble(v: VehicleSnapshot, refreshing: Boolean, canRefresh: Boolean, onRefresh: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    WearPebble(title = "Care", icon = Icons.Filled.Build) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            WearCarFacts.care(v).forEach { (label, value) -> WearStatRow(label, value) }
             val updated = v.updatedLabel()
             if (refreshing || updated != null) {
                 WearStatRow(

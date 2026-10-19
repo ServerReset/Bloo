@@ -32,6 +32,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -198,9 +200,52 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val tint = if (action.active) scheme.onPrimary else scheme.onSurface
     val glyph = action.icon ?: standardButtonIcon(action.label)
+    // --- The tile's motion: it pops in (staggered by quadrant), squashes under a finger and springs back, breathes
+    // while it is on, and its glyph bounces when what it says changes. All gated by the watch's own power policy.
+    val policy by DeviceStatus.policy.collectAsStateWithLifecycle()
+    val interaction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        if (pressed) 0.92f else 1f,
+        animationSpec = if (policy.bouncySprings) spring(dampingRatio = 0.42f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium) else snap(),
+        label = "tilePress",
+    )
+    val enter = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(if (policy.bouncySprings) 0f else 1f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (enter.value < 1f) {
+            kotlinx.coroutines.delay(quadrant * 70L)
+            enter.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = androidx.compose.animation.core.Spring.StiffnessLow))
+        }
+    }
+    val breathe = if (action.active && policy.ambientMotion) {
+        androidx.compose.animation.core.rememberInfiniteTransition(label = "tileBreath").animateFloat(
+            0.86f, 1f,
+            androidx.compose.animation.core.infiniteRepeatable(
+                androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                androidx.compose.animation.core.RepeatMode.Reverse,
+            ),
+            label = "tileBreathAlpha",
+        )
+    } else null
+    // The glyph bounces when the tile's meaning changes (Lock becomes Unlock, Climate turns on).
+    val glyphBump = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(1f) }
+    androidx.compose.runtime.LaunchedEffect(action.label, action.active) {
+        if (policy.bouncySprings) {
+            glyphBump.snapTo(1.3f)
+            glyphBump.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium))
+        }
+    }
     MorphButton(
         onClick = action.onClick,
+        interactionSource = interaction,
         modifier = modifier.semantics { contentDescription = action.label }
+            .graphicsLayer {
+                val e = enter.value
+                val s = (0.78f + 0.22f * e) * pressScale
+                scaleX = s
+                scaleY = s
+                alpha = e.coerceIn(0f, 1f) * (breathe?.value ?: 1f)
+            }
             .wearGlassRim(shape(0f)),
         enabled = !action.pending,
         frostWhenDisabled = false,
@@ -225,7 +270,8 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
         Box(Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.Center) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.align(androidx.compose.ui.BiasAlignment(biasX(toward), biasY(toward))),
+                modifier = Modifier.align(androidx.compose.ui.BiasAlignment(biasX(toward), biasY(toward)))
+                    .graphicsLayer { scaleX = glyphBump.value; scaleY = glyphBump.value },
             ) {
                 glyph?.let {
                     CompositionLocalProvider(LocalContentColor provides tint) {

@@ -35,9 +35,10 @@ internal fun WearDetailsPage(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    WearListScreen(contentPadding = PaddingValues(vertical = 18.dp)) {
+    WearListScreen(contentPadding = PaddingValues(top = 34.dp, bottom = 22.dp)) {
         // The refresh button sits with the freshness in the status pebble.
-        item { WearStatusPebble(v, refreshing = refreshing, canRefresh = signedIn, onRefresh = { repo.refresh() }) }
+        item { WearStatusPebble(v, refreshing = refreshing, canRefresh = false, onRefresh = {}) }
+        item { WearCarCarePebble(v, refreshing = refreshing, canRefresh = signedIn, onRefresh = { repo.refresh() }) }
         // The update error, shown where the update lives. It used to go nowhere at all.
         updateError?.let { message ->
             item {
