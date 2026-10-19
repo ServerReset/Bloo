@@ -86,9 +86,13 @@ internal fun OnboardingSetupPage(
 ) {
     val scheme = MaterialTheme.colorScheme
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        // After a refusal the system dialog may never show again (a second denial, or "don't ask again", answers
+        // instantly), and this step blocks Next: so the button then opens the app's notification settings, the one place
+        // the permission can still be turned on. The resume re-check unblocks the step when it is.
+        var denied by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
         val notifLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
-        ) { granted -> onNotifResult(granted) }
+        ) { granted -> if (!granted) denied = true; onNotifResult(granted) }
         OnboardingStagger(0) {
         OnboardingSetupCard(
             icon = Icons.Filled.Notifications,
@@ -98,9 +102,21 @@ internal fun OnboardingSetupPage(
             required = true,
         ) {
             MorphActionButton(
-                label = "Turn on notifications",
+                label = if (denied) "Open notification settings" else "Turn on notifications",
                 icon = Icons.Filled.Notifications,
-                onClick = { notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
+                onClick = {
+                    if (denied) {
+                        runCatching {
+                            context.startActivity(
+                                android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        }
+                    } else {
+                        notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 emphasis = ButtonEmphasis.Confirm,
             )
