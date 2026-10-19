@@ -52,8 +52,7 @@ suspend fun SettingsStore.importSettingsJson(json: String): String? {
     val plan = SyncMerge.parseBackup(json) ?: return "Settings file has no data"
     val photoPaths = SyncPhotos.apply(context, root["photos"] as? JsonObject)
     editTracked { mut ->
-        plan.stringPuts.forEach { (name, value) -> mut[stringPreferencesKey(name)] = value }
-        plan.boolPuts.forEach { (name, value) -> mut[booleanPreferencesKey(name)] = value }
+        mut.putTyped(plan.stringPuts, plan.boolPuts)
         photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
         // Propagate deletions: a key tombstoned on the source device is removed here too (both key
         // types, since this file mixes string/boolean prefs under the same name) so a deletion
@@ -128,8 +127,7 @@ internal suspend fun SettingsStore.mergeSettingsJson(json: String, protect: Set<
         val guarded = protect + liveDirty
         // Non-null after the guards above; the return is defensive.
         val plan = SyncMerge.mergePlan(json, guarded) ?: return@edit
-        plan.stringPuts.forEach { (name, value) -> mut[stringPreferencesKey(name)] = value }
-        plan.boolPuts.forEach { (name, value) -> mut[booleanPreferencesKey(name)] = value }
+        mut.putTyped(plan.stringPuts, plan.boolPuts)
         // Same race as `liveDirty`: setImageUrl (via editTracked, no mutex) can land after the snapshot, and
         // overwriting it would also leave it unmarked for re-upload.
         photoPaths.forEach { (vin, path) ->
@@ -169,8 +167,7 @@ internal suspend fun SettingsStore.adoptSettingsJson(json: String): Boolean {
     // Unguarded plan: the file wins for every portable pref/tombstone.
     val plan = SyncMerge.parseBackup(json) ?: return false
     context.settingsDataStore.edit { mut ->
-        plan.stringPuts.forEach { (name, value) -> mut[stringPreferencesKey(name)] = value }
-        plan.boolPuts.forEach { (name, value) -> mut[booleanPreferencesKey(name)] = value }
+        mut.putTyped(plan.stringPuts, plan.boolPuts)
         photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
         plan.removes.forEach { name ->
             mut.remove(stringPreferencesKey(name))
@@ -182,4 +179,25 @@ internal suspend fun SettingsStore.adoptSettingsJson(json: String): Boolean {
         mut.remove(stringPreferencesKey("sync_dirty_keys"))
     }
     return true
+}
+
+/**
+ * Applies a file's values, but never one of a different TYPE than the setting already holds. Preferences are keyed
+ * by name, and a hand-edited or foreign file can say `"theme_mode": true`; written as given, the reader (which asks
+ * for a string) throws ClassCastException on every launch and the app crash-loops until its data is cleared, with Drive
+ * sync restoring the bad value. A value that disagrees with what is stored is skipped instead.
+ */
+private fun androidx.datastore.preferences.core.MutablePreferences.putTyped(
+    strings: Map<String, String>,
+    bools: Map<String, Boolean>,
+) {
+    val held = asMap().mapKeys { it.key.name }
+    strings.forEach { (name, value) ->
+        val now = held[name]
+        if (now == null || now is String) this[stringPreferencesKey(name)] = value
+    }
+    bools.forEach { (name, value) ->
+        val now = held[name]
+        if (now == null || now is Boolean) this[booleanPreferencesKey(name)] = value
+    }
 }
