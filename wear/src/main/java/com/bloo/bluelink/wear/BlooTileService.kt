@@ -124,12 +124,29 @@ class BlooTileService : TileService() {
     /**
      * The tile as the face in the app: the charge ring round the edge, the four chosen controls as quarters inside it,
      * and the value in a hub where they meet. Pressing a quarter runs that control (through the app, so the PIN gate
-     * applies); pressing the hub refreshes. Quarters are rounded squares: a Tile cannot clip to a quarter disc.
+     * applies); pressing the hub refreshes. Each quarter is a disc quarter, from per-corner radii.
      */
     private fun faceLayout(car: VehicleSnapshot, open: ModifiersBuilders.Modifiers): LayoutElementBuilders.LayoutElement {
         val color = tint(car)
         val slots = WearTileActions.forSlots(car, WearFacePrefs.load(applicationContext))
-        fun quarter(a: WearTileAction?): LayoutElementBuilders.LayoutElement {
+        // Quarter discs, as on the face: the OUTER corner (the one on the display's edge) rounded by the tile's whole width,
+        // the inner corner (at the hub) a soft curve, the other two nearly square. [index]: 0 top-left, 1 top-right,
+        // 2 bottom-left, 3 bottom-right.
+        fun quarterCorner(index: Int): ModifiersBuilders.Corner {
+            fun r(v: Float) = ModifiersBuilders.CornerRadius.Builder(dp(v), dp(v)).build()
+            val outer = r(92f)
+            val inner = r(16f)
+            val flat = r(4f)
+            val b = ModifiersBuilders.Corner.Builder()
+            when (index) {
+                0 -> b.setTopLeftRadius(outer).setTopRightRadius(flat).setBottomRightRadius(inner).setBottomLeftRadius(flat)
+                1 -> b.setTopLeftRadius(flat).setTopRightRadius(outer).setBottomRightRadius(flat).setBottomLeftRadius(inner)
+                2 -> b.setTopLeftRadius(flat).setTopRightRadius(inner).setBottomRightRadius(flat).setBottomLeftRadius(outer)
+                else -> b.setTopLeftRadius(inner).setTopRightRadius(flat).setBottomRightRadius(outer).setBottomLeftRadius(flat)
+            }
+            return b.build()
+        }
+        fun quarter(index: Int, a: WearTileAction?): LayoutElementBuilders.LayoutElement {
             val box = LayoutElementBuilders.Box.Builder()
                 .setWidth(expand())
                 .setHeight(expand())
@@ -139,7 +156,7 @@ class BlooTileService : TileService() {
                 .setBackground(
                     ModifiersBuilders.Background.Builder()
                         .setColor(argb(if (a?.active == true) ACTIVE else if (a != null) BUTTON else QUIET))
-                        .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(26f)).build())
+                        .setCorner(quarterCorner(index))
                         .build(),
                 )
             if (a != null) {
@@ -161,9 +178,9 @@ class BlooTileService : TileService() {
         val grid = LayoutElementBuilders.Column.Builder()
             .setWidth(expand())
             .setHeight(expand())
-            .addContent(row(quarter(slots[0]), quarter(slots[1])))
+            .addContent(row(quarter(0, slots[0]), quarter(1, slots[1])))
             .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(5f)).build())
-            .addContent(row(quarter(slots[2]), quarter(slots[3])))
+            .addContent(row(quarter(2, slots[2]), quarter(3, slots[3])))
             .setModifiers(
                 ModifiersBuilders.Modifiers.Builder()
                     .setPadding(ModifiersBuilders.Padding.Builder().setAll(dp(16f)).build())
