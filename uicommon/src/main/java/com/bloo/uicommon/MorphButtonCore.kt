@@ -1,6 +1,5 @@
 package com.bloo.uicommon
 
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -83,9 +82,7 @@ fun MorphButtonCore(
     // The content Row wraps and the chrome uses matchParentSize(), so CONTENT decides the button's size
     // and `modifier` stretches it. fillMaxSize() children would leave the Box with no intrinsic size
     // (growing to full width, or zero height in unbounded parents).
-    // mergeDescendants: the label (a sibling of the clickable chrome, not inside it) and the click become ONE node, so a
-    // screen reader reads "Lock, button" as one stop instead of an unlabelled click target plus a separate text stop.
-    Box(modifier = modifier.semantics(mergeDescendants = true) {}, contentAlignment = Alignment.Center) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
         MorphChrome(
             pressed = pressed,
             active = active,
