@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -140,12 +141,14 @@ private fun resultIntent(widgetId: Int) =
 /** Everything the screen folds in one load: the cars (with their photos), and the widget's existing options. */
 private data class Loaded(
     val sealed: Boolean,
+    /** This widget is the slim strip: it gets a shape and an ordered choice of controls instead of the full widget's options. */
+    val strip: Boolean,
     val cars: List<VehicleSnapshot>,
     val photos: Map<String, String>,
     val choice: Choice,
 ) {
     companion object {
-        fun empty() = Loaded(false, emptyList(), emptyMap(), Choice())
+        fun empty() = Loaded(false, false, emptyList(), emptyMap(), Choice())
     }
 }
 
@@ -163,6 +166,9 @@ internal data class Choice(
     val corner: WidgetCorner = WidgetCorner.MEDIUM,
     val textSize: WidgetTextSize = WidgetTextSize.NORMAL,
     val levelTint: Boolean = false,
+    val stripShape: StripShape = StripShape.PILL,
+    /** The strip's buttons, most important first: a narrower strip keeps the front of this list. */
+    val stripControls: List<StripControl> = StripControl.entries,
 )
 
 private suspend fun loadConfig(context: Context, widgetId: Int): Loaded {
@@ -177,8 +183,12 @@ private suspend fun loadConfig(context: Context, widgetId: Int): Loaded {
         val glanceId = GlanceAppWidgetManager(context).getGlanceIdBy(widgetId)
         getAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId)
     }.getOrDefault(emptyPreferences())
+    val strip = runCatching {
+        AppWidgetManager.getInstance(context).getAppWidgetInfo(widgetId)?.provider?.className == BlooStripWidgetReceiver::class.java.name
+    }.getOrDefault(false)
     return Loaded(
         sealed = sealed,
+        strip = strip,
         cars = cars,
         photos = photos,
         choice = Choice(
@@ -194,6 +204,8 @@ private suspend fun loadConfig(context: Context, widgetId: Int): Loaded {
             corner = WidgetCorner.entries.getOrElse(prefs[WidgetKeys.CORNER] ?: WidgetCorner.MEDIUM.ordinal) { WidgetCorner.MEDIUM },
             textSize = WidgetTextSize.entries.getOrElse(prefs[WidgetKeys.TEXT_SIZE] ?: WidgetTextSize.NORMAL.ordinal) { WidgetTextSize.NORMAL },
             levelTint = prefs[WidgetKeys.LEVEL_TINT] ?: false,
+            stripShape = StripShape.entries.getOrElse(prefs[WidgetKeys.STRIP_SHAPE] ?: 0) { StripShape.PILL },
+            stripControls = StripControl.of(prefs, WidgetOptions.of(prefs)),
         ),
     )
 }
@@ -223,13 +235,24 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
             // The live preview: every choice below shows up here as you make it.
             // The preview at a chosen size, from the widget's own plan: tall and narrow shows what a tall and narrow
             // widget does, not just a medium one.
-            var previewSize by remember { mutableStateOf(PreviewSize.TALL) }
-            SettingsSegmentedRow(
-                label = "Preview size",
-                options = PreviewSize.entries.map { SegmentOption(it.name, it.label) },
-                selectedKey = previewSize.name,
-            ) { previewSize = PreviewSize.valueOf(it) }
-            WidgetPreview(car, photoUrl, choice, previewSize)
+            if (loaded.strip) {
+                // Buttons per width: the strip keeps the front of the list and drops the rest as it narrows.
+                var stripWidth by remember { mutableStateOf(330) }
+                SettingsSegmentedRow(
+                    label = "Preview width",
+                    options = listOf(SegmentOption("250", "Narrow"), SegmentOption("330", "Medium"), SegmentOption("410", "Wide")),
+                    selectedKey = stripWidth.toString(),
+                ) { stripWidth = it.toInt() }
+                StripPreview(car, photoUrl, choice, stripControlCount(stripWidth.toFloat()))
+            } else {
+                var previewSize by remember { mutableStateOf(PreviewSize.TALL) }
+                SettingsSegmentedRow(
+                    label = "Preview size",
+                    options = PreviewSize.entries.map { SegmentOption(it.name, it.label) },
+                    selectedKey = previewSize.name,
+                ) { previewSize = PreviewSize.valueOf(it) }
+                WidgetPreview(car, photoUrl, choice, previewSize)
+            }
 
             when {
                 loaded.sealed -> NoteGroup("Open Bloo and sign in to see your car. The widget can still be added and fills in once you do.")
@@ -243,9 +266,16 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
                 }
             }
 
-            // Only what a person actually decides: which car, whether the photo is behind it, and which controls it has.
-            // Corner shape, text size, softness, colouring and spacing are the widget's own good defaults (it sizes
-            // itself to the space it is given), not choices to make.
+            if (loaded.strip) {
+                SettingsGroup("Shape") {
+                    SettingsSegmentedRow(
+                        label = "Corners",
+                        options = StripShape.entries.map { SegmentOption(it.name, it.label) },
+                        selectedKey = choice.stripShape.name,
+                    ) { choice = choice.copy(stripShape = StripShape.valueOf(it)) }
+                }
+            }
+
             SettingsGroup("Background") {
                 ToggleRow(
                     "Car photo",
@@ -255,13 +285,32 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
             }
 
             SettingsGroup("Controls") {
-                SettingsCaption("Tap to choose what the widget can do. Unlock always asks for a second tap.", bottomGap = 0.dp)
-                ActionRow {
-                    SafeMorphTextButton("Lock", onClick = {}, icon = Icons.Filled.Lock, active = true, enabled = false)
-                    SafeMorphTextButton("Climate", onClick = { choice = choice.copy(climate = !choice.climate) }, icon = Icons.Filled.AcUnit, active = choice.climate)
-                    SafeMorphTextButton("Charge", onClick = { choice = choice.copy(charge = !choice.charge) }, icon = Icons.Filled.Bolt, active = choice.charge)
-                    SafeMorphTextButton("Flash", onClick = { choice = choice.copy(flash = !choice.flash) }, icon = Icons.Filled.FlashOn, active = choice.flash)
-                    SafeMorphTextButton("Refresh", onClick = { choice = choice.copy(refresh = !choice.refresh) }, icon = Icons.Filled.Refresh, active = choice.refresh)
+                if (loaded.strip) {
+                    SettingsCaption("Tap to add or remove. The strip keeps the first ones you picked when it is narrow, and drops the rest. Unlock always asks for a second tap.", bottomGap = 0.dp)
+                    ActionRow {
+                        StripControl.entries.forEach { c ->
+                            val index = choice.stripControls.indexOf(c)
+                            SafeMorphTextButton(
+                                if (index >= 0) "${index + 1} ${c.label}" else c.label,
+                                onClick = {
+                                    val now = choice.stripControls
+                                    // Never empty: a strip with no button is just a label.
+                                    choice = choice.copy(stripControls = if (c in now) (now - c).ifEmpty { now } else now + c)
+                                },
+                                icon = stripControlIcon(c),
+                                active = index >= 0,
+                            )
+                        }
+                    }
+                } else {
+                    SettingsCaption("Tap to choose what the widget can do. Unlock always asks for a second tap.", bottomGap = 0.dp)
+                    ActionRow {
+                        SafeMorphTextButton("Lock", onClick = {}, icon = Icons.Filled.Lock, active = true, enabled = false)
+                        SafeMorphTextButton("Climate", onClick = { choice = choice.copy(climate = !choice.climate) }, icon = Icons.Filled.AcUnit, active = choice.climate)
+                        SafeMorphTextButton("Charge", onClick = { choice = choice.copy(charge = !choice.charge) }, icon = Icons.Filled.Bolt, active = choice.charge)
+                        SafeMorphTextButton("Flash", onClick = { choice = choice.copy(flash = !choice.flash) }, icon = Icons.Filled.FlashOn, active = choice.flash)
+                        SafeMorphTextButton("Refresh", onClick = { choice = choice.copy(refresh = !choice.refresh) }, icon = Icons.Filled.Refresh, active = choice.refresh)
+                    }
                 }
             }
             Spacer(Modifier.height(GapRow))
@@ -321,6 +370,43 @@ private fun CarCard(car: VehicleSnapshot, photoUrl: String?, selected: Boolean, 
     }
 }
 
+private fun stripControlIcon(c: StripControl) = when (c) {
+    StripControl.LOCK -> Icons.Filled.Lock
+    StripControl.CLIMATE -> Icons.Filled.AcUnit
+    StripControl.CHARGE -> Icons.Filled.Bolt
+    StripControl.FLASH -> Icons.Filled.FlashOn
+}
+
+/** The strip as the settings draw it: its shape, photo and the first [count] chosen buttons, as the real strip would keep them. */
+@Composable
+private fun StripPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Choice, count: Int) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(choice.stripShape.squareDp?.dp ?: 50.dp)
+    Box(
+        Modifier.fillMaxWidth().height(64.dp).clip(shape).background(scheme.surfaceContainerHigh),
+    ) {
+        if (choice.photo && photoUrl != null) {
+            AsyncImage(
+                model = if (photoUrl.startsWith("/")) java.io.File(photoUrl) else photoUrl,
+                contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+            )
+            Box(Modifier.fillMaxSize().background(scheme.surface.copy(alpha = 0.6f)))
+        }
+        Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(car?.name ?: "Your car", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(car?.bigValue() ?: "82%", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+            choice.stripControls.take(count).forEach { c ->
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.size(38.dp).clip(CircleShape).background(scheme.secondaryContainer), contentAlignment = Alignment.Center) {
+                    Icon(stripControlIcon(c), null, tint = scheme.onSecondaryContainer, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+    }
+}
+
 private fun saveAndFinish(
     context: Context,
     scope: kotlinx.coroutines.CoroutineScope,
@@ -348,6 +434,8 @@ private fun saveAndFinish(
                     m[WidgetKeys.CORNER] = choice.corner.ordinal
                     m[WidgetKeys.TEXT_SIZE] = choice.textSize.ordinal
                     m[WidgetKeys.LEVEL_TINT] = choice.levelTint
+                    m[WidgetKeys.STRIP_SHAPE] = choice.stripShape.ordinal
+                    m[WidgetKeys.STRIP_CONTROLS] = StripControl.encode(choice.stripControls)
                 }
             }
             // The strip shares this screen: redraw whichever widget this id belongs to.

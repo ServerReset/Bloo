@@ -40,6 +40,33 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.stateLineOrParked
 
+/** A button the strip can carry, in the order the settings chose; the narrower the strip, the fewer from the front it keeps. */
+internal enum class StripControl(val key: String, val label: String, val action: String) {
+    LOCK("lock", "Lock", CarAction.TOGGLE_LOCK),
+    CLIMATE("climate", "Climate", CarAction.TOGGLE_CLIMATE),
+    CHARGE("charge", "Charge", CarAction.TOGGLE_CHARGE),
+    FLASH("flash", "Flash", CarAction.FLASH_LIGHTS);
+
+    companion object {
+        fun parse(raw: String?): List<StripControl>? =
+            raw?.split(",")?.mapNotNull { k -> entries.firstOrNull { it.key == k } }?.distinct()?.takeIf { it.isNotEmpty() }
+
+        /** The chosen controls, or (a strip made before this choice existed) the ones its old switches left on. */
+        fun of(prefs: Preferences, opts: WidgetOptions): List<StripControl> =
+            parse(prefs[WidgetKeys.STRIP_CONTROLS]) ?: buildList {
+                add(LOCK)
+                if (opts.climate) add(CLIMATE)
+                if (opts.charge) add(CHARGE)
+                if (opts.flash) add(FLASH)
+            }
+
+        fun encode(list: List<StripControl>) = list.joinToString(",") { it.key }
+    }
+}
+
+/** How many round buttons fit beside the readout in a strip [widthDp] wide (1..4). */
+internal fun stripControlCount(widthDp: Float): Int = ((widthDp - 28f - 96f + 8f) / 48f).toInt().coerceIn(1, 4)
+
 /**
  * The slim strip: one row, the car's name and charge on the left and its lock, climate and charge buttons on the
  * right. For the homescreen row where the full widget is too big. It speaks the same commands as the full widget
@@ -78,7 +105,7 @@ private fun StripContent(cars: List<VehicleSnapshot>) {
         photo = if (photoKey != null && car != null) WidgetPhoto.load(context, car.vin, opts.blur) else null
     }
     Box(
-        GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(opts.corner.dp.dp).clickable(open),
+        GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(stripCorner(prefs, size.height)).clickable(open),
     ) {
         photo?.let { bmp ->
             androidx.glance.Image(
@@ -133,19 +160,22 @@ private fun StripContent(cars: List<VehicleSnapshot>) {
                 }
             }
             // The controls the settings chose, as many as the width holds beside the readout.
-            val controls = buildList {
-                add(CarAction.TOGGLE_LOCK)
-                if (opts.climate) add(CarAction.TOGGLE_CLIMATE)
-                if (opts.charge && car.hasBattery) add(CarAction.TOGGLE_CHARGE)
-                if (opts.flash) add(CarAction.FLASH_LIGHTS)
-            }.take(((size.width.value - 28f - 96f + 8f) / 48f).toInt().coerceIn(1, 4))
+            val controls = StripControl.of(prefs, opts)
+                .filter { it != StripControl.CHARGE || car.hasBattery }
+                .take(stripControlCount(size.width.value))
             val diameter = if (tall) 44f else 38f
-            controls.forEach { action ->
+            controls.forEach { control ->
                 Spacer(GlanceModifier.width(WidgetGap))
-                ActionButton(car, action, pending, armed, label = null, heightDp = diameter)
+                ActionButton(car, control.action, pending, armed, label = null, heightDp = diameter)
             }
         }
     }
+}
+
+/** A pill is half the strip's height, so it stays a pill however tall the strip is stretched; a square keeps a fixed, softer corner. */
+private fun stripCorner(prefs: Preferences, height: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp {
+    val shape = StripShape.entries.getOrElse(prefs[WidgetKeys.STRIP_SHAPE] ?: 0) { StripShape.PILL }
+    return shape.squareDp?.dp ?: (height / 2)
 }
 
 /** The system's entry point for the strip widget. */

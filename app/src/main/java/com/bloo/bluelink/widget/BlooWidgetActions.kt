@@ -44,12 +44,20 @@ internal object WidgetKeys {
     /** Show the charge bar and status chips when there is room (on by default). */
     val SHOW_EXTRAS = booleanPreferencesKey("show_extras")
 
+    /** The strip's shape: [StripShape] index (pill by default). */
+    val STRIP_SHAPE = androidx.datastore.preferences.core.intPreferencesKey("strip_shape")
+    /** The strip's controls in priority order, comma separated [StripControl] keys; unset follows the older per-control switches. */
+    val STRIP_CONTROLS = stringPreferencesKey("strip_controls")
+
     val PARAM_VIN = ActionParameters.Key<String>("vin")
     val PARAM_ACTION = ActionParameters.Key<String>("action")
 }
 
 /** How round the widget's corners are: small, medium (the default), large. */
 internal enum class WidgetCorner(val label: String, val dp: Int) { SMALL("Small", 16), MEDIUM("Medium", 28), LARGE("Large", 40) }
+
+/** The strip's outline: a full pill, or a rounded square. */
+internal enum class StripShape(val label: String, val squareDp: Int?) { PILL("Pill", null), SQUARE("Rounded square", 20) }
 
 /** How big the widget's text is relative to the layout's own sizing. */
 internal enum class WidgetTextSize(val label: String, val scale: Float) { SMALL("Small", 0.9f), NORMAL("Normal", 1f), LARGE("Large", 1.12f) }
