@@ -28,15 +28,21 @@ suspend fun reverseGeocode(context: Context, lat: Double, lon: Double): Geocoded
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         withTimeoutOrNull(GEOCODE_TIMEOUT_MS) {
             suspendCancellableCoroutine { cont ->
-                geocoder.getFromLocation(lat, lon, 1, object : Geocoder.GeocodeListener {
-                    override fun onGeocode(addresses: MutableList<Address>) {
-                        if (cont.isActive) cont.resume(addresses.firstOrNull()?.let { formatPlaceName(it) })
-                    }
+                // An out-of-range latitude or longitude throws here (the older path below already catches it): no name,
+                // not a crash on the Locate tap the user is waiting on.
+                try {
+                    geocoder.getFromLocation(lat, lon, 1, object : Geocoder.GeocodeListener {
+                        override fun onGeocode(addresses: MutableList<Address>) {
+                            if (cont.isActive) cont.resume(addresses.firstOrNull()?.let { formatPlaceName(it) })
+                        }
 
-                    override fun onError(message: String?) {
-                        if (cont.isActive) cont.resume(null)
-                    }
-                })
+                        override fun onError(message: String?) {
+                            if (cont.isActive) cont.resume(null)
+                        }
+                    })
+                } catch (e: IllegalArgumentException) {
+                    if (cont.isActive) cont.resume(null)
+                }
             }
         }
     } else {

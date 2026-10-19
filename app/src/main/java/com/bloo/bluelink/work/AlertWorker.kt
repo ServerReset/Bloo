@@ -75,7 +75,11 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         // same poll below, so leaving it out would mean a user who disabled
         // every alert but kept the live charging bar got no poll at all,
         // and therefore a bar that never updates or clears.
-        if (!prefs.service && !prefs.doorOpen && !prefs.running && !prefs.unlocked && !prefs.charging) {
+        // Every alert type CarAlerts.evaluate handles: car started and charge complete too, or a user who kept only
+        // those on never got them with the app closed.
+        if (!prefs.service && !prefs.doorOpen && !prefs.running && !prefs.unlocked && !prefs.charging &&
+            !prefs.carStarted && !prefs.chargeComplete
+        ) {
             return Result.success()
         }
         // Logged specifically so a slow foreground cold-start/unlock status fetch (see

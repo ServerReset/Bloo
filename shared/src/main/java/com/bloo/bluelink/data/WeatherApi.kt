@@ -176,16 +176,16 @@ object WeatherApi {
     @Serializable
     private data class Daily(
         val time: List<String>? = null,
-        @SerialName("temperature_2m_max") val max: List<Double>? = null,
-        @SerialName("temperature_2m_min") val min: List<Double>? = null,
-        @SerialName("weather_code") val weatherCode: List<Int>? = null,
+        @SerialName("temperature_2m_max") val max: List<Double?>? = null,
+        @SerialName("temperature_2m_min") val min: List<Double?>? = null,
+        @SerialName("weather_code") val weatherCode: List<Int?>? = null,
     )
 
     @Serializable
     private data class Hourly(
         val time: List<String>? = null,
-        @SerialName("temperature_2m") val temperature: List<Double>? = null,
-        @SerialName("weather_code") val weatherCode: List<Int>? = null,
+        @SerialName("temperature_2m") val temperature: List<Double?>? = null,
+        @SerialName("weather_code") val weatherCode: List<Int?>? = null,
         @SerialName("precipitation_probability") val precipProbability: List<Int?>? = null,
     )
 

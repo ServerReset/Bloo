@@ -226,25 +226,35 @@ object CarAlerts {
 
         // Charge complete: detect the charging-to-complete transition.
         if (prefs.chargeComplete && status != null) {
-            val isCharging = status.evStatus?.batteryCharge == true
-            if (!isCharging && settings.chargeCompleteNotificationSent(v.vin)) {
-                // Only send complete if the charging notification was sent earlier.
-                if (canDeliver) {
-                    out += Alert(
-                        chargeCompleteId(v),
-                        "${v.name} charging is complete",
-                        "Your car has finished charging.",
-                        channelId = Notifications.CHANNEL_EVENTS,
-                        // The watch raises its own "charged" alert, so don't also bridge this one.
-                        localOnly = com.bloo.bluelink.wear.WatchPresence.appInstalled(settings.context),
-                    )
-                }
-                // Reset for the next charge cycle.
-                settings.setChargeCompleteNotificationSent(v.vin, false)
-            } else if (isCharging) {
-                // Charging: mark the session started.
-                if (!settings.chargeCompleteNotificationSent(v.vin)) {
-                    settings.setChargeCompleteNotificationSent(v.vin, true)
+            val ev = status.evStatus
+            // No EV block in this payload is "unknown", not "stopped charging": a partial reading mid-charge used to
+            // read as complete. The episode is left as it was.
+            if (ev != null) {
+                val isCharging = ev.batteryCharge == true
+                if (!isCharging && settings.chargeCompleteNotificationSent(v.vin)) {
+                    // Stopped charging while still plugged in is a finished charge; unplugged mid-charge is not (the
+                    // session simply ended), and neither is it a reason to say "complete".
+                    val unplugged = ev.batteryPlugin == 0
+                    if (unplugged) {
+                        settings.setChargeCompleteNotificationSent(v.vin, false)
+                    } else if (canDeliver) {
+                        out += Alert(
+                            chargeCompleteId(v),
+                            "${v.name} charging is complete",
+                            "Your car has finished charging.",
+                            channelId = Notifications.CHANNEL_EVENTS,
+                            // The watch raises its own "charged" alert, so don't also bridge this one.
+                            localOnly = com.bloo.bluelink.wear.WatchPresence.appInstalled(settings.context),
+                        )
+                        // Reset for the next charge cycle -- only once it could be delivered; with the permission or
+                        // channel off the alert used to be consumed unseen, and never retried.
+                        settings.setChargeCompleteNotificationSent(v.vin, false)
+                    }
+                } else if (isCharging) {
+                    // Charging: mark the session started.
+                    if (!settings.chargeCompleteNotificationSent(v.vin)) {
+                        settings.setChargeCompleteNotificationSent(v.vin, true)
+                    }
                 }
             }
         }
