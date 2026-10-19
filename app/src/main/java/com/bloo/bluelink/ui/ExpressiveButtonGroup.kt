@@ -215,10 +215,21 @@ fun ExpressiveButtonGroup(
                     val iconIdx = memberIdx.filter { collapsed[it] }
                     val labelIdx = memberIdx.filter { !collapsed[it] }
                     val iconTotal = iconIdx.sumOf { natLine[it] }
-                    val each = if (labelIdx.isEmpty()) 0.0 else (room - iconTotal).toDouble() / labelIdx.size
                     for (i in iconIdx) base[i] = natLine[i].toDouble()
-                    // Never below what the label needs.
-                    for (i in labelIdx) base[i] = maxOf(each, basis[i].toDouble())
+                    // Equal shares, but never below what a label needs. A member whose label is wider than the equal
+                    // share keeps its own width and the rest SHARE WHAT IS LEFT (repeated until no member is over
+                    // its share): taking max(each, own) for every member let the line exceed the room (a long label
+                    // beside two short ones pushed the last button off the edge).
+                    var remaining = (room - iconTotal).toDouble()
+                    val shared = labelIdx.toMutableList()
+                    while (shared.isNotEmpty()) {
+                        val each = remaining / shared.size
+                        val wider = shared.filter { basis[it] > each }
+                        if (wider.isEmpty()) break
+                        for (i in wider) { base[i] = basis[i].toDouble(); remaining -= basis[i] }
+                        shared.removeAll(wider.toSet())
+                    }
+                    for (i in shared) base[i] = remaining / shared.size
                     total = if (labelIdx.isEmpty()) iconTotal else maxOf(room, memberIdx.sumOf { base[it] }.roundToInt())
                 } else {
                     // Weighted members stretch to fill the line's leftover, inside the budget, so a
