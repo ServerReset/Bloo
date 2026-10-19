@@ -130,32 +130,37 @@ object UpdateApi {
                 .build()
             client.newCall(request).execute().use { resp ->
                 if (!resp.isSuccessful) return@use null
-                val body = resp.body.string()
-                val releases = json.decodeFromString(ListSerializer(ReleaseResponse.serializer()), body)
-                // "build-<N>" tags from the rolling per-push release; skips drafts and anything
-                // from the separate tagged "vN" release job, which doesn't follow this naming
-                // convention at all.
-                // Only a FINISHED release counts: published (not a draft or prerelease -- CI publishes it after
-                // the build and tests pass) and carrying a completely uploaded phone APK. A release that is
-                // still uploading is skipped in favour of the previous finished one.
-                // The HIGHEST build among them, not whichever the list happens to return first: overlapping runs can
-                // publish out of order, and the first-listed release can be the older build.
-                val release = releases.filter { r ->
-                    !r.draft && !r.prerelease && r.tagName.startsWith("build-") &&
-                        r.assets.any { it.name == PHONE_ASSET_NAME && it.ready }
-                }.maxByOrNull { it.tagName.removePrefix("build-").toIntOrNull() ?: -1 } ?: return@use null
-                val runNumber = release.tagName.removePrefix("build-").toIntOrNull() ?: return@use null
-                if (release.htmlUrl.isBlank()) return@use null
-                WorkflowRun(
-                    runNumber = runNumber,
-                    htmlUrl = release.htmlUrl,
-                    displayTitle = release.name,
-                    phoneApkUrl = release.assets.firstOrNull { it.name == PHONE_ASSET_NAME && it.ready }?.browserDownloadUrl,
-                    releaseNotes = extractChangelog(release.body),
-                    watchApkUrl = release.assets.firstOrNull { it.name == WATCH_ASSET_NAME && it.ready }?.browserDownloadUrl,
-                )
+                latestRunFrom(resp.body.string())
             }
         }.getOrNull()
+    }
+
+    /**
+     * The newest finished build in a GitHub releases list ([body] is the API's JSON), or null. Pure, so the
+     * selection rules are tested: published, a "build-N" tag, a completely uploaded phone APK, and the HIGHEST N.
+     */
+    internal fun latestRunFrom(body: String): WorkflowRun? {
+        val releases = json.decodeFromString(ListSerializer(ReleaseResponse.serializer()), body)
+        // "build-<N>" tags from the rolling per-push release; skips drafts and anything from the separate tagged
+        // "vN" release job, which doesn't follow this naming convention at all.
+        // Only a FINISHED release counts: published (not a draft or prerelease -- CI publishes it after the build and
+        // tests pass) and carrying a completely uploaded phone APK. A release that is still uploading is skipped in
+        // favour of the previous finished one. The HIGHEST build among them, not whichever the list happens to return
+        // first: overlapping runs can publish out of order, and the first-listed release can be the older build.
+        val release = releases.filter { r ->
+            !r.draft && !r.prerelease && r.tagName.startsWith("build-") &&
+                r.assets.any { it.name == PHONE_ASSET_NAME && it.ready }
+        }.maxByOrNull { it.tagName.removePrefix("build-").toIntOrNull() ?: -1 } ?: return null
+        val runNumber = release.tagName.removePrefix("build-").toIntOrNull() ?: return null
+        if (release.htmlUrl.isBlank()) return null
+        return WorkflowRun(
+            runNumber = runNumber,
+            htmlUrl = release.htmlUrl,
+            displayTitle = release.name,
+            phoneApkUrl = release.assets.firstOrNull { it.name == PHONE_ASSET_NAME && it.ready }?.browserDownloadUrl,
+            releaseNotes = extractChangelog(release.body),
+            watchApkUrl = release.assets.firstOrNull { it.name == WATCH_ASSET_NAME && it.ready }?.browserDownloadUrl,
+        )
     }
 
     // The update tile already shows its own dedicated install-steps card, so showing the release
