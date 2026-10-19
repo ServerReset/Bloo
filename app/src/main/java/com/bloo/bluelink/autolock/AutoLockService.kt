@@ -204,7 +204,9 @@ class AutoLockService : Service() {
                         // down -- but only stop the whole SERVICE once every car it's tracking
                         // has reached the same point.
                         delay(4000)
-                        finishTracking(vin)
+                        // Still finished? A new evaluation can have begun during that glance (a stale result from the
+                        // last run is what first read as terminal); tearing down then dropped the live countdown.
+                        if (AutoLockController.stateFor(vin).detection.isTerminal) finishTracking(vin)
                     }
                 }
             }
