@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -71,7 +72,18 @@ internal fun GlassSurface(
                             interactionSource = interaction,
                             indication = ripple(),
                             onClickLabel = contentDescription,
+                            // A button, and named: an icon-only glass button (refresh, back) had no accessible name at
+                            // all -- the label above was only the verb in "double tap to ...", on an unnamed node.
+                            role = androidx.compose.ui.semantics.Role.Button,
                             onClick = onClick,
+                        )
+                        .then(
+                            if (contentDescription != null) {
+                                val name: String = contentDescription
+                                Modifier.semantics { this.contentDescription = name }
+                            } else {
+                                Modifier
+                            },
                         )
                 } else {
                     Modifier
