@@ -66,7 +66,7 @@ private data class WidgetData(val sealed: Boolean, val cars: List<VehicleSnapsho
  * own Glance state. Everything defaults to on/shown, so a widget placed without configuring still
  * does the useful thing.
  */
-private data class WidgetOptions(
+internal data class WidgetOptions(
     val climate: Boolean,
     val charge: Boolean,
     val flash: Boolean,
@@ -164,8 +164,8 @@ private fun WidgetContent(data: WidgetData) {
 }
 
 /** The veil over a photo background: light enough to keep the car visible, firm enough for the text. */
-private val PhotoVeilDay = androidx.compose.ui.graphics.Color(0xB3FFFFFF)
-private val PhotoVeilNight = androidx.compose.ui.graphics.Color(0x99000000)
+internal val PhotoVeilDay = androidx.compose.ui.graphics.Color(0xB3FFFFFF)
+internal val PhotoVeilNight = androidx.compose.ui.graphics.Color(0x99000000)
 
 @Composable
 private fun Message(root: GlanceModifier, title: String, detail: String) {
@@ -254,7 +254,7 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
 
 /** The charge (or fuel) as a bar, with the charge limit's share in a lighter tone when it is known. */
 @Composable
-private fun ChargeBar(car: VehicleSnapshot, tint: androidx.glance.unit.ColorProvider? = null) {
+internal fun ChargeBar(car: VehicleSnapshot, tint: androidx.glance.unit.ColorProvider? = null) {
     val pct = car.percent ?: return
     androidx.glance.appwidget.LinearProgressIndicator(
         progress = (pct / 100f).coerceIn(0f, 1f),
@@ -539,7 +539,7 @@ internal fun VehicleSnapshot.detailLine(): String? = listOfNotNull(
 ).joinToString("   ·   ").ifBlank { null }
 
 /** The value's and the bar's colour by level (red low, amber, green, blue charging), shared with the watch. */
-private fun levelTint(car: VehicleSnapshot): androidx.glance.unit.ColorProvider =
+internal fun levelTint(car: VehicleSnapshot): androidx.glance.unit.ColorProvider =
     androidx.glance.unit.ColorProvider(
         androidx.compose.ui.graphics.Color(com.bloo.bluelink.data.BlooColors.levelColor(car.percent, car.charging == true, 0xFF888888.toInt())),
     )

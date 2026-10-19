@@ -371,7 +371,12 @@ private fun saveAndFinish(
                     m[WidgetKeys.LEVEL_TINT] = choice.levelTint
                 }
             }
-            BlooWidget().update(context, glanceId)
+            // The strip shares this screen: redraw whichever widget this id belongs to.
+            if (GlanceAppWidgetManager(context).getGlanceIds(BlooStripWidget::class.java).contains(glanceId)) {
+                BlooStripWidget().update(context, glanceId)
+            } else {
+                BlooWidget().update(context, glanceId)
+            }
         }
         finish(Activity.RESULT_OK)
     }
