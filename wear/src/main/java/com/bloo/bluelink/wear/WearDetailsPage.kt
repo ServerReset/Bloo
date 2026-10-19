@@ -36,6 +36,18 @@ internal fun WearDetailsPage(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     WearListScreen(contentPadding = PaddingValues(top = 34.dp, bottom = 22.dp)) {
+        // A failed command's reason first: it is what the wearer came here to read, not something to scroll down to find.
+        lastResult?.takeIf { it.vin == v.vin && !it.ok }?.let { failure ->
+            item {
+                WearCenteredText(
+                    failure.message ?: "Command failed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 3,
+                )
+            }
+        }
         // The refresh button sits with the freshness in the status pebble.
         item { WearStatusPebble(v, refreshing = refreshing, canRefresh = false, onRefresh = {}) }
         item { WearCarCarePebble(v, refreshing = refreshing, canRefresh = signedIn, onRefresh = { repo.refresh() }) }
@@ -65,16 +77,5 @@ internal fun WearDetailsPage(
         // Auto lock needs the car's credentials on the watch, which only the pairing step in Settings on the
         // phone hands over; until then the pebble is a pointer to that step, not a switch.
         item { if (signedIn) WearAutoLockPebble() else WearPairPebble() }
-        lastResult?.takeIf { it.vin == v.vin && !it.ok }?.let { failure ->
-            item {
-                WearCenteredText(
-                    failure.message ?: "Command failed",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 3,
-                )
-            }
-        }
     }
 }
