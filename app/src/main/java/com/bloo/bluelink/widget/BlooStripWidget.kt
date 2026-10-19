@@ -1,7 +1,6 @@
 package com.bloo.bluelink.widget
 
 import android.content.Context
-import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,7 +29,6 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.SnapshotStore
@@ -58,8 +56,8 @@ class BlooStripWidget : GlanceAppWidget() {
 private fun StripContent(cars: List<VehicleSnapshot>) {
     val prefs = currentState<Preferences>()
     val context = androidx.glance.LocalContext.current
-    val open = actionStartActivity(Intent(context, MainActivity::class.java))
     val car = cars.firstOrNull { it.vin == prefs[WidgetKeys.VIN] } ?: cars.firstOrNull()
+    val open = actionStartActivity(openCarIntent(context, car?.vin))
     Row(
         GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(24.dp)
             .padding(horizontal = 14.dp, vertical = 8.dp).clickable(open),

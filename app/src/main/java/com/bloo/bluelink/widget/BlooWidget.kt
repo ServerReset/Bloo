@@ -125,8 +125,9 @@ private fun WidgetContent(data: WidgetData) {
     val prefs = currentState<Preferences>()
     val context = androidx.glance.LocalContext.current
     val opts = WidgetOptions.of(prefs)
-    val open = actionStartActivity(Intent(context, MainActivity::class.java))
     val car = if (data.sealed) null else data.cars.firstOrNull { it.vin == prefs[WidgetKeys.VIN] } ?: data.cars.firstOrNull()
+    // Tapping the widget opens the app on THIS car, not just the app.
+    val open = actionStartActivity(openCarIntent(context, car?.vin))
     // The photo loads inside the session (not in provideGlance), so changing the car or the option in the
     // settings swaps it right away.
     var photo by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -542,3 +543,18 @@ private fun levelTint(car: VehicleSnapshot): androidx.glance.unit.ColorProvider 
     androidx.glance.unit.ColorProvider(
         androidx.compose.ui.graphics.Color(com.bloo.bluelink.data.BlooColors.levelColor(car.percent, car.charging == true, 0xFF888888.toInt())),
     )
+
+/**
+ * The intent a tap on the widget fires: the app, on the car the widget shows (the same "open" a launcher shortcut
+ * makes, so a locked app waits for its unlock first). The data uri makes each car's intent distinct, because Android
+ * treats two intents differing only in extras as the same one -- two widgets for two cars would share a tap.
+ */
+internal fun openCarIntent(context: Context, vin: String?): Intent {
+    val intent = Intent(context, MainActivity::class.java)
+    if (vin == null) return intent
+    return intent
+        .setAction(com.bloo.bluelink.Shortcuts.ACTION)
+        .setData(android.net.Uri.parse("bloo://car/${android.net.Uri.encode(vin)}"))
+        .putExtra(com.bloo.bluelink.Shortcuts.EXTRA_VIN, vin)
+        .putExtra(com.bloo.bluelink.Shortcuts.EXTRA_CMD, "open")
+}
