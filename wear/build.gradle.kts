@@ -187,6 +187,9 @@ dependencies {
     implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
     implementation("androidx.wear.protolayout:protolayout:1.2.1")
     implementation("androidx.concurrent:concurrent-futures:1.2.0")
+    // Raised to the version the phone app uses: a dependency above (the Wearable and Wear libraries) pulls in an old
+    // androidx.fragment (1.1.0), which Google Play flags as an outdated SDK. Gradle takes the highest version asked for.
+    implementation("androidx.fragment:fragment:1.9.1")
     // .await() for a Play Services Task in a coroutine.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
 
