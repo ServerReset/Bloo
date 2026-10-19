@@ -34,6 +34,21 @@ object WearTileActions {
             )
         }
 
+    /**
+     * The four quarters in the face's own positions (top-left, top-right, bottom-left, bottom-right): the control chosen
+     * for each, or null where there is none or this car cannot do it. Positions are kept, unlike [forCar], so the tile
+     * is laid out exactly as the face is.
+     */
+    fun forSlots(car: VehicleSnapshot, slots: List<String>): List<WearTileAction?> =
+        (0 until 4).map { i ->
+            val control = slots.getOrNull(i)?.let { WearFaceControls.byKey(it) }?.takeIf { it.available(car) } ?: return@map null
+            WearTileAction(
+                label = tileLabel(control.label(car)),
+                key = control.key,
+                active = control.active(car) || (control.key == "lock" && car.locked == true),
+            )
+        }
+
     /** A tile button is narrow: a long label ("Climate off", "Stop charge") keeps its first word. */
     internal fun tileLabel(label: String) = if (label.length > 8) label.substringBefore(' ') else label
 }

@@ -18,8 +18,6 @@ import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
-import com.bloo.bluelink.data.isStale
-import com.bloo.bluelink.data.stateLine
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.ioScope
 import com.google.common.util.concurrent.ListenableFuture
@@ -53,6 +51,10 @@ class BlooTileService : TileService() {
                 val sealed = WearBootGate.isLocked(applicationContext)
                 val snapshot = if (sealed) null
                 else runCatching { SnapshotStore(applicationContext).current() }.getOrNull()
+                // The hub is the refresh button: a press reloads the tile with this id, and a refresh is asked for as it does.
+                if (!sealed && requestParams.currentState.lastClickableId == HUB_ID) {
+                    runCatching { WearSnapshotRepository(applicationContext).refresh() }
+                }
                 val car = snapshot?.selected
                 // Whatever goes wrong while drawing, the request is answered: an unset completer leaves the tile
                 // spinning for good, so a failure draws the plain "open Bloo" layout instead.
@@ -90,16 +92,16 @@ class BlooTileService : TileService() {
             )
             .build()
 
+        if (car != null) return faceLayout(car, open)
+
+        // No car: say why. A sealed watch has been set up and is only waiting for its PIN; "add a car" read as not set up.
+        val line = if (sealed) "Enter your PIN in Bloo" else "Add a car in Bloo on your phone"
         val glance = LayoutElementBuilders.Column.Builder()
             .setWidth(expand())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-
-        if (car == null) {
-            // A sealed watch has been set up; it is only waiting for its PIN. Saying "add a car" read as not set up.
-            val line = if (sealed) "Enter your PIN in Bloo" else "Add a car in Bloo on your phone"
-            glance.addContent(text("Bloo", 22f, WHITE, bold = true))
-            glance.addContent(text(line, 13f, MUTED))
-            glance.setModifiers(
+            .addContent(text("Bloo", 22f, WHITE, bold = true))
+            .addContent(text(line, 13f, MUTED))
+            .setModifiers(
                 ModifiersBuilders.Modifiers.Builder()
                     .setSemantics(
                         ModifiersBuilders.Semantics.Builder()
@@ -108,56 +110,108 @@ class BlooTileService : TileService() {
                     )
                     .build(),
             )
-        } else {
-            glance.addContent(text(car.name, 12f, MUTED))
-            glance.addContent(text(car.bigValue(), 34f, tint(car), bold = true))
-            car.stateLine()?.let { line ->
-                glance.addContent(text(line, 13f, MUTED))
-            }
-            car.updatedLabel()?.let { updated ->
-                glance.addContent(text("Updated $updated", 11f, if (car.isStale()) STALE else MUTED))
-            }
-            // One spoken sentence for the whole glance, rather than the four fragments a reader would
-            // otherwise get from four separate text elements.
-            glance.setModifiers(
-                ModifiersBuilders.Modifiers.Builder()
-                    .setSemantics(
-                        ModifiersBuilders.Semantics.Builder()
-                            .setContentDescription(
-                                buildString {
-                                    append(car.name).append(", ").append(car.bigValue())
-                                    car.stateLine()?.let { append(", ").append(it) }
-                                    car.updatedLabel()?.let { append(", updated ").append(it) }
-                                },
-                            )
-                            .build(),
-                    )
-                    .build(),
-            )
-        }
-
-        val outer = LayoutElementBuilders.Column.Builder()
-            .setWidth(expand())
-            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-            .addContent(glance.build())
-
-        if (car != null) {
-            val actions = WearTileActions.forCar(car, WearFacePrefs.load(applicationContext))
-            if (actions.isNotEmpty()) {
-                outer.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(10f)).build())
-                outer.addContent(actionRow(actions))
-            }
-        }
-
-        val tile = LayoutElementBuilders.Box.Builder()
+            .build()
+        return LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
             .setHeight(expand())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .setModifiers(open)
-        // The charge runs round the very edge of the display, the same ring the watch face has.
-        if (car?.percent != null) tile.addContent(edgeRing(car))
-        return tile.addContent(outer.build()).build()
+            .addContent(glance)
+            .build()
+    }
+
+    /**
+     * The tile as the face in the app: the charge ring round the edge, the four chosen controls as quarters inside it,
+     * and the value in a hub where they meet. Pressing a quarter runs that control (through the app, so the PIN gate
+     * applies); pressing the hub refreshes. Quarters are rounded squares: a Tile cannot clip to a quarter disc.
+     */
+    private fun faceLayout(car: VehicleSnapshot, open: ModifiersBuilders.Modifiers): LayoutElementBuilders.LayoutElement {
+        val color = tint(car)
+        val slots = WearTileActions.forSlots(car, WearFacePrefs.load(applicationContext))
+        fun quarter(a: WearTileAction?): LayoutElementBuilders.LayoutElement {
+            val box = LayoutElementBuilders.Box.Builder()
+                .setWidth(expand())
+                .setHeight(expand())
+                .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+                .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            val mods = ModifiersBuilders.Modifiers.Builder()
+                .setBackground(
+                    ModifiersBuilders.Background.Builder()
+                        .setColor(argb(if (a?.active == true) ACTIVE else if (a != null) BUTTON else QUIET))
+                        .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(26f)).build())
+                        .build(),
+                )
+            if (a != null) {
+                mods.setClickable(
+                    ModifiersBuilders.Clickable.Builder().setId("act_${a.key}").setOnClick(launchAction(a.key)).build(),
+                ).setSemantics(ModifiersBuilders.Semantics.Builder().setContentDescription(a.label).build())
+                box.addContent(text(a.label, 13f, if (a.active) 0xFF101014.toInt() else WHITE, bold = true))
+            }
+            return box.setModifiers(mods.build()).build()
+        }
+        fun row(left: LayoutElementBuilders.LayoutElement, right: LayoutElementBuilders.LayoutElement) =
+            LayoutElementBuilders.Row.Builder()
+                .setWidth(expand())
+                .setHeight(expand())
+                .addContent(left)
+                .addContent(LayoutElementBuilders.Spacer.Builder().setWidth(dp(5f)).build())
+                .addContent(right)
+                .build()
+        val grid = LayoutElementBuilders.Column.Builder()
+            .setWidth(expand())
+            .setHeight(expand())
+            .addContent(row(quarter(slots[0]), quarter(slots[1])))
+            .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(5f)).build())
+            .addContent(row(quarter(slots[2]), quarter(slots[3])))
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setPadding(ModifiersBuilders.Padding.Builder().setAll(dp(16f)).build())
+                    .build(),
+            )
+            .build()
+        val hub = LayoutElementBuilders.Box.Builder()
+            .setWidth(dp(74f))
+            .setHeight(dp(74f))
+            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setBackground(
+                        ModifiersBuilders.Background.Builder()
+                            .setColor(argb(0xFF000000.toInt()))
+                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(37f)).build())
+                            .build(),
+                    )
+                    .setClickable(
+                        ModifiersBuilders.Clickable.Builder()
+                            .setId(HUB_ID)
+                            .setOnClick(ActionBuilders.LoadAction.Builder().build())
+                            .build(),
+                    )
+                    .setSemantics(
+                        ModifiersBuilders.Semantics.Builder()
+                            .setContentDescription("Refresh. ${car.name}, ${car.bigValue()}" + (car.updatedLabel()?.let { ", updated $it" } ?: ""))
+                            .build(),
+                    )
+                    .build(),
+            )
+            .addContent(
+                LayoutElementBuilders.Column.Builder()
+                    .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+                    .addContent(text(car.bigValue(), 24f, if (car.percent != null) color else WHITE, bold = true))
+                    .addContent(text(car.name, 10f, MUTED))
+                    .build(),
+            )
+            .build()
+        val root = LayoutElementBuilders.Box.Builder()
+            .setWidth(expand())
+            .setHeight(expand())
+            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .setModifiers(open)
+        if (car.percent != null) root.addContent(edgeRing(car))
+        return root.addContent(grid).addContent(hub).build()
     }
 
     /** The ring's colour from the level, shared with the watch face ([levelColorArgb]). */
@@ -189,73 +243,6 @@ class BlooTileService : TileService() {
             .setThickness(dp(8f))
             .setColor(argb(color))
             .setStrokeCap(LayoutElementBuilders.STROKE_CAP_ROUND)
-            .build()
-
-    /**
-     * The actions worth a tap from the carousel, in the order the wearer chose them: one row for up to three,
-     * two rows of two for four, so no label is squeezed.
-     */
-    private fun actionRow(actions: List<WearTileAction>): LayoutElementBuilders.LayoutElement {
-        fun row(chunk: List<WearTileAction>, height: Float): LayoutElementBuilders.Row {
-            val row = LayoutElementBuilders.Row.Builder()
-                .setWidth(expand())
-                .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
-            chunk.forEachIndexed { index, action ->
-                if (index > 0) row.addContent(LayoutElementBuilders.Spacer.Builder().setWidth(dp(6f)).build())
-                row.addContent(actionButton(action, height))
-            }
-            return row.build()
-        }
-        if (actions.size <= 3) return row(actions, 44f)
-        val column = LayoutElementBuilders.Column.Builder().setWidth(expand())
-        actions.chunked(2).forEachIndexed { i, chunk ->
-            if (i > 0) column.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(6f)).build())
-            column.addContent(row(chunk, 38f))
-        }
-        return column.build()
-    }
-
-    /**
-     * One action, sized by `expand()` so however many there are they share the tile's width evenly.
-     * A click can only be an [ActionBuilders.Action], so this launches the app with the key in its
-     * extras -- the app owns the PIN gate and the command layer, and duplicating either here would
-     * give the watch two places where a command can be authorised.
-     */
-    private fun actionButton(action: WearTileAction, heightDp: Float): LayoutElementBuilders.Box =
-        LayoutElementBuilders.Box.Builder()
-            .setWidth(expand())
-            .setHeight(dp(heightDp))
-            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
-            .setModifiers(
-                ModifiersBuilders.Modifiers.Builder()
-                    .setBackground(
-                        ModifiersBuilders.Background.Builder()
-                            .setColor(argb(if (action.active) GREEN else BUTTON))
-                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(heightDp / 2f)).build())
-                            .build(),
-                    )
-                    .setClickable(
-                        ModifiersBuilders.Clickable.Builder()
-                            .setId("act_${action.key}")
-                            .setOnClick(launchAction(action.key))
-                            .build(),
-                    )
-                    .setSemantics(
-                        ModifiersBuilders.Semantics.Builder()
-                            .setContentDescription(action.label)
-                            .build(),
-                    )
-                    .build(),
-            )
-            .addContent(
-                text(
-                    action.label,
-                    12f,
-                    if (action.active) 0xFF101014.toInt() else WHITE,
-                    bold = true,
-                ),
-            )
             .build()
 
     private fun launchAction(actionKey: String?): ActionBuilders.Action {
@@ -291,6 +278,9 @@ class BlooTileService : TileService() {
         const val TRACK = 0x33FFFFFF
         const val BUTTON = 0xFF2A2A33.toInt()
         const val STALE = 0xFFFF6B6B.toInt()
+        const val HUB_ID = "refresh"
+        const val QUIET = 0xFF1A1A20.toInt()
+        val ACTIVE = BlooColors.brandAccent
         val GREEN = BlooColors.chargeGreen
     }
 }

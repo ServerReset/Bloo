@@ -84,4 +84,14 @@ class WearTileActionsTest {
         assertEquals("Stop", WearTileActions.tileLabel("Stop charge"))
         assertEquals("Unlock", WearTileActions.tileLabel("Unlock"))
     }
+
+    @Test
+    fun `the tile keeps the face's four positions, with a gap where a control cannot run`() {
+        val slots = WearTileActions.forSlots(car(isEv = false, percent = null, locked = false), listOf("lock", "charge", "refresh", "none"))
+        assertEquals(4, slots.size)
+        assertEquals("Lock", slots[0]?.label)
+        assertEquals(null, slots[1]) // no battery, so no charge
+        assertEquals("Refresh", slots[2]?.label)
+        assertEquals(null, slots[3]) // empty
+    }
 }
