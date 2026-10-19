@@ -18,6 +18,7 @@ import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
+import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.ioScope
 import com.google.common.util.concurrent.ListenableFuture
@@ -128,6 +129,7 @@ class BlooTileService : TileService() {
      */
     private fun faceLayout(car: VehicleSnapshot, open: ModifiersBuilders.Modifiers): LayoutElementBuilders.LayoutElement {
         val color = tint(car)
+        val stale = if (car.isStale()) car.updatedLabel() else null
         val slots = WearTileActions.forSlots(car, WearFacePrefs.load(applicationContext))
         // Quarter discs, as on the face: the OUTER corner (the one on the display's edge) rounded by the tile's whole width,
         // the inner corner (at the hub) a soft curve, the other two nearly square. [index]: 0 top-left, 1 top-right,
@@ -217,7 +219,10 @@ class BlooTileService : TileService() {
                 LayoutElementBuilders.Column.Builder()
                     .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
                     .addContent(text(car.bigValue(), 24f, if (car.percent != null) color else WHITE, bold = true))
-                    .addContent(text(car.name, 10f, MUTED))
+                    // An old reading says so (in red, as the face does) instead of passing as current; otherwise the name.
+                    .addContent(
+                        if (stale != null) text(stale, 10f, STALE, bold = true) else text(car.name, 10f, MUTED),
+                    )
                     .build(),
             )
             .build()
