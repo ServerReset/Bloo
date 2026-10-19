@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -91,6 +92,8 @@ fun WearCarFace(
     status: FaceStatus? = null,
     /** A refresh is in flight: the light travels the ring as it does while charging. */
     refreshing: Boolean = false,
+    /** Pressing the centre: refresh. Null leaves the hub as plain text. */
+    onHubClick: (() -> Unit)? = null,
 ) {
     // The aurora, at watch scale: a soft wash of the level's colour behind the tiles, as the phone's
     // background washes behind its cards. Drawn once, no animation.
@@ -109,7 +112,7 @@ fun WearCarFace(
             // The labels run round the inside of the ring, each along its own quarter's outer edge.
             WearRingLabels(actions)
             BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                WearFaceHub(value = value, caption = caption, tint = tint, size = maxWidth * HubFraction, status = status)
+                WearFaceHub(value = value, caption = caption, tint = tint, size = maxWidth * HubFraction, status = status, onClick = onHubClick)
             }
         }
     }
@@ -335,13 +338,31 @@ private fun quarterShape(quadrant: Int, innerCorner: Dp): RoundedCornerShape {
 
 /** The value where the four quarters meet: the charge or fuel (or the lock state), and the car's name under it. */
 @Composable
-fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp, status: FaceStatus? = null) {
+fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp, status: FaceStatus? = null, onClick: (() -> Unit)? = null) {
     val scheme = MaterialTheme.colorScheme
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val interaction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // The hub squeezes under a finger and springs back, like the tiles round it.
+    val press by animateFloatAsState(if (pressed) 0.9f else 1f, spring(dampingRatio = 0.45f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium), label = "hubPress")
     Box(
         Modifier
             .size(size)
+            .graphicsLayer { scaleX = press; scaleY = press }
             .clip(CircleShape)
             .background(scheme.background)
+            .then(
+                if (onClick != null) {
+                    Modifier
+                        .semantics { contentDescription = "Refresh" }
+                        .clickable(interactionSource = interaction, indication = null) {
+                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
+                            onClick()
+                        }
+                } else {
+                    Modifier
+                },
+            )
             .padding(4.dp),
         contentAlignment = Alignment.Center,
     ) {

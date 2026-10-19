@@ -54,6 +54,7 @@ internal fun WearFacePage(
                 stale = v.isStale(),
                 status = if (refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
                 refreshing = refreshing,
+                onHubClick = { repo.refresh() },
             )
             WearPullIndicator(pullState, refreshing)
         }
