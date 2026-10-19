@@ -36,6 +36,10 @@ class Ai(context: Context) {
 
         // How long the availability check may take before it is reported as "no answer".
         const val PROBE_TIMEOUT_MS = 10_000L
+        /** A model download may be large and slow: generous, but not forever. */
+        const val DOWNLOAD_TIMEOUT_MS = 10 * 60_000L
+        /** One summary is a few seconds of work; past this it is stuck. */
+        const val INFERENCE_TIMEOUT_MS = 90_000L
 
         // How long a freshly built client settles before it is asked anything.
         const val CLIENT_WARMUP_MS = 400L
@@ -122,10 +126,17 @@ class Ai(context: Context) {
      * caller can surface a real message.
      */
     suspend fun summarize(text: String): String = withSummarizer { summarizer ->
-        ensureFeatureReady(summarizer)
-        val request = SummarizationRequest.builder(padToMinimum(text)).build()
-        val result = summarizer.runInference(request).await()
-        result.summary
+        // Both steps are bounded: a stalled model download or an inference that never returns held the lock and left
+        // the caller's busy flag set for good (no spinner clearing, no retry). A timeout is reported as a plain failure
+        // (it is a CancellationException otherwise, which the callers rightly rethrow instead of surfacing).
+        try {
+            kotlinx.coroutines.withTimeout(DOWNLOAD_TIMEOUT_MS) { ensureFeatureReady(summarizer) }
+            val request = SummarizationRequest.builder(padToMinimum(text)).build()
+            val result = kotlinx.coroutines.withTimeout(INFERENCE_TIMEOUT_MS) { summarizer.runInference(request).await() }
+            result.summary
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            throw IllegalStateException("The on-device AI didn't answer in time. Try again in a moment.")
+        }
     }
 
     /**
