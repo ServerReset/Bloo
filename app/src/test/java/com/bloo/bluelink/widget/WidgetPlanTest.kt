@@ -65,4 +65,28 @@ class WidgetPlanTest {
         val without = planWidget(110f, 110f, 1f, false, valueChars = 3, actionCount = 3, refreshButton = false)
         assertTrue(withButton.valueSp <= without.valueSp, "$withButton vs $without")
     }
+
+    @Test fun aStackPlanAndItsSpareFitTheHeight() {
+        for (w in sizes) for (h in sizes) for (compact in listOf(false, true)) {
+            val plan = planWidget(w, h, 1f, compact, valueChars = 3, actionCount = 4)
+            if (plan.arrangement != WidgetArrangement.STACK || plan.valueSp <= 24.5f) continue
+            val pad = if (compact) 10f else 16f
+            assertTrue(plan.spareDp >= 0f, "$plan")
+            assertTrue(plan.heightDp(1f) + plan.spareDp <= h - 2 * pad - 8f + 0.5f, "w=$w h=$h plan=$plan")
+        }
+    }
+
+    @Test fun aNarrowWidgetShowsOnlyTheChipsThatFit() {
+        val narrow = planWidget(110f, 400f, 1f, false, valueChars = 3, actionCount = 4)
+        val wide = planWidget(400f, 400f, 1f, false, valueChars = 3, actionCount = 4)
+        assertTrue(narrow.maxChips == 1, "$narrow")
+        assertTrue(wide.maxChips == 3, "$wide")
+    }
+
+    @Test fun theValueIsNeverWiderThanTheWidget() {
+        // "84%" at the plan's size must fit the inner width (it was being clipped to "84...").
+        val plan = planWidget(150f, 300f, 1f, false, valueChars = 3, actionCount = 4)
+        val innerW = 150f - 32f - 8f
+        assertTrue(plan.valueSp * 3 * 0.76f <= innerW + 0.5f, "$plan")
+    }
 }

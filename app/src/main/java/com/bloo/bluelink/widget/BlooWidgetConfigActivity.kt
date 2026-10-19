@@ -8,20 +8,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,7 +30,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -69,7 +65,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.glance.appwidget.GlanceAppWidgetManager
@@ -99,7 +94,6 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.imageUrl
-import com.bloo.bluelink.data.stateLineOrParked
 import kotlinx.coroutines.launch
 
 /**
@@ -157,7 +151,7 @@ private data class Loaded(
 }
 
 /** What the user is choosing; one value so the preview and the save read the same thing. */
-private data class Choice(
+internal data class Choice(
     val vin: String? = null,
     val climate: Boolean = true,
     val charge: Boolean = true,
@@ -228,7 +222,15 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
             }
 
             // The live preview: every choice below shows up here as you make it.
-            WidgetPreview(car, photoUrl, choice)
+            // The preview at a chosen size, from the widget's own plan: tall and narrow shows what a tall and narrow
+            // widget does, not just a medium one.
+            var previewSize by remember { mutableStateOf(PreviewSize.TALL) }
+            SettingsSegmentedRow(
+                label = "Preview size",
+                options = PreviewSize.entries.map { SegmentOption(it.name, it.label) },
+                selectedKey = previewSize.name,
+            ) { previewSize = PreviewSize.valueOf(it) }
+            WidgetPreview(car, photoUrl, choice, previewSize)
 
             when {
                 loaded.sealed -> NoteGroup("Open Bloo and sign in to see your car. The widget can still be added and fills in once you do.")
@@ -299,100 +301,6 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
 /** A note where a group's controls would be (no cars, or sealed): the app's standard group with one caption. */
 @Composable
 private fun NoteGroup(text: String) = SettingsGroup { SettingsCaption(text, bottomGap = 0.dp) }
-
-/**
- * A stand-in of the widget as it will look (a medium size), drawn with ordinary Compose so it can change live
- * as the choices change: the photo backdrop and its softness, the readout, the bar and the controls.
- */
-@Composable
-private fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Choice) {
-    val scheme = MaterialTheme.colorScheme
-    val pad by animateDpAsState(if (choice.compact) 12.dp else 18.dp, label = "previewPad")
-    val blurRadius = when (choice.blur) {
-        WidgetPhoto.BLUR_LIGHT -> 6.dp
-        WidgetPhoto.BLUR_STRONG -> 28.dp
-        else -> 14.dp
-    }
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(Brush.linearGradient(listOf(scheme.primaryContainer, scheme.tertiaryContainer)))
-            .padding(18.dp),
-    ) {
-        // A small "homescreen" behind the preview, so the widget reads as an object on a wallpaper.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f)
-                .clip(RoundedCornerShape(choice.corner.dp.dp))
-                .background(scheme.surfaceContainer),
-        ) {
-            if (choice.photo && photoUrl != null) {
-                AsyncImage(
-                    model = if (photoUrl.startsWith("/")) java.io.File(photoUrl) else photoUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().scale(1.15f).blur(blurRadius),
-                )
-                Box(Modifier.fillMaxSize().background(scheme.surface.copy(alpha = if (isSystemInDarkTheme()) 0.55f else 0.65f)))
-            }
-            Column(Modifier.fillMaxSize().padding(pad)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.DirectionsCar, null, tint = scheme.primary, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(car?.name ?: "Your car", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                    if (choice.refresh) {
-                        Box(Modifier.size(26.dp).clip(CircleShape).background(scheme.secondaryContainer), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.Refresh, null, tint = scheme.onSecondaryContainer, modifier = Modifier.size(14.dp))
-                        }
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            car?.bigValue() ?: "80%", fontSize = (34 * choice.textSize.scale).sp, fontWeight = FontWeight.Bold,
-                            color = if (choice.levelTint) Color(com.bloo.bluelink.data.BlooColors.levelColor(car?.percent ?: 80, car?.charging == true, 0xFF888888.toInt())) else scheme.onSurface,
-                        )
-                        Text(
-                            car?.stateLineOrParked() ?: "Locked · 210 mi",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = scheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (choice.extras && !choice.compact) {
-                            Spacer(Modifier.height(6.dp))
-                            val pct = (car?.percent ?: 80) / 100f
-                            Box(Modifier.fillMaxWidth(0.9f).height(6.dp).clip(CircleShape).background(scheme.secondaryContainer)) {
-                                Box(Modifier.fillMaxWidth(pct).height(6.dp).clip(CircleShape).background(scheme.primary))
-                            }
-                        }
-                    }
-                    // The controls, as the widget's round buttons.
-                    val controls = buildList {
-                        add(Icons.Filled.Lock)
-                        if (choice.climate) add(Icons.Filled.AcUnit)
-                        if (choice.charge) add(Icons.Filled.Bolt)
-                        if (choice.flash) add(Icons.Filled.FlashOn)
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        controls.chunked(2).forEach { row ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                row.forEach { icon ->
-                                    Box(Modifier.size(32.dp).clip(CircleShape).background(scheme.secondaryContainer), contentAlignment = Alignment.Center) {
-                                        Icon(icon, null, tint = scheme.onSecondaryContainer, modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 /** A car to show, as a card with its photo (or the palette when it has none); the chosen one is ringed. */
 @Composable

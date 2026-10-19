@@ -226,9 +226,9 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
         }
         WidgetArrangement.STACK -> Column(root) {
             Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = (plan.nameSp * us).sp)
-            // Spare height is shared between the sections (each Spacer takes an equal share), so a tall
-            // widget is evenly spaced rather than empty in one band.
-            Spacer(GlanceModifier.defaultWeight())
+            // Spare height is split into two FIXED gaps (above the value and above the controls), so a tall widget is
+            // spaced evenly and everything the plan placed is certain to be on screen.
+            Spacer(GlanceModifier.height((plan.spareDp / 2f).dp))
             Text(car.bigValue(), maxLines = 1, style = valueStyle)
             if (plan.showStatus) StatusText(car, note, (plan.statusSp * us).sp)
             if (plan.showDetails) {
@@ -243,9 +243,9 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
             }
             if (plan.showChips && opts.extras) {
                 Spacer(GlanceModifier.height(WidgetGap))
-                StatusChips(car)
+                StatusChips(car, plan.maxChips)
             }
-            Spacer(GlanceModifier.defaultWeight())
+            Spacer(GlanceModifier.height((plan.spareDp / 2f).dp))
             Actions(car, pending, armed, opts, labels = plan.labels, maxActions = plan.maxActions, heightDp = plan.buttonHeightDp, gridColumns = plan.gridColumns)
         }
     }
@@ -265,12 +265,12 @@ private fun ChargeBar(car: VehicleSnapshot, tint: androidx.glance.unit.ColorProv
 
 /** Small pills for the states worth a glance on a big widget: climate and charging. */
 @Composable
-private fun StatusChips(car: VehicleSnapshot) {
+private fun StatusChips(car: VehicleSnapshot, maxChips: Int = 3) {
     val chips = buildList {
         car.climateOn?.let { add((if (it) "Climate on" else "Climate off") to it) }
         if (car.hasBattery) car.charging?.let { add((if (it) "Charging" else "Not charging") to it) }
         car.chargeLimitPct?.let { add("Limit $it%" to false) }
-    }.take(3)
+    }.take(maxChips)
     if (chips.isEmpty()) return
     Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         chips.forEachIndexed { i, (text, on) ->
@@ -531,7 +531,7 @@ internal val WidgetGap = 8.dp
 // --- The car's words ---------------------------------------------------------------------------
 
 /** The detail line the roomiest layouts show: charge limit, odometer, service — whichever exist. */
-private fun VehicleSnapshot.detailLine(): String? = listOfNotNull(
+internal fun VehicleSnapshot.detailLine(): String? = listOfNotNull(
     chargeLimitPct?.let { "Limit $it%" },
     odometer?.takeIf { it.isNotBlank() }?.let { "Odo $it" },
     lastServiceMiles?.let { "Service ${it} mi" },

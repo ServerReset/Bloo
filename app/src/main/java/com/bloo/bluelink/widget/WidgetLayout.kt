@@ -85,6 +85,10 @@ internal data class WidgetPlan(
     val gridColumns: Int = 0,
     /** Whether the header carries the 32dp refresh button (it is taller than its text). */
     val refresh: Boolean = true,
+    /** STACK: height left over after everything the plan placed, split into fixed gaps (weights proved unreliable). */
+    val spareDp: Float = 0f,
+    /** STACK: how many status chips fit across the width without clipping. */
+    val maxChips: Int = 3,
 ) {
     val minimal: Boolean get() = arrangement == WidgetArrangement.MINIMAL
 
@@ -98,7 +102,7 @@ internal const val WIDGET_CHIP_DP = 30f
 private const val LINE = 1.3f
 private const val VALUE_LINE = 1.15f
 /** Average glyph width of the bold value, as a share of its size. */
-private const val VALUE_GLYPH = 0.62f
+private const val VALUE_GLYPH = 0.76f
 private const val MIN_VALUE_SP = 24f
 private const val GAP = 8f
 /** The header's refresh button, which makes the header at least this tall. */
@@ -226,11 +230,16 @@ internal fun planWidget(
     val showBar = !compact && left >= WIDGET_BAR_DP + 2 * GAP
     if (showBar) left -= WIDGET_BAR_DP + 2 * GAP
     val showChips = !compact && left >= WIDGET_CHIP_DP * fs.coerceAtLeast(1f) + GAP
-    return WidgetPlan(
+    val plan = WidgetPlan(
         arrangement = WidgetArrangement.STACK, valueSp = value, nameSp = nameSp, statusSp = statusSp, detailSp = detailSp,
         showUpdated = showUpdated, showStatus = showStatus, showDetails = showDetails, showBar = showBar, showChips = showChips,
         labels = labels, buttonHeightDp = rowButtonH, maxActions = maxActions, gridColumns = cols, refresh = refreshButton,
+        // A chip is about 100dp wide with its text; only as many as fit, so none is cut to "N...".
+        maxChips = (innerW / 104f).toInt().coerceIn(1, 3),
     )
+    // What is left once everything is placed becomes two fixed gaps (above the value, above the controls): a tall
+    // widget is spaced evenly, and the whole plan fits by construction instead of depending on weighted spacers.
+    return plan.copy(spareDp = (innerH - plan.heightDp(fs)).coerceAtLeast(0f))
 }
 
 /** The plan's total height, in dp, for tests: it must never exceed the widget's inner height. */
