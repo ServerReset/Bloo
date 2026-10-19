@@ -74,7 +74,6 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import coil.compose.AsyncImage
 import com.bloo.bluelink.ui.ActionRow
 import com.bloo.bluelink.ui.BlooTheme
-import com.bloo.bluelink.ui.EnumSegmented
 import com.bloo.bluelink.ui.IconBadge
 import com.bloo.bluelink.ui.ScreenGutter
 import com.bloo.bluelink.ui.SettingsCaption
@@ -244,35 +243,15 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
                 }
             }
 
-            SettingsGroup("Look") {
+            // Only what a person actually decides: which car, whether the photo is behind it, and which controls it has.
+            // Corner shape, text size, softness, colouring and spacing are the widget's own good defaults (it sizes
+            // itself to the space it is given), not choices to make.
+            SettingsGroup("Background") {
                 ToggleRow(
-                    "Photo background",
+                    "Car photo",
                     choice.photo,
-                    description = if (photoUrl == null && car != null) "Add a photo of ${car.name} in Bloo to use it here" else "Your car's photo, softly blurred",
+                    description = if (photoUrl == null && car != null) "Add a photo of ${car.name} in Bloo to use it here" else "Your car's photo, softly blurred behind the widget",
                 ) { choice = choice.copy(photo = it) }
-                if (choice.photo) {
-                    SettingsSegmentedRow(
-                        label = "Softness",
-                        options = listOf(
-                            SegmentOption(WidgetPhoto.BLUR_LIGHT.toString(), "Light"),
-                            SegmentOption(WidgetPhoto.BLUR_MEDIUM.toString(), "Medium"),
-                            SegmentOption(WidgetPhoto.BLUR_STRONG.toString(), "Strong"),
-                        ),
-                        selectedKey = choice.blur.toString(),
-                    ) { choice = choice.copy(blur = it.toInt()) }
-                }
-                ToggleRow("Colour by level", choice.levelTint, description = "Red when low, amber, green, blue while charging") {
-                    choice = choice.copy(levelTint = it)
-                }
-            }
-
-            SettingsGroup("Shape and text") {
-                EnumSegmented(WidgetCorner.entries, choice.corner, { it.label }, { choice = choice.copy(corner = it) })
-                EnumSegmented(WidgetTextSize.entries, choice.textSize, { it.label }, { choice = choice.copy(textSize = it) })
-                ToggleRow("Compact", choice.compact, description = "Tighter spacing and fewer lines") { choice = choice.copy(compact = it) }
-                ToggleRow("Charge bar and status", choice.extras, description = "Shown on taller widgets where there is room") {
-                    choice = choice.copy(extras = it)
-                }
             }
 
             SettingsGroup("Controls") {
