@@ -198,7 +198,7 @@ private fun Modifier.dialogScrollbar(state: ScrollState): Modifier {
         val trackH = size.height
         val contentH = trackH + max
         val w = 4.dp.toPx()
-        val thumbH = (trackH * (trackH / contentH)).coerceIn(24.dp.toPx(), trackH)
+        val thumbH = (trackH * (trackH / contentH)).coerceIn(24.dp.toPx().coerceAtMost(trackH), trackH)
         val y = (trackH - thumbH) * (state.value.toFloat() / max).coerceIn(0f, 1f)
         drawRoundRect(
             color = thumb,
@@ -247,6 +247,10 @@ internal fun AuroraBackground(
     var tiltY by remember { mutableFloatStateOf(0f) }
     // Live pause flag: the sensor callback and coroutines start once and must see the newest value.
     val currentPaused by rememberUpdatedState(paused)
+    // The clock loop below outlives any one composition's value, so it reads the live battery-saver state (a plain `saver`
+    // was frozen at first composition: saver turned on mid-session never stopped the clock, and saver turned off never
+    // restarted it).
+    val currentSaver by rememberUpdatedState(saver)
     // The drift keeps moving while the car pager is dragged (freezing it read as a stall and jumped on
     // resume); it stands still only while the app is not on screen.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -371,7 +375,7 @@ internal fun AuroraBackground(
             android.os.SystemClock.uptimeMillis() - ambient.lastTouchMs > AmbientIdleMs
         while (true) {
             val now = System.nanoTime()
-            if (currentPaused || saver ||
+            if (currentPaused || currentSaver ||
                 !lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
             ) {
                 last = now

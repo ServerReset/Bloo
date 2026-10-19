@@ -66,6 +66,13 @@ fun AnimatedSlider(
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    // The gesture below is one long-lived block (keyed on range, steps and enabled only), so what it calls must be the
+    // CURRENT callbacks, not the ones from the composition where a key last changed: a settle used to run a stale
+    // onValueSettled lambda (a caller's old copy of its state) and silently undo a change made since.
+    val currentOnValueChange by androidx.compose.runtime.rememberUpdatedState(onValueChange)
+    val currentOnStepTick by androidx.compose.runtime.rememberUpdatedState(onStepTick)
+    val currentOnSettle by androidx.compose.runtime.rememberUpdatedState(onSettle)
+    val currentReduceMotion by androidx.compose.runtime.rememberUpdatedState(reduceMotion)
     // Tracked via onSizeChanged below (Compose only knows this after the first layout pass), since
     // every gesture-to-value conversion needs the control's actual pixel width to turn a touch
     // x-coordinate into a fraction of the track.
@@ -130,11 +137,11 @@ fun AnimatedSlider(
         val clamped = raw.coerceIn(valueRange.start, valueRange.endInclusive)
         val s = snapToStep(clamped, valueRange, steps)
         if (steps > 0 && s != prevStep) {
-            onStepTick()
+            currentOnStepTick()
             prevStep = s
         }
         // Free-flow during drag; the snapped step is applied on settle.
-        onValueChange(clamped)
+        currentOnValueChange(clamped)
     }
     // Commits the final step-snapped [target], then animates (or snaps under reduceMotion) the thumb with a
     // bouncy spring. Cancels any settle in flight so two springs never write `anim` at once.
@@ -142,13 +149,13 @@ fun AnimatedSlider(
         prevStep = target
         settling = true
         // onValueChange before onSettle: callers read the last value inside onSettle, and a plain tap never called onValueChange.
-        onValueChange(target)
-        onSettle()
+        currentOnValueChange(target)
+        currentOnSettle()
         settleJob?.cancel()
         settleJob = scope.launch {
             // finally so `settling` resets when a new drag cancels this settle (CancellationException).
             try {
-                if (reduceMotion) {
+                if (currentReduceMotion) {
                     anim.snapTo(target)
                 } else {
                     anim.animateTo(
@@ -323,6 +330,8 @@ fun AnimatedSlider(
 fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: Int): Float {
     if (steps <= 0) return v.coerceIn(range.start, range.endInclusive)
     val inc = (range.endInclusive - range.start) / (steps + 1)
+    // A range with no span has one position: dividing by its zero increment gave NaN, and NaN.roundToInt() throws.
+    if (inc <= 0f) return range.start
     val snapped = range.start + (v - range.start).div(inc).roundToInt() * inc
     return snapped.coerceIn(range.start, range.endInclusive)
 }
