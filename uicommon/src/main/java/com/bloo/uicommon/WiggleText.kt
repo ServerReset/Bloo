@@ -1,6 +1,8 @@
 package com.bloo.uicommon
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -159,9 +161,15 @@ fun AnimatedValue(
     modifier: Modifier = Modifier,
     maxLines: Int = 1,
 ) {
-    if (reduceMotion || maxLines > 1 || value.length > RollTokenMaxChars ||
-        !value.any { it.isDigit() } || value.contains('\n')
-    ) {
+    val hasDigits = value.any { it.isDigit() }
+    // A value too long or too wrapped for the one-line token row, but with numbers in it: [RevealText] rolls just the
+    // digits that change (inline, so wrapping is kept) and leaves the words still, so a wrapping pebble summary changes
+    // like a short one does. It also turns the effect off under reduce-motion on its own.
+    if (!reduceMotion && hasDigits && (maxLines > 1 || value.length > RollTokenMaxChars || value.contains('\n'))) {
+        RevealText(text = value, modifier = modifier, style = style, maxLines = maxLines)
+        return
+    }
+    if (reduceMotion || maxLines > 1 || value.length > RollTokenMaxChars || !hasDigits || value.contains('\n')) {
         AnimatedContent(
             targetState = value,
             modifier = modifier,
@@ -177,13 +185,24 @@ fun AnimatedValue(
     RollingTokenRow(value, style, modifier)
 }
 
+/**
+ * THE digit roll, the one transition every changing number in the app uses (a status value's digits in
+ * [AnimatedValue], a number inside any [RevealText]): the old digits slide out and the new ones slide in from the
+ * direction the number moved, up when it grew and down when it shrank, fading as they go.
+ */
+internal fun AnimatedContentTransitionScope<String>.digitRoll(): ContentTransform {
+    val dir = if ((targetState.toLongOrNull() ?: 0L) >= (initialState.toLongOrNull() ?: 0L)) 1 else -1
+    return (fadeIn(tween(RollFadeIn)) + slideInVertically(tween(RollFadeIn)) { dir * it / 2 }) togetherWith
+        (fadeOut(tween(RollFadeOut)) + slideOutVertically(tween(RollFadeOut)) { -dir * it / 2 })
+}
+
 /** Longest value still eligible for the tokenized digit-roll path. */
 private const val RollTokenMaxChars = 24
 
 /** Roll timings, local to :uicommon on purpose (it cannot reach :app's tokens;
  *  these match :app's MotionShort-side values and :app's own digit roll). */
-private const val RollFadeIn = 180
-private const val RollFadeOut = 150
+internal const val RollFadeIn = 180
+internal const val RollFadeOut = 150
 
 /**
  * One token of a to-be-rolled value: a digit run (rolls vertically,
@@ -230,10 +249,7 @@ private fun RollingTokenRow(
                 targetState = t.text,
                 transitionSpec = {
                     if (t.digits) {
-                        val dir =
-                            if ((targetState.toLongOrNull() ?: 0L) >= (initialState.toLongOrNull() ?: 0L)) 1 else -1
-                        (fadeIn(tween(RollFadeIn)) + slideInVertically(tween(RollFadeIn)) { dir * it / 2 }) togetherWith
-                            (fadeOut(tween(RollFadeOut)) + slideOutVertically(tween(RollFadeOut)) { -dir * it / 2 })
+                        digitRoll()
                     } else {
                         fadeIn(tween(RollFadeIn)) togetherWith fadeOut(tween(RollFadeOut))
                     }
