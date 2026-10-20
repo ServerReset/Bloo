@@ -353,13 +353,14 @@ fun WearRoundButton(
     size: Dp,
     description: String,
     modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
     onClick: () -> Unit,
     content: @Composable BoxScope.() -> Unit,
 ) {
     androidx.compose.material3.Surface(
         onClick = onClick,
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
+        color = color,
         modifier = modifier
             .size(size)
             .wearGlassRim(CircleShape)

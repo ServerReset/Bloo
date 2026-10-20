@@ -68,19 +68,17 @@ internal fun WearFaceEditor(
                                 }
                             }
                             WearQuadrantGrid(actions, Modifier.fillMaxSize(), press)
-                            Box(
-                                Modifier
+                            WearRoundButton(
+                                size = face * 0.27f,
+                                description = "Done",
+                                color = scheme.background,
+                                modifier = Modifier
                                     .align(Alignment.Center)
-                                    .offset { androidx.compose.ui.unit.IntOffset((press.dx * face.roundToPx()).roundToInt(), (press.dy * face.roundToPx()).roundToInt()) }
-                                    .size(face * 0.27f)
-                                    .clip(CircleShape)
-                                    .background(scheme.background)
-                                    .semantics { contentDescription = "Done" }
-                                    .clickable {
-                                        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                                        onDone()
-                                    },
-                                contentAlignment = Alignment.Center,
+                                    .offset { androidx.compose.ui.unit.IntOffset((press.dx * face.roundToPx()).roundToInt(), (press.dy * face.roundToPx()).roundToInt()) },
+                                onClick = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                                    onDone()
+                                },
                             ) {
                                 Icon(AppIcons.Check, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(face * 0.16f))
                             }

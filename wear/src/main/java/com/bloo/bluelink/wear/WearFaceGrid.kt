@@ -76,9 +76,7 @@ internal fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifie
     val slots = (0 until 4).map { actions.getOrNull(it) }
     val unit = LocalFaceUnit.current
     val gap = TileGap * unit
-    val rim = androidx.compose.ui.graphics.Brush.sweepGradient(
-        listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.2f), Color.White.copy(alpha = 0.3f)),
-    )
+    val rim = androidx.compose.ui.graphics.Brush.sweepGradient(WearRimStops + WearRimStops.first())
     androidx.compose.ui.layout.Layout(
         content = { for (q in 0 until 4) QuarterTile(q, slots[q], Modifier.fillMaxSize(), press) },
         modifier = modifier

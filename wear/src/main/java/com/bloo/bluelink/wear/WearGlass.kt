@@ -31,11 +31,10 @@ import androidx.compose.ui.unit.dp
  */
 
 /** A hairline rim, bright toward the top-left and again faintly at the bottom-right, like the phone's cards. */
-fun Modifier.wearGlassRim(shape: Shape): Modifier = border(
-    1.dp,
-    Brush.linearGradient(listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.2f))),
-    shape,
-)
+fun Modifier.wearGlassRim(shape: Shape): Modifier = border(1.dp, Brush.linearGradient(WearRimStops), shape)
+
+/** The rim's light: bright, nearly gone, then faint. The face's circular rim sweeps the same stops, closed back to the first. */
+internal val WearRimStops = listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.2f))
 
 /** The Haze state of the watch's aurora, which glass panes blur; null where there is no backdrop (a preview, a test). */
 internal val LocalWearHaze = androidx.compose.runtime.staticCompositionLocalOf<HazeState?> { null }
