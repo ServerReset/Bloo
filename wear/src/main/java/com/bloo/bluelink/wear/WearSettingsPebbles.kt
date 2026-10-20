@@ -10,7 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.bloo.uicommon.AppIcons
 
 /**
- * The watch's own settings, in ONE pebble: what it alerts about (four tiles), the effects switch, and its own Auto lock. They
+ * The watch's own settings, in ONE pebble: what it alerts about (four switches), the effects switch, and its own Auto lock. They
  * touch no car, so they live apart from the car page that shows them; each change the phone should keep (and Drive with it) is
  * sent up through [WearLook] or [WearNotificationPrefs].
  *
@@ -28,24 +28,21 @@ internal fun WearSettingsPebble(signedIn: Boolean) {
     var autoLock by remember { mutableStateOf(WearAutoLock.isEnabled(context)) }
 
     WearPebble(title = "Watch settings", icon = AppIcons.Settings) {
-        // --- Alerts: a tile each, filled when on (the same four switches the phone's notification settings share) ---
+        // --- Alerts: one switch a row, the same rows as the effects below, so the section reads as a list not a grid ---
         WearSubheading("Alerts")
-        WearTileRow {
-            WearToggleTile("Charging card", AppIcons.Bolt, charging, Modifier.weight(1f)) {
-                charging = it; alerts.charging = it; alerts.sendToPhone(context)
-            }
-            WearToggleTile("Charged", AppIcons.BatteryFull, complete, Modifier.weight(1f)) {
-                complete = it; alerts.chargeComplete = it; alerts.sendToPhone(context)
-            }
+        WearToggleRow("Charging", AppIcons.Bolt, charging) {
+            charging = it; alerts.charging = it; alerts.sendToPhone(context)
         }
-        WearTileRow {
-            WearToggleTile("Low battery", AppIcons.BatteryAlert, low, Modifier.weight(1f)) {
-                low = it; alerts.lowBattery = it; alerts.sendToPhone(context)
-            }
-            WearToggleTile("Auto lock", AppIcons.Lock, autoLockAlert, Modifier.weight(1f)) {
-                autoLockAlert = it; alerts.autoLock = it; alerts.sendToPhone(context)
-            }
+        WearToggleRow("Charged", AppIcons.BatteryFull, complete) {
+            complete = it; alerts.chargeComplete = it; alerts.sendToPhone(context)
         }
+        WearToggleRow("Low battery", AppIcons.BatteryAlert, low) {
+            low = it; alerts.lowBattery = it; alerts.sendToPhone(context)
+        }
+        WearToggleRow("Auto lock", AppIcons.Lock, autoLockAlert) {
+            autoLockAlert = it; alerts.autoLock = it; alerts.sendToPhone(context)
+        }
+        WearCaption("Each switch decides whether the watch tells you about it.", small = true)
 
         // --- Effects: blur, the drifting aurora, springs and text animation off, as under Battery Saver ---
         WearSubheading("Effects")

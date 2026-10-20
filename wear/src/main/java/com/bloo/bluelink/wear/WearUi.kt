@@ -81,7 +81,7 @@ import com.bloo.uicommon.standardButtonIcon
  */
 
 /**
- * A scrolling screen for the round display: the clock on top, a vertical list whose rows each fit the curve on
+ * A scrolling screen for the round display: the clock on top (always showing, even while the list scrolls), a vertical list whose rows each fit the curve on
  * their own ([fitRound]), padded so the first and last row clear the bezel. [content] adds the rows.
  */
 @Composable
@@ -91,7 +91,8 @@ fun WearListScreen(
     content: ScalingLazyListScope.() -> Unit,
 ) {
     val listState = rememberScalingLazyListState()
-    ScreenScaffold(scrollState = listState, timeText = { TimeText() }, modifier = modifier) {
+    // No scroll state handed to the scaffold: it would hide the clock while the list moves. The clock stays on top, always.
+    ScreenScaffold(timeText = { TimeText() }, modifier = modifier) {
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -128,11 +129,10 @@ internal fun WearBackable(onBack: () -> Unit, content: @Composable () -> Unit) {
 }
 
 /**
- * The watch's pebble: a glass card that holds a section's heading and its rows, as the phone's pebbles do, so one group reads
- * as one thing and the next as another.
+ * A section of the watch: its glyph and title on one line, then its rows. No card behind it -- the rows already carry their
+ * own glass, and the gap between sections (see [WearListScreen]) is what tells one group from the next.
  *
- * The body is a slot rather than a fixed layout, so a pebble is whatever the caller puts in it -- a row of switches, a block
- * of text, a status readout. [WearPebble] owns the card, nothing else.
+ * The body is a slot, so a section is whatever the caller puts under its title -- a list of rows, a block of text, a readout.
  */
 @Composable
 fun WearPebble(
@@ -141,18 +141,9 @@ fun WearPebble(
     modifier: Modifier = Modifier,
     body: @Composable () -> Unit,
 ) {
-    // The card sits closer to the edge than its rows do (the rows keep [ListInset]), because on a round face a full-width row
-    // is cut by the bezel at the top and bottom.
     val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(PebbleCorner)
     Column(
-        modifier
-            .fillMaxWidth()
-            .padding(horizontal = ListInset - PebblePad)
-            .wearGlassBlur(shape)
-            .background(scheme.surfaceContainer.copy(alpha = 0.55f), shape)
-            .wearGlassRim(shape)
-            .padding(horizontal = PebblePad, vertical = PebblePad + 4.dp),
+        modifier.fillMaxWidth().padding(horizontal = ListInset),
         verticalArrangement = Arrangement.spacedBy(RowGap),
     ) {
         Row(
@@ -177,11 +168,7 @@ fun WearPebble(
     }
 }
 
-/** A pebble's corners and the padding between its edge and its rows (the phone's rounded card, at watch size). */
-private val PebbleCorner = 28.dp
-private val PebblePad = 8.dp
-
-/** A quiet heading inside a pebble, for a group of rows within it (the pebble has the one title; this names a part). */
+/** A quiet heading inside a section, for a group of rows within it (the section has the one title; this names a part). */
 @Composable
 fun WearSubheading(text: String, modifier: Modifier = Modifier) {
     RevealText(
@@ -441,53 +428,6 @@ fun WearToggleRow(
     modifier: Modifier = Modifier,
     onChange: (Boolean) -> Unit,
 ) = WearActionRow(label, icon, modifier = modifier, active = checked, switch = true) { onChange(!checked) }
-
-/**
- * A square toggle for a short list of switches (the alerts): the glyph over its name, filled when on. Two sit side by side in a
- * [WearTileRow]. The same button as every row -- it morphs to a rounded square under a finger like them.
- */
-@Composable
-fun WearToggleTile(
-    label: String,
-    icon: ImageVector,
-    checked: Boolean,
-    modifier: Modifier = Modifier,
-    onChange: (Boolean) -> Unit,
-) {
-    val scheme = MaterialTheme.colorScheme
-    val tint = if (checked) scheme.onPrimary else scheme.onSurface
-    WearButton(
-        active = checked,
-        modifier = modifier.height(TileHeight).semantics {
-            role = Role.Switch
-            toggleableState = if (checked) ToggleableState.On else ToggleableState.Off
-        },
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
-        onClick = { onChange(!checked) },
-    ) {
-        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.height(4.dp))
-            RevealText(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = tint,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-/** Two [WearToggleTile]s side by side, sharing the row. */
-@Composable
-fun WearTileRow(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(RowGap), content = content)
-}
-
-private val TileHeight = 72.dp
 
 /** The quiet words under a row or a group: what it does, why, what is wrong. [small] is the finer print under a caption. */
 @Composable
