@@ -38,7 +38,7 @@ fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp, status: F
     val interaction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     // The hub squeezes under a finger and springs back, like the tiles round it.
-    val press by animateFloatAsState(if (pressed) 0.9f else 1f, spring(dampingRatio = 0.45f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium), label = "hubPress")
+    val press by animateFloatAsState(if (pressed) 0.96f else 1f, spring(dampingRatio = 0.6f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium), label = "hubPress")
     Box(
         Modifier
             .size(size)

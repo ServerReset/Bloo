@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -9,9 +10,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -63,7 +61,7 @@ internal fun WearFaceEditor(
                                 val control = slots.getOrNull(i)?.let { WearFaceControls.byKey(it) }?.takeIf { it.available(car) }
                                 WearQuickAction(
                                     label = control?.choice ?: "Empty",
-                                    icon = control?.icon?.invoke(car) ?: Icons.Filled.Add,
+                                    icon = control?.icon?.invoke(car) ?: AppIcons.Add,
                                 ) {
                                     haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
                                     onPickSlot(i)
@@ -84,7 +82,7 @@ internal fun WearFaceEditor(
                                     },
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(Icons.Filled.Check, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(face * 0.16f))
+                                Icon(AppIcons.Check, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(face * 0.16f))
                             }
                         }
                         RevealText(

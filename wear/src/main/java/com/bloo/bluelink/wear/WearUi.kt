@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -10,17 +11,22 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -88,6 +94,8 @@ fun WearListScreen(
             modifier = Modifier.fillMaxSize(),
             // No per-item scaling: each element fits the round display on its own.
             scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
+            // Air between the sections, so one group does not run into the next.
+            verticalArrangement = Arrangement.spacedBy(SectionGap),
             contentPadding = contentPadding,
             content = content,
         )
@@ -115,7 +123,7 @@ fun <T> WearChoiceScreen(
         item { WearCenteredText(title, style = MaterialTheme.typography.titleSmall) }
         (choices + listOfNotNull(empty)).forEachIndexed { i, choice ->
             item(key = i) {
-                WearActionRow(choice.label, choice.icon ?: Icons.Filled.Close.takeIf { choice === empty }, active = choice.value == selected, switch = true) {
+                WearActionRow(choice.label, choice.icon ?: AppIcons.Close.takeIf { choice === empty }, active = choice.value == selected, switch = true) {
                     onPick(choice.value)
                 }
             }
@@ -158,17 +166,17 @@ fun WearPebble(
     modifier: Modifier = Modifier,
     body: @Composable () -> Unit,
 ) {
-    // No card around it: on the phone a section is a quiet heading over its own pills, so on the watch the
-    // pebble is a small heading and the rows beneath it carry the shape.
-    // Inset from both edges: on a round face a full-width row is cut by the bezel at the top and bottom.
-    Column(modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // No card around it: on the phone a section is a heading over its own pills, so on the watch the pebble is a heading
+    // between two hairlines (which is what sets one section off from the next) and the rows beneath it carry the shape.
+    // Inset well from both edges: on a round face a full-width row is cut by the bezel at the top and bottom.
+    Column(modifier.fillMaxWidth().padding(horizontal = ListInset), verticalArrangement = Arrangement.spacedBy(RowGap)) {
         Row(
             Modifier.fillMaxWidth().fitRound(),
-            horizontalArrangement = Arrangement.Center,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
+            WearHairline(Modifier.weight(1f))
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             RevealText(
                 title,
                 fontWeight = FontWeight.SemiBold,
@@ -179,10 +187,30 @@ fun WearPebble(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            WearHairline(Modifier.weight(1f))
         }
         body()
     }
 }
+
+/** A fine line that fades out toward its ends: the rule either side of a section's title. */
+@Composable
+internal fun WearHairline(modifier: Modifier = Modifier) {
+    val line = MaterialTheme.colorScheme.onSurfaceVariant
+    Spacer(
+        modifier
+            .height(1.dp)
+            .background(Brush.horizontalGradient(listOf(Color.Transparent, line.copy(alpha = 0.45f), Color.Transparent))),
+    )
+}
+
+/**
+ * Side margin of the lists, and the gaps that keep their rows and sections apart -- the phone's own spacing tokens (a row gap
+ * between rows, a block gap between sections), so the watch breathes in the same units the phone does.
+ */
+internal val ListInset = 26.dp
+internal val RowGap: androidx.compose.ui.unit.Dp @Composable get() = com.bloo.uicommon.GapRow
+internal val SectionGap: androidx.compose.ui.unit.Dp @Composable get() = com.bloo.uicommon.GapBlock
 
 /**
  * A single action inside a [WearPebble] -- the shared phone [MorphButtonCore], so the watch's tap
@@ -229,7 +257,7 @@ fun WearActionRow(
                     Modifier
                 },
             ),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        contentPadding = RowPadding,
         onClick = onClick,
     ) {
         // The glyph (or the in-flight spinner) and the label side by side, the label taking the row and wrapping to a
@@ -289,10 +317,21 @@ internal fun WearButton(
 ) {
     val scheme = MaterialTheme.colorScheme
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // The shape the button wears, animated by the same press the button itself morphs on: a full pill at rest, a rounded square
+    // while pressed or on. The frosted layer behind it is clipped to this shape, so it changes with the button instead of
+    // holding the pill and hiding the morph.
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val corner by animateFloatAsState(
+        if (pressed || active) MorphedCorner else PillCorner,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        label = "buttonCorner",
+    )
     MorphButton(
         onClick = onClick,
+        interactionSource = interaction,
         // Frosted: the aurora behind the row, blurred (when the device allows), under the translucent fill below.
-        modifier = modifier.wearGlassBlur(RoundedCornerShape(50)),
+        modifier = modifier.wearGlassBlur(RoundedCornerShape(corner.toInt().coerceIn(1, 50))),
         enabled = enabled,
         active = active,
         // Glass, as on the phone: a translucent pill that lets the aurora through; the filled primary is
@@ -302,13 +341,77 @@ internal fun WearButton(
         activeContainerColor = scheme.primary,
         activeContentColor = scheme.onPrimary,
         contentPadding = contentPadding,
-        minHeight = 0.dp,
+        minHeight = RowMinHeight,
+        pillCornerPercent = PillCorner,
+        morphedCornerPercent = MorphedCorner,
         expressive = false,
         onClickHaptic = {
             haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
         },
         content = content,
     )
+}
+
+/** A row's corners: a full pill at rest, the phone's rounded square (28%) while pressed. */
+private const val PillCorner = 50f
+private const val MorphedCorner = 28f
+
+/** A row's height and padding: taller than a line of text needs, so a row is a target and not a strip. */
+internal val RowMinHeight = 56.dp
+internal val RowPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp)
+
+/**
+ * A list row with two lines: the [title] and, under it, the [subtitle] (a preset's name and what it sets, a choice and what it
+ * does). The same button as [WearActionRow], so it looks, morphs and presses like every other row; a [trailing] glyph marks
+ * what a tap does.
+ */
+@Composable
+fun WearListRow(
+    title: String,
+    subtitle: String?,
+    icon: ImageVector?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    active: Boolean = false,
+    pending: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val tint = if (active) scheme.onPrimary else scheme.onSurface
+    val quiet = if (active) scheme.onPrimary.copy(alpha = 0.8f) else scheme.onSurfaceVariant
+    WearButton(
+        active = active,
+        enabled = enabled && !pending,
+        modifier = modifier.fillMaxWidth().fitRound(),
+        contentPadding = RowPadding,
+        onClick = onClick,
+    ) {
+        if (icon != null) {
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides tint) {
+                MorphButtonLabel(icon = icon, label = "", pending = pending, iconSize = 20.dp)
+            }
+            Spacer(Modifier.width(12.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            RevealText(
+                title,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge,
+                color = tint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (subtitle != null) {
+                RevealText(
+                    subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = quiet,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
 }
 
 /** An on/off row: a [WearActionRow] drawn as a switch. Stateless; the caller owns [checked] and what [onChange] does. */
@@ -421,9 +524,9 @@ fun WearConfirmScreen(
     val scheme = MaterialTheme.colorScheme
     WearMessageScreen(icon = icon, title = title, detail = detail, tint = if (destructive) scheme.error else scheme.primary) {
         Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            RoundChoice(Icons.Filled.Close, "Cancel", scheme.surfaceContainerHigh.copy(alpha = 0.6f), scheme.onSurface, onCancel)
+            RoundChoice(AppIcons.Close, "Cancel", scheme.surfaceContainerHigh.copy(alpha = 0.6f), scheme.onSurface, onCancel)
             RoundChoice(
-                Icons.Filled.Check, confirmLabel,
+                AppIcons.Check, confirmLabel,
                 if (destructive) scheme.error else scheme.primary,
                 if (destructive) scheme.onError else scheme.onPrimary,
                 onConfirm,

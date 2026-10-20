@@ -33,6 +33,8 @@ fun WearCarFace(
     caption: String,
     /** 0..1, or null for a car that reports no charge or fuel (the ring then shows its track only). */
     progress: Float?,
+    /** The car's charge limit in percent, for the ring's split; null when it has none. */
+    limitPct: Int?,
     tint: Color,
     actions: List<WearQuickAction?>,
     modifier: Modifier = Modifier,
@@ -58,7 +60,7 @@ fun WearCarFace(
         CompositionLocalProvider(LocalFaceUnit provides unit) {
             WearEdgeRing(
                 progress = progress,
-                tint = tint,
+                limitPct = limitPct,
                 modifier = Modifier.fillMaxSize().alpha(if (stale) 0.5f else 1f),
                 stroke = RingStroke * unit,
                 charging = charging || refreshing,

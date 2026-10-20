@@ -1,8 +1,6 @@
 package com.bloo.bluelink.wear
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoMode
-import androidx.compose.material.icons.filled.Thermostat
+import com.bloo.uicommon.AppIcons
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,11 +25,11 @@ internal fun WearClimateList(
         WearListScreen {
             item(key = "title") { WearCenteredText(title, style = MaterialTheme.typography.titleSmall) }
             item(key = "smart") {
-                WearActionRow("Smart climate", Icons.Filled.AutoMode) { onPick(WearFaceControls.CLIMATE_SMART_KEY) }
+                WearActionRow("Smart climate", AppIcons.SmartClimate) { onPick(WearFaceControls.CLIMATE_SMART_KEY) }
             }
             saved.forEach { preset ->
                 item(key = preset.id) {
-                    WearActionRow(preset.name, Icons.Filled.Thermostat) { onPick(WearFaceControls.PRESET_PREFIX + preset.id) }
+                    WearActionRow(preset.name, AppIcons.Thermostat) { onPick(WearFaceControls.PRESET_PREFIX + preset.id) }
                 }
                 item(key = preset.id + ":detail") { WearCaption(WearPresets.detail(preset.request), small = true, maxLines = 1) }
             }

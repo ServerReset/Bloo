@@ -1,16 +1,6 @@
 package com.bloo.bluelink.wear
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AcUnit
-import androidx.compose.material.icons.filled.AutoMode
-import androidx.compose.material.icons.filled.Thermostat
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Refresh
+import com.bloo.uicommon.AppIcons
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.ClimateRequest
@@ -54,66 +44,66 @@ internal object WearFaceControls {
         FaceControl(
             key = "lock", choice = "Lock / unlock",
             label = { if (it.locked == true) "Unlock" else "Lock" },
-            icon = { if (it.locked == true) Icons.Filled.LockOpen else Icons.Filled.Lock },
+            icon = { if (it.locked == true) AppIcons.LockOpen else AppIcons.Lock },
             action = CarAction.TOGGLE_LOCK,
             confirm = { it.locked == true },
         ),
         FaceControl(
-            key = "lock_only", choice = "Lock", label = { "Lock" }, icon = { Icons.Filled.Lock },
+            key = "lock_only", choice = "Lock", label = { "Lock" }, icon = { AppIcons.Lock },
             action = CarAction.LOCK, active = { it.locked == true },
         ),
         FaceControl(
-            key = "unlock_only", choice = "Unlock", label = { "Unlock" }, icon = { Icons.Filled.LockOpen },
+            key = "unlock_only", choice = "Unlock", label = { "Unlock" }, icon = { AppIcons.LockOpen },
             action = CarAction.UNLOCK, confirm = { true },
         ),
         FaceControl(
             key = "climate", choice = "Climate on / off",
             label = { if (it.climateOn == true) "Climate off" else "Climate" },
-            icon = { Icons.Filled.AcUnit }, action = CarAction.TOGGLE_CLIMATE, active = { it.climateOn == true },
+            icon = { AppIcons.Climate }, action = CarAction.TOGGLE_CLIMATE, active = { it.climateOn == true },
         ),
         FaceControl(
-            key = "climate_on", choice = "Start climate", label = { "Climate on" }, icon = { Icons.Filled.AcUnit },
+            key = "climate_on", choice = "Start climate", label = { "Climate on" }, icon = { AppIcons.Climate },
             action = CarAction.CLIMATE_ON, active = { it.climateOn == true },
         ),
         FaceControl(
-            key = "climate_off", choice = "Stop climate", label = { "Climate off" }, icon = { Icons.Filled.Close },
+            key = "climate_off", choice = "Stop climate", label = { "Climate off" }, icon = { AppIcons.Close },
             action = CarAction.CLIMATE_OFF,
         ),
         FaceControl(
             key = "climate_smart", choice = "Smart climate",
             label = { if (it.climateOn == true) "Climate off" else "Smart climate" },
-            icon = { Icons.Filled.AutoMode }, action = CarAction.CLIMATE_SMART, active = { it.climateOn == true },
+            icon = { AppIcons.SmartClimate }, action = CarAction.CLIMATE_SMART, active = { it.climateOn == true },
         ),
         // Choosing this in the quarter chooser opens the list of climate presets (smart climate among them), and the quarter
         // then holds the one picked. Stored as itself only before that pick, in which case a press asks again.
         FaceControl(
-            key = CLIMATE_PICK, choice = "Climate preset…", label = { "Climate" }, icon = { Icons.Filled.Thermostat },
+            key = CLIMATE_PICK, choice = "Climate preset…", label = { "Climate" }, icon = { AppIcons.Thermostat },
             action = CarAction.CLIMATE_ON, active = { it.climateOn == true }, needsChoice = { true },
         ),
         FaceControl(
             key = "charge", choice = "Charge on / off",
             label = { if (it.charging == true) "Stop charge" else "Charge" },
-            icon = { Icons.Filled.Bolt }, action = CarAction.TOGGLE_CHARGE,
+            icon = { AppIcons.Bolt }, action = CarAction.TOGGLE_CHARGE,
             available = { it.hasBattery }, active = { it.charging == true },
         ),
         FaceControl(
-            key = "charge_on", choice = "Start charging", label = { "Charge" }, icon = { Icons.Filled.Bolt },
+            key = "charge_on", choice = "Start charging", label = { "Charge" }, icon = { AppIcons.Bolt },
             action = CarAction.CHARGE_ON, available = { it.hasBattery }, active = { it.charging == true },
         ),
         FaceControl(
-            key = "charge_off", choice = "Stop charging", label = { "Stop charge" }, icon = { Icons.Filled.Close },
+            key = "charge_off", choice = "Stop charging", label = { "Stop charge" }, icon = { AppIcons.Close },
             action = CarAction.CHARGE_OFF, available = { it.hasBattery },
         ),
         FaceControl(
-            key = "flash", choice = "Flash lights", label = { "Flash" }, icon = { Icons.Filled.FlashOn },
+            key = "flash", choice = "Flash lights", label = { "Flash" }, icon = { AppIcons.Flash },
             action = CarAction.FLASH_LIGHTS, available = { it.toVehicle().supportsHornLights },
         ),
         FaceControl(
-            key = "horn", choice = "Horn and lights", label = { "Horn" }, icon = { Icons.Filled.Notifications },
+            key = "horn", choice = "Horn and lights", label = { "Horn" }, icon = { AppIcons.Notifications },
             action = CarAction.HORN_AND_LIGHTS, available = { it.toVehicle().supportsHornLights },
         ),
         FaceControl(
-            key = "refresh", choice = "Refresh status", label = { "Refresh" }, icon = { Icons.Filled.Refresh },
+            key = "refresh", choice = "Refresh status", label = { "Refresh" }, icon = { AppIcons.Refresh },
             action = CarAction.REFRESH,
         ),
     )
@@ -139,7 +129,7 @@ internal object WearFaceControls {
         key = PRESET_PREFIX + id,
         choice = "Preset: " + (WearPresets.findAny(id)?.name ?: "Climate"),
         label = { WearPresets.find(it.vin, id)?.name ?: "Climate" },
-        icon = { Icons.Filled.Thermostat },
+        icon = { AppIcons.Thermostat },
         action = CarAction.CLIMATE_ON,
         active = { it.climateOn == true },
         request = { WearPresets.find(it.vin, id)?.request },

@@ -1,8 +1,7 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -108,7 +107,7 @@ internal fun WearCarPage(
 
     confirmAction?.let { action ->
         WearConfirmScreen(
-            icon = Icons.Filled.LockOpen,
+            icon = AppIcons.LockOpen,
             title = "Unlock ${car.name}?",
             detail = "The doors open for anyone nearby.",
             confirmLabel = "Unlock",

@@ -1,13 +1,6 @@
 package com.bloo.bluelink.wear
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.BatteryAlert
-import androidx.compose.material.icons.filled.BatteryFull
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Tune
+import com.bloo.uicommon.AppIcons
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,8 +17,8 @@ import androidx.compose.ui.platform.LocalContext
 /** A door to the face editor, where each quarter's control is chosen. */
 @Composable
 internal fun WearFaceControlsPebble(onOpen: () -> Unit) {
-    WearPebble(title = "Face controls", icon = Icons.Filled.Tune) {
-        WearActionRow("Change controls", Icons.Filled.Tune, onClick = onOpen)
+    WearPebble(title = "Face controls", icon = AppIcons.Tune) {
+        WearActionRow("Change controls", AppIcons.Tune, onClick = onOpen)
     }
 }
 
@@ -38,17 +31,17 @@ internal fun WearAlertsPebble() {
     var complete by remember { mutableStateOf(prefs.chargeComplete) }
     var low by remember { mutableStateOf(prefs.lowBattery) }
     var autoLock by remember { mutableStateOf(prefs.autoLock) }
-    WearPebble(title = "Watch alerts", icon = Icons.Filled.Notifications) {
-        WearToggleRow("Charging card", Icons.Filled.Bolt, charging) {
+    WearPebble(title = "Watch alerts", icon = AppIcons.Notifications) {
+        WearToggleRow("Charging card", AppIcons.Bolt, charging) {
             charging = it; prefs.charging = it; prefs.sendToPhone(context)
         }
-        WearToggleRow("Charged", Icons.Filled.BatteryFull, complete) {
+        WearToggleRow("Charged", AppIcons.BatteryFull, complete) {
             complete = it; prefs.chargeComplete = it; prefs.sendToPhone(context)
         }
-        WearToggleRow("Low battery", Icons.Filled.BatteryAlert, low) {
+        WearToggleRow("Low battery", AppIcons.BatteryAlert, low) {
             low = it; prefs.lowBattery = it; prefs.sendToPhone(context)
         }
-        WearToggleRow("Auto lock", Icons.Filled.Lock, autoLock) {
+        WearToggleRow("Auto lock", AppIcons.Lock, autoLock) {
             autoLock = it; prefs.autoLock = it; prefs.sendToPhone(context)
         }
     }
@@ -62,8 +55,8 @@ internal fun WearAlertsPebble() {
 internal fun WearEffectsPebble() {
     val context = LocalContext.current
     var reduced by remember { mutableStateOf(WearLook.reduceEffects(context)) }
-    WearPebble(title = "Effects", icon = Icons.Filled.AutoAwesome) {
-        WearToggleRow("Reduce effects", Icons.Filled.AutoAwesome, reduced) {
+    WearPebble(title = "Effects", icon = AppIcons.AutoAwesome) {
+        WearToggleRow("Reduce effects", AppIcons.AutoAwesome, reduced) {
             reduced = it
             WearLook.setReduceEffects(context, it)
             WearLook.sendToPhone(context)
@@ -83,8 +76,8 @@ internal fun WearEffectsPebble() {
 internal fun WearAutoLockPebble() {
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(WearAutoLock.isEnabled(context)) }
-    WearPebble(title = if (WearAutoLock.BETA) "Auto lock · Beta" else "Auto lock", icon = Icons.Filled.Lock) {
-        WearToggleRow("Lock when I walk away", Icons.Filled.Lock, enabled) {
+    WearPebble(title = if (WearAutoLock.BETA) "Auto lock · Beta" else "Auto lock", icon = AppIcons.Lock) {
+        WearToggleRow("Lock when I walk away", AppIcons.Lock, enabled) {
             enabled = it
             WearAutoLock.setEnabled(context, it)
             WearLook.sendToPhone(context)
@@ -104,7 +97,7 @@ internal fun WearAutoLockPebble() {
 /** Shown in place of Auto lock until the phone has handed this watch the car's sign-in. */
 @Composable
 internal fun WearPairPebble() {
-    WearPebble(title = "Pair with phone", icon = Icons.Filled.Lock) {
+    WearPebble(title = "Pair with phone", icon = AppIcons.Lock) {
         WearCaption("Auto lock needs your car's sign-in. In Bloo on the phone, open Settings and set up the watch.")
     }
 }

@@ -1,12 +1,8 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -102,7 +98,7 @@ fun WearApp(
             }
             signInCode != null -> SignInCode(signInCode.orEmpty())
             vehicles.isEmpty() -> WearMessageScreen(
-                icon = if (connected) Icons.Filled.DirectionsCar else Icons.Filled.PhoneAndroid,
+                icon = if (connected) AppIcons.DirectionsCar else AppIcons.PhoneAndroid,
                 title = if (connected) "No cars yet" else "Waiting for your phone",
                 detail = if (connected) "Add a car in Bloo on your phone." else "Open Bloo on your phone and keep it near the watch.",
             )
@@ -121,7 +117,7 @@ private fun PinGate(store: WatchPinStore, title: String, onUnlocked: () -> Unit)
 @Composable
 private fun SignInCode(code: String) {
     WearMessageScreen(
-        icon = Icons.Filled.Watch,
+        icon = AppIcons.Watch,
         title = "Sign in from your phone",
         detail = "Check this code matches the phone.",
     ) {
@@ -133,7 +129,7 @@ private fun SignInCode(code: String) {
             textAlign = TextAlign.Center,
             maxLines = 1,
         )
-        WearActionRow("Cancel", Icons.Filled.Close) { WearCredentialSync.cancel() }
+        WearActionRow("Cancel", AppIcons.Close) { WearCredentialSync.cancel() }
     }
 }
 

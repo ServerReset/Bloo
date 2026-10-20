@@ -155,8 +155,8 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
     val glyphBump = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(1f) }
     androidx.compose.runtime.LaunchedEffect(action.label, action.active) {
         if (policy.bouncySprings) {
-            glyphBump.snapTo(1.3f)
-            glyphBump.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium))
+            glyphBump.snapTo(1.1f)
+            glyphBump.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium))
         }
     }
     MorphButton(
@@ -165,7 +165,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
         modifier = modifier.semantics { contentDescription = action.label }
             .graphicsLayer {
                 val e = enter.value
-                val s = 0.78f + 0.22f * e
+                val s = 0.92f + 0.08f * e
                 scaleX = s
                 scaleY = s
                 alpha = e.coerceIn(0f, 1f) * (breathe?.value ?: 1f)

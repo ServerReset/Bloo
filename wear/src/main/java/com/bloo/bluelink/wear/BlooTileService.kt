@@ -22,6 +22,7 @@ import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.ioScope
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -66,18 +67,18 @@ class BlooTileService : TileService() {
                 // The hub is the refresh button: a press reloads the tile with this id, and a refresh is asked for as it does.
                 // Not more than once in HUB_REFRESH_GAP_MS: the tile keeps reporting the last pressed id on later reloads (its own
                 // freshness updates, the redraw a refresh causes), and each would otherwise start another refresh.
-                if (!sealed && requestParams.currentState.lastClickableId == HUB_ID && hubRefreshDue()) {
-                    runCatching { WearSnapshotRepository(applicationContext).refresh() }
-                }
+                if (!sealed && requestParams.currentState.lastClickableId == HUB_ID && hubRefreshDue()) startHubRefresh()
+                // While one runs the tile SAYS so (see [faceLayout]) and is asked for again soon, so the answer lands quickly.
+                val refreshing = !sealed && System.currentTimeMillis() < tilePrefs().getLong(REFRESHING_UNTIL, 0L)
                 val car = snapshot?.let { WearTileCar.pick(applicationContext, it.vehicles) ?: it.selected }
                 // Whatever goes wrong while drawing, the request is answered: an unset completer leaves the tile
                 // spinning for good, so a failure draws the plain "open Bloo" layout instead.
-                val layout = runCatching { layoutFor(car, sealed) }.getOrElse { layoutFor(null, sealed) }
-                return tileOf(layout)
+                val layout = runCatching { layoutFor(car, sealed, refreshing) }.getOrElse { layoutFor(null, sealed) }
+                return tileOf(layout, refreshing)
     }
 
-    private fun tileOf(layout: LayoutElement): TileBuilders.Tile {
-        val freshness = runCatching {
+    private fun tileOf(layout: LayoutElement, refreshing: Boolean = false): TileBuilders.Tile {
+        val freshness = if (refreshing) 2_000L else runCatching {
             60_000L * com.bloo.bluelink.data.DeviceStatus.policy(applicationContext).pollIntervalMultiplier
         }.getOrDefault(60_000L)
         return TileBuilders.Tile.Builder()
@@ -88,9 +89,28 @@ class BlooTileService : TileService() {
             .build()
     }
 
+    private fun tilePrefs() = applicationContext.getSharedPreferences("bloo_watch_tile", MODE_PRIVATE)
+
+    /**
+     * Starts the refresh the hub asked for, without waiting for it: the tile answers at once showing "Updating..." (the flag
+     * below), and when the refresh ends the flag is cleared and the tile is asked for again, so the new numbers replace it.
+     * The flag also lapses by itself after [REFRESH_SHOW_MS], so a refresh that never reports cannot leave it stuck.
+     */
+    private fun startHubRefresh() {
+        val app = applicationContext
+        tilePrefs().edit().putLong(REFRESHING_UNTIL, System.currentTimeMillis() + REFRESH_SHOW_MS).apply()
+        val repo = WearSnapshotRepository(app)
+        runCatching { repo.refresh() }
+        scope.launch {
+            kotlinx.coroutines.withTimeoutOrNull(REFRESH_SHOW_MS) { repo.refreshing.first { !it } }
+            tilePrefs().edit().putLong(REFRESHING_UNTIL, 0L).apply()
+            runCatching { TileService.getUpdater(app).requestUpdate(BlooTileService::class.java) }
+        }
+    }
+
     /** True when the hub's refresh has not run in the last [HUB_REFRESH_GAP_MS] (and records that it is running now). */
     private fun hubRefreshDue(): Boolean {
-        val prefs = applicationContext.getSharedPreferences("bloo_watch_tile", MODE_PRIVATE)
+        val prefs = tilePrefs()
         val now = System.currentTimeMillis()
         if (now - prefs.getLong("hub_refreshed_ms", 0L) < HUB_REFRESH_GAP_MS) return false
         prefs.edit().putLong("hub_refreshed_ms", now).apply()
@@ -113,11 +133,11 @@ class BlooTileService : TileService() {
             "BlooTileResources"
         }
 
-    private fun layoutFor(car: VehicleSnapshot?, sealed: Boolean = false): LayoutElement {
+    private fun layoutFor(car: VehicleSnapshot?, sealed: Boolean = false, refreshing: Boolean = false): LayoutElement {
         // The whole tile opens the app. The quarters and the hub are clickables of their own inside it, and the system
         // routes the innermost hit, so a tap on "Charge" charges and a tap anywhere else opens Bloo.
         val open = tileModifiers(clickableId = "open", onClick = launchAction(null))
-        if (car != null) return faceLayout(car, open)
+        if (car != null) return faceLayout(car, open, refreshing)
 
         // No car: say why. A sealed watch has been set up and is only waiting for its PIN; "add a car" read as not set up.
         val line = if (sealed) "Enter your PIN in Bloo" else "Add a car in Bloo on your phone"
@@ -137,20 +157,25 @@ class BlooTileService : TileService() {
      * and the value in a hub where they meet. Pressing a quarter runs that control (through the app, so the PIN gate
      * applies); pressing the hub refreshes. Each quarter is a disc quarter, from per-corner radii.
      */
-    private fun faceLayout(car: VehicleSnapshot, open: ModifiersBuilders.Modifiers): LayoutElement {
+    private fun faceLayout(car: VehicleSnapshot, open: ModifiersBuilders.Modifiers, refreshing: Boolean): LayoutElement {
         // The presets a quarter may start live in prefs the app fills; the tile can run without the app having opened.
         WearPresets.ensureLoaded(applicationContext)
         val slots = WearTileActions.forSlots(car, WearFacePrefs.load(applicationContext))
         val grid = tileColumn(
-            tileRow(quarter(0, slots[0]), tileSpace(width = TILE_GAP), quarter(1, slots[1])),
+            tileRow(quarter(0, slots[0], refreshing), tileSpace(width = TILE_GAP), quarter(1, slots[1], refreshing)),
             tileSpace(height = TILE_GAP),
-            tileRow(quarter(2, slots[2]), tileSpace(width = TILE_GAP), quarter(3, slots[3])),
+            tileRow(quarter(2, slots[2], refreshing), tileSpace(width = TILE_GAP), quarter(3, slots[3], refreshing)),
             width = expand(),
             height = expand(),
             modifiers = tileModifiers(padding = RING_INSET),
         )
         return tileBox(
-            *listOfNotNull(if (car.percent != null) edgeRing(car) else null, grid, hub(car)).toTypedArray(),
+            *listOfNotNull(
+                // While refreshing, the ring is four bright accent arcs -- it reads as "working" at a glance, not as a charge.
+                if (refreshing) refreshRing() else if (car.percent != null) edgeRing(car) else null,
+                grid,
+                hub(car, refreshing),
+            ).toTypedArray(),
             modifiers = open,
         )
     }
@@ -160,7 +185,7 @@ class BlooTileService : TileService() {
      * corner (at the hub) a soft curve, the other two nearly square. [index]: 0 top-left, 1 top-right, 2 bottom-left,
      * 3 bottom-right. A control the car cannot do is a quiet, inert quarter.
      */
-    private fun quarter(index: Int, action: WearTileAction?): LayoutElement {
+    private fun quarter(index: Int, action: WearTileAction?, refreshing: Boolean = false): LayoutElement {
         val outer = 92f
         val inner = 16f
         val flat = 4f
@@ -171,7 +196,7 @@ class BlooTileService : TileService() {
             else -> tileCorners(inner, flat, outer, flat)
         }
         val fill = when {
-            action == null -> QUIET
+            action == null || refreshing -> QUIET
             action.active -> ACTIVE
             else -> BUTTON
         }
@@ -194,8 +219,25 @@ class BlooTileService : TileService() {
     }
 
     /** The value where the quarters meet; pressing it refreshes (the tile reloads with this id, and a refresh is asked for). */
-    private fun hub(car: VehicleSnapshot): LayoutElement {
+    private fun hub(car: VehicleSnapshot, refreshing: Boolean = false): LayoutElement {
         val stale = if (car.isStale()) car.updatedLabel() else null
+        if (refreshing) {
+            // The press is answered at once: the refresh glyph and "Updating..." in the accent, until the new numbers land.
+            return tileBox(
+                tileColumn(
+                    tileImage("refresh", 22f, ACTIVE),
+                    tileSpace(height = 2f),
+                    tileText("Updating…", 12f, ACTIVE, bold = true),
+                ),
+                width = dp(HUB_SIZE),
+                height = dp(HUB_SIZE),
+                modifiers = tileModifiers(
+                    background = BLACK, corner = tileCorner(HUB_SIZE / 2),
+                    clickableId = HUB_ID, onClick = ActionBuilders.LoadAction.Builder().build(),
+                    description = "Updating ${car.name}",
+                ),
+            )
+        }
         return tileBox(
             tileColumn(
                 // 24sp fits a percentage; a word ("Unlocked") would be cut off in the hub, so it is smaller.
@@ -218,22 +260,49 @@ class BlooTileService : TileService() {
         levelColorArgb(car.percent, car.charging == true, WHITE)
 
     /**
-     * The car's charge as a ring round the display's edge -- the app's hero, at tile scale.
-     *
-     * Two arc lines rather than one: a full-circle track under a partial sweep, both anchored at the top and
-     * running clockwise, so the drawn part reads as "how full" against a visible remainder. A car with no
-     * battery gets no ring, because a ring with nothing to say is a decoration.
+     * The car's charge as a ring round the display's edge, split as the phone's charge bar is: the fill (green, blue once it has
+     * reached its limit), a track up to the charge limit and a dimmer one past it, with a gap between each -- or one track
+     * for a car without a limit. A car with no battery gets no ring, because a ring with nothing to say is a decoration.
      */
     private fun edgeRing(car: VehicleSnapshot): LayoutElement {
-        val color = tint(car)
         val pct = (car.percent ?: 0).coerceIn(0, 100)
-        return LayoutElementBuilders.Arc.Builder()
+        val limit = car.chargeLimitPct?.takeIf { it in 1..99 }
+        val stuck = limit != null && pct >= limit
+        val fill = if (stuck) BlooColors.chargeBlue else BlooColors.chargeGreen
+        val filledEnd = if (pct > 0) maxOf(360f * pct / 100f, 2 * RING_GAP) else 0f
+        val ring = LayoutElementBuilders.Arc.Builder()
             .setAnchorAngle(degrees(0f))
             .setAnchorType(LayoutElementBuilders.ARC_ANCHOR_START)
             .setArcDirection(LayoutElementBuilders.ARC_DIRECTION_CLOCKWISE)
-            .addContent(arcLine(360f, (color and 0x00FFFFFF) or 0x40000000))
-            .addContent(arcLine(360f * (pct / 100f), color))
-            .build()
+        // Each segment runs from one boundary to the next, less the gap; the spacer after it is that gap.
+        fun segment(from: Float, to: Float, color: Int) {
+            val length = to - from - RING_GAP
+            if (length <= 0f) return
+            ring.addContent(arcLine(length, color))
+            ring.addContent(arcLine(RING_GAP, CLEAR))
+        }
+        segment(0f, filledEnd, fill)
+        if (limit == null || stuck) {
+            segment(filledEnd, 360f, if (limit != null) RING_DIM else RING_TRACK)
+        } else {
+            val limitAt = (360f * limit / 100f).coerceIn(filledEnd, 360f)
+            segment(filledEnd, limitAt, RING_TRACK)
+            segment(limitAt, 360f, RING_DIM)
+        }
+        return ring.build()
+    }
+
+    /** The ring while the hub's refresh runs: four accent arcs with gaps. */
+    private fun refreshRing(): LayoutElement {
+        val ring = LayoutElementBuilders.Arc.Builder()
+            .setAnchorAngle(degrees(0f))
+            .setAnchorType(LayoutElementBuilders.ARC_ANCHOR_START)
+            .setArcDirection(LayoutElementBuilders.ARC_DIRECTION_CLOCKWISE)
+        repeat(4) {
+            ring.addContent(arcLine(90f - RING_GAP, ACTIVE))
+            ring.addContent(arcLine(RING_GAP, CLEAR))
+        }
+        return ring.build()
     }
 
     private fun arcLine(sweepDegrees: Float, color: Int): LayoutElementBuilders.ArcLine =
@@ -266,6 +335,8 @@ class BlooTileService : TileService() {
     private companion object {
         const val RESOURCES_VERSION = "3"
         const val HUB_REFRESH_GAP_MS = 30_000L
+        const val REFRESH_SHOW_MS = 12_000L
+        const val REFRESHING_UNTIL = "hub_refreshing_until"
         val GLYPHS = mapOf(
             "lock" to R.drawable.tile_lock, "unlock" to R.drawable.tile_unlock, "climate" to R.drawable.tile_climate,
             "bolt" to R.drawable.tile_bolt, "flash" to R.drawable.tile_flash, "refresh" to R.drawable.tile_refresh,
@@ -278,6 +349,12 @@ class BlooTileService : TileService() {
         const val BUTTON = 0xFF2A2A33.toInt()
         /** The ring's inset from the display's edge, and the gaps between quarters, matching the face (dp at 227dp). */
         const val RING_INSET = 13f
+        /** The gap between two segments of the ring, in degrees (the round caps stand out past it, so it reads as a small space). */
+        const val RING_GAP = 7f
+        /** A gap in the ring is an arc nothing is drawn in. */
+        const val CLEAR = 0x00000000
+        const val RING_TRACK = 0x38FFFFFF
+        const val RING_DIM = 0x17FFFFFF
         const val TILE_GAP = 6f
         const val HUB_SIZE = 72f
         const val STALE = 0xFFFF6B6B.toInt()

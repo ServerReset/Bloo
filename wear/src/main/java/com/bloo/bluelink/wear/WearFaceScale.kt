@@ -29,7 +29,7 @@ internal const val HubFraction = 0.36f
 internal val ReferenceFace = 227.dp
 
 /** How far the cross through the face moves, as a share of the face, when a quarter is pressed (the quarter grows). */
-private const val PressGrow = 0.11f
+private const val PressGrow = 0.05f
 
 /**
  * The face's size relative to the 227dp it was designed on, so a 192dp watch and a 240dp watch (and any display

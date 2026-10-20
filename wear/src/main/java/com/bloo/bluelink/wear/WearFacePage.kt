@@ -49,6 +49,7 @@ internal fun WearFacePage(
                 value = v.bigValue(),
                 caption = v.name,
                 progress = v.percent?.let { it / 100f },
+                limitPct = v.chargeLimitPct,
                 tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
                 actions = actions,
                 charging = v.charging == true,

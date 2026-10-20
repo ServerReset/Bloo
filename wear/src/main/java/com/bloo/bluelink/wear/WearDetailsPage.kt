@@ -1,9 +1,7 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,15 +60,15 @@ internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState, onEditFace:
         item { WearStatusPebble(ui.car) }
         item { WearCarCarePebble(ui.car, refreshing = ui.refreshing, canRefresh = ui.signedIn, onRefresh = { ui.repo.refresh() }) }
         update.error?.let { message ->
-            item { WearPebble(title = "Watch update", icon = Icons.Filled.SystemUpdate) { WearCaption(message) } }
+            item { WearPebble(title = "Watch update", icon = AppIcons.SystemUpdate) { WearCaption(message) } }
         }
         if (update.run != null) {
             item {
-                WearPebble(title = "Update available", icon = Icons.Filled.SystemUpdate) {
+                WearPebble(title = "Update available", icon = AppIcons.SystemUpdate) {
                     if (update.downloading) {
                         WearCenteredText("Downloading… ${(update.progress * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
                     } else {
-                        WearActionRow("Update now", Icons.Filled.Download) {
+                        WearActionRow("Update now", AppIcons.Download) {
                             scope.launch { WearUpdateChecker.downloadAndInstall(context) }
                         }
                     }

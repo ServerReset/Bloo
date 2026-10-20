@@ -19,6 +19,22 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Watch
 
 // The phone's design-system vocabulary that the button system is built on, moved here so the watch
 // can use the same one: the icon for a given button label, the spin used by an in-flight glyph, and
@@ -45,6 +61,23 @@ object AppIcons {
   val Warning = Icons.Filled.Warning
   val Fullscreen = Icons.Filled.Fullscreen
   val FullscreenExit = Icons.Filled.FullscreenExit
+  // The watch's glyphs too, so the one vocabulary names them all (the phone and the watch draw the same icon for the same thing).
+  val Climate = Icons.Filled.AcUnit
+  val SmartClimate = Icons.Filled.AutoMode
+  val Thermostat = Icons.Filled.Thermostat
+  val Refresh = Icons.Filled.Refresh
+  val Flash = Icons.Filled.FlashOn
+  val LockOpen = Icons.Filled.LockOpen
+  val Notifications = Icons.Filled.Notifications
+  val Tune = Icons.Filled.Tune
+  val Add = Icons.Filled.Add
+  val BatteryFull = Icons.Filled.BatteryFull
+  val BatteryAlert = Icons.Filled.BatteryAlert
+  val Download = Icons.Filled.Download
+  val SystemUpdate = Icons.Filled.SystemUpdate
+  val Build = Icons.Filled.Build
+  val Watch = Icons.Filled.Watch
+  val PhoneAndroid = Icons.Filled.PhoneAndroid
 }
 
 @Composable
