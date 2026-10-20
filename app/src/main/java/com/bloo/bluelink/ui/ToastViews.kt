@@ -38,7 +38,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -61,19 +60,17 @@ import com.bloo.uicommon.canBlurBackdrops
 // --- The toast slot and card that ToastHost lays out ---
 
 /**
- * The toasts' motion, one family with the search bar's own springs: a toast pops up from behind the bar with
- * an overshoot (so it visibly jumps, then settles), a quick no-bounce retreat back behind it, and a damped
- * reflow when the slots around it change.
+ * The toasts' motion: a toast rises in from below the screen with an overshoot (it visibly jumps, then settles), leaves by
+ * a quick no-bounce slide back off the screen, and the toasts around it glide on a damped reflow when the slots change.
+ * It never comes from, or goes into, the search bar: the bar is just something the toast passes in front of or behind.
  */
 private val EnterSpring = spring<Float>(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow)
 private val ExitSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
 private val ReflowSpring = spring<Float>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
 
-/** How a toast leaves (see ToastSlot): back behind the search bar, tucked into the toast in front, off the side, or down and out. */
-private const val ExitBar = 0
-private const val ExitTuck = 1
-private const val ExitSide = 2
-private const val ExitDown = 3
+/** How a toast leaves (see ToastSlot): straight down off the bottom of the screen, or sideways off the edge of a fanned-out pile. */
+private const val ExitDown = 0
+private const val ExitSide = 1
 
 /** How much of each older toast peeks out above the newest while the pile is folded. */
 private val PeekHeight = 9.dp
@@ -82,14 +79,14 @@ private val PeekHeight = 9.dp
 private val StackSwipe = 36.dp
 
 /**
- * One toast: it owns its expiry clock, pops up from behind the search bar into its slot and drops back
- * behind it on the way out, and removes itself from the stack the moment its exit finishes.
+ * One toast: it owns its expiry clock, rises in from below the screen into its slot and slides back off the screen on the
+ * way out, and removes itself from the stack the moment its exit finishes.
  *
  * It is laid out once, full-width at the bottom of the stack, and its whole motion is a `graphicsLayer`
  * transform read in the draw phase: [slot] is the slot it currently occupies (animated, so older toasts glide
- * as newer ones arrive), [enter] is how far it has come out from behind the search bar (it overshoots past
- * 1, which is the jump), and [expandFrac] is how far the folded pile is fanned out. Folded, the toasts behind
- * the newest are shrunken slivers peeking above it, sharing its width -- which beside a docked search is the
+ * as newer ones arrive), [enter] is how far it has risen from below the screen (it overshoots past 1, which is the
+ * jump), [exit] is how far it has left, and [expandFrac] is how far the folded pile is fanned out. Folded, the toasts
+ * behind the newest are shrunken slivers peeking above it, sharing its width -- which beside a docked search is the
  * gap next to it.
  */
 @Composable
@@ -100,13 +97,10 @@ internal fun BoxScope.ToastSlot(
     liftPx: Float,
     startInsetPx: Float,
     endInsetPx: Float,
-    searchRect: Rect?,
-    toastWidthPx: Float,
     windowWidthPx: Float,
     expandFrac: () -> Float,
     stackSize: Int,
-    contentBottomPx: Float,
-    edgePx: Float,
+    bottomInsetPx: Float,
     onToggleStack: () -> Unit,
     onSetExpanded: (Boolean) -> Unit,
     hazeState: HazeState,
@@ -131,29 +125,24 @@ internal fun BoxScope.ToastSlot(
     // The slot it rests in, animated toward [index]. Starts AT its index (no initial glide).
     val slot = remember(toast.id) { Animatable(index.toFloat()) }
     LaunchedEffect(index) { slot.animateTo(index.toFloat(), ReflowSpring) }
-    // 0 = hidden behind the search bar, 1 = resting in its slot; overshoots past 1 on the way up.
+    // 0 = below the screen, 1 = resting in its slot; overshoots past 1 on the way up.
     val enter = remember(toast.id) { Animatable(0f) }
     LaunchedEffect(toast.id) { enter.animateTo(1f, EnterSpring) }
-    // How it leaves depends on where it is, so every toast leaves the same way in the same place:
-    //  - the one in the search's row goes back behind the search bar (or, with no bar, down and out),
-    //  - one tucked in a folded pile sinks into the toast in front of it,
-    //  - one in a fanned-out pile slides off the side,
+    // How it leaves depends on where it is, so a toast in the same place always leaves the same way:
+    //  - one in front (above the search bar or beside it) or tucked behind another in a folded pile slides straight down
+    //    off the screen -- the pile's front toast and the search bar are drawn over it, so it passes behind them,
+    //  - one in a fanned-out pile, above the toasts beneath it, slides off the side,
     //  - one that was swiped has already gone and is dropped at once.
     val exit = remember(toast.id) { Animatable(0f) }
-    var exitMode by remember(toast.id) { androidx.compose.runtime.mutableIntStateOf(ExitBar) }
+    var exitMode by remember(toast.id) { androidx.compose.runtime.mutableIntStateOf(ExitDown) }
     LaunchedEffect(toast.leaving) {
         if (!toast.leaving) return@LaunchedEffect
         if (toast.flung) {
             onGone()
             return@LaunchedEffect
         }
-        exitMode = when {
-            index == 0 && searchRect != null -> ExitBar
-            index == 0 -> ExitDown
-            expandFrac() > 0.5f -> ExitSide
-            else -> ExitTuck
-        }
-        if (exitMode == ExitBar) enter.animateTo(0f, ExitSpring) else exit.animateTo(1f, ExitSpring)
+        exitMode = if (index > 0 && expandFrac() > 0.5f) ExitSide else ExitDown
+        exit.animateTo(1f, ExitSpring)
         onGone()
     }
     val swipe = Modifier.rememberSwipeToDismiss(toast.id) {
@@ -169,7 +158,6 @@ internal fun BoxScope.ToastSlot(
     val lift = liftPx.coerceAtLeast(0f)
     val peekPx = with(density) { PeekHeight.toPx() }
     val barPx = with(density) { ChromeBarHeight.toPx() }
-    val maxCardPx = with(density) { MaxToastWidth.toPx() }
     val swipePx = with(density) { StackSwipe.toPx() }
     // Read through derivedStateOf: composition only hears the fold/fan flip, not every frame of the animation.
     val folded by androidx.compose.runtime.remember { androidx.compose.runtime.derivedStateOf { expandFrac() < 0.5f } }
@@ -193,22 +181,12 @@ internal fun BoxScope.ToastSlot(
                 val merge = 1f - enterV
                 var ty = baseY
                 var tx = 0f
-                var sx = 1f
-                if (merge > 0f && searchRect != null && toastWidthPx > 0f) {
-                    // Behind the search bar: centred on it and squeezed to its width, so the toast is hidden
-                    // until it jumps up and widens into its slot.
-                    val boxW = (windowWidthPx - 2f * edgePx - startInsetPx - endInsetPx).coerceAtLeast(1f)
-                    val boxCx = edgePx + startInsetPx.coerceAtLeast(0f) + boxW / 2f
-                    val restCy = contentBottomPx - barPx / 2f + baseY
-                    tx = merge * (searchRect.center.x - boxCx)
-                    ty = baseY + merge * (searchRect.center.y - restCy)
-                    val cardW = minOf(boxW, maxCardPx)
-                    sx = 1f - merge * (1f - (searchRect.width / cardW).coerceIn(0.1f, 1f))
-                } else if (merge > 0f) {
-                    // No search bar to come out from: rise from just below the stack instead of appearing in place.
-                    ty = baseY + merge * (barPx + edgePx)
+                // Below the screen's bottom edge, from where it rests: its own height plus the stack's offset from the bottom.
+                val offscreen = size.height - baseY + bottomInsetPx + 8f
+                if (merge > 0f) {
+                    ty = baseY + merge * offscreen
                 } else if (merge < 0f) {
-                    // The overshoot of the jump: a touch past the slot, then settling.
+                    // The overshoot of the rise: a touch past the slot, then settling.
                     ty = baseY + merge * barPx * 0.6f
                 }
                 var leaveAlpha = 1f
@@ -216,12 +194,10 @@ internal fun BoxScope.ToastSlot(
                 val x = exit.value
                 if (x > 0f) {
                     when (exitMode) {
-                        // Sinks into the toast in front of it, shrinking and fading.
-                        ExitTuck -> { ty += x * peekPx * 2f; leaveScale = 1f - 0.06f * x; leaveAlpha = 1f - x }
-                        // Slides off the right edge of the screen.
+                        // Off the right edge of the screen, fading a little as it goes.
                         ExitSide -> { tx += x * windowWidthPx; leaveAlpha = 1f - 0.5f * x }
-                        // No bar to retreat behind: drops down and out past the bottom edge.
-                        else -> { ty += x * (barPx + edgePx * 2f); leaveAlpha = 1f - x }
+                        // Straight down and out, fully opaque: the toasts and the bar in front of it cover it as it passes.
+                        else -> ty += x * offscreen
                     }
                 }
                 // Stretches tall in flight (a quick squash-and-stretch), shrinks as it sits deeper in the pile.
@@ -229,13 +205,11 @@ internal fun BoxScope.ToastSlot(
                 val shrink = (1f - 0.05f * depth * (1f - e)) * leaveScale
                 translationX = tx
                 translationY = ty
-                scaleX = sx * shrink
+                scaleX = shrink
                 scaleY = stretch * shrink
                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
                 // Deeper than two behind the newest, a folded toast is not there at all.
-                alpha = (1f - (1f - e) * (s - 2f).coerceIn(0f, 1f)) * leaveAlpha *
-                    // With no bar to come out from, the toast fades in as it rises.
-                    (if (searchRect == null) enterV.coerceIn(0f, 1f) else 1f)
+                alpha = (1f - (1f - e) * (s - 2f).coerceIn(0f, 1f)) * leaveAlpha
             }
             .pointerInput(toast.id) {
                 // Observes only (Initial pass, never consumes), so the swipe and the buttons still work.

@@ -268,7 +268,6 @@ internal fun ToastHost(
     val navBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
     val edgePx = with(density) { ToastEdge.toPx() }
     val gapPx = with(density) { GapRow.toPx() }
-    val contentWidthPx = window.width.toFloat() - 2 * edgePx
     val minWidthPx = with(density) { MinBesideWidth.toPx() }
 
     val clearance = toastClearance(
@@ -334,12 +333,9 @@ internal fun ToastHost(
                     endInsetPx = if (index == 0) endInset else endInset * (1f - expandFrac.value),
                     expandFrac = { expandFrac.value },
                     stackSize = liveCount,
-                    contentBottomPx = window.height.toFloat() - maxOf(imeBottomPx, navBottomPx) - edgePx,
-                    edgePx = edgePx,
+                    bottomInsetPx = maxOf(imeBottomPx, navBottomPx) + edgePx,
                     onToggleStack = { state.toggleStack() },
                     onSetExpanded = { state.fan(it) },
-                    searchRect = searchRect,
-                    toastWidthPx = contentWidthPx,
                     windowWidthPx = window.width.toFloat(),
                     hazeState = hazeState,
                     onCopy = onCopy,
@@ -354,7 +350,7 @@ internal fun ToastHost(
 }
 
 /**
- * The search element's answer to a message arriving: it squashes a little as the toast pushes off from behind it,
+ * The search element's answer to a message arriving: it squashes a little as the toast rises past it,
  * then springs back, so the two read as one piece of chrome.
  */
 @Composable
