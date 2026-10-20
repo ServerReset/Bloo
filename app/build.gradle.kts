@@ -269,6 +269,10 @@ dependencies {
     // collecting -- and preparing a recomposition for -- state nobody can see.
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     implementation("androidx.activity:activity-compose:1.13.0")
+    // The password manager's saved logins, asked for through one system sheet (the sign-in screen's "Use a saved login"). The
+    // play-services-auth half is what serves it before Android 14, where managers are not Credential Manager providers yet.
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
     // Only FragmentActivity is used (MainActivity / BiometricAuth); no fragment-ktx
     // extensions are called, so the plain `fragment` artifact is the honest dependency.
     implementation("androidx.fragment:fragment:1.9.1")

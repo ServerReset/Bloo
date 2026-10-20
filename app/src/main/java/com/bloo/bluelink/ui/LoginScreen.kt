@@ -54,6 +54,30 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetPasswordOption
+import androidx.credentials.PasswordCredential
+import androidx.credentials.exceptions.NoCredentialException
+import com.bloo.uicommon.LocalPowerPolicy
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -83,6 +107,13 @@ import com.bloo.uicommon.SegmentOption
  * Sign-in form for every brand (US, Canada, Europe) on one screen. Field state is local until
  * [onLogin] fires, so switching brands keeps typed values. Brand copy cross-fades via
  * [AnimatedContent].
+ *
+ * Laid out as a short story, top to bottom: who we are (the hero), which account (region and brand), your login (the fields,
+ * the saved-login shortcut and the button), and the quiet things last (forgot password, privacy, updates). Each block eases
+ * in a beat after the one above it.
+ *
+ * Password managers: only the email and the password are autofill fields; the screen asks the manager for a saved login by
+ * itself when it opens, and a button asks again; keyboard actions walk email, password, PIN, and Go signs in.
  */
 @Composable
 internal fun LoginScreen(
@@ -117,10 +148,12 @@ internal fun LoginScreen(
         LocalWindowInfo.current.containerSize.height.toDp() < 520.dp
     }
     val context = LocalContext.current
+    val focus = LocalFocusManager.current
 
-    // Password managers. Only the email and the password carry an autofill type (below), so a manager offers its saved login
-    // for exactly those two and offers to SAVE exactly those two: the Service PIN, the region and brand pickers have none, and
-    // an untyped Compose field is not part of the autofill structure at all.
+    // --- Password managers -----------------------------------------------------------------------------------------------
+    // Only the email and the password carry an autofill type (below), so a manager offers its saved login for exactly those
+    // two and offers to SAVE exactly those two: the Service PIN, the region and the brand pickers have none, and an untyped
+    // Compose field is not part of the autofill structure at all.
     //
     // The save is offered when a sign-in WORKED. Tapping Sign in marks the form submitted; if the form comes back from the
     // attempt it failed (cancel: the manager must not keep a wrong password), and if the screen goes away while still
@@ -140,6 +173,46 @@ internal fun LoginScreen(
     DisposableEffect(Unit) {
         onDispose { if (submitted) runCatching { autofill?.commit() } }
     }
+    val submit = {
+        if (!loading) {
+            focus.clearFocus()
+            submitted = true
+            onLogin(email, password, pin, brand)
+        }
+    }
+
+    // The saved login, asked of the password manager through Android's Credential Manager: one sheet of the logins it holds,
+    // one tap to fill both fields. Asked once when the screen opens (the screen only shows when signed out, so it is the moment
+    // a saved login is wanted) and again by the button. A cancelled sheet or a manager with nothing saved is not an error.
+    val scope = rememberCoroutineScope()
+    var savedNote by remember { mutableStateOf<String?>(null) }
+    var askedOnce by rememberSaveable { mutableStateOf(false) }
+    suspend fun fillFromManager(quiet: Boolean) {
+        val credential = try {
+            CredentialManager.create(context)
+                .getCredential(context.findActivity(), GetCredentialRequest(listOf(GetPasswordOption())))
+                .credential
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: NoCredentialException) {
+            if (!quiet) savedNote = "No saved login yet. Sign in once and your password manager will offer to keep it."
+            return
+        } catch (e: Exception) {
+            return
+        }
+        if (credential is PasswordCredential) {
+            email = credential.id
+            password = credential.password
+            savedNote = null
+        }
+    }
+    LaunchedEffect(Unit) {
+        if (!askedOnce) {
+            askedOnce = true
+            delay(800)
+            fillFromManager(quiet = true)
+        }
+    }
 
     // Brand-specific copy
     val brandSubtitle = when (brand) {
@@ -157,9 +230,17 @@ internal fun LoginScreen(
         Brand.KIA, Brand.KIA_CA -> "Kia Connect email"
     }
 
-    // Animate the form in from below on first composition.
-    var formVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { formVisible = true }
+    // Each block eases in a beat after the one above it.
+    var heroIn by remember { mutableStateOf(false) }
+    var accountIn by remember { mutableStateOf(false) }
+    var loginIn by remember { mutableStateOf(false) }
+    var footerIn by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        heroIn = true
+        delay(110); accountIn = true
+        delay(110); loginIn = true
+        delay(110); footerIn = true
+    }
 
     if (onCancel != null) BackHandler { onCancel() }
 
@@ -173,79 +254,40 @@ internal fun LoginScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .imePadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Hero: the app tile and wordmark, with the brand line beneath crossfading as it
-            // changes.
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 480.dp)
-                    .statusBarsPadding()
-                    .padding(horizontal = GapBlock)
-                    .padding(top = if (shortScreen) 16.dp else 48.dp, bottom = 20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(GapGroup),
-            ) {
-                Box(
-                    Modifier
-                        .size(if (shortScreen) 52.dp else 68.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(
-                            Brush.linearGradient(listOf(scheme.primary, scheme.tertiary)),
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        AppIcons.DirectionsCar,
-                        contentDescription = null,
-                        tint = scheme.onPrimary,
-                        modifier = Modifier.size(if (shortScreen) 28.dp else 36.dp),
-                    )
-                }
-                Column {
-                    RevealText(
-                        "Bloo",
-                        style = if (shortScreen) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayMedium,
-                        fontWeight = FontWeight.Black,
-                        color = scheme.onSurface,
-                    )
-                    AnimatedContent(
-                        targetState = brandSubtitle,
-                        transitionSpec = {
-                            (fadeIn(tween(MotionMedium)) + slideInVertically(tween(MotionMedium)) { it / 3 }) togetherWith
-                                (fadeOut(tween(MotionShort)) + slideOutVertically(tween(MotionShort)) { -it / 3 })
-                        },
-                        label = "loginSubtitle",
-                    ) { subtitle ->
-                        RevealText(subtitle, style = MaterialTheme.typography.titleSmall, color = scheme.onSurfaceVariant)
-                    }
-                }
-            }
+            val blockModifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 480.dp)
+                .padding(horizontal = GapSection)
+            val enter = slideInVertically(tween(MotionLong, easing = LinearOutSlowInEasing)) { it / 4 } + fadeIn(tween(MotionLong))
 
-            // The form, on one liquid-glass card, slides up on first composition.
-            AnimatedVisibility(
-                visible = formVisible,
-                enter = slideInVertically(tween(MotionLong, easing = LinearOutSlowInEasing)) { it / 3 } +
-                    fadeIn(tween(MotionLong)),
-            ) {
-                GlassSurface(
-                    shape = ExtraLargeShape,
-                    hazeState = hazeState,
+            // The hero: the app tile with a soft glow behind it, the wordmark, and the brand line crossfading beneath.
+            AnimatedVisibility(visible = heroIn, enter = enter) {
+                LoginHero(
+                    subtitle = brandSubtitle,
+                    compact = shortScreen,
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 480.dp)
-                        .padding(horizontal = GapSection)
-                        .padding(bottom = GapBlock),
+                        .statusBarsPadding()
+                        .padding(horizontal = GapBlock)
+                        .padding(top = if (shortScreen) 16.dp else 40.dp, bottom = if (shortScreen) 14.dp else 22.dp),
+                )
+            }
+
+            // Which account: where it lives, then which brand.
+            AnimatedVisibility(visible = accountIn, enter = enter) {
+                GlassSurface(
+                    shape = ExtraLargeShape,
+                    hazeState = hazeState,
+                    modifier = blockModifier.padding(bottom = GapGroup),
                     contentAlignment = Alignment.TopStart,
                 ) {
-                    Column(
-                        Modifier.fillMaxWidth().padding(GapPage),
-                        verticalArrangement = Arrangement.spacedBy(GapGroup),
-                    ) {
-                        // Where the car lives, then which account: two selectors, one thought.
-                        LabelText("Where is your account?")
+                    Column(Modifier.fillMaxWidth().padding(GapPage), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+                        LoginSectionLabel(Icons.Filled.Public, "Where is your account?")
                         MorphSegmented(
                             options = listOf(
                                 SegmentOption("US", "United States", null),
@@ -264,6 +306,29 @@ internal fun LoginScreen(
                             selectedKey = brand.name,
                             onSelect = { key -> brand = Brand.valueOf(key) },
                         )
+                    }
+                }
+            }
+
+            // Your login: the saved-login shortcut, the fields, the PIN when the brand wants one, and the button.
+            AnimatedVisibility(visible = loginIn, enter = enter) {
+                GlassSurface(
+                    shape = ExtraLargeShape,
+                    hazeState = hazeState,
+                    modifier = blockModifier.padding(bottom = GapBlock),
+                    contentAlignment = Alignment.TopStart,
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(GapPage), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+                        LoginSectionLabel(Icons.Filled.VpnKey, "Your ${brand.label} login")
+                        SafeMorphTextButton(
+                            text = "Use a saved login",
+                            onClick = { scope.launch { fillFromManager(quiet = false) } },
+                            icon = Icons.Filled.VpnKey,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        AnimatedVisibility(visible = savedNote != null) {
+                            BodySmallText(savedNote.orEmpty())
+                        }
 
                         BlooTextField(
                             value = email,
@@ -271,7 +336,8 @@ internal fun LoginScreen(
                             label = { RevealText(emailLabel) },
                             singleLine = true,
                             leadingIcon = { Icon(Icons.Filled.MailOutline, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                            keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Down) }),
                             modifier = Modifier.fillMaxWidth().semantics {
                                 contentType = ContentType.Username + ContentType.EmailAddress
                             },
@@ -284,7 +350,15 @@ internal fun LoginScreen(
                             leadingIcon = { Icon(AppIcons.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             trailingIcon = { RevealToggle(showPassword, "password") { showPassword = !showPassword } },
                             visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            // Next to the PIN when the brand has one, else Go signs in from the keyboard.
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = if (brand.requiresPin) ImeAction.Next else ImeAction.Go,
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onNext = { focus.moveFocus(FocusDirection.Down) },
+                                onGo = { submit() },
+                            ),
                             modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.Password },
                         )
 
@@ -301,6 +375,7 @@ internal fun LoginScreen(
                                     digitsOnly = false,
                                     revealed = showPin,
                                     trailingIcon = { RevealToggle(showPin, "service PIN") { showPin = !showPin } },
+                                    onDone = { submit() },
                                 )
                                 if (!brand.pinRequiredToSignIn) {
                                     BodySmallText("Only needed to run remote commands. Leave it blank if you never set one in the Hyundai app; you can add it later in Settings.")
@@ -310,35 +385,14 @@ internal fun LoginScreen(
 
                         SafeMorphTextButton(
                             text = "Sign in to ${brand.label}",
-                            onClick = { submitted = true; onLogin(email, password, pin, brand) },
+                            onClick = { submit() },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !loading,
                             pending = loading,
                             emphasis = ButtonEmphasis.Confirm,
                         )
 
-                        // Secondary actions share one row, the app's standard button group.
-                        ActionRow {
-                            SafeMorphTextButton(
-                                text = "Forgot password?",
-                                onClick = {
-                                    val forgotUrl = when (brand) {
-                                        Brand.HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgot-password"
-                                        Brand.GENESIS -> "https://owners.genesis.com/us/en/forgot-password.html"
-                                        Brand.KIA     -> "https://owners.kia.com/us/en/kia-owner-portal.html"
-                                        Brand.HYUNDAI_CA -> "https://www.hyundaicanada.com/en/owners-section"
-                                        Brand.GENESIS_CA -> "https://www.genesis.com/ca/en/support/contact-us.html"
-                                        Brand.KIA_CA -> "https://www.kia.ca/en/owners"
-                                        Brand.HYUNDAI_EU -> "https://www.hyundai.com/eu/en/owners.html"
-                                    }
-                                    openUrl(context, forgotUrl)
-                                },
-                            )
-                            if (onCancel != null) {
-                                SafeMorphTextButton(text = "Cancel", onClick = onCancel, emphasis = ButtonEmphasis.Deny)
-                            }
-                        }
-
+                        // Said where the credentials are typed, in one line: where they go.
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
                             Icon(AppIcons.Lock, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
                             AnimatedContent(
@@ -353,40 +407,148 @@ internal fun LoginScreen(
                                 )
                             }
                         }
+                    }
+                }
+            }
 
-                        // Update affordance, available WITHOUT signing in. Reads "Update available"
-                        // and opens the release page once a check finds a build; otherwise it
-                        // checks (or re-checks) on tap.
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            SafeMorphTextButton(
-                                text = when {
-                                    updateChecking -> "Checking…"
-                                    updateAvailableUrl != null -> "Update available"
-                                    else -> "Check for updates"
-                                },
-                                onClick = {
-                                    val url = updateAvailableUrl
-                                    if (url != null) {
-                                        openUrl(context, url)
-                                    } else {
-                                        onCheckForUpdates()
-                                    }
-                                },
-                                icon = if (updateAvailableUrl != null) {
-                                    Icons.AutoMirrored.Filled.OpenInNew
-                                } else {
-                                    Icons.Filled.SystemUpdate
-                                },
-                                enabled = !updateChecking,
-                                pending = updateChecking,
-                                contentColor = scheme.onSurfaceVariant,
-                            )
+            // The quiet things last: forgot password, cancel, and the update check (available WITHOUT signing in -- the normal
+            // surface lives in Settings behind sign-in; it reads "Update available" once a check finds a build).
+            AnimatedVisibility(visible = footerIn, enter = enter) {
+                Column(
+                    blockModifier.padding(bottom = GapBlock),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(GapGroup),
+                ) {
+                    ActionRow {
+                        SafeMorphTextButton(
+                            text = "Forgot password?",
+                            onClick = {
+                                val forgotUrl = when (brand) {
+                                    Brand.HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgot-password"
+                                    Brand.GENESIS -> "https://owners.genesis.com/us/en/forgot-password.html"
+                                    Brand.KIA     -> "https://owners.kia.com/us/en/kia-owner-portal.html"
+                                    Brand.HYUNDAI_CA -> "https://www.hyundaicanada.com/en/owners-section"
+                                    Brand.GENESIS_CA -> "https://www.genesis.com/ca/en/support/contact-us.html"
+                                    Brand.KIA_CA -> "https://www.kia.ca/en/owners"
+                                    Brand.HYUNDAI_EU -> "https://www.hyundai.com/eu/en/owners.html"
+                                }
+                                openUrl(context, forgotUrl)
+                            },
+                        )
+                        if (onCancel != null) {
+                            SafeMorphTextButton(text = "Cancel", onClick = onCancel, emphasis = ButtonEmphasis.Deny)
+                        }
                     }
-                    }
+                    SafeMorphTextButton(
+                        text = when {
+                            updateChecking -> "Checking…"
+                            updateAvailableUrl != null -> "Update available"
+                            else -> "Check for updates"
+                        },
+                        onClick = {
+                            val url = updateAvailableUrl
+                            if (url != null) openUrl(context, url) else onCheckForUpdates()
+                        },
+                        icon = if (updateAvailableUrl != null) Icons.AutoMirrored.Filled.OpenInNew else Icons.Filled.SystemUpdate,
+                        enabled = !updateChecking,
+                        pending = updateChecking,
+                        contentColor = scheme.onSurfaceVariant,
+                    )
                 }
             }
         }
         // The hero wordmark draws under the status bar (no top inset, deliberate); the app-wide
         // status strip (StatusBarScrim, Screens) frosts it like every other screen.
     }
+}
+
+/**
+ * The hero: the app tile with a soft, slowly breathing glow behind it (still under Battery Saver), the wordmark, and the
+ * brand line that crossfades as the brand changes. Centred on a tall screen; tile and words side by side on a short one.
+ */
+@Composable
+private fun LoginHero(subtitle: String, compact: Boolean, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val moving = LocalPowerPolicy.current.ambientMotion
+    val breath = if (moving) {
+        rememberInfiniteTransition(label = "heroBreath").animateFloat(
+            0.9f, 1.08f,
+            infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "heroBreathScale",
+        ).value
+    } else 1f
+    val tileSize = if (compact) 52.dp else 76.dp
+    val tile: @Composable () -> Unit = {
+        Box(contentAlignment = Alignment.Center) {
+            // The glow: a radial wash of the accent behind the tile, larger than it and breathing.
+            Box(
+                Modifier
+                    .size(tileSize * 1.9f)
+                    .graphicsLayer { scaleX = breath; scaleY = breath }
+                    .background(
+                        Brush.radialGradient(listOf(scheme.primary.copy(alpha = 0.32f), androidx.compose.ui.graphics.Color.Transparent)),
+                        CircleShape,
+                    ),
+            )
+            Box(
+                Modifier
+                    .size(tileSize)
+                    .clip(RoundedCornerShape(tileSize * 0.32f))
+                    .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary))),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(AppIcons.DirectionsCar, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(tileSize * 0.52f))
+            }
+        }
+    }
+    val words: @Composable (Alignment.Horizontal) -> Unit = { align ->
+        Column(horizontalAlignment = align) {
+            RevealText(
+                "Bloo",
+                style = if (compact) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayMedium,
+                fontWeight = FontWeight.Black,
+                color = scheme.onSurface,
+            )
+            AnimatedContent(
+                targetState = subtitle,
+                transitionSpec = {
+                    (fadeIn(tween(MotionMedium)) + slideInVertically(tween(MotionMedium)) { it / 3 }) togetherWith
+                        (fadeOut(tween(MotionShort)) + slideOutVertically(tween(MotionShort)) { -it / 3 })
+                },
+                label = "loginSubtitle",
+            ) { text ->
+                RevealText(text, style = MaterialTheme.typography.titleSmall, color = scheme.onSurfaceVariant)
+            }
+        }
+    }
+    if (compact) {
+        Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapGroup)) {
+            tile()
+            words(Alignment.Start)
+        }
+    } else {
+        Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+            tile()
+            words(Alignment.CenterHorizontally)
+        }
+    }
+}
+
+/** A small heading for a block of the form: a tinted icon and the words. */
+@Composable
+private fun LoginSectionLabel(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        RevealText(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+/** The Activity under a (possibly wrapped) context: the Credential Manager needs one to show its sheet. */
+private fun android.content.Context.findActivity(): android.app.Activity {
+    var c: android.content.Context = this
+    while (c is android.content.ContextWrapper) {
+        if (c is android.app.Activity) return c
+        c = c.baseContext
+    }
+    return this as android.app.Activity
 }
