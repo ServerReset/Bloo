@@ -8,41 +8,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
-import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.isStale
 
 /**
- * The car's face page: the charge ring and the four chosen controls ([WearCarFace]), with the phone's pull-down
- * refresh over it. Pulling down from the top drops a disc in, arms at a point (a tick), and refreshes on release.
- *
- * Pull down refreshes; pressing the centre opens the face editor. A control that opens the car is not sent from here: it goes to [onConfirm] so the caller can ask first.
+ * The car's face page: the charge ring and the four chosen controls ([WearCarFace]) with the phone's pull-down refresh over
+ * it (pull from the top, a disc drops in and arms at a tick, release refreshes). Pressing the centre opens the face
+ * editor. A control that opens the car is not sent from here: it goes to [onConfirm] so the page can ask first.
  */
 @Composable
 internal fun WearFacePage(
-    repo: WearSnapshotRepository,
-    v: VehicleSnapshot,
+    ui: WearCarUi,
     slotKeys: List<String>,
-    pendingCommands: Set<String>,
     faceStatus: FaceStatus?,
-    refreshing: Boolean,
     onConfirm: (String) -> Unit,
-    requestCommand: ((() -> Unit)) -> Unit,
-    /** Pressing the centre: open the editor that chooses the four controls. */
     onEditFace: () -> Unit,
 ) {
+    val v = ui.car
     ScreenScaffold(timeText = { TimeText() }) {
         val pullState = remember { WearPullState() }
-        Box(Modifier.fillMaxSize().wearPullToRefresh(pullState) { repo.refresh() }) {
-            val actions: List<WearQuickAction?> = slotKeys.map { key ->
+        Box(Modifier.fillMaxSize().wearPullToRefresh(pullState) { ui.repo.refresh() }) {
+            val actions = slotKeys.map { key ->
                 val control = WearFaceControls.byKey(key)?.takeIf { it.available(v) } ?: return@map null
                 WearQuickAction(
                     control.label(v), control.icon(v),
                     active = control.active(v),
-                    pending = WearCommands.key(v.vin, control.action) in pendingCommands,
+                    pending = ui.isPending(control.action),
                 ) {
-                    if (control.confirm(v)) onConfirm(control.action)
-                    else requestCommand { repo.command(v.vin, control.action, control.request?.invoke(v)) }
+                    if (control.confirm(v)) onConfirm(control.action) else ui.run(control)
                 }
             }
             WearCarFace(
@@ -54,11 +47,11 @@ internal fun WearFacePage(
                 actions = actions,
                 charging = v.charging == true,
                 stale = v.isStale(),
-                status = if (refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
-                refreshing = refreshing,
+                status = if (ui.refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
+                refreshing = ui.refreshing,
                 onHubClick = onEditFace,
             )
-            WearPullIndicator(pullState, refreshing)
+            WearPullIndicator(pullState, ui.refreshing)
         }
     }
 }

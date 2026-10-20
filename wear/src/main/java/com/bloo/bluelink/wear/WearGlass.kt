@@ -1,12 +1,11 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.uicommon.LocalPowerPolicy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.bloo.bluelink.data.DeviceStatus
 import com.bloo.uicommon.canBlurBackdrops
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
@@ -50,7 +49,7 @@ internal val LocalWearHaze = androidx.compose.runtime.staticCompositionLocalOf<H
 internal fun WearBackdrop(modifier: Modifier = Modifier, content: @androidx.compose.runtime.Composable () -> Unit) {
     val scheme = androidx.compose.material3.MaterialTheme.colorScheme
     val haze = androidx.compose.runtime.remember { HazeState() }
-    val policy by DeviceStatus.policy.collectAsStateWithLifecycle()
+    val policy = LocalPowerPolicy.current
     var phase by androidx.compose.runtime.mutableFloatStateOf(0f)
     androidx.compose.runtime.LaunchedEffect(policy.ambientMotion) {
         if (!policy.ambientMotion) return@LaunchedEffect

@@ -6,40 +6,47 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.VehicleSnapshot
-import com.bloo.bluelink.data.WatchCommandResult
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.WorkflowRun
 import kotlinx.coroutines.launch
 
+/** The watch's own update, as the details page shows it: one thing, so the page does not juggle four flows. */
+internal class WearUpdateState(
+    /** A newer watch build (from the watch's own check, or advertised by the phone), or null. */
+    val run: WorkflowRun?,
+    /** Why the last check or download failed, so the page can say instead of staying silent. */
+    val error: String?,
+    val downloading: Boolean,
+    val progress: Float,
+)
+
+@Composable
+internal fun rememberWearUpdateState(): WearUpdateState {
+    val advice by WearDataLayerSync.updateAdvice.collectAsStateWithLifecycle(initialValue = null)
+    val own by WearUpdateChecker.available.collectAsStateWithLifecycle(initialValue = null)
+    val error by WearUpdateChecker.error.collectAsStateWithLifecycle(initialValue = null)
+    val downloading by WearUpdateChecker.downloading.collectAsStateWithLifecycle(initialValue = false)
+    val progress by WearUpdateChecker.progress.collectAsStateWithLifecycle(initialValue = 0f)
+    val run = own ?: advice?.let { WorkflowRun(it.runNumber, htmlUrl = "", watchApkUrl = it.apkUrl) }
+    return WearUpdateState(run, error, downloading, progress)
+}
+
 /**
- * The car's details page, one swipe up from the face: its readings, any watch update, the face's control
- * choices, the watch's alerts and Auto lock, and a command's failure line. A scrolling [WearListScreen].
+ * The car's details page, one swipe up from the face: a failed command's reason, its readings, its climate, its care and
+ * freshness, any watch update, then the watch's own settings. A scrolling [WearListScreen].
  */
 @Composable
-internal fun WearDetailsPage(
-    repo: WearSnapshotRepository,
-    v: VehicleSnapshot,
-    slotKeys: List<String>,
-    refreshing: Boolean,
-    signedIn: Boolean,
-    updateError: String?,
-    updateRun: WorkflowRun?,
-    downloading: Boolean,
-    progress: Float,
-    lastResult: WatchCommandResult?,
-    pendingCommands: Set<String>,
-    requestCommand: ((() -> Unit)) -> Unit,
-    onChooseSlot: (Int) -> Unit,
-) {
+internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState, onEditFace: () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     WearListScreen(contentPadding = PaddingValues(top = 34.dp, bottom = 22.dp)) {
         // A failed command's reason first: it is what the wearer came here to read, not something to scroll down to find.
-        lastResult?.takeIf { it.vin == v.vin && !it.ok }?.let { failure ->
+        ui.lastResult?.takeIf { it.vin == ui.car.vin && !it.ok }?.let { failure ->
             item {
                 WearCenteredText(
                     failure.message ?: "Command failed",
@@ -50,36 +57,30 @@ internal fun WearDetailsPage(
                 )
             }
         }
-        // The refresh button sits with the freshness in the status pebble.
-        item { WearStatusPebble(v, refreshing = refreshing, canRefresh = false, onRefresh = {}) }
-        item { WearClimatePebble(repo, v, pendingCommands, requestCommand) }
-        item { WearCarCarePebble(v, refreshing = refreshing, canRefresh = signedIn, onRefresh = { repo.refresh() }) }
-        // The update error, shown where the update lives. It used to go nowhere at all.
-        updateError?.let { message ->
-            item {
-                WearPebble(title = "Watch update", icon = Icons.Filled.SystemUpdate) {
-                    WearCenteredText(message, style = MaterialTheme.typography.bodySmall)
-                }
-            }
+        item { WearStatusPebble(ui.car) }
+        item { WearClimatePebble(ui.repo, ui.car, ui.pending, ui.send) }
+        item { WearCarCarePebble(ui.car, refreshing = ui.refreshing, canRefresh = ui.signedIn, onRefresh = { ui.repo.refresh() }) }
+        update.error?.let { message ->
+            item { WearPebble(title = "Watch update", icon = Icons.Filled.SystemUpdate) { WearCaption(message) } }
         }
-        updateRun?.let {
+        if (update.run != null) {
             item {
                 WearPebble(title = "Update available", icon = Icons.Filled.SystemUpdate) {
-                    if (downloading) {
-                        WearCenteredText("Downloading… ${(progress * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+                    if (update.downloading) {
+                        WearCenteredText("Downloading… ${(update.progress * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
                     } else {
-                        WearActionRow(label = "Update now", icon = Icons.Filled.Download) {
+                        WearActionRow("Update now", Icons.Filled.Download) {
                             scope.launch { WearUpdateChecker.downloadAndInstall(context) }
                         }
                     }
                 }
             }
         }
-        item { WearFaceControlsPebble(slotKeys, onChooseSlot) }
+        item { WearFaceControlsPebble(onOpen = onEditFace) }
         item { WearAlertsPebble() }
         item { WearEffectsPebble() }
-        // Auto lock needs the car's credentials on the watch, which only the pairing step in Settings on the
-        // phone hands over; until then the pebble is a pointer to that step, not a switch.
-        item { if (signedIn) WearAutoLockPebble() else WearPairPebble() }
+        // Auto lock needs the car's credentials on the watch, which only the pairing step on the phone hands over; until
+        // then the pebble points at that step instead of offering a switch.
+        item { if (ui.signedIn) WearAutoLockPebble() else WearPairPebble() }
     }
 }
