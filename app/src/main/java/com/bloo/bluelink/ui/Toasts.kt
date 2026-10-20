@@ -76,6 +76,8 @@ internal class Toast(val id: Long, val message: String, val type: ToastKind, exp
     /** The latest it may stay however often a repeat re-arms it: a message that keeps repeating must still go. */
     var hardExpireAt by mutableLongStateOf(hardExpireAt)
     var leaving by mutableStateOf(false)
+    /** True when it was swiped away: it has already flown off the screen, so it is dropped the moment it is marked leaving. */
+    var flung by mutableStateOf(false)
     /** How many times this same message has repeated without leaving, shown as a count. */
     var count by mutableIntStateOf(1)
     /** False once split out of a group, so a later repeat starts a fresh group instead of rejoining it. */
@@ -312,9 +314,14 @@ internal fun ToastHost(
     ) {
         visible.forEachIndexed { i, toast ->
             key(toast.id) {
-                // Slot 0 is the NEWEST (in the search's own row); older toasts count up from it, so
-                // the list (oldest first) runs the other way.
-                val index = visible.lastIndex - i
+                // Slot 0 is the NEWEST (in the search's own row); older toasts count up from it, so the list (oldest first)
+                // runs the other way. Only LIVE toasts count: the moment one starts to leave, the ones around it close
+                // the gap while it plays its exit, instead of waiting for it to finish. The leaving one itself keeps the
+                // slot it had, so it leaves from where it was.
+                val liveIndex = (i + 1 until visible.size).count { !visible[it].leaving }
+                var restingIndex by remember { androidx.compose.runtime.mutableIntStateOf(liveIndex) }
+                if (!toast.leaving) restingIndex = liveIndex
+                val index = restingIndex
                 ToastSlot(
                     toast = toast,
                     index = index,
