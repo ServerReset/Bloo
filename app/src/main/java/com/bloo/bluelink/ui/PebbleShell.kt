@@ -8,8 +8,6 @@ package com.bloo.bluelink.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.background
@@ -73,8 +71,6 @@ internal fun Pebble(
      * row (via `titleTrailing`) and skip the body/disclosure. Null leaves normal expand/collapse.
      */
     inlineSettingInSimpleMode: (@Composable () -> Unit)? = null,
-    /** Shown under the header while the pebble is COLLAPSED (quick actions that should not need an expand); null for none. */
-    peek: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val forceExpanded = LocalForceExpanded.current
@@ -98,7 +94,6 @@ internal fun Pebble(
         titleTrailing = if (inlineSimple) inlineSettingInSimpleMode else null,
         titleTrailingAtEnd = inlineSimple,
         background = background,
-        peek = peek,
         content = content,
     )
 }
@@ -165,8 +160,6 @@ internal fun PebbleShell(
      * [Spacer]s.
      */
     contentGap: Dp = GapRow,
-    /** See [Pebble]'s `peek`: drawn under the header only while collapsed. */
-    peek: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
@@ -264,15 +257,6 @@ internal fun PebbleShell(
                         onMeasured = { h, w -> headerRowHeightPx = h; headerRowWidthDp = w },
                         onChevronPressChange = { chevronPressed = it },
                     )
-                    if (peek != null) {
-                        AnimatedVisibility(
-                            visible = !expanded,
-                            enter = expandVertically(animationSpec = pebbleOpenSizeSpec(), expandFrom = Alignment.Top, clip = false) + fadeIn(),
-                            exit = shrinkVertically(shrinkTowards = Alignment.Top, clip = false) + fadeOut(),
-                        ) {
-                            Box(Modifier.padding(start = GapSection, end = GapSection, bottom = GapSection, top = GapHairline)) { peek() }
-                        }
-                    }
                     // Animate the body sliding open/closed; the exit fades the block so the
                     // shrinking bottom edge doesn't visibly clip the content.
                     // The body only GROWS (nothing slides, nothing is cut at a line): each row pops in as the

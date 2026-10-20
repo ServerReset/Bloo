@@ -22,7 +22,6 @@ internal fun WearClimatePebble(
     v: VehicleSnapshot,
     pending: Set<String>,
     requestCommand: ((() -> Unit)) -> Unit,
-    onOpenList: () -> Unit,
 ) {
     val presets by WearPresets.presets.collectAsStateWithLifecycle()
     val saved = presets[v.vin].orEmpty()
@@ -37,9 +36,12 @@ internal fun WearClimatePebble(
         WearActionRow("Smart climate", Icons.Filled.AutoMode, pending = busy(CarAction.CLIMATE_SMART)) {
             requestCommand { repo.command(v.vin, CarAction.CLIMATE_SMART) }
         }
-        // The presets are a list of their own (it scrolls however many there are), not a growing run of rows here.
-        if (saved.isNotEmpty()) {
-            WearActionRow("Presets (${saved.size})", Icons.Filled.Thermostat, onClick = onOpenList)
+        // Every preset, right here: the page scrolls, so there is no limit and nothing to open first.
+        saved.forEach { preset ->
+            WearActionRow(preset.name, Icons.Filled.Thermostat, pending = busy(CarAction.CLIMATE_ON)) {
+                requestCommand { repo.command(v.vin, CarAction.CLIMATE_ON, preset.request) }
+            }
+            WearCaption(WearPresets.detail(preset.request), small = true, maxLines = 1)
         }
         if (saved.isEmpty()) {
             WearCaption(

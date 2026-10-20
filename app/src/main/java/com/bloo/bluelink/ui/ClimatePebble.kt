@@ -3,11 +3,6 @@ package com.bloo.bluelink.ui
 /** The Climate pebble: [ClimatePebble]. */
 
 import androidx.compose.foundation.layout.Arrangement
-import com.bloo.uicommon.GapGroup
-import androidx.compose.material.icons.filled.AutoMode
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
@@ -202,7 +197,7 @@ internal fun ClimatePebble(
         }
     }
 
-    // Starting a saved preset (or stopping the one running), shared by the pebble's body and the collapsed quick row.
+    // Starting a saved preset, or stopping the one running.
     val startPreset: (com.bloo.bluelink.data.ClimatePreset) -> Unit = { preset ->
         if (activePresetId == preset.id && climateOn) {
             vm.stopClimate(v)
@@ -213,7 +208,6 @@ internal fun ClimatePebble(
             activePresetId = preset.id
         }
     }
-    val smartAmbientF = weather?.let { ambientFahrenheit(it.tempC) }
     // Smart climate needs the weather where the car is parked; load it here rather than waiting for the Location pebble to.
     // (Without a reading the button is still there and finds the weather itself when pressed.)
     LaunchedEffect(v.vin, state.locations[v.vin]) {
@@ -223,29 +217,6 @@ internal fun ClimatePebble(
 
     Pebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, modifier,
-        // Smart climate and every saved preset, one tap away even with the pebble closed.
-        peek = if (running) null else {
-            {
-                ClimateQuickStart(
-                    // Always offered: with a weather reading it names the target, without one it is just "Smart climate".
-                    smartLabel = smartAmbientF?.let {
-                        val target = degLabel(smartClimateTargetF(it).toString(), fahrenheit)
-                        if (smartClimateIsCooling(it)) "Smart: cool to $target" else "Smart: heat to $target"
-                    } ?: "Smart climate",
-                    onSmart = {
-                        if (smartAmbientF != null) startAtTarget(smartClimateTargetF(smartAmbientF), currentReq)
-                        else vm.startSmartClimate(v)
-                    },
-                    presets = presets,
-                    activeId = activePresetId,
-                    fahrenheit = fahrenheit,
-                    // Not before the car's last-used settings are in: a start now would send the defaults instead.
-                    enabled = !pending && settingsLoaded,
-                    climateOn = climateOn,
-                    onPreset = startPreset,
-                )
-            }
-        },
         summary = when {
             climateOn && running -> "On · running"
             climateOn -> "On"
@@ -433,38 +404,3 @@ private fun TempValue.asFahrenheit(): Int? {
 
 /** How long after a start the car's old reading of its settings is distrusted (see `lastSent`). */
 private const val CarCatchUpMs = 90_000L
-
-/**
- * The collapsed climate pebble's quick row: smart climate first (the phone's own target for the weather by the car), then
- * each saved preset, in a row that scrolls sideways. A tap starts it; the running preset stops on a second tap, and
- * while climate runs the others wait.
- */
-@Composable
-private fun ClimateQuickStart(
-    smartLabel: String,
-    onSmart: () -> Unit,
-    presets: List<com.bloo.bluelink.data.ClimatePreset>,
-    activeId: String?,
-    fahrenheit: Boolean,
-    enabled: Boolean,
-    climateOn: Boolean,
-    onPreset: (com.bloo.bluelink.data.ClimatePreset) -> Unit,
-) {
-    Row(
-        Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(GapGroup),
-    ) {
-        SafeMorphTextButton(smartLabel, onClick = onSmart, icon = Icons.Filled.AutoMode, enabled = enabled && !climateOn, fillOnPress = false)
-        presets.forEach { preset ->
-            val running = climateOn && preset.id == activeId
-            SafeMorphTextButton(
-                preset.name + " · " + presetDetail(preset.request, fahrenheit).substringBefore(" ·"),
-                onClick = { onPreset(preset) },
-                icon = Icons.Filled.Thermostat,
-                active = running,
-                enabled = enabled && (!climateOn || running),
-                fillOnPress = false,
-            )
-        }
-    }
-}
