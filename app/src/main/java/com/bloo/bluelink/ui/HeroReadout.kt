@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -144,7 +145,7 @@ internal fun animatedChargeFrac(target: Float): Float {
         dampingRatio = Spring.DampingRatioMediumBouncy,
         stiffness = Spring.StiffnessMediumLow,
     )
-    val fill = remember { androidx.compose.animation.core.Animatable(0f) }
+    val fill = remember { Animatable(0f) }
     LaunchedEffect(target) { fill.animateTo(target, spec) }
     return fill.value
 }

@@ -2,7 +2,7 @@ package com.bloo.bluelink.wear
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.runtime.remember
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.uicommon.AppIcons
 
@@ -21,7 +21,7 @@ internal fun WearControlPicker(
 ) {
     // A quarter holding a climate preset (or smart climate) lights the "Climate preset..." entry that leads to them.
     val selected = if (WearFaceControls.isClimatePick(current)) WearFaceControls.CLIMATE_PICK else current
-    val groups = WearFaceControls.choicesFor(car).groupBy { it.group }
+    val groups = remember(car) { WearFaceControls.choicesFor(car).groupBy { it.group } }
     // Swiping right (or the back button) returns to the editor it was opened from.
     WearBackable(onBack) {
         WearListScreen {
@@ -29,11 +29,11 @@ internal fun WearControlPicker(
                 WearCenteredText(position, style = MaterialTheme.typography.titleMedium)
             }
             item(key = "hint") { WearCaption("What should this quarter do?", small = true, maxLines = 2) }
-            GroupOrder.forEach { group ->
+            FaceGroup.entries.forEach { group ->
                 val controls = groups[group].orEmpty()
                 if (controls.isEmpty()) return@forEach
-                item(key = group) {
-                    WearPebble(title = group, icon = groupIcon(group)) {
+                item(key = group.name) {
+                    WearPebble(title = group.title, icon = group.icon) {
                         controls.forEach { control ->
                             WearListRow(
                                 title = control.choice,
@@ -57,15 +57,4 @@ internal fun WearControlPicker(
             }
         }
     }
-}
-
-/** The order the groups appear in, most used first. */
-private val GroupOrder = listOf("Doors", "Climate", "Charging", "Lights and horn", "Car")
-
-private fun groupIcon(group: String): ImageVector = when (group) {
-    "Doors" -> AppIcons.Lock
-    "Climate" -> AppIcons.Thermostat
-    "Charging" -> AppIcons.Bolt
-    "Lights and horn" -> AppIcons.Flash
-    else -> AppIcons.DirectionsCar
 }

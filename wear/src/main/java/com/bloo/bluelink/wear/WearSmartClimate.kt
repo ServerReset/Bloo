@@ -28,8 +28,15 @@ internal object WearSmartClimate {
         val lat = car.lat ?: return
         val lon = car.lon ?: return
         val held = _hints.value[car.vin]
-        if (held != null && System.currentTimeMillis() - held.fetchedAt < TTL_MS) return
-        val weather = runCatching { WeatherApi.fetch(lat, lon) }.getOrNull() ?: return
+        val now = System.currentTimeMillis()
+        if (held != null && now - held.fetchedAt < TTL_MS) return
+        if (now - (failedAt[car.vin] ?: 0L) < RETRY_MS) return
+        val weather = runCatching { WeatherApi.fetch(lat, lon) }.getOrNull()
+        if (weather == null) {
+            // Offline or unavailable: do not ask again on every scroll past the row.
+            failedAt[car.vin] = now
+            return
+        }
         val ambient = ambientFahrenheit(weather.tempC)
         val hint = Hint(smartClimateTargetF(ambient), ambient, smartClimateIsCooling(ambient), System.currentTimeMillis())
         _hints.update { it + (car.vin to hint) }
@@ -43,5 +50,8 @@ internal object WearSmartClimate {
         return (if (hint.cooling) "Cool to $target°" else "Heat to $target°") + " · $outside° outside"
     }
 
+    private val failedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
     private const val TTL_MS = 15 * 60_000L
+    private const val RETRY_MS = 90_000L
 }

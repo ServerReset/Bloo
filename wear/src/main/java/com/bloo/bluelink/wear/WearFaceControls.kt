@@ -12,11 +12,20 @@ import com.bloo.bluelink.data.supportsHornLights
  * reads it to draw and run a quarter, and the chooser reads it to offer the options, so adding a control is
  * one entry here and nothing else.
  */
+/** What a control acts on: the headings of the chooser, in the order they appear. */
+internal enum class FaceGroup(val title: String, val icon: ImageVector) {
+    Doors("Doors", AppIcons.Lock),
+    Climate("Climate", AppIcons.Thermostat),
+    Charging("Charging", AppIcons.Bolt),
+    LightsAndHorn("Lights and horn", AppIcons.Flash),
+    Car("Car", AppIcons.DirectionsCar),
+}
+
 internal data class FaceControl(
     /** What is stored in the wearer's choice; never change one. */
     val key: String,
     /** The heading it sits under in the chooser (the controls are grouped by what they act on). */
-    val group: String = "",
+    val group: FaceGroup,
     /** A few words under its name in the chooser: what it does. */
     val hint: String = "",
     /** The name in the chooser (the quarter's own label may change with the car's state). */
@@ -46,31 +55,31 @@ internal object WearFaceControls {
 
     val all: List<FaceControl> = listOf(
         FaceControl(
-            key = "lock", group = "Doors", hint = "Locks, or unlocks (asks first)", choice = "Lock / unlock",
+            key = "lock", group = FaceGroup.Doors, hint = "Locks, or unlocks (asks first)", choice = "Lock / unlock",
             label = { if (it.locked == true) "Unlock" else "Lock" },
             icon = { if (it.locked == true) AppIcons.LockOpen else AppIcons.Lock },
             action = CarAction.TOGGLE_LOCK,
             confirm = { it.locked == true },
         ),
         FaceControl(
-            key = "lock_only", group = "Doors", hint = "Always locks", choice = "Lock", label = { "Lock" }, icon = { AppIcons.Lock },
+            key = "lock_only", group = FaceGroup.Doors, hint = "Always locks", choice = "Lock", label = { "Lock" }, icon = { AppIcons.Lock },
             action = CarAction.LOCK, active = { it.locked == true },
         ),
         FaceControl(
-            key = "unlock_only", group = "Doors", hint = "Asks first, then unlocks", choice = "Unlock", label = { "Unlock" }, icon = { AppIcons.LockOpen },
+            key = "unlock_only", group = FaceGroup.Doors, hint = "Asks first, then unlocks", choice = "Unlock", label = { "Unlock" }, icon = { AppIcons.LockOpen },
             action = CarAction.UNLOCK, confirm = { true },
         ),
         FaceControl(
-            key = "climate", group = "Climate", hint = "Starts or stops it", choice = "Climate on / off",
+            key = "climate", group = FaceGroup.Climate, hint = "Starts or stops it", choice = "Climate on / off",
             label = { if (it.climateOn == true) "Climate off" else "Climate" },
             icon = { AppIcons.Climate }, action = CarAction.TOGGLE_CLIMATE, active = { it.climateOn == true },
         ),
         FaceControl(
-            key = "climate_on", group = "Climate", hint = "Starts it on the usual settings", choice = "Start climate", label = { "Climate on" }, icon = { AppIcons.Climate },
+            key = "climate_on", group = FaceGroup.Climate, hint = "Starts it on the usual settings", choice = "Start climate", label = { "Climate on" }, icon = { AppIcons.Climate },
             action = CarAction.CLIMATE_ON, active = { it.climateOn == true },
         ),
         FaceControl(
-            key = "climate_off", group = "Climate", hint = "Stops it", choice = "Stop climate", label = { "Climate off" }, icon = { AppIcons.Close },
+            key = "climate_off", group = FaceGroup.Climate, hint = "Stops it", choice = "Stop climate", label = { "Climate off" }, icon = { AppIcons.Close },
             action = CarAction.CLIMATE_OFF,
         ),
         FaceControl(
@@ -81,33 +90,33 @@ internal object WearFaceControls {
         // Choosing this in the quarter chooser opens the list of climate presets (smart climate among them), and the quarter
         // then holds the one picked. Stored as itself only before that pick, in which case a press asks again.
         FaceControl(
-            key = CLIMATE_PICK, group = "Climate", hint = "A saved preset, or smart climate", choice = "Climate preset…", label = { "Climate" }, icon = { AppIcons.Thermostat },
+            key = CLIMATE_PICK, group = FaceGroup.Climate, hint = "A saved preset, or smart climate", choice = "Climate preset…", label = { "Climate" }, icon = { AppIcons.Thermostat },
             action = CarAction.CLIMATE_ON, active = { it.climateOn == true }, needsChoice = { true },
         ),
         FaceControl(
-            key = "charge", group = "Charging", hint = "Starts or stops it", choice = "Charge on / off",
+            key = "charge", group = FaceGroup.Charging, hint = "Starts or stops it", choice = "Charge on / off",
             label = { if (it.charging == true) "Stop charge" else "Charge" },
             icon = { AppIcons.Bolt }, action = CarAction.TOGGLE_CHARGE,
             available = { it.hasBattery }, active = { it.charging == true },
         ),
         FaceControl(
-            key = "charge_on", group = "Charging", hint = "Starts charging", choice = "Start charging", label = { "Charge" }, icon = { AppIcons.Bolt },
+            key = "charge_on", group = FaceGroup.Charging, hint = "Starts charging", choice = "Start charging", label = { "Charge" }, icon = { AppIcons.Bolt },
             action = CarAction.CHARGE_ON, available = { it.hasBattery }, active = { it.charging == true },
         ),
         FaceControl(
-            key = "charge_off", group = "Charging", hint = "Stops charging", choice = "Stop charging", label = { "Stop charge" }, icon = { AppIcons.Close },
+            key = "charge_off", group = FaceGroup.Charging, hint = "Stops charging", choice = "Stop charging", label = { "Stop charge" }, icon = { AppIcons.Close },
             action = CarAction.CHARGE_OFF, available = { it.hasBattery },
         ),
         FaceControl(
-            key = "flash", group = "Lights and horn", hint = "Flashes the lights", choice = "Flash lights", label = { "Flash" }, icon = { AppIcons.Flash },
+            key = "flash", group = FaceGroup.LightsAndHorn, hint = "Flashes the lights", choice = "Flash lights", label = { "Flash" }, icon = { AppIcons.Flash },
             action = CarAction.FLASH_LIGHTS, available = { it.toVehicle().supportsHornLights },
         ),
         FaceControl(
-            key = "horn", group = "Lights and horn", hint = "Sounds the horn and flashes", choice = "Horn and lights", label = { "Horn" }, icon = { AppIcons.Notifications },
+            key = "horn", group = FaceGroup.LightsAndHorn, hint = "Sounds the horn and flashes", choice = "Horn and lights", label = { "Horn" }, icon = { AppIcons.Notifications },
             action = CarAction.HORN_AND_LIGHTS, available = { it.toVehicle().supportsHornLights },
         ),
         FaceControl(
-            key = "refresh", group = "Car", hint = "Reads its latest status", choice = "Refresh status", label = { "Refresh" }, icon = { AppIcons.Refresh },
+            key = "refresh", group = FaceGroup.Car, hint = "Reads its latest status", choice = "Refresh status", label = { "Refresh" }, icon = { AppIcons.Refresh },
             action = CarAction.REFRESH,
         ),
     )
@@ -131,6 +140,7 @@ internal object WearFaceControls {
      */
     private fun presetControl(id: String) = FaceControl(
         key = PRESET_PREFIX + id,
+        group = FaceGroup.Climate,
         choice = "Preset: " + (WearPresets.findAny(id)?.name ?: "Climate"),
         label = { WearPresets.find(it.vin, id)?.name ?: "Climate" },
         icon = { AppIcons.Thermostat },

@@ -15,11 +15,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.bloo.uicommon.rememberChargeFront
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -73,16 +73,7 @@ fun WearEdgeRing(
     )
     // The charging "fill up": a lighter arc grows out of the fill's end on a bouncy spring, overshoots, rests a beat, and goes
     // again -- the ring visibly keeps filling while the car charges.
-    val front = remember { Animatable(0f) }
-    val frontOn = charging && policy.ambientMotion && progress != null
-    LaunchedEffect(frontOn) {
-        if (!frontOn) { front.snapTo(0f); return@LaunchedEffect }
-        while (true) {
-            front.snapTo(0f)
-            front.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow))
-            delay(350)
-        }
-    }
+    val front by rememberChargeFront(charging && policy.ambientMotion && progress != null)
     // The phone's two stops of the fill: the darker end where it starts, the lighter where it ends.
     val fillDark by animateColorAsState(
         Color(if (stuck) BlooColors.chargeBlueDark else BlooColors.chargeGreenDark),
@@ -141,9 +132,9 @@ fun WearEdgeRing(
                 }
             }
             // The growing front, in the room beyond the fill (up to the limit, or the end of the ring).
-            if (front.value > 0f && filledEnd > 0f) {
+            if (front > 0f && filledEnd > 0f) {
                 val room = (if (limit != null && !stuck) 360f * limitAnim.value else 360f) - filledEnd
-                val grow = (minOf(34f, room) * front.value).coerceIn(0f, maxOf(room, 0f))
+                val grow = (minOf(34f, room) * front).coerceIn(0f, maxOf(room, 0f))
                 if (grow > 2f * half) {
                     drawArc(
                         fillLight.copy(alpha = 0.55f), filledEnd + half - 90f, grow - 2f * half, false, topLeft, arc,

@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.bloo.uicommon.rememberChargeFront
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.CornerRadius
@@ -110,16 +111,7 @@ internal fun ChargeSegmentBar(
     // The charging "fill up": a lighter piece grows out of the end of the fill toward the rest of the bar on a bouncy spring
     // (it overshoots, settles, rests a beat, and starts again), so a charging car's bar visibly keeps filling. Only while it
     // charges and the device allows motion; it is read in the draw phase, so it never recomposes the bar.
-    val front = remember { Animatable(0f) }
-    val frontOn = charging && LocalPowerPolicy.current.ambientMotion
-    LaunchedEffect(frontOn) {
-        if (!frontOn) { front.snapTo(0f); return@LaunchedEffect }
-        while (true) {
-            front.snapTo(0f)
-            front.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow))
-            kotlinx.coroutines.delay(350)
-        }
-    }
+    val front by rememberChargeFront(charging && LocalPowerPolicy.current.ambientMotion)
     // One Canvas pass costs nothing per frame that isn't already being paid for the fill's own
     // animateFloatAsState.
     Canvas(modifier.fillMaxWidth().height(ChargeBarHeight)) {
@@ -151,12 +143,13 @@ internal fun ChargeSegmentBar(
             // separate clip) -- drawRoundRect only lights up the pixels its own shape covers, so
             // this rides on top of the gradient above without needing to clip anything itself.
             // The growing front, drawn in the room beyond the fill (never past the end of the bar).
-            val frontRoom = size.width - layout.fillWidth - ChargeSegmentGap.toPx()
-            val frontWidth = (minOf(size.width * 0.16f, frontRoom) * front.value).coerceIn(0f, maxOf(frontRoom, 0f))
+            val gapPx = ChargeSegmentGap.toPx()
+            val frontRoom = size.width - layout.fillWidth - gapPx
+            val frontWidth = (minOf(size.width * 0.16f, frontRoom) * front).coerceIn(0f, maxOf(frontRoom, 0f))
             if (frontWidth > h * 0.5f) {
                 drawRoundRect(
                     color = fillLight.copy(alpha = 0.55f),
-                    topLeft = Offset(layout.fillWidth + ChargeSegmentGap.toPx(), 0f),
+                    topLeft = Offset(layout.fillWidth + gapPx, 0f),
                     size = Size(frontWidth, h),
                     cornerRadius = radius,
                 )
