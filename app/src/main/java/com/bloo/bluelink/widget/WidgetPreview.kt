@@ -205,13 +205,12 @@ private fun PreviewControls(choice: Choice, car: VehicleSnapshot?, plan: WidgetP
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items.chunked(perRow).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { (icon, label) ->
+                row.forEach { (icon, _) ->
                     Box(
                         Modifier.weight(1f).height(d).clip(RoundedCornerShape(d / 2)).background(scheme.secondaryContainer),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (plan.labels) Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = scheme.onSecondaryContainer, maxLines = 1)
-                        else Icon(icon, null, tint = scheme.onSecondaryContainer, modifier = Modifier.size(20.dp))
+                        Icon(icon, null, tint = scheme.onSecondaryContainer, modifier = Modifier.size(22.dp))
                     }
                 }
             }

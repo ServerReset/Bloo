@@ -80,7 +80,7 @@ class StatusCache(private val context: Context) {
     /**
      * Serializes the given maps into one [CachePayload] JSON blob and writes it as a
      * single atomic DataStore edit (DataStore's `edit` runs the whole block as one
-     * transaction), replacing whatever was previously stored under [key] wholesale —
+     * transaction), replacing whatever was previously stored under [key] wholesale -
      * there is no per-VIN partial update, callers must pass the full merged state.
      */
     suspend fun save(

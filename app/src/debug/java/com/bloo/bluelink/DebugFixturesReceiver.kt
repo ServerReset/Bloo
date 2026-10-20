@@ -11,7 +11,7 @@ import com.bloo.bluelink.ui.DebugSampleGarage
  * release APK). See [DebugSampleGarage] for why the state has to be fabricated rather than signed
  * into.
  *
- * Target the component explicitly (`-n`) — a bare `-a` broadcast is implicit and does NOT reach a
+ * Target the component explicitly (`-n`) - a bare `-a` broadcast is implicit and does NOT reach a
  * manifest receiver in a backgrounded app on modern Android:
  *
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd garage

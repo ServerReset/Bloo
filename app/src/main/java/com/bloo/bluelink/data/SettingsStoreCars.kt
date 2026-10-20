@@ -245,7 +245,7 @@ fun SettingsStore.collapsedSections(vin: String, p: Preferences): Set<String> =
 
 /** Toggles [section] in or out of [vin]'s collapsed set: reads the current
  *  CSV-encoded set, adds or removes the section, then re-encodes and writes
- *  it back — a read-modify-write pair inside one editTracked() transaction
+ *  it back - a read-modify-write pair inside one editTracked() transaction
  *  so a concurrent write to the same key can't be lost between the read and
  *  the write (DataStore's edit{} block runs with the current prefs snapshot
  *  passed in, not a stale one captured earlier). */
@@ -292,7 +292,7 @@ suspend fun SettingsStore.setHotspots(vin: String, section: String?) {
     }
 }
 
-/** Null means "not confirmed by the user yet" — the US Hyundai/Genesis API
+/** Null means "not confirmed by the user yet" - the US Hyundai/Genesis API
  *  only distinguishes EV vs. gas, so the app asks the user to disambiguate
  *  hybrid/PHEV during car setup and stores their answer here; callers fall
  *  back to whatever the API-derived guess was when this is null. */

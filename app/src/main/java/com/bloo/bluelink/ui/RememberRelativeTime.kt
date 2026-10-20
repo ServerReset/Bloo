@@ -66,7 +66,7 @@ internal fun AnimatedSlider(
     // No default and never zero: every slider in the app picks from fixed values, none are free.
     steps: Int,
     accent: Color = MaterialTheme.colorScheme.primary,
-    // Fired once, with the final value, when the drag/tap settles — for callers whose real commit
+    // Fired once, with the final value, when the drag/tap settles - for callers whose real commit
     // is expensive (see the Vibrancy/UI-scale sliders, which otherwise call onValueChange on every
     // drag tick and each one recomposes the whole app since they feed BlooTheme's
     // colorScheme/LocalDensity).

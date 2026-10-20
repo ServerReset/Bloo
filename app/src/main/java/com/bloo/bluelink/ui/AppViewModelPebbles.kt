@@ -41,7 +41,7 @@ internal suspend fun AppViewModel.checkAlerts(v: Vehicle, status: VehicleStatus)
 
 /**
  * Switch the visible car (swipe). Updates the index, and lazily loads this car's status only if we
- * don't already have it — so already-loaded cars are never re-fetched on a swipe, but a car that
+ * don't already have it - so already-loaded cars are never re-fetched on a swipe, but a car that
  * failed to load at startup gets another chance when you view it.
  */
 fun AppViewModel.selectIndex(index: Int) {

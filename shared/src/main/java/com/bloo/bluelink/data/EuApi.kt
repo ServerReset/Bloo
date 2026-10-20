@@ -23,7 +23,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * A signed-in Hyundai Bluelink Europe (CCAPI / "CCS2") session. [deviceId] is the `ccsp-device-id`
  * from device registration and must stay stable across refreshes; [pin] is the account service PIN,
  * required to mint the short-lived control token every command needs (the EU analogue of Canada's
- * `pAuth`). [accessToken] is the bare token — headers prepend "Bearer ".
+ * `pAuth`). [accessToken] is the bare token - headers prepend "Bearer ".
  */
 data class EuSession(
     val accessToken: String,
@@ -54,7 +54,7 @@ data class EuVehicleSummary(
 )
 
 /**
- * Client for Hyundai Bluelink Europe on the CCAPI platform ("CCS2" — E-GMP / 2023+ cars). One
+ * Client for Hyundai Bluelink Europe on the CCAPI platform ("CCS2" - E-GMP / 2023+ cars). One
  * shared API shape that Kia Connect EU and Genesis EU also ride (different host/client/login-form
  * host only), like the three Canada brands share [CanadaApi]; only Hyundai EU is wired today via
  * [Brand.isEurope].
@@ -150,7 +150,7 @@ class EuApi(private val brand: Brand) {
 
     /**
      * [authHeaders] with the PIN-derived control token in both Authorization and AuthorizationCCSP
-     * — CCS2 control endpoints authenticate on the control token, not the plain access token.
+     * - CCS2 control endpoints authenticate on the control token, not the plain access token.
      * [controlToken] already carries "Bearer ".
      */
     internal fun Request.Builder.commandHeaders(session: EuSession, ccs2: Int, controlToken: String): Request.Builder =
@@ -162,7 +162,7 @@ class EuApi(private val brand: Brand) {
 
     /**
      * Registers this device with the CCAPI push channel and returns the `ccsp-device-id` all
-     * authenticated calls carry. Bloo doesn't use CCAPI push — it only needs the device id the
+     * authenticated calls carry. Bloo doesn't use CCAPI push - it only needs the device id the
      * register call mints from a generated push registration id. Ported from
      * KiaUvoApiEU._get_device_id (no auth token).
      */
@@ -185,7 +185,7 @@ class EuApi(private val brand: Brand) {
             return@withContext refreshCci(session)
         }
         val refresh = session.refreshToken
-            ?: throw BlueLinkException("Session expired — please sign in again", code = 401)
+            ?: throw BlueLinkException("Session expired - please sign in again", code = 401)
         val form = FormBody.Builder()
             .add("grant_type", "refresh_token")
             .add("refresh_token", refresh)
@@ -196,13 +196,13 @@ class EuApi(private val brand: Brand) {
             .header("User-Agent", USER_AGENT_IDP).post(form).build()
         val root = call(req)
         val access = root.path("access_token").str()
-            ?: throw BlueLinkException("Session expired — please sign in again", code = 401)
+            ?: throw BlueLinkException("Session expired - please sign in again", code = 401)
         session.copy(accessToken = access, refreshToken = root.path("refresh_token").str() ?: refresh)
     }
 
     /**
      * Mint the short-lived control token every command needs by verifying the PIN (PUT user/pin).
-     * Not cached here — [EuRepository] caches it and refetches on a 401, like [CanadaRepository]
+     * Not cached here - [EuRepository] caches it and refetches on a 401, like [CanadaRepository]
      * does with `pAuth`.
      */
     suspend fun controlToken(session: EuSession, pin: String): String = withContext(Dispatchers.IO) {
@@ -248,7 +248,7 @@ class EuApi(private val brand: Brand) {
 
             val before = readLatest()
             val beforeDate = before.path("Date").str()
-            // Wake the car (best-effort — the wake returns an async envelope, not state).
+            // Wake the car (best-effort - the wake returns an async envelope, not state).
             runCatching { call(Request.Builder().url(base).get().authHeaders(session, v.ccs2).build()) }
             repeat(REFRESH_POLLS) {
                 delay(REFRESH_POLL_INTERVAL_MS)
@@ -260,7 +260,7 @@ class EuApi(private val brand: Brand) {
 
     /**
      * Last-known parked GPS via the dedicated `/location/park` endpoint (returns
-     * `resMsg.coord.lat/lon`) — the CCS2 carstatus snapshot doesn't reliably carry a position.
+     * `resMsg.coord.lat/lon`) - the CCS2 carstatus snapshot doesn't reliably carry a position.
      * Non-rate-limited (parked position), access-token auth.
      */
     suspend fun location(session: EuSession, v: EuVehicleSummary): GeoLocation? = withContext(Dispatchers.IO) {
@@ -302,7 +302,7 @@ class EuApi(private val brand: Brand) {
 
     /**
      * RSA-PKCS1v1.5-encrypt [password] with the JWK public key ([nB64Url]/[eB64Url] are base64url
-     * modulus/exponent), returning lowercase hex — matching the reference's
+     * modulus/exponent), returning lowercase hex - matching the reference's
      * `cipher.encrypt(pw).hex()`.
      */
     internal fun rsaEncryptHex(password: String, nB64Url: String, eB64Url: String): String {
@@ -339,17 +339,17 @@ class EuApi(private val brand: Brand) {
             val resMsg = root.path("resMsg").str()
 
             // 4004 "Duplicate request": an identical command is already being processed server-side
-            // (e.g. a command fired right after a refresh, or a double-tap) — the request DID land,
+            // (e.g. a command fired right after a refresh, or a double-tap) - the request DID land,
             // so treat it as an accepted no-op whatever the HTTP status, and never retry (that just
             // duplicates again).
             if (resCode == "4004") {
-                AppLog.log("$where: duplicate request — already accepted, ignoring")
+                AppLog.log("$where: duplicate request - already accepted, ignoring")
                 return@use root
             }
 
             // Only genuine token/device expiry retries (mapped to 401). 7501 = auth, 4002 = bad
             // deviceId, or an explicit "token expired" message. A plain HTTP 401 counts too.
-            // Everything else is a terminal error (no retry) — notably we do NOT treat a bare 403
+            // Everything else is a terminal error (no retry) - notably we do NOT treat a bare 403
             // as retryable.
             val expired = resp.code == 401 || resCode == "7501" || resCode == "4002" ||
                 (resMsg?.contains("token", true) == true && resMsg.contains("expired", true))

@@ -46,7 +46,7 @@ sealed class UpdateCheckResult {
 object UpdateChecker {
 
     /**
-     * Check for an update. Returns the result — available, up-to-date, or failed.
+     * Check for an update. Returns the result - available, up-to-date, or failed.
      *
      * Order of checks, each an early return that skips the network call entirely:
      * 1. If this build wasn't stamped with a CI run number at all

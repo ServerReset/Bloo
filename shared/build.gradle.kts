@@ -34,7 +34,7 @@ kotlin {
 
 dependencies {
     // Exposed with api(...) so :app picks up the model/networking types
-    // transitively — these classes appear in its public signatures.
+    // transitively - these classes appear in its public signatures.
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
@@ -47,7 +47,7 @@ dependencies {
     // Pure-JVM unit tests (CI: testDebugUnitTest). kotlin-test-junit maps
     // kotlin.test's @Test/assert* onto JUnit 4 AND pulls JUnit transitively, so
     // Android's testDebugUnitTest (a JUnit-4-based task) actually discovers and
-    // runs the tests — the bare `kotlin-test` artifact provides only the assert
+    // runs the tests - the bare `kotlin-test` artifact provides only the assert
     // API with no runner, so no tests would be found. Version = project Kotlin 2.2.20.
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
     testImplementation("org.json:json:20240303")

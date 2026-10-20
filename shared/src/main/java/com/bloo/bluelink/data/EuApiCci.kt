@@ -51,7 +51,7 @@ internal suspend fun EuApi.loginCci(
         if (body.contains("abusing", ignoreCase = true)) {
             throw BlueLinkException(
                 "Europe sign-in was blocked by Hyundai's WAF. This is a server-side block, " +
-                    "not your credentials — try again later.",
+                    "not your credentials - try again later.",
             )
         }
     }
@@ -67,7 +67,7 @@ internal suspend fun EuApi.loginCci(
         jwk.path("e").str() ?: throw BlueLinkException("Europe sign-in: bad login key"),
     )
 
-    // 3. signin (form POST, do NOT follow) — pull `code` from the 302 Location.
+    // 3. signin (form POST, do NOT follow) - pull `code` from the 302 Location.
     val signinForm = FormBody.Builder()
         .add("client_id", oneAppClientId)
         .add("encryptedPassword", "true")
@@ -86,7 +86,7 @@ internal suspend fun EuApi.loginCci(
     ).execute().use { resp ->
         if (resp.code != 302) {
             throw BlueLinkException(
-                "Europe sign-in failed (HTTP ${resp.code}) — check your Bluelink email and password",
+                "Europe sign-in failed (HTTP ${resp.code}) - check your Bluelink email and password",
                 code = resp.code,
             )
         }
@@ -97,7 +97,7 @@ internal suspend fun EuApi.loginCci(
             if (location.contains("authorization", true)) {
                 "Bluelink needs a one-time consent in the official app/website first, then try again."
             } else {
-                "Europe sign-in was rejected — check your Bluelink email and password."
+                "Europe sign-in was rejected - check your Bluelink email and password."
             },
         )
 

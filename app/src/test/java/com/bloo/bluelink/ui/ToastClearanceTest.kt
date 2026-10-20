@@ -3,7 +3,6 @@ package com.bloo.bluelink.ui
 import androidx.compose.ui.geometry.Rect
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import com.bloo.uicommon.content
 
 /**
  * The pure search/toast negotiation geometry ([toastClearance]). The bug this guards against

@@ -17,7 +17,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Fetches fresh status once per session. Disk-cached data is shown instantly (so no UI flash), but
- * we still pull a live update — otherwise a warm cache would leave the garage permanently stale
+ * we still pull a live update - otherwise a warm cache would leave the garage permanently stale
  * until a manual refresh.
  */
 internal fun AppViewModel.ensureStatus(
@@ -129,7 +129,7 @@ internal fun AppViewModel.loadStatus(
                 repoFor(v).status(v, refresh = refresh)
             }
             s?.let { status ->
-                // The status payload carries last-known GPS for free — use it so the map/location
+                // The status payload carries last-known GPS for free - use it so the map/location
                 // works without the rate-limited findMyCar call (this is what the official app
                 // does).
                 val statusLoc = status.toGeoLocation()

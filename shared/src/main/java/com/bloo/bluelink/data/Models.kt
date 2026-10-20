@@ -131,7 +131,7 @@ data class SeatHeaterVentState(
 )
 
 /**
- * Coarse tire-pressure reading; [all] is a single combined status (not broken out per wheel —
+ * Coarse tire-pressure reading; [all] is a single combined status (not broken out per wheel -
  * that's [TirePressureLamp] instead).
  */
 @Serializable
@@ -181,7 +181,7 @@ data class TirePressureLamp(
 
 /**
  * Distance-to-empty: a numeric [value] plus a [unit] code (the API's own unit enum, not resolved
- * here — callers that care about miles vs km read this in conjunction with the user's own unit
+ * here - callers that care about miles vs km read this in conjunction with the user's own unit
  * preference).
  */
 @Serializable
@@ -204,7 +204,7 @@ data class TempValue(
 data class Battery12V(
     val batSoc: Int? = null,
     val batState: Int? = null,
-    // NB: batSignalReferenceValue is intentionally omitted — some vehicles (e.g. newer CCNC head
+    // NB: batSignalReferenceValue is intentionally omitted - some vehicles (e.g. newer CCNC head
     // units) return it as an object like {"batWarning":65} rather than a number, which would break
     // parsing.
 ) {
@@ -281,7 +281,7 @@ data class ReservChargeInfos(
 ) {
     /**
      * Look up the target for a specific [plugType] (0 = DC fast, 1 = AC) by scanning the flat list
-     * the API returns — there's no guaranteed order or fixed index, so this is a linear search by
+     * the API returns - there's no guaranteed order or fixed index, so this is a linear search by
      * the plug-type key rather than direct indexing.
      */
     fun level(plugType: Int): Int? =
@@ -289,7 +289,7 @@ data class ReservChargeInfos(
 }
 
 /**
- * One entry in the charge-limit list: which plug ([plugType], 0 = DC fast, 1 = AC — matching the
+ * One entry in the charge-limit list: which plug ([plugType], 0 = DC fast, 1 = AC - matching the
  * same encoding used elsewhere for battery plug type) and its configured target state-of-charge
  * percentage.
  */
@@ -310,7 +310,7 @@ data class DrvDistance(
 )
 
 /**
- * The actual range value, one level deeper than [DrvDistance] — the API nests it this way to allow
+ * The actual range value, one level deeper than [DrvDistance] - the API nests it this way to allow
  * (unused here) per-fuel-type breakdowns.
  */
 @Serializable

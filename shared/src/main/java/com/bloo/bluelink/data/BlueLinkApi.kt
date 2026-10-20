@@ -43,7 +43,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     internal val client: OkHttpClient get() = ApiHttp.client
 
     // The two request-body content types this API's endpoints expect: plain JSON for most commands,
-    // and form-urlencoded specifically for lock/unlock (see [formCommand] below) — sending the
+    // and form-urlencoded specifically for lock/unlock (see [formCommand] below) - sending the
     // wrong one for a given endpoint results in the server rejecting the body.
     internal val jsonMedia = "application/json".toMediaType()
 
@@ -123,7 +123,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     /**
      * Fetch the car's current status. [refresh] controls whether the car is asked to report *fresh*
      * telemetry (a live poll, slower and rate limited) via the REFRESH header, versus just
-     * returning whatever the server last cached from the car — the caller decides which trade-off
+     * returning whatever the server last cached from the car - the caller decides which trade-off
      * it wants.
      */
     suspend fun status(token: String, username: String, pin: String, v: Vehicle, refresh: Boolean): VehicleStatus? =
@@ -169,7 +169,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     suspend fun lock(token: String, username: String, pin: String, v: Vehicle) =
         formCommand("/ac/v2/rcs/rdo/off", token, username, pin, v)
 
-    /** Unlock the doors ("rdo/on" — see [lock] for the naming logic). */
+    /** Unlock the doors ("rdo/on" - see [lock] for the naming logic). */
     suspend fun unlock(token: String, username: String, pin: String, v: Vehicle) =
         formCommand("/ac/v2/rcs/rdo/on", token, username, pin, v)
 
@@ -188,7 +188,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     suspend fun stopClimate(token: String, username: String, pin: String, v: Vehicle): String = execute {
         // Pure EVs use evc/fatc/stop (no engine). ICE and PHEVs use rcs/rsc/stop (remote engine
         // start can be cancelled). The v.isEv flag comes from the enrollment API and is true only
-        // for pure EVs — PHEVs are false.
+        // for pure EVs - PHEVs are false.
         val path = if (v.isEv) "/ac/v2/evc/fatc/stop" else "/ac/v2/rcs/rsc/stop"
         val request = baseRequest(path, token, username, pin, v)
             .post(ByteArray(0).toRequestBody(null))
@@ -249,7 +249,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     /**
      * Builds the common header set every authenticated command request needs (auth token in two
      * different header names, vehicle identifiers, locale/routing headers the API expects even
-     * though most of their values never vary) — [path] is joined onto [baseUrl] and the caller
+     * though most of their values never vary) - [path] is joined onto [baseUrl] and the caller
      * still needs to attach its own HTTP method + body before calling build().
      */
     internal fun baseRequest(
@@ -309,7 +309,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     }
 
     /**
-     * Executes [request] synchronously (must run off the main thread — all callers go through
+     * Executes [request] synchronously (must run off the main thread - all callers go through
      * [execute]'s Dispatchers.IO) and returns the raw response body text.
      */
     internal fun call(request: Request): String {
@@ -346,7 +346,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
 
     /**
      * Runs [block] on the IO dispatcher (network calls shouldn't block the caller's thread) and
-     * normalises any thrown exception into a [BlueLinkException] — a [BlueLinkException] thrown
+     * normalises any thrown exception into a [BlueLinkException] - a [BlueLinkException] thrown
      * deeper (e.g. by [call]) passes through unchanged so its HTTP code/message survive, while any
      * other exception (IOException, SerializationException, etc.) is wrapped so every public method
      * on this class has one exception type callers need to handle.

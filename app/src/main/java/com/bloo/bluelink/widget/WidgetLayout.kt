@@ -30,7 +30,6 @@ internal data class WidgetPlan(
     val showBar: Boolean,
     /** A row of status chips (climate, charging) under the bar (taller still). */
     val showChips: Boolean,
-    val labels: Boolean,
     /** Height of a control (STACK row) or the diameter of a round control (SIDE grid, MINIMAL lock). */
     val buttonHeightDp: Float,
     val maxActions: Int,
@@ -127,7 +126,7 @@ internal fun planWidget(
             return WidgetPlan(
                 arrangement = WidgetArrangement.SIDE, valueSp = value, nameSp = nameSp, statusSp = statusSp, detailSp = detailSp,
                 showUpdated = showUpdated, showStatus = showStatus, showDetails = false, showBar = false, showChips = false,
-                labels = false, buttonHeightDp = diameter, maxActions = minOf(actions, rows * cols), gridColumns = cols,
+                buttonHeightDp = diameter, maxActions = minOf(actions, rows * cols), gridColumns = cols,
                 refresh = refreshButton,
             )
         }
@@ -142,30 +141,26 @@ internal fun planWidget(
         return WidgetPlan(
             arrangement = WidgetArrangement.MINIMAL, valueSp = v, nameSp = nameSp, statusSp = statusSp, detailSp = detailSp,
             showUpdated = false, showStatus = false, showDetails = false, showBar = false, showChips = false,
-            labels = false, buttonHeightDp = lock, maxActions = 1, refresh = refreshButton,
+            buttonHeightDp = lock, maxActions = 1, refresh = refreshButton,
         )
     }
 
-    // STACK: the controls run along one row while they fit (at least a circle each); a narrow widget wraps them
-    // into two columns instead of dropping any, as long as the height holds the extra row.
-    val fit = ((innerW + GAP) / (buttonH + GAP)).toInt()
-    // Every control on one row, each shrunk to fit (but never under a 40dp circle), before wrapping at all.
+    // STACK: the controls are one kind of button that flexes. They run along one row while each can be at least a
+    // circle; otherwise they stack in a grid (two columns, or one on a skinny widget) of as many as the height holds,
+    // never dropping to a lone control while there is room for more.
     val perButton = (innerW - GAP * (actions - 1)) / actions
     val singleRow = perButton >= 40f
     val rowButtonH = if (singleRow) minOf(buttonH, perButton) else buttonH
-    val gridRows = (actions + 1) / 2
-    val gridH = gridRows * buttonH + (gridRows - 1) * GAP
-    val gridNeed = header(false) + GAP + MIN_VALUE_SP * fs * VALUE_LINE + GAP + gridH
-    val useGrid = !singleRow && actions > 1 && innerH >= gridNeed
-    val cols = if (useGrid) 2 else 0
-    val rows = if (useGrid) gridRows else 1
-    val maxActions = when {
-        useGrid || singleRow -> actions
-        else -> minOf(actions, fit).coerceAtLeast(1)
-    }
+    val colsAvail = if (innerW >= 2 * 40f + GAP) 2 else 1
+    fun gridRowsFor(n: Int) = (n + colsAvail - 1) / colsAvail
+    fun gridNeedFor(n: Int) =
+        header(false) + GAP + MIN_VALUE_SP * fs * VALUE_LINE + GAP + gridRowsFor(n) * buttonH + (gridRowsFor(n) - 1) * GAP
+    val fitting = if (singleRow) actions else (actions downTo 1).firstOrNull { gridNeedFor(it) <= innerH } ?: 1
+    val useGrid = !singleRow && fitting >= 2
+    val cols = if (useGrid) colsAvail else 0
+    val rows = if (useGrid) gridRowsFor(fitting) else 1
+    val maxActions = if (singleRow) actions else fitting
     val controlsH = rows * rowButtonH + (rows - 1) * GAP
-    val cellW = if (useGrid) (innerW - GAP) / 2 else (innerW - GAP * (maxActions - 1)) / maxActions
-    val labels = !compact && cellW >= 84f
 
     var showStatus = true
     var showUpdated = widthDp >= 180f
@@ -188,7 +183,7 @@ internal fun planWidget(
     val plan = WidgetPlan(
         arrangement = WidgetArrangement.STACK, valueSp = value, nameSp = nameSp, statusSp = statusSp, detailSp = detailSp,
         showUpdated = showUpdated, showStatus = showStatus, showDetails = showDetails, showBar = showBar, showChips = showChips,
-        labels = labels, buttonHeightDp = rowButtonH, maxActions = maxActions, gridColumns = cols, refresh = refreshButton,
+        buttonHeightDp = rowButtonH, maxActions = maxActions, gridColumns = cols, refresh = refreshButton,
         // A chip is about 100dp wide with its text; only as many as fit, so none is cut to "N...".
         maxChips = (innerW / 104f).toInt().coerceIn(1, 3),
     )

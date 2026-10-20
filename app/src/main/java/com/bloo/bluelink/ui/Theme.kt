@@ -30,8 +30,8 @@ import kotlinx.serialization.Serializable
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 /**
- * User-selectable typeface. GOOGLE_SANS uses Google Sans Flex — Google's officially open-sourced
- * (OFL) sibling of the proprietary Product Sans — so it ships legitimately as the geometric option.
+ * User-selectable typeface. GOOGLE_SANS uses Google Sans Flex - Google's officially open-sourced
+ * (OFL) sibling of the proprietary Product Sans - so it ships legitimately as the geometric option.
  */
 enum class FontChoice { SYSTEM, ATKINSON, GOOGLE_SANS }
 

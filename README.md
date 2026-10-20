@@ -4,7 +4,7 @@
   <img src="docs/img/icon.png" width="104" alt="Bloo">
 </p>
 
-<p align="center"><b>Lock, climate, charge and live status for your Hyundai, Genesis or Kia &mdash; without the slow official app.</b></p>
+<p align="center"><b>Lock, climate, charge and live status for your Hyundai, Genesis or Kia - without the slow official app.</b></p>
 
 <p align="center">
   <img src="docs/img/garage.png" width="22%" alt="Garage">
@@ -17,38 +17,38 @@
 
 **On Google Play (closed test).** Two steps, and both use the Google account you use on your phone:
 
-1. **Join the testing group** — **[groups.google.com/g/bloo-testing](https://groups.google.com/g/bloo-testing)**.
+1. **Join the testing group** - **[groups.google.com/g/bloo-testing](https://groups.google.com/g/bloo-testing)**.
    This is what puts you on the tester list; the opt-in below only works for accounts in it.
-2. **Install from Google Play** — **[play.google.com/store/apps/details?id=com.bloo.bluelink](https://play.google.com/store/apps/details?id=com.bloo.bluelink)**.
+2. **Install from Google Play** - **[play.google.com/store/apps/details?id=com.bloo.bluelink](https://play.google.com/store/apps/details?id=com.bloo.bluelink)**.
    Once you are in the group it resolves, and Play keeps the app up to date from there.
 
 Testing builds skip review, so new versions land the day they're built.
 
-**Or install the APK directly** — the same app, built for installing by hand:
+**Or install the APK directly** - the same app, built for installing by hand:
 
-- **[Bloo.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk)** — the phone app.
-- **[Bloo-watch.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo-watch.apk)** — the watch app.
+- **[Bloo.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk)** - the phone app.
+- **[Bloo-watch.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo-watch.apk)** - the watch app.
 
 Both are always the newest build. Step-by-step instructions are under [Install](#install) below.
 
 ### Which one?
 
 The same app either way, but **not interchangeable**. The package name is the same; the **signing key is
-not** — Play re-signs every upload with Google's app-signing key, so a Play-installed copy and an APK copy
+not** - Play re-signs every upload with Google's app-signing key, so a Play-installed copy and an APK copy
 cannot update each other. Moving between them costs one uninstall, and an uninstall takes the app's data
 with it: export first, from Settings → Export. They differ in **how they update, and how the watch gets
 its app**:
 
 | | Google Play | The APK |
 |---|---|---|
-| **Updates** | Play downloads and installs them | the app does it itself — silently if you have [Shizuku](https://shizuku.rikka.app/), otherwise through Android's installer |
+| **Updates** | Play downloads and installs them | the app does it itself - silently if you have [Shizuku](https://shizuku.rikka.app/), otherwise through Android's installer |
 | **Watch app** | Play installs it on the watch | the phone pairs with the watch's wireless debugging and pushes it across |
 | **Needs** | a Google account on the tester list | nothing but the file |
 | **Size** | smaller: no installer of its own | larger: it carries one |
 
 The APK is the fuller of the two, and that is the whole reason it exists: it installs the watch app and
 updates itself, and Play does not allow an app to install other apps. Neither is a test build in the
-"unfinished" sense — both are the same release, published by the same pipeline at the same moment.
+"unfinished" sense - both are the same release, published by the same pipeline at the same moment.
 
 A third-party Android app for **Hyundai**, **Genesis** and **Kia** vehicles (US, Canada, Hyundai Europe). Built with Jetpack Compose and Material 3 Expressive for phones, foldables and tablets. Every screen talks to live servers; nothing is simulated.
 
@@ -73,13 +73,13 @@ A third-party Android app for **Hyundai**, **Genesis** and **Kia** vehicles (US,
 
 ## Install
 
-Bloo is in closed testing on Google Play (join above), or you can install it straight from a release —
+Bloo is in closed testing on Google Play (join above), or you can install it straight from a release -
 no Play account and no GitHub sign-in needed.
 
 1. On your phone, open the [latest release](https://github.com/ServerReset/Bloo/releases/latest) and, under **Assets**, download **`Bloo.apk`**. (Wear OS owners: `Bloo-watch.apk` is there too.)
-2. Open the downloaded file. If you can't find it, pull down your notifications and tap the finished download, or open **Downloads** — in your browser it's usually behind the **⋮** or **☰** menu, or use the **Files** app → **Downloads**.
+2. Open the downloaded file. If you can't find it, pull down your notifications and tap the finished download, or open **Downloads** - in your browser it's usually behind the **⋮** or **☰** menu, or use the **Files** app → **Downloads**.
 3. Android warns that Bloo isn't from a trusted source. What you tap depends on the warning you get:
-   - **"Blocked by Play Protect" / "unsafe app"**: tap **More details** — if you don't see it, look for a **⌄** or **⋮** on the warning sheet to expand it — then **Install anyway**.
+   - **"Blocked by Play Protect" / "unsafe app"**: tap **More details** - if you don't see it, look for a **⌄** or **⋮** on the warning sheet to expand it - then **Install anyway**.
    - **"For your security…" (unknown sources)**: tap **Settings**, turn on **Allow from this source** for the app you're installing with (your browser, or Files), then go **Back** and tap **Install**.
 4. Confirm with your **fingerprint, face, PIN, pattern or password**.
 
@@ -89,11 +89,11 @@ After that the app updates itself: every push publishes a new release, and the b
 
 Bloo was signed with a new key in October 2026, and Android will not install an update signed with a
 different key than the copy already on your phone. A version installed before that change has to be
-replaced rather than updated — the download is fine, the installer just refuses it.
+replaced rather than updated - the download is fine, the installer just refuses it.
 
 Export your settings first (**Settings → Backup & sync → Export**), then uninstall Bloo, install the
 newest **`Bloo.apk`** from the [releases page](https://github.com/ServerReset/Bloo/releases), sign in
-again, and restore the backup. Until you do, the old copy keeps working exactly as it did — it just
+again, and restore the backup. Until you do, the old copy keeps working exactly as it did - it just
 stops receiving updates.
 
 ## Build

@@ -24,7 +24,7 @@ import rikka.shizuku.SystemServiceHelper
 /**
  * Optional silent APK install via Shizuku (local ADB / root), used by the self-update
  * flow when the user opts in AND Shizuku is running. It drives a real
- * [PackageInstaller] session through the privileged Shizuku identity — the "clean
+ * [PackageInstaller] session through the privileged Shizuku identity - the "clean
  * route" the official Shizuku demo uses: wrap the framework "package" binder in
  * [ShizukuBinderWrapper] so calls execute in the shell/root server, reach the hidden
  * [IPackageInstaller], and build the SDK [PackageInstaller]/[PackageInstaller.Session]
@@ -33,7 +33,7 @@ import rikka.shizuku.SystemServiceHelper
  * lifts the runtime non-SDK block on the reflected constructors, done once at app
  * start in MainActivity).
  *
- * Everything is wrapped so a missing/dead Shizuku binder never crashes — callers fall
+ * Everything is wrapped so a missing/dead Shizuku binder never crashes - callers fall
  * back to the normal system-installer intent on [Result.failure]. minSdk is 26 (O), so
  * only the S+ and O+ [PackageInstaller] constructors are needed (no legacy branch).
  */
@@ -56,16 +56,16 @@ object ShizukuInstaller : ShizukuInstall {
     /**
      * Called when the user opts INTO seamless install: prompt for the Shizuku
      * permission now (unless already granted). This is also what makes Bloo appear in
-     * the Shizuku manager's authorized-apps list — an app only shows up there once it
+     * the Shizuku manager's authorized-apps list - an app only shows up there once it
      * has actually requested permission while the binder was alive; merely declaring
      * the provider isn't enough.
      *
      * If the binder isn't received yet (Shizuku installed but service just started, or
      * not started), a request now would throw, so we register a STICKY binder-received
      * listener that fires immediately if the binder is already up, else once it arrives
-     * — then requests once and removes itself. Returns true if Shizuku is installed
+     * - then requests once and removes itself. Returns true if Shizuku is installed
      * enough to have requested/queued a request; false if not installed at all (so the
-     * caller can tell the user to install/start Shizuku). Fully guarded — never throws.
+     * caller can tell the user to install/start Shizuku). Fully guarded - never throws.
      */
     override fun requestPermissionOnEnable(requestCode: Int): Boolean = runCatching {
         if (hasPermission()) return@runCatching true
@@ -94,7 +94,7 @@ object ShizukuInstaller : ShizukuInstall {
     }.getOrDefault(false)
 
     /**
-     * Install [apk] silently. Blocking (awaits the commit result on a latch) — call
+     * Install [apk] silently. Blocking (awaits the commit result on a latch) - call
      * off the main thread. Returns [Result.failure] on any error so the caller can
      * fall back to the tap-through system installer.
      *
@@ -123,12 +123,12 @@ object ShizukuInstaller : ShizukuInstall {
 
         val pi = createPackageInstaller(installer, installerPackageName, null, userId)
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-        // INSTALL_REPLACE_EXISTING (0x2) + INSTALL_ALLOW_TEST (0x4), the demo's flags —
+        // INSTALL_REPLACE_EXISTING (0x2) + INSTALL_ALLOW_TEST (0x4), the demo's flags -
         // replace-existing is what makes "update over the installed build" work.
         orInstallFlags(params, 0x00000002 or 0x00000004)
 
         // Allocate the system-side session up front; everything after (openSession,
-        // write, commit) is inside a try that ABANDONS the session on any failure —
+        // write, commit) is inside a try that ABANDONS the session on any failure -
         // Session.close() alone does NOT abandon, so failed attempts would otherwise
         // accumulate orphaned sessions against the per-uid cap and eventually break
         // silent install until reboot. session is nullable so the finally only closes
@@ -179,7 +179,7 @@ object ShizukuInstaller : ShizukuInstall {
             session.commit(intentSender)
             // Bounded wait: commit() returns immediately and the result is delivered
             // asynchronously into our IIntentSender. If the Shizuku/system server dies
-            // after commit (or the install stalls), send() never fires — an unbounded
+            // after commit (or the install stalls), send() never fires - an unbounded
             // await() would hang this IO thread forever AND starve the caller's
             // fallback. Time out → throw → Result.failure → system-installer fallback.
             val delivered = latch.await(120, TimeUnit.SECONDS)

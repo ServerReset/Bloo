@@ -58,7 +58,7 @@ internal data class ChargeReadout(
     /**
      * Target fill, 0..1. Deliberately the TARGET and not an already-animated value: each site
      * springs towards it through [animatedChargeFrac] with the same spec, so the two agree at rest
-     * — and at rest is when the pebble gets toggled. Holding an animating float in here instead
+     * - and at rest is when the pebble gets toggled. Holding an animating float in here instead
      * would rebuild this object every frame.
      */
     val frac: Float,
@@ -73,7 +73,7 @@ internal data class ChargeReadout(
     val fuelPct: Int?,
 )
 
-/** Derives the [ChargeReadout] — the single source for both densities. */
+/** Derives the [ChargeReadout] - the single source for both densities. */
 @Composable
 internal fun chargeReadoutOf(
     status: VehicleStatus?,

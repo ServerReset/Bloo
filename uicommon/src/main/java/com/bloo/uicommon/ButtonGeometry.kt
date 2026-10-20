@@ -6,8 +6,8 @@ import androidx.compose.ui.unit.dp
 
 /**
  * The shared button-geometry helpers, pulled out of the app so the pill
- * math — the corner percentages, the split-pill seams, the connected-group
- * silhouettes — lives in ONE place and every phone control builds
+ * math - the corner percentages, the split-pill seams, the connected-group
+ * silhouettes - lives in ONE place and every phone control builds
  * from byte-identical shapes.
  */
 

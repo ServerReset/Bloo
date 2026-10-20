@@ -29,7 +29,7 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
             // Silent before, which made "AutoLock stopped working after a restart" impossible to tell
             // apart from "the Bluetooth event never arrived". See BootGate: after a reboot the app is
             // sealed until the user signs in again, and that seals this receiver with everything else.
-            AppLog.log("AutoLock: ignoring $action — the app is sealed after a restart (BootGate), so no evaluation can run.")
+            AppLog.log("AutoLock: ignoring $action - the app is sealed after a restart (BootGate), so no evaluation can run.")
             return
         }
         @Suppress("DEPRECATION")

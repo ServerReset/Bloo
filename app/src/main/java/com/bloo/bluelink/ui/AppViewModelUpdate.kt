@@ -78,7 +78,7 @@ fun AppViewModel.downloadUpdateInBackground() {
 fun AppViewModel.installDownloadedUpdate() {
     if (!_state.value.updateApkReady) return
     // Guard against a second tap (or a permission-grant retry) re-entering while a seamless install
-    // is already running — otherwise two concurrent installer sessions write/commit the same APK.
+    // is already running - otherwise two concurrent installer sessions write/commit the same APK.
     if (_state.value.updateInstalling) return
     val dest = com.bloo.bluelink.update.UpdateCleanup.stagedApkFile(getApplication())
     if (!dest.exists()) {
@@ -117,14 +117,14 @@ private fun AppViewModel.seamlessInstall(dest: java.io.File) {
     viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         val result = com.bloo.bluelink.update.shizukuInstall().installApk(dest, ctx.packageName)
         if (result.isFailure) {
-            // Silent path failed (Shizuku died, OEM restriction, timed out, etc.) — clear the
+            // Silent path failed (Shizuku died, OEM restriction, timed out, etc.) - clear the
             // in-flight flag and fall back to the system installer.
             launch(kotlinx.coroutines.Dispatchers.Main) {
                 _state.update { it.copy(updateInstalling = false) }
                 fallbackInstall(dest)
             }
         } else {
-            // Success. Usually the OS force-stops us as it swaps the APK, so this never renders —
+            // Success. Usually the OS force-stops us as it swaps the APK, so this never renders -
             // BUT a replace-install commit reports STATUS_SUCCESS as soon as it's staged and some
             // OEMs defer the process kill.
             launch(kotlinx.coroutines.Dispatchers.Main) {

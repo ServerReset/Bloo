@@ -141,7 +141,7 @@ class Ai(context: Context) {
 
     /**
      * The ARTICLE input type rejects anything under 400 characters. A single car's status can fall
-     * short, so we repeat the same facts until the floor is met — the model sees no new
+     * short, so we repeat the same facts until the floor is met - the model sees no new
      * information, so the summary stays accurate.
      */
     private fun padToMinimum(text: String): String {

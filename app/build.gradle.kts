@@ -277,7 +277,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics:$composeUi")
     implementation("androidx.compose.foundation:foundation:$composeUi")
 
-    // Material 3 Expressive — the Expressive components (ButtonGroup,
+    // Material 3 Expressive - the Expressive components (ButtonGroup,
     // SplitButtonLayout, FloatingToolbar, LoadingIndicator) live in 1.5.0-alpha.
     implementation("androidx.compose.material3:material3:1.5.0-alpha29")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
@@ -314,7 +314,7 @@ dependencies {
 
 
 
-    // On-device Gemini Nano (ML Kit GenAI) — optional AI summaries; gated at
+    // On-device Gemini Nano (ML Kit GenAI) - optional AI summaries; gated at
     // runtime by feature availability so unsupported devices simply hide it.
     implementation("com.google.mlkit:genai-summarization:1.0.0-beta1")
 

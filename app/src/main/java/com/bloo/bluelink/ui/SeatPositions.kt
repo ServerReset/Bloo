@@ -4,7 +4,7 @@ import com.bloo.bluelink.data.SeatConfig
 
 /**
  * The four seat positions, each pairing its persisted heat/cool flag keys with the matching
- * [SeatConfig] fields — the seat matrix lives here once instead of being hand-written at each of
+ * [SeatConfig] fields - the seat matrix lives here once instead of being hand-written at each of
  * the three places seats are configured.
  */
 internal data class SeatPosition(

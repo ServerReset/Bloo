@@ -43,8 +43,8 @@ object ApiHttp {
 
 /**
  * Parse a response body to JSON, converting a malformed/empty/non-JSON body (a WAF HTML block page,
- * a gateway 5xx, a truncated response) into a [BlueLinkException] — which the repository layer
- * already catches — instead of letting a raw SerializationException/IOException crash the app.
+ * a gateway 5xx, a truncated response) into a [BlueLinkException] - which the repository layer
+ * already catches - instead of letting a raw SerializationException/IOException crash the app.
  */
 fun parseJsonOrThrow(json: Json, text: String, code: Int, message: String): kotlinx.serialization.json.JsonElement =
     runCatching { json.parseToJsonElement(text) }

@@ -138,7 +138,7 @@ class EuRepository(
     /** Runs [block] with a fresh control token for [v], fetching it via
      *  [EuApi.controlToken] if not cached, and retrying once with a freshly
      *  minted token if the command itself 401s (an expired control token,
-     *  distinct from an expired session — [withSession] handles that below). */
+     *  distinct from an expired session - [withSession] handles that below). */
     private suspend fun <T> withCommandAuth(
         v: Vehicle, block: suspend (EuSession, EuVehicleSummary, String) -> T,
     ): T = withSession { s ->
@@ -152,7 +152,7 @@ class EuRepository(
     /**
      * Runs [block] with the saved Europe session. On a 401/403, refreshes the
      * access token via the stored refresh token (a cheap, password-free exchange
-     * the CCAPI supports — unlike Canada) and retries once. If the refresh itself
+     * the CCAPI supports - unlike Canada) and retries once. If the refresh itself
      * fails, falls back to replaying the stored-credentials password login before
      * giving up with "sign in again". Control tokens are dropped on reauth since
      * they were bound to the now-dead session.
@@ -164,12 +164,12 @@ class EuRepository(
         } catch (e: BlueLinkException) {
             // Only a genuine token/device expiry (EuApi maps those to 401) triggers
             // a silent refresh. A bare 403 or a business error like "Duplicate
-            // request" is terminal here — retrying it would just refresh/duplicate.
+            // request" is terminal here - retrying it would just refresh/duplicate.
             if (e.code != 401) throw e
             AppLog.log("${brand.label} session expired; refreshing")
             val refreshed = runCatching { api.refresh(stored.toEu()) }.onFailure { rethrowIfCancellation(it) }.getOrNull()
             val session = refreshed ?: reLogin() ?: throw BlueLinkException(
-                "Session expired — please sign out and sign in again", code = e.code,
+                "Session expired - please sign out and sign in again", code = e.code,
             )
             save(session, stored.username, stored.pin)
             controlTokens.clear()

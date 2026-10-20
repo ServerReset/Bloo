@@ -7,7 +7,7 @@ plugins {
 // IPackageInstallerSession / IIntentSender / IIntentReceiver) so :app can compile the
 // Shizuku silent-install path. This matches the official Shizuku demo's
 // `demo-hidden-api-stub` and is REQUIRED: AGP does not support `compileOnly` on an AAR
-// (Android-library) dependency — that combo can silently dex these android.*-package
+// (Android-library) dependency - that combo can silently dex these android.*-package
 // classes into the APK, which then throws SecurityException("Prohibited package name")
 // at runtime. As a plain JAR consumed via compileOnly, the classes are reliably kept
 // OUT of the APK; at runtime the real framework classes are used (via ShizukuBinderWrapper

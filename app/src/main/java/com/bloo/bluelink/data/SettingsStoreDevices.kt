@@ -42,7 +42,7 @@ fun SettingsStore.syncFileFingerprint(p: Preferences): String? {
     // cached here device-local). Every device on the same file reads the same
     // value → the same short code. This replaces the old URI hash, which was
     // WRONG: a SAF content:// URI is assigned PER DEVICE by the OS, so the same
-    // Drive file had different URIs (and different hashes) on two phones — the
+    // Drive file had different URIs (and different hashes) on two phones - the
     // exact "I picked the same file but the codes differ" bug. Null until the
     // first successful sync has read/minted the id.
     val id = p[stringPreferencesKey("sync_file_id")] ?: return null

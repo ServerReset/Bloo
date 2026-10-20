@@ -43,7 +43,7 @@ data class KiaOtpUi(
 /**
  * A pending Canada one-time-code challenge shown over the login form. Unlike [KiaOtpUi] there's no
  * destination to choose (Canada is email-only), so the code is already sent by the time this
- * appears — see [AppViewModel.loginCanada].
+ * appears - see [AppViewModel.loginCanada].
  */
 data class CanadaOtpUi(
     val challenge: CanadaAuth.OtpRequired,

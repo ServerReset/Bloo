@@ -7,7 +7,7 @@ import java.util.Base64
  * carry. The CCAPI rejects requests whose stamp it can't reproduce, so this is
  * required on device registration, sign-in, and every command.
  *
- * Algorithm — ported verbatim from the Apache-2.0 `hyundai_kia_connect_api`
+ * Algorithm - ported verbatim from the Apache-2.0 `hyundai_kia_connect_api`
  * reference (`KiaUvoApiEU._get_stamp`):
  *
  * ```python
@@ -19,16 +19,16 @@ import java.util.Base64
  * Two details that matter and are easy to get wrong:
  *  - the timestamp is **Unix seconds**, not milliseconds;
  *  - `zip` stops at the **shorter** of CFB / raw_data, so the XOR (and the
- *    output) is truncated to that length — the CFB is never repeated.
+ *    output) is truncated to that length - the CFB is never repeated.
  *
  * [CFB]/[APP_ID] and the matching `clientSecret` in [Brand] are the Hyundai EU
  * values from that project's `KiaUvoApiEU.py`. They rotate when Hyundai ships a
  * new app build; if EU sign-in starts failing with a stamp error, refresh all
- * three from the same source — this is the single maintenance point, mirroring
+ * three from the same source - this is the single maintenance point, mirroring
  * how [Brand] already documents its rotatable `clientSecret` values.
  */
 object EuStamp {
-    /** Hyundai EU CFB seed (base64) — pairs with [APP_ID]. */
+    /** Hyundai EU CFB seed (base64) - pairs with [APP_ID]. */
     const val CFB: String = "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
 
     /** Hyundai EU ccsp-application-id the stamp is bound to. */

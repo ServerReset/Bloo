@@ -11,7 +11,7 @@ package com.bloo.bluelink.data
 
 /** The one value a glance should show: charge/fuel %, else the lock state, else a dash. */
 fun VehicleSnapshot.bigValue(): String =
-    percent?.let { "$it%" } ?: locked?.let { if (it) "Locked" else "Unlocked" } ?: "—"
+    percent?.let { "$it%" } ?: locked?.let { if (it) "Locked" else "Unlocked" } ?: "-"
 
 /**
  * The supporting line: lock state, charging and range, whichever the car reports, or null when it

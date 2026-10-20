@@ -118,7 +118,7 @@ internal fun AppViewModel.bootstrapDriveSync() {
         // identical set, so the retry never got scheduled.
         settingsStore.dirtyKeysFlow
             .collect { dirty ->
-                // Empty = nothing pending (or a sync just cleared it) — cancel any scheduled push
+                // Empty = nothing pending (or a sync just cleared it) - cancel any scheduled push
                 // and wait for the next real change.
                 if (dirty.isEmpty() || _state.value.syncUri == null) {
                     pushJob?.cancel()

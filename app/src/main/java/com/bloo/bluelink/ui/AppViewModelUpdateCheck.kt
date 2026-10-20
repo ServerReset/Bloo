@@ -38,7 +38,7 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
                         it.copy(
                             updateAvailable = result.info,
                             updateApkReady = it.updateApkReady && sameBuild,
-                            // ("Remind me" is the one that stays hidden longer — it sets a snooze
+                            // ("Remind me" is the one that stays hidden longer - it sets a snooze
                             // so checkPhone short-circuits to UpToDate until the reminder worker
                             // clears it, so we never reach this branch while snoozed.)
                             updateTileDismissed = false,

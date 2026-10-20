@@ -7,10 +7,10 @@ which runs it through its normal command path (`CarCommandRunner`) and reports b
 
 It reuses the phone's own shared modules so the two can never drift:
 
-- **`:shared`** — `SnapshotStore`/`VehicleSnapshot` for state, `CarCommand`/`CarAction` for the
+- **`:shared`** - `SnapshotStore`/`VehicleSnapshot` for state, `CarCommand`/`CarAction` for the
   command vocabulary, `PinRecord`/`PinCrypto`/`PinLockout` for the PIN, and the pure
   `WatchPinPolicy` + `WatchSyncProtocol`/`WatchSyncPayload` that define the sync contract.
-- **`:uicommon`** — the foundation-only `MorphButtonCore`, so the watch's tap targets morph and
+- **`:uicommon`** - the foundation-only `MorphButtonCore`, so the watch's tap targets morph and
   press like every other Bloo button.
 
 ## What it does

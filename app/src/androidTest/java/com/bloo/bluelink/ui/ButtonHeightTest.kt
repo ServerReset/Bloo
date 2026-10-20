@@ -15,7 +15,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import com.bloo.uicommon.ButtonTargetHeight
-import com.bloo.uicommon.content
 
 /**
  * The pebble header's main action (the action + chevron [ButtonCluster]) must be the same height as

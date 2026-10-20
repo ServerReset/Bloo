@@ -40,7 +40,7 @@ class SyncMergeDriveTest {
     private val dev = SyncMerge.SyncDevice(id = "uuid-A", name = "Adi's S24", model = "SM-S921", appVersion = "1.0", lastSeenMs = 1000L)
 
     // 8. buildExportForMainToMain parses back to the SAME MergePlan as a plain portable
-    //    file — the additive Drive-only keys (_hash/devices/_primaryDeviceId/
+    //    file - the additive Drive-only keys (_hash/devices/_primaryDeviceId/
     //    _writerDeviceId) never leak into stringPuts/boolPuts/removes.
     @Test
     fun driveExportParsesLikePortable() {
@@ -124,7 +124,7 @@ class SyncMergeDriveTest {
     }
 
     // 12. Simulated A→B→A convergence: once both devices carry the same portable
-    //     content, the hash stabilizes — a device seeing remoteHash == its own last
+    //     content, the hash stabilizes - a device seeing remoteHash == its own last
     //     hash has nothing to import (proves the loop terminates).
     @Test
     fun twoDeviceHashConverges() {

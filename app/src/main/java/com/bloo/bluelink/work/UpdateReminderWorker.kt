@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
  *    check surfaces the tile again instead of short-circuiting to UpToDate.
  * 2. Does a forced check: if a newer build is (still) available, posts a reminder
  *    notification pointing the user back into the app. If the user already updated
- *    in the interim, the check reports UpToDate and NO notification is posted —
+ *    in the interim, the check reports UpToDate and NO notification is posted -
  *    so we never nag about a build that's already installed.
  *
  * One-time, delayed work (not periodic): "Remind me" is a single deferral, not a

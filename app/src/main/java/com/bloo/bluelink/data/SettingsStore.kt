@@ -24,7 +24,7 @@ class SettingsStore(internal val context: Context) {
 
     /**
      * Per-car keys are instead built ad hoc with string interpolation (see e.g. [seatConfig]) since
-     * Preferences DataStore has no notion of a keyed sub-namespace — this object only holds the
+     * Preferences DataStore has no notion of a keyed sub-namespace - this object only holds the
      * ones that are the same for the whole app.
      */
     internal object Keys {
@@ -262,7 +262,7 @@ class SettingsStore(internal val context: Context) {
         val syncedAtMs: Long,
         /**
          * A user-facing reason the pass didn't fully succeed, or null if it did (or wasn't
-         * configured — that's not a failure).
+         * configured - that's not a failure).
          */
         val error: String? = null,
         /** The merged device registry after this pass (for the ViewModel/Settings). */
@@ -303,7 +303,7 @@ class SettingsStore(internal val context: Context) {
     /**
      * Preference keys that describe THIS device's own Drive-sync wiring (a content:// URI this app
      * instance was granted permission for, local bookkeeping of when it last synced, its own
-     * Wi-Fi-only preference, and which keys it's changed locally since its last sync) — never
+     * Wi-Fi-only preference, and which keys it's changed locally since its last sync) - never
      * portable, so never included in or restored from a settings backup.
      */
     internal val DEVICE_LOCAL_KEYS = SyncMerge.DEVICE_LOCAL_KEYS

@@ -26,7 +26,7 @@ class VehicleSnapshotTextTest {
         assertEquals("76%", car(percent = 76, locked = true).bigValue())
         assertEquals("Locked", car(locked = true).bigValue())
         assertEquals("Unlocked", car(locked = false).bigValue())
-        assertEquals("—", car().bigValue())
+        assertEquals("-", car().bigValue())
     }
 
     @Test fun stateLineJoinsWhatTheCarReports() {

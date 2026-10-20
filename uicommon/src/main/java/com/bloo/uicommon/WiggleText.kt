@@ -35,12 +35,12 @@ private val WIGGLE_NUMBERS = listOf("67", "42")
 private val UNIT_SUFFIXES = charArrayOf('F', 'C', '°')
 
 /**
- * Renders [text] normally — but when the displayed number is one of
+ * Renders [text] normally - but when the displayed number is one of
  * [WIGGLE_NUMBERS], the digits bounce up and down in a travelling wave.
  * Callers must resolve [Color.Unspecified] and merge fontWeight into [style]
  * before calling, so this function always receives a fully-specified style.
  *
- * [reduceMotion] has no default, deliberately — see [AnimatedValue], where the
+ * [reduceMotion] has no default, deliberately - see [AnimatedValue], where the
  * default this used to have cost three call sites.
  */
 @Composable

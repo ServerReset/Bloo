@@ -24,7 +24,7 @@ suspend fun KiaUsaApi.verifyOtpAndComplete(
     val (interimSid, rmtoken) = raw(verifyReq).use { resp ->
         val sid = resp.header("sid")
         val rm = resp.header("rmtoken")
-        if (sid == null || rm == null) throw BlueLinkException("Invalid code — please try again.", code = resp.code)
+        if (sid == null || rm == null) throw BlueLinkException("Invalid code - please try again.", code = resp.code)
         sid to rm
     }
     // Exchange for the final session id.

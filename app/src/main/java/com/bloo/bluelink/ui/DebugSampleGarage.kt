@@ -19,7 +19,7 @@ import com.bloo.bluelink.data.VehicleStatus
  * A sample garage, for store screenshots and nothing else.
  *
  * The real garage is only ever reached after a saved login is found (`coldStartAutoLogin`), and a
- * saved login lives in the Keystore-backed vault — so there is no way to photograph the garage on a
+ * saved login lives in the Keystore-backed vault - so there is no way to photograph the garage on a
  * device that has never signed in, and signing in is the one thing that would put a real car, its
  * name and its location on a public listing.
  *
@@ -70,7 +70,7 @@ internal object DebugSampleGarage {
      * The two state flags are not enough: with `appPinSet` true but nothing in the vault, the lock
      * renders its dead end ("Bloo is locked / Please try opening Bloo again") instead of the PIN
      * screen. This writes a real record through the app's own store, which is legitimate here
-     * because it runs inside the app — and the value is irrelevant, since a screenshot never needs
+     * because it runs inside the app - and the value is irrelevant, since a screenshot never needs
      * to unlock anything. Debug builds only.
      */
     fun ensurePin(context: Context) {
@@ -90,7 +90,7 @@ internal object DebugSampleGarage {
         }
     }
 
-    /** Irrelevant — only the presence of a record matters, and the lock is never unlocked. */
+    /** Irrelevant - only the presence of a record matters, and the lock is never unlocked. */
     private const val SAMPLE_PIN = "1234"
 
     /**
@@ -119,7 +119,7 @@ internal object DebugSampleGarage {
     }
 
     /**
-     * The fabricated state. No `locations` and no `placeNames` are set — that is what keeps the
+     * The fabricated state. No `locations` and no `placeNames` are set - that is what keeps the
      * Location pebble empty, and the car's position out of the screenshot.
      */
     fun apply(state: UiState, locked: Boolean): UiState {

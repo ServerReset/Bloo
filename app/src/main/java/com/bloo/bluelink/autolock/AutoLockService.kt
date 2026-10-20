@@ -90,7 +90,7 @@ class AutoLockService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Sealed after a phone restart (see BootGate): stand down until the user has signed in.
         if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) {
-            AppLog.log("AutoLock: service standing down — the app is sealed after a restart (BootGate).")
+            AppLog.log("AutoLock: service standing down - the app is sealed after a restart (BootGate).")
             promoteThenStop()
             return START_NOT_STICKY
         }
@@ -336,7 +336,7 @@ class AutoLockService : Service() {
             // SEALED AFTER A RESTART: nothing may run, and starting this service at all is what made
             // the app CRASH -- see promoteThenStop. Refusing here is the first of three guards.
             if (com.bloo.bluelink.data.BootGate.isLocked(context)) {
-                AppLog.log("AutoLock: not starting the service — the app is sealed after a restart (BootGate).")
+                AppLog.log("AutoLock: not starting the service - the app is sealed after a restart (BootGate).")
                 return false
             }
             // The connectedDevice type needs a prerequisite permission (BLUETOOTH_CONNECT on 31+), and
@@ -345,7 +345,7 @@ class AutoLockService : Service() {
             // the process can be killed for failing to promote in time -- a missing permission turning
             // "AutoLock is broken" into "Bloo crashed". Ask before starting anything.
             if (!context.hasPermission(android.Manifest.permission.BLUETOOTH_CONNECT, Build.VERSION_CODES.S)) {
-                AppLog.log("AutoLock: not starting the progress service — BLUETOOTH_CONNECT is not granted, so it could not be promoted to foreground.")
+                AppLog.log("AutoLock: not starting the progress service - BLUETOOTH_CONNECT is not granted, so it could not be promoted to foreground.")
                 return false
             }
             val intent = Intent(context, AutoLockService::class.java).putExtra(EXTRA_VIN, vin)

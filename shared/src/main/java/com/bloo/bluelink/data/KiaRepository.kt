@@ -135,7 +135,7 @@ class KiaRepository(
     )
 
     // Fetches the account's full vehicle-summary list from the API and replaces the entire
-    // `summaries` cache with it (clear, then repopulate keyed by vehicle id), rather than merging —
+    // `summaries` cache with it (clear, then repopulate keyed by vehicle id), rather than merging -
     // so a car removed from the account also disappears from the cache instead of lingering with
     // stale data.
     private suspend fun fetchSummaries(s: KiaSession): List<KiaVehicleSummary> =
@@ -155,7 +155,7 @@ class KiaRepository(
 
     /**
      * Runs [block] with the saved Kia session. On an expired session (401/403), re-authenticates
-     * once with the stored rmtoken — silently, no OTP — then refreshes the session-specific vinkeys
+     * once with the stored rmtoken - silently, no OTP - then refreshes the session-specific vinkeys
      * and retries.
      */
     private suspend fun <T> withSession(block: suspend (KiaSession) -> T): T {
@@ -165,7 +165,7 @@ class KiaRepository(
         } catch (e: BlueLinkException) {
             if (e.code != 401 && e.code != 403) throw e
             val creds = credentialStore.load(Brand.KIA)
-                ?: throw BlueLinkException("Kia session expired — please sign in again")
+                ?: throw BlueLinkException("Kia session expired - please sign in again")
             AppLog.log("Kia session expired; re-authenticating with stored rmtoken")
             val auth = api.authUser(
                 creds.email, creds.password, stored.deviceId ?: KiaUsaApi.newDeviceId(),
@@ -173,7 +173,7 @@ class KiaRepository(
             )
             if (auth !is KiaAuth.LoggedIn) {
                 // The rmtoken itself expired; a fresh OTP round-trip is needed.
-                throw BlueLinkException("Kia session expired — please sign out and sign in again")
+                throw BlueLinkException("Kia session expired - please sign out and sign in again")
             }
             save(auth.session, creds.email, stored.pin)
             val fresh = store.load(Brand.KIA) ?: throw e

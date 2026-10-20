@@ -5,7 +5,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Test
-import com.bloo.uicommon.content
 
 /** The app starts on a clean install and stays up: the cheapest check that nothing crashes at launch. */
 class SmokeTest {

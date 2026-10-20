@@ -8,7 +8,6 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.WorkflowRun
 import com.bloo.bluelink.data.isGen5W
-import com.bloo.bluelink.data.platformOverridable
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

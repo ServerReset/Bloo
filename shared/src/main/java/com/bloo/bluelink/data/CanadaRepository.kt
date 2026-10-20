@@ -141,13 +141,13 @@ class CanadaRepository(
         } catch (e: BlueLinkException) {
             if (e.code != 401 && e.code != 403) throw e
             val creds = credentialStore.load(brand)
-                ?: throw BlueLinkException("Session expired — please sign in again", code = e.code)
+                ?: throw BlueLinkException("Session expired - please sign in again", code = e.code)
             AppLog.log("${brand.label} session expired; re-authenticating silently")
             val auth = runCatching {
                 api.authUser(creds.email, creds.password, stored.deviceId ?: CanadaApi.newDeviceId(), stored.pin)
             }.onFailure { rethrowIfCancellation(it) }.getOrNull()
             if (auth !is CanadaAuth.LoggedIn) {
-                throw BlueLinkException("Session expired — please sign out and sign in again", code = e.code)
+                throw BlueLinkException("Session expired - please sign out and sign in again", code = e.code)
             }
             save(auth.session, creds.email, stored.pin)
             val fresh = store.load(brand) ?: throw e

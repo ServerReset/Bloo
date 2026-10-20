@@ -177,9 +177,10 @@ fun WearCarFace(
                 BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     val w = constraints.maxWidth
                     val h = constraints.maxHeight
+                    val hubSize = maxWidth * HubFraction
                     // The hub sits where the cross is, so it moves with the quarter that was pressed.
                     Box(Modifier.offset { androidx.compose.ui.unit.IntOffset((press.dx * w).roundToInt(), (press.dy * h).roundToInt()) }) {
-                        WearFaceHub(value = value, caption = caption, tint = tint, size = maxWidth * HubFraction, status = status, onClick = onHubClick)
+                        WearFaceHub(value = value, caption = caption, tint = tint, size = hubSize, status = status, onClick = onHubClick)
                     }
                 }
             }

@@ -9,7 +9,7 @@ import android.os.IInterface;
  * compileOnly stub of the hidden framework interface. Never shipped; a subclass of
  * Stub is passed to the reflected IntentSender(IIntentSender) constructor to receive
  * the install-session commit result. (The demo annotates the 7-arg overload with
- * @RequiresApi(26); dropped here so the stub needs no androidx.annotation dependency —
+ * @RequiresApi(26); dropped here so the stub needs no androidx.annotation dependency -
  * it's advisory only and doesn't affect override resolution.)
  */
 public interface IIntentSender extends IInterface {

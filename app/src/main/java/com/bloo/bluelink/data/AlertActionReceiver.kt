@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 /**
  * Handles an action button tapped on a Bloo alert notification. Runs the
  * remote command with the stored session via [CarCommandRunner], dismisses
- * the alert, and posts a short follow-up so the user sees whether it worked —
+ * the alert, and posts a short follow-up so the user sees whether it worked -
  * important for "Lock" when a door is still physically open and the car
  * refuses to lock.
  */

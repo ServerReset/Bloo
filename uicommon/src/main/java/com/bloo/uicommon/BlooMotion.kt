@@ -2,7 +2,7 @@ package com.bloo.uicommon
 
 /**
  * App-wide spring animation constants used by the phone UI. [SoftDamping] is the standard damping
- * ratio for most transitions — slightly overdamped (0.82) so motions feel settled without
+ * ratio for most transitions - slightly overdamped (0.82) so motions feel settled without
  * oscillation.
  */
 const val SoftDamping = 0.82f

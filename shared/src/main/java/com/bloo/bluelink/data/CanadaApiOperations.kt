@@ -132,7 +132,7 @@ internal fun CanadaApi.parseStatus(vs: JsonObject, modelYear: Int?): VehicleStat
 
 /** Start climate / remote start. Temperature comes in as Fahrenheit
  *  ([ClimateRequest.tempF], the shared UI's unit) and is converted to the
- *  nearest Celsius half-degree, then hex-encoded — see [tempToHex]. */
+ *  nearest Celsius half-degree, then hex-encoded - see [tempToHex]. */
 suspend fun CanadaApi.startClimate(
     session: CanadaSession, v: CanadaVehicleSummary, pAuth: String, req: ClimateRequest,
 ) = withContext(Dispatchers.IO) {
@@ -192,7 +192,7 @@ internal fun CanadaApi.tempToHex(tempF: Int, modelYear: Int?): String {
 
 /** Inverse of [tempToHex]: decode the API's hex-"H" Celsius-index setpoint
  *  (e.g. "0AH") back to a °F numeric string for display. Mirrors KiaUvoApiCA's
- *  get_hex_temp_into_index guard — only `unit == 0` hex-"H" values are the
+ *  get_hex_temp_into_index guard - only `unit == 0` hex-"H" values are the
  *  encoded setpoint; anything else (a plain number, "OFF", unit != 0) is
  *  passed through untouched so [degLabel] handles it. Round-trips with
  *  tempToHex to within the table's half-degree resolution. */

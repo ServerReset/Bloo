@@ -63,14 +63,14 @@ class KiaUsaApi {
 
     // --- Headers ---------------------------------------------------------
 
-    /** Current time formatted as an RFC 1123 date string in GMT — the exact
+    /** Current time formatted as an RFC 1123 date string in GMT - the exact
      *  format HTTP's own Date header uses, which the Kia API expects as its
      *  own `date` header on every request (see [apiHeaders]). */
     internal fun rfc1123Date(): String =
         rfc1123Format.get()!!.format(System.currentTimeMillis())
 
     /** The full set of headers every Kia API call needs regardless of
-     *  endpoint (client/device identification, locale, a fresh timestamp) —
+     *  endpoint (client/device identification, locale, a fresh timestamp) -
      *  [authedHeaders] below layers session-specific headers (sid/vinkey) on
      *  top of this for calls that need an active session. */
     internal fun Request.Builder.apiHeaders(deviceId: String): Request.Builder = this
@@ -97,7 +97,7 @@ class KiaUsaApi {
         .header("deviceid", deviceId)
 
     /** [apiHeaders] plus the two headers that identify *which* logged-in
-     *  session and *which* car a command applies to — every authenticated
+     *  session and *which* car a command applies to - every authenticated
      *  call (status, lock/unlock, climate, etc.) goes through this. */
     internal fun Request.Builder.authedHeaders(session: KiaSession, vehicle: KiaVehicleSummary): Request.Builder =
         apiHeaders(session.deviceId).header("sid", session.sid).header("vinkey", vehicle.key)
@@ -161,7 +161,7 @@ class KiaUsaApi {
     // --- Vehicles --------------------------------------------------------
 
     /** Fetch every vehicle registered on this Kia account. Mechanism: calls
-     *  ownr/gvl (get vehicle list), then walks payload.vehicleSummary — an
+     *  ownr/gvl (get vehicle list), then walks payload.vehicleSummary - an
      *  entry with no vehicleIdentifier is dropped entirely (mapNotNull) since
      *  there's nothing to key the car by; fuelType == 4 is the API's encoding
      *  for a pure EV. */
@@ -192,7 +192,7 @@ class KiaUsaApi {
      *  smaller; the response wraps the actual status in a one-element
      *  vehicleInfoList array (returns null if that's empty/missing). Because
      *  cmm/gvi's own response doesn't include EV charge-limit targets, EVs
-     *  get a second request ([chargeTargets]) merged in afterward — done as
+     *  get a second request ([chargeTargets]) merged in afterward - done as
      *  a best-effort (runCatching) so a failure fetching just the charge
      *  targets doesn't blank out the rest of an otherwise-successful status
      *  fetch. */
@@ -210,7 +210,7 @@ class KiaUsaApi {
 
     /** Read just the car's GPS position. Same cmm/gvi fetch as [status] via
      *  [fetchInfo], but skips the EV charge-targets ([chargeTargets]) round-trip
-     *  since location doesn't need them — returns null if the fetch is
+     *  since location doesn't need them - returns null if the fetch is
      *  empty/missing or the parsed status carries no location. */
     suspend fun location(session: KiaSession, vehicle: KiaVehicleSummary): VehicleLocation? =
         fetchInfo(session, vehicle)?.let { parseStatus(it).vehicleLocation }
@@ -265,7 +265,7 @@ class KiaUsaApi {
 
     // --- Commands --------------------------------------------------------
 
-    // These four are simple no-body GET commands — see [getCommand] for the
+    // These four are simple no-body GET commands - see [getCommand] for the
     // shared mechanism (fire the request, discard the response body, only
     // care whether it succeeded).
     suspend fun lock(session: KiaSession, v: KiaVehicleSummary) = getCommand("rems/door/lock", session, v)
@@ -285,7 +285,7 @@ class KiaUsaApi {
 
     /** Set EV charge target SOC for AC and DC in percent. Mechanism: like the
      *  Hyundai/Genesis equivalent, both targets are sent together in one
-     *  targetSOClist body (plugType 0 = DC, 1 = AC — same encoding used
+     *  targetSOClist body (plugType 0 = DC, 1 = AC - same encoding used
      *  throughout this codebase), since the endpoint has no way to update
      *  just one without resending the other's current value too. */
     suspend fun setChargeTargets(session: KiaSession, v: KiaVehicleSummary, ac: Int, dc: Int) = withContext(Dispatchers.IO) {
@@ -314,7 +314,7 @@ class KiaUsaApi {
     /** Shared shape for the simple no-body GET commands (lock/unlock/stop):
      *  build the URL, attach session+vehicle headers, run it via [call]
      *  (which already throws on any failure) and discard the parsed
-     *  response — these commands only need a success/failure signal. */
+     *  response - these commands only need a success/failure signal. */
     internal suspend fun getCommand(path: String, session: KiaSession, v: KiaVehicleSummary) = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(API + path).get().authedHeaders(session, v).build()
         call(req)
@@ -322,7 +322,7 @@ class KiaUsaApi {
     }
 
     /** Shared shape for commands that need a JSON request body (charge,
-     *  climate start, charge targets) — same header/error handling as
+     *  climate start, charge targets) - same header/error handling as
      *  [getCommand], just POSTing [body] instead of a bodyless GET. Runs
      *  synchronously; callers wrap it in withContext(Dispatchers.IO)
      *  themselves. */
@@ -363,13 +363,13 @@ class KiaUsaApi {
     /**
      * Parse a response body to JSON, converting a malformed/empty/non-JSON body
      * (WAF HTML block page, gateway 5xx, truncated response) into a
-     * [BlueLinkException] — which the repository layer already catches — instead of
+     * [BlueLinkException] - which the repository layer already catches - instead of
      * letting a raw SerializationException/IOException crash the app.
      */
     internal fun parseJson(text: String, code: Int): JsonElement =
         parseJsonOrThrow(json, text, code, friendly(code, text))
 
-    /** RFC 4122 v5 (name-based, SHA-1) UUID in the DNS namespace — matches the iOS app. */
+    /** RFC 4122 v5 (name-based, SHA-1) UUID in the DNS namespace - matches the iOS app. */
     internal fun uuid5FromDns(name: String): String {
         val namespace = byteArrayOf(
             0x6b, 0xa7.toByte(), 0xb8.toByte(), 0x10, 0x9d.toByte(), 0xad.toByte(), 0x11, 0xd1.toByte(),

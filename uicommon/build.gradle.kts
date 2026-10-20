@@ -55,7 +55,7 @@ dependencies {
     implementation("androidx.compose.animation:animation-core")
     implementation("androidx.compose.runtime:runtime")
     // Icons needed for weatherIcon(); the material-icons artifact is pure ImageVector
-    // data — no Material theme dependency — so it's safe to add here.
+    // data - no Material theme dependency - so it's safe to add here.
     implementation("androidx.compose.material:material-icons-extended")
     // Material3, for exactly one thing: the Text that RevealText draws with. The boundary this module
     // kept -- foundation only, colours and specs passed in as parameters -- existed to stay neutral

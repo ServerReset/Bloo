@@ -143,7 +143,7 @@ internal fun VehicleSnapshot.keepingStatusOf(old: VehicleSnapshot): VehicleSnaps
 )
 
 /**
- * The exact shape persisted to disk as a single JSON string under one DataStore key — kept as one
+ * The exact shape persisted to disk as a single JSON string under one DataStore key - kept as one
  * blob (rather than one DataStore entry per field) so a read or write is always a single atomic
  * operation over the whole vehicle list + selection together.
  */
@@ -154,7 +154,7 @@ private data class SnapshotPayload(
 )
 
 // A corruption handler so a file damaged by an interrupted write/power loss resets to empty prefs
-// instead of rethrowing an uncaught exception out of every read — this store is read from
+// instead of rethrowing an uncaught exception out of every read - this store is read from
 // background workers and command runners, every one of which would otherwise crash on a corrupt
 // file.
 private val Context.snapshotDataStore by safePreferencesDataStore("bloo_snapshots")

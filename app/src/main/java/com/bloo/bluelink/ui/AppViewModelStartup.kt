@@ -32,7 +32,7 @@ internal fun AppViewModel.bootstrapColdStart() {
     // probe above).
     refreshShizukuAvailable()
     // Bloo isn't on the Play Store, so check its own build channel once per cold start
-    // (debounced internally — see UpdateChecker). Also re-run on every user-triggered refresh,
+    // (debounced internally - see UpdateChecker). Also re-run on every user-triggered refresh,
     // see refreshStatus below.
     checkForUpdate()
     com.bloo.bluelink.data.StartupTrace.markIfStarting("AppViewModel init block: synchronous tail done")
@@ -61,7 +61,7 @@ internal fun AppViewModel.bootstrapColdStart() {
 
 /**
  * Cold-start auto-login: if any brand has saved credentials (from a previous session), silently
- * restore all of them and start loading the garage — the one-time launch path, separate from the
+ * restore all of them and start loading the garage - the one-time launch path, separate from the
  * interactive login(). After a phone restart (see BootGate) it stops at the sign-in form instead and
  * runs again once the whole re-auth flow has passed.
  */

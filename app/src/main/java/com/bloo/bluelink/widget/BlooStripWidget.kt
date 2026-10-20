@@ -166,7 +166,7 @@ private fun StripContent(cars: List<VehicleSnapshot>) {
             val diameter = if (tall) 44f else 38f
             controls.forEach { control ->
                 Spacer(GlanceModifier.width(WidgetGap))
-                ActionButton(car, control.action, pending, armed, label = null, heightDp = diameter)
+                ActionButton(car, control.action, pending, armed, heightDp = diameter)
             }
         }
     }

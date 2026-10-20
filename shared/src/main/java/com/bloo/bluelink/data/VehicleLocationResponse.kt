@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 // --- Location -------------------------------------------------------------
 
 /**
- * Response body from the dedicated (rate-limited) findMyCar location endpoint — a superset of the
+ * Response body from the dedicated (rate-limited) findMyCar location endpoint - a superset of the
  * free [VehicleLocation] embedded in the status payload, adding [head] (compass heading in
  * degrees).
  */

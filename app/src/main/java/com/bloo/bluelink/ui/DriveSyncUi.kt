@@ -48,7 +48,7 @@ import com.bloo.uicommon.SegmentOption
 
 /**
  * The synced-devices registry shown in the "Backup & sync" card: a drag-to-reorder list (same
- * gesture as the car-order list in Settings) where the TOP device is the primary — the source of
+ * gesture as the car-order list in Settings) where the TOP device is the primary - the source of
  * truth other devices adopt.
  */
 @Composable
@@ -68,7 +68,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
 
     // Order the list so the primary is on top (that's the invariant the drag gesture maintains);
     // everyone else falls in by most-recently-seen. Dragging a device to the top sets it primary,
-    // after which this same sort keeps it there — so the visual order and the "primary" concept
+    // after which this same sort keeps it there - so the visual order and the "primary" concept
     // stay in lockstep.
     val ordered = remember(devices, state.syncPrimaryId) {
         devices.sortedWith(

@@ -3,6 +3,7 @@ package com.bloo.uicommon
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +22,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -141,15 +145,37 @@ fun RevealText(
     //
     // NOT on the first composition -- that is the reveal's job, and doing both reads as a flicker. And
     // not on the frames of a reveal already in flight, which would fight it.
+    //
+    // When ONLY a number changed ("78%" to "79%", "4 min ago" to "5 min ago") the words did not, so the block stays put
+    // and just the changed digits fade in: [numberFade] drives those, and [changeFade] (the whole block) is left alone.
     val changeFade = remember { Animatable(1f) }
+    val numberFade = remember { Animatable(1f) }
     var seenOnce by remember { mutableStateOf(false) }
+    var previousText by remember { mutableStateOf(text) }
+    var changedFrom by remember { mutableStateOf(text) }
     LaunchedEffect(text) {
         if (!seenOnce) {
             seenOnce = true
+            previousText = text
             return@LaunchedEffect
         }
-        changeFade.snapTo(0f)
-        changeFade.animateTo(1f, tween(TextChangeMs))
+        val before = previousText
+        previousText = text
+        if (onlyNumbersChanged(before, text)) {
+            changedFrom = before
+            numberFade.snapTo(0f)
+            numberFade.animateTo(1f, tween(TextChangeMs))
+        } else {
+            changeFade.snapTo(0f)
+            changeFade.animateTo(1f, tween(TextChangeMs))
+        }
+    }
+    // The text drawn: plain, or with the digit runs that just changed at the fade's alpha.
+    val ink = color.takeOrElse { style.color.takeOrElse { LocalContentColor.current } }
+    val shown: AnnotatedString = if (numberFade.value < 1f) {
+        fadedNumbers(text, changedFrom, ink, numberFade.value)
+    } else {
+        AnnotatedString(text)
     }
     // On the LAYER, so a frame of the fade costs a re-composite rather than a recomposition -- across
     // every text in the app at once, which is what "universally" has to mean here.
@@ -162,7 +188,7 @@ fun RevealText(
     // A rare caller-supplied onTextLayout still runs; the reveal's own capture is chained on top.
     val callerOnTextLayout by rememberUpdatedState(onTextLayout)
     Text(
-        text = text,
+        text = shown,
         modifier = (if (settled) {
             // Done: the plain modifier, so nothing of the reveal is even a node any more.
             modifier
@@ -218,4 +244,27 @@ fun RevealText(
         },
         style = style,
     )
+}
+
+/** [text] with every digit run replaced by a placeholder: two texts with equal skeletons differ only in their numbers. */
+private fun skeleton(text: String): String = text.replace(Regex("[0-9]+"), "#")
+
+/** Whether [after] differs from [before] in its numbers alone (same words, same layout of digit runs). */
+internal fun onlyNumbersChanged(before: String, after: String): Boolean =
+    before != after && after.any { it.isDigit() } && skeleton(before) == skeleton(after)
+
+/**
+ * [text] with the digit runs that differ from [previous] drawn at [alpha], so only the number that changed animates
+ * and the words around it stay still. Runs are matched in order (the skeletons are equal, so there are as many).
+ */
+private fun fadedNumbers(text: String, previous: String, ink: Color, alpha: Float): AnnotatedString {
+    val runs = Regex("[0-9]+")
+    val old = runs.findAll(previous).map { it.value }.toList()
+    val faded = SpanStyle(color = ink.copy(alpha = ink.alpha * alpha))
+    return androidx.compose.ui.text.buildAnnotatedString {
+        append(text)
+        runs.findAll(text).forEachIndexed { i, m ->
+            if (old.getOrNull(i) != m.value) addStyle(faded, m.range.first, m.range.last + 1)
+        }
+    }
 }

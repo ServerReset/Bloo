@@ -233,7 +233,7 @@ object Notifications {
 /**
  * The one place a BUILT notification is handed to the system.
  *
- * Every caller used to re-implement the same three-step guard — a runtime `POST_NOTIFICATIONS`
+ * Every caller used to re-implement the same three-step guard - a runtime `POST_NOTIFICATIONS`
  * re-read (lint's contract at the call site), a [runCatching] around `notify()` because that
  * check is a TOCTOU race, and a boolean/nothing return so callers can record whether it went
  * out. Three copies had already drifted (one returned `Boolean`, two returned `Unit` on the

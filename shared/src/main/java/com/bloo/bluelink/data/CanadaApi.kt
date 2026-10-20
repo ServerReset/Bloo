@@ -18,7 +18,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * A signed-in Hyundai/Genesis/Kia Canada session. [pin] is the account's service PIN (needed to
- * obtain [CanadaApi.pinAuth] before any command); [deviceId] must stay stable across logins — the
+ * obtain [CanadaApi.pinAuth] before any command); [deviceId] must stay stable across logins - the
  * 90-day "remembered device" (mfaYn) is bound to it, and re-sending a fresh one forces a new OTP.
  */
 data class CanadaSession(
@@ -30,7 +30,7 @@ data class CanadaSession(
 
 /**
  * A Canada-account vehicle summary. [id] is the API's own `vehicleId`, sent back as the `vehicleId`
- * header on every vehicle-scoped call — unlike Kia US there is no separate session-scoped "vinkey"
+ * header on every vehicle-scoped call - unlike Kia US there is no separate session-scoped "vinkey"
  * to refresh. [year] drives which of the two temperature lookup tables [CanadaApi] hex-encodes
  * against (see [CanadaApi.tempToHex]).
  */
@@ -54,7 +54,7 @@ sealed interface CanadaAuth {
 }
 
 /**
- * Client for the Hyundai/Genesis/Kia Canada telematics backend — one shared API shape across all
+ * Client for the Hyundai/Genesis/Kia Canada telematics backend - one shared API shape across all
  * three brands (same client_id/client_secret, same endpoints, differing only by host), and a
  * completely different backend from both the US Hyundai/Genesis "HATA" API ([BlueLinkApi]) and
  * Kia's separate US backend ([KiaUsaApi]).
@@ -84,7 +84,7 @@ class CanadaApi(private val brand: Brand) {
         // hot command paths, so a per-call client would cost a fresh TCP + TLS handshake every
         // time.
 
-        // Celsius half-degree lookup tables the hex-encoded setpoint indexes into — pre-2020
+        // Celsius half-degree lookup tables the hex-encoded setpoint indexes into - pre-2020
         // model-year vehicles report a narrower range. Mirrors KiaUvoApiCA's
         // temperature_range_c_old/temperature_range_c_new exactly.
         internal val TEMP_RANGE_OLD: List<Double> = (32..63).map { it * 0.5 }
@@ -170,7 +170,7 @@ class CanadaApi(private val brand: Brand) {
         }.toString().toRequestBody(jsonMedia)
         val req = Request.Builder().url(apiUrl + "mfa/sendotp").post(body).apiHeaders(deviceId).build()
         call(req).path("result", "otpKey").str()
-            ?: throw BlueLinkException("Couldn't send the verification code — please try again.")
+            ?: throw BlueLinkException("Couldn't send the verification code - please try again.")
     }
 
     /** Step 2b: verify the code and mint a session (remembering this device for 90 days). */
@@ -185,7 +185,7 @@ class CanadaApi(private val brand: Brand) {
         val validationKey = validateRoot.path("result", "otpValidationKey").str()
             ?: validateRoot.path("result", "validationKey").str()
             ?: validateRoot.path("result", "otpKey").str()
-            ?: throw BlueLinkException("Invalid code — please try again.")
+            ?: throw BlueLinkException("Invalid code - please try again.")
 
         val genBody = buildJsonObject {
             put("userAccount", username); put("otpEmail", email); put("mfaApiCode", MFA_API_CODE)
@@ -195,7 +195,7 @@ class CanadaApi(private val brand: Brand) {
         val genRoot = call(genReq)
         val token = genRoot.path("result", "token")
         val accessToken = token.path("accessToken").str()
-            ?: throw BlueLinkException("Sign-in failed after verifying the code — please try again.")
+            ?: throw BlueLinkException("Sign-in failed after verifying the code - please try again.")
         CanadaSession(accessToken, token.path("refreshToken").str(), deviceId, pin)
     }
 

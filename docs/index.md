@@ -2,7 +2,7 @@
 
 <h1 align="center">Bloo</h1>
 
-<p align="center"><b>Lock, climate, charge and live status for your Hyundai, Genesis or Kia — without the slow official app.</b></p>
+<p align="center"><b>Lock, climate, charge and live status for your Hyundai, Genesis or Kia - without the slow official app.</b></p>
 
 An independent Android client for the Bluelink / Connected Car services (US, Canada, Hyundai Europe).
 Phones, foldables, tablets and Wear OS. Jetpack Compose, Material 3 Expressive, and every screen
@@ -27,14 +27,14 @@ the app up to date from there.
 Tap **Become a tester**, then install from the Play Store link it gives you. Builds on a testing track
 skip review, so new versions arrive the day they are built.
 
-**Not on Play, or a device without Play services?** Install the APK straight from the newest release —
+**Not on Play, or a device without Play services?** Install the APK straight from the newest release -
 **[Bloo.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk)** for the phone,
 **[Bloo-watch.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo-watch.apk)** for the
 watch. Instructions are in the [install notes](https://github.com/ServerReset/Bloo#install).
 
 ### Which one should I use?
 
-Both are the same features, but they are **not interchangeable** — the package name is the same and the
+Both are the same features, but they are **not interchangeable** - the package name is the same and the
 **signing key is not**, because Play re-signs every upload with Google's app-signing key. A Play copy and
 an APK copy cannot update each other, so moving between them costs one uninstall, and an uninstall takes
 the app's data with it. What differs is how each one updates and how the watch gets its app:
@@ -45,7 +45,7 @@ the app's data with it. What differs is how each one updates and how the watch g
 | **Watch app** | Play installs it on the watch | the phone pushes it over wireless debugging |
 | **Needs** | a Google account on the tester list | nothing but the file |
 
-The APK is the fuller one: it carries its own installer, which is exactly why it cannot go on Play —
+The APK is the fuller one: it carries its own installer, which is exactly why it cannot go on Play -
 Play does not allow an app to install other apps. Neither is a test build in the "unfinished" sense.
 
 ---
@@ -65,11 +65,11 @@ Play does not allow an app to install other apps. Neither is a test build in the
 
 ## What it does
 
-- **Control** — lock and unlock, remote climate, charging limits, live location, full vehicle status, trips, weather.
-- **On-device AI** — Gemini Nano summaries and natural-language commands, run on the phone. Nothing is sent anywhere for them.
-- **AutoLock** — locks the car when you walk away from it.
-- **Sync** — settings and photos follow you across devices through your own Google Drive.
-- **Layouts** — adaptive for foldables and tablets, with reorderable pebbles, custom palettes and an animated background.
+- **Control** - lock and unlock, remote climate, charging limits, live location, full vehicle status, trips, weather.
+- **On-device AI** - Gemini Nano summaries and natural-language commands, run on the phone. Nothing is sent anywhere for them.
+- **AutoLock** - locks the car when you walk away from it.
+- **Sync** - settings and photos follow you across devices through your own Google Drive.
+- **Layouts** - adaptive for foldables and tablets, with reorderable pebbles, custom palettes and an animated background.
 - **Multiple accounts**, signed in at once.
 
 ## Privacy

@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Runs the Drive auto-sync periodically in the background, so a settings change
  * made on another device shows up here (and vice versa) even if this device's
- * app isn't opened for a while — sync otherwise only ran when the app happened
+ * app isn't opened for a while - sync otherwise only ran when the app happened
  * to be in the foreground and a refresh settled.
  *
  * A no-op (cheap early exit) when Drive sync isn't configured; [SettingsStore.

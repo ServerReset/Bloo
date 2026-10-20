@@ -86,7 +86,7 @@ object SyncMerge {
     /**
      * The Drive-sync-only metadata parsed out of a file's top-level keys, kept separate from the
      * [MergePlan] (which is only the portable prefs/tombstones). [hash] is null when the file
-     * predates the hash gate (old client, or the header/marker case) — the caller then falls back
+     * predates the hash gate (old client, or the header/marker case) - the caller then falls back
      * to the timestamp gate.
      */
     data class SyncMeta(
@@ -102,12 +102,12 @@ object SyncMerge {
     // Pretty-printed so the exported file is human-readable; unknown keys ignored on decode.
     private val backupJson = BlooBackupJson
 
-    // --- Portable export (prefs/photos/_removed only — safe to share) ----------
+    // --- Portable export (prefs/photos/_removed only - safe to share) ----------
 
     /**
      * The `prefs` object shared by [buildExport] and [buildExportForMainToMain]: skips
      * [DEVICE_LOCAL_KEYS] and local-file `img_` paths (a "/"-prefixed String path is meaningless on
-     * another device — only the photos channel carries local photos), and types each value as a
+     * another device - only the photos channel carries local photos), and types each value as a
      * JSON boolean/string (anything else coerced via toString()).
      */
     private fun portablePrefsObject(prefs: Map<String, Any>): JsonObject = buildJsonObject {
@@ -262,7 +262,7 @@ object SyncMerge {
     /**
      * Union [remote] with [self] by device id (self's entry replaces its own prior copy; other
      * devices are preserved), then prune entries whose [SyncDevice.lastSeenMs] is older than
-     * [retentionMs] before [nowMs] — except [self], which is always kept. Blank-id entries are
+     * [retentionMs] before [nowMs] - except [self], which is always kept. Blank-id entries are
      * dropped.
      */
     fun mergeDevices(
@@ -353,7 +353,7 @@ object SyncMerge {
 
     /**
      * Like [parseBackup], but additionally drops every key in [guarded] from the puts and the
-     * removes — the protect + live-dirty logic in the automatic merge: a key changed locally since
+     * removes - the protect + live-dirty logic in the automatic merge: a key changed locally since
      * our last sync (and not yet uploaded) must keep its current local value and must not be
      * tombstoned by the incoming file.
      */

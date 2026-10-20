@@ -395,7 +395,7 @@ private fun AutoLockSettings(
             val graceNow = grace.roundToInt()
             BodySmallText(
                 if (graceNow == 0) {
-                    "Then it locks as soon as that confirmation lands — no extra wait."
+                    "Then it locks as soon as that confirmation lands - no extra wait."
                 } else {
                     "Then it waits ${graceNow}s more before locking, on top of the confirmation. " +
                         "\"Lock now\" skips this part."

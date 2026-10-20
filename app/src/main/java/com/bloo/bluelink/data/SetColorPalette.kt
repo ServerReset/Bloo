@@ -48,7 +48,7 @@ fun SettingsStore.climatePresets(vin: String, p: Preferences): List<ClimatePrese
 /**
  * Insert-or-replace by id: the whole preset list is re-read, decoded, the matching entry (by
  * [ClimatePreset.id]) is replaced in place if found or appended if not, then the entire list is
- * re-encoded and written back as one JSON string — there's no partial-update of a single preset
+ * re-encoded and written back as one JSON string - there's no partial-update of a single preset
  * within the stored JSON, the whole array is always rewritten.
  */
 suspend fun SettingsStore.saveClimatePreset(vin: String, preset: ClimatePreset) {

@@ -22,7 +22,7 @@ suspend fun SettingsStore.resetSyncStateForNewFile() {
         it.remove(stringPreferencesKey("sync_primary_cache"))
         it.remove(stringPreferencesKey("sync_primary_pending"))
         it.remove(stringPreferencesKey("sync_pending_removed_device_ids"))
-        // Drop the cached file id too — the new file has its own (or will mint one).
+        // Drop the cached file id too - the new file has its own (or will mint one).
         it.remove(stringPreferencesKey("sync_file_id"))
     }
 }
@@ -171,7 +171,7 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
     val pendingRemovedIds = syncPendingRemovedDeviceIds()
     val remoteDevices = (remoteMeta?.devices ?: emptyList()).filterNot { it.id in pendingRemovedIds }
     // Best-available registry/primary for the outcome even if the upload half doesn't run (failed
-    // download) — the UI still updates from what we read.
+    // download) - the UI still updates from what we read.
     var outcomeDevices: List<SyncMerge.SyncDevice> = remoteDevices
     // Precedence, and the order matters: an un-uploaded designation made HERE wins, then whatever
     // the file says, and only then this device's cached copy.

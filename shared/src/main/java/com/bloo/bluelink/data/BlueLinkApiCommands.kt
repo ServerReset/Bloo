@@ -75,7 +75,7 @@ suspend fun BlueLinkApi.startClimate(
 
 /**
  * Set EV charge target SOC for AC (plugType 1) and DC (plugType 0) in percent. Mechanism: both
- * targets are always sent together in one call — the API's targetsoc/set endpoint takes the full
+ * targets are always sent together in one call - the API's targetsoc/set endpoint takes the full
  * list, so there's no way to update just one plug type's target without also re-sending the other's
  * current value.
  */

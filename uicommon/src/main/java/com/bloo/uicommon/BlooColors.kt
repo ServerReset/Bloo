@@ -21,7 +21,7 @@ object BlooColors {
      * The default button fill colour. Used by [MorphButton]
      * so idle buttons read clearly against any surface they sit on, without
      * needing a border. Pushes the highest available surface tone slightly
-     * toward `onSurface` — more in dark themes, less in light — so the
+     * toward `onSurface` - more in dark themes, less in light - so the
      * button always contrasts the surface behind it.
      */
     fun buttonContainer(surface: Color, onSurface: Color): Color {

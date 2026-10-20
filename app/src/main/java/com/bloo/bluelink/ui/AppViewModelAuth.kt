@@ -45,7 +45,7 @@ fun AppViewModel.login(username: String, password: String, pin: String, brand: B
 }
 
 /**
- * Europe (Hyundai Bluelink EU) sign-in. Single-step like the Hyundai/Genesis US branch — no OTP —
+ * Europe (Hyundai Bluelink EU) sign-in. Single-step like the Hyundai/Genesis US branch - no OTP -
  * just against [EuRepository] instead of [BlueLinkRepository]; same post-login bookkeeping (persist
  * credentials, reload the garage).
  */
@@ -61,7 +61,7 @@ private fun AppViewModel.loginEurope(username: String, password: String, pin: St
 
 /**
  * Step 1 of Kia login: attempt sign-in with just username/password/PIN. Kia's API either logs
- * straight in ([KiaAuth.LoggedIn]) or demands a one-time code ([KiaAuth.OtpRequired]) — which
+ * straight in ([KiaAuth.LoggedIn]) or demands a one-time code ([KiaAuth.OtpRequired]) - which
  * branch happens depends on the account and isn't knowable ahead of time.
  */
 private fun AppViewModel.loginKia(username: String, password: String, pin: String) {
@@ -184,7 +184,7 @@ fun AppViewModel.beginAddAccount() = _state.update { it.copy(addingAccount = tru
 
 fun AppViewModel.cancelAddAccount() = _state.update { s ->
     // If the user arrived here by backing out of the biometric prompt, "Cancel" must re-lock the
-    // app — not silently return them to the already-loaded garage.
+    // app - not silently return them to the already-loaded garage.
     if (s.lockedToLogin) s.copy(addingAccount = false, locked = true, lockedToLogin = false)
     else s.copy(addingAccount = false)
 }

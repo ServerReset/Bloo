@@ -15,7 +15,7 @@ class EuStampTest {
     @Test
     fun zeroCfbMakesStampPlainBase64OfAppIdColonTimestamp() {
         // A CFB longer than the raw, all zero bytes, makes XOR a no-op, so the
-        // stamp reduces to base64("$appId:$seconds") — a vector independent of
+        // stamp reduces to base64("$appId:$seconds") - a vector independent of
         // the real seed.
         val appId = "app"
         val zeroCfb = Base64.getEncoder().encodeToString(ByteArray(16)) // 16 zero bytes > "app:5"

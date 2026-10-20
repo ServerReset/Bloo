@@ -29,7 +29,7 @@ internal object UpdateRuntime {
     private const val PLAY_STORE_PACKAGE = "com.android.vending"
 
     /**
-     * Bloo's own Play Store page — the LISTING.
+     * Bloo's own Play Store page - the LISTING.
      *
      * This is the link for anywhere that has to work for someone who can already see the app, which is
      * testers on either track: it resolves for them, and it stays correct when the app goes to

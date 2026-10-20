@@ -40,7 +40,7 @@ object ResponseFraming {
             if (request.method != "GET" || !isFramingFailure(t)) throw t
             AppLog.log(
                 "Malformed response framing from ${request.url.host} " +
-                    "(${request.method} ${request.url.encodedPath}) — retrying on a new connection.",
+                    "(${request.method} ${request.url.encodedPath}) - retrying on a new connection.",
             )
             call(
                 request.newBuilder()

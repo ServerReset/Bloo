@@ -52,7 +52,6 @@ import com.bloo.bluelink.update.shizukuInstall
 import com.bloo.bluelink.update.UpdateCheckResult
 import com.bloo.bluelink.update.UpdateChecker
 import com.bloo.bluelink.update.UpdateRuntime
-import com.bloo.bluelink.ui.tryStart
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

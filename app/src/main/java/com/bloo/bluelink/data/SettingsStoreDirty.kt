@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.map
 
 /**
  * Wraps a settings mutation to record which preference keys it actually changed into the
- * "dirty" set — the keys this device has touched locally since its own last successful Drive
+ * "dirty" set - the keys this device has touched locally since its own last successful Drive
  * sync. [performMainToMainSync] protects these from being overwritten by an incoming remote
  * file, so a local edit that hasn't been uploaded yet is never silently lost (field-level merge
  * instead of one whole-file last-write-wins).
@@ -32,7 +32,7 @@ internal suspend fun SettingsStore.editTracked(mutate: (androidx.datastore.prefe
         // Strip BOTH the exact device-local keys AND the per-VIN device-local prefixes (see
         // SyncMerge.DEVICE_LOCAL_PREFIXES for the list -- naming them here just meant this
         // comment fell behind it), matching what the export/hash already exclude via
-        // isDeviceLocal — otherwise those transient runtime stamps land in the dirty set and
+        // isDeviceLocal - otherwise those transient runtime stamps land in the dirty set and
         // every alert/tile tick fires a redundant full Drive round-trip (the hash is unchanged,
         // so no data corrupts, but it's needless background I/O the prefix design meant to
         // stop).
@@ -56,7 +56,7 @@ internal suspend fun SettingsStore.dirtyKeys(): Set<String> =
     context.settingsDataStore.data.first().dirtyKeySet()
 
 /**
- * Reactive view of the dirty set — emits whenever a tracked setting changes (every
+ * Reactive view of the dirty set - emits whenever a tracked setting changes (every
  * [editTracked] that touches a portable key appends to it).
  */
 val SettingsStore.dirtyKeysFlow: Flow<Set<String>> get() = context.settingsDataStore.data

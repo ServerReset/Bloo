@@ -27,7 +27,7 @@ import com.bloo.uicommon.content
 
 /**
  * Share a full settings backup (includes colours and palettes) via the share sheet, as a real file
- * — not raw EXTRA_TEXT, which most file-saving targets (Drive, Files, email attachments) don't
+ * - not raw EXTRA_TEXT, which most file-saving targets (Drive, Files, email attachments) don't
  * accept as a share destination at all, silently limiting "Export" to text-only apps and defeating
  * the whole point of producing something "Restore" can later read back in.
  */

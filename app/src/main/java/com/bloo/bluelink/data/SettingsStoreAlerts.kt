@@ -25,7 +25,7 @@ internal fun SettingsStore.decodeNotificationPrefs(p: Preferences): SettingsStor
 
 /**
  * One-shot read of [SettingsStore.NotificationPrefs] (vs. the [notifications] Flow below, which
- * stays subscribed) — used where a caller just needs the current values once, e.g. deciding whether
+ * stays subscribed) - used where a caller just needs the current values once, e.g. deciding whether
  * to schedule a check at all.
  */
 suspend fun SettingsStore.notificationPrefs(): SettingsStore.NotificationPrefs =

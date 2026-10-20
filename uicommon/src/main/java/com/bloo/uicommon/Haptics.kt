@@ -89,12 +89,12 @@ class Haptics(context: Context) {
 
     // --- The vocabulary --------------------------------------------------
 
-    /** Light, crisp step — slider notches, list ticks. */
+    /** Light, crisp step - slider notches, list ticks. */
     fun tick() {
         if (composes) composed { add(VibrationEffect.Composition.PRIMITIVE_TICK, 0.45f, 0) } else oneShot(8, 50)
     }
 
-    /** Standard confirm — taps, expand/collapse, page settle. */
+    /** Standard confirm - taps, expand/collapse, page settle. */
     fun click() {
         if (composes) composed { add(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.6f, 0) } else oneShot(12, 110)
     }
@@ -133,7 +133,7 @@ class Haptics(context: Context) {
         } else oneShot(8 + (10 * l).toLong(), 40 + (210 * l).toInt())
     }
 
-    /** Weighty confirm — lock/unlock landed, command sent. */
+    /** Weighty confirm - lock/unlock landed, command sent. */
     fun heavy() {
         if (composes) composed {
             add(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 0)
@@ -158,7 +158,7 @@ class Haptics(context: Context) {
     }
 
     /**
-     * Pull-to-refresh release: a tumbling "shake the dice" burst — irregular ticks of varied weight
+     * Pull-to-refresh release: a tumbling "shake the dice" burst - irregular ticks of varied weight
      * that land on a final knock.
      */
     fun diceRoll() {
@@ -176,7 +176,7 @@ class Haptics(context: Context) {
     }
 
     /**
-     * Slot-machine settle: rapid ticking that decelerates and stops — used when refreshed numbers
+     * Slot-machine settle: rapid ticking that decelerates and stops - used when refreshed numbers
      * roll into place.
      */
     fun slotSettle() {

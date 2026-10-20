@@ -75,7 +75,7 @@ fun AppViewModel.setSearchBubblePosition(xFrac: Float, yFrac: Float) =
 
 /**
  * Toggle the opt-in Shizuku silent-install path (device-local; see SettingsStore). Turning it ON
- * prompts for the Shizuku permission immediately — that request is also what makes Bloo appear in
+ * prompts for the Shizuku permission immediately - that request is also what makes Bloo appear in
  * the Shizuku manager's app list (declaring the provider alone isn't enough). If Shizuku isn't
  * running, guide the user.
  */

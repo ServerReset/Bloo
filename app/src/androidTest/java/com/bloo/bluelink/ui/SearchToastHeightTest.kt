@@ -14,7 +14,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import com.bloo.uicommon.content
 
 /**
  * The search element and a toast are the SAME height ([ChromeBarHeight]), so a toast reads as the

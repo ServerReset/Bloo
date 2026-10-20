@@ -42,7 +42,7 @@ data class AutoLockEvalState(
     val graceRemaining: Int = 0,
     val lastLockAtEpochMs: Long? = null,
     /**
-     * The last COMPLETED evaluation's own words -- "Locked.", "Skipped — a door was open.", or the
+     * The last COMPLETED evaluation's own words -- "Locked.", "Skipped - a door was open.", or the
      * failure. The detection alone says what happened; this says why, in the one place the user is
      * already looking (the AutoLock section), instead of only in the app log.
      */
@@ -116,7 +116,7 @@ object AutoLockController {
         val job = jobs[vin] ?: return
         if (!job.isActive) return
         job.cancel()
-        _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ABORTED, lastOutcome = "Cancelled — the car reconnected.")) }
+        _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ABORTED, lastOutcome = "Cancelled - the car reconnected.")) }
         AppLog.log("AutoLock: cancelled for $vin")
     }
 
@@ -152,7 +152,7 @@ object AutoLockController {
 
             val sm = LockStateMachine().also { machines[vin] = it }
             advance(vin, sm.next(DetectionState.IDLE, DetectionEvent.CarBluetoothDisconnected))
-            AppLog.log("AutoLock: left the car ($vin) — evaluating.")
+            AppLog.log("AutoLock: left the car ($vin) - evaluating.")
 
             ActivityRecognitionManager.start(context)
             startedActivityRecognition = true
@@ -184,7 +184,7 @@ object AutoLockController {
                 // open all still skip). Only a permaless device is treated as "can't confirm",
                 // which is logged for support.
                 if (!walkAwayConfirmed.contains(vin)) {
-                    AppLog.log("AutoLock: no walk-away confirmation for $vin — proceeding on the Bluetooth disconnect alone.")
+                    AppLog.log("AutoLock: no walk-away confirmation for $vin - proceeding on the Bluetooth disconnect alone.")
                 }
                 advance(vin, DetectionState.GRACE)
             }
@@ -226,8 +226,8 @@ object AutoLockController {
 
             when (val decision = LockPolicy.decide(status)) {
                 is LockDecision.Skip -> {
-                    _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED, lastOutcome = "Skipped — ${decision.reason}.")) }
-                    AppLog.log("AutoLock: skipped for $vin — ${decision.reason}.")
+                    _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED, lastOutcome = "Skipped - ${decision.reason}.")) }
+                    AppLog.log("AutoLock: skipped for $vin - ${decision.reason}.")
                 }
                 LockDecision.Lock -> performLock(context, vin, v.name, settings)
             }
@@ -334,7 +334,7 @@ object AutoLockController {
                 ))
             }
         } else {
-            fail(vin, "AutoLock: lock command failed${result?.message?.let { " — $it" } ?: ""}.")
+            fail(vin, "AutoLock: lock command failed${result?.message?.let { " - $it" } ?: ""}.")
             notifyLockFailed(context, vin, carName, result?.message)
         }
     }

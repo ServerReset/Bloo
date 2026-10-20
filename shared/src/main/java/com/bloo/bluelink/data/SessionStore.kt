@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 private val Context.dataStore by safePreferencesDataStore("bloo_session")
 
 /**
- * Persists Blue Link sessions — one per brand, so a Hyundai and a Genesis account can be signed in
+ * Persists Blue Link sessions - one per brand, so a Hyundai and a Genesis account can be signed in
  * at the same time. The service PIN is required as a header on every remote command, so it is
  * stored locally on-device only, in the encrypted [SecureVault] with the credentials.
  */
@@ -132,7 +132,7 @@ class SessionStore(private val context: Context) {
 
     /**
      * Reads back one brand's session. Returns null (meaning "not logged in for this brand") if any
-     * of the three required fields — access token, username, pin — is missing, rather than
+     * of the three required fields - access token, username, pin - is missing, rather than
      * returning a half-populated [Session].
      */
     suspend fun load(brand: Brand): Session? {

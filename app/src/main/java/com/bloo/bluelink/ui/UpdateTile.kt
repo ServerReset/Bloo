@@ -147,7 +147,7 @@ internal fun UpdateAvailableTile(
                 UpdateReleaseNotes(info, collapsedLines = 5, hazeState = hazeState)
             }
             // Progressive install help: only in the tap-through (non-seamless) path, and only as an
-            // opt-in disclosure — the Play-Protect steps are scaffolding, not something to shout
+            // opt-in disclosure - the Play-Protect steps are scaffolding, not something to shout
             // before the user has even tapped Update.
             if (!seamless) {
                 var showHelp by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }

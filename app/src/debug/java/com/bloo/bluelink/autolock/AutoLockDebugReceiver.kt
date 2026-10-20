@@ -7,7 +7,6 @@ import android.util.Log
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
-import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.setAutoLockConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,8 +45,8 @@ class AutoLockDebugReceiver : BroadcastReceiver() {
                 val vin = intent.getStringExtra("vin")
                     ?: SnapshotStore(ctx).current().vehicles.firstOrNull()?.vin
                 if (vin == null) {
-                    Log.w("AutoLockDebug", "no vehicle in the snapshot — sign in first")
-                    AppLog.log("AutoLock debug: no vehicle in the snapshot — sign in first.")
+                    Log.w("AutoLockDebug", "no vehicle in the snapshot - sign in first")
+                    AppLog.log("AutoLock debug: no vehicle in the snapshot - sign in first.")
                     return@launch
                 }
                 Log.i("AutoLockDebug", "cmd=$cmd vin=$vin")

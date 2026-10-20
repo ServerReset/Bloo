@@ -118,7 +118,7 @@ object CarCommandRunner {
         else -> null
     }
 
-    /** Puts a value read by [stateFor] back into the field [action] touches — the revert half. */
+    /** Puts a value read by [stateFor] back into the field [action] touches - the revert half. */
     fun withState(snap: VehicleSnapshot, action: String, value: Boolean?): VehicleSnapshot = when (action) {
         CarAction.TOGGLE_LOCK, CarAction.LOCK, CarAction.UNLOCK -> snap.copy(locked = value)
         CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_ON, CarAction.CLIMATE_OFF -> snap.copy(climateOn = value)
@@ -149,7 +149,7 @@ object CarCommandRunner {
 
     /**
      * Refresh one car (blank [vin] → all), folding fresh status into snapshots. [force] true wakes
-     * the car for a live pull (on-demand button); false reads the server's last-known status —
+     * the car for a live pull (on-demand button); false reads the server's last-known status -
      * light enough for frequent background polls that keep the stored snapshots fresh without
      * draining the car's 12V battery. Most callers legitimately ignore the result.
      */

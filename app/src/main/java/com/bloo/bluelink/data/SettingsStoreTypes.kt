@@ -11,7 +11,7 @@ internal val Context.settingsDataStore by safePreferencesDataStore("bloo_setting
 // Process-wide serialization for performMainToMainSync(): the periodic worker and the
 // auto-sync-on-refresh collector can both fire at nearly the same moment, and
 // SettingsStore is instantiated fresh at each call
-// site (not a singleton) — a per-instance lock wouldn't serialize anything, so
+// site (not a singleton) - a per-instance lock wouldn't serialize anything, so
 // this lives at module scope instead, same pattern as BlueLinkGate.statusMutex.
 internal val mainToMainSyncMutex = Mutex()
 
@@ -23,8 +23,8 @@ internal const val DRIVE_IO_TIMEOUT_MS = 20_000L
 /**
  * Which seat heat/cool functions a specific car actually has (user-configured).
  *
- * The US remote-start climate command addresses four seat positions only —
- * driver, front passenger, rear-left and rear-right — so even on a 7-seater
+ * The US remote-start climate command addresses four seat positions only -
+ * driver, front passenger, rear-left and rear-right - so even on a 7-seater
  * those are the seats that can be controlled remotely. Each is independently
  * heat- and/or cool-capable.
  */

@@ -21,7 +21,7 @@ internal fun Context.tryStart(intent: Intent): Boolean = runCatching {
 
 /**
  * The one permission check. Five objects kept a `fun hasPermission(context)` that differed only in
- * the permission string and the OS level where the check stops being needed — and each had to be
+ * the permission string and the OS level where the check stops being needed - and each had to be
  * re-read (or, more often, forgotten) by every new caller.
  */
 @Suppress("ObsoleteSdkInt") // minSdk is a caller-supplied OS level, not a literal

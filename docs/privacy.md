@@ -1,4 +1,4 @@
-# Bloo — Privacy Policy
+# Bloo - Privacy Policy
 
 **Last updated: 14 October 2026**
 
@@ -40,7 +40,7 @@ anywhere.
 ## What is never collected
 
 - No name, address, phone number or contacts.
-- No precise location of *you* — only of your car, and only because the manufacturer's service
+- No precise location of *you* - only of your car, and only because the manufacturer's service
   reports it.
 - No data from other apps, and no data about how you use your phone.
 - Nothing is sold, and nothing is shared with data brokers or advertisers.

@@ -212,7 +212,7 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
             Spacer(GlanceModifier.defaultWeight())
             Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(car.bigValue(), maxLines = 1, modifier = GlanceModifier.defaultWeight(), style = valueStyle)
-                ActionButton(car, CarAction.TOGGLE_LOCK, pending, armed, label = null, heightDp = plan.buttonHeightDp)
+                ActionButton(car, CarAction.TOGGLE_LOCK, pending, armed, heightDp = plan.buttonHeightDp)
             }
         }
         WidgetArrangement.SIDE -> Row(root, verticalAlignment = Alignment.CenterVertically) {
@@ -250,7 +250,7 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
             // The controls sit on their own layer pinned to the bottom, so they are never pushed off the widget by
             // the readout above them (a tall, narrow widget used to lose them entirely).
             Column(GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.Bottom) {
-                Actions(car, pending, armed, opts, labels = plan.labels, maxActions = plan.maxActions, heightDp = plan.buttonHeightDp, gridColumns = plan.gridColumns)
+                Actions(car, pending, armed, opts, maxActions = plan.maxActions, heightDp = plan.buttonHeightDp, gridColumns = plan.gridColumns)
             }
         }
     }
@@ -316,7 +316,7 @@ private fun ControlGrid(car: VehicleSnapshot, pending: String?, armed: Boolean, 
             Row {
                 rowActions.forEachIndexed { i, action ->
                     if (i > 0) Spacer(GlanceModifier.width(WidgetGap))
-                    ActionButton(car, action, pending, armed, label = null, heightDp = plan.buttonHeightDp)
+                    ActionButton(car, action, pending, armed, heightDp = plan.buttonHeightDp)
                 }
             }
         }
@@ -391,12 +391,12 @@ private fun RefreshButton(car: VehicleSnapshot, pending: String?) {
  * left to right, so a narrow widget never pushes a button off the edge.
  */
 @Composable
-private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts: WidgetOptions, labels: Boolean, maxActions: Int, heightDp: Float, gridColumns: Int = 0) {
+private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts: WidgetOptions, maxActions: Int, heightDp: Float, gridColumns: Int = 0) {
     val actions = buildList {
-        add(WidgetAction(CarAction.TOGGLE_LOCK, if (labels) lockLabel(car) else null))
-        if (opts.climate) add(WidgetAction(CarAction.TOGGLE_CLIMATE, if (labels) "Climate" else null))
-        if (opts.charge && car.hasBattery) add(WidgetAction(CarAction.TOGGLE_CHARGE, if (labels) "Charge" else null))
-        if (opts.flash) add(WidgetAction(CarAction.FLASH_LIGHTS, if (labels) "Flash" else null))
+        add(CarAction.TOGGLE_LOCK)
+        if (opts.climate) add(CarAction.TOGGLE_CLIMATE)
+        if (opts.charge && car.hasBattery) add(CarAction.TOGGLE_CHARGE)
+        if (opts.flash) add(CarAction.FLASH_LIGHTS)
     }.take(maxActions)
     // The controls SHARE the row, each an equal slice: no empty run beside them, and every tap target is as
     // big as the widget allows (never under the 44dp the row is tall).
@@ -409,7 +409,7 @@ private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts
                 Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     rowActions.forEachIndexed { i, a ->
                         if (i > 0) Spacer(GlanceModifier.width(WidgetGap))
-                        ActionButton(car, a.action, pending, armed, label = a.label, modifier = GlanceModifier.defaultWeight(), heightDp = heightDp)
+                        ActionButton(car, a, pending, armed, modifier = GlanceModifier.defaultWeight(), heightDp = heightDp)
                     }
                 }
             }
@@ -419,21 +419,17 @@ private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts
     Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         actions.forEachIndexed { i, a ->
             if (i > 0) Spacer(GlanceModifier.width(WidgetGap))
-            ActionButton(car, a.action, pending, armed, label = a.label, modifier = GlanceModifier.defaultWeight(), heightDp = heightDp)
+            ActionButton(car, a, pending, armed, modifier = GlanceModifier.defaultWeight(), heightDp = heightDp)
         }
     }
 }
 
-/** One control to draw: which command, and the word beside it (null = icon only). */
-private data class WidgetAction(val action: String, val label: String?)
-
-/** The lock button's own word, showing what a tap DOES: "Unlock" while locked, "Lock" while open. */
-private fun lockLabel(car: VehicleSnapshot): String = if (car.locked == true) "Unlock" else "Lock"
-
 /**
- * One round (or pill, with a [label]) action button. It shows the car's CURRENT state (a lock closed
- * or open, climate and charge lit when on), ignores taps while its command is in flight, and for an
- * Unlock asks "Confirm" first.
+ * THE widget control: one button for every size and layout. Left to size itself it is a circle of [heightDp]; given a
+ * [modifier] with a width (an equal share of its row or grid cell) it flexes into a pill that fills it, so one shape
+ * serves a single row, a grid, a skinny column and the round buttons beside the readout. It always shows an icon (the
+ * car's CURRENT state: a lock closed or open, climate and charge lit when on), ignores taps while its command is in
+ * flight, and for an Unlock asks "OK?" first.
  */
 @Composable
 internal fun ActionButton(
@@ -441,11 +437,9 @@ internal fun ActionButton(
     action: String,
     pending: String?,
     armed: Boolean,
-    label: String?,
-    compact: Boolean = false,
-    /** A width from the row (an equal share); none = a circle (icon) or a pill sized to its word. */
+    /** A width from the row (an equal share); none = a circle. */
     modifier: GlanceModifier? = null,
-    /** The control row's height from the plan (taller on a taller widget). */
+    /** The control's height from the plan (taller on a taller widget). */
     heightDp: Float = 46f,
 ) {
     val busy = pending == "${car.vin}:$action"
@@ -472,46 +466,31 @@ internal fun ActionButton(
     // Unlock lit Climate, Charge and Flash too.)
     val armedHere = armed && action == CarAction.TOGGLE_LOCK
     val text = when {
-        busy -> "…"
-        // An icon-only circle has no room for a word: it asks "OK?" and stays a circle.
-        armedHere -> if (label == null) "OK?" else "Confirm"
-        else -> label
+        busy -> "..."
+        armedHere -> "OK?"
+        else -> null
     }
     val lit = active || armedHere
     val container: ColorProvider = if (lit) GlanceTheme.colors.primary else GlanceTheme.colors.secondaryContainer
     val content: ColorProvider = if (lit) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSecondaryContainer
-    val h = if (compact) 40.dp else heightDp.dp
-    val tall = heightDp >= 56f
+    val h = heightDp.dp
     Box(
-        modifier = (modifier ?: GlanceModifier)
+        modifier = (modifier ?: GlanceModifier.width(h))
             .height(h)
-            .then(
-                when {
-                    modifier != null -> GlanceModifier
-                    // An icon-only button is a circle whatever it says ("…", "OK?"): it must keep the width the plan
-                    // reserved. Only a labelled button, which already is a pill, sizes to its word.
-                    label == null -> GlanceModifier.width(h)
-                    else -> GlanceModifier.padding(horizontal = 14.dp)
-                },
-            )
             .background(container)
             .cornerRadius(h / 2)
             .clickable(actionFor(car, action, busy)),
         contentAlignment = Alignment.Center,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // An unlabelled control is an icon circle; a labelled one is a TEXT pill -- dropping the
-            // glyph keeps four of them inside a wide widget, which icon+label never fit.
-            if (text == null) {
-                Image(
-                    // Said aloud by a screen reader: the button's only content is this glyph.
-                    ImageProvider(icon), spoken,
-                    modifier = GlanceModifier.size(if (tall) 24.dp else if (compact) 18.dp else 20.dp),
-                    colorFilter = ColorFilter.tint(content),
-                )
-            } else {
-                Text(text, maxLines = 1, style = TextStyle(color = content, fontSize = if (tall) 16.sp else 14.sp, fontWeight = FontWeight.Bold))
-            }
+        if (text == null) {
+            Image(
+                // Said aloud by a screen reader: the button's only content is this glyph.
+                ImageProvider(icon), spoken,
+                modifier = GlanceModifier.size(if (heightDp >= 56f) 26.dp else 22.dp),
+                colorFilter = ColorFilter.tint(content),
+            )
+        } else {
+            Text(text, maxLines = 1, style = TextStyle(color = content, fontSize = if (heightDp >= 56f) 16.sp else 14.sp, fontWeight = FontWeight.Bold))
         }
     }
 }
@@ -535,7 +514,7 @@ internal val WidgetGap = 8.dp
 
 // --- The car's words ---------------------------------------------------------------------------
 
-/** The detail line the roomiest layouts show: charge limit, odometer, service — whichever exist. */
+/** The detail line the roomiest layouts show: charge limit, odometer, service - whichever exist. */
 internal fun VehicleSnapshot.detailLine(): String? = listOfNotNull(
     chargeLimitPct?.let { "Limit $it%" },
     odometer?.takeIf { it.isNotBlank() }?.let { "Odo $it" },

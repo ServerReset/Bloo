@@ -38,7 +38,7 @@ for line in diff.splitlines():
 bad=0
 for f,lines in added.items():
     if not os.path.exists(f): continue
-    # encoding pinned: these sources are UTF-8 and contain "·", "—" and friends.
+    # encoding pinned: these sources are UTF-8 and contain "·", "-" and friends.
     # Bare open() uses the platform default, which is cp1252 on Windows, and the
     # checker died with a UnicodeDecodeError before examining a single symbol --
     # i.e. the one local guard against a red build was itself unusable there.

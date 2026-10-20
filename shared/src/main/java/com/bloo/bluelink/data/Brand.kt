@@ -3,7 +3,7 @@ package com.bloo.bluelink.data
 /**
  * A supported US telematics brand. Genesis US runs on the same Hyundai-shaped backend
  * ("…telematics.hyundaiusa.com") with its own host + OAuth client, so the entire request/path
- * structure is shared — only these per-brand values change. Values are taken from the community
+ * structure is shared - only these per-brand values change. Values are taken from the community
  * reverse-engineering projects referenced in [Models].
  */
 enum class Brand(
@@ -84,8 +84,8 @@ enum class Brand(
 
     /**
      * Hyundai Bluelink Europe on the CCAPI ("CCS2") platform, served by [EuApi]/[EuRepository]. Kia
-     * Connect EU and Genesis EU ride the SAME backend family (different host + client only) —
-     * exactly like the three Canada brands share [CanadaApi] — so they can later be added as
+     * Connect EU and Genesis EU ride the SAME backend family (different host + client only) -
+     * exactly like the three Canada brands share [CanadaApi] - so they can later be added as
      * sibling entries here with no new API code.
      */
     HYUNDAI_EU(
@@ -191,7 +191,7 @@ enum class Brand(
 /** The telematics brand a vehicle belongs to. */
 val Vehicle.brand: Brand get() = Brand.fromIndicator(brandIndicator)
 
-/** Brand-specific apps, sites and phone numbers — the single source of truth. */
+/** Brand-specific apps, sites and phone numbers - the single source of truth. */
 data class BrandLinks(
     /** Play Store package of the official companion app. */
     val appPackage: String,
@@ -287,7 +287,7 @@ val Brand.links: BrandLinks
         // Europe: the pan-European site root, which redirects to the visitor's country. Deep pages differ
         // per country (the old fixed /en/... paths 404'd), so every link lands on the root and the
         // country site takes over. No single EU roadside
-        // number (it's per-country), so it's left blank — callers already guard empty phone
+        // number (it's per-country), so it's left blank - callers already guard empty phone
         // strings.
         Brand.HYUNDAI_EU -> BrandLinks(
             appPackage = "com.hyundai.bluelink.eu",
@@ -310,7 +310,7 @@ val Vehicle.supportsConnectedStore: Boolean
     get() = brand == Brand.KIA || (!brand.isCanada && !brand.isEurope && (generation.trim().toIntOrNull() ?: 0) >= 3)
 
 /**
- * Whether this car is an older Gen5W (pre-ccNC) Hyundai/Genesis head unit — a non-Kia car that
+ * Whether this car is an older Gen5W (pre-ccNC) Hyundai/Genesis head unit - a non-Kia car that
  * reports head-unit generation below 3. Unlike [supportsConnectedStore], the generation fallback
  * here is 3 (assume modern ccNC, i.e.
  */

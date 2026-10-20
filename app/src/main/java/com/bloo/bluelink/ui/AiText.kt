@@ -19,9 +19,9 @@ internal fun summaryPrompt(v: Vehicle, status: VehicleStatus?, state: UiState): 
             parts += "No live status has been fetched yet for this car."
             return parts.joinToString(" ")
         }
-        // Priority 1 — doors.
+        // Priority 1 - doors.
         status.doorLock?.let { parts += "The doors are ${if (it) "locked" else "unlocked"}." }
-        // Priority 2 — charging + time to full (EV/PHEV only).
+        // Priority 2 - charging + time to full (EV/PHEV only).
         if (state.hasBattery(v)) {
             if (status.evStatus?.batteryCharge == true) {
                 val mins = status.evStatus?.minutesToFull
@@ -34,7 +34,7 @@ internal fun summaryPrompt(v: Vehicle, status: VehicleStatus?, state: UiState): 
                 parts += "It is not charging."
             }
         }
-        // Priority 3 — driving / parked.
+        // Priority 3 - driving / parked.
         state.drivingLabel(v)?.let { parts += "The car is ${it.lowercase(Locale.US)}." }
         status.engine?.let { parts += "The engine is ${if (it) "on" else "off"}." }
         // Remaining status, most useful first.
