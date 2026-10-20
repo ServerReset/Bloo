@@ -29,7 +29,7 @@ internal const val HubFraction = 0.36f
 internal val ReferenceFace = 227.dp
 
 /** How far the cross through the face moves, as a share of the face, when a quarter is pressed (the quarter grows). */
-private const val PressGrow = 0.05f
+private const val PressGrow = 0.06f
 
 /**
  * The face's size relative to the 227dp it was designed on, so a 192dp watch and a 240dp watch (and any display
@@ -77,7 +77,7 @@ internal fun rememberQuadrantPress(): QuadrantPress {
             val tx = when (q) { 0, 2 -> PressGrow; 1, 3 -> -PressGrow; else -> 0f }
             val ty = when (q) { 0, 1 -> PressGrow; 2, 3 -> -PressGrow; else -> 0f }
             val spec: androidx.compose.animation.core.AnimationSpec<Float> =
-                if (bouncy.value) spring(dampingRatio = 0.62f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium) else snap()
+                if (bouncy.value) spring(dampingRatio = 0.38f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow) else snap()
             kotlinx.coroutines.coroutineScope {
                 launch { state.x.animateTo(tx, spec) }
                 launch { state.y.animateTo(ty, spec) }

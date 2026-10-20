@@ -2,6 +2,7 @@ package com.bloo.bluelink.wear
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -14,6 +15,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,14 +47,16 @@ fun WearEdgeRing(
     limitPct: Int?,
     modifier: Modifier = Modifier,
     stroke: Dp = RingStroke,
-    /** A short light travels along the filled arc while charging or refreshing (not under the watch's lean mode). */
+    /** Charging: a lighter piece keeps filling out of the end of the fill on a bouncy spring (not under the lean mode). */
     charging: Boolean = false,
+    /** A refresh is running: a short light travels along the filled arc (not under the lean mode). */
+    refreshing: Boolean = false,
 ) {
     val policy = LocalPowerPolicy.current
     val limit = limitPct?.takeIf { it in 1..99 }
     val frac = (progress ?: 0f).coerceIn(0f, 1f)
     val stuck = progress != null && limit != null && frac * 100f >= limit
-    val sheen = if (charging && policy.ambientMotion && progress != null) {
+    val sheen = if (refreshing && policy.ambientMotion && progress != null) {
         rememberInfiniteTransition(label = "chargeSheen").animateFloat(
             0f, 1f,
             infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Restart),
@@ -61,11 +65,24 @@ fun WearEdgeRing(
     } else {
         null
     }
+    // The level lands with a bounce (it overshoots the new charge and settles), as the phone's bar does.
     val sweep by animateFloatAsState(
         frac,
-        animationSpec = if (policy.bouncySprings) spring() else snap(),
+        animationSpec = if (policy.bouncySprings) spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow) else snap(),
         label = "edgeRing",
     )
+    // The charging "fill up": a lighter arc grows out of the fill's end on a bouncy spring, overshoots, rests a beat, and goes
+    // again -- the ring visibly keeps filling while the car charges.
+    val front = remember { Animatable(0f) }
+    val frontOn = charging && policy.ambientMotion && progress != null
+    LaunchedEffect(frontOn) {
+        if (!frontOn) { front.snapTo(0f); return@LaunchedEffect }
+        while (true) {
+            front.snapTo(0f)
+            front.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow))
+            delay(350)
+        }
+    }
     // The phone's two stops of the fill: the darker end where it starts, the lighter where it ends.
     val fillDark by animateColorAsState(
         Color(if (stuck) BlooColors.chargeBlueDark else BlooColors.chargeGreenDark),
@@ -121,6 +138,17 @@ fun WearEdgeRing(
                         val at = half + (filledEnd - 2f * half - span) * phase
                         drawArc(Color.White.copy(alpha = 0.5f), at - 90f, span, false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
                     }
+                }
+            }
+            // The growing front, in the room beyond the fill (up to the limit, or the end of the ring).
+            if (front.value > 0f && filledEnd > 0f) {
+                val room = (if (limit != null && !stuck) 360f * limitAnim.value else 360f) - filledEnd
+                val grow = (minOf(34f, room) * front.value).coerceIn(0f, maxOf(room, 0f))
+                if (grow > 2f * half) {
+                    drawArc(
+                        fillLight.copy(alpha = 0.55f), filledEnd + half - 90f, grow - 2f * half, false, topLeft, arc,
+                        style = Stroke(w, cap = StrokeCap.Round),
+                    )
                 }
             }
             if (limit == null || stuck) {

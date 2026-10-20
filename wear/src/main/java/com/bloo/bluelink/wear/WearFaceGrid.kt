@@ -246,9 +246,12 @@ internal fun WearRingLabels(actions: List<WearQuickAction?>) {
     }
 }
 
-/** A little toward the hub: the curved label takes the outer edge. */
-private fun biasX(a: Alignment) = when (a) { Alignment.TopStart, Alignment.BottomStart -> 0.1f; else -> -0.1f }
-private fun biasY(a: Alignment) = when (a) { Alignment.TopStart, Alignment.TopEnd -> 0.1f; else -> -0.1f }
+/**
+ * Toward the circle's centre: a glyph is not centred in its quarter but drawn in toward the hub (the curved label takes the
+ * outer edge), so the four read as one group round the middle.
+ */
+private fun biasX(a: Alignment) = when (a) { Alignment.TopStart, Alignment.BottomStart -> 0.34f; else -> -0.34f }
+private fun biasY(a: Alignment) = when (a) { Alignment.TopStart, Alignment.TopEnd -> 0.34f; else -> -0.34f }
 
 /**
  * A quarter's own shape: a plain rectangle whose only rounded corner is the inner one, at the hub. The OUTER edge is not

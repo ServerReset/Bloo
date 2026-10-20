@@ -39,7 +39,7 @@ internal fun rememberWearUpdateState(): WearUpdateState {
  * freshness, any watch update, then the watch's own settings. A scrolling [WearListScreen].
  */
 @Composable
-internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState, onEditFace: () -> Unit) {
+internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     WearListScreen(contentPadding = PaddingValues(top = 34.dp, bottom = 22.dp)) {
@@ -75,11 +75,7 @@ internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState, onEditFace:
                 }
             }
         }
-        item { WearFaceControlsPebble(onOpen = onEditFace) }
-        item { WearAlertsPebble() }
-        item { WearEffectsPebble() }
-        // Auto lock needs the car's credentials on the watch, which only the pairing step on the phone hands over; until
-        // then the pebble points at that step instead of offering a switch.
-        item { if (ui.signedIn) WearAutoLockPebble() else WearPairPebble() }
+        // The watch's own settings, together in one pebble (the face's controls are changed from the face's centre).
+        item { WearSettingsPebble(ui.signedIn) }
     }
 }

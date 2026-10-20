@@ -172,7 +172,7 @@ internal fun WearCarPage(
                 onEditFace = { editingFace = true },
             )
         } else {
-            WearDetailsPage(ui, update, onEditFace = { editingFace = true })
+            WearDetailsPage(ui, update)
         }
     }
 }

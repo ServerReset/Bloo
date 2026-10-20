@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +14,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -136,17 +137,16 @@ internal fun chargeReadoutOf(
 /** The one spring the charge fill uses, so collapsed and expanded bars animate identically. */
 @Composable
 internal fun animatedChargeFrac(target: Float): Float {
-    val frac by animateFloatAsState(
-        targetValue = target,
-        // Deliberately bouncy: the fill overshoots the new charge a touch and springs back, which
-        // reads as the bar "landing" on the value.
-        animationSpec = lowPowerAwareSpring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
-        label = "chargeFill",
+    // Deliberately bouncy: the fill overshoots the new charge a touch and springs back, which reads as the bar "landing" on
+    // the value. It also STARTS empty: the first time a bar is drawn it fills up to the charge, with the same bounce, instead of
+    // appearing already full.
+    val spec = lowPowerAwareSpring<Float>(
+        dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessMediumLow,
     )
-    return frac
+    val fill = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(target) { fill.animateTo(target, spec) }
+    return fill.value
 }
 
 /** How far above its resting position the hero photo starts (entrance) or travels to (exit). */
