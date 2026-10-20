@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -68,10 +69,6 @@ private val EnterSpring = spring<Float>(dampingRatio = 0.55f, stiffness = Spring
 private val ExitSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
 private val ReflowSpring = spring<Float>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
 
-/** How a toast leaves (see ToastSlot): straight down off the bottom of the screen, or sideways off the edge of a fanned-out pile. */
-private const val ExitDown = 0
-private const val ExitSide = 1
-
 /** How much of each older toast peeks out above the newest while the pile is folded. */
 private val PeekHeight = 9.dp
 
@@ -97,7 +94,6 @@ internal fun BoxScope.ToastSlot(
     liftPx: Float,
     startInsetPx: Float,
     endInsetPx: Float,
-    windowWidthPx: Float,
     expandFrac: () -> Float,
     stackSize: Int,
     bottomInsetPx: Float,
@@ -128,21 +124,13 @@ internal fun BoxScope.ToastSlot(
     // 0 = below the screen, 1 = resting in its slot; overshoots past 1 on the way up.
     val enter = remember(toast.id) { Animatable(0f) }
     LaunchedEffect(toast.id) { enter.animateTo(1f, EnterSpring) }
-    // How it leaves depends on where it is, so a toast in the same place always leaves the same way:
-    //  - one in front (above the search bar or beside it) or tucked behind another in a folded pile slides straight down
-    //    off the screen -- the pile's front toast and the search bar are drawn over it, so it passes behind them,
-    //  - one in a fanned-out pile, above the toasts beneath it, slides off the side,
-    //  - one that was swiped has already gone and is dropped at once.
+    // How it leaves: dismissed or expired, wherever it is in the stack (on top, in the middle, behind another), it drops
+    // behind everything -- the other toasts and the search bar -- and off the bottom of the screen. A swipe is the one
+    // exception: that toast has already flown off the side it was swiped to, and is dropped at once.
     val exit = remember(toast.id) { Animatable(0f) }
-    var exitMode by remember(toast.id) { androidx.compose.runtime.mutableIntStateOf(ExitDown) }
     LaunchedEffect(toast.leaving) {
         if (!toast.leaving) return@LaunchedEffect
-        if (toast.flung) {
-            onGone()
-            return@LaunchedEffect
-        }
-        exitMode = if (index > 0 && expandFrac() > 0.5f) ExitSide else ExitDown
-        exit.animateTo(1f, ExitSpring)
+        if (!toast.flung) exit.animateTo(1f, ExitSpring)
         onGone()
     }
     val swipe = Modifier.rememberSwipeToDismiss(toast.id) {
@@ -167,6 +155,8 @@ internal fun BoxScope.ToastSlot(
     Box(
         Modifier
             .align(Alignment.BottomStart)
+            // A leaving toast goes behind every other one (and so behind the search bar, which is drawn after the stack).
+            .zIndex(if (toast.leaving) -1f else 0f)
             .fillMaxWidth()
             .padding(start = startInset, end = endInset)
             .graphicsLayer {
@@ -189,27 +179,18 @@ internal fun BoxScope.ToastSlot(
                     // The overshoot of the rise: a touch past the slot, then settling.
                     ty = baseY + merge * barPx * 0.6f
                 }
-                var leaveAlpha = 1f
-                var leaveScale = 1f
-                val x = exit.value
-                if (x > 0f) {
-                    when (exitMode) {
-                        // Off the right edge of the screen, fading a little as it goes.
-                        ExitSide -> { tx += x * windowWidthPx; leaveAlpha = 1f - 0.5f * x }
-                        // Straight down and out, fully opaque: the toasts and the bar in front of it cover it as it passes.
-                        else -> ty += x * offscreen
-                    }
-                }
+                // Straight down and out, fully opaque: it is drawn behind everything, so it passes behind what is in front.
+                ty += exit.value * offscreen
                 // Stretches tall in flight (a quick squash-and-stretch), shrinks as it sits deeper in the pile.
                 val stretch = 1f + 0.09f * kotlin.math.sin(Math.PI.toFloat() * enterV.coerceIn(0f, 1f))
-                val shrink = (1f - 0.05f * depth * (1f - e)) * leaveScale
+                val shrink = 1f - 0.05f * depth * (1f - e)
                 translationX = tx
                 translationY = ty
                 scaleX = shrink
                 scaleY = stretch * shrink
                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
                 // Deeper than two behind the newest, a folded toast is not there at all.
-                alpha = (1f - (1f - e) * (s - 2f).coerceIn(0f, 1f)) * leaveAlpha
+                alpha = 1f - (1f - e) * (s - 2f).coerceIn(0f, 1f)
             }
             .pointerInput(toast.id) {
                 // Observes only (Initial pass, never consumes), so the swipe and the buttons still work.

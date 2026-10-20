@@ -336,7 +336,6 @@ internal fun ToastHost(
                     bottomInsetPx = maxOf(imeBottomPx, navBottomPx) + edgePx,
                     onToggleStack = { state.toggleStack() },
                     onSetExpanded = { state.fan(it) },
-                    windowWidthPx = window.width.toFloat(),
                     hazeState = hazeState,
                     onCopy = onCopy,
                     onExpand = { state.expand(toast) },
