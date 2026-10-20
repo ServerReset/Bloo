@@ -6,6 +6,7 @@ import android.security.keystore.KeyProperties
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.CarCommand
+import com.bloo.bluelink.data.withClimate
 import com.bloo.bluelink.data.CarCommandResult
 import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.CredentialStore
@@ -99,10 +100,10 @@ object WearCredentialSync {
      * Run a command on the watch itself. Returns null when the watch has no session, which is the
      * caller's cue to hand the command to the phone instead.
      */
-    suspend fun runLocally(context: Context, vin: String, action: String): CarCommandResult? {
+    suspend fun runLocally(context: Context, vin: String, action: String, climate: com.bloo.bluelink.data.ClimateRequest? = null): CarCommandResult? {
         val app = context.applicationContext
         if (!hasSession(app)) return null
-        val result = runCatching { CarCommandRunner.execute(app, CarCommand(vin, action)) }
+        val result = runCatching { CarCommandRunner.execute(app, CarCommand(vin, action).withClimate(climate)) }
             .getOrElse { CarCommandResult(vin, action, ok = false, message = it.message) }
         WearDataLayerSync.reloadFromStore(app, result)
         return result

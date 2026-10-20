@@ -44,7 +44,11 @@ fun AppViewModel.saveClimatePreset(v: Vehicle, name: String, req: ClimateRequest
     _state.update {
         it.copy(climatePresets = it.climatePresets + (v.vin to (it.climatePresets[v.vin].orEmpty() + preset)))
     }
-    viewModelScope.launch { settingsStore.saveClimatePreset(v.vin, preset) }
+    viewModelScope.launch {
+        settingsStore.saveClimatePreset(v.vin, preset)
+        // The watch offers the same presets.
+        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+    }
 }
 
 /** Remove one saved preset by id. */
@@ -53,13 +57,19 @@ fun AppViewModel.deleteClimatePreset(v: Vehicle, id: String) {
         val updated = it.climatePresets[v.vin].orEmpty().filter { p -> p.id != id }
         it.copy(climatePresets = it.climatePresets + (v.vin to updated))
     }
-    viewModelScope.launch { settingsStore.deleteClimatePreset(v.vin, id) }
+    viewModelScope.launch {
+        settingsStore.deleteClimatePreset(v.vin, id)
+        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+    }
 }
 
 /** Persist a new drag-and-drop order for a car's saved presets. */
 fun AppViewModel.reorderClimatePresets(v: Vehicle, ordered: List<ClimatePreset>) {
     _state.update { it.copy(climatePresets = it.climatePresets + (v.vin to ordered)) }
-    viewModelScope.launch { settingsStore.setClimatePresets(v.vin, ordered) }
+    viewModelScope.launch {
+        settingsStore.setClimatePresets(v.vin, ordered)
+        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+    }
 }
 
 /**

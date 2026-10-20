@@ -50,6 +50,7 @@ class WearMainActivity : ComponentActivity() {
         com.bloo.bluelink.data.DeviceStatus.ensureInitialized(this)
         // The wearer's own reduce-effects switch joins Battery Saver in the policy before anything draws.
         com.bloo.bluelink.data.DeviceStatus.setManualLean(WearLook.reduceEffects(this))
+        WearPresets.ensureLoaded(this)
         val repo = WearSnapshotRepository(this)
         val pinStore = WatchPinStore(this)
         // Sealed after a restart until the PIN is entered (see WearBootGate): nothing starts before that.

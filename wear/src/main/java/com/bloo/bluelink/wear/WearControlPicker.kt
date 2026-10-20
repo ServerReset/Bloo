@@ -19,7 +19,7 @@ internal fun WearControlPicker(
   WearBackable(onBack) {
     WearChoiceScreen(
         title = position,
-        choices = WearFaceControls.all.filter { it.available(car) }.map { WearChoice(it.key, it.choice, it.icon(car)) },
+        choices = WearFaceControls.choicesFor(car).map { WearChoice(it.key, it.choice, it.icon(car)) },
         selected = current,
         onPick = onPick,
         empty = WearChoice(WearFaceControls.NONE, "Empty"),

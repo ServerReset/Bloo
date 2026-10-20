@@ -20,4 +20,11 @@ class WearFacePrefsTest {
     @Test fun `an unknown key gives the defaults rather than a broken quarter`() {
         assertEquals(WearFaceControls.defaults, WearFacePrefs.parse("lock,climate,charge,nonsense"))
     }
+
+    @Test fun `a saved climate preset can sit in a quarter`() {
+        assertEquals(
+            listOf("preset:abc", "lock", "climate_smart", "none"),
+            WearFacePrefs.parse("preset:abc,lock,climate_smart,none"),
+        )
+    }
 }

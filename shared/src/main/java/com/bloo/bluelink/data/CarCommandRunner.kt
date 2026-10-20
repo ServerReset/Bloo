@@ -23,6 +23,8 @@ object CarCommandRunner {
             return CarCommandResult(command.vin, command.action, ok = ok, message = if (ok) null else "Couldn't refresh")
         }
         val store = SnapshotStore(context)
+        // Smart climate's weather lookup is network, so it happens BEFORE the lock (the lock is the whole account's).
+        val smart = if (command.action == CarAction.CLIMATE_SMART) smartClimateFor(context, command.vin) else null
         // Same lock refresh() and the phone UI's own command path already use -- BlueLink 502s on
         // overlapping requests for the same account, and this was the one command-executing path
         // that skipped it, so a resent command could fire the same command twice concurrently, or
@@ -72,6 +74,13 @@ object CarCommandRunner {
                         if (snap.isDriving) error("Can't start climate while driving")
                         repo.startClimate(v, climate); snap.copy(climateOn = climateFlag(true))
                     }
+                    CarAction.CLIMATE_SMART ->
+                        if (snap.climateOn == true) { repo.stopClimate(v); snap.copy(climateOn = climateFlag(false)) }
+                        else {
+                            if (snap.isDriving) error("Can't start climate while driving")
+                            repo.startClimate(v, smart ?: error("No weather for smart climate"))
+                            snap.copy(climateOn = climateFlag(true))
+                        }
                     CarAction.CLIMATE_OFF -> { repo.stopClimate(v); snap.copy(climateOn = climateFlag(false)) }
                     CarAction.TOGGLE_CHARGE ->
                         if (snap.charging == true) { repo.stopCharge(v); snap.copy(charging = false) }
@@ -100,7 +109,7 @@ object CarCommandRunner {
     fun resolveToggle(snap: VehicleSnapshot, action: String): String = when (action) {
         CarAction.TOGGLE_LOCK ->
             if (snap.locked == true) CarAction.UNLOCK else CarAction.LOCK
-        CarAction.TOGGLE_CLIMATE ->
+        CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_SMART ->
             if (snap.climateOn == true) CarAction.CLIMATE_OFF else CarAction.CLIMATE_ON
         CarAction.TOGGLE_CHARGE ->
             if (snap.charging == true) CarAction.CHARGE_OFF else CarAction.CHARGE_ON
@@ -113,7 +122,7 @@ object CarCommandRunner {
      */
     fun stateFor(snap: VehicleSnapshot, action: String): Boolean? = when (action) {
         CarAction.TOGGLE_LOCK, CarAction.LOCK, CarAction.UNLOCK -> snap.locked
-        CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_ON, CarAction.CLIMATE_OFF -> snap.climateOn
+        CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_SMART, CarAction.CLIMATE_ON, CarAction.CLIMATE_OFF -> snap.climateOn
         CarAction.TOGGLE_CHARGE, CarAction.CHARGE_ON, CarAction.CHARGE_OFF -> snap.charging
         else -> null
     }
@@ -121,7 +130,7 @@ object CarCommandRunner {
     /** Puts a value read by [stateFor] back into the field [action] touches - the revert half. */
     fun withState(snap: VehicleSnapshot, action: String, value: Boolean?): VehicleSnapshot = when (action) {
         CarAction.TOGGLE_LOCK, CarAction.LOCK, CarAction.UNLOCK -> snap.copy(locked = value)
-        CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_ON, CarAction.CLIMATE_OFF -> snap.copy(climateOn = value)
+        CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_SMART, CarAction.CLIMATE_ON, CarAction.CLIMATE_OFF -> snap.copy(climateOn = value)
         CarAction.TOGGLE_CHARGE, CarAction.CHARGE_ON, CarAction.CHARGE_OFF -> snap.copy(charging = value)
         else -> snap
     }
@@ -136,7 +145,7 @@ object CarCommandRunner {
             CarAction.TOGGLE_LOCK -> snap.copy(locked = !(snap.locked ?: false))
             CarAction.LOCK -> snap.copy(locked = true)
             CarAction.UNLOCK -> snap.copy(locked = false)
-            CarAction.TOGGLE_CLIMATE ->
+            CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_SMART ->
                 snap.copy(climateOn = if (climateKnown) !(snap.climateOn ?: false) else null)
             CarAction.CLIMATE_ON -> snap.copy(climateOn = if (climateKnown) true else null)
             CarAction.CLIMATE_OFF -> snap.copy(climateOn = if (climateKnown) false else null)
@@ -209,4 +218,20 @@ object CarCommandRunner {
         if (fetched.isNotEmpty()) onStatuses?.invoke(fetched)
         return merged.isNotEmpty()
     }
+}
+
+/** The smart-climate request for a given weather reading: the temperature [smartClimateTargetF] picks, no defrost. */
+fun smartClimateRequest(w: Weather): ClimateRequest = ClimateRequest(
+    tempF = smartClimateTargetF(ambientFahrenheit(w.tempC)),
+    defrost = false,
+    durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
+)
+
+/** The smart request for [vin] from the weather at the car, or null when it cannot be built (no location, no weather, already on). */
+private suspend fun smartClimateFor(context: Context, vin: String): ClimateRequest? {
+    val snap = SnapshotStore(context).current().vehicles.firstOrNull { it.vin == vin } ?: return null
+    if (snap.climateOn == true) return null
+    val lat = snap.lat ?: return null
+    val lon = snap.lon ?: return null
+    return WeatherApi.fetch(lat, lon)?.let(::smartClimateRequest)
 }

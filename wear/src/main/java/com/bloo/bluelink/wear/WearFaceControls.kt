@@ -2,6 +2,8 @@ package com.bloo.bluelink.wear
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashOn
@@ -11,6 +13,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.bloo.bluelink.data.CarAction
+import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.supportsHornLights
 
@@ -35,6 +38,8 @@ internal data class FaceControl(
     val active: (VehicleSnapshot) -> Boolean = { false },
     /** Opens the car, so it asks once more first. */
     val confirm: (VehicleSnapshot) -> Boolean = { false },
+    /** The climate settings the command carries (a saved preset's); null for a control that has none. */
+    val request: ((VehicleSnapshot) -> ClimateRequest?)? = null,
 )
 
 internal object WearFaceControls {
@@ -70,6 +75,11 @@ internal object WearFaceControls {
             action = CarAction.CLIMATE_OFF,
         ),
         FaceControl(
+            key = "climate_smart", choice = "Smart climate",
+            label = { if (it.climateOn == true) "Climate off" else "Smart climate" },
+            icon = { Icons.Filled.AutoMode }, action = CarAction.CLIMATE_SMART, active = { it.climateOn == true },
+        ),
+        FaceControl(
             key = "charge", choice = "Charge on / off",
             label = { if (it.charging == true) "Stop charge" else "Charge" },
             icon = { Icons.Filled.Bolt }, action = CarAction.TOGGLE_CHARGE,
@@ -100,7 +110,32 @@ internal object WearFaceControls {
     /** What each quarter holds until the wearer chooses: the four everyday controls. */
     val defaults = listOf("lock", "climate", "charge", "flash")
 
-    fun byKey(key: String): FaceControl? = all.firstOrNull { it.key == key }
+    /** A stored choice that is one of the phone's climate presets is "preset:" and its id; the controls below are built from it. */
+    const val PRESET_PREFIX = "preset:"
+
+    /**
+     * A control that starts one saved climate preset (the phone's own, see [WearPresets]). Built on demand from the stored
+     * id, because which presets exist belongs to the phone; one the car does not have is simply unavailable, so its quarter
+     * stays quiet instead of failing.
+     */
+    private fun presetControl(id: String) = FaceControl(
+        key = PRESET_PREFIX + id,
+        choice = "Preset: " + (WearPresets.findAny(id)?.name ?: "Climate"),
+        label = { WearPresets.find(it.vin, id)?.name ?: "Preset" },
+        icon = { Icons.Filled.Thermostat },
+        action = CarAction.CLIMATE_ON,
+        available = { WearPresets.find(it.vin, id) != null },
+        active = { it.climateOn == true },
+        request = { WearPresets.find(it.vin, id)?.request },
+    )
+
+    fun byKey(key: String): FaceControl? =
+        all.firstOrNull { it.key == key }
+            ?: key.takeIf { it.startsWith(PRESET_PREFIX) && it.length > PRESET_PREFIX.length }?.let { presetControl(it.removePrefix(PRESET_PREFIX)) }
+
+    /** Everything this car's quarter can be: the fixed controls it can do, then each of its climate presets. */
+    fun choicesFor(car: VehicleSnapshot): List<FaceControl> =
+        all.filter { it.available(car) } + WearPresets.forCar(car.vin).map { presetControl(it.id) }
 
     /** The name for a stored choice, in the chooser and the settings row. */
     fun choiceName(key: String): String = byKey(key)?.choice ?: "Empty"

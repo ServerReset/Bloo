@@ -32,6 +32,10 @@ data class WatchSyncPayload(
      * the phone's settings, so Drive carries it). Null until anything has been stored: the watch then offers its own.
      */
     val look: WatchLookPrefs? = null,
+    /** The phone's saved climate presets for each car (by VIN), so the watch can start any of them. */
+    val climatePresets: Map<String, List<ClimatePreset>> = emptyMap(),
+    /** Whether the phone shows temperatures in Fahrenheit, so a preset reads the same on the watch. */
+    val fahrenheit: Boolean = true,
 )
 
 /**

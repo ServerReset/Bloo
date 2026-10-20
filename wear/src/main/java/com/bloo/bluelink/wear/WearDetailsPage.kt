@@ -31,6 +31,8 @@ internal fun WearDetailsPage(
     downloading: Boolean,
     progress: Float,
     lastResult: WatchCommandResult?,
+    pendingCommands: Set<String>,
+    requestCommand: ((() -> Unit)) -> Unit,
     onChooseSlot: (Int) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -50,6 +52,7 @@ internal fun WearDetailsPage(
         }
         // The refresh button sits with the freshness in the status pebble.
         item { WearStatusPebble(v, refreshing = refreshing, canRefresh = false, onRefresh = {}) }
+        item { WearClimatePebble(repo, v, pendingCommands, requestCommand) }
         item { WearCarCarePebble(v, refreshing = refreshing, canRefresh = signedIn, onRefresh = { repo.refresh() }) }
         // The update error, shown where the update lives. It used to go nowhere at all.
         updateError?.let { message ->

@@ -138,6 +138,8 @@ class BlooTileService : TileService() {
      * applies); pressing the hub refreshes. Each quarter is a disc quarter, from per-corner radii.
      */
     private fun faceLayout(car: VehicleSnapshot, open: ModifiersBuilders.Modifiers): LayoutElementBuilders.LayoutElement {
+        // The presets a quarter may start live in prefs the app fills; the tile can run without the app having opened.
+        WearPresets.ensureLoaded(applicationContext)
         val color = tint(car)
         val stale = if (car.isStale()) car.updatedLabel() else null
         val slots = WearTileActions.forSlots(car, WearFacePrefs.load(applicationContext))

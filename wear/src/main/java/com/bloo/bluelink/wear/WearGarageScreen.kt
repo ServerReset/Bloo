@@ -205,7 +205,7 @@ private fun WearCarPage(
         // The tile's button is one of the face's own controls, so it runs exactly as a tap on the face would.
         WearFaceControls.byKey(key)?.takeIf { it.available(v) }?.let { control ->
             if (control.confirm(v)) confirmAction = control.action
-            else requestCommand { repo.command(v.vin, control.action) }
+            else requestCommand { repo.command(v.vin, control.action, control.request?.invoke(v)) }
         }
         onTileRequestHandled()
     }
@@ -307,7 +307,8 @@ private fun WearCarPage(
             WearDetailsPage(
                 repo = repo, v = v, slotKeys = slotKeys, refreshing = refreshing, signedIn = signedIn,
                 updateError = updateError, updateRun = updateRun, downloading = downloading, progress = progress,
-                lastResult = lastResult, onChooseSlot = { editingFace = true },
+                lastResult = lastResult, pendingCommands = pendingCommands, requestCommand = requestCommand,
+                onChooseSlot = { editingFace = true },
             )
         }
     }

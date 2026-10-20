@@ -19,6 +19,8 @@ import com.bloo.bluelink.data.setNotifyCharging
 import com.bloo.bluelink.data.setNotifyWatchLowBattery
 import com.bloo.bluelink.data.setWatchLook
 import com.bloo.bluelink.data.watchLook
+import com.bloo.bluelink.data.climatePresets
+import kotlinx.coroutines.flow.first
 import com.bloo.bluelink.data.watchLockTiming
 import com.bloo.bluelink.ioScope
 import com.google.android.gms.wearable.DataEvent
@@ -194,6 +196,9 @@ class PhoneWatchSyncService : WearableListenerService() {
                     watchUpdateNotes = watchUpdateNotes,
                     notify = SettingsStore(app).notificationPrefs().let { WatchNotifyPrefs(it.charging, it.chargeComplete, it.watchLowBattery) },
                     look = SettingsStore(app).watchLook(),
+                    climatePresets = snapshot.vehicles.associate { it.vin to SettingsStore(app).climatePresets(it.vin) }
+                        .filterValues { it.isNotEmpty() },
+                    fahrenheit = SettingsStore(app).appearance.first().useFahrenheit,
                 )
                 val jsonString = Json.encodeToString(WatchSyncPayload.serializer(), payload)
                 val req = PutDataMapRequest.create(WatchSyncProtocol.PATH_SNAPSHOT).apply {

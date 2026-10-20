@@ -24,6 +24,12 @@ object CarAction {
     const val FLASH_LIGHTS = "flash_lights"
     const val HORN_AND_LIGHTS = "horn_and_lights"
 
+    /**
+     * Start climate at the temperature the weather at the car calls for (see [smartClimateTargetF]); a second press while
+     * it is running stops it. Needs the car's location and a weather reading, so it fails plainly without them.
+     */
+    const val CLIMATE_SMART = "climate_smart"
+
     /** Apply the AC/DC charge-limit targets in [CarCommand.acLimit]/[CarCommand.dcLimit]. */
     const val SET_CHARGE_LIMITS = "set_charge_limits"
 
@@ -53,6 +59,19 @@ data class CarCommand(
     val acLimit: Int = DEFAULT_AC_CHARGE_LIMIT_PCT,
     val dcLimit: Int = DEFAULT_DC_CHARGE_LIMIT_PCT,
 )
+
+/** This command carrying [req] as its climate settings (null leaves the defaults). */
+fun CarCommand.withClimate(req: ClimateRequest?): CarCommand =
+    if (req == null) this else copy(
+        tempF = req.tempF,
+        durationMinutes = req.durationMinutes,
+        defrost = req.defrost,
+        steeringWheelHeat = req.steeringWheelHeat.apiValue,
+        seatFrontLeft = req.seatFrontLeft.apiValue,
+        seatFrontRight = req.seatFrontRight.apiValue,
+        seatRearLeft = req.seatRearLeft.apiValue,
+        seatRearRight = req.seatRearRight.apiValue,
+    )
 
 /** The result of attempting a [CarCommand]. */
 @Serializable

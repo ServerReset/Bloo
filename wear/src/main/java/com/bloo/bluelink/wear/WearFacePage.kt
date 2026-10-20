@@ -42,7 +42,7 @@ internal fun WearFacePage(
                     pending = WearCommands.key(v.vin, control.action) in pendingCommands,
                 ) {
                     if (control.confirm(v)) onConfirm(control.action)
-                    else requestCommand { repo.command(v.vin, control.action) }
+                    else requestCommand { repo.command(v.vin, control.action, control.request?.invoke(v)) }
                 }
             }
             WearCarFace(

@@ -6,6 +6,7 @@ import com.bloo.bluelink.data.PinRecord
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WatchCommandRequest
+import com.bloo.bluelink.data.withClimate
 import com.bloo.bluelink.data.WatchSyncPayload
 import com.bloo.bluelink.data.WatchSyncProtocol
 import com.bloo.bluelink.ioScope
@@ -122,6 +123,7 @@ object WearDataLayerSync {
         val app = context.applicationContext
         WearNotificationPrefs(app).apply(payload.notify)
         WearLook.applyOrSeed(app, payload.look)
+        WearPresets.update(app, payload.climatePresets, payload.fahrenheit)
         WearNotifier.onVehicles(app, _vehicles.value, payload.vehicles)
         _vehicles.value = payload.vehicles
         _selectedVin.value = payload.selectedVin
@@ -189,11 +191,11 @@ object WearDataLayerSync {
      * Send a command to the phone to run; its outcome arrives in [lastCommandResult]. Used when
      * the watch has no session of its own (see [WearCredentialSync.runLocally]).
      */
-    fun sendCommand(context: Context, vin: String, action: String) {
+    fun sendCommand(context: Context, vin: String, action: String, climate: com.bloo.bluelink.data.ClimateRequest? = null) {
         val app = context.applicationContext
         val request = WatchCommandRequest(
             requestId = UUID.randomUUID().toString(),
-            command = com.bloo.bluelink.data.CarCommand(vin, action),
+            command = com.bloo.bluelink.data.CarCommand(vin, action).withClimate(climate),
         )
         scope.launch {
             val req = PutDataMapRequest.create(WatchSyncProtocol.PATH_COMMAND).apply {

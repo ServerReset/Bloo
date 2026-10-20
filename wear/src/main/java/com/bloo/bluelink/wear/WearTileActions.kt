@@ -59,12 +59,12 @@ object WearTileActions {
         "lock" -> if (car.locked == true) "unlock" else "lock"
         "lock_only" -> "lock"
         "unlock_only" -> "unlock"
-        "climate", "climate_on" -> "climate"
+        "climate", "climate_on", "climate_smart" -> "climate"
         "charge", "charge_on" -> "bolt"
         "flash" -> "flash"
         "horn" -> "horn"
         "refresh" -> "refresh"
-        else -> "close"
+        else -> if (key.startsWith(WearFaceControls.PRESET_PREFIX)) "climate" else "close"
     }
 
     /** A tile button is narrow: a long label ("Climate off", "Stop charge") keeps its first word. */

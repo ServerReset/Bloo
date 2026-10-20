@@ -289,4 +289,35 @@ class CarCommandRunnerTest {
             assertEquals(before != true, flipped.locked, "flip from $before went the wrong way")
         }
     }
+
+    @Test
+    fun smartClimateIsAClimateToggleForTheStateHelpers() {
+        assertEquals(CarAction.CLIMATE_OFF, CarCommandRunner.resolveToggle(snap(climateOn = true), CarAction.CLIMATE_SMART))
+        assertEquals(CarAction.CLIMATE_ON, CarCommandRunner.resolveToggle(snap(climateOn = false), CarAction.CLIMATE_SMART))
+        assertEquals(false, CarCommandRunner.stateFor(snap(climateOn = false), CarAction.CLIMATE_SMART))
+        assertEquals(true, CarCommandRunner.optimistic(snap(climateOn = false), CarAction.CLIMATE_SMART).climateOn)
+        assertEquals(false, CarCommandRunner.withState(snap(climateOn = true), CarAction.CLIMATE_SMART, false).climateOn)
+    }
+
+    @Test
+    fun aCommandCarriesAPresetsClimateSettings() {
+        val req = ClimateRequest(
+            tempF = 71, defrost = true, durationMinutes = 7,
+            steeringWheelHeat = WheelHeatLevel.fromApi(1), seatFrontLeft = SeatLevel.fromApi(2),
+        )
+        val cmd = CarCommand("VIN1", CarAction.CLIMATE_ON).withClimate(req)
+        assertEquals(71, cmd.tempF)
+        assertEquals(7, cmd.durationMinutes)
+        assertEquals(true, cmd.defrost)
+        assertEquals(req.steeringWheelHeat.apiValue, cmd.steeringWheelHeat)
+        assertEquals(req.seatFrontLeft.apiValue, cmd.seatFrontLeft)
+        // No request: the command is left as it was.
+        assertEquals(CarCommand("VIN1", CarAction.CLIMATE_ON), CarCommand("VIN1", CarAction.CLIMATE_ON).withClimate(null))
+    }
+
+    @Test
+    fun smartClimateRequestFollowsTheWeather() {
+        val hot = smartClimateRequest(Weather(tempC = 38.0, feelsLikeC = 38.0, highC = null, lowC = null, windKph = 0.0, humidity = null, isDay = true, code = 0))
+        assertEquals(smartClimateTargetF(ambientFahrenheit(38.0)), hot.tempF)
+    }
 }

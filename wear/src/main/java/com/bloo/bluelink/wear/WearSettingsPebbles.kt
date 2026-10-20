@@ -1,7 +1,11 @@
 package com.bloo.bluelink.wear
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bolt
@@ -16,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
  * The watch's settings pebbles: what it notifies about, and its own AutoLock.
@@ -42,6 +47,56 @@ internal fun WearAlertsPebble() {
         }
         WearActionRow("Low battery", Icons.Filled.BatteryAlert, active = low, switch = true) {
             low = !low; prefs.lowBattery = low; prefs.sendToPhone(context)
+        }
+    }
+}
+
+/**
+ * The car's climate on the watch, the phone's own: smart climate (the temperature the weather at the car calls for), then
+ * every preset saved on the phone for this car, each starting at its settings, and a stop while it runs. A start goes
+ * through the same PIN gate as a tap on the face ([requestCommand]).
+ */
+@Composable
+internal fun WearClimatePebble(
+    repo: WearSnapshotRepository,
+    v: com.bloo.bluelink.data.VehicleSnapshot,
+    pending: Set<String>,
+    requestCommand: ((() -> Unit)) -> Unit,
+) {
+    val presets by WearPresets.presets.collectAsStateWithLifecycle()
+    val saved = presets[v.vin].orEmpty()
+    val on = v.climateOn == true
+    fun busy(action: String) = WearCommands.key(v.vin, action) in pending
+    WearPebble(title = "Climate", icon = Icons.Filled.AcUnit) {
+        if (on) {
+            WearActionRow("Stop climate", Icons.Filled.Close, pending = busy(com.bloo.bluelink.data.CarAction.CLIMATE_OFF)) {
+                requestCommand { repo.command(v.vin, com.bloo.bluelink.data.CarAction.CLIMATE_OFF) }
+            }
+        } else {
+            WearActionRow("Smart climate", Icons.Filled.AutoMode, pending = busy(com.bloo.bluelink.data.CarAction.CLIMATE_SMART)) {
+                requestCommand { repo.command(v.vin, com.bloo.bluelink.data.CarAction.CLIMATE_SMART) }
+            }
+            saved.forEach { preset ->
+                WearActionRow(preset.name, Icons.Filled.Thermostat, pending = busy(com.bloo.bluelink.data.CarAction.CLIMATE_ON)) {
+                    requestCommand { repo.command(v.vin, com.bloo.bluelink.data.CarAction.CLIMATE_ON, preset.request) }
+                }
+                WearCenteredText(
+                    WearPresets.detail(preset.request),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Normal,
+                    maxLines = 1,
+                )
+            }
+            if (saved.isEmpty()) {
+                WearCenteredText(
+                    "Smart climate sets the temperature for the weather at the car. Presets you save in Bloo on your phone show up here.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Normal,
+                    maxLines = 5,
+                )
+            }
         }
     }
 }

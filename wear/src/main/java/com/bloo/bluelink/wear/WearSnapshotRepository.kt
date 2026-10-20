@@ -67,13 +67,13 @@ class WearSnapshotRepository(private val context: Context) {
     val refreshing: StateFlow<Boolean> = _refreshing
 
     /** Send any of the app's command names for [vin]; the face's controls all go through here. */
-    fun command(vin: String, action: String) {
+    fun command(vin: String, action: String, climate: com.bloo.bluelink.data.ClimateRequest? = null) {
         // Refresh is not a car command (the runner has no such action): it pulls fresh status, like the pull-down.
-        if (action == CarAction.REFRESH) refresh() else run(vin, action)
+        if (action == CarAction.REFRESH) refresh() else run(vin, action, climate)
     }
 
-    private fun run(vin: String, action: String) {
-        scope.launch { WearCommands.track(vin, action) { runWatchCommand(context, vin, action) } }
+    private fun run(vin: String, action: String, climate: com.bloo.bluelink.data.ClimateRequest? = null) {
+        scope.launch { WearCommands.track(vin, action) { runWatchCommand(context, vin, action, climate) } }
     }
 
     /** The last command result, so the UI can clear pending + show a failure. */
@@ -88,9 +88,14 @@ class WearSnapshotRepository(private val context: Context) {
  * phone. The watch's one command path, shared by [WearSnapshotRepository] and [WearActionReceiver]
  * (a notification's Stop action).
  */
-internal suspend fun runWatchCommand(context: Context, vin: String, action: String): Boolean {
-    if (WearCredentialSync.runLocally(context, vin, action) != null) return true
-    WearDataLayerSync.sendCommand(context, vin, action)
+internal suspend fun runWatchCommand(
+    context: Context,
+    vin: String,
+    action: String,
+    climate: com.bloo.bluelink.data.ClimateRequest? = null,
+): Boolean {
+    if (WearCredentialSync.runLocally(context, vin, action, climate) != null) return true
+    WearDataLayerSync.sendCommand(context, vin, action, climate)
     return false
 }
 

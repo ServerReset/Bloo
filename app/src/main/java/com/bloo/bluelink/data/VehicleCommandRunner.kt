@@ -165,13 +165,6 @@ object VehicleCommandRunner {
         return smartClimateRequest(w)
     }
 
-    /** The smart-climate request for a given weather reading. */
-    private fun smartClimateRequest(w: Weather): ClimateRequest = ClimateRequest(
-        tempF = smartClimateTargetF(ambientFahrenheit(w.tempC)),
-        defrost = false,
-        durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
-    )
-
     /**
      * Force-start climate for the "climate_on" command (explicit start phrasing from settings
      * search).
