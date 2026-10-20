@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.RevealText
 
 /**
@@ -176,31 +176,26 @@ internal fun pinPadSizing(maxWidth: Dp, maxHeight: Dp, gap: Dp = PIN_PAD_GAP): P
     return PinPadSizing(key, showCaption)
 }
 
+/** One key: a digit, or the backspace and confirm glyphs (the shared ones) with a spoken name, since a glyph alone reads as nothing. */
 @Composable
-private fun WearKey(label: String, size: Dp, onClick: () -> Unit) {    // A spoken label, because a key's only label is the glyph it draws -- a digit, a backspace or a
-    // tick -- which a screen reader reads as punctuation or as nothing at all. The glyph and the
-    // corner scale with the key, so a small key is a small key rather than a cropped big one.
+private fun WearKey(label: String, size: Dp, onClick: () -> Unit) {
+    val glyph = when (label) {
+        "del" -> AppIcons.Backspace
+        "ok" -> AppIcons.Check
+        else -> null
+    }
     val spoken = when (label) {
         "del" -> "Delete"
         "ok" -> "Confirm"
         else -> label
     }
-    Surface(
-        onClick = onClick,
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
-        modifier = Modifier
-            .size(size)
-            .wearGlassRim(CircleShape)
-            .semantics { contentDescription = spoken },
-    ) {
-        Box(contentAlignment = Alignment.Center) {
+    WearRoundButton(size, spoken, onClick = onClick) {
+        if (glyph != null) {
+            // The glyph scales with the key, so a small key is a small key rather than a cropped big one.
+            androidx.compose.material3.Icon(glyph, contentDescription = null, modifier = Modifier.size(size * 0.46f))
+        } else {
             Text(
-                when (label) {
-                    "del" -> "\u232B"
-                    "ok" -> "\u2713"
-                    else -> label
-                },
+                label,
                 style = MaterialTheme.typography.titleMedium,
                 fontSize = (size * 0.42f).value.sp,
                 fontWeight = FontWeight.SemiBold,

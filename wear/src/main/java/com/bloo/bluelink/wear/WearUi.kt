@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -68,6 +70,8 @@ import com.bloo.uicommon.standardButtonIcon
  *   Sections  WearPebble (a headed group)  with  WearActionRow (a tap), WearToggleRow (an on/off), WearStatRow (a fact)
  *             and WearCaption / WearCenteredText (the words under them)
  *   Glass     WearButton: the one button every row is (see WearGlass for the blur and the rim)
+ *             WearRoundButton: the same glass as a circle (keypad keys, single-glyph controls)
+ *   Buttons   every button is :uicommon's MorphButton (via WearButton) and every glyph is an AppIcons one; nothing here draws its own
  */
 
 /*
@@ -337,6 +341,32 @@ internal fun WearButton(
         },
         content = content,
     )
+}
+
+/**
+ * The watch's round key: a glass circle of a given [size] with the hairline rim, for a keypad's keys and any single-glyph
+ * control. Its [description] is what a screen reader says, because its content is a glyph or a digit. Rows and wide buttons are
+ * [WearButton]; this is the same glass for a shape that must stay a circle.
+ */
+@Composable
+fun WearRoundButton(
+    size: Dp,
+    description: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    androidx.compose.material3.Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
+        modifier = modifier
+            .size(size)
+            .wearGlassRim(CircleShape)
+            .semantics { contentDescription = description },
+    ) {
+        Box(contentAlignment = Alignment.Center, content = content)
+    }
 }
 
 /** A row's corners: a full pill at rest, the phone's rounded square (28%) while pressed. */

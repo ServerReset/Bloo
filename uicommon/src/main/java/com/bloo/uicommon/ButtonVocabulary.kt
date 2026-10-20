@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
@@ -54,6 +55,7 @@ object AppIcons {
   val ArrowForward = Icons.AutoMirrored.Filled.ArrowForward
   val Search = Icons.Filled.Search
   val Check = Icons.Filled.Check
+  val Backspace = Icons.AutoMirrored.Filled.Backspace
   val CheckCircle = Icons.Filled.CheckCircle
   val Info = Icons.Filled.Info
   val DirectionsCar = Icons.Filled.DirectionsCar
