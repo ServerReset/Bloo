@@ -64,7 +64,7 @@ import com.bloo.uicommon.standardButtonIcon
  * RevealText and AnimatedValue rather than copies of them):
  *
  *   Screens   WearListScreen (scrolling, clock on top)   WearMessageScreen / WearConfirmScreen (full-screen states)
- *             WearChoiceScreen (pick one)                WearBackable (a layer that peels off with back or a swipe)
+ *             WearBackable (a layer that peels off with back or a swipe)
  *   Sections  WearPebble (a headed group)  with  WearActionRow (a tap), WearToggleRow (an on/off), WearStatRow (a fact)
  *             and WearCaption / WearCenteredText (the words under them)
  *   Glass     WearButton: the one button every row is (see WearGlass for the blur and the rim)
@@ -73,7 +73,7 @@ import com.bloo.uicommon.standardButtonIcon
 /*
  * The watch's reusable screens. Every scrolling screen is a [WearListScreen] (so the clock, the scroll
  * indicator, the round-display padding and the "no per-card scaling, each element fits on its own" rule are
- * written once), and every "pick one of these" screen is a [WearChoiceScreen].
+ * written once).
  */
 
 /**
@@ -98,35 +98,6 @@ fun WearListScreen(
             contentPadding = contentPadding,
             content = content,
         )
-    }
-}
-
-/** One option on a [WearChoiceScreen]. */
-data class WearChoice<T>(val value: T, val label: String, val icon: ImageVector? = null)
-
-/**
- * A "pick one" screen: a title, the options as rows with the current one lit, and optionally an "Empty" row at
- * the end. A tap picks and the caller decides what happens next. Used by the face's control chooser; anything
- * else that needs a choice on the watch (a unit, a delay) is the same screen.
- */
-@Composable
-fun <T> WearChoiceScreen(
-    title: String,
-    choices: List<WearChoice<T>>,
-    selected: T,
-    onPick: (T) -> Unit,
-    /** A last "none of these" row, or null for none. */
-    empty: WearChoice<T>? = null,
-) {
-    WearListScreen {
-        item { WearCenteredText(title, style = MaterialTheme.typography.titleSmall) }
-        (choices + listOfNotNull(empty)).forEachIndexed { i, choice ->
-            item(key = i) {
-                WearActionRow(choice.label, choice.icon ?: AppIcons.Close.takeIf { choice === empty }, active = choice.value == selected, switch = true) {
-                    onPick(choice.value)
-                }
-            }
-        }
     }
 }
 
