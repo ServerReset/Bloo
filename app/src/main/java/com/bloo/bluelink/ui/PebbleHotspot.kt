@@ -48,7 +48,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.bloo.bluelink.data.Vehicle
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.GapGroup
@@ -57,9 +56,6 @@ import com.bloo.uicommon.LocalHaptics
 
 /** How far right the pinned pebble must be dragged before releasing unpins it. */
 private val UnpinTravel = 88.dp
-
-/** How long a collapsed pin stays collapsed in the hot seat before it opens as a reveal. */
-private const val PinRevealDelayMs = 220L
 
 /**
  * The spring an unpinned pebble flies back into its stack slot on. Mirrors the ReorderColumn's own
@@ -80,9 +76,8 @@ private val UnpinFlightProgressSpec = spring<Float>(dampingRatio = Spring.Dampin
  * back to the right, toward the stack. While a pebble is dragged over the seat from the stack the seat
  * leans toward the finger, a soft tick fires on entry, and the empty drop zone fills in.
  *
- * A pinned pebble keeps its OWN collapsed/expanded state: one that was collapsed lands here collapsed,
- * opens a beat later as a small reveal, and stays open; unpinned back into the stack it collapses again
- * on the way out, exactly as it was (pinning never touches the stored state).
+ * A pinned pebble is always expanded in the hot seat, on every page: pinning opens it and it stays open. Unpinned back
+ * into the stack it folds up again on the way out if it was folded there (pinning never touches the stored state).
  */
 @Composable
 internal fun HotspotSlot(
@@ -211,16 +206,10 @@ internal fun PinnedPebble(
     val haptics = LocalHaptics.current
     val scope = rememberCoroutineScope()
     val unpinPx = with(LocalDensity.current) { UnpinTravel.toPx() }
-    // The stored state never changes: a collapsed pebble opens a beat after it lands, and collapses
-    // again on the way home.
-    val initiallyExpanded = remember(v.vin, section) { stateSource.value.isPebbleExpanded(v.vin, section) }
-    var revealed by remember(v.vin, section) { mutableStateOf(initiallyExpanded) }
-    LaunchedEffect(v.vin, section) {
-        if (!initiallyExpanded) {
-            delay(PinRevealDelayMs)
-            revealed = true
-        }
-    }
+    // A pinned pebble is always open: it lives in the hot seat, so it stays expanded on every page the wearer swipes to. The
+    // stored state (what it was in the stack) is only read to decide, on the way home, whether it folds back up.
+    val storedExpanded = remember(v.vin, section) { stateSource.value.isPebbleExpanded(v.vin, section) }
+    var revealed by remember(v.vin, section) { mutableStateOf(true) }
     var dragging by remember(section) { mutableStateOf(false) }
     val dragX = remember(section) { mutableFloatStateOf(0f) }
     val dragY = remember(section) { mutableFloatStateOf(0f) }
@@ -262,7 +251,7 @@ internal fun PinnedPebble(
             // Collapse back to the state it came from, fly to its own slot in the stack, and only
             // THEN commit the unpin -- so it travels to the right place instead of fading where it
             // was dropped. The target is the row's slot, registered even while it is collapsed.
-            if (!initiallyExpanded) revealed = false
+            if (!storedExpanded) revealed = false
             val from = hotDrag?.slotTopLeft
             val to = hotDrag?.stackSlot?.get(section)
             scope.launch {
