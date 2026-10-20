@@ -1,6 +1,5 @@
 package com.bloo.bluelink.wear
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.LinearEasing
@@ -19,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.bloo.uicommon.rememberChargeFillColors
 import com.bloo.uicommon.rememberChargeFront
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.Dp
-import com.bloo.bluelink.data.BlooColors
 import com.bloo.uicommon.LocalPowerPolicy
 
 /**
@@ -75,14 +74,7 @@ fun WearEdgeRing(
     // again -- the ring visibly keeps filling while the car charges.
     val front by rememberChargeFront(charging && policy.ambientMotion && progress != null)
     // The phone's two stops of the fill: the darker end where it starts, the lighter where it ends.
-    val fillDark by animateColorAsState(
-        Color(if (stuck) BlooColors.chargeBlueDark else BlooColors.chargeGreenDark),
-        animationSpec = if (policy.bouncySprings) tween(500) else snap(), label = "ringFillDark",
-    )
-    val fillLight by animateColorAsState(
-        Color(if (stuck) BlooColors.chargeBlue else BlooColors.chargeGreen),
-        animationSpec = if (policy.bouncySprings) tween(500) else snap(), label = "ringFillLight",
-    )
+    val fill = rememberChargeFillColors(stuck, if (policy.bouncySprings) tween(500) else snap())
     // The limit glides when it changes; the first value is where it starts, not an animation from nothing.
     val limitAnim = remember { Animatable(0f) }
     var limitSeen by remember { mutableStateOf(false) }
@@ -118,7 +110,7 @@ fun WearEdgeRing(
             if (filledEnd > 0f) {
                 // Dark where the fill starts, light where it ends: the gradient is as long as the fill, as on the phone's bar.
                 val gradient = Brush.sweepGradient(
-                    0f to fillDark, (filledEnd / 360f).coerceIn(0.02f, 1f) to fillLight, 1f to fillLight,
+                    0f to fill.fillDark, (filledEnd / 360f).coerceIn(0.02f, 1f) to fill.fillLight, 1f to fill.fillLight,
                     center = center,
                 )
                 segment(0f, filledEnd, brush = gradient)
@@ -137,7 +129,7 @@ fun WearEdgeRing(
                 val grow = (minOf(34f, room) * front).coerceIn(0f, maxOf(room, 0f))
                 if (grow > 2f * half) {
                     drawArc(
-                        fillLight.copy(alpha = 0.55f), filledEnd + half - 90f, grow - 2f * half, false, topLeft, arc,
+                        fill.fillLight.copy(alpha = 0.55f), filledEnd + half - 90f, grow - 2f * half, false, topLeft, arc,
                         style = Stroke(w, cap = StrokeCap.Round),
                     )
                 }

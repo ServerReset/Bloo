@@ -3,8 +3,9 @@ package com.bloo.bluelink.wear
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WeatherApi
 import com.bloo.bluelink.data.ambientFahrenheit
-import com.bloo.bluelink.data.degValue
+import com.bloo.bluelink.data.degLabel
 import com.bloo.bluelink.data.smartClimateIsCooling
+import com.bloo.bluelink.data.smartClimateLabel
 import com.bloo.bluelink.data.smartClimateTargetF
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,12 +43,10 @@ internal object WearSmartClimate {
         _hints.update { it + (car.vin to hint) }
     }
 
-    /** "Cool to 62°" or "Heat to 78°", with the outside temperature, in the phone's unit. */
+    /** "Cool to 62°" or "Heat to 78°", with the outside temperature, in the phone's unit (the phone words the first part the same way). */
     fun describe(hint: Hint): String {
         val fahrenheit = WearPresets.fahrenheit
-        val target = degValue(hint.targetF.toDouble(), fahrenheit)
-        val outside = degValue(hint.ambientF.toDouble(), fahrenheit)
-        return (if (hint.cooling) "Cool to $target°" else "Heat to $target°") + " · $outside° outside"
+        return smartClimateLabel(hint.ambientF, fahrenheit) + " · " + degLabel(hint.ambientF.toString(), fahrenheit) + " outside"
     }
 
     private val failedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()

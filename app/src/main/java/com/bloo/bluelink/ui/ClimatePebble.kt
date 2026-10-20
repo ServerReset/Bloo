@@ -35,7 +35,7 @@ import com.bloo.bluelink.data.deleteClimatePreset
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.saveClimatePreset
 import com.bloo.bluelink.data.settingsMode
-import com.bloo.bluelink.data.smartClimateIsCooling
+import com.bloo.bluelink.data.smartClimateLabel
 import com.bloo.bluelink.data.smartClimateTargetF
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
@@ -310,7 +310,7 @@ internal fun ClimatePebble(
                 val smartTarget = smartClimateTargetF(ambientF)
                 val targetLabel = degLabel(smartTarget.toString(), fahrenheit)
                 val ambientLabel = degLabel(ambientF.toString(), fahrenheit)
-                val smartLabel = if (smartClimateIsCooling(ambientF)) "Cool to $targetLabel" else "Heat to $targetLabel"
+                val smartLabel = smartClimateLabel(ambientF, fahrenheit)
                 MorphActionButton(
                     label = smartLabel,
                     icon = Icons.Filled.AcUnit,

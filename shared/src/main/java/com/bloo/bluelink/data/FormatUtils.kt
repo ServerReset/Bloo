@@ -56,6 +56,12 @@ fun smartClimateTargetF(ambientF: Int): Int {
 /** Whether [smartClimateTargetF] cools (70F and up) rather than heats for [ambientF]. */
 fun smartClimateIsCooling(ambientF: Int): Boolean = ambientF >= 70
 
+/** What smart climate says it will do for [ambientF], in the person's unit: "Cool to 62°" or "Heat to 78°". The phone and the watch both show it. */
+fun smartClimateLabel(ambientF: Int, fahrenheit: Boolean): String {
+    val target = degLabel(smartClimateTargetF(ambientF).toString(), fahrenheit)
+    return (if (smartClimateIsCooling(ambientF)) "Cool to " else "Heat to ") + target
+}
+
 /**
  * The valid range (in minutes) for a SINGLE remote-start climate command's duration -- the vendor
  * API itself rejects/clamps anything past 10 minutes per command. The default within this range

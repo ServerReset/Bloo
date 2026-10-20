@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.bloo.uicommon.rememberChargeFillColors
 import com.bloo.uicommon.rememberChargeFront
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -72,16 +73,7 @@ internal fun ChargeSegmentBar(
     val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else Color.Black.copy(alpha = 0.14f)
     // Springing both gradient stops gives that moment an actual transition instead of a colour
     // popping mid-draw.
-    val fillDark by androidx.compose.animation.animateColorAsState(
-        targetValue = if (stuckAtLimit) ChargeBlueDark else ChargeGreenDark,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "chargeFillDark",
-    )
-    val fillLight by androidx.compose.animation.animateColorAsState(
-        targetValue = if (stuckAtLimit) ChargeBlue else ChargeGreen,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "chargeFillLight",
-    )
+    val fill = rememberChargeFillColors(stuckAtLimit, lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow))
     val limitAnim = remember { Animatable(0f) }
     var limitSeen by remember { mutableStateOf(false) }
     // Read here, at composable scope, not inline inside the LaunchedEffect below --
@@ -131,7 +123,7 @@ internal fun ChargeSegmentBar(
         if (layout.fillWidth > 0f) {
             drawRoundRect(
                 brush = Brush.horizontalGradient(
-                    listOf(fillDark, fillLight),
+                    listOf(fill.fillDark, fill.fillLight),
                     startX = 0f,
                     endX = layout.fillWidth,
                 ),
@@ -148,7 +140,7 @@ internal fun ChargeSegmentBar(
             val frontWidth = (minOf(size.width * 0.16f, frontRoom) * front).coerceIn(0f, maxOf(frontRoom, 0f))
             if (frontWidth > h * 0.5f) {
                 drawRoundRect(
-                    color = fillLight.copy(alpha = 0.55f),
+                    color = fill.fillLight.copy(alpha = 0.55f),
                     topLeft = Offset(layout.fillWidth + gapPx, 0f),
                     size = Size(frontWidth, h),
                     cornerRadius = radius,
