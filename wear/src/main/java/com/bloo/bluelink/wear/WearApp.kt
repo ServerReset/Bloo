@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
@@ -57,6 +60,21 @@ fun WearApp(
     // A command waiting behind the PIN prompt, replayed after a right PIN.
     var pendingCommand by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pinPromptVisible by remember { mutableStateOf(false) }
+
+    // The PIN opens the app for as long as it is in front of the wearer: once it stops (screen off, home, another app) the
+    // proof is gone, so a tile or complication tap that brings the same instance back asks again.
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(owner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                sessionUnlocked = false
+                pinPromptVisible = false
+                pendingCommand = null
+            }
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
 
     val timing = pinStore.timing
     val needsOpenUnlock = pinStore.hasPin &&

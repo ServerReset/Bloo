@@ -73,6 +73,8 @@ class WearPullState {
 fun Modifier.wearPullToRefresh(state: WearPullState, onRefresh: () -> Unit): Modifier {
     val haptics = LocalHapticFeedback.current
     val distancePx = with(LocalDensity.current) { PullDistance.toPx() }
+    // The gesture loop starts once; it must call the CURRENT refresh, not the one from the composition that began it.
+    val refresh = androidx.compose.runtime.rememberUpdatedState(onRefresh)
     return pointerInput(state) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -102,7 +104,7 @@ fun Modifier.wearPullToRefresh(state: WearPullState, onRefresh: () -> Unit): Mod
             if (state.pull >= 1f) {
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                 state.requested = true
-                onRefresh()
+                refresh.value()
             }
             state.pull = 0f
         }
@@ -114,13 +116,22 @@ fun Modifier.wearPullToRefresh(state: WearPullState, onRefresh: () -> Unit): Mod
 fun BoxScope.WearPullIndicator(state: WearPullState, refreshing: Boolean) {
     val active = refreshing || state.requested
     // The real flag takes over from the request; and a refresh that never reports one must not hold the disc.
+    val refreshingNow = androidx.compose.runtime.rememberUpdatedState(refreshing)
     LaunchedEffect(state.requested) {
         if (state.requested) {
             kotlinx.coroutines.delay(700)
-            if (!refreshing) state.requested = false
+            if (!refreshingNow.value) state.requested = false
         }
     }
-    LaunchedEffect(refreshing) { if (refreshing) state.requested = false }
+    // A request made while a refresh was already running is cleared when that one ends, not left holding the disc.
+    LaunchedEffect(refreshing) {
+        if (refreshing) {
+            state.requested = false
+        } else if (state.requested) {
+            kotlinx.coroutines.delay(300)
+            state.requested = false
+        }
+    }
     fun fingerOf(p: Float): Float {
         val over = (p - 1f).coerceAtLeast(0f)
         return p.coerceIn(0f, 1f) + over / (1f + over) * 0.35f

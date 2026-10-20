@@ -27,9 +27,11 @@ suspend fun SettingsStore.watchLook(): WatchLookPrefs? {
 
 /** Stores the watch's settings; true when that changed anything (so the caller can skip a pointless push back). */
 suspend fun SettingsStore.setWatchLook(look: WatchLookPrefs): Boolean {
-    if (watchLook() == look) return false
+    val stored = watchLook()
+    if (stored == look || (look.slots.isEmpty() && stored != null && stored.copy(slots = emptyList()) == look)) return false
     editTracked {
-        it[SLOTS] = look.slots.joinToString(",")
+        // An empty list means "the watch has not chosen": keep the controls already stored rather than erasing them.
+        if (look.slots.isNotEmpty()) it[SLOTS] = look.slots.joinToString(",")
         it[REDUCE_EFFECTS] = look.reduceEffects
         it[AUTOLOCK] = look.autoLock
     }

@@ -356,7 +356,7 @@ private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptio
             if (showUpdated) {
                 car.updatedLabel()?.let { updated ->
                     Text(
-                        updated,
+                        updated, maxLines = 1,
                         style = TextStyle(color = if (stale) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp),
                     )
                 }

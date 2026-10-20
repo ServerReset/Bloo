@@ -65,7 +65,8 @@ internal enum class StripControl(val key: String, val label: String, val action:
 }
 
 /** How many round buttons fit beside the readout in a strip [widthDp] wide (1..4). */
-internal fun stripControlCount(widthDp: Float): Int = ((widthDp - 28f - 96f + 8f) / 48f).toInt().coerceIn(1, 4)
+internal fun stripControlCount(widthDp: Float, buttonDp: Float = 38f): Int =
+    ((widthDp - 28f - 96f + 8f) / (buttonDp + 8f)).toInt().coerceIn(1, 4)
 
 /**
  * The slim strip: one row, the car's name and charge on the left and its lock, climate and charge buttons on the
@@ -96,7 +97,9 @@ private fun StripContent(cars: List<VehicleSnapshot>) {
     // The strip follows the same options as the full widget (corners, text size, photo, level colour, which controls),
     // set in the same settings screen, and lays itself out from its real size: a roomier strip adds a state line and a
     // charge bar, a short one stays to the value.
-    val tall = size.height >= 68.dp
+    // Room for the name, the value, the state line and the bar (about 71dp at 1x) plus the padding; a font scale grows it.
+    val fontScale = context.resources.configuration.fontScale * opts.textSize.scale
+    val tall = size.height.value >= 96f * fontScale.coerceAtLeast(1f)
     val us = opts.textSize.scale
     // The photo loads inside the session, so changing the car or the option in the settings swaps it at once.
     var photo by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -162,7 +165,9 @@ private fun StripContent(cars: List<VehicleSnapshot>) {
             // The controls the settings chose, as many as the width holds beside the readout.
             val controls = StripControl.of(prefs, opts)
                 .filter { it != StripControl.CHARGE || car.hasBattery }
-                .take(stripControlCount(size.width.value))
+                // A strip whose only chosen button is one this car cannot do still has the lock.
+                .ifEmpty { listOf(StripControl.LOCK) }
+                .take(stripControlCount(size.width.value, if (tall) 44f else 38f))
             val diameter = if (tall) 44f else 38f
             controls.forEach { control ->
                 Spacer(GlanceModifier.width(WidgetGap))

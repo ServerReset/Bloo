@@ -68,7 +68,11 @@ fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp, status: F
                     color = tint,
                     textAlign = TextAlign.Center,
                     // In dp-sized text: the hub is a fixed circle, so the value must not grow with the font setting.
-                    fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (size.value * 0.26f).coerceIn(14f, 26f).dp.toSp() },
+                    // A long value ("Unlocked" for a car with no charge to show) shrinks to fit the hub instead of breaking mid-word.
+                    fontSize = with(androidx.compose.ui.platform.LocalDensity.current) {
+                        val base = (size.value * 0.26f).coerceIn(14f, 26f)
+                        (if (value.length > 4) (base * 4.5f / value.length).coerceAtLeast(11f) else base).dp.toSp()
+                    },
                 ),
                 maxLines = 1,
                 reduceMotion = false,

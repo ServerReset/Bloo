@@ -231,7 +231,8 @@ internal fun WearRingLabels(actions: List<WearQuickAction?>) {
                 else androidx.wear.compose.foundation.CurvedDirection.Angular.Normal,
             ) {
                 basicCurvedText(
-                    action.label,
+                    // A preset's name is the phone's to choose: cut so it stays on its own quarter's arc.
+                    action.label.let { if (it.length > 14) it.take(13) + "…" else it },
                     style = {
                         androidx.wear.compose.foundation.CurvedTextStyle(
                             fontSize = labelSize,

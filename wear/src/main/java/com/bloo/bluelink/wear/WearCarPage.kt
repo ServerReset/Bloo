@@ -17,6 +17,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.pager.VerticalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
+import com.bloo.bluelink.data.CarAction
+import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WatchCommandResult
 import com.bloo.bluelink.data.isStale
@@ -37,8 +39,22 @@ internal class WearCarUi(
     val lastResult: WatchCommandResult?,
     val send: (() -> Unit) -> Unit,
 ) {
-    /** Runs [control] for this car through the PIN gate, carrying its climate settings when it has any. */
-    fun run(control: FaceControl) = send { repo.command(car.vin, control.action, control.request?.invoke(car)) }
+    /**
+     * Runs [control] for this car through the PIN gate, carrying its climate settings when it has any.
+     *
+     * Two things are decided NOW, at the press, not when the PIN is answered or the phone gets to it: a toggle becomes the
+     * direction the wearer was shown ([resolved]) -- so a stale screen can never turn "Lock" into an unlock the confirm never
+     * covered -- and a preset's settings are read, so a preset deleted meanwhile cannot start climate on defaults.
+     */
+    fun run(control: FaceControl) {
+        val action = resolved(control.action)
+        val request = control.request?.invoke(car)
+        send { repo.command(car.vin, action, request) }
+    }
+
+    /** [action], with a lock, climate or charge TOGGLE turned into the lock/unlock, on/off the car's state on screen calls for. */
+    fun resolved(action: String): String =
+        if (action in TOGGLES) CarCommandRunner.resolveToggle(car, action) else action
 
     fun isPending(action: String) = WearCommands.key(car.vin, action) in pending
 }
@@ -77,7 +93,7 @@ internal fun WearCarPage(
         WearFaceControls.byKey(key)?.takeIf { it.available(car) }?.let { control ->
             when {
                 // A climate quarter whose preset has gone: ask which to use (for that quarter), as a press on the face does.
-                control.needsChoice(car) -> climateAsk = ClimateAsk.Assign(slotKeys.indexOf(key), run = true)
+                control.needsChoice(car) -> climateAsk = ClimateAsk.Assign(tileRequest.slot.takeIf { it in 0..3 } ?: slotKeys.indexOf(key), run = true)
                 control.confirm(car) -> confirmAction = control.action
                 else -> ui.run(control)
             }
@@ -97,7 +113,7 @@ internal fun WearCarPage(
             detail = "The doors open for anyone nearby.",
             confirmLabel = "Unlock",
             destructive = true,
-            onConfirm = { confirmAction = null; send { repo.command(car.vin, action) } },
+            onConfirm = { confirmAction = null; val resolved = ui.resolved(action); send { repo.command(car.vin, resolved) } },
             onCancel = { confirmAction = null },
         )
         return
@@ -161,6 +177,8 @@ internal fun WearCarPage(
         }
     }
 }
+
+private val TOGGLES = setOf(CarAction.TOGGLE_LOCK, CarAction.TOGGLE_CLIMATE, CarAction.TOGGLE_CHARGE)
 
 /** Why the climate list is open: to pick a preset for a face quarter (and run it too, when the quarter was pressed), or to start one. */
 private sealed interface ClimateAsk {

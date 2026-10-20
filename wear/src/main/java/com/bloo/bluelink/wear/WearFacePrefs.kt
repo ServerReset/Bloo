@@ -18,6 +18,9 @@ object WearFacePrefs {
 
     fun load(context: Context): List<String> = parse(prefs(context).getString("slots", null))
 
+    /** Whether the wearer (or the phone) has ever chosen the four controls, as opposed to the defaults showing. */
+    fun hasSaved(context: Context): Boolean = prefs(context).contains("slots")
+
     private var live: MutableStateFlow<List<String>>? = null
 
     /**

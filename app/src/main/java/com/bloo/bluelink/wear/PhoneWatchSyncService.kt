@@ -58,7 +58,7 @@ class PhoneWatchSyncService : WearableListenerService() {
         for (event in dataEvents) {
             if (event.type != DataEvent.TYPE_CHANGED) continue
             val path = event.dataItem.uri.path ?: continue
-            if (path != WatchSyncProtocol.PATH_COMMAND) continue
+            if (!WatchSyncProtocol.isCommandPath(path)) continue
             val map = DataMapItem.fromDataItem(event.dataItem).dataMap
             // A command that sat in the Data Layer while the phone was unreachable must not run hours later: an unlock
             // delivered then would open a car the wearer has long since left. The watch stamps each one (_ts).
@@ -71,7 +71,11 @@ class PhoneWatchSyncService : WearableListenerService() {
             val request = runCatching {
                 json.decodeFromString(WatchCommandRequest.serializer(), bytes.decodeToString())
             }.getOrNull() ?: continue
+            // Delivered twice (a retry of the transport, or the same item seen again): run it once.
+            if (!firstSighting(request.requestId)) continue
             AppLog.log("WatchSync: command ${request.command.action} for ${request.command.vin}")
+            // Taken off the Data Layer once seen, so it can never be delivered (and run) again later.
+            runCatching { Wearable.getDataClient(applicationContext).deleteDataItems(event.dataItem.uri) }
             scope.launch { runCommand(request) }
         }
     }
@@ -136,7 +140,20 @@ class PhoneWatchSyncService : WearableListenerService() {
         private const val KEY_PAYLOAD = "payload"
 
         /** How old a watch command may be and still run: a few minutes covers a slow link, not a day offline. */
-        private const val MAX_COMMAND_AGE_MS = 3 * 60_000L
+        private const val MAX_COMMAND_AGE_MS = 90_000L
+
+        private val seenRequests = LinkedHashSet<String>()
+
+        /** True the first time [requestId] is seen (the last 64 are remembered). */
+        @Synchronized
+        private fun firstSighting(requestId: String): Boolean {
+            if (!seenRequests.add(requestId)) return false
+            if (seenRequests.size > 64) seenRequests.remove(seenRequests.first())
+            return true
+        }
+
+        /** The last watch update the phone advertised, so a plain snapshot push does not erase the watch's offer. */
+        @Volatile private var lastAdvice: Triple<Int, String, String?>? = null
 
         /**
          * Download the watch APK at [url] on a background thread and push it to any paired watch as
@@ -185,15 +202,19 @@ class PhoneWatchSyncService : WearableListenerService() {
                 val snapshot = SnapshotStore(app).current()
                 val pinRecord = runCatching { CredentialStore(app).getPinRecord() }.getOrNull()
                 val timing = SettingsStore(app).watchLockTiming()
+                if (watchUpdateRunNumber != null && watchUpdateApkUrl != null) {
+                    lastAdvice = Triple(watchUpdateRunNumber, watchUpdateApkUrl, watchUpdateNotes)
+                }
+                val advice = lastAdvice
                 val payload = WatchSyncPayload(
                     vehicles = snapshot.vehicles,
                     selectedVin = snapshot.selectedVin,
                     lockTiming = timing.wireKey,
                     pinRecord = pinRecord,
                     sentAtMs = System.currentTimeMillis(),
-                    watchUpdateRunNumber = watchUpdateRunNumber,
-                    watchUpdateApkUrl = watchUpdateApkUrl,
-                    watchUpdateNotes = watchUpdateNotes,
+                    watchUpdateRunNumber = advice?.first,
+                    watchUpdateApkUrl = advice?.second,
+                    watchUpdateNotes = advice?.third,
                     notify = SettingsStore(app).notificationPrefs().let { WatchNotifyPrefs(it.charging, it.chargeComplete, it.watchLowBattery) },
                     look = SettingsStore(app).watchLook(),
                     climatePresets = snapshot.vehicles.associate { it.vin to SettingsStore(app).climatePresets(it.vin) }

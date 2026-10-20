@@ -229,7 +229,8 @@ internal fun ClimatePebble(
                     presets = presets,
                     activeId = activePresetId,
                     fahrenheit = fahrenheit,
-                    enabled = !pending,
+                    // Not before the car's last-used settings are in: a start now would send the defaults instead.
+                    enabled = !pending && settingsLoaded,
                     climateOn = climateOn,
                     onPreset = startPreset,
                 )

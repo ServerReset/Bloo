@@ -29,7 +29,7 @@ class WearMainActivity : ComponentActivity() {
      * twice, and two identical requests would otherwise be the same state, so the screen would not
      * react to the second one.
      */
-    data class TileRequest(val seq: Int, val key: String)
+    data class TileRequest(val seq: Int, val key: String, val slot: Int = -1)
 
     private var seq = 0
     private var tileRequest by mutableStateOf<TileRequest?>(null)
@@ -62,6 +62,7 @@ class WearMainActivity : ComponentActivity() {
                                 tileRequest = null
                                 // Done with it: it must not come back with the intent.
                                 intent?.removeExtra(EXTRA_ACTION)
+                                intent?.removeExtra(EXTRA_SLOT)
                             },
                         )
                     }
@@ -79,7 +80,7 @@ class WearMainActivity : ComponentActivity() {
 
     private fun readTileRequest(intent: Intent?) {
         val key = intent?.getStringExtra(EXTRA_ACTION) ?: return
-        tileRequest = TileRequest(++seq, key)
+        tileRequest = TileRequest(++seq, key, intent.getIntExtra(EXTRA_SLOT, -1))
     }
 
     private fun startWork() {
@@ -102,5 +103,8 @@ class WearMainActivity : ComponentActivity() {
     companion object {
         /** The extra a Tile button sets; read by [readTileRequest]. */
         const val EXTRA_ACTION = "bloo_action"
+
+        /** Which quarter of the face a tile button was (0 to 3), so two quarters holding the same control stay distinct. */
+        const val EXTRA_SLOT = "bloo_slot"
     }
 }

@@ -70,6 +70,9 @@ private const val TextChangeMs = 180
 /** How long a number-only change keeps its digits as rolling inline content: a little over the roll itself. */
 private const val RollMs = 260L
 
+/** A number rolls only when the text was last changed longer ago than this. */
+private const val RollCalmMs = 400L
+
 /** One line's own beat. Short -- the lines should trip out quickly, not crawl. */
 private const val MsPerLine = 110
 
@@ -169,7 +172,15 @@ fun RevealText(
     // number-only change shows its rolling digits on the very frame the text changes, not a frame of the new number
     // first. (Written after composition, so inside `remember(text)` it still reads the previous text.)
     val lastText = remember { arrayOf(text) }
-    val rollStart = remember(text) { lastText[0].takeIf { onlyNumbersChanged(it, text) } }
+    // Only a change that follows a pause rolls: text that changes faster than the roll lasts (a ticker, an animator) simply
+    // appears, as the class doc promises, instead of staying mid-slide with a re-measure on every change.
+    val lastChangeMs = remember { longArrayOf(0L) }
+    val rollStart = remember(text) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val calm = now - lastChangeMs[0] > RollCalmMs
+        lastChangeMs[0] = now
+        lastText[0].takeIf { calm && onlyNumbersChanged(it, text) }
+    }
     var rollDone by remember(text) { mutableStateOf(false) }
     androidx.compose.runtime.SideEffect { lastText[0] = text }
     val rollFrom = rollStart?.takeUnless { rollDone }
@@ -179,6 +190,8 @@ fun RevealText(
             return@LaunchedEffect
         }
         if (rollStart != null) {
+            // A fade begun by an earlier change and cut off by this one must not stay half-transparent.
+            changeFade.snapTo(1f)
             kotlinx.coroutines.delay(RollMs)
             rollDone = true
         } else {

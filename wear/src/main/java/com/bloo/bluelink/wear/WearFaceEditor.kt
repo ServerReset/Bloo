@@ -53,10 +53,11 @@ internal fun WearFaceEditor(
                 contentAlignment = Alignment.Center,
             ) {
                 // The face, at two thirds of the display; its fixed sizes scale with it as they do on the main screen.
-                val face = minOf(maxWidth, maxHeight) * 0.66f
+                val face = minOf(maxWidth, maxHeight) * 0.6f
                 val press = rememberQuadrantPress()
                 androidx.compose.runtime.CompositionLocalProvider(LocalFaceUnit provides face / 201.dp) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Clear of the clock above, and of the bezel below at a large font setting.
+                    Column(Modifier.padding(top = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(Modifier.size(face)) {
                             val actions = (0 until 4).map { i ->
                                 val control = slots.getOrNull(i)?.let { WearFaceControls.byKey(it) }?.takeIf { it.available(car) }
@@ -88,12 +89,12 @@ internal fun WearFaceEditor(
                         }
                         RevealText(
                             "Tap a quarter to change it",
-                            modifier = Modifier.padding(top = 8.dp, start = 28.dp, end = 28.dp),
+                            modifier = Modifier.padding(top = 8.dp, start = 28.dp, end = 28.dp).fitRound(),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = scheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
-                            maxLines = 2,
+                            maxLines = 1,
                         )
                     }
                 }

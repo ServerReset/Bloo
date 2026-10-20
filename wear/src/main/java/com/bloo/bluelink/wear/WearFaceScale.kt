@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /*
@@ -67,16 +68,20 @@ internal fun rememberQuadrantPress(): QuadrantPress {
     val state = androidx.compose.runtime.remember {
         QuadrantPress(androidx.compose.animation.core.Animatable(0f), androidx.compose.animation.core.Animatable(0f))
     }
-    val q = state.pressed
-    androidx.compose.runtime.LaunchedEffect(q, policy.bouncySprings) {
-        // The pressed quarter's own corner stays put; the cross moves AWAY from it, which is what makes it bigger.
-        val tx = when (q) { 0, 2 -> PressGrow; 1, 3 -> -PressGrow; else -> 0f }
-        val ty = when (q) { 0, 1 -> PressGrow; 2, 3 -> -PressGrow; else -> 0f }
-        val spec: androidx.compose.animation.core.AnimationSpec<Float> =
-            if (policy.bouncySprings) spring(dampingRatio = 0.62f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium) else snap()
-        kotlinx.coroutines.coroutineScope {
-            launch { state.x.animateTo(tx, spec) }
-            launch { state.y.animateTo(ty, spec) }
+    val bouncy = androidx.compose.runtime.rememberUpdatedState(policy.bouncySprings)
+    // `pressed` is read here, in a flow, and not in composition: a press then moves the cross (a layout) without recomposing
+    // the face and its four tiles around it.
+    androidx.compose.runtime.LaunchedEffect(state) {
+        androidx.compose.runtime.snapshotFlow { state.pressed }.collectLatest { q ->
+            // The pressed quarter's own corner stays put; the cross moves AWAY from it, which is what makes it bigger.
+            val tx = when (q) { 0, 2 -> PressGrow; 1, 3 -> -PressGrow; else -> 0f }
+            val ty = when (q) { 0, 1 -> PressGrow; 2, 3 -> -PressGrow; else -> 0f }
+            val spec: androidx.compose.animation.core.AnimationSpec<Float> =
+                if (bouncy.value) spring(dampingRatio = 0.62f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium) else snap()
+            kotlinx.coroutines.coroutineScope {
+                launch { state.x.animateTo(tx, spec) }
+                launch { state.y.animateTo(ty, spec) }
+            }
         }
     }
     return state

@@ -17,6 +17,7 @@ import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -111,7 +112,15 @@ object WearDataLayerSync {
 
     /** Apply a snapshot payload: mirror into SnapshotStore + WatchPinStore. */
     suspend fun mirrorSnapshot(context: Context, bytes: ByteArray?) {
-        if (bytes == null) return
+        // One at a time and oldest-never-wins: two pushes in quick succession used to finish in either order, and the
+        // older could leave stale cars, a stale PIN timing (or a revoked PIN) behind the newer one.
+        if (bytes != null) mirrorLock.withLock { mirrorLocked(context, bytes) }
+    }
+
+    private val mirrorLock = kotlinx.coroutines.sync.Mutex()
+    private var lastSentAtMs = 0L
+
+    private suspend fun mirrorLocked(context: Context, bytes: ByteArray) {
         // The listener service can receive the first push before the Activity has ever opened.
         // Initialise the PIN store here too, otherwise that first payload updates vehicles but
         // silently drops the phone's lock timing/PIN and the watch opens unguarded until the
@@ -120,11 +129,18 @@ object WearDataLayerSync {
         val payload = runCatching {
             json.decodeFromString(WatchSyncPayload.serializer(), bytes.decodeToString())
         }.getOrNull() ?: return
+        if (payload.sentAtMs != 0L) {
+            if (payload.sentAtMs < lastSentAtMs) return
+            lastSentAtMs = payload.sentAtMs
+        }
         val app = context.applicationContext
         WearNotificationPrefs(app).apply(payload.notify)
         WearLook.applyOrSeed(app, payload.look)
         WearPresets.update(app, payload.climatePresets, payload.fahrenheit)
-        WearNotifier.onVehicles(app, _vehicles.value, payload.vehicles)
+        // A cold process has no cars in memory yet; what was stored last time is the "before", or a charge that completed while
+        // the app was closed would raise nothing (a first sighting never alerts).
+        val before = _vehicles.value.ifEmpty { runCatching { SnapshotStore(app).current().vehicles }.getOrDefault(emptyList()) }
+        WearNotifier.onVehicles(app, before, payload.vehicles)
         _vehicles.value = payload.vehicles
         _selectedVin.value = payload.selectedVin
         _connected.value = true
@@ -198,7 +214,7 @@ object WearDataLayerSync {
             command = com.bloo.bluelink.data.CarCommand(vin, action).withClimate(climate),
         )
         scope.launch {
-            val req = PutDataMapRequest.create(WatchSyncProtocol.PATH_COMMAND).apply {
+            val req = PutDataMapRequest.create(WatchSyncProtocol.commandPath(request.requestId)).apply {
                 dataMap.putByteArray(KEY_PAYLOAD, json.encodeToString(WatchCommandRequest.serializer(), request).encodeToByteArray())
                 dataMap.putLong("_ts", System.currentTimeMillis())
             }.asPutDataRequest().setUrgent()

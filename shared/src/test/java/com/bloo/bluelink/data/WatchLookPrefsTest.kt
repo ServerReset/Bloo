@@ -26,3 +26,18 @@ class WatchLookPrefsTest {
         assertEquals(listOf("lock", "climate", "charge", "flash"), back.look?.slots)
     }
 }
+
+class WatchCommandPathTest {
+    @Test fun eachCommandHasItsOwnPath() {
+        assertEquals("/bloo/command/abc", WatchSyncProtocol.commandPath("abc"))
+        assertEquals(false, WatchSyncProtocol.commandPath("a") == WatchSyncProtocol.commandPath("b"))
+    }
+
+    @Test fun commandPathsAreRecognisedButTheResultPathIsNot() {
+        assertEquals(true, WatchSyncProtocol.isCommandPath(WatchSyncProtocol.PATH_COMMAND))
+        assertEquals(true, WatchSyncProtocol.isCommandPath(WatchSyncProtocol.commandPath("abc")))
+        // "/bloo/command_result" starts with "/bloo/command" but is the phone's answer, not a request.
+        assertEquals(false, WatchSyncProtocol.isCommandPath(WatchSyncProtocol.PATH_COMMAND_RESULT))
+        assertEquals(false, WatchSyncProtocol.isCommandPath(WatchSyncProtocol.PATH_SNAPSHOT))
+    }
+}

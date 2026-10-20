@@ -166,7 +166,7 @@ fun AnimatedValue(
     // digits that change (inline, so wrapping is kept) and leaves the words still, so a wrapping pebble summary changes
     // like a short one does. It also turns the effect off under reduce-motion on its own.
     if (!reduceMotion && hasDigits && (maxLines > 1 || value.length > RollTokenMaxChars || value.contains('\n'))) {
-        RevealText(text = value, modifier = modifier, style = style, maxLines = maxLines)
+        RevealText(text = value, modifier = modifier, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
         return
     }
     if (reduceMotion || maxLines > 1 || value.length > RollTokenMaxChars || !hasDigits || value.contains('\n')) {

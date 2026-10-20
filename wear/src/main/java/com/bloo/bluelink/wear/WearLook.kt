@@ -30,14 +30,24 @@ internal object WearLook {
     }
 
     fun current(context: Context) = WatchLookPrefs(
-        slots = WearFacePrefs.load(context),
+        // Only controls somebody chose: the defaults showing are not a choice, and must not overwrite the phone's.
+        slots = if (WearFacePrefs.hasSaved(context)) WearFacePrefs.load(context) else emptyList(),
         reduceEffects = reduceEffects(context),
         autoLock = WearAutoLock.isEnabled(context),
     )
 
     /** Tell the phone about a change made here, so it keeps it (and Drive with it) and the two stay the same. */
-    fun sendToPhone(context: Context) {
+    fun sendToPhone(context: Context) = send(context, markDirty = true)
+
+    /**
+     * A change made here that the phone has not confirmed yet: while it is unconfirmed the phone's older copy must not
+     * overwrite it (the phone may simply have been out of reach), and it is sent again with the next push.
+     */
+    private fun dirty(context: Context) = prefs(context).getBoolean("look_dirty", false)
+
+    private fun send(context: Context, markDirty: Boolean) {
         val app = context.applicationContext
+        if (markDirty) prefs(app).edit { putBoolean("look_dirty", true) }
         val bytes = Json.encodeToString(WatchLookPrefs.serializer(), current(app)).encodeToByteArray()
         ioScope().launch {
             runCatching {
@@ -54,8 +64,16 @@ internal object WearLook {
     fun applyOrSeed(context: Context, look: WatchLookPrefs?) {
         val app = context.applicationContext
         if (look == null) {
-            if (!seeded) { seeded = true; sendToPhone(app) }
+            if (!seeded) { seeded = true; send(app, markDirty = false) }
             return
+        }
+        if (dirty(app)) {
+            // The phone confirms a change by pushing it back unchanged; until then ours stands, and goes up again.
+            val mine = current(app)
+            val confirmed = (mine.slots.isEmpty() || mine.slots == look.slots) &&
+                mine.reduceEffects == look.reduceEffects && mine.autoLock == look.autoLock
+            if (!confirmed) { send(app, markDirty = true); return }
+            prefs(app).edit { putBoolean("look_dirty", false) }
         }
         apply(app, look)
     }

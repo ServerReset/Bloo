@@ -76,6 +76,15 @@ object WatchSyncProtocol {
     const val PATH_WATCH_APK = "/bloo/watch_apk"
     /** Phone → watch: a command the watch wants run (see [WatchCommandRequest]). */
     const val PATH_COMMAND = "/bloo/command"
+
+    /**
+     * Each command travels on a path of its own ([PATH_COMMAND], a slash and the request id). One shared path made a new command
+     * REPLACE one the phone had not received yet (two cars locked in a row, two quick taps), so only the last survived.
+     */
+    fun commandPath(requestId: String) = "$PATH_COMMAND/$requestId"
+
+    /** Whether [path] is a command request (the old shared path, or one made by [commandPath]); not the "_result" path. */
+    fun isCommandPath(path: String) = path == PATH_COMMAND || path.startsWith("$PATH_COMMAND/")
     /**
      * Phone → watch: the result of a command the watch asked for, so the watch can clear its
      * pending state and surface failures.

@@ -48,31 +48,54 @@ class BlooTileService : TileService() {
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> =
         CallbackToFutureAdapter.getFuture { completer ->
             scope.launch {
+                // Whatever throws, the request is answered: an unset completer leaves the tile spinning for good.
+                try {
+                    completer.set(buildTile(requestParams))
+                } catch (t: Throwable) {
+                    completer.set(tileOf(layoutFor(null)))
+                }
+            }
+            "BlooTile"
+        }
+
+    private suspend fun buildTile(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
                 // Sealed after a restart: the tile shows nothing about the car until the PIN is entered.
-                val sealed = WearBootGate.isLocked(applicationContext)
+                val sealed = runCatching { WearBootGate.isLocked(applicationContext) }.getOrDefault(true)
                 val snapshot = if (sealed) null
                 else runCatching { SnapshotStore(applicationContext).current() }.getOrNull()
                 // The hub is the refresh button: a press reloads the tile with this id, and a refresh is asked for as it does.
-                if (!sealed && requestParams.currentState.lastClickableId == HUB_ID) {
+                // Not more than once in HUB_REFRESH_GAP_MS: the tile keeps reporting the last pressed id on later reloads (its own
+                // freshness updates, the redraw a refresh causes), and each would otherwise start another refresh.
+                if (!sealed && requestParams.currentState.lastClickableId == HUB_ID && hubRefreshDue()) {
                     runCatching { WearSnapshotRepository(applicationContext).refresh() }
                 }
                 val car = snapshot?.let { WearTileCar.pick(applicationContext, it.vehicles) ?: it.selected }
                 // Whatever goes wrong while drawing, the request is answered: an unset completer leaves the tile
                 // spinning for good, so a failure draws the plain "open Bloo" layout instead.
                 val layout = runCatching { layoutFor(car, sealed) }.getOrElse { layoutFor(null, sealed) }
-                val freshness = runCatching {
-                    60_000L * com.bloo.bluelink.data.DeviceStatus.policy(applicationContext).pollIntervalMultiplier
-                }.getOrDefault(60_000L)
-                val tile = TileBuilders.Tile.Builder()
-                    .setResourcesVersion(RESOURCES_VERSION)
-                    // Refresh about once a minute while it is on screen.
-                    .setFreshnessIntervalMillis(freshness)
-                    .setTileTimeline(TimelineBuilders.Timeline.fromLayoutElement(layout))
-                    .build()
-                completer.set(tile)
-            }
-            "BlooTile"
-        }
+                return tileOf(layout)
+    }
+
+    private fun tileOf(layout: LayoutElement): TileBuilders.Tile {
+        val freshness = runCatching {
+            60_000L * com.bloo.bluelink.data.DeviceStatus.policy(applicationContext).pollIntervalMultiplier
+        }.getOrDefault(60_000L)
+        return TileBuilders.Tile.Builder()
+            .setResourcesVersion(RESOURCES_VERSION)
+            // Refresh about once a minute while it is on screen.
+            .setFreshnessIntervalMillis(freshness)
+            .setTileTimeline(TimelineBuilders.Timeline.fromLayoutElement(layout))
+            .build()
+    }
+
+    /** True when the hub's refresh has not run in the last [HUB_REFRESH_GAP_MS] (and records that it is running now). */
+    private fun hubRefreshDue(): Boolean {
+        val prefs = applicationContext.getSharedPreferences("bloo_watch_tile", MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        if (now - prefs.getLong("hub_refreshed_ms", 0L) < HUB_REFRESH_GAP_MS) return false
+        prefs.edit().putLong("hub_refreshed_ms", now).apply()
+        return true
+    }
 
     override fun onTileResourcesRequest(requestParams: RequestBuilders.ResourcesRequest): ListenableFuture<ResourceBuilders.Resources> =
         CallbackToFutureAdapter.getFuture { completer ->
@@ -165,7 +188,7 @@ class BlooTileService : TileService() {
             tileColumn(*content.toTypedArray()),
             modifiers = tileModifiers(
                 background = fill, corner = corner, border = RIM,
-                clickableId = "act_${action.key}", onClick = launchAction(action.key), description = action.label,
+                clickableId = "act_$index", onClick = launchAction(action.key, index), description = action.label,
             ),
         )
     }
@@ -175,7 +198,8 @@ class BlooTileService : TileService() {
         val stale = if (car.isStale()) car.updatedLabel() else null
         return tileBox(
             tileColumn(
-                tileText(car.bigValue(), 24f, if (car.percent != null) tint(car) else WHITE, bold = true),
+                // 24sp fits a percentage; a word ("Unlocked") would be cut off in the hub, so it is smaller.
+                tileText(car.bigValue(), if (car.bigValue().length > 4) 14f else 24f, if (car.percent != null) tint(car) else WHITE, bold = true),
                 // An old reading says so (in red, as the face does) instead of passing as current; otherwise the name.
                 if (stale != null) tileText(stale, 10f, STALE, bold = true) else tileText(car.name, 12f, WHITE, bold = true),
             ),
@@ -220,7 +244,7 @@ class BlooTileService : TileService() {
             .setStrokeCap(LayoutElementBuilders.STROKE_CAP_ROUND)
             .build()
 
-    private fun launchAction(actionKey: String?): ActionBuilders.Action {
+    private fun launchAction(actionKey: String?, slot: Int? = null): ActionBuilders.Action {
         val activity = ActionBuilders.AndroidActivity.Builder()
             .setPackageName(packageName)
             .setClassName(WearMainActivity::class.java.name)
@@ -230,11 +254,18 @@ class BlooTileService : TileService() {
                 ActionBuilders.AndroidStringExtra.Builder().setValue(actionKey).build(),
             )
         }
+        if (slot != null) {
+            activity.addKeyToExtraMapping(
+                WearMainActivity.EXTRA_SLOT,
+                ActionBuilders.AndroidIntExtra.Builder().setValue(slot).build(),
+            )
+        }
         return ActionBuilders.LaunchAction.Builder().setAndroidActivity(activity.build()).build()
     }
 
     private companion object {
         const val RESOURCES_VERSION = "3"
+        const val HUB_REFRESH_GAP_MS = 30_000L
         val GLYPHS = mapOf(
             "lock" to R.drawable.tile_lock, "unlock" to R.drawable.tile_unlock, "climate" to R.drawable.tile_climate,
             "bolt" to R.drawable.tile_bolt, "flash" to R.drawable.tile_flash, "refresh" to R.drawable.tile_refresh,

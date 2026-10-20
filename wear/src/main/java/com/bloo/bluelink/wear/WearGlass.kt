@@ -4,6 +4,7 @@ import com.bloo.uicommon.LocalPowerPolicy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import com.bloo.uicommon.canBlurBackdrops
@@ -51,12 +52,17 @@ internal fun WearBackdrop(modifier: Modifier = Modifier, content: @androidx.comp
     val haze = androidx.compose.runtime.remember { HazeState() }
     val policy = LocalPowerPolicy.current
     var phase by androidx.compose.runtime.mutableFloatStateOf(0f)
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val start = androidx.compose.runtime.remember { System.nanoTime() }
     androidx.compose.runtime.LaunchedEffect(policy.ambientMotion) {
         if (!policy.ambientMotion) return@LaunchedEffect
-        val start = System.nanoTime()
-        while (true) {
-            phase = ((System.nanoTime() - start) / 1_000_000_000f) / DriftSeconds * (2f * Math.PI.toFloat())
-            kotlinx.coroutines.delay(DriftStepMs)
+        // Only while the watch is in front of the wearer: a stopped or dimmed activity keeps its composition, and a loop
+        // that outlived the screen would wake the CPU a few times a second for nothing.
+        owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            while (true) {
+                phase = ((System.nanoTime() - start) / 1_000_000_000f) / DriftSeconds * (2f * Math.PI.toFloat())
+                kotlinx.coroutines.delay(DriftStepMs)
+            }
         }
     }
     val primary = scheme.primary
@@ -96,8 +102,8 @@ internal fun WearBackdrop(modifier: Modifier = Modifier, content: @androidx.comp
 /** One drift cycle, in seconds: slow enough to read as ambient, not as animation. */
 private const val DriftSeconds = 70f
 
-/** Time between drift steps: about 8 a second (each step re-blurs the glass above). */
-private const val DriftStepMs = 120L
+/** Time between drift steps: about 4 a second (each step re-blurs the glass above, so it is kept low). */
+private const val DriftStepMs = 250L
 
 /**
  * Frosted glass for a watch surface: the backdrop blurred behind [shape] when the device can and may (API 31+, not lean),

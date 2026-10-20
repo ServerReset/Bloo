@@ -257,6 +257,8 @@ internal suspend fun AppViewModel.runDriveSyncNow() {
             refreshLocalCarConfig()
             // Another device may have flipped the AI switches.
             refreshAiSettings()
+            // ...or changed what the watch shows (its face controls, effects, climate presets): hand it over now.
+            com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
         }
         _state.update {
             it.copy(

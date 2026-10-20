@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -373,7 +374,12 @@ fun WearMessageScreen(
 ) {
     ScreenScaffold(timeText = { TimeText() }) {
         Box(Modifier.fillMaxSize().wearAuroraWash(tint).padding(horizontal = 22.dp), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Scrolls: at a large font setting the badge, the words and the round buttons are taller than a small display.
+            Column(
+                Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 ScreenBadge(icon, tint)
                 RevealText(
                     title,
