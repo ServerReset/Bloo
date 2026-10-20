@@ -12,24 +12,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** The toast stack: several at once, oldest on top / newest at the bottom, a repeat refreshes instead of stacking. */
+/** The toast stack: several at once, oldest on top / newest at the bottom, a repeated message stacks like any other. */
 class ToastStackTest {
     @get:Rule val rule = createComposeRule()
 
     private fun exists(text: String) = rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
 
     @Test
-    fun toastsStackOldestOnTopAndARepeatDoesNotDuplicate() {
+    fun toastsStackOldestOnTop() {
         val state = ToastState()
         rule.setContent { BlooTheme { ToastHost(state, HazeState(), onCopy = {}) } }
         rule.runOnUiThread {
             state.show("First toast", ToastKind.INFO)
             state.show("Second toast", ToastKind.INFO)
-            state.show("Second toast", ToastKind.INFO)
             state.show("Third toast", ToastKind.SUCCESS)
         }
         rule.waitUntil(8_000) { exists("First toast") && exists("Second toast") && exists("Third toast") }
-        assertEquals("a repeat of the newest message is refreshed, not stacked", 1, rule.onAllNodesWithText("Second toast").fetchSemanticsNodes().size)
         val first = rule.onNodeWithText("First toast").getBoundsInRoot().top.value
         val second = rule.onNodeWithText("Second toast").getBoundsInRoot().top.value
         val third = rule.onNodeWithText("Third toast").getBoundsInRoot().top.value
@@ -37,7 +35,7 @@ class ToastStackTest {
     }
 
     @Test
-    fun aRepeatBumpsACountInsteadOfStacking() {
+    fun aRepeatedMessageStacksAsItsOwnToast() {
         val state = ToastState()
         rule.setContent { BlooTheme { ToastHost(state, HazeState(), onCopy = {}) } }
         rule.runOnUiThread {
@@ -45,8 +43,8 @@ class ToastStackTest {
             state.show("Saved", ToastKind.SUCCESS)
             state.show("Saved", ToastKind.SUCCESS)
         }
-        rule.waitUntil(8_000) { exists("Saved") && exists("\u00d73") }
-        assertEquals("one toast, not three", 1, rule.onAllNodesWithText("Saved").fetchSemanticsNodes().size)
+        rule.waitUntil(8_000) { rule.onAllNodesWithText("Saved").fetchSemanticsNodes().size == 3 }
+        assertEquals("three toasts, no multiplier", 0, rule.onAllNodesWithText("\u00d73").fetchSemanticsNodes().size)
     }
 
     @Test

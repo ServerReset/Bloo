@@ -78,10 +78,6 @@ internal class Toast(val id: Long, val message: String, val type: ToastKind, exp
     var leaving by mutableStateOf(false)
     /** True when it was swiped away: it has already flown off the screen, so it is dropped the moment it is marked leaving. */
     var flung by mutableStateOf(false)
-    /** How many times this same message has repeated without leaving, shown as a count. */
-    var count by mutableIntStateOf(1)
-    /** False once split out of a group, so a later repeat starts a fresh group instead of rejoining it. */
-    var groupable = true
 }
 
 /** The app's one toast stack, for any composable that needs to tell the user something. */
@@ -91,9 +87,7 @@ internal val LocalToasts = androidx.compose.runtime.staticCompositionLocalOf<Toa
  * The stack of live toasts, oldest at the top and newest at the bottom. Each toast expires on its own clock,
  * but never before the one above it, so they always go oldest to newest however long each message is.
  *
- * Repeats are grouped: any live toast with the same message and kind is re-armed and its
- * [Toast.count] bumped rather than stacking an identical card, so a burst of one message reads as
- * one toast. Different messages or kinds all stay up.
+ * A repeated message is just another toast: identical ones stack like any others, in the folded pile.
  */
 @Stable
 internal class ToastState {
@@ -110,10 +104,6 @@ internal class ToastState {
 
     /** True while the collapsed pile is fanned out into one card per toast. */
     var expanded by mutableStateOf(false)
-        private set
-
-    /** Bumps whenever a message arrives, so the search bar can answer it with a little bounce. */
-    var pulse by mutableIntStateOf(0)
         private set
 
     fun fan(open: Boolean) { expanded = open }
@@ -136,32 +126,7 @@ internal class ToastState {
         // Created while the clocks are paused: resuming adds the whole pause to every live toast, so this one
         // starts the pause already owed, and nets out to its intended duration.
         val expire = nextExpiry(now, toastDurationMs(message, type)) - (if (paused) now - pausedAt else 0L)
-        // Identical toasts collapse into one entry wherever it sits in the stack: re-arm it and bump
-        // its count instead of pushing a duplicate card.
-        val existing = items.lastOrNull { !it.leaving && it.groupable && it.message == message && it.type == type }
-        if (existing != null) {
-            existing.expireAt = expire
-            existing.count += 1
-            pulse++
-            return
-        }
         items += Toast(nextId++, message, type, expire, now + toastDurationMs(message, type) + MaxLifetimeExtraMs)
-        pulse++
-        trimToLimit()
-    }
-
-    /** Tapping a grouped toast splits it back into one card per occurrence (up to [MaxToasts]). */
-    @Synchronized
-    fun expand(toast: Toast) {
-        if (toast.count <= 1 || toast.leaving || toast !in items) return
-        val extra = minOf(toast.count, MaxToasts) - 1
-        toast.count = 1
-        toast.groupable = false
-        val at = items.indexOf(toast) + 1
-        // One card per occurrence, each leaving a beat after the one above it like any other stack.
-        repeat(extra) { i ->
-            items.add(at + i, Toast(nextId++, toast.message, toast.type, toast.expireAt + (i + 1) * ExpiryStaggerMs, toast.hardExpireAt + (i + 1) * ExpiryStaggerMs).also { it.groupable = false })
-        }
         trimToLimit()
     }
 
@@ -338,32 +303,11 @@ internal fun ToastHost(
                     onSetExpanded = { state.fan(it) },
                     hazeState = hazeState,
                     onCopy = onCopy,
-                    onExpand = { state.expand(toast) },
                     paused = state.paused,
                     onHold = { down -> held = (held + if (down) 1 else -1).coerceAtLeast(0) },
                     onGone = { state.items.remove(toast) },
                 )
             }
         }
-    }
-}
-
-/**
- * The search element's answer to a message arriving: it squashes a little as the toast rises past it,
- * then springs back, so the two read as one piece of chrome.
- */
-@Composable
-internal fun Modifier.toastBump(): Modifier {
-    val toasts = LocalToasts.current ?: return this
-    val bump = remember { androidx.compose.animation.core.Animatable(0f) }
-    LaunchedEffect(toasts.pulse) {
-        if (toasts.pulse == 0) return@LaunchedEffect
-        bump.snapTo(1f)
-        bump.animateTo(0f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium))
-    }
-    return this.graphicsLayer {
-        val b = bump.value
-        scaleX = 1f + 0.06f * b
-        scaleY = 1f - 0.08f * b
     }
 }

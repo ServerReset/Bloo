@@ -366,7 +366,7 @@ private fun BoxScope.SearchElement(
             dragX = Float.NaN
             dragging = false
         },
-        modifier = Modifier.align(Alignment.TopStart).offset(x, y).toastBump(),
+        modifier = Modifier.align(Alignment.TopStart).offset(x, y),
         hazeState = hazeState,
     )
 }

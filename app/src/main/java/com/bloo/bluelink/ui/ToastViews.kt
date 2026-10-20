@@ -101,7 +101,6 @@ internal fun BoxScope.ToastSlot(
     onSetExpanded: (Boolean) -> Unit,
     hazeState: HazeState,
     onCopy: (String) -> Unit,
-    onExpand: () -> Unit,
     paused: Boolean,
     onHold: (Boolean) -> Unit,
     onGone: () -> Unit,
@@ -245,12 +244,8 @@ internal fun BoxScope.ToastSlot(
                 onDismiss = { toast.leaving = true },
                 hazeState = hazeState,
                 onCopy = onCopy,
-                // A repeat count opens into its separate cards; otherwise a tap fans the pile out or folds it.
-                onTap = when {
-                    toast.count > 1 -> onExpand
-                    stackSize > 1 -> onToggleStack
-                    else -> null
-                },
+                // A tap on a pile fans it out or folds it back.
+                onTap = if (stackSize > 1) onToggleStack else null,
             )
         }
     }
@@ -275,7 +270,7 @@ private fun ToastCard(
         // A pill, like the search bar it emerges from; mostly clear glass with just enough tint to read.
         shape = CircleShape,
         hazeState = hazeState,
-        // A grouped toast (×N) opens into its cards when tapped; a pile fans out or folds.
+        // A pile fans out or folds when tapped.
         onClick = onTap,
         tint = scheme.surface.copy(alpha = if (canBlurBackdrops()) 0.16f else 0.96f),
         modifier = Modifier
@@ -302,11 +297,6 @@ private fun ToastCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            // A grouped repeat shows its count, so a burst of one message reads as one toast.
-            if (toast.count > 1) {
-                Spacer(Modifier.width(GapRow))
-                RevealText("×${toast.count}", style = MaterialTheme.typography.labelMedium, color = accent)
             }
             CopyButton(toast, accent, onCopy)
             MorphIconButton(onClick = onDismiss) { Icon(AppIcons.Close, contentDescription = "Dismiss") }
