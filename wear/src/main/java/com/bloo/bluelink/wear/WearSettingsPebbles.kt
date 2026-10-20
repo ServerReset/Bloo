@@ -37,6 +37,7 @@ internal fun WearAlertsPebble() {
     var charging by remember { mutableStateOf(prefs.charging) }
     var complete by remember { mutableStateOf(prefs.chargeComplete) }
     var low by remember { mutableStateOf(prefs.lowBattery) }
+    var autoLock by remember { mutableStateOf(prefs.autoLock) }
     WearPebble(title = "Watch alerts", icon = Icons.Filled.Notifications) {
         WearToggleRow("Charging card", Icons.Filled.Bolt, charging) {
             charging = it; prefs.charging = it; prefs.sendToPhone(context)
@@ -46,6 +47,9 @@ internal fun WearAlertsPebble() {
         }
         WearToggleRow("Low battery", Icons.Filled.BatteryAlert, low) {
             low = it; prefs.lowBattery = it; prefs.sendToPhone(context)
+        }
+        WearToggleRow("Auto lock", Icons.Filled.Lock, autoLock) {
+            autoLock = it; prefs.autoLock = it; prefs.sendToPhone(context)
         }
     }
 }

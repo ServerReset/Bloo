@@ -93,10 +93,18 @@ internal suspend fun runWatchCommand(
     vin: String,
     action: String,
     climate: com.bloo.bluelink.data.ClimateRequest? = null,
-): Boolean {
-    if (WearCredentialSync.runLocally(context, vin, action, climate) != null) return true
+): Boolean = runWatchCommandChecked(context, vin, action, climate) != null
+
+/** [runWatchCommand] that also says how it went: true/false when the watch ran it itself, null when it went to the phone. */
+internal suspend fun runWatchCommandChecked(
+    context: Context,
+    vin: String,
+    action: String,
+    climate: com.bloo.bluelink.data.ClimateRequest? = null,
+): Boolean? {
+    WearCredentialSync.runLocally(context, vin, action, climate)?.let { return it.ok }
     WearDataLayerSync.sendCommand(context, vin, action, climate)
-    return false
+    return null
 }
 
 /**

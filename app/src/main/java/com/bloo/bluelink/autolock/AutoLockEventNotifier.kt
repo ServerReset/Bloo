@@ -103,6 +103,10 @@ object AutoLockEventNotifier {
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            // Said outright: shown on a paired watch as well as the phone (Wear OS bridges every notification that is not
+            // local-only), so "my car locked itself" reaches the wrist. The watch's own AutoLock raises the same kind of
+            // alert for itself (WearNotifier.autoLockResult), under the one "Auto lock" switch both devices share.
+            .setLocalOnly(false)
         contentIntent?.let { builder.setContentIntent(it) }
 
         postBuilt(context, notificationId(vin), builder)

@@ -41,3 +41,17 @@ class WatchCommandPathTest {
         assertEquals(false, WatchSyncProtocol.isCommandPath(WatchSyncProtocol.PATH_SNAPSHOT))
     }
 }
+
+class WatchNotifyDefaultsTest {
+    @Test fun everyAlertIsOnByDefaultAutoLockIncluded() {
+        val p = WatchNotifyPrefs()
+        assertEquals(true, p.charging)
+        assertEquals(true, p.chargeComplete)
+        assertEquals(true, p.lowBattery)
+        assertEquals(true, p.autoLock)
+        // A payload from an older phone has no autoLock field: it reads as on.
+        val old = Json { ignoreUnknownKeys = true }.decodeFromString(WatchNotifyPrefs.serializer(), """{"charging":false}""")
+        assertEquals(true, old.autoLock)
+        assertEquals(false, old.charging)
+    }
+}

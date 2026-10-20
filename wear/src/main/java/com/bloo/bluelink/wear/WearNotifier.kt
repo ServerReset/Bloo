@@ -24,10 +24,13 @@ class WearNotificationPrefs(context: Context) {
 
     /** Take the phone's choices (it is the source of truth; see [WatchNotifyPrefs]). */
     fun apply(p: com.bloo.bluelink.data.WatchNotifyPrefs) {
-        prefs.edit { putBoolean("charging", p.charging); putBoolean("charge_complete", p.chargeComplete); putBoolean("low_battery", p.lowBattery) }
+        prefs.edit {
+            putBoolean("charging", p.charging); putBoolean("charge_complete", p.chargeComplete)
+            putBoolean("low_battery", p.lowBattery); putBoolean("auto_lock", p.autoLock)
+        }
     }
 
-    fun current() = com.bloo.bluelink.data.WatchNotifyPrefs(charging, chargeComplete, lowBattery)
+    fun current() = com.bloo.bluelink.data.WatchNotifyPrefs(charging, chargeComplete, lowBattery, autoLock)
 
     /** Tell the phone about a change made here, so both sides stay the same. */
     fun sendToPhone(context: Context) {
@@ -52,6 +55,11 @@ class WearNotificationPrefs(context: Context) {
     var lowBattery: Boolean
         get() = prefs.getBoolean("low_battery", true)
         set(v) = prefs.edit { putBoolean("low_battery", v) }
+
+    /** Alerts for what Auto lock did (on by default, like the phone's, and one switch with it). */
+    var autoLock: Boolean
+        get() = prefs.getBoolean("auto_lock", true)
+        set(v) = prefs.edit { putBoolean("auto_lock", v) }
 }
 
 /**
@@ -129,6 +137,22 @@ object WearNotifier {
      * A one-shot alert. It takes no action button, and no longer takes an unused `action` parameter
      * either: both call sites passed null, so the button it could have drawn never appeared.
      */
+    /**
+     * What the watch's own Auto lock did, as a lasting alert: it locked the car, asked the phone to, or could not. [ok] true is
+     * done here, null is handed to the phone, false is a failure. Off only if the wearer turned the Auto lock alerts off.
+     */
+    fun autoLockResult(context: Context, vin: String, carName: String, ok: Boolean?) {
+        val app = context.applicationContext
+        if (!canPost(app) || !WearNotificationPrefs(app).autoLock) return
+        ensureChannels(app)
+        val (title, text) = when (ok) {
+            true -> "Locked $carName" to "Auto lock locked it after you walked away."
+            null -> "Locking $carName" to "Auto lock asked your phone to lock it."
+            false -> "Couldn't lock $carName" to "Auto lock tried and it did not go through."
+        }
+        app.getSystemService(NotificationManager::class.java).notify(idFor(vin, "autolock"), alert(app, title, text))
+    }
+
     private fun alert(app: Context, title: String, text: String) =
         NotificationCompat.Builder(app, CHANNEL_ALERTS)
             .setSmallIcon(R.drawable.ic_stat_bloo)
@@ -153,7 +177,7 @@ object WearNotifier {
 
     private fun ensureChannels(app: Context) {
         ensureNotificationChannel(app, CHANNEL_CHARGING, "Charging", NotificationManager.IMPORTANCE_LOW, "Live charge progress", showBadge = false)
-        ensureNotificationChannel(app, CHANNEL_ALERTS, "Car alerts", NotificationManager.IMPORTANCE_DEFAULT, "Charge complete and low battery")
+        ensureNotificationChannel(app, CHANNEL_ALERTS, "Car alerts", NotificationManager.IMPORTANCE_DEFAULT, "Charge complete, low battery and Auto lock")
     }
 
     /** Notifications need a runtime grant from Android 13 (watches included). */

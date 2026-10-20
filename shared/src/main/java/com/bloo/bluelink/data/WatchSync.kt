@@ -58,6 +58,8 @@ data class WatchNotifyPrefs(
     val charging: Boolean = true,
     val chargeComplete: Boolean = true,
     val lowBattery: Boolean = true,
+    /** AutoLock events ("Locked <car>"): on by default on every device, the watch included. One switch for the phone and the watch. */
+    val autoLock: Boolean = true,
 )
 
 /**

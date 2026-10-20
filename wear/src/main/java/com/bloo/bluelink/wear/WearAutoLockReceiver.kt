@@ -29,7 +29,10 @@ class WearAutoLockReceiver : BroadcastReceiver() {
             try {
                 val vehicles = runCatching { SnapshotStore(app).current().vehicles }.getOrDefault(emptyList())
                 for (vin in WearAutoLock.targets(vehicles)) {
-                    runCatching { runWatchCommand(app, vin, CarAction.LOCK) }
+                    val outcome = runCatching { runWatchCommandChecked(app, vin, CarAction.LOCK) }
+                    // What it did is said on the wrist (and the phone's own Auto lock says the same on the phone).
+                    val name = vehicles.firstOrNull { it.vin == vin }?.name ?: "your car"
+                    runCatching { WearNotifier.autoLockResult(app, vin, name, outcome.getOrElse { false }) }
                 }
             } finally {
                 result.finish()

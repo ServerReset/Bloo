@@ -16,6 +16,7 @@ import com.bloo.bluelink.data.WatchSyncProtocol
 import com.bloo.bluelink.data.notificationPrefs
 import com.bloo.bluelink.data.setNotifyChargeComplete
 import com.bloo.bluelink.data.setNotifyCharging
+import com.bloo.bluelink.data.setNotifyAutoLock
 import com.bloo.bluelink.data.setNotifyWatchLowBattery
 import com.bloo.bluelink.data.setWatchLook
 import com.bloo.bluelink.data.watchLook
@@ -100,6 +101,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                         store.setNotifyCharging(p.charging)
                         store.setNotifyChargeComplete(p.chargeComplete)
                         store.setNotifyWatchLowBattery(p.lowBattery)
+                        store.setNotifyAutoLock(p.autoLock)
                         if (!p.charging) {
                             com.bloo.bluelink.data.LiveCharge.cancelAll(applicationContext, SnapshotStore(applicationContext).current().vehicles.map { it.vin })
                         }
@@ -215,7 +217,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                     watchUpdateRunNumber = advice?.first,
                     watchUpdateApkUrl = advice?.second,
                     watchUpdateNotes = advice?.third,
-                    notify = SettingsStore(app).notificationPrefs().let { WatchNotifyPrefs(it.charging, it.chargeComplete, it.watchLowBattery) },
+                    notify = SettingsStore(app).notificationPrefs().let { WatchNotifyPrefs(it.charging, it.chargeComplete, it.watchLowBattery, it.autoLockAlerts) },
                     look = SettingsStore(app).watchLook(),
                     climatePresets = snapshot.vehicles.associate { it.vin to SettingsStore(app).climatePresets(it.vin) }
                         .filterValues { it.isNotEmpty() },
