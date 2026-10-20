@@ -43,9 +43,22 @@ class WidgetPlanTest {
         assertTrue(perRow * 46f + (perRow - 1) * 8f <= 150f - 32f + 0.5f, "$plan")
     }
 
-    @Test fun aNarrowTallWidgetWrapsItsControlsInsteadOfDroppingThem() {
-        val plan = planWidget(110f, 300f, 1f, false, valueChars = 3, actionCount = 4)
+    @Test fun aNarrowTallWidgetStacksItsControlsInOneColumnInsteadOfDroppingThem() {
+        // 110dp is too narrow for two pills side by side (70dp inside), so they stack, each the full width.
+        val plan = planWidget(110f, 420f, 1f, false, valueChars = 3, actionCount = 4)
+        assertTrue(plan.arrangement == WidgetArrangement.STACK && plan.gridColumns == 1 && plan.maxActions == 4, "$plan")
+    }
+
+    @Test fun aMediumTallWidgetWrapsItsControlsInTwoColumns() {
+        val plan = planWidget(150f, 300f, 1f, false, valueChars = 3, actionCount = 4)
         assertTrue(plan.arrangement == WidgetArrangement.STACK && plan.gridColumns == 2 && plan.maxActions == 4, "$plan")
+    }
+
+    @Test fun aTallWidgetGrowsItsControlsToSpendTheHeight() {
+        val short = planWidget(150f, 300f, 1f, false, valueChars = 3, actionCount = 4)
+        val tall = planWidget(150f, 560f, 1f, false, valueChars = 3, actionCount = 4)
+        assertTrue(tall.buttonHeightDp > short.buttonHeightDp, "$short vs $tall")
+        assertTrue(tall.buttonHeightDp <= 96f, "$tall")
     }
 
     @Test fun aSideGridNeverTakesTheReadoutsWidth() {
