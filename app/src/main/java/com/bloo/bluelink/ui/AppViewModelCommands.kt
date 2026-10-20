@@ -264,6 +264,22 @@ fun AppViewModel.setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
     }
 
 /**
+ * Starts climate at the temperature the weather where the car is parked calls for -- for when no weather reading is loaded in the
+ * app yet (smart climate must not depend on a pebble having been open). The lookup happens before the command takes the account
+ * lock; with no location or no weather it says so instead of doing nothing.
+ */
+fun AppViewModel.startSmartClimate(v: Vehicle) {
+    viewModelScope.launch {
+        val request = com.bloo.bluelink.data.smartClimateRequestFor(getApplication(), v.vin)
+        if (request == null) {
+            _state.update { it.copy(message = "Smart climate needs your car's location and the weather there.", messageType = ToastKind.ERROR) }
+            return@launch
+        }
+        startClimate(v, request)
+    }
+}
+
+/**
  * Runs a command with a per-action spinner; on success logs, shows a message and optimistically
  * flips the cached status.
  */

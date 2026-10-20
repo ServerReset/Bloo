@@ -24,7 +24,7 @@ object CarCommandRunner {
         }
         val store = SnapshotStore(context)
         // Smart climate's weather lookup is network, so it happens BEFORE the lock (the lock is the whole account's).
-        val smart = if (command.action == CarAction.CLIMATE_SMART) smartClimateFor(context, command.vin) else null
+        val smart = if (command.action == CarAction.CLIMATE_SMART) smartClimateRequestFor(context, command.vin) else null
         // Same lock refresh() and the phone UI's own command path already use -- BlueLink 502s on
         // overlapping requests for the same account, and this was the one command-executing path
         // that skipped it, so a resent command could fire the same command twice concurrently, or
@@ -227,8 +227,11 @@ fun smartClimateRequest(w: Weather): ClimateRequest = ClimateRequest(
     durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
 )
 
-/** The smart request for [vin] from the weather at the car, or null when it cannot be built (no location, no weather, already on). */
-private suspend fun smartClimateFor(context: Context, vin: String): ClimateRequest? {
+/**
+ * The smart-climate request for [vin] from the weather where the car is parked, or null when it cannot be built (no location,
+ * no weather, already running). Network: call it outside the account lock.
+ */
+suspend fun smartClimateRequestFor(context: Context, vin: String): ClimateRequest? {
     val snap = SnapshotStore(context).current().vehicles.firstOrNull { it.vin == vin } ?: return null
     if (snap.climateOn == true) return null
     val lat = snap.lat ?: return null

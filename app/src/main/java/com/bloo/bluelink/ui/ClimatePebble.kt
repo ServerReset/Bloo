@@ -214,18 +214,28 @@ internal fun ClimatePebble(
         }
     }
     val smartAmbientF = weather?.let { ambientFahrenheit(it.tempC) }
+    // Smart climate needs the weather where the car is parked; load it here rather than waiting for the Location pebble to.
+    // (Without a reading the button is still there and finds the weather itself when pressed.)
+    LaunchedEffect(v.vin, state.locations[v.vin]) {
+        if (state.carWeather[v.vin] == null) vm.loadCarWeather(v)
+        if (state.homeWeather == null) vm.loadHomeWeather()
+    }
 
     Pebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, modifier,
         // Smart climate and every saved preset, one tap away even with the pebble closed.
-        peek = if (running || (presets.isEmpty() && smartAmbientF == null)) null else {
+        peek = if (running) null else {
             {
                 ClimateQuickStart(
+                    // Always offered: with a weather reading it names the target, without one it is just "Smart climate".
                     smartLabel = smartAmbientF?.let {
                         val target = degLabel(smartClimateTargetF(it).toString(), fahrenheit)
                         if (smartClimateIsCooling(it)) "Smart: cool to $target" else "Smart: heat to $target"
+                    } ?: "Smart climate",
+                    onSmart = {
+                        if (smartAmbientF != null) startAtTarget(smartClimateTargetF(smartAmbientF), currentReq)
+                        else vm.startSmartClimate(v)
                     },
-                    onSmart = { smartAmbientF?.let { startAtTarget(smartClimateTargetF(it), currentReq) } },
                     presets = presets,
                     activeId = activePresetId,
                     fahrenheit = fahrenheit,
@@ -321,7 +331,8 @@ internal fun ClimatePebble(
         // -- see smartClimateTargetF, the same rule the tile command runner uses: ~10°F off ambient
         // normally, or the car's most aggressive setting on a genuinely extreme day, always within
         // what the car's own climate range actually accepts.
-        PopVisible(visible = weather != null) {
+        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+            SectionLabel("Smart climate")
             val w = weather
             if (w != null) {
                 val ambientF = ambientFahrenheit(w.tempC)
@@ -329,20 +340,30 @@ internal fun ClimatePebble(
                 val targetLabel = degLabel(smartTarget.toString(), fahrenheit)
                 val ambientLabel = degLabel(ambientF.toString(), fahrenheit)
                 val smartLabel = if (smartClimateIsCooling(ambientF)) "Cool to $targetLabel" else "Heat to $targetLabel"
-                Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                    SectionLabel("Smart climate")
-                    MorphActionButton(
-                        label = smartLabel,
-                        icon = Icons.Filled.AcUnit,
-                        onClick = { startAtTarget(smartTarget, currentReq) },
-                        enabled = !pending && !climateOn,
-                    )
-                    RevealText(
-                        "It's $ambientLabel by your car. Smart climate targets $targetLabel.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = mutedContentColor(),
-                    )
-                }
+                MorphActionButton(
+                    label = smartLabel,
+                    icon = Icons.Filled.AcUnit,
+                    onClick = { startAtTarget(smartTarget, currentReq) },
+                    enabled = !pending && !climateOn,
+                )
+                RevealText(
+                    "It's $ambientLabel by your car. Smart climate targets $targetLabel.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = mutedContentColor(),
+                )
+            } else {
+                // No reading yet (no car location, or still loading): the button finds the weather itself when pressed.
+                MorphActionButton(
+                    label = "Smart climate",
+                    icon = Icons.Filled.AcUnit,
+                    onClick = { vm.startSmartClimate(v) },
+                    enabled = !pending && !climateOn,
+                )
+                RevealText(
+                    "Sets the temperature for the weather where your car is parked.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = mutedContentColor(),
+                )
             }
         }
 
@@ -420,7 +441,7 @@ private const val CarCatchUpMs = 90_000L
  */
 @Composable
 private fun ClimateQuickStart(
-    smartLabel: String?,
+    smartLabel: String,
     onSmart: () -> Unit,
     presets: List<com.bloo.bluelink.data.ClimatePreset>,
     activeId: String?,
@@ -433,9 +454,7 @@ private fun ClimateQuickStart(
         Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
-        if (smartLabel != null) {
-            SafeMorphTextButton(smartLabel, onClick = onSmart, icon = Icons.Filled.AutoMode, enabled = enabled && !climateOn, fillOnPress = false)
-        }
+        SafeMorphTextButton(smartLabel, onClick = onSmart, icon = Icons.Filled.AutoMode, enabled = enabled && !climateOn, fillOnPress = false)
         presets.forEach { preset ->
             val running = climateOn && preset.id == activeId
             SafeMorphTextButton(
