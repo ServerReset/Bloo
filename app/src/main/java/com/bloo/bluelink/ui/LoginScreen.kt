@@ -51,6 +51,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -113,6 +117,29 @@ internal fun LoginScreen(
         LocalWindowInfo.current.containerSize.height.toDp() < 520.dp
     }
     val context = LocalContext.current
+
+    // Password managers. Only the email and the password carry an autofill type (below), so a manager offers its saved login
+    // for exactly those two and offers to SAVE exactly those two: the Service PIN, the region and brand pickers have none, and
+    // an untyped Compose field is not part of the autofill structure at all.
+    //
+    // The save is offered when a sign-in WORKED. Tapping Sign in marks the form submitted; if the form comes back from the
+    // attempt it failed (cancel: the manager must not keep a wrong password), and if the screen goes away while still
+    // submitted the account was signed in (commit: the manager asks to save it).
+    val autofill = remember(context) { context.getSystemService(android.view.autofill.AutofillManager::class.java) }
+    var submitted by remember { mutableStateOf(false) }
+    var attempted by remember { mutableStateOf(false) }
+    LaunchedEffect(loading) {
+        if (loading) {
+            attempted = true
+        } else if (attempted && submitted) {
+            attempted = false
+            submitted = false
+            runCatching { autofill?.cancel() }
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { if (submitted) runCatching { autofill?.commit() } }
+    }
 
     // Brand-specific copy
     val brandSubtitle = when (brand) {
@@ -245,7 +272,9 @@ internal fun LoginScreen(
                             singleLine = true,
                             leadingIcon = { Icon(Icons.Filled.MailOutline, contentDescription = null, modifier = Modifier.size(20.dp)) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().semantics {
+                                contentType = ContentType.Username + ContentType.EmailAddress
+                            },
                         )
                         BlooTextField(
                             value = password,
@@ -256,7 +285,7 @@ internal fun LoginScreen(
                             trailingIcon = { RevealToggle(showPassword, "password") { showPassword = !showPassword } },
                             visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.Password },
                         )
 
                         AnimatedVisibility(
@@ -281,7 +310,7 @@ internal fun LoginScreen(
 
                         SafeMorphTextButton(
                             text = "Sign in to ${brand.label}",
-                            onClick = { onLogin(email, password, pin, brand) },
+                            onClick = { submitted = true; onLogin(email, password, pin, brand) },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !loading,
                             pending = loading,
