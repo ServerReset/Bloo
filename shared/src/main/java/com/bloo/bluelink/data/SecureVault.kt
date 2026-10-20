@@ -79,7 +79,6 @@ class SecureVault(
     class Editor internal constructor(internal val map: HashMap<String, String>) {
         fun put(key: String, value: String) { map[key] = value }
         fun remove(key: String) { map.remove(key) }
-        fun removeWithPrefix(prefix: String) { map.keys.removeAll { it.startsWith(prefix) } }
     }
 
     /** Seals the data key under [pin] as well, so the PIN can recover the vault. */

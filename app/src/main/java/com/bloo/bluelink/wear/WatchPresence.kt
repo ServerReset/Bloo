@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 /**
  * Phone-side watch presence + the live snapshot push.
  *
- * [isWatchPaired] / [hasWatch] is what the Settings "under the phone" watch-lock option keys
+ * [isWatchPaired] is what the Settings "under the phone" watch-lock option keys
  * off: the option only shows when there IS a paired watch, because there is nothing to lock
  * otherwise. Presence is the Data Layer's connected-node list, refreshed on start and on any
  * node change.
@@ -34,8 +34,6 @@ object WatchPresence {
     val watch: StateFlow<ConnectedWatch?> = _watch
 
     private val _hasWatch = MutableStateFlow(false)
-    /** Live "is a watch paired right now", for the Settings UI. */
-    val hasWatch: StateFlow<Boolean> = _hasWatch
 
     private val _hasApp = MutableStateFlow(false)
     /** Whether a reachable watch is running the Bloo watch app (not just any paired Wear device). */

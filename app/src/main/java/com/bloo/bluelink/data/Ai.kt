@@ -118,9 +118,6 @@ class Ai(context: Context) {
         AiAvailability.Error("${t.javaClass.simpleName}: ${t.message ?: "no message"}$frame$cause")
     }
 
-    /** True if the model is, or can be, used here. */
-    suspend fun isSupported(): Boolean = availability().usable
-
     /**
      * Summarize [text] on-device, downloading the model first if needed. Throws on failure so the
      * caller can surface a real message.

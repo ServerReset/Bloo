@@ -43,15 +43,6 @@ internal object UpdateRuntime {
      */
     const val JOIN_TESTING_URL = "https://groups.google.com/g/bloo-testing"
 
-    /**
-     * Whether this build was cut for a major, and so published to CLOSED testing. An ordinary push
-     * build goes to INTERNAL testing.
-     *
-     * The app cannot ask Play which track installed it -- there is no API for that -- so this is the
-     * signal it has: the version the pipeline stamped. See app/build.gradle.kts's BLOO_MAJOR.
-     */
-    val isClosedTesting: Boolean get() = BuildConfig.BLOO_MAJOR > 0
-
     @Volatile
     private var fromPlay: Boolean? = null
 

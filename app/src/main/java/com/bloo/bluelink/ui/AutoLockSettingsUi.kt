@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.autolock.AutoLockConfig
 import com.bloo.bluelink.autolock.AutoLockNotification
+import com.bloo.bluelink.autolock.PairedDevice
 import com.bloo.bluelink.autolock.DetectionState
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.Vehicle
@@ -120,10 +121,6 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel, gen5w: Boolean 
         vm.setAutoLockConfig(v.vin, new)
     }
 
-    fun updateLocal(new: AutoLockConfig) {
-        config = new
-    }
-
     val bluetoothOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
         granted(Manifest.permission.BLUETOOTH_CONNECT)
     val notificationsOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -181,54 +178,16 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel, gen5w: Boolean 
     }
 
     if (showDevicePicker) {
-        val devices = remember { vm.pairedBluetoothDevices() }
-        // GlassAlertDialog (Ambient.kt), like every other dialog in the app. Nothing about picking
-        // a Bluetooth device needs its own dialog treatment.
-        GlassAlertDialog(
-            onDismissRequest = { showDevicePicker = false },
-            icon = Icons.Filled.Bluetooth,
-            title = "Choose the car's Bluetooth device",
-            text = {
-                if (devices.isEmpty()) {
-                    RevealText(
-                        "No paired Bluetooth devices. Pair your car in Android's Bluetooth settings first.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                } else {
-                    // The paired-device list is a handful of rows, not a feed.
-                    devices.forEach { device ->
-                        ListButton(
-                            title = device.name,
-                            subtitle = device.address,
-                            onClick = {
-                                // Choosing a device is what turns AutoLock ON for this car, not the
-                                // toggle: the toggle cannot appear until this is done (see above), so
-                                // the pick IS the enable. Dry run stays on (see AutoLockConfig), so
-                                // the first walks only say "would have locked".
-                                update(
-                                    current.copy(
-                                        deviceAddress = device.address,
-                                        deviceName = device.name,
-                                        enabled = true,
-                                    ),
-                                )
-                                showDevicePicker = false
-                            },
-                        )
-                    }
-                }
+        BluetoothDevicePicker(
+            vm,
+            onPick = { device ->
+                // Choosing a device is what turns AutoLock ON for this car, not the toggle: the toggle cannot appear until this
+                // is done (see above), so the pick IS the enable. Dry run stays on (see AutoLockConfig), so the first walks only
+                // say "would have locked".
+                update(current.copy(deviceAddress = device.address, deviceName = device.name, enabled = true))
+                showDevicePicker = false
             },
-            buttons = {
-                // MorphTextButton, not M3's TextButton: the only bare Material button left in the
-                // app's own UI, and it rendered with stock M3 styling -- no morph, no haptic, none
-                // of the app's own button language -- next to dialogs whose dismiss action is
-                // always a MorphTextButton.
-                MorphTextButton(
-                    "Close",
-                    onClick = { showDevicePicker = false },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            },
+            onDismiss = { showDevicePicker = false },
         )
     }
 }
@@ -447,39 +406,42 @@ private fun AutoLockSettings(
     }
 
     if (showDevicePicker) {
-        val devices = remember { vm.pairedBluetoothDevices() }
-        GlassAlertDialog(
-            onDismissRequest = { showDevicePicker = false },
-            icon = Icons.Filled.Bluetooth,
-            title = "Choose the car's Bluetooth device",
-            text = {
-                if (devices.isEmpty()) {
-                    RevealText(
-                        "No paired Bluetooth devices. Pair your car in Android's Bluetooth settings first.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                } else {
-                    devices.forEach { device ->
-                        ListButton(
-                            title = device.name,
-                            subtitle = device.address,
-                            onClick = {
-                                update(current.copy(deviceAddress = device.address, deviceName = device.name))
-                                showDevicePicker = false
-                            },
-                        )
-                    }
-                }
+        BluetoothDevicePicker(
+            vm,
+            onPick = { device ->
+                update(current.copy(deviceAddress = device.address, deviceName = device.name))
+                showDevicePicker = false
             },
-            buttons = {
-                MorphTextButton(
-                    "Close",
-                    onClick = { showDevicePicker = false },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            },
+            onDismiss = { showDevicePicker = false },
         )
     }
+}
+
+/** The paired Bluetooth devices as a dialog, to choose the one that is the car's; [onPick] gets the chosen device. */
+@Composable
+private fun BluetoothDevicePicker(vm: AppViewModel, onPick: (PairedDevice) -> Unit, onDismiss: () -> Unit) {
+    val devices = remember { vm.pairedBluetoothDevices() }
+    // GlassAlertDialog (Ambient.kt), like every other dialog in the app. Nothing about picking a Bluetooth device needs its
+    // own dialog treatment, and its dismiss action is a MorphTextButton like all the rest.
+    GlassAlertDialog(
+        onDismissRequest = onDismiss,
+        icon = Icons.Filled.Bluetooth,
+        title = "Choose the car's Bluetooth device",
+        text = {
+            if (devices.isEmpty()) {
+                RevealText(
+                    "No paired Bluetooth devices. Pair your car in Android's Bluetooth settings first.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                // The paired-device list is a handful of rows, not a feed.
+                devices.forEach { device ->
+                    ListButton(title = device.name, subtitle = device.address, onClick = { onPick(device) })
+                }
+            }
+        },
+        buttons = { MorphTextButton("Close", onClick = onDismiss, modifier = Modifier.fillMaxWidth()) },
+    )
 }
 
 private fun DetectionState.label(): String = when (this) {

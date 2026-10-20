@@ -191,22 +191,18 @@ private suspend fun loadConfig(context: Context, widgetId: Int): Loaded {
         strip = strip,
         cars = cars,
         photos = photos,
-        choice = Choice(
-            vin = prefs[WidgetKeys.VIN] ?: cars.firstOrNull()?.vin,
-            climate = prefs[WidgetKeys.SHOW_CLIMATE] ?: true,
-            charge = prefs[WidgetKeys.SHOW_CHARGE] ?: true,
-            flash = prefs[WidgetKeys.SHOW_FLASH] ?: true,
-            refresh = prefs[WidgetKeys.SHOW_REFRESH] ?: true,
-            compact = prefs[WidgetKeys.COMPACT] ?: false,
-            photo = prefs[WidgetKeys.SHOW_PHOTO] ?: true,
-            blur = prefs[WidgetKeys.PHOTO_BLUR] ?: WidgetPhoto.BLUR_MEDIUM,
-            extras = prefs[WidgetKeys.SHOW_EXTRAS] ?: true,
-            corner = WidgetCorner.entries.getOrElse(prefs[WidgetKeys.CORNER] ?: WidgetCorner.MEDIUM.ordinal) { WidgetCorner.MEDIUM },
-            textSize = WidgetTextSize.entries.getOrElse(prefs[WidgetKeys.TEXT_SIZE] ?: WidgetTextSize.NORMAL.ordinal) { WidgetTextSize.NORMAL },
-            levelTint = prefs[WidgetKeys.LEVEL_TINT] ?: false,
-            stripShape = StripShape.entries.getOrElse(prefs[WidgetKeys.STRIP_SHAPE] ?: 0) { StripShape.PILL },
-            stripControls = StripControl.of(prefs, WidgetOptions.of(prefs)),
-        ),
+        choice = WidgetOptions.of(prefs).let { o ->
+            // The same reading of the stored options the widget itself uses ([WidgetOptions.of]), so this screen and the
+            // widget can never disagree about what is stored.
+            Choice(
+                vin = prefs[WidgetKeys.VIN] ?: cars.firstOrNull()?.vin,
+                climate = o.climate, charge = o.charge, flash = o.flash, refresh = o.refresh,
+                compact = o.compact, photo = o.photo, blur = o.blur, extras = o.extras,
+                corner = o.corner, textSize = o.textSize, levelTint = o.levelTint,
+                stripShape = StripShape.entries.getOrElse(prefs[WidgetKeys.STRIP_SHAPE] ?: 0) { StripShape.PILL },
+                stripControls = StripControl.of(prefs, o),
+            )
+        },
     )
 }
 

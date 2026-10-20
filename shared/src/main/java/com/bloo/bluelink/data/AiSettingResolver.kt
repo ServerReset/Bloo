@@ -31,7 +31,6 @@ object AiSettingResolver {
         val isChoice get() = options.isNotEmpty()
         val isRange get() = min != null && max != null
         val isText get() = text
-        val isToggle get() = !isChoice && !isRange && !isText
 
         companion object {
             fun toggle(id: String, title: String, on: Boolean, hint: String = "") =
