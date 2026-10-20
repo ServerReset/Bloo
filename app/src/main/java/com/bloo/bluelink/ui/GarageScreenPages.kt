@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.drop
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.roundToInt
 import com.bloo.bluelink.data.Vehicle
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -31,6 +32,9 @@ import com.bloo.uicommon.LocalHaptics
  * the motion, not inside it. Null outside a pager (previews, tests): such content builds at once.
  */
 internal val LocalPagerIdle = androidx.compose.runtime.staticCompositionLocalOf<State<Boolean>?> { null }
+
+/** The farthest (in pages) an external car selection is travelled to by an animated scroll; beyond it the pager jumps. */
+private const val MAX_ANIMATED_HOP = 3
 
 /*
  * The garage's layout, peeled out of GarageScreen: CollapsedGaragePager is the pager of cars (and
@@ -48,6 +52,10 @@ internal fun CollapsedGaragePager(
     count: Int,
     slots: Int,
     perPage: Int,
+    /** The most cars the grid ever shows at once (the window's natural column count, whatever full screen does). */
+    maxPerPage: Int,
+    /** [perPage] eased: how many cars share the width right now (between the grid's count and 1 while one goes full screen). */
+    perPageAnim: State<Float>,
     /** Read only inside effects (never in composition), so a settle does not recompose the pager and its pages. */
     currentIndex: kotlinx.coroutines.flow.StateFlow<Int>,
     windowWidthPx: Int,
@@ -58,12 +66,6 @@ internal fun CollapsedGaragePager(
     expandedT: State<Float>,
     /** True when the grid shows more than one car column: the hero's full-screen button appears. */
     multiColumn: Boolean,
-    /**
-     * How many columns THIS car's page is laid out in: 2 when it is wide enough to reflow (the hero
-     * beside its pebbles), 1 otherwise. The page width is divided by it to get one column's width,
-     * which is what the reflow measures both of its blocks at.
-     */
-    carColumns: Int,
     /** One car is filling the whole window instead of sharing it with its neighbours. */
     fullScreen: Boolean,
     /** Expand the car at this index to full screen, or leave full screen. */
@@ -129,13 +131,17 @@ internal fun CollapsedGaragePager(
         // pager was already composed on a different one) updated currentIndex, but the pager itself
         // just sat there on whatever car it last settled on.
         suspend fun snapToIndex(idx: Int) {
+            // A nearby car is travelled to (a full-screen button on the second column brings that car to the front while
+            // the page widens); only a long way off, or a car count change, jumps.
             // Not on Garage any more (mid exit-transition to another screen, Settings included):
             // this composition's `state` param keeps updating live even while AnimatedContent
             // slides its ALREADY- STALE content off screen, so without this guard a snap here still
             // visibly moves the pager underneath its own exit animation -- see the `total` effect
             // below, which skips itself on the way out for the same reason.
             if (state.value.screen != Screen.Garage) return
-            wrap.snapToReal(idx.coerceIn(0, slots - 1))
+            val target = idx.coerceIn(0, slots - 1)
+            val hop = kotlin.math.abs(wrapPageToward(pager.currentPage, pager.pageCount, total, target) - pager.currentPage)
+            if (hop in 1..MAX_ANIMATED_HOP) wrap.animateToReal(target) else wrap.snapToReal(target)
         }
         LaunchedEffect(Unit) {
             // Followed in an effect, not as a key: the pager's own settles change it every swipe, and as a
@@ -170,14 +176,20 @@ internal fun CollapsedGaragePager(
         androidx.compose.runtime.CompositionLocalProvider(LocalPagerIdle provides pagerIdle, LocalPagerBlur provides pagerBlur) {
         Box(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
-            val columnWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).coerceAtLeast(1).toDp() }
+            // One column's width, per frame and only in the measure phase: the page width (the window over the EASED car count)
+            // over the reflow's own fraction of two columns. Continuous, so a car widening to full screen grows its blocks
+            // with the page; read nowhere in composition, so the animation never recomposes the car.
+            val columnWidthOf: () -> androidx.compose.ui.unit.Dp = remember(density, perPageAnim, expandedT) {
+                { with(density) { (boxWidthPx / perPageAnim.value.coerceAtLeast(1f) / (1f + expandedT.value)).toDp() } }
+            }
             // One column per car, `perPage` of them side by side: a car never grows to swallow the
             // pager any more -- the layout INSIDE the page scales (one column or two) with the
             // device width instead.
-            val columnPageSize = remember(perPage) {
+            val columnPageSize = remember(perPageAnim) {
                 object : androidx.compose.foundation.pager.PageSize {
+                    // Read in the pager's measure, so easing the car count re-measures the pages and nothing recomposes.
                     override fun androidx.compose.ui.unit.Density.calculateMainAxisPageSize(availableSpace: Int, pageSpacing: Int): Int =
-                        ((availableSpace + perPage - 1) / perPage).coerceAtLeast(1)
+                        (availableSpace / perPageAnim.value.coerceAtLeast(1f)).roundToInt().coerceAtLeast(1)
                 }
             }
             HorizontalPager(
@@ -189,7 +201,7 @@ internal fun CollapsedGaragePager(
                 // Never a flat 1: perPage + 2*beyond pages are composed at once, and if that
                 // exceeds `total` two virtual pages resolve to the same real item (e.g. Settings
                 // mounted twice) and corrupt its state, crashing.
-                beyondViewportPageCount = ((total - perPage) / 2).coerceIn(0, 1),
+                beyondViewportPageCount = ((total - maxPerPage) / 2).coerceIn(0, 1),
                 // Raw page index as key, never the modulo item: duplicate keys crash ("Key already
                 // used").
                 key = { page -> page },
@@ -242,7 +254,7 @@ internal fun CollapsedGaragePager(
                             // each block full-width, the two could not sit side by side, and the pebble
                             // column landed off-screen. A single car expanded to full screen showed a
                             // stretched hero with the pebbles stacked under it.
-                            pageColumnWidth = columnWidth / carColumns.coerceAtLeast(1),
+                            pageColumnWidth = columnWidthOf,
                             expandedT = expandedT,
                             hazeState = hazeState,
                             heroAction = heroAction,

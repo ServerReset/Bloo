@@ -111,10 +111,19 @@ internal fun GarageScreen(
     // column on a narrow window. No manual expand state, no second screen, nothing to open or close --
     // except the full-screen button above, which only widens a car's PAGE, never swaps screens.
     val twoColumn = (widthDp / perPage.toFloat()) >= TWO_COLUMN_MIN_DP.dp
+    // The two springs below are the SAME spring (a critically damped one is linear in its progress), so they move as one:
+    // how many cars share the width eases between the grid and one car, and the car's own reflow between one column and
+    // two eases with it. Before, the page snapped to full width at once and only the reflow animated -- the jump.
+    val carSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
     val expandedT = androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (twoColumn) 1f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = carSpring,
         label = "expandT",
+    )
+    val perPageT = androidx.compose.animation.core.animateFloatAsState(
+        targetValue = perPage.toFloat(),
+        animationSpec = carSpring,
+        label = "perPageT",
     )
 
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
@@ -123,7 +132,7 @@ internal fun GarageScreen(
         // expand or collapse to reconcile -- the pebbles slide from under the hero to beside it purely
         // as the page grows wide enough.
         CollapsedGaragePager(
-            vehicles, count, slots, perPage, vm.currentIndex,
+            vehicles, count, slots, perPage, naturalColumns, perPageT, vm.currentIndex,
             windowInfo.containerSize.width, state, vm, hazeState,
             expandedT = expandedT,
             multiColumn = multiColumn,
@@ -133,7 +142,6 @@ internal fun GarageScreen(
             // block full-width, the two could not fit, and the pebble column was placed off-screen.
             // The hero then stretched to fill and the pebbles stacked underneath, which is what a
             // single car expanded to full screen looked like.
-            carColumns = if (twoColumn) 2 else 1,
             onToggleFullScreen = { real ->
                 if (fullScreen) {
                     fullScreen = false

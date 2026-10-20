@@ -16,9 +16,10 @@ import com.bloo.uicommon.content
  *  - 0 (collapsed): the two blocks sit UNDER each other, both one column wide.
  *  - 1 (expanded): they sit BESIDE each other, each one column wide.
  *
- * Both blocks are measured at the CONSTANT [blockWidth] -- one column, the same width whether the
- * page is showing one column (collapsed) or two (expanded) -- so nothing ever re-wraps as the page
- * grows; only their POSITIONS animate. The caller owns the scrolling (this positions the two
+ * Both blocks are measured at [blockWidth] -- one column, the same width whether the page is showing
+ * one column (collapsed) or two (expanded) -- so they do not re-wrap as the page grows between the
+ * two; only their POSITIONS animate. When a car widens to full screen the width itself eases
+ * continuously (the caller supplies it per frame), so the blocks grow with the page instead of jumping. The caller owns the scrolling (this positions the two
  * blocks).
  *
  * [expandedT] is a SUPPLIER, read only here in the measure phase, never in composition: that is what
@@ -27,7 +28,8 @@ import com.bloo.uicommon.content
 @Composable
 internal fun ReflowPair(
     expandedT: () -> Float,
-    blockWidth: Dp,
+    /** One column's width, read in the measure phase: it may change every frame (a car widening to full screen). */
+    blockWidth: () -> Dp,
     modifier: Modifier = Modifier,
     gap: Dp = GapSection,
     lead: @Composable () -> Unit,
@@ -42,7 +44,7 @@ internal fun ReflowPair(
     ) { measurables, constraints ->
         val t = expandedT().coerceIn(0f, 1f)
         val gapPx = gap.roundToPx()
-        val w = blockWidth.roundToPx().coerceIn(0, constraints.maxWidth)
+        val w = blockWidth().roundToPx().coerceIn(0, constraints.maxWidth)
         val blockConstraints = constraints.copy(minWidth = w, maxWidth = w, minHeight = 0)
         val leadPlaceable = measurables[0].measure(blockConstraints)
         val trailPlaceable = measurables[1].measure(blockConstraints)

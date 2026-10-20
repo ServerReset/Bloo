@@ -56,10 +56,11 @@ internal fun ExpandedCar(
     state: State<UiState>,
     vm: AppViewModel,
     /**
-     * Width of ONE column. The reflow holds this constant so the blocks never re-wrap as the page
-     * grows to two columns.
+     * Width of ONE column, as a supplier read in the measure phase. The reflow holds it constant while the page grows
+     * from one column to two, so the blocks do not re-wrap; when the page itself is widening (a car going full screen)
+     * it eases with the page, frame by frame, so the blocks grow with it instead of jumping to the new width.
      */
-    pageColumnWidth: Dp,
+    pageColumnWidth: () -> Dp,
     /**
      * Switch to the neighbouring car, -1 = previous / +1 = next -- two-finger-free car swapping
      * driven by a horizontal swipe on the hero card itself (see [CriticalContent]'s own
@@ -127,7 +128,7 @@ internal fun ExpandedCar(
     val hotSeatPresent by remember { derivedStateOf { expandedT.value > 0.001f } }
     // One column wide, held constant through the animation (see ReflowPair's own doc): the page
     // grows to two columns but each block stays a single column's width, so nothing re-wraps.
-    val blockWidth = (minOf(pageColumnWidth, 960.dp) - ScreenGutter * 2).coerceAtLeast(1.dp)
+    val blockWidth: () -> Dp = { (minOf(pageColumnWidth(), 960.dp) - ScreenGutter * 2).coerceAtLeast(1.dp) }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }) {
         // One scrolling page whose two blocks reflow by [expandedT]: the pebble list sits UNDER the
