@@ -1,13 +1,14 @@
 package com.bloo.bluelink.wear
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -76,17 +77,23 @@ fun <T> WearChoiceScreen(
 }
 
 /**
- * A screen that can be swiped away (right, the Wear OS way) or backed out of, calling [onBack] for either. The
- * face editor and its control list are screens of this kind: each swipe peels one layer, ending on the face.
+ * A screen that can be backed out of -- the back button or gesture, or a swipe right across it -- calling [onBack]
+ * for either. The face editor and its control list are screens of this kind: each swipe peels one layer, ending on
+ * the face. (The swipe is read here rather than left to the system, which would close the whole app.)
  */
 @Composable
 internal fun WearBackable(onBack: () -> Unit, content: @Composable () -> Unit) {
     androidx.activity.compose.BackHandler(onBack = onBack)
-    androidx.wear.compose.foundation.SwipeToDismissBox(onDismissed = onBack) { isBackground ->
-        if (isBackground) {
-            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black))
-        } else {
-            content()
-        }
-    }
+    val current = androidx.compose.runtime.rememberUpdatedState(onBack)
+    androidx.compose.foundation.layout.Box(
+        Modifier.fillMaxSize().pointerInput(Unit) {
+            var travelled = 0f
+            detectHorizontalDragGestures(
+                onDragStart = { travelled = 0f },
+                onDragEnd = { if (travelled > size.width * 0.3f) current.value() },
+                onDragCancel = { travelled = 0f },
+                onHorizontalDrag = { _, delta -> travelled += delta },
+            )
+        },
+    ) { content() }
 }

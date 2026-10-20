@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +29,7 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.uicommon.RevealText
+import kotlin.math.roundToInt
 
 /**
  * The face in miniature -- the same four quarters the main screen draws -- opened by pressing the face's centre.
@@ -46,45 +48,54 @@ internal fun WearFaceEditor(
     val haptics = LocalHapticFeedback.current
     WearBackable(onDone) {
         ScreenScaffold(timeText = { TimeText() }) {
-            Box(Modifier.fillMaxSize().wearAuroraWash(scheme.primary), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(150.dp)) {
-                        val actions = (0 until 4).map { i ->
-                            val control = slots.getOrNull(i)?.let { WearFaceControls.byKey(it) }?.takeIf { it.available(car) }
-                            WearQuickAction(
-                                label = control?.choice ?: "Empty",
-                                icon = control?.icon?.invoke(car) ?: Icons.Filled.Add,
+            androidx.compose.foundation.layout.BoxWithConstraints(
+                Modifier.fillMaxSize().wearAuroraWash(scheme.primary),
+                contentAlignment = Alignment.Center,
+            ) {
+                // The face, at two thirds of the display; its fixed sizes scale with it as they do on the main screen.
+                val face = minOf(maxWidth, maxHeight) * 0.66f
+                val press = rememberQuadrantPress()
+                androidx.compose.runtime.CompositionLocalProvider(LocalFaceUnit provides face / 201.dp) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.size(face)) {
+                            val actions = (0 until 4).map { i ->
+                                val control = slots.getOrNull(i)?.let { WearFaceControls.byKey(it) }?.takeIf { it.available(car) }
+                                WearQuickAction(
+                                    label = control?.choice ?: "Empty",
+                                    icon = control?.icon?.invoke(car) ?: Icons.Filled.Add,
+                                ) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                    onPickSlot(i)
+                                }
+                            }
+                            WearQuadrantGrid(actions, Modifier.fillMaxSize(), press)
+                            Box(
+                                Modifier
+                                    .align(Alignment.Center)
+                                    .offset { androidx.compose.ui.unit.IntOffset((press.dx * face.roundToPx()).roundToInt(), (press.dy * face.roundToPx()).roundToInt()) }
+                                    .size(face * 0.27f)
+                                    .clip(CircleShape)
+                                    .background(scheme.background)
+                                    .semantics { contentDescription = "Done" }
+                                    .clickable {
+                                        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                                        onDone()
+                                    },
+                                contentAlignment = Alignment.Center,
                             ) {
-                                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                                onPickSlot(i)
+                                Icon(Icons.Filled.Check, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(face * 0.16f))
                             }
                         }
-                        WearQuadrantGrid(actions, Modifier.fillMaxSize())
-                        Box(
-                            Modifier
-                                .align(Alignment.Center)
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(scheme.background)
-                                .semantics { contentDescription = "Done" }
-                                .clickable {
-                                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                                    onDone()
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Filled.Check, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(24.dp))
-                        }
+                        RevealText(
+                            "Tap a quarter to change it",
+                            modifier = Modifier.padding(top = 8.dp, start = 28.dp, end = 28.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = scheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                        )
                     }
-                    RevealText(
-                        "Tap a quarter to change it",
-                        modifier = Modifier.padding(top = 8.dp, start = 28.dp, end = 28.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = scheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                    )
                 }
             }
         }

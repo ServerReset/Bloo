@@ -7,14 +7,12 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,9 +25,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
@@ -45,13 +45,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import androidx.wear.compose.foundation.basicCurvedText
 import com.bloo.bluelink.data.DeviceStatus
 import com.bloo.uicommon.MorphButton
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.standardButtonIcon
+import kotlinx.coroutines.launch
 
 /*
  * The watch face for one car: the charge (or fuel) as a ring around the very edge of the display, and inside
@@ -70,6 +71,64 @@ private val TileGap = 6.dp
 
 /** The hub's share of the inner circle's diameter. */
 private const val HubFraction = 0.36f
+
+/** The display the face's fixed sizes (ring, gaps, glyphs) were drawn for; every size scales by (real display / this). */
+private val ReferenceFace = 227.dp
+
+/** How far the cross through the face moves, as a share of the face, when a quarter is pressed (the quarter grows). */
+private const val PressGrow = 0.11f
+
+/**
+ * The face's size relative to the 227dp it was designed on, so a 192dp watch and a 240dp watch (and any display
+ * size setting, which changes the dp the display has) get the same face, proportionally.
+ */
+internal val LocalFaceUnit = androidx.compose.runtime.compositionLocalOf { 1f }
+
+/**
+ * Which quarter is held down, and the cross through the middle of the face that moves because of it: pressing a
+ * quarter makes it grow and the other three give way, and the hub (which sits on the cross) moves with it -- the
+ * same push-and-give of a row of buttons on the phone. The cross is two springs, one per axis; they are read where
+ * the face is laid out, so a press re-lays-out the tiles without recomposing them.
+ */
+@androidx.compose.runtime.Stable
+internal class QuadrantPress(
+    internal val x: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    internal val y: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+) {
+    var pressed by androidx.compose.runtime.mutableIntStateOf(NONE)
+        private set
+
+    /** The cross's offset from the middle, as a share of the face's width and height. */
+    val dx: Float get() = x.value
+    val dy: Float get() = y.value
+
+    fun press(quadrant: Int, down: Boolean) {
+        if (down) pressed = quadrant else if (pressed == quadrant) pressed = NONE
+    }
+
+    companion object { const val NONE = -1 }
+}
+
+@Composable
+internal fun rememberQuadrantPress(): QuadrantPress {
+    val policy by DeviceStatus.policy.collectAsStateWithLifecycle()
+    val state = androidx.compose.runtime.remember {
+        QuadrantPress(androidx.compose.animation.core.Animatable(0f), androidx.compose.animation.core.Animatable(0f))
+    }
+    val q = state.pressed
+    androidx.compose.runtime.LaunchedEffect(q, policy.bouncySprings) {
+        // The pressed quarter's own corner stays put; the cross moves AWAY from it, which is what makes it bigger.
+        val tx = when (q) { 0, 2 -> PressGrow; 1, 3 -> -PressGrow; else -> 0f }
+        val ty = when (q) { 0, 1 -> PressGrow; 2, 3 -> -PressGrow; else -> 0f }
+        val spec: androidx.compose.animation.core.AnimationSpec<Float> =
+            if (policy.bouncySprings) spring(dampingRatio = 0.62f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium) else snap()
+        kotlinx.coroutines.coroutineScope {
+            launch { state.x.animateTo(tx, spec) }
+            launch { state.y.animateTo(ty, spec) }
+        }
+    }
+    return state
+}
 
 /**
  * The whole face. Fills its square (on a round watch, the display); everything inside is sized from it, so the
@@ -97,22 +156,32 @@ fun WearCarFace(
 ) {
     // The aurora, at watch scale: a soft wash of the level's colour behind the tiles, as the phone's
     // background washes behind its cards. Drawn once, no animation.
-    Box(
+    BoxWithConstraints(
         modifier.wearAuroraWash(tint),
         contentAlignment = Alignment.Center,
     ) {
-        WearEdgeRing(
-            progress = progress,
-            tint = tint,
-            modifier = Modifier.fillMaxSize().alpha(if (stale) 0.5f else 1f),
-            charging = charging || refreshing,
-        )
-        Box(Modifier.fillMaxSize().padding(RingStroke + RingGap), contentAlignment = Alignment.Center) {
-            WearQuadrantGrid(actions = actions, modifier = Modifier.fillMaxSize())
-            // The labels run round the inside of the ring, each along its own quarter's outer edge.
-            WearRingLabels(actions)
-            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                WearFaceHub(value = value, caption = caption, tint = tint, size = maxWidth * HubFraction, status = status, onClick = onHubClick)
+        val unit = minOf(maxWidth, maxHeight) / ReferenceFace
+        val press = rememberQuadrantPress()
+        CompositionLocalProvider(LocalFaceUnit provides unit) {
+            WearEdgeRing(
+                progress = progress,
+                tint = tint,
+                modifier = Modifier.fillMaxSize().alpha(if (stale) 0.5f else 1f),
+                stroke = RingStroke * unit,
+                charging = charging || refreshing,
+            )
+            Box(Modifier.fillMaxSize().padding((RingStroke + RingGap) * unit), contentAlignment = Alignment.Center) {
+                WearQuadrantGrid(actions = actions, modifier = Modifier.fillMaxSize(), press = press)
+                // The labels run round the inside of the ring, each along its own quarter's outer edge.
+                WearRingLabels(actions)
+                BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    val w = constraints.maxWidth
+                    val h = constraints.maxHeight
+                    // The hub sits where the cross is, so it moves with the quarter that was pressed.
+                    Box(Modifier.offset { androidx.compose.ui.unit.IntOffset((press.dx * w).roundToInt(), (press.dy * h).roundToInt()) }) {
+                        WearFaceHub(value = value, caption = caption, tint = tint, size = maxWidth * HubFraction, status = status, onClick = onHubClick)
+                    }
+                }
             }
         }
     }
@@ -176,26 +245,59 @@ fun WearEdgeRing(
  * Each quarter is the app's own [MorphButton] -- its press feedback, haptic, frost and pending spinner -- given
  * the quarter shape; a press softens the inner corner a little more, the way every button squares off.
  */
+/**
+ * The grid with press-and-give: [press] holds which quarter is down, and the cross between the four moves away from
+ * it, so that quarter grows and the others shrink to make room. The grid is clipped to a circle, so the tiles are
+ * plain rectangles that the circle trims -- whatever the cross does, the outer edge keeps following the display's.
+ */
 @Composable
-fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifier = Modifier) {
+internal fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifier = Modifier, press: QuadrantPress? = null) {
     val slots = (0 until 4).map { actions.getOrNull(it) }
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(TileGap)) {
-        for (row in 0..1) {
-            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(TileGap)) {
-                for (col in 0..1) {
-                    val q = row * 2 + col
-                    QuarterTile(q, slots[q], Modifier.weight(1f).fillMaxSize())
-                }
-            }
+    val unit = LocalFaceUnit.current
+    val gap = TileGap * unit
+    val rim = androidx.compose.ui.graphics.Brush.sweepGradient(
+        listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.2f), Color.White.copy(alpha = 0.3f)),
+    )
+    androidx.compose.ui.layout.Layout(
+        content = { for (q in 0 until 4) QuarterTile(q, slots[q], Modifier.fillMaxSize(), press) },
+        modifier = modifier
+            .clip(CircleShape)
+            .drawWithContent {
+                drawContent()
+                // The glass rim on the curved outer edge, which the circle clip leaves bare.
+                drawCircle(rim, radius = size.minDimension / 2f - 0.5.dp.toPx(), style = Stroke(1.dp.toPx()))
+            },
+    ) { measurables, constraints ->
+        val w = constraints.maxWidth
+        val h = constraints.maxHeight
+        val g = gap.roundToPx()
+        // The cross: the middle, moved by the press. Each quarter spans from the edge to half a gap short of it.
+        val cx = (w / 2f + w * (press?.dx ?: 0f)).roundToInt()
+        val cy = (h / 2f + h * (press?.dy ?: 0f)).roundToInt()
+        val leftW = (cx - g / 2).coerceAtLeast(1)
+        val rightW = (w - cx - g / 2).coerceAtLeast(1)
+        val topH = (cy - g / 2).coerceAtLeast(1)
+        val bottomH = (h - cy - g / 2).coerceAtLeast(1)
+        val placeables = measurables.mapIndexed { q, m ->
+            val tw = if (q % 2 == 0) leftW else rightW
+            val th = if (q < 2) topH else bottomH
+            m.measure(androidx.compose.ui.unit.Constraints.fixed(tw, th))
+        }
+        layout(w, h) {
+            placeables[0].place(0, 0)
+            placeables[1].place(w - rightW, 0)
+            placeables[2].place(0, h - bottomH)
+            placeables[3].place(w - rightW, h - bottomH)
         }
     }
 }
 
 /** One quarter of the face. [quadrant]: 0 top-left, 1 top-right, 2 bottom-left, 3 bottom-right. */
 @Composable
-private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modifier) {
+private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modifier, press: QuadrantPress?) {
     val scheme = MaterialTheme.colorScheme
-    val shape = { morph: Float -> quarterShape(quadrant, innerCorner = (14f + 10f * morph).dp) }
+    val unit = LocalFaceUnit.current
+    val shape = { morph: Float -> quarterShape(quadrant, innerCorner = (14f + 10f * morph).dp * unit) }
     if (action == null) {
         Box(modifier.clip(shape(0f)).background(scheme.surfaceContainer.copy(alpha = 0.5f)))
         return
@@ -208,11 +310,9 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
     val policy by DeviceStatus.policy.collectAsStateWithLifecycle()
     val interaction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        if (pressed) 0.92f else 1f,
-        animationSpec = if (policy.bouncySprings) spring(dampingRatio = 0.42f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium) else snap(),
-        label = "tilePress",
-    )
+    // A press is shown by the tile growing and the others giving way ([QuadrantPress]), not by squashing it.
+    androidx.compose.runtime.LaunchedEffect(pressed) { press?.press(quadrant, pressed) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { press?.press(quadrant, false) } }
     val enter = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(if (policy.bouncySprings) 0f else 1f) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         if (enter.value < 1f) {
@@ -244,7 +344,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
         modifier = modifier.semantics { contentDescription = action.label }
             .graphicsLayer {
                 val e = enter.value
-                val s = (0.78f + 0.22f * e) * pressScale
+                val s = 0.78f + 0.22f * e
                 scaleX = s
                 scaleY = s
                 alpha = e.coerceIn(0f, 1f) * (breathe?.value ?: 1f)
@@ -252,6 +352,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
             .wearGlassRim(shape(0f)),
         enabled = !action.pending,
         frostWhenDisabled = false,
+        expressive = false,
         active = action.active,
         // Glass with the phone's rim: a translucent quarter that lets the wash behind it through.
         containerColor = scheme.surfaceContainerHigh.copy(alpha = 0.55f),
@@ -270,7 +371,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
             2 -> Alignment.BottomStart
             else -> Alignment.BottomEnd
         }
-        Box(Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().padding(10.dp * unit), contentAlignment = Alignment.Center) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.align(androidx.compose.ui.BiasAlignment(biasX(toward), biasY(toward)))
@@ -278,7 +379,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
             ) {
                 glyph?.let {
                     CompositionLocalProvider(LocalContentColor provides tint) {
-                        MorphButtonLabel(icon = it, label = "", pending = action.pending, iconSize = 28.dp)
+                        MorphButtonLabel(icon = it, label = "", pending = action.pending, iconSize = 28.dp * unit)
                     }
                 }
             }
@@ -294,6 +395,9 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
 private fun WearRingLabels(actions: List<WearQuickAction?>) {
     val scheme = MaterialTheme.colorScheme
     val anchors = floatArrayOf(225f, 315f, 135f, 45f)
+    // The label is part of the drawing, so it is sized with the face (and ignores the font-size setting, which would
+    // grow it past the arc it is curved along) -- 12dp on the 227dp design.
+    val labelSize = with(androidx.compose.ui.platform.LocalDensity.current) { (12f * LocalFaceUnit.current).dp.toSp() }
     Box(Modifier.fillMaxSize()) {
         for (q in 0 until 4) {
             val action = actions.getOrNull(q) ?: continue
@@ -308,7 +412,7 @@ private fun WearRingLabels(actions: List<WearQuickAction?>) {
                     action.label,
                     style = {
                         androidx.wear.compose.foundation.CurvedTextStyle(
-                            fontSize = 12.sp,
+                            fontSize = labelSize,
                             fontWeight = FontWeight.SemiBold,
                             color = color,
                         )
@@ -323,16 +427,19 @@ private fun WearRingLabels(actions: List<WearQuickAction?>) {
 private fun biasX(a: Alignment) = when (a) { Alignment.TopStart, Alignment.BottomStart -> 0.1f; else -> -0.1f }
 private fun biasY(a: Alignment) = when (a) { Alignment.TopStart, Alignment.TopEnd -> 0.1f; else -> -0.1f }
 
-/** The quarter-disc: the outer corner rounded by the tile's whole width, the inner corner by [innerCorner]. */
+/**
+ * A quarter's own shape: a plain rectangle whose only rounded corner is the inner one, at the hub. The OUTER edge is not
+ * the tile's business -- the grid is clipped to a circle -- which is what keeps it on the display's curve while the
+ * tile grows and shrinks under a press.
+ */
 private fun quarterShape(quadrant: Int, innerCorner: Dp): RoundedCornerShape {
-    val outer = CornerSize(100)
     val inner = CornerSize(innerCorner)
-    val none = CornerSize(4.dp)
+    val none = CornerSize(0.dp)
     return when (quadrant) {
-        0 -> RoundedCornerShape(topStart = outer, topEnd = none, bottomEnd = inner, bottomStart = none)
-        1 -> RoundedCornerShape(topStart = none, topEnd = outer, bottomEnd = none, bottomStart = inner)
-        2 -> RoundedCornerShape(topStart = none, topEnd = inner, bottomEnd = none, bottomStart = outer)
-        else -> RoundedCornerShape(topStart = inner, topEnd = none, bottomEnd = outer, bottomStart = none)
+        0 -> RoundedCornerShape(topStart = none, topEnd = none, bottomEnd = inner, bottomStart = none)
+        1 -> RoundedCornerShape(topStart = none, topEnd = none, bottomEnd = none, bottomStart = inner)
+        2 -> RoundedCornerShape(topStart = none, topEnd = inner, bottomEnd = none, bottomStart = none)
+        else -> RoundedCornerShape(topStart = inner, topEnd = none, bottomEnd = none, bottomStart = none)
     }
 }
 
@@ -373,14 +480,17 @@ fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp, status: F
                     fontWeight = FontWeight.Bold,
                     color = tint,
                     textAlign = TextAlign.Center,
-                    fontSize = (size.value * 0.26f).coerceIn(14f, 26f).sp,
+                    // In dp-sized text: the hub is a fixed circle, so the value must not grow with the font setting.
+                    fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (size.value * 0.26f).coerceIn(14f, 26f).dp.toSp() },
                 ),
                 maxLines = 1,
                 reduceMotion = false,
             )
             RevealText(
                 status?.text ?: caption,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (size.value * 0.15f).coerceIn(9f, 12f).dp.toSp() },
+                ),
                 color = when {
                     status == null -> scheme.onSurfaceVariant
                     status.error -> scheme.error
