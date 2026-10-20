@@ -3,6 +3,11 @@ package com.bloo.bluelink.ui
 /** The Climate pebble: [ClimatePebble]. */
 
 import androidx.compose.foundation.layout.Arrangement
+import com.bloo.uicommon.GapGroup
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
@@ -111,10 +116,15 @@ internal fun ClimatePebble(
     var presetName by remember { mutableStateOf("") }
 
     // Warn if the engine is on before changing climate settings.
+    // What was last sent and when: the car's own reading of its set temperature lags a command by a refresh, and
+    // mirroring that stale reading straight back put the slider on whatever the car last reported (72) the moment a
+    // start went out. Until the car reports what was sent (or a minute passes), the slider keeps what was sent.
+    var lastSent by remember(v.vin) { mutableStateOf<Pair<ClimateRequest, Long>?>(null) }
     val startClimateWithEngineCheck: (ClimateRequest) -> Unit = { req ->
         if (status?.engine == true) {
             vm.reportInfo("Climate changes may be rejected while the car is running")
         }
+        lastSent = req to System.currentTimeMillis()
         vm.startClimate(v, req)
     }
     // Which preset (if any) is currently applied: set when you start one, and cleared automatically
@@ -159,7 +169,6 @@ internal fun ClimatePebble(
     // be stopped remotely either. If it IS on, we show what the car is currently set to at the car
     // instead of editable inputs.
     val running = state.isRunning(v)
-    val startClimate = { vm.startClimate(v, currentReq) }
     val weather = state.carWeather[v.vin] ?: state.homeWeather
     val simpleMode = state.settingsMode != "advanced"
     // Mirrors Pebble()'s own expanded computation so this and the header Start button agree.
@@ -171,9 +180,18 @@ internal fun ClimatePebble(
     val carDefrost = status?.defrost
     val carWheelHeat = status?.steerWheelHeat
     val syncFromCar: () -> Unit = {
-        carTempF?.let { tempF = it.coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last) }
-        carDefrost?.let { defrost = it }
-        carWheelHeat?.let { steeringHeat = WheelHeatLevel.fromApi(it) }
+        val sent = lastSent?.takeIf { System.currentTimeMillis() - it.second < CarCatchUpMs }?.first
+        val carCaughtUp = sent == null || (
+            (carTempF == null || carTempF == sent.tempF) &&
+                (carDefrost == null || carDefrost == sent.defrost) &&
+                (carWheelHeat == null || carWheelHeat == sent.steeringWheelHeat.apiValue)
+            )
+        // The car still shows its OLD settings after a start: keep what was sent until it reports them.
+        if (carCaughtUp) {
+            carTempF?.let { tempF = it.coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last) }
+            carDefrost?.let { defrost = it }
+            carWheelHeat?.let { steeringHeat = WheelHeatLevel.fromApi(it) }
+        }
     }
     LaunchedEffect(climateOn, carTempF, carDefrost, carWheelHeat) { if (climateOn) syncFromCar() }
     // Collapsing discards unsent edits: re-opening shows the car's settings while running, else the
@@ -184,8 +202,39 @@ internal fun ClimatePebble(
         }
     }
 
+    // Starting a saved preset (or stopping the one running), shared by the pebble's body and the collapsed quick row.
+    val startPreset: (com.bloo.bluelink.data.ClimatePreset) -> Unit = { preset ->
+        if (activePresetId == preset.id && climateOn) {
+            vm.stopClimate(v)
+            activePresetId = null
+        } else {
+            applyRequest(preset.request)
+            startClimateWithEngineCheck(preset.request)
+            activePresetId = preset.id
+        }
+    }
+    val smartAmbientF = weather?.let { ambientFahrenheit(it.tempC) }
+
     Pebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, modifier,
+        // Smart climate and every saved preset, one tap away even with the pebble closed.
+        peek = if (running || (presets.isEmpty() && smartAmbientF == null)) null else {
+            {
+                ClimateQuickStart(
+                    smartLabel = smartAmbientF?.let {
+                        val target = degLabel(smartClimateTargetF(it).toString(), fahrenheit)
+                        if (smartClimateIsCooling(it)) "Smart: cool to $target" else "Smart: heat to $target"
+                    },
+                    onSmart = { smartAmbientF?.let { startAtTarget(smartClimateTargetF(it), currentReq) } },
+                    presets = presets,
+                    activeId = activePresetId,
+                    fahrenheit = fahrenheit,
+                    enabled = !pending,
+                    climateOn = climateOn,
+                    onPreset = startPreset,
+                )
+            }
+        },
         summary = when {
             climateOn && running -> "On · running"
             climateOn -> "On"
@@ -259,17 +308,7 @@ internal fun ClimatePebble(
             presets = presets,
             activeId = activePresetId,
             fahrenheit = fahrenheit,
-            onStart = { preset ->
-                // Tapping the running preset turns climate back off.
-                if (activePresetId == preset.id && climateOn) {
-                    vm.stopClimate(v)
-                    activePresetId = null
-                } else {
-                    applyRequest(preset.request)
-                    startClimateWithEngineCheck(preset.request)
-                    activePresetId = preset.id
-                }
-            },
+            onStart = startPreset,
             onDelete = { id ->
                 if (activePresetId == id) activePresetId = null
                 vm.deleteClimatePreset(v, id)
@@ -368,4 +407,44 @@ internal fun ClimatePebble(
 private fun TempValue.asFahrenheit(): Int? {
     val n = value?.toDoubleOrNull() ?: return null
     return (if (unit == 0) n * 9 / 5 + 32 else n).roundToInt()
+}
+
+/** How long after a start the car's old reading of its settings is distrusted (see `lastSent`). */
+private const val CarCatchUpMs = 90_000L
+
+/**
+ * The collapsed climate pebble's quick row: smart climate first (the phone's own target for the weather by the car), then
+ * each saved preset, in a row that scrolls sideways. A tap starts it; the running preset stops on a second tap, and
+ * while climate runs the others wait.
+ */
+@Composable
+private fun ClimateQuickStart(
+    smartLabel: String?,
+    onSmart: () -> Unit,
+    presets: List<com.bloo.bluelink.data.ClimatePreset>,
+    activeId: String?,
+    fahrenheit: Boolean,
+    enabled: Boolean,
+    climateOn: Boolean,
+    onPreset: (com.bloo.bluelink.data.ClimatePreset) -> Unit,
+) {
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(GapGroup),
+    ) {
+        if (smartLabel != null) {
+            SafeMorphTextButton(smartLabel, onClick = onSmart, icon = Icons.Filled.AutoMode, enabled = enabled && !climateOn, fillOnPress = false)
+        }
+        presets.forEach { preset ->
+            val running = climateOn && preset.id == activeId
+            SafeMorphTextButton(
+                preset.name + " · " + presetDetail(preset.request, fahrenheit).substringBefore(" ·"),
+                onClick = { onPreset(preset) },
+                icon = Icons.Filled.Thermostat,
+                active = running,
+                enabled = enabled && (!climateOn || running),
+                fillOnPress = false,
+            )
+        }
+    }
 }
