@@ -31,7 +31,7 @@ internal fun WearFacePage(
         val pullState = remember { WearPullState() }
         Box(Modifier.fillMaxSize().wearPullToRefresh(pullState) { ui.repo.refresh() }) {
             val actions = slotKeys.mapIndexed { slot, key ->
-                val control = WearFaceControls.byKey(key)?.takeIf { it.available(v) } ?: return@map null
+                val control = WearFaceControls.byKey(key)?.takeIf { it.available(v) } ?: return@mapIndexed null
                 WearQuickAction(
                     control.label(v), control.icon(v),
                     active = control.active(v),
