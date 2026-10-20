@@ -20,7 +20,8 @@ internal fun WearControlPicker(
     WearChoiceScreen(
         title = position,
         choices = WearFaceControls.choicesFor(car).map { WearChoice(it.key, it.choice, it.icon(car)) },
-        selected = current,
+        // A quarter holding a climate preset (or smart climate) lights the "Climate preset…" entry that leads to them.
+        selected = if (WearFaceControls.isClimatePick(current)) WearFaceControls.CLIMATE_PICK else current,
         onPick = onPick,
         empty = WearChoice(WearFaceControls.NONE, "Empty"),
     )

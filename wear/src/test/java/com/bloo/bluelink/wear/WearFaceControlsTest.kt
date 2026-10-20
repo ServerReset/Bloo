@@ -64,4 +64,28 @@ class WearFaceControlsTest {
         assertEquals("Empty", WearFaceControls.choiceName("nonsense"))
         assertEquals(null, WearFaceControls.byKey("nonsense"))
     }
+
+    @Test fun `the chooser offers one climate preset entry, not every preset`() {
+        val keys = WearFaceControls.choicesFor(car()).map { it.key }
+        assertTrue(WearFaceControls.CLIMATE_PICK in keys)
+        assertFalse(WearFaceControls.CLIMATE_SMART_KEY in keys, "smart climate is picked from the preset list")
+        assertFalse(keys.any { it.startsWith(WearFaceControls.PRESET_PREFIX) })
+    }
+
+    @Test fun `smart climate and presets count as the climate preset entry`() {
+        assertTrue(WearFaceControls.isClimatePick("climate_smart"))
+        assertTrue(WearFaceControls.isClimatePick("preset:abc"))
+        assertTrue(WearFaceControls.isClimatePick(WearFaceControls.CLIMATE_PICK))
+        assertFalse(WearFaceControls.isClimatePick("climate"))
+        assertFalse(WearFaceControls.isClimatePick("lock"))
+    }
+
+    @Test fun `a preset the car no longer has asks which to use instead of failing`() {
+        val gone = WearFaceControls.byKey("preset:no-such-preset")!!
+        assertTrue(gone.available(car()), "its quarter stays live")
+        assertTrue(gone.needsChoice(car()), "a press must ask")
+        assertEquals("Climate", gone.label(car()))
+        assertTrue(WearFaceControls.byKey(WearFaceControls.CLIMATE_PICK)!!.needsChoice(car()))
+        assertFalse(WearFaceControls.byKey("lock")!!.needsChoice(car()))
+    }
 }

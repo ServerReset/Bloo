@@ -40,6 +40,11 @@ internal data class FaceControl(
     val confirm: (VehicleSnapshot) -> Boolean = { false },
     /** The climate settings the command carries (a saved preset's); null for a control that has none. */
     val request: ((VehicleSnapshot) -> ClimateRequest?)? = null,
+    /**
+     * True when pressing it cannot run yet because the wearer has to choose first: a quarter set to a climate preset this car
+     * no longer has (or to "a climate preset" without one picked). The page then shows the list instead of failing.
+     */
+    val needsChoice: (VehicleSnapshot) -> Boolean = { false },
 )
 
 internal object WearFaceControls {
@@ -79,6 +84,12 @@ internal object WearFaceControls {
             label = { if (it.climateOn == true) "Climate off" else "Smart climate" },
             icon = { Icons.Filled.AutoMode }, action = CarAction.CLIMATE_SMART, active = { it.climateOn == true },
         ),
+        // Choosing this in the quarter chooser opens the list of climate presets (smart climate among them), and the quarter
+        // then holds the one picked. Stored as itself only before that pick, in which case a press asks again.
+        FaceControl(
+            key = CLIMATE_PICK, choice = "Climate preset…", label = { "Climate" }, icon = { Icons.Filled.Thermostat },
+            action = CarAction.CLIMATE_ON, active = { it.climateOn == true }, needsChoice = { true },
+        ),
         FaceControl(
             key = "charge", choice = "Charge on / off",
             label = { if (it.charging == true) "Stop charge" else "Charge" },
@@ -110,32 +121,44 @@ internal object WearFaceControls {
     /** What each quarter holds until the wearer chooses: the four everyday controls. */
     val defaults = listOf("lock", "climate", "charge", "flash")
 
+    /** The chooser entry that leads to the list of climate presets; see the control of this key. */
+    const val CLIMATE_PICK = "climate_pick"
+
+    /** Smart climate's stored key (it is chosen from the preset list, not from the quarter chooser). */
+    const val CLIMATE_SMART_KEY = "climate_smart"
+
     /** A stored choice that is one of the phone's climate presets is "preset:" and its id; the controls below are built from it. */
     const val PRESET_PREFIX = "preset:"
 
     /**
      * A control that starts one saved climate preset (the phone's own, see [WearPresets]). Built on demand from the stored
-     * id, because which presets exist belongs to the phone; one the car does not have is simply unavailable, so its quarter
-     * stays quiet instead of failing.
+     * id, because which presets exist belongs to the phone. One the car does not have any more still answers a press, by
+     * asking which to use ([FaceControl.needsChoice]) rather than staying silent or failing.
      */
     private fun presetControl(id: String) = FaceControl(
         key = PRESET_PREFIX + id,
         choice = "Preset: " + (WearPresets.findAny(id)?.name ?: "Climate"),
-        label = { WearPresets.find(it.vin, id)?.name ?: "Preset" },
+        label = { WearPresets.find(it.vin, id)?.name ?: "Climate" },
         icon = { Icons.Filled.Thermostat },
         action = CarAction.CLIMATE_ON,
-        available = { WearPresets.find(it.vin, id) != null },
         active = { it.climateOn == true },
         request = { WearPresets.find(it.vin, id)?.request },
+        needsChoice = { WearPresets.find(it.vin, id) == null },
     )
 
     fun byKey(key: String): FaceControl? =
         all.firstOrNull { it.key == key }
             ?: key.takeIf { it.startsWith(PRESET_PREFIX) && it.length > PRESET_PREFIX.length }?.let { presetControl(it.removePrefix(PRESET_PREFIX)) }
 
-    /** Everything this car's quarter can be: the fixed controls it can do, then each of its climate presets. */
+    /**
+     * Everything this car's quarter can be: the fixed controls it can do. Climate presets are not listed one by one: "Climate
+     * preset…" opens their own list (smart climate first), so the chooser stays short however many presets there are.
+     */
     fun choicesFor(car: VehicleSnapshot): List<FaceControl> =
-        all.filter { it.available(car) } + WearPresets.forCar(car.vin).map { presetControl(it.id) }
+        all.filter { it.available(car) && it.key != CLIMATE_SMART_KEY }
+
+    /** Whether a stored key is one of the climate ones that the "Climate preset…" entry stands for. */
+    fun isClimatePick(key: String) = key == CLIMATE_PICK || key == CLIMATE_SMART_KEY || key.startsWith(PRESET_PREFIX)
 
     /** The name for a stored choice, in the chooser and the settings row. */
     fun choiceName(key: String): String = byKey(key)?.choice ?: "Empty"

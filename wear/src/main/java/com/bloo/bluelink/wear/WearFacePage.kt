@@ -22,20 +22,26 @@ internal fun WearFacePage(
     slotKeys: List<String>,
     faceStatus: FaceStatus?,
     onConfirm: (String) -> Unit,
+    /** A quarter that must be told which climate preset to use (none chosen, or the chosen one is gone): ask, for this quarter. */
+    onChooseClimate: (slot: Int) -> Unit,
     onEditFace: () -> Unit,
 ) {
     val v = ui.car
     ScreenScaffold(timeText = { TimeText() }) {
         val pullState = remember { WearPullState() }
         Box(Modifier.fillMaxSize().wearPullToRefresh(pullState) { ui.repo.refresh() }) {
-            val actions = slotKeys.map { key ->
+            val actions = slotKeys.mapIndexed { slot, key ->
                 val control = WearFaceControls.byKey(key)?.takeIf { it.available(v) } ?: return@map null
                 WearQuickAction(
                     control.label(v), control.icon(v),
                     active = control.active(v),
                     pending = ui.isPending(control.action),
                 ) {
-                    if (control.confirm(v)) onConfirm(control.action) else ui.run(control)
+                    when {
+                        control.needsChoice(v) -> onChooseClimate(slot)
+                        control.confirm(v) -> onConfirm(control.action)
+                        else -> ui.run(control)
+                    }
                 }
             }
             WearCarFace(

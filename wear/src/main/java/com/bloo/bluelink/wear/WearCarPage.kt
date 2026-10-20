@@ -67,13 +67,20 @@ internal fun WearCarPage(
     var confirmAction by remember { mutableStateOf<String?>(null) }
     var choosingSlot by remember { mutableStateOf<Int?>(null) }
     var editingFace by remember { mutableStateOf(false) }
+    // The climate list, and what a pick from it means: put in a quarter (and, when it was pressed, run), or just run.
+    var climateAsk by remember { mutableStateOf<ClimateAsk?>(null) }
 
     // An action chosen on the tile is one of the face's own controls and runs exactly as a tap on the face would: the PIN
     // gate, the pending state and the haptic are the same -- the tile is a second door into the same room.
     LaunchedEffect(tileRequest) {
         val key = tileRequest?.key ?: return@LaunchedEffect
         WearFaceControls.byKey(key)?.takeIf { it.available(car) }?.let { control ->
-            if (control.confirm(car)) confirmAction = control.action else ui.run(control)
+            when {
+                // A climate quarter whose preset has gone: ask which to use (for that quarter), as a press on the face does.
+                control.needsChoice(car) -> climateAsk = ClimateAsk.Assign(slotKeys.indexOf(key), run = true)
+                control.confirm(car) -> confirmAction = control.action
+                else -> ui.run(control)
+            }
         }
         onTileRequestHandled()
     }
@@ -95,17 +102,41 @@ internal fun WearCarPage(
         )
         return
     }
+    climateAsk?.let { ask ->
+        WearClimateList(
+            car = car,
+            title = if (ask is ClimateAsk.Assign) "Which climate?" else "Climate presets",
+            onPick = { key ->
+                climateAsk = null
+                if (ask is ClimateAsk.Assign && ask.slot in slotKeys.indices) {
+                    // The quarter now holds this one (kept with the tile, the phone and Drive); a press runs it right away.
+                    WearFacePrefs.save(context, slotKeys.toMutableList().also { it[ask.slot] = key })
+                    WearSurfaces.refresh(context)
+                    WearLook.sendToPhone(context)
+                    choosingSlot = null
+                }
+                if (ask !is ClimateAsk.Assign || ask.run) WearFaceControls.byKey(key)?.let(ui::run)
+            },
+            onBack = { climateAsk = null },
+        )
+        return
+    }
     choosingSlot?.let { slot ->
         WearControlPicker(
             position = WearFacePrefs.positions[slot],
             current = slotKeys[slot],
             car = car,
             onPick = { key ->
-                WearFacePrefs.save(context, slotKeys.toMutableList().also { it[slot] = key })
-                // The tile shows the same controls, and the phone (and Drive) keeps them.
-                WearSurfaces.refresh(context)
-                WearLook.sendToPhone(context)
-                choosingSlot = null
+                if (key == WearFaceControls.CLIMATE_PICK) {
+                    // "Climate preset…": the quarter holds whichever preset (or smart climate) is picked from the list.
+                    climateAsk = ClimateAsk.Assign(slot, run = false)
+                } else {
+                    WearFacePrefs.save(context, slotKeys.toMutableList().also { it[slot] = key })
+                    // The tile shows the same controls, and the phone (and Drive) keeps them.
+                    WearSurfaces.refresh(context)
+                    WearLook.sendToPhone(context)
+                    choosingSlot = null
+                }
             },
             onBack = { choosingSlot = null },
         )
@@ -119,11 +150,22 @@ internal fun WearCarPage(
     // Page 0 is the face, full-bleed so its ring IS the display's edge; page 1 is the car's details.
     VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
         if (page == 0) {
-            WearFacePage(ui, slotKeys, faceStatus, onConfirm = { confirmAction = it }, onEditFace = { editingFace = true })
+            WearFacePage(
+                ui, slotKeys, faceStatus,
+                onConfirm = { confirmAction = it },
+                onChooseClimate = { climateAsk = ClimateAsk.Assign(it, run = true) },
+                onEditFace = { editingFace = true },
+            )
         } else {
-            WearDetailsPage(ui, update, onEditFace = { editingFace = true })
+            WearDetailsPage(ui, update, onEditFace = { editingFace = true }, onClimateList = { climateAsk = ClimateAsk.Run })
         }
     }
+}
+
+/** Why the climate list is open: to pick a preset for a face quarter (and run it too, when the quarter was pressed), or to start one. */
+private sealed interface ClimateAsk {
+    class Assign(val slot: Int, val run: Boolean) : ClimateAsk
+    data object Run : ClimateAsk
 }
 
 /** A buzz when a command comes back (a confirm for success, a reject for a failure): a wrist is often felt, not looked at. */

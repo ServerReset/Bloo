@@ -41,7 +41,7 @@ internal fun rememberWearUpdateState(): WearUpdateState {
  * freshness, any watch update, then the watch's own settings. A scrolling [WearListScreen].
  */
 @Composable
-internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState, onEditFace: () -> Unit) {
+internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState, onEditFace: () -> Unit, onClimateList: () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     WearListScreen(contentPadding = PaddingValues(top = 34.dp, bottom = 22.dp)) {
@@ -58,7 +58,7 @@ internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState, onEditFace:
             }
         }
         item { WearStatusPebble(ui.car) }
-        item { WearClimatePebble(ui.repo, ui.car, ui.pending, ui.send) }
+        item { WearClimatePebble(ui.repo, ui.car, ui.pending, ui.send, onClimateList) }
         item { WearCarCarePebble(ui.car, refreshing = ui.refreshing, canRefresh = ui.signedIn, onRefresh = { ui.repo.refresh() }) }
         update.error?.let { message ->
             item { WearPebble(title = "Watch update", icon = Icons.Filled.SystemUpdate) { WearCaption(message) } }
