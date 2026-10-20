@@ -74,6 +74,7 @@ internal fun WearDetailsPage(
         }
         item { WearFaceControlsPebble(slotKeys, onChooseSlot) }
         item { WearAlertsPebble() }
+        item { WearEffectsPebble() }
         // Auto lock needs the car's credentials on the watch, which only the pairing step in Settings on the
         // phone hands over; until then the pebble is a pointer to that step, not a switch.
         item { if (signedIn) WearAutoLockPebble() else WearPairPebble() }

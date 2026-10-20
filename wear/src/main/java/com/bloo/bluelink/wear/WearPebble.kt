@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -180,7 +181,8 @@ internal fun WearButton(
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     MorphButton(
         onClick = onClick,
-        modifier = modifier,
+        // Frosted: the aurora behind the row, blurred (when the device allows), under the translucent fill below.
+        modifier = modifier.wearGlassBlur(RoundedCornerShape(50)),
         enabled = enabled,
         active = active,
         // Glass, as on the phone: a translucent pill that lets the aurora through; the filled primary is

@@ -27,6 +27,22 @@ data class WatchSyncPayload(
      * (the watch edits them too, via [WatchSyncProtocol.PATH_NOTIF_PREFS]).
      */
     val notify: WatchNotifyPrefs = WatchNotifyPrefs(),
+    /**
+     * How the watch looks and behaves (face controls, reduced effects, auto lock), as the phone keeps it (it is stored with
+     * the phone's settings, so Drive carries it). Null until anything has been stored: the watch then offers its own.
+     */
+    val look: WatchLookPrefs? = null,
+)
+
+/**
+ * The watch's own settings, one thing for both sides: the four face controls (stored keys of the face's control list, in
+ * quarter order; empty means the defaults), the manual reduced-effects mode, and the watch's own auto lock.
+ */
+@Serializable
+data class WatchLookPrefs(
+    val slots: List<String> = emptyList(),
+    val reduceEffects: Boolean = false,
+    val autoLock: Boolean = false,
 )
 
 /**
@@ -65,6 +81,8 @@ object WatchSyncProtocol {
      * Watch → phone message: a [WatchNotifyPrefs] (JSON) the user changed on the watch.
      */
     const val PATH_NOTIF_PREFS = "/bloo/notif_prefs"
+    /** Watch → phone message: a [WatchLookPrefs] (JSON) the user changed on the watch. */
+    const val PATH_LOOK_PREFS = "/bloo/look_prefs"
     /**
      * Capability the watch app advertises, so the phone can tell a Bloo watch from any other Wear
      * device.

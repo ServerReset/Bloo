@@ -55,14 +55,14 @@ import kotlinx.coroutines.launch
  * string and never recomposes the text -- it costs one clip per frame while it runs and nothing once
  * it settles. That also clips each line's own halo, so a shadow can never appear before its line.
  *
- * Off entirely (text simply there) under reduce-motion OR battery saver, and for text too long to
- * animate cheaply.
+ * Off entirely (text simply there) under reduce-motion OR when running lean (battery saver, a throttling device, or
+ * the watch's reduce-effects switch), and for text too long to animate cheaply.
  */
 
 /** Whether the text entrance may play right now: off under reduce-motion or power saving. */
 @Composable
 private fun textRevealAllowed(): Boolean =
-    !LocalReduceMotion.current && !LocalPowerPolicy.current.batterySaver
+    !LocalReduceMotion.current && !LocalPowerPolicy.current.lean
 
 /** How long a changed value takes to fade in. Short: a change is not an entrance. */
 private const val TextChangeMs = 180

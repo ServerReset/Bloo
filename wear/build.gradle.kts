@@ -190,6 +190,9 @@ dependencies {
     // Raised to the version the phone app uses: a dependency above (the Wearable and Wear libraries) pulls in an old
     // androidx.fragment (1.1.0), which Google Play flags as an outdated SDK. Gradle takes the highest version asked for.
     implementation("androidx.fragment:fragment:1.9.1")
+    // The phone's own backdrop-blur library (same version), so the watch's glass is the same glass.
+    implementation("dev.chrisbanes.haze:haze:2.0.0")
+    implementation("dev.chrisbanes.haze:haze-blur:2.0.0")
     // .await() for a Play Services Task in a coroutine.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
 

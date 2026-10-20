@@ -19,6 +19,8 @@ data class DeviceState(
     val thermalThrottled: Boolean = false,
     /** The device is locked (screen lock or lockdown): nobody has proven who they are right now. */
     val deviceLocked: Boolean = false,
+    /** The wearer asked for reduced effects (the watch's own switch): everything runs lean, as under Battery Saver. */
+    val manualLean: Boolean = false,
 )
 
 /**
@@ -57,7 +59,7 @@ data class PowerPolicy(
     companion object {
         fun of(state: DeviceState) = PowerPolicy(
             batterySaver = state.batterySaver,
-            lean = state.batterySaver || state.thermalThrottled,
+            lean = state.batterySaver || state.thermalThrottled || state.manualLean,
         )
     }
 }
@@ -74,6 +76,15 @@ object DeviceStatus {
     val policy: StateFlow<PowerPolicy> = _policy
 
     @Volatile private var started = false
+
+    /** The wearer's manual "reduce effects" switch; it joins the device's own reasons to run lean (see [PowerPolicy.of]). */
+    @Volatile private var manualLean = false
+
+    /** Turns the manual reduced-effects mode on or off; the policy follows at once. */
+    fun setManualLean(on: Boolean) {
+        manualLean = on
+        publish(_state.value.copy(manualLean = on))
+    }
 
     /** Starts the listeners (once) and returns the current policy. Safe from any thread or entry point. */
     fun policy(context: Context): PowerPolicy {
@@ -117,7 +128,7 @@ object DeviceStatus {
         // Logged on every CHANGE, so the app's own log shows exactly why it went lean (and what the
         // device actually reported) instead of it looking like a phantom battery saver.
         if (changed) {
-            AppLog.log("power: battery saver=${s.batterySaver} thermalThrottled=${s.thermalThrottled} -> lean=${_policy.value.lean}")
+            AppLog.log("power: battery saver=${s.batterySaver} thermalThrottled=${s.thermalThrottled} manual=${s.manualLean} -> lean=${_policy.value.lean}")
         }
     }
 
@@ -132,6 +143,7 @@ object DeviceStatus {
             thermalThrottled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                 (pm?.currentThermalStatus ?: 0) >= PowerManager.THERMAL_STATUS_CRITICAL,
             deviceLocked = km?.isDeviceLocked == true,
+            manualLean = manualLean,
         )
     }
 }

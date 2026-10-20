@@ -121,6 +121,7 @@ object WearDataLayerSync {
         }.getOrNull() ?: return
         val app = context.applicationContext
         WearNotificationPrefs(app).apply(payload.notify)
+        WearLook.applyOrSeed(app, payload.look)
         WearNotifier.onVehicles(app, _vehicles.value, payload.vehicles)
         _vehicles.value = payload.vehicles
         _selectedVin.value = payload.selectedVin

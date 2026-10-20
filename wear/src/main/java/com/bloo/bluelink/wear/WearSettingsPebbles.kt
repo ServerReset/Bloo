@@ -1,6 +1,7 @@
 package com.bloo.bluelink.wear
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bolt
@@ -46,6 +47,31 @@ internal fun WearAlertsPebble() {
 }
 
 /**
+ * The wearer's own switch for effects: blur, the drifting aurora, springs and text animation off, as under Battery Saver
+ * (which turns them off by itself). Kept with the phone's settings, so it follows the watch to Drive.
+ */
+@Composable
+internal fun WearEffectsPebble() {
+    val context = LocalContext.current
+    var reduced by remember { mutableStateOf(WearLook.reduceEffects(context)) }
+    WearPebble(title = "Effects", icon = Icons.Filled.AutoAwesome) {
+        WearActionRow("Reduce effects", Icons.Filled.AutoAwesome, active = reduced, switch = true) {
+            reduced = !reduced
+            WearLook.setReduceEffects(context, reduced)
+            WearLook.sendToPhone(context)
+        }
+        WearCenteredText(
+            if (reduced) "On. No blur, drifting colour or animation, which saves battery."
+            else "Blur, drifting colour and animation. They switch off by themselves in Battery Saver.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Normal,
+            maxLines = 4,
+        )
+    }
+}
+
+/**
  * The watch's own AutoLock, tagged **beta**: lock the car when the wearer walks away. Off by
  * default, and honest about what beta means -- the phone does not need to be nearby, and the watch
  * only ever locks a car it has data for and that is not already locked.
@@ -58,6 +84,7 @@ internal fun WearAutoLockPebble() {
         WearActionRow("Lock when I walk away", Icons.Filled.Lock, active = enabled, switch = true) {
             enabled = !enabled
             WearAutoLock.setEnabled(context, enabled)
+            WearLook.sendToPhone(context)
         }
         WearCenteredText(
             if (enabled) "On. The watch locks the car about a minute after it feels you walk away."

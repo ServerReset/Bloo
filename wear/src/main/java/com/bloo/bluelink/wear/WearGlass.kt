@@ -2,6 +2,18 @@ package com.bloo.bluelink.wear
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bloo.bluelink.data.DeviceStatus
+import com.bloo.uicommon.canBlurBackdrops
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazePerformanceMode
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -24,6 +36,86 @@ fun Modifier.wearGlassRim(shape: Shape): Modifier = border(
     Brush.linearGradient(listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.2f))),
     shape,
 )
+
+/** The Haze state of the watch's aurora, which glass panes blur; null where there is no backdrop (a preview, a test). */
+internal val LocalWearHaze = androidx.compose.runtime.staticCompositionLocalOf<HazeState?> { null }
+
+/**
+ * The watch's aurora, as the phone has one: drifting soft blobs of the accent palette on black, with a faint vignette,
+ * marked as the Haze source every glass pane in front of it blurs. It drifts slowly (in the draw phase, a handful of
+ * times a second -- every step re-blurs the glass above it, so it is deliberately not 60fps) and stands still whenever the
+ * device runs lean: Battery Saver, a hot watch, or the wearer's own reduce-effects switch.
+ */
+@androidx.compose.runtime.Composable
+internal fun WearBackdrop(modifier: Modifier = Modifier, content: @androidx.compose.runtime.Composable () -> Unit) {
+    val scheme = androidx.compose.material3.MaterialTheme.colorScheme
+    val haze = androidx.compose.runtime.remember { HazeState() }
+    val policy by DeviceStatus.policy.collectAsStateWithLifecycle()
+    var phase by androidx.compose.runtime.mutableFloatStateOf(0f)
+    androidx.compose.runtime.LaunchedEffect(policy.ambientMotion) {
+        if (!policy.ambientMotion) return@LaunchedEffect
+        val start = System.nanoTime()
+        while (true) {
+            phase = ((System.nanoTime() - start) / 1_000_000_000f) / DriftSeconds * (2f * Math.PI.toFloat())
+            kotlinx.coroutines.delay(DriftStepMs)
+        }
+    }
+    val primary = scheme.primary
+    val secondary = scheme.secondary
+    val tertiary = scheme.tertiary
+    androidx.compose.foundation.layout.Box(modifier) {
+        androidx.compose.foundation.layout.Box(
+            Modifier
+                .fillMaxSize()
+                .hazeSource(haze)
+                .drawBehind {
+                    drawRect(Color.Black)
+                    val t = phase
+                    fun blob(c: Color, fx: Float, fy: Float, r: Float) {
+                        val center = androidx.compose.ui.geometry.Offset(size.width * fx, size.height * fy)
+                        val radius = size.minDimension * r
+                        drawCircle(Brush.radialGradient(listOf(c, Color.Transparent), center = center, radius = radius), radius, center)
+                    }
+                    // Dimmer than the phone's: this is an OLED a wrist holds close, and what is lit costs battery.
+                    blob(primary.copy(alpha = 0.34f), 0.30f + 0.06f * kotlin.math.sin(t), 0.26f + 0.05f * kotlin.math.cos(t), 0.80f)
+                    blob(tertiary.copy(alpha = 0.26f), 0.80f + 0.05f * kotlin.math.cos(t * 1.3f), 0.34f + 0.06f * kotlin.math.sin(t * 0.9f), 0.62f)
+                    blob(secondary.copy(alpha = 0.24f), 0.50f + 0.06f * kotlin.math.sin(t * 0.7f), 0.84f + 0.04f * kotlin.math.cos(t * 1.1f), 0.72f)
+                    // The vignette, so the glass and the clock read at the bezel.
+                    drawRect(
+                        Brush.radialGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
+                            center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f),
+                            radius = size.maxDimension * 0.62f,
+                        ),
+                    )
+                },
+        )
+        androidx.compose.runtime.CompositionLocalProvider(LocalWearHaze provides haze) { content() }
+    }
+}
+
+/** One drift cycle, in seconds: slow enough to read as ambient, not as animation. */
+private const val DriftSeconds = 70f
+
+/** Time between drift steps: about 8 a second (each step re-blurs the glass above). */
+private const val DriftStepMs = 120L
+
+/**
+ * Frosted glass for a watch surface: the backdrop blurred behind [shape] when the device can and may (API 31+, not lean),
+ * else nothing -- the caller's own translucent fill and [wearGlassRim] then carry the look. Put it BEFORE the fill.
+ */
+@androidx.compose.runtime.Composable
+fun Modifier.wearGlassBlur(shape: Shape): Modifier {
+    val haze = LocalWearHaze.current
+    if (haze == null || !canBlurBackdrops()) return this
+    return this.clip(shape).hazeBlur(
+        input = HazeInput.Sources(haze),
+        style = HazeBlurStyle { blurRadius(WearBlurRadius) },
+        performanceMode = HazePerformanceMode.Performance,
+    )
+}
+
+private val WearBlurRadius = 14.dp
 
 /** The wash behind a full screen: [tint] fading to nothing from the middle. */
 fun Modifier.wearAuroraWash(tint: Color): Modifier = background(

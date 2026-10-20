@@ -48,6 +48,8 @@ class WearMainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // The watch's own power state (Battery Saver, thermal): see PowerPolicy.
         com.bloo.bluelink.data.DeviceStatus.ensureInitialized(this)
+        // The wearer's own reduce-effects switch joins Battery Saver in the policy before anything draws.
+        com.bloo.bluelink.data.DeviceStatus.setManualLean(WearLook.reduceEffects(this))
         val repo = WearSnapshotRepository(this)
         val pinStore = WatchPinStore(this)
         // Sealed after a restart until the PIN is entered (see WearBootGate): nothing starts before that.
@@ -58,17 +60,20 @@ class WearMainActivity : ComponentActivity() {
         setContent {
             WearTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    WearGarageScreen(
-                        repo = repo,
-                        pinStore = pinStore,
-                        onBootUnlocked = { startWork() },
-                        tileRequest = tileRequest,
-                        onTileRequestHandled = {
-                            tileRequest = null
-                            // Done with it: it must not come back with the intent.
-                            intent?.removeExtra(EXTRA_ACTION)
-                        },
-                    )
+                    // The aurora behind every screen, which the glass in front of it blurs.
+                    WearBackdrop(Modifier.fillMaxSize()) {
+                        WearGarageScreen(
+                            repo = repo,
+                            pinStore = pinStore,
+                            onBootUnlocked = { startWork() },
+                            tileRequest = tileRequest,
+                            onTileRequestHandled = {
+                                tileRequest = null
+                                // Done with it: it must not come back with the intent.
+                                intent?.removeExtra(EXTRA_ACTION)
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -128,7 +133,8 @@ private fun WearTheme(content: @Composable () -> Unit) {
     val reduceMotion = remember(context.contentResolver) { reduceMotionCached(context) }
     val policy by com.bloo.bluelink.data.DeviceStatus.policy.collectAsStateWithLifecycle()
     CompositionLocalProvider(
-        LocalReduceMotion provides reduceMotion,
+        // Reduced effects (the system setting, Battery Saver, a hot watch, or the wearer's own switch) turn the motion off.
+        LocalReduceMotion provides (reduceMotion || policy.lean),
         // The watch theme is dark, and the shared tones need to know that.
         com.bloo.uicommon.LocalIsDarkTheme provides true,
         LocalPowerPolicy provides policy,

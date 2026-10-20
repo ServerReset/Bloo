@@ -276,6 +276,8 @@ private fun WearCarPage(
                 WearFacePrefs.save(faceContext, slotKeys.toMutableList().also { it[slot] = key })
                 // The tile shows the same controls: ask it to redraw.
                 WearSurfaces.refresh(faceContext)
+                // Kept with the phone's settings (and so Drive).
+                WearLook.sendToPhone(faceContext)
                 choosingSlot = null
             },
             onBack = { choosingSlot = null },

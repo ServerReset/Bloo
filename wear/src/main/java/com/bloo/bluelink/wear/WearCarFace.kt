@@ -350,6 +350,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
                 scaleY = s
                 alpha = e.coerceIn(0f, 1f) * (breathe?.value ?: 1f)
             }
+            .wearGlassBlur(shape(0f))
             .wearGlassRim(shape(0f)),
         enabled = !action.pending,
         frostWhenDisabled = false,

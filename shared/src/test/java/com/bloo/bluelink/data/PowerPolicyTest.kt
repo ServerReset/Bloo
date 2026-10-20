@@ -20,6 +20,12 @@ class PowerPolicyTest {
         assertEquals(3, p.pollIntervalMultiplier)
     }
 
+    @Test fun theWearersOwnSwitch_runsLean_butIsNotBatterySaver() {
+        val p = PowerPolicy.of(DeviceState(manualLean = true))
+        assertTrue(p.lean); assertFalse(p.batterySaver)
+        assertFalse(p.blurBackdrops || p.bouncySprings || p.ambientMotion)
+    }
+
     @Test fun thermalThrottling_runsLean_butIsNotBatterySaver() {
         val p = PowerPolicy.of(DeviceState(thermalThrottled = true))
         assertTrue(p.lean); assertFalse(p.batterySaver)
