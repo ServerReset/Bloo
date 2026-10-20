@@ -83,7 +83,7 @@ internal object WearFaceControls {
             action = CarAction.CLIMATE_OFF,
         ),
         FaceControl(
-            key = "climate_smart", choice = "Smart climate",
+            key = "climate_smart", group = FaceGroup.Climate, hint = "For the weather at the car", choice = "Smart climate",
             label = { if (it.climateOn == true) "Climate off" else "Smart climate" },
             icon = { AppIcons.SmartClimate }, action = CarAction.CLIMATE_SMART, active = { it.climateOn == true },
         ),
