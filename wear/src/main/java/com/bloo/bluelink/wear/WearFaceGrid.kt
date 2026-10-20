@@ -214,7 +214,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
  * top-right 315, bottom-right 45, bottom-left 135), the bottom two reversed so they still read left to right.
  */
 @Composable
-private fun WearRingLabels(actions: List<WearQuickAction?>) {
+internal fun WearRingLabels(actions: List<WearQuickAction?>) {
     val scheme = MaterialTheme.colorScheme
     val anchors = floatArrayOf(225f, 315f, 135f, 45f)
     // The label is part of the drawing, so it is sized with the face (and ignores the font-size setting, which would
