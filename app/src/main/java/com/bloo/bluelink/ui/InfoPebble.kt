@@ -81,43 +81,51 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     val glance = LocalForceExpanded.current
     Pebble(v, "info", "Car info", AppIcons.Info, state, vm, modifier, summary = infoSummary) {
         PebbleStatusGate(status, state.refreshing) { status ->
-            SectionLabel("Status")
-            status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
-            status.doorLock?.let { StatusRow("Doors", if (it) "Locked" else "Unlocked") }
-            status.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
-                ?.let { StatusRow("Doors open", it.joinToString(", ")) }
-            status.windowOpen?.openLabels()?.takeIf { it.isNotEmpty() }
-                ?.let { StatusRow("Windows open", it.joinToString(", ")) }
-            if (status.trunkOpen == true) StatusRow("Trunk", "Open")
-            if (status.hoodOpen == true) StatusRow("Hood", "Open")
-            if (status.acc == true) StatusRow("Accessory power", "On")
-            status.airCtrlOn?.let { StatusRow("Climate", if (it) "On" else "Off") }
-            if (status.defrost == true) StatusRow("Defrost", "On")
-            status.airTemp?.let { t ->
-                t.value?.let { StatusRow("Climate setpoint", degLabel(it, appearance.useFahrenheit, t.unit)) }
+            val hasBattery = state.hasBattery(v)
+            PebbleSection("Status", AppIcons.Info) {
+                status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
+                status.doorLock?.let { StatusRow("Doors", if (it) "Locked" else "Unlocked") }
+                status.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
+                    ?.let { StatusRow("Doors open", it.joinToString(", ")) }
+                status.windowOpen?.openLabels()?.takeIf { it.isNotEmpty() }
+                    ?.let { StatusRow("Windows open", it.joinToString(", ")) }
+                if (status.trunkOpen == true) StatusRow("Trunk", "Open")
+                if (status.hoodOpen == true) StatusRow("Hood", "Open")
+                if (status.acc == true) StatusRow("Accessory power", "On")
             }
-            status.percentFor(state.hasBattery(v))?.let {
-                StatusRow(if (state.hasBattery(v)) "Charge" else "Fuel", "$it%")
+            PebbleSection("Climate", AppIcons.Climate) {
+                status.airCtrlOn?.let { StatusRow("Running", if (it) "On" else "Off") }
+                if (status.defrost == true) StatusRow("Defrost", "On")
+                status.airTemp?.let { t ->
+                    t.value?.let { StatusRow("Setpoint", degLabel(it, appearance.useFahrenheit, t.unit)) }
+                }
+                // Comfort heaters (read-only; mirror/rear-window heat track defrost).
+                status.steerWheelHeat?.takeIf { it != 0 }?.let { StatusRow("Steering wheel heat", "On") }
+                status.sideMirrorHeat?.takeIf { it != 0 }?.let { StatusRow("Mirror heat", "On") }
+                status.sideBackWindowHeat?.takeIf { it != 0 }?.let { StatusRow("Rear defroster", "On") }
             }
-            status.rangeMiFor(state.hasBattery(v))?.let { StatusRow("Range", formatDistance(it, metric)) }
-            status.battery?.level?.let { StatusRow("12V battery", "$it%") }
-            // Comfort heaters (read-only; mirror/rear-window heat track defrost).
-            status.steerWheelHeat?.takeIf { it != 0 }?.let { StatusRow("Steering wheel heat", "On") }
-            status.sideMirrorHeat?.takeIf { it != 0 }?.let { StatusRow("Mirror heat", "On") }
-            status.sideBackWindowHeat?.takeIf { it != 0 }?.let { StatusRow("Rear defroster", "On") }
+            PebbleSection(if (hasBattery) "Battery & range" else "Fuel & range", AppIcons.Bolt) {
+                status.percentFor(hasBattery)?.let { StatusRow(if (hasBattery) "Charge" else "Fuel", "$it%") }
+                status.rangeMiFor(hasBattery)?.let { StatusRow("Range", formatDistance(it, metric)) }
+                status.battery?.level?.let { StatusRow("12V battery", "$it%") }
+                // Only while plugged: what the charge is doing, in the same group as the charge itself.
+                if (plugged) {
+                    ev?.minutesToFull?.let { StatusRow("Time to full", fmtMinutes(it)) }
+                    chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
+                    ev?.targetForCurrentPlug()?.let { StatusRow("Charge limit", "$it%") }
+                }
+            }
             // Phone keeps the long form, which has the room for it.
-            location?.let {
-                val place = if (glance) state.placeZips[v.vin] ?: state.placeNames[v.vin] else state.placeNames[v.vin]
-                StatusRow("Location", place ?: it.coordString())
+            val place = location?.let {
+                (if (glance) state.placeZips[v.vin] ?: state.placeNames[v.vin] else state.placeNames[v.vin]) ?: it.coordString()
             }
-            rememberRelativeTime(state.fetchedAt(v))?.let { StatusRow("Last refreshed", it) }
-
-            if (plugged) {
-                SectionLabel("Charging")
-                ev?.minutesToFull
-                    ?.let { StatusRow("Time to full", fmtMinutes(it)) }
-                chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
-                ev?.targetForCurrentPlug()?.let { StatusRow("Charge limit", "$it%") }
+            val refreshed = rememberRelativeTime(state.fetchedAt(v))
+            if (place != null || refreshed != null) {
+                PebbleSection("Location", Icons.Filled.Place) {
+                    // The address is long: it gets its own line under the label rather than the squeezed half of a row.
+                    place?.let { StackedRow("Parked at", it) }
+                    refreshed?.let { StatusRow("Last refreshed", it) }
+                }
             }
         }
 
@@ -127,27 +135,29 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         if (glance) {
             odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }
         } else {
-            SectionLabel("Service & identity")
-            SelectionContainer { StatusRow("VIN", v.vin) }
-            if (!plate.isNullOrBlank()) StatusRow("Licence plate", plate)
-            odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }
-            lastSvc?.let { StatusRow("Last service at", formatDistance(it, metric)) }
-            nextDue?.let {
-                val note = remaining?.let { r ->
-                    if (r >= 0) " · ${formatDistance(r, metric)} to go" else " · overdue ${formatDistance(-r, metric)}"
-                } ?: ""
-                StatusRow("Next service due", "${formatDistance(it, metric)}$note")
-            }
-            if (lastSvc == null || interval == null) {
-                RevealText(
-                    "Set last-service mileage and interval in Settings to track service.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            PebbleSection("Service & identity", Icons.Filled.Build) {
+                SelectionContainer { StatusRow("VIN", v.vin, valueMono = true) }
+                if (!plate.isNullOrBlank()) StatusRow("Licence plate", plate)
+                odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }
+                lastSvc?.let { StatusRow("Last service at", formatDistance(it, metric)) }
+                nextDue?.let {
+                    val note = remaining?.let { r ->
+                        if (r >= 0) " · ${formatDistance(r, metric)} to go" else " · overdue ${formatDistance(-r, metric)}"
+                    } ?: ""
+                    StatusRow("Next service due", "${formatDistance(it, metric)}$note")
+                }
+                if (lastSvc == null || interval == null) {
+                    RevealText(
+                        "Set last-service mileage and interval in Settings to track service.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
-            SectionLabel("${v.brand.label} owners")
-            OwnerLinks(v, state, context)
+            PebbleSection("${v.brand.label} owners", Icons.Filled.Person, panel = false) {
+                OwnerLinks(v, state, context)
+            }
         }
     }
 }
@@ -162,7 +172,13 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
 
     @Composable
     fun group(title: String, content: @Composable () -> Unit) {
-        SectionLabel(title)
+        // A quiet subheading: the group of links is already under "<brand> owners".
+        RevealText(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         ExpressiveButtonRow(
             modifier = Modifier.fillMaxWidth(),
             spacing = GapRow,

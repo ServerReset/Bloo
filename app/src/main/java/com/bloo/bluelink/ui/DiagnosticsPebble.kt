@@ -15,7 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.TireRepair
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -141,47 +144,40 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         if (rows.isEmpty()) {
             PebbleMessage("No diagnostics yet.")
         }
-        rows.forEach { row ->
-            if (row.indent) {
-                val indentLabelColor = if (LocalForceExpanded.current) {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
-                Row(
-                    Modifier.fillMaxWidth().padding(start = GapPage),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        Modifier
-                            .size(5.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onSurfaceVariant),
-                    )
-                    Spacer(Modifier.width(GapGroup))
-                    RevealText(
-                        row.label,
-                        Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = indentLabelColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.width(GapRow))
-                    RevealText(
-                        row.value,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                }
+        // Grouped by what the reading is about, in the order a person would check them; a group with nothing to say is left out.
+        DiagGroup.entries.forEach { group ->
+            val inGroup = rows.filter { diagGroupOf(it.label) == group }
+            if (inGroup.isEmpty()) return@forEach
+            if (group == DiagGroup.Tires) {
+                val verdict = inGroup.firstOrNull { !it.indent }
+                PebbleSection(
+                    group.title, group.icon,
+                    trailing = verdict?.value,
+                    trailingColor = if (verdict?.value == "OK") MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                ) { WheelGrid(inGroup.filter { it.indent }) }
             } else {
-                StatusRow(row.label, row.value)
+                PebbleSection(group.title, group.icon) { inGroup.forEach { StatusRow(it.label, it.value) } }
             }
         }
     }
+}
+
+/** The headings of the Diagnostics pebble, in the order they appear. */
+internal enum class DiagGroup(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Tires("Tires", Icons.Filled.TireRepair),
+    Power("Battery & range", Icons.Filled.BatteryChargingFull),
+    Fluids("Fluids & key", Icons.Filled.WaterDrop),
+    Comfort("Climate & comfort", AppIcons.Climate),
+    Alerts("Doors & alerts", Icons.Filled.Warning),
+}
+
+/** Which heading a diagnostic reading sits under, by its label. */
+internal fun diagGroupOf(label: String): DiagGroup = when (label) {
+    "Tire pressure", "Front left", "Front right", "Rear left", "Rear right" -> DiagGroup.Tires
+    "12V battery", "Drive battery", "Range", "Fuel level", "Low fuel", "Plug", "Time to full" -> DiagGroup.Power
+    "Washer fluid", "Brake fluid", "Key fob battery" -> DiagGroup.Fluids
+    "Climate setpoint", "Steering wheel heat", "Rear defroster", "Mirror heat", "Seat heat/vent active" -> DiagGroup.Comfort
+    else -> DiagGroup.Alerts
 }
 
 internal fun warn(v: Int) = if (v == 0) "OK" else "Warning"

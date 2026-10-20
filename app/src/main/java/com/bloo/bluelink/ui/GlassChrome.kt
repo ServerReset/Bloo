@@ -142,8 +142,8 @@ internal fun Modifier.appHazeEffect(
     state: HazeState,
     progressive: Boolean = false,
     cheap: Boolean = false,
-    /** With [progressive]: how much blur is left at the far end (0 fades to none). */
-    progressiveEnd: Float = 0f,
+    /** With [progressive]: how much blur is left at the far end (0 fades to none); negative uses the standard taper. */
+    progressiveEnd: Float = -1f,
 ): Modifier =
     this.hazeBlur(
         input = HazeInput.Sources(state),
@@ -154,7 +154,7 @@ internal fun Modifier.appHazeEffect(
             if (cheap) noiseFactor(0f)
             if (progressive) {
                 this.progressive(
-                    if (progressiveEnd <= 0f) StandardBlurProgressive
+                    if (progressiveEnd < 0f) StandardBlurProgressive
                     else dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = progressiveEnd),
                 )
             }

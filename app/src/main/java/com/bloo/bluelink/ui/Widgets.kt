@@ -75,11 +75,12 @@ private fun statusStripAllowed(): Boolean =
     !inMultiWindowMode && WindowInsets.statusBars.asPaddingValues().calculateTopPadding() > 0.dp
 
 /**
- * The status bar: clear, with the app running behind it, frosted -- nearly fully at the top edge, still a
- * little at the bottom of the strip -- so the system icons always sit on a calm pane while the cards and the
- * aurora show through. It blurs [haze], which carries the content AND the backdrop (see Screens), so what
- * scrolls under the strip is what frosts. A faint tint follows the same taper. Skipped whenever the
- * app does not own the top of its window -- see [statusStripAllowed].
+ * The status bar: clear, with the app running behind it, frosted most at the top edge and tapering to nothing at the bottom,
+ * so the system icons sit on a calm pane while the cards and the aurora show through, and the pane has no edge where it ends.
+ * The frost runs [StatusStripFade] below the bar itself so the taper finishes out of the icons' way; the blur and the faint
+ * tint both fall to zero over that whole height, never cut off. It blurs [haze], which carries the content AND the
+ * backdrop (see Screens), so what scrolls under the strip is what frosts. Skipped whenever the app does not own the top of
+ * its window -- see [statusStripAllowed].
  */
 @Composable
 internal fun StatusBarScrim(haze: HazeState? = LocalBackdropHaze.current) {
@@ -88,20 +89,28 @@ internal fun StatusBarScrim(haze: HazeState? = LocalBackdropHaze.current) {
     val dark = appIsDarkTheme()
     val tint = if (dark) Color.White else MaterialTheme.colorScheme.surfaceContainer
     val topAlpha = if (dark) StatusStripTintAlpha else StatusStripTintAlpha * 2f
-    Box(Modifier.fillMaxWidth().height(topInset).clipToBounds()) {
+    // Not touchable and not clipped to the bar: it is paint only, so the soft part below the bar passes taps to what is under it.
+    Box(Modifier.fillMaxWidth().height(topInset + StatusStripFade).clipToBounds()) {
         if (haze != null && canBlurBackdrops()) {
-            Box(Modifier.matchParentSize().appHazeEffect(haze, progressive = true, progressiveEnd = StatusStripBottomFrost))
+            // Strongest at the very top, none at the bottom edge.
+            Box(Modifier.matchParentSize().appHazeEffect(haze, progressive = true, progressiveEnd = 0f))
         }
         Box(
             Modifier.matchParentSize().background(
-                Brush.verticalGradient(listOf(tint.copy(alpha = topAlpha), tint.copy(alpha = topAlpha * 0.3f))),
+                // Eased in steps, so the tint leaves as smoothly as the blur does rather than as a straight ramp.
+                Brush.verticalGradient(
+                    0f to tint.copy(alpha = topAlpha),
+                    0.45f to tint.copy(alpha = topAlpha * 0.55f),
+                    0.8f to tint.copy(alpha = topAlpha * 0.12f),
+                    1f to Color.Transparent,
+                ),
             ),
         )
     }
 }
 
-/** How much of the status bar's frost is left at its bottom edge (1 = as frosted as the top). */
-private const val StatusStripBottomFrost = 0.10f
+/** How far below the status bar the frost keeps fading out, so it ends softly instead of at a line. */
+private val StatusStripFade = 18.dp
 
 /**
  * Settings mode (Simple/Advanced) toggle hanging flush from the status bar as one piece of chrome.
