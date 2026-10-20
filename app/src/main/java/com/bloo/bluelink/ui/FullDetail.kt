@@ -46,6 +46,8 @@ import kotlin.math.roundToInt
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.GapPage
+import androidx.compose.ui.zIndex
 
 // --- Full detail ----------------------------------------------------------
 
@@ -136,7 +138,6 @@ internal fun ExpandedCar(
         // expanding/collapsing is an in-place animation, not a screen swap.
         // Read only in the hot seat's offset (layout phase): as composition state it recomposed this whole
         // page on every swipe frame, since the window position moves with the pager.
-        val pageOrigin = remember { arrayOf(Offset.Zero) }
         // The page's scrolling edges, for the liquid-glass distortion of anything sliding under the status bar
         // or the bottom bar: the viewport is the page less the two insets, in window coordinates.
         val edgeViewportPx = remember { androidx.compose.runtime.mutableIntStateOf(0) }
@@ -150,7 +151,8 @@ internal fun ExpandedCar(
         Box(
             Modifier.fillMaxSize().onGloballyPositioned {
                 val origin = it.localToWindow(Offset.Zero)
-                pageOrigin[0] = origin
+                // The pin target reaches from the slot to the bottom of the page.
+                hotDrag.zoneBottom = origin.y + it.size.height
                 // Not mid-swipe: the page's window position moves with the swipe (see glassEdgeFocus).
                 if (pagerIdle?.value != false) {
                     edgeWindowTop.floatValue = origin.y + edgeTopPx
@@ -170,8 +172,10 @@ internal fun ExpandedCar(
                 ReflowPair(
                     expandedT = { expandedT.value },
                     blockWidth = blockWidth,
+                    // A little air above the pebble column: beside the hero it started flush with the page top, close under the status bar.
+                    trailInset = GapPage,
                     lead = {
-                        Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+                        Column(Modifier.zIndex(if (hotDrag.pinnedActive) 1f else 0f), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
                             // No bespoke swipe handler here any more: the car pager one level up owns
                             // every horizontal swipe (the columns scroll vertically only, so a
                             // horizontal drag falls through to it).
@@ -199,21 +203,6 @@ internal fun ExpandedCar(
                 )
                 Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
             }
-            // The pinned pebble's own layer, drawn AFTER the scrolling content so it sits above BOTH
-            // columns. A pebble rendered inside the hero column would slide behind the stack the
-            // moment it was dragged out; this one never does, and it is the only node for that pebble.
-            if (expanded) {
-                HotSeatOverlay(
-                    v, state, vm, hotspots, hotDrag, { pageOrigin[0] },
-                    // Arrives LAST: only once the columns have mostly moved, rising a little into
-                    // its seat. Read in the draw phase, so the reflow never recomposes it.
-                    modifier = Modifier.align(Alignment.TopStart).graphicsLayer {
-                        val f = hotSeatArrival(expandedT.value)
-                        alpha = f
-                        translationY = (1f - f) * 16.dp.toPx()
-                    },
-                )
-            }
         }
         }
     }
@@ -231,7 +220,9 @@ private fun Modifier.hotSeatReveal(t: () -> Float): Modifier = this
     .graphicsLayer {
         val f = hotSeatFraction(t())
         alpha = f
-        clip = true
+        // Clipped only while it is still arriving: once settled nothing is cut, so the pinned pebble's shadow is whole and a
+        // pebble dragged out of the seat is not cropped at its edge.
+        clip = f < 1f
     }
     .layout { measurable, constraints ->
         val placeable = measurable.measure(constraints)

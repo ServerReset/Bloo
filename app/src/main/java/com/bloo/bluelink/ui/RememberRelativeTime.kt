@@ -110,6 +110,17 @@ internal class HotSeatDrag {
     var pointer by mutableStateOf(Offset.Zero)
     var slotTopLeft by mutableStateOf(Offset.Zero)
     var slotSize by mutableStateOf(IntSize.Zero)
+    /**
+     * The window y of the bottom of the page. The pin target is not just the empty slot but the whole left column from the
+     * slot DOWN to here (under the hero and the controls), so a pebble can be dropped anywhere there rather than aimed at a
+     * strip the right-hand column makes small.
+     */
+    var zoneBottom by mutableFloatStateOf(0f)
+    /**
+     * True while the pinned pebble is being dragged, or flying home: the car's first column is then drawn above the stack, so
+     * the pebble stays in front of it on its way out instead of sliding behind.
+     */
+    var pinnedActive by mutableStateOf(false)
     /** The key released over the slot, awaiting its fly-in before the pin commits. */
     var pendingPin by mutableStateOf<String?>(null)
     /**
@@ -126,7 +137,7 @@ internal class HotSeatDrag {
     val overSlot: Boolean
         get() = section != null && slotSize.width > 0 &&
             pointer.x in slotTopLeft.x..(slotTopLeft.x + slotSize.width) &&
-            pointer.y in slotTopLeft.y..(slotTopLeft.y + slotSize.height)
+            pointer.y in slotTopLeft.y..maxOf(slotTopLeft.y + slotSize.height, zoneBottom)
 }
 
 internal val LocalHotSeatDrag = staticCompositionLocalOf<HotSeatDrag?> { null }

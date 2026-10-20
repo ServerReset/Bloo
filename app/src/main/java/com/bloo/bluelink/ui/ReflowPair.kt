@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.content
@@ -32,6 +33,8 @@ internal fun ReflowPair(
     blockWidth: () -> Dp,
     modifier: Modifier = Modifier,
     gap: Dp = GapSection,
+    /** Extra space above the trail block when it sits BESIDE the lead (scaled by the reflow), so it does not start flush with the page top. */
+    trailInset: Dp = 0.dp,
     lead: @Composable () -> Unit,
     trail: @Composable () -> Unit,
 ) {
@@ -50,7 +53,7 @@ internal fun ReflowPair(
         val trailPlaceable = measurables[1].measure(blockConstraints)
         // Under the lead when collapsed (0), even with it when expanded (1).
         val stackedY = leadPlaceable.height + gapPx
-        val y = (stackedY * (1f - t)).roundToInt()
+        val y = (stackedY * (1f - t) + trailInset.toPx() * t).roundToInt()
         val x = ((w + gapPx) * t).roundToInt()
         val height = maxOf(leadPlaceable.height, y + trailPlaceable.height)
         layout(constraints.maxWidth, height) {

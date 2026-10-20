@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,13 +45,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapPage
@@ -74,11 +71,10 @@ private val UnpinFlightProgressSpec = spring<Float>(dampingRatio = Spring.Dampin
  * The car-info column's "hot seat": the controls pebble pinned under the hero, plus the empty slot a
  * second pebble can be dragged into.
  *
- * The pinned pebbles themselves are NOT drawn here. The pebble column draws OVER the hero column, so a
- * pebble living here would slide behind the stack the moment it was dragged out and then reappear.
- * Instead the second slot reserves its space and reports its position, and [HotSeatOverlay] (a layer
- * above BOTH columns) draws the one pinned pebble into it. That keeps the pinned pebble a single node
- * that is never duplicated and never occluded.
+ * The second slot holds the pinned pebble itself, in the column: it scrolls and turns with the page, and a vertical drag on it
+ * scrolls the column. While it is dragged out toward the stack the whole column is drawn above the stack (see
+ * [HotSeatDrag.pinnedActive]), so it stays in front instead of sliding behind. The pin target is the whole column under the hero
+ * and the controls ([HotSeatDrag.zoneBottom]), not just the empty slot.
  *
  * There is no remove button: a pinned pebble is unpinned by picking it up (long-press) and dragging it
  * back to the right, toward the stack. While a pebble is dragged over the seat from the stack the seat
@@ -147,7 +143,7 @@ internal fun HotspotSlot(
         }
 
         // SECOND SLOT: a reservation. It holds the space a second pinned pebble occupies and reports
-        // that space's position, so the drop target is right and HotSeatOverlay knows where to draw.
+        // that space's position, so the drop target and the flight home are right.
         // The reservation itself stays put while the seat is expanded (a pin in flight needs a stable
         // target); only the drop-zone CONTENT retreats, and on the same beat as the flight.
         AnimatedVisibility(
@@ -173,6 +169,10 @@ internal fun HotspotSlot(
                             }
                         },
                 ) {
+                    // The pinned pebble itself, IN the column (not a layer above it): it scrolls with the page, turns with the
+                    // page when the pager moves, and a vertical drag on it scrolls the column like any other part of it. Only
+                    // while it is dragged out does the column draw above the stack (see HotSeatDrag.pinnedActive).
+                    if (secondaryPebble != null) PinnedPebble(v, stateSource, vm, secondaryPebble, hotDrag)
                     androidx.compose.animation.AnimatedVisibility(
                         // Retreats the moment a released pebble starts its flight in (pendingPin), so
                         // the zone is already leaving as the pebble arrives rather than lingering under
@@ -196,9 +196,8 @@ internal fun HotspotSlot(
 }
 
 /**
- * The one pinned (secondary) pebble, drawn in a layer ABOVE both columns by [HotSeatOverlay]. It is
- * the only node for that pebble, so it is never duplicated and never slides behind the stack while it
- * is dragged out. Long-press and drag it right to unpin: it collapses back to the state it came from,
+ * The one pinned (secondary) pebble, in the hot seat's second slot. It is the only node for that pebble, so it is never
+ * duplicated, and the column is drawn above the stack while it is dragged out, so it never slides behind it. Long-press and drag it right to unpin: it collapses back to the state it came from,
  * flies to its own slot in the stack, and only then commits the unpin.
  */
 @Composable
@@ -287,6 +286,9 @@ internal fun PinnedPebble(
             }
         }
     }
+    // The column is drawn above the stack for as long as the pebble is dragged or flying, and its own drag state is the cue.
+    LaunchedEffect(dragging, flying) { hotDrag?.pinnedActive = dragging || flying }
+    androidx.compose.runtime.DisposableEffect(hotDrag) { onDispose { hotDrag?.pinnedActive = false } }
     Box(
         Modifier
             .fillMaxWidth()
@@ -322,40 +324,6 @@ internal fun PinnedPebble(
         CompositionLocalProvider(LocalForceExpanded provides revealed, LocalPebbleFloating provides dragging) {
             SinglePebble(section, v, stateSource, vm, Modifier)
         }
-    }
-}
-
-/**
- * The pinned (secondary) pebble's layer: a child of the full-screen page's own Box, drawn AFTER the
- * scrolling content, so it sits above BOTH columns. It converts the hot-seat slot's window position
- * into this layer's coordinates and draws [PinnedPebble] into it. Nothing is drawn here when there is
- * no second pin.
- */
-@Composable
-internal fun HotSeatOverlay(
-    v: Vehicle,
-    stateSource: State<UiState>,
-    vm: AppViewModel,
-    hotspots: List<String>,
-    hotDrag: HotSeatDrag,
-    /** This layer's own origin in window coords, to convert the slot's window position. */
-    origin: () -> Offset,
-    /** Placement in the page Box (TopStart), so the offset below is measured from the page origin. */
-    modifier: Modifier = Modifier,
-) {
-    val secondary = hotspots.getOrNull(1) ?: return
-    if (hotDrag.slotSize.width == 0) return
-    Box(
-        modifier
-            .offset {
-                IntOffset(
-                    (hotDrag.slotTopLeft.x - origin().x).roundToInt(),
-                    (hotDrag.slotTopLeft.y - origin().y).roundToInt(),
-                )
-            }
-            .width(with(LocalDensity.current) { hotDrag.slotSize.width.toDp() }),
-    ) {
-        PinnedPebble(v, stateSource, vm, secondary, hotDrag)
     }
 }
 
