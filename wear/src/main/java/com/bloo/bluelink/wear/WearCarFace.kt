@@ -92,7 +92,7 @@ fun WearCarFace(
     status: FaceStatus? = null,
     /** A refresh is in flight: the light travels the ring as it does while charging. */
     refreshing: Boolean = false,
-    /** Pressing the centre: refresh. Null leaves the hub as plain text. */
+    /** Pressing the centre (the app opens the face editor). Null leaves the hub as plain text. */
     onHubClick: (() -> Unit)? = null,
 ) {
     // The aurora, at watch scale: a soft wash of the level's colour behind the tiles, as the phone's
@@ -354,7 +354,7 @@ fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp, status: F
             .then(
                 if (onClick != null) {
                     Modifier
-                        .semantics { contentDescription = "Refresh" }
+                        .semantics { contentDescription = "Change face controls" }
                         .clickable(interactionSource = interaction, indication = null) {
                             haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
                             onClick()

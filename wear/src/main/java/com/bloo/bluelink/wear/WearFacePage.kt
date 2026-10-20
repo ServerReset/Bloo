@@ -16,7 +16,7 @@ import com.bloo.bluelink.data.isStale
  * The car's face page: the charge ring and the four chosen controls ([WearCarFace]), with the phone's pull-down
  * refresh over it. Pulling down from the top drops a disc in, arms at a point (a tick), and refreshes on release.
  *
- * A control that opens the car is not sent from here: it goes to [onConfirm] so the caller can ask first.
+ * Pull down refreshes; pressing the centre opens the face editor. A control that opens the car is not sent from here: it goes to [onConfirm] so the caller can ask first.
  */
 @Composable
 internal fun WearFacePage(
@@ -28,6 +28,8 @@ internal fun WearFacePage(
     refreshing: Boolean,
     onConfirm: (String) -> Unit,
     requestCommand: ((() -> Unit)) -> Unit,
+    /** Pressing the centre: open the editor that chooses the four controls. */
+    onEditFace: () -> Unit,
 ) {
     ScreenScaffold(timeText = { TimeText() }) {
         val pullState = remember { WearPullState() }
@@ -54,7 +56,7 @@ internal fun WearFacePage(
                 stale = v.isStale(),
                 status = if (refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
                 refreshing = refreshing,
-                onHubClick = { repo.refresh() },
+                onHubClick = onEditFace,
             )
             WearPullIndicator(pullState, refreshing)
         }

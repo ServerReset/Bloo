@@ -254,16 +254,16 @@ private fun WearCarPage(
         return
     }
     choosingSlot?.let { slot ->
-        WearControlPicker(
-            position = WearFacePrefs.positions[slot],
-            current = slotKeys[slot],
+        WearFaceEditor(
             car = v,
-            onPick = { key ->
-                WearFacePrefs.save(faceContext, slotKeys.toMutableList().also { it[slot] = key })
+            slots = slotKeys,
+            initialSlot = slot,
+            onChange = { slots ->
+                WearFacePrefs.save(faceContext, slots)
                 // The tile shows the same controls: ask it to redraw.
                 WearSurfaces.refresh(faceContext)
-                choosingSlot = null
             },
+            onDone = { choosingSlot = null },
         )
         return
     }
@@ -280,6 +280,7 @@ private fun WearCarPage(
                 repo = repo, v = v, slotKeys = slotKeys, pendingCommands = pendingCommands,
                 faceStatus = faceStatus, refreshing = refreshing,
                 onConfirm = { confirmAction = it }, requestCommand = requestCommand,
+                onEditFace = { choosingSlot = 0 },
             )
         } else {
             WearDetailsPage(

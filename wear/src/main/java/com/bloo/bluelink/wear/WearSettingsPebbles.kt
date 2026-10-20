@@ -93,12 +93,11 @@ internal fun WearPairPebble() {
     }
 }
 
-/** What each quarter of the face does: a row per quarter, and a tap opens the chooser for it. */
+/** A door to the face editor, where each quarter's control is chosen. */
 @Composable
 internal fun WearFaceControlsPebble(slots: List<String>, onChoose: (Int) -> Unit) {
+    // One door to the editor (the face in miniature) instead of four list rows that each said a long name and got cut off.
     WearPebble(title = "Face controls", icon = Icons.Filled.Tune) {
-        slots.forEachIndexed { i, key ->
-            WearActionRow("${WearFacePrefs.positions[i]}: ${WearFaceControls.choiceName(key)}", Icons.Filled.Tune) { onChoose(i) }
-        }
+        WearActionRow("Change controls", Icons.Filled.Tune) { onChoose(0) }
     }
 }

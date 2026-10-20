@@ -76,7 +76,17 @@ class BlooTileService : TileService() {
 
     override fun onTileResourcesRequest(requestParams: RequestBuilders.ResourcesRequest): ListenableFuture<ResourceBuilders.Resources> =
         CallbackToFutureAdapter.getFuture { completer ->
-            completer.set(ResourceBuilders.Resources.Builder().setVersion(RESOURCES_VERSION).build())
+            val resources = ResourceBuilders.Resources.Builder().setVersion(RESOURCES_VERSION)
+            // The face's glyphs, as drawables the tile can draw (a tile cannot use the app's Compose icons).
+            GLYPHS.forEach { (name, res) ->
+                resources.addIdToImageMapping(
+                    name,
+                    ResourceBuilders.ImageResource.Builder()
+                        .setAndroidResourceByResId(ResourceBuilders.AndroidImageResourceByResId.Builder().setResourceId(res).build())
+                        .build(),
+                )
+            }
+            completer.set(resources.build())
             "BlooTileResources"
         }
 
@@ -161,11 +171,30 @@ class BlooTileService : TileService() {
                         .setCorner(quarterCorner(index))
                         .build(),
                 )
+                // The face's glass rim.
+                .setBorder(ModifiersBuilders.Border.Builder().setWidth(dp(1f)).setColor(argb(RIM)).build())
             if (a != null) {
                 mods.setClickable(
                     ModifiersBuilders.Clickable.Builder().setId("act_${a.key}").setOnClick(launchAction(a.key)).build(),
                 ).setSemantics(ModifiersBuilders.Semantics.Builder().setContentDescription(a.label).build())
-                box.addContent(text(a.label, 13f, if (a.active) 0xFF101014.toInt() else WHITE, bold = true))
+                // The glyph over its word, as on the face (where the word runs along the outer edge): white on the lit fill.
+                val col = LayoutElementBuilders.Column.Builder()
+                    .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+                if (a.glyph in GLYPHS) {
+                    col.addContent(
+                        LayoutElementBuilders.Image.Builder()
+                            .setResourceId(a.glyph)
+                            .setWidth(dp(26f))
+                            .setHeight(dp(26f))
+                            .setColorFilter(
+                                LayoutElementBuilders.ColorFilter.Builder().setTint(argb(WHITE)).build(),
+                            )
+                            .build(),
+                    )
+                    col.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(2f)).build())
+                }
+                col.addContent(text(a.label, 11f, WHITE, bold = true))
+                box.addContent(col.build())
             }
             return box.setModifiers(mods.build()).build()
         }
@@ -174,24 +203,24 @@ class BlooTileService : TileService() {
                 .setWidth(expand())
                 .setHeight(expand())
                 .addContent(left)
-                .addContent(LayoutElementBuilders.Spacer.Builder().setWidth(dp(5f)).build())
+                .addContent(LayoutElementBuilders.Spacer.Builder().setWidth(dp(6f)).build())
                 .addContent(right)
                 .build()
         val grid = LayoutElementBuilders.Column.Builder()
             .setWidth(expand())
             .setHeight(expand())
             .addContent(row(quarter(0, slots[0]), quarter(1, slots[1])))
-            .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(5f)).build())
+            .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(6f)).build())
             .addContent(row(quarter(2, slots[2]), quarter(3, slots[3])))
             .setModifiers(
                 ModifiersBuilders.Modifiers.Builder()
-                    .setPadding(ModifiersBuilders.Padding.Builder().setAll(dp(16f)).build())
+                    .setPadding(ModifiersBuilders.Padding.Builder().setAll(dp(13f)).build())
                     .build(),
             )
             .build()
         val hub = LayoutElementBuilders.Box.Builder()
-            .setWidth(dp(74f))
-            .setHeight(dp(74f))
+            .setWidth(dp(72f))
+            .setHeight(dp(72f))
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .setModifiers(
@@ -199,7 +228,7 @@ class BlooTileService : TileService() {
                     .setBackground(
                         ModifiersBuilders.Background.Builder()
                             .setColor(argb(0xFF000000.toInt()))
-                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(37f)).build())
+                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(36f)).build())
                             .build(),
                     )
                     .setClickable(
@@ -221,7 +250,7 @@ class BlooTileService : TileService() {
                     .addContent(text(car.bigValue(), 24f, if (car.percent != null) color else WHITE, bold = true))
                     // An old reading says so (in red, as the face does) instead of passing as current; otherwise the name.
                     .addContent(
-                        if (stale != null) text(stale, 10f, STALE, bold = true) else text(car.name, 10f, MUTED),
+                        if (stale != null) text(stale, 10f, STALE, bold = true) else text(car.name, 12f, WHITE, bold = true),
                     )
                     .build(),
             )
@@ -254,7 +283,7 @@ class BlooTileService : TileService() {
             .setAnchorAngle(degrees(0f))
             .setAnchorType(LayoutElementBuilders.ARC_ANCHOR_START)
             .setArcDirection(LayoutElementBuilders.ARC_DIRECTION_CLOCKWISE)
-            .addContent(arcLine(360f, TRACK))
+            .addContent(arcLine(360f, (color and 0x00FFFFFF) or 0x40000000))
             .addContent(arcLine(360f * (pct / 100f), color))
             .build()
     }
@@ -294,10 +323,15 @@ class BlooTileService : TileService() {
             .build()
 
     private companion object {
-        const val RESOURCES_VERSION = "2"
+        const val RESOURCES_VERSION = "3"
+        val GLYPHS = mapOf(
+            "lock" to R.drawable.tile_lock, "unlock" to R.drawable.tile_unlock, "climate" to R.drawable.tile_climate,
+            "bolt" to R.drawable.tile_bolt, "flash" to R.drawable.tile_flash, "refresh" to R.drawable.tile_refresh,
+            "close" to R.drawable.tile_close, "horn" to R.drawable.tile_horn,
+        )
         const val WHITE = 0xFFFFFFFF.toInt()
         const val MUTED = 0xFFB8B8C4.toInt()
-        const val TRACK = 0x33FFFFFF
+        const val RIM = 0x33FFFFFF
         const val BUTTON = 0xFF2A2A33.toInt()
         const val STALE = 0xFFFF6B6B.toInt()
         const val HUB_ID = "refresh"

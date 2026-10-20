@@ -31,6 +31,7 @@ object WearTileActions {
                 // true -- and these two must not be the same thing, or a lit "Unlock" would read as "already
                 // unlocked".
                 active = control.active(car) || (control.key == "lock" && car.locked == true),
+                glyph = tileGlyph(control.key, car),
             )
         }
 
@@ -46,12 +47,29 @@ object WearTileActions {
                 label = tileLabel(control.label(car)),
                 key = control.key,
                 active = control.active(car) || (control.key == "lock" && car.locked == true),
+                glyph = tileGlyph(control.key, car),
             )
         }
+
+    /**
+     * Which of the tile's drawables a control wears -- the face's own glyph for it (see [WearFaceControls]): the
+     * lock shows the padlock it will turn into, as on the face. A name, not a resource id, so this stays testable.
+     */
+    internal fun tileGlyph(key: String, car: VehicleSnapshot): String = when (key) {
+        "lock" -> if (car.locked == true) "unlock" else "lock"
+        "lock_only" -> "lock"
+        "unlock_only" -> "unlock"
+        "climate", "climate_on" -> "climate"
+        "charge", "charge_on" -> "bolt"
+        "flash" -> "flash"
+        "horn" -> "horn"
+        "refresh" -> "refresh"
+        else -> "close"
+    }
 
     /** A tile button is narrow: a long label ("Climate off", "Stop charge") keeps its first word. */
     internal fun tileLabel(label: String) = if (label.length > 8) label.substringBefore(' ') else label
 }
 
 /** One action on the watch's Tile: what it says, which command the app runs, and whether it is on. */
-data class WearTileAction(val label: String, val key: String, val active: Boolean)
+data class WearTileAction(val label: String, val key: String, val active: Boolean, val glyph: String = "")
