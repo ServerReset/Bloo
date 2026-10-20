@@ -78,6 +78,10 @@ internal fun WearCarPage(
         onTileRequestHandled()
     }
     ResultHaptics(lastResult, car.vin)
+    // Above the screens that replace the page, so opening one and coming back keeps the page, its hub line and its place.
+    val faceStatus = rememberFaceStatus(ui)
+    val update = rememberWearUpdateState()
+    val pagerState = rememberPagerState(pageCount = { 2 })
 
     confirmAction?.let { action ->
         WearConfirmScreen(
@@ -112,10 +116,8 @@ internal fun WearCarPage(
         return
     }
 
-    val faceStatus = rememberFaceStatus(ui)
-    val update = rememberWearUpdateState()
     // Page 0 is the face, full-bleed so its ring IS the display's edge; page 1 is the car's details.
-    VerticalPager(state = rememberPagerState(pageCount = { 2 }), modifier = Modifier.fillMaxSize()) { page ->
+    VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
         if (page == 0) {
             WearFacePage(ui, slotKeys, faceStatus, onConfirm = { confirmAction = it }, onEditFace = { editingFace = true })
         } else {
@@ -128,7 +130,10 @@ internal fun WearCarPage(
 @Composable
 private fun ResultHaptics(result: WatchCommandResult?, vin: String) {
     val haptics = LocalHapticFeedback.current
+    // The result already there when this page appeared belongs to an earlier moment: only a NEW one buzzes.
+    val baseline = remember { result }
     LaunchedEffect(result) {
+        if (result === baseline) return@LaunchedEffect
         result?.takeIf { it.vin == vin }?.let {
             haptics.performHapticFeedback(if (it.ok) HapticFeedbackType.Confirm else HapticFeedbackType.Reject)
         }
@@ -143,7 +148,9 @@ private fun ResultHaptics(result: WatchCommandResult?, vin: String) {
 private fun rememberFaceStatus(ui: WearCarUi): FaceStatus? {
     val vin = ui.car.vin
     var recent by remember { mutableStateOf<WatchCommandResult?>(null) }
+    val baseline = remember { ui.lastResult }
     LaunchedEffect(ui.lastResult) {
+        if (ui.lastResult === baseline) return@LaunchedEffect
         val r = ui.lastResult?.takeIf { it.vin == vin } ?: return@LaunchedEffect
         recent = r
         delay(FaceResultMs)
