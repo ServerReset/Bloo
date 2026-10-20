@@ -134,7 +134,18 @@ fun WearGarageScreen(
             )
             return@AppScaffold
         }
-        val pagerState = rememberPagerState(pageCount = { vehicles.size })
+        // Opens on the car last shown (which is the car the tile shows), so a tile button acts on the car it was drawn for.
+        val tileContext = LocalContext.current
+        val startPage = remember {
+            WearTileCar.saved(tileContext)?.let { vin -> vehicles.indexOfFirst { it.vin == vin } }?.coerceAtLeast(0) ?: 0
+        }
+        val pagerState = rememberPagerState(initialPage = startPage, pageCount = { vehicles.size })
+        // The tile follows the car on screen: it shows this car, with this car's actions, as the face does.
+        LaunchedEffect(pagerState.currentPage, vehicles) {
+            vehicles.getOrNull(pagerState.currentPage)?.vin?.let { vin ->
+                if (WearTileCar.save(tileContext, vin)) WearSurfaces.refresh(tileContext)
+            }
+        }
         Box(Modifier.fillMaxSize()) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             vehicles.getOrNull(page)?.let { v ->
@@ -183,6 +194,7 @@ private fun WearCarPage(
     var confirmAction by remember { mutableStateOf<String?>(null) }
     // The quarter whose control is being chosen (index), or null; and the saved choice for each.
     var choosingSlot by remember { mutableStateOf<Int?>(null) }
+    var editingFace by remember { mutableStateOf(false) }
     val faceContext = LocalContext.current
     val slotKeys by WearFacePrefs.flow(faceContext).collectAsStateWithLifecycle()
     // An action chosen on the Tile. It runs through requestCommand, so the PIN gate, the pending
@@ -253,18 +265,25 @@ private fun WearCarPage(
         )
         return
     }
+    // Two layers over the face: the editor (the face in miniature, opened from its centre), and over that the list of
+    // controls for the quarter tapped in it. Back or a swipe right peels one layer at a time.
     choosingSlot?.let { slot ->
-        WearFaceEditor(
+        WearControlPicker(
+            position = WearFacePrefs.positions[slot],
+            current = slotKeys[slot],
             car = v,
-            slots = slotKeys,
-            initialSlot = slot,
-            onChange = { slots ->
-                WearFacePrefs.save(faceContext, slots)
+            onPick = { key ->
+                WearFacePrefs.save(faceContext, slotKeys.toMutableList().also { it[slot] = key })
                 // The tile shows the same controls: ask it to redraw.
                 WearSurfaces.refresh(faceContext)
+                choosingSlot = null
             },
-            onDone = { choosingSlot = null },
+            onBack = { choosingSlot = null },
         )
+        return
+    }
+    if (editingFace) {
+        WearFaceEditor(car = v, slots = slotKeys, onPickSlot = { choosingSlot = it }, onDone = { editingFace = false })
         return
     }
     val pageState = androidx.wear.compose.foundation.pager.rememberPagerState(pageCount = { 2 })
@@ -280,13 +299,13 @@ private fun WearCarPage(
                 repo = repo, v = v, slotKeys = slotKeys, pendingCommands = pendingCommands,
                 faceStatus = faceStatus, refreshing = refreshing,
                 onConfirm = { confirmAction = it }, requestCommand = requestCommand,
-                onEditFace = { choosingSlot = 0 },
+                onEditFace = { editingFace = true },
             )
         } else {
             WearDetailsPage(
                 repo = repo, v = v, slotKeys = slotKeys, refreshing = refreshing, signedIn = signedIn,
                 updateError = updateError, updateRun = updateRun, downloading = downloading, progress = progress,
-                lastResult = lastResult, onChooseSlot = { choosingSlot = it },
+                lastResult = lastResult, onChooseSlot = { editingFace = true },
             )
         }
     }

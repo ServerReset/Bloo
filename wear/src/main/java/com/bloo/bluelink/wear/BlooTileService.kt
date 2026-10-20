@@ -56,7 +56,7 @@ class BlooTileService : TileService() {
                 if (!sealed && requestParams.currentState.lastClickableId == HUB_ID) {
                     runCatching { WearSnapshotRepository(applicationContext).refresh() }
                 }
-                val car = snapshot?.selected
+                val car = snapshot?.let { WearTileCar.pick(applicationContext, it.vehicles) ?: it.selected }
                 // Whatever goes wrong while drawing, the request is answered: an unset completer leaves the tile
                 // spinning for good, so a failure draws the plain "open Bloo" layout instead.
                 val layout = runCatching { layoutFor(car, sealed) }.getOrElse { layoutFor(null, sealed) }

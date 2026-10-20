@@ -225,29 +225,33 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
             Spacer(GlanceModifier.width(12.dp))
             ControlGrid(car, pending, armed, opts, plan)
         }
-        WidgetArrangement.STACK -> Column(root) {
-            Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = (plan.nameSp * us).sp)
-            // Spare height is split into two FIXED gaps (above the value and above the controls), so a tall widget is
-            // spaced evenly and everything the plan placed is certain to be on screen.
-            Spacer(GlanceModifier.height((plan.spareDp / 2f).dp))
-            Text(car.bigValue(), maxLines = 1, style = valueStyle)
-            if (plan.showStatus) StatusText(car, note, (plan.statusSp * us).sp)
-            if (plan.showDetails) {
-                car.detailLine()?.let { line ->
-                    Spacer(GlanceModifier.height(4.dp))
-                    Text(line, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = (plan.detailSp * us).sp))
+        WidgetArrangement.STACK -> Box(root) {
+            Column(GlanceModifier.fillMaxSize()) {
+                Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = (plan.nameSp * us).sp)
+                // What the plan left over is one fixed gap above the value.
+                Spacer(GlanceModifier.height((plan.spareDp / 2f).dp))
+                Text(car.bigValue(), maxLines = 1, style = valueStyle)
+                if (plan.showStatus) StatusText(car, note, (plan.statusSp * us).sp)
+                if (plan.showDetails) {
+                    car.detailLine()?.let { line ->
+                        Spacer(GlanceModifier.height(4.dp))
+                        Text(line, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = (plan.detailSp * us).sp))
+                    }
+                }
+                if (plan.showBar && opts.extras) {
+                    Spacer(GlanceModifier.height(WidgetGap * 2))
+                    ChargeBar(car, levelColor)
+                }
+                if (plan.showChips && opts.extras) {
+                    Spacer(GlanceModifier.height(WidgetGap))
+                    StatusChips(car, plan.maxChips)
                 }
             }
-            if (plan.showBar && opts.extras) {
-                Spacer(GlanceModifier.height(WidgetGap * 2))
-                ChargeBar(car, levelColor)
+            // The controls sit on their own layer pinned to the bottom, so they are never pushed off the widget by
+            // the readout above them (a tall, narrow widget used to lose them entirely).
+            Column(GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.Bottom) {
+                Actions(car, pending, armed, opts, labels = plan.labels, maxActions = plan.maxActions, heightDp = plan.buttonHeightDp, gridColumns = plan.gridColumns)
             }
-            if (plan.showChips && opts.extras) {
-                Spacer(GlanceModifier.height(WidgetGap))
-                StatusChips(car, plan.maxChips)
-            }
-            Spacer(GlanceModifier.height((plan.spareDp / 2f).dp))
-            Actions(car, pending, armed, opts, labels = plan.labels, maxActions = plan.maxActions, heightDp = plan.buttonHeightDp, gridColumns = plan.gridColumns)
         }
     }
 }

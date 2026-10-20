@@ -58,6 +58,8 @@ private const val VALUE_LINE = 1.15f
 private const val VALUE_GLYPH = 0.76f
 private const val MIN_VALUE_SP = 24f
 private const val GAP = 8f
+/** The tallest a grid control grows when a tall widget has room to spare. */
+private const val MAX_BUTTON_DP = 96f
 /** The header's refresh button, which makes the header at least this tall. */
 private const val REFRESH_DP = 32f
 /** The least width the readout beside a SIDE control grid keeps. */
@@ -190,9 +192,17 @@ internal fun planWidget(
         // A chip is about 100dp wide with its text; only as many as fit, so none is cut to "N...".
         maxChips = (innerW / 104f).toInt().coerceIn(1, 3),
     )
-    // What is left once everything is placed becomes two fixed gaps (above the value, above the controls): a tall
-    // widget is spaced evenly, and the whole plan fits by construction instead of depending on weighted spacers.
-    return plan.copy(spareDp = (innerH - plan.heightDp(fs)).coerceAtLeast(0f))
+    // A tall widget spends most of what is left on the controls themselves: the grid's buttons grow to fill the height
+    // (up to MAX_BUTTON_DP), so the room becomes bigger, easier targets instead of a gap. Circles in a single row stay
+    // circles, so only the grid grows.
+    val spare0 = innerH - plan.heightDp(fs)
+    val grown = if (useGrid && spare0 > 0f) {
+        val grow = minOf(spare0 * 0.7f / plan.stackRows(), MAX_BUTTON_DP - rowButtonH).coerceAtLeast(0f)
+        plan.copy(buttonHeightDp = rowButtonH + grow)
+    } else plan
+    // What is still left is the gap above the value; the controls are anchored to the bottom by the widget itself, so
+    // they are on screen however the launcher's real height differs from the one it reports.
+    return grown.copy(spareDp = (innerH - grown.heightDp(fs)).coerceAtLeast(0f))
 }
 
 /** The plan's total height, in dp, for tests: it must never exceed the widget's inner height. */

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
@@ -70,6 +71,22 @@ fun <T> WearChoiceScreen(
                     onPick(choice.value)
                 }
             }
+        }
+    }
+}
+
+/**
+ * A screen that can be swiped away (right, the Wear OS way) or backed out of, calling [onBack] for either. The
+ * face editor and its control list are screens of this kind: each swipe peels one layer, ending on the face.
+ */
+@Composable
+internal fun WearBackable(onBack: () -> Unit, content: @Composable () -> Unit) {
+    androidx.activity.compose.BackHandler(onBack = onBack)
+    androidx.wear.compose.foundation.SwipeToDismissBox(onDismissed = onBack) { isBackground ->
+        if (isBackground) {
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black))
+        } else {
+            content()
         }
     }
 }
