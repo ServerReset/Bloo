@@ -34,7 +34,7 @@ suspend fun SettingsStore.exportSettingsJson(): String {
  * Why [json] is not a settings backup this build can restore, or null when it is one. Shared by the import and by the share
  * sheet, so a file is judged the same way whichever way it arrives.
  */
-internal fun settingsBackupProblem(json: String): String? {
+internal fun SettingsStore.settingsBackupProblem(json: String): String? {
     val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }
         .getOrElse { return "Invalid settings file" }
     // `as?` casts, never `?.jsonPrimitive`: those accessors throw on a wrong kind, and these guards

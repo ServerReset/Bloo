@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
@@ -43,7 +44,7 @@ fun AppViewModel.offerSharedFile(uri: Uri, mime: String?) {
                 runCatching { getApplication<android.app.Application>().contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }
                     .getOrNull()
             }
-            val problem = if (json == null) "Couldn't read that file." else settingsBackupProblem(json)
+            val problem = if (json == null) "Couldn't read that file." else settingsStore.settingsBackupProblem(json)
             if (problem != null) {
                 AppLog.log("⚠ Shared settings file refused: $problem")
                 _state.update { it.copy(message = problem, messageType = ToastKind.ERROR) }
