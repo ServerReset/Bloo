@@ -52,11 +52,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
 import com.bloo.bluelink.data.ClimatePreset
-import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.climatePresetDetail
-import com.bloo.bluelink.data.degValue
 import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.rememberConfirmArm
 import kotlin.math.roundToInt
