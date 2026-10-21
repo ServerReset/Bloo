@@ -128,8 +128,9 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
             SecondaryText("No diagnostics yet.")
         }
         // Grouped by what the reading is about, in the order a person would check them; a group with nothing to say is left out.
+        val grouped = remember(rows) { rows.groupBy { diagGroupOf(it.label) } }
         DiagGroup.entries.forEach { group ->
-            val inGroup = rows.filter { diagGroupOf(it.label) == group }
+            val inGroup = grouped[group].orEmpty()
             if (inGroup.isEmpty()) return@forEach
             if (group == DiagGroup.Tires) {
                 val verdict = inGroup.firstOrNull { !it.indent }

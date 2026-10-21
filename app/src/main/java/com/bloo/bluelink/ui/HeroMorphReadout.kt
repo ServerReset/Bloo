@@ -109,8 +109,9 @@ internal fun HeroMorphReadout(
                 RevealText("Fuel $fuelPct%", style = type.bodyMedium, color = fuelColor, maxLines = 1)
             }
         }
+        val chargeFill = animatedChargeFrac(data.frac)
         ChargeSegmentBar(
-            frac = animatedChargeFrac(data.frac),
+            frac = { chargeFill.value },
             limitPct = data.limitPct,
             stuckAtLimit = data.stuckAtLimit,
             charging = data.charging,

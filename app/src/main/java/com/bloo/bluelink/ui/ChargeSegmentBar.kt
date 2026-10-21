@@ -45,7 +45,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
  */
 @Composable
 internal fun ChargeSegmentBar(
-    frac: Float,
+    /** The fill, 0..1, read when the bar is drawn (so an animated value redraws the bar and recomposes nothing). */
+    frac: () -> Float,
     limitPct: Int?,
     stuckAtLimit: Boolean,
     charging: Boolean,
@@ -115,7 +116,7 @@ internal fun ChargeSegmentBar(
         val layout = chargeBarLayout(
             totalWidth = size.width,
             barHeight = h,
-            filledFrac = frac,
+            filledFrac = frac(),
             limitFrac = limit?.let { limitAnim.value },
             stuckAtLimit = stuckAtLimit,
             gap = ChargeSegmentGap.toPx(),

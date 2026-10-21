@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -144,7 +145,7 @@ internal fun chargeReadoutOf(
 
 /** The one spring the charge fill uses, so collapsed and expanded bars animate identically. */
 @Composable
-internal fun animatedChargeFrac(target: Float): Float {
+internal fun animatedChargeFrac(target: Float): State<Float> {
     // Deliberately bouncy: the fill overshoots the new charge a touch and springs back, which reads as the bar "landing" on
     // the value. It also STARTS empty: the first time a bar is drawn it fills up to the charge, with the same bounce, instead of
     // appearing already full. (The charging animation is a separate thing: a slight sheen over the full part, see ChargeSegmentBar.)
@@ -154,7 +155,9 @@ internal fun animatedChargeFrac(target: Float): Float {
     )
     val fill = remember { Animatable(0f) }
     LaunchedEffect(target) { fill.animateTo(target, spec) }
-    return fill.value
+    // The State itself, not its value: the bar reads it when it DRAWS, so a charge change redraws the bar (it needed that) and
+    // does not recompose the whole readout around it on every frame of the spring.
+    return fill.asState()
 }
 
 /** How far above its resting position the hero photo starts (entrance) or travels to (exit). */
