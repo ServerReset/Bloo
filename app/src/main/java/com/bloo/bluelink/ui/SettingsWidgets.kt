@@ -66,6 +66,7 @@ import com.bloo.uicommon.ChipPaddingH
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.GroupWeightProportional
 import com.bloo.uicommon.MorphButton
+import com.bloo.uicommon.TitleSubtitle
 import com.bloo.uicommon.MorphSegmented
 import com.bloo.uicommon.SegmentOption
 import com.bloo.uicommon.content
@@ -325,10 +326,8 @@ internal fun ListButton(
             Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
             Spacer(Modifier.width(ButtonIconGap))
         }
-        Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-            RevealText(title, style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
-            if (subtitle != null) RevealText(subtitle, style = SecondaryTextStyle())
-        }
+        // The shared name-and-detail column (:uicommon), in the button's own label style.
+        TitleSubtitle(title, subtitle, Modifier.weight(1f), titleStyle = ButtonLabelStyle, titleWeight = FontWeight.SemiBold)
         if (showCheck) {
             AnimatedVisibility(
                 visible = active,

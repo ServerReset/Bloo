@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.TitleSubtitle
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.content
@@ -156,10 +157,10 @@ internal fun IconLeadRow(
         horizontalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
         IconBadge(icon, tint, containerColor = containerColor, size = badgeSize)
-        Column(Modifier.weight(1f)) {
-            TitleSmallText(title, color = titleColor)
-            if (subtitle != null) BodySmallText(subtitle)
-        }
+        TitleSubtitle(
+            title, subtitle, Modifier.weight(1f),
+            titleColor = titleColor, titleWeight = FontWeight.Bold, subtitleColor = secondaryTextColor(),
+        )
         trailing?.invoke()
     }
 }

@@ -61,6 +61,7 @@ import com.bloo.uicommon.GroupHeading
 import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.SectionHeading
 import com.bloo.uicommon.SwitchTrack
+import com.bloo.uicommon.TitleSubtitle
 import com.bloo.uicommon.LabelValueRow
 import com.bloo.uicommon.standardButtonIcon
 import androidx.activity.compose.BackHandler
@@ -399,25 +400,13 @@ fun WearListRow(
             }
             Spacer(Modifier.width(12.dp))
         }
-        Column(Modifier.weight(1f)) {
-            RevealText(
-                title,
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.labelLarge,
-                color = tint,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (subtitle != null) {
-                RevealText(
-                    subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = quiet,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        // The phone's name-and-detail column (:uicommon), one line each for the round face.
+        TitleSubtitle(
+            title, subtitle, Modifier.weight(1f),
+            titleStyle = MaterialTheme.typography.labelLarge, titleColor = tint, titleWeight = FontWeight.SemiBold,
+            subtitleStyle = MaterialTheme.typography.labelSmall, subtitleColor = quiet,
+            maxLines = 1,
+        )
     }
 }
 
