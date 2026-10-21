@@ -276,10 +276,17 @@ suspend fun SettingsStore.performMainToMainSync(
             uploaded = runCatching {
                 withDriveRetry {
                     kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                        val beforeMs = providerLastModifiedMs(parsed)
                         context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
                             ?: error("Couldn't open the Drive file for writing")
                         val verify = context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
                         if (verify != body) error("Upload didn't verify: the Drive file doesn't match what was written")
+                        // Reading the bytes back can pass from a local copy, so also require the file's own timestamp to move:
+                        // a write that the storage provider keeps locally without advancing the file is not a saved write.
+                        val afterMs = providerLastModifiedMs(parsed)
+                        if (beforeMs != null && afterMs != null && afterMs <= beforeMs) {
+                            error("Drive didn't save the change: the file's modified time didn't move. Check the Drive app on this phone.")
+                        }
                     }
                 }
                 // Which document this device actually wrote: two phones that look like one file must show the same name here.
