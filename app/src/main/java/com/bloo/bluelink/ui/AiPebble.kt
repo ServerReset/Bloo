@@ -21,6 +21,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.LocalIsDarkTheme
 
 /** Optional on-device Gemini Nano summary of the car's last-refreshed status. */
 @Composable
@@ -43,14 +44,18 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
         // sending a command.
         background = {
             val scheme = MaterialTheme.colorScheme
-            val brush = remember(scheme.tertiaryContainer, scheme.primaryContainer, scheme.secondaryContainer) {
+            val dark = LocalIsDarkTheme.current
+            val brush = remember(scheme.tertiaryContainer, scheme.primaryContainer, scheme.secondaryContainer, dark) {
+                // The text on the card is the theme's own: light on a dark theme, dark on a light one. So the gradient is
+                // lightened toward white on a light theme and darkened toward black on a dark one, keeping that text readable.
+                fun tone(c: Color, amount: Float): Color = if (dark) lerp(c, Color.Black, amount) else lerp(c, Color.White, amount)
                 Brush.linearGradient(
                     // Diagonal rather than vertical: a pebble is much wider than it is tall when
                     // collapsed, so a vertical sweep would compress to a flat band and read as a
-                    // slightly-off solid fill. Lightened toward white so the text on it keeps its contrast.
-                    0f to lerp(scheme.tertiaryContainer, Color.White, 0.45f),
-                    0.55f to lerp(scheme.primaryContainer, Color.White, 0.5f).copy(alpha = 0.8f),
-                    1f to lerp(scheme.secondaryContainer, Color.White, 0.4f).copy(alpha = 0.85f),
+                    // slightly-off solid fill.
+                    0f to tone(scheme.tertiaryContainer, 0.45f),
+                    0.55f to tone(scheme.primaryContainer, 0.5f).copy(alpha = 0.8f),
+                    1f to tone(scheme.secondaryContainer, 0.4f).copy(alpha = 0.85f),
                     start = Offset.Zero,
                     end = Offset.Infinite,
                 )
