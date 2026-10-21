@@ -37,6 +37,7 @@ import androidx.compose.ui.text.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import com.bloo.bluelink.data.CHARGING_WORD
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.fmtMinutes
@@ -111,7 +112,7 @@ internal fun chargeReadoutOf(
         // descriptor.
         statusLine = when {
             charging -> buildString {
-                append("Charging")
+                append(CHARGING_WORD)
                 chargeMinutes?.let { append(" · ${fmtMinutes(it)}") }
                 chargeType?.let { append(" · $it") }
             }

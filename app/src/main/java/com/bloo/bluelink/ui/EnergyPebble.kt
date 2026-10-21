@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.onClick
+import com.bloo.bluelink.data.CHARGING_WORD
 import com.bloo.bluelink.data.DEFAULT_AC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.DEFAULT_DC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.Vehicle
@@ -42,7 +43,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
     // The car rejects charge commands while it is running, so every charge control greys out.
     val running = state.isRunning(v)
     val summary = when {
-        charging -> "Charging"
+        charging -> CHARGING_WORD
         plugged -> "Plugged in · idle"
         else -> "Not plugged in"
     }
