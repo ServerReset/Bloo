@@ -17,7 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 
 /**
@@ -67,4 +71,13 @@ fun SwitchTrack(
                 .background(thumbColor),
         )
     }
+}
+
+/**
+ * The TalkBack meaning of an on/off row: a switch, and whether it is on. Used where a row is drawn as a plain
+ * clickable (the watch's buttons), so a screen reader says "switch, on" rather than "button".
+ */
+fun Modifier.switchSemantics(checked: Boolean): Modifier = semantics {
+    role = Role.Switch
+    toggleableState = if (checked) ToggleableState.On else ToggleableState.Off
 }

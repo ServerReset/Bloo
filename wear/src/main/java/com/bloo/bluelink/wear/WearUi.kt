@@ -38,12 +38,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.toggleableState
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +58,7 @@ import com.bloo.uicommon.GroupHeading
 import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.SectionHeading
 import com.bloo.uicommon.SwitchTrack
+import com.bloo.uicommon.switchSemantics
 import com.bloo.uicommon.TitleSubtitle
 import com.bloo.uicommon.LabelValueRow
 import com.bloo.uicommon.standardButtonIcon
@@ -233,10 +231,7 @@ fun WearActionRow(
             .fitRound()
             .then(
                 if (switch) {
-                    Modifier.semantics {
-                        role = Role.Switch
-                        toggleableState = if (active) ToggleableState.On else ToggleableState.Off
-                    }
+                    Modifier.switchSemantics(active)
                 } else {
                     Modifier
                 },
