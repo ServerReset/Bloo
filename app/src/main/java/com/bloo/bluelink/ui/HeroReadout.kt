@@ -143,10 +143,11 @@ internal fun chargeReadoutOf(
 /** The one spring the charge fill uses, so collapsed and expanded bars animate identically. */
 @Composable
 internal fun animatedChargeFrac(target: Float): Float {
-    // Glides to the charge without overshooting: a bounce on the bar read as wobbly. It STARTS empty, so the first time a bar is
-    // drawn it fills up to the charge instead of appearing already full.
+    // Deliberately bouncy: the fill overshoots the new charge a touch and springs back, which reads as the bar "landing" on
+    // the value. It also STARTS empty: the first time a bar is drawn it fills up to the charge, with the same bounce, instead of
+    // appearing already full. (The charging animation is a separate thing: a slight sheen over the full part, see ChargeSegmentBar.)
     val spec = lowPowerAwareSpring<Float>(
-        dampingRatio = Spring.DampingRatioNoBouncy,
+        dampingRatio = Spring.DampingRatioMediumBouncy,
         stiffness = Spring.StiffnessMediumLow,
     )
     val fill = remember { Animatable(0f) }

@@ -64,10 +64,10 @@ fun WearEdgeRing(
     } else {
         null
     }
-    // The level glides to its new value without overshooting: a bounce on the charge reads as wobbly, not alive.
+    // The level lands with a bounce (it overshoots the new charge and settles), as the phone's bar does.
     val sweep by animateFloatAsState(
         frac,
-        animationSpec = if (policy.bouncySprings) tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing) else snap(),
+        animationSpec = if (policy.bouncySprings) spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow) else snap(),
         label = "edgeRing",
     )
     // The phone's two stops of the fill: the darker end where it starts, the lighter where it ends.
