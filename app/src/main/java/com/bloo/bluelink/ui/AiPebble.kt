@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.Vehicle
@@ -45,10 +47,10 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
                 Brush.linearGradient(
                     // Diagonal rather than vertical: a pebble is much wider than it is tall when
                     // collapsed, so a vertical sweep would compress to a flat band and read as a
-                    // slightly-off solid fill.
-                    0f to scheme.tertiaryContainer,
-                    0.55f to scheme.primaryContainer.copy(alpha = 0.55f),
-                    1f to scheme.secondaryContainer.copy(alpha = 0.65f),
+                    // slightly-off solid fill. Lightened toward white so the text on it keeps its contrast.
+                    0f to lerp(scheme.tertiaryContainer, Color.White, 0.45f),
+                    0.55f to lerp(scheme.primaryContainer, Color.White, 0.5f).copy(alpha = 0.8f),
+                    1f to lerp(scheme.secondaryContainer, Color.White, 0.4f).copy(alpha = 0.85f),
                     start = Offset.Zero,
                     end = Offset.Infinite,
                 )
