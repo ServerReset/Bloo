@@ -11,7 +11,7 @@ import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
 
 /**
@@ -56,7 +56,7 @@ internal fun UpdateInstallGuideDialog(
         },
         buttons = {
             ActionRow(spacing = GapGroup) {
-                SafeMorphTextButton(text = "Cancel", onClick = onDismiss)
+                MorphTextButton(text = "Cancel", onClick = onDismiss)
                 MorphActionButton(
                     label = "Continue",
                     icon = AppIcons.Check,

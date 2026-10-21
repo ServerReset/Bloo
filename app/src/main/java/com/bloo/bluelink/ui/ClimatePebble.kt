@@ -43,7 +43,6 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.denyTone
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.container
 import com.bloo.uicommon.content
@@ -384,7 +383,7 @@ internal fun ClimatePebble(
                         emphasis = ButtonEmphasis.Confirm,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    SafeMorphTextButton(
+                    MorphTextButton(
                         "Cancel",
                         onClick = { showAddPreset = false },
                         modifier = Modifier.fillMaxWidth(),

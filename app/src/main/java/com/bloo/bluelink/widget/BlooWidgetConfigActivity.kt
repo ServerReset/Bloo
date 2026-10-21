@@ -86,7 +86,7 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.RevealText
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.SegmentOption
 import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.SettingsStore
@@ -286,7 +286,7 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
                     ActionRow {
                         StripControl.entries.forEach { c ->
                             val index = choice.stripControls.indexOf(c)
-                            SafeMorphTextButton(
+                            MorphTextButton(
                                 if (index >= 0) "${index + 1} ${c.label}" else c.label,
                                 onClick = {
                                     val now = choice.stripControls
@@ -301,19 +301,19 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
                 } else {
                     SettingsCaption("Tap to choose what the widget can do. Unlock always asks for a second tap.", bottomGap = 0.dp)
                     ActionRow {
-                        SafeMorphTextButton("Lock", onClick = {}, icon = Icons.Filled.Lock, active = true, enabled = false)
-                        SafeMorphTextButton("Climate", onClick = { choice = choice.copy(climate = !choice.climate) }, icon = Icons.Filled.AcUnit, active = choice.climate)
-                        SafeMorphTextButton("Charge", onClick = { choice = choice.copy(charge = !choice.charge) }, icon = Icons.Filled.Bolt, active = choice.charge)
-                        SafeMorphTextButton("Flash", onClick = { choice = choice.copy(flash = !choice.flash) }, icon = Icons.Filled.FlashOn, active = choice.flash)
-                        SafeMorphTextButton("Refresh", onClick = { choice = choice.copy(refresh = !choice.refresh) }, icon = Icons.Filled.Refresh, active = choice.refresh)
+                        MorphTextButton("Lock", onClick = {}, icon = Icons.Filled.Lock, active = true, enabled = false)
+                        MorphTextButton("Climate", onClick = { choice = choice.copy(climate = !choice.climate) }, icon = Icons.Filled.AcUnit, active = choice.climate)
+                        MorphTextButton("Charge", onClick = { choice = choice.copy(charge = !choice.charge) }, icon = Icons.Filled.Bolt, active = choice.charge)
+                        MorphTextButton("Flash", onClick = { choice = choice.copy(flash = !choice.flash) }, icon = Icons.Filled.FlashOn, active = choice.flash)
+                        MorphTextButton("Refresh", onClick = { choice = choice.copy(refresh = !choice.refresh) }, icon = Icons.Filled.Refresh, active = choice.refresh)
                     }
                 }
             }
             Spacer(Modifier.height(GapRow))
         }
         ActionRow(Modifier.padding(horizontal = ScreenGutter, vertical = GapGroup)) {
-            SafeMorphTextButton("Cancel", onClick = { finish(Activity.RESULT_CANCELED) })
-            SafeMorphTextButton(
+            MorphTextButton("Cancel", onClick = { finish(Activity.RESULT_CANCELED) })
+            MorphTextButton(
                 if (loaded.cars.isEmpty()) "Add widget" else "Done",
                 onClick = { saveAndFinish(context, scope, widgetId, choice, finish) },
                 emphasis = ButtonEmphasis.Confirm,

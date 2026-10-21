@@ -19,7 +19,7 @@ import com.bloo.uicommon.rememberConfirmArm
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 
 /**
  * The "Accounts" card: one panel per signed-in account (each brand has its own sign-in, and Hyundai
@@ -41,7 +41,7 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
             // "Add another account" rides in the LAST account's button row, next to its Sign out.
             accounts.forEachIndexed { i, creds -> AccountPanel(creds, vm, addAnother = i == accounts.lastIndex) }
             if (accounts.isEmpty()) {
-                SafeMorphTextButton(
+                MorphTextButton(
                     text = "Sign in",
                     onClick = { vm.beginAddAccount() },
                     icon = Icons.Filled.PersonAdd,
@@ -77,15 +77,15 @@ private fun AccountPanel(creds: Credentials, vm: AppViewModel, addAnother: Boole
         }
         ActionRow {
             if (creds.brand.requiresPin && pin.isNotBlank() && pin != creds.pin) {
-                SafeMorphTextButton("Update PIN", onClick = { vm.updatePin(creds.brand, pin) }, emphasis = ButtonEmphasis.Confirm)
+                MorphTextButton("Update PIN", onClick = { vm.updatePin(creds.brand, pin) }, emphasis = ButtonEmphasis.Confirm)
             }
-            SafeMorphTextButton(
+            MorphTextButton(
                 text = if (signOut.armed) "Tap again to confirm" else "Sign out",
                 onClick = { if (signOut.armed) vm.logout(creds.brand) else signOut.arm() },
                 emphasis = ButtonEmphasis.Deny,
             )
             if (addAnother) {
-                SafeMorphTextButton(
+                MorphTextButton(
                     text = "Add another account",
                     onClick = { vm.beginAddAccount() },
                     icon = Icons.Filled.PersonAdd,

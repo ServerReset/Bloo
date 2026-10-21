@@ -13,7 +13,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 
 // --- One-time-code dialogs for the region-specific sign-in challenges ---
 
@@ -33,7 +33,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
             if (otp.sentTo == null) {
                 RevealText("Kia needs a one-time code. Where should it go?")
                 if (otp.challenge.hasEmail) {
-                    SafeMorphTextButton(
+                    MorphTextButton(
                         text = "Email" + (otp.challenge.email?.let { " · $it" } ?: ""),
                         onClick = { vm.kiaSendOtp("EMAIL") },
                         modifier = Modifier.fillMaxWidth(),
@@ -41,7 +41,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                     )
                 }
                 if (otp.challenge.hasSms) {
-                    SafeMorphTextButton(
+                    MorphTextButton(
                         text = "Text message" + (otp.challenge.sms?.let { " · $it" } ?: ""),
                         onClick = { vm.kiaSendOtp("SMS") },
                         modifier = Modifier.fillMaxWidth(),
@@ -60,7 +60,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
             // Verify shown only once a code's been sent; Cancel always. Stacked full-width (primary
             // on top) per the shell's convention.
             if (otp.sentTo != null) {
-                SafeMorphTextButton(
+                MorphTextButton(
                     text = "Verify",
                     onClick = { vm.kiaVerifyOtp(code) },
                     modifier = Modifier.fillMaxWidth(),
@@ -69,7 +69,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                     emphasis = ButtonEmphasis.Confirm,
                 )
             }
-            SafeMorphTextButton(
+            MorphTextButton(
                 "Cancel",
                 vm::kiaCancelOtp,
                 enabled = !loading,
@@ -99,7 +99,7 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
             OtpCodeField(code) { code = it }
         },
         buttons = {
-            SafeMorphTextButton(
+            MorphTextButton(
                 text = "Verify",
                 onClick = { vm.canadaVerifyOtp(code) },
                 modifier = Modifier.fillMaxWidth(),
@@ -107,7 +107,7 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
                 pending = loading,
                 emphasis = ButtonEmphasis.Confirm,
             )
-            SafeMorphTextButton(
+            MorphTextButton(
                 "Cancel",
                 vm::canadaCancelOtp,
                 enabled = !loading,

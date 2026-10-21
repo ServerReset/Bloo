@@ -68,7 +68,7 @@ import com.bloo.uicommon.GapHero
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.GroupWeightProportional
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.content
 import com.bloo.uicommon.MorphButton
 import androidx.compose.animation.Crossfade
@@ -279,7 +279,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 }
                 if (pinInstalled) {
                     Spacer(Modifier.height(GapGroup))
-                    SafeMorphTextButton(
+                    MorphTextButton(
                         "Use PIN",
                         onClick = { haptics?.click(); usePinMode = true },
                         containerColor = lockFg.copy(alpha = 0.10f),
@@ -363,7 +363,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                         }
                         if (bioAvailable) {
                             Spacer(Modifier.height(GapRow))
-                            SafeMorphTextButton(
+                            MorphTextButton(
                                 "Use biometrics",
                                 onClick = { haptics?.click(); usePinMode = false; authenticateBiometric() },
                                 modifier = Modifier.fillMaxWidth(),

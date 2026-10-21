@@ -33,7 +33,6 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.SafeMorphTextButton
 
 /**
  * The watch, as one card under the phone it belongs to: its glyph, its name and status (PRIMARY and SECONDARY text), a remove
@@ -79,7 +78,7 @@ fun CompanionActionRow(label: String, caption: String, modifier: Modifier = Modi
         // No leading arrow, matching WearCompanionRow: the indent carries the relationship, and the
         // button already wears the watch glyph.
         Column(Modifier.weight(1f)) {
-            SafeMorphTextButton(label, onClick = onClick, icon = Icons.Filled.Watch)
+            MorphTextButton(label, onClick = onClick, icon = Icons.Filled.Watch)
             SecondaryText(caption)
         }
     }
@@ -136,7 +135,7 @@ internal fun DriveSyncSetupDialog(
                         style = SecondaryTextStyle(),
                         color = scheme.onErrorContainer,
                     )
-                    SafeMorphTextButton(
+                    MorphTextButton(
                         text = "Create a new file anyway",
                         onClick = onSaveToDrive,
                         modifier = Modifier.fillMaxWidth(),

@@ -39,7 +39,7 @@ import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapPage
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.content
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -197,7 +197,7 @@ internal fun OnboardingBottomBar(
                 }
             }
             ActionRow(spacing = GapGroup) {
-                onBack?.let { back -> SafeMorphTextButton(text = "Back", onClick = back) }
+                onBack?.let { back -> MorphTextButton(text = "Back", onClick = back) }
                 MorphActionButton(
                     label = nextLabel,
                     icon = nextIcon,

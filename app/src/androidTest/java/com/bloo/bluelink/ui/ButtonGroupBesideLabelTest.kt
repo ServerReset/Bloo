@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 
 /**
  * A button group sharing a row with a weighted label (the Logs card header) must leave the label
@@ -29,8 +29,8 @@ class ButtonGroupBesideLabelTest {
                 Row(Modifier.width(380.dp)) {
                     Text("Activity log, 125 lines", Modifier.weight(1f).testTag("label"))
                     ExpressiveButtonRow(spacing = 8.dp) {
-                        SafeMorphTextButton("Copy", onClick = {}, modifier = Modifier.testTag("copy"))
-                        SafeMorphTextButton("Clear", onClick = {}, modifier = Modifier.testTag("clear"))
+                        MorphTextButton("Copy", onClick = {}, modifier = Modifier.testTag("copy"))
+                        MorphTextButton("Clear", onClick = {}, modifier = Modifier.testTag("clear"))
                     }
                 }
             }

@@ -53,7 +53,7 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.GroupWeightProportional
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphButton
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.StandardButtonPadding
 
 // --- Photo crop editor ---
@@ -133,7 +133,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                 }
             }
             ExpressiveButtonRow(spacing = GapGroup) {
-                SafeMorphTextButton(
+                MorphTextButton(
                     "Cancel",
                     onClick = onCancel,
                     emphasis = ButtonEmphasis.Deny,

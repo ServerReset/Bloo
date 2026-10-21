@@ -30,7 +30,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.AnimatedSlider
 import com.bloo.uicommon.AnimatedValue
 import com.bloo.uicommon.tempColor
@@ -185,7 +185,7 @@ internal fun ClimateControlsSection(
         }
 
         // No "Save" heading either: the button below already says what it does.
-        SafeMorphTextButton(
+        MorphTextButton(
             text = "Save as preset",
             onClick = onSaveAsPreset,
             modifier = Modifier.fillMaxWidth(),

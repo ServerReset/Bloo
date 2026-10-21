@@ -35,7 +35,7 @@ import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.confirmTone
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.container
 import com.bloo.uicommon.content
 
@@ -151,7 +151,7 @@ internal fun UpdateAvailableTile(
             // before the user has even tapped Update.
             if (!seamless) {
                 var showHelp by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
-                SafeMorphTextButton(
+                MorphTextButton(
                     if (showHelp) "Hide install help" else "Trouble installing?",
                     onClick = { showHelp = !showHelp },
                 )

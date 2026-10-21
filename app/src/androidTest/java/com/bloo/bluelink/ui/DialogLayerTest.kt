@@ -17,7 +17,7 @@ import dev.chrisbanes.haze.HazeState
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 
 /** The glass dialog layer: a dialog rises into view, takes taps, and is fully gone after it leaves. */
 class DialogLayerTest {
@@ -36,7 +36,7 @@ class DialogLayerTest {
                                 onDismissRequest = { show = false },
                                 title = "Hello dialog",
                                 text = { Text("Some body text") },
-                                buttons = { SafeMorphTextButton("Close", onClick = { show = false }) },
+                                buttons = { MorphTextButton("Close", onClick = { show = false }) },
                             )
                         }
                         DialogLayer(host)

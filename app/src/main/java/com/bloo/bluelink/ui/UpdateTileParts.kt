@@ -63,7 +63,6 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.SoftDamping
 import com.bloo.uicommon.content
@@ -131,13 +130,13 @@ internal fun UpdateReleaseNotes(
             val showToggle = looksLong || expanded
             ActionRow {
                 if (showToggle) {
-                    SafeMorphTextButton(
+                    MorphTextButton(
                         if (expanded) "Show less" else "Show more",
                         onClick = { expanded = !expanded },
                         fillOnPress = false,
                     )
                 }
-                SafeMorphTextButton(
+                MorphTextButton(
                     "GitHub",
                     onClick = { context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())) },
                     icon = Icons.AutoMirrored.Filled.OpenInNew,
@@ -179,7 +178,7 @@ internal fun UpdateDismissRow(
             enabled = !busy,
             emphasis = ButtonEmphasis.Confirm,
         )
-        SafeMorphTextButton(
+        MorphTextButton(
             "Not now",
             onClick = vm::dismissUpdate,
             enabled = !busy,

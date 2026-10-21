@@ -31,7 +31,7 @@ import com.bloo.bluelink.data.requestBackgroundUnrestricted
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapGroup
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 
 /**
  * Simple mode is the handful of switches most people want. Advanced adds the timing thresholds, the
@@ -79,7 +79,7 @@ internal fun NotificationsCardContent(
             // of the card behind advanced mode.
             PopVisible(visible = notif.charging) {
                 var showTroubleshoot by remember { mutableStateOf(false) }
-                SafeMorphTextButton(
+                MorphTextButton(
                     "Live notification not showing?",
                     onClick = { showTroubleshoot = true },
                     icon = AppIcons.Info,
@@ -160,7 +160,7 @@ internal fun NotificationsCardContent(
                                     "Android's notification settings.",
                                 bottomGap = GapHairline,
                             )
-                            SafeMorphTextButton(
+                            MorphTextButton(
                                 "Hide watcher notification",
                                 onClick = {
                                     context.tryStart(
@@ -229,7 +229,7 @@ internal fun NotificationsCardContent(
 @Composable
 private fun AttentionRow(problem: String, action: String, onClick: () -> Unit) {
     SettingsCaption(problem, bottomGap = GapHairline)
-    SafeMorphTextButton(
+    MorphTextButton(
         action,
         onClick = onClick,
         icon = AppIcons.Warning,

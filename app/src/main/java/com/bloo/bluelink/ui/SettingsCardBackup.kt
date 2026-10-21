@@ -43,7 +43,7 @@ import com.bloo.uicommon.ButtonIconSize
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.SegmentOption
 
 /**
@@ -102,9 +102,9 @@ internal fun BackupSyncCardContent(
 
             if (!configured) {
                 BodySmallText("One file in your Google Drive, shared by every device.")
-                SafeMorphTextButton("Set up auto-sync", onClick = { showDriveDialog = true }, icon = Icons.Filled.CloudSync, emphasis = ButtonEmphasis.Confirm)
+                MorphTextButton("Set up auto-sync", onClick = { showDriveDialog = true }, icon = Icons.Filled.CloudSync, emphasis = ButtonEmphasis.Confirm)
             } else {
-                SafeMorphTextButton("Sync now", onClick = { vm.syncNow() }, icon = Icons.Filled.CloudSync, emphasis = ButtonEmphasis.Confirm)
+                MorphTextButton("Sync now", onClick = { vm.syncNow() }, icon = Icons.Filled.CloudSync, emphasis = ButtonEmphasis.Confirm)
                 state.syncError?.let { SyncErrorBanner(it) }
                 SyncDevicesSection(state = state, vm = vm)
                 SettingsGroup("Drive file") {
@@ -116,8 +116,8 @@ internal fun BackupSyncCardContent(
                     )
                     val disable = rememberConfirmArm()
                     ActionRow {
-                        SafeMorphTextButton("Change Drive file", onClick = { showDriveDialog = true })
-                        SafeMorphTextButton(
+                        MorphTextButton("Change Drive file", onClick = { showDriveDialog = true })
+                        MorphTextButton(
                             text = if (disable.armed) "Tap again to disable" else "Disable",
                             onClick = { if (disable.armed) vm.clearSyncUri() else disable.arm() },
                             emphasis = ButtonEmphasis.Deny,
@@ -160,7 +160,7 @@ private fun SyncErrorBanner(message: String) {
 @Composable
 private fun SyncDiagnostics(state: UiState, vm: AppViewModel) {
     var open by rememberSaveable { mutableStateOf(false) }
-    SafeMorphTextButton(if (open) "Hide diagnostics" else "Diagnostics", onClick = { open = !open })
+    MorphTextButton(if (open) "Hide diagnostics" else "Diagnostics", onClick = { open = !open })
     AnimatedVisibility(visible = open, enter = expandEnterSized(Alignment.Bottom), exit = expandExitSized(Alignment.Bottom)) {
         SettingsGroup("Diagnostics") {
             val lastSync = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
@@ -171,11 +171,11 @@ private fun SyncDiagnostics(state: UiState, vm: AppViewModel) {
             state.syncFileFingerprint?.let { StatusRow("File ID", it, valueMono = true) }
             ActionRow {
                 // A non-destructive round trip through the real provider, to confirm sync works.
-                SafeMorphTextButton("Test sync", onClick = { vm.testSync() })
+                MorphTextButton("Test sync", onClick = { vm.testSync() })
                 // Adopt the primary's full settings -- only when a primary exists and it isn't this
                 // device (pulling from yourself is a no-op).
                 if (state.syncPrimaryId != null && state.syncPrimaryId != state.thisDeviceId) {
-                    SafeMorphTextButton("Pull from primary", onClick = { vm.pullFromPrimary() })
+                    MorphTextButton("Pull from primary", onClick = { vm.pullFromPrimary() })
                 }
             }
         }
@@ -191,8 +191,8 @@ private fun ManualBackup(vm: AppViewModel, context: Context) {
     SettingsGroup("Manual backup") {
         BodySmallText("A one-time snapshot file. Credentials are never included.")
         ActionRow {
-            SafeMorphTextButton("Export", onClick = { vm.exportSettings(context) })
-            SafeMorphTextButton("Restore", onClick = { importLauncher.launch("application/json") }, emphasis = ButtonEmphasis.Confirm)
+            MorphTextButton("Export", onClick = { vm.exportSettings(context) })
+            MorphTextButton("Restore", onClick = { importLauncher.launch("application/json") }, emphasis = ButtonEmphasis.Confirm)
         }
     }
 }

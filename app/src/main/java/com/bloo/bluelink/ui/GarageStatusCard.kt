@@ -45,7 +45,7 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.GapPage
 import com.bloo.uicommon.GapHero
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 
 // --- Garage status card -----------------------------------------------
 
@@ -157,7 +157,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                     // The body says "pull down to try again"; this makes the retry an actual, visible
                     // control rather than a gesture someone has to already know.
                     if (loadFailed) {
-                        SafeMorphTextButton(
+                        MorphTextButton(
                             text = "Try again",
                             onClick = { vm.loadGarage() },
                             emphasis = ButtonEmphasis.Confirm,

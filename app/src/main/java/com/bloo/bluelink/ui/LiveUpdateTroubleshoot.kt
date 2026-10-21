@@ -27,7 +27,6 @@ import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.SafeMorphTextButton
 
 /**
  * Ordered troubleshooting steps covering the two different ways this bar can fail to show
@@ -74,13 +73,13 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
                 emphasis = ButtonEmphasis.Confirm,
             )
             if (isSamsung) {
-                SafeMorphTextButton(
+                MorphTextButton(
                     "Open Developer options",
                     onClick = { LiveCharge.openDeveloperOptions(context) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            SafeMorphTextButton(
+            MorphTextButton(
                 "Close",
                 onDismiss,
                 modifier = Modifier.fillMaxWidth(),

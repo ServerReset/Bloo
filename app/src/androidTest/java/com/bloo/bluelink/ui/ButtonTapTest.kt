@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 
 /**
  * A tap on a button must reach its click handler, whether the label fits or has shrunk to its symbol.
@@ -27,7 +27,7 @@ class ButtonTapTest {
     @Test
     fun aTapReachesAButtonWhoseLabelFits() {
         var clicks = 0
-        rule.setContent { BlooTheme { SafeMorphTextButton("Save", onClick = { clicks++ }) } }
+        rule.setContent { BlooTheme { MorphTextButton("Save", onClick = { clicks++ }) } }
         rule.onNodeWithText("Save").performClick()
         rule.waitForIdle()
         assertEquals(1, clicks)
@@ -39,7 +39,7 @@ class ButtonTapTest {
         rule.setContent {
             BlooTheme {
                 Box(Modifier.width(52.dp)) {
-                    SafeMorphTextButton("A rather long button label", onClick = { clicks++ })
+                    MorphTextButton("A rather long button label", onClick = { clicks++ })
                 }
             }
         }

@@ -99,7 +99,7 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.GapPage
 import com.bloo.uicommon.GapBlock
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphSegmented
 import com.bloo.uicommon.SegmentOption
 import androidx.compose.ui.graphics.Color
@@ -323,7 +323,7 @@ internal fun LoginScreen(
                 ) {
                     Column(Modifier.fillMaxWidth().padding(GapPage), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
                         LoginSectionLabel(Icons.Filled.VpnKey, "Your ${brand.label} login")
-                        SafeMorphTextButton(
+                        MorphTextButton(
                             text = "Use a saved login",
                             onClick = { scope.launch { fillFromManager(quiet = false) } },
                             icon = Icons.Filled.VpnKey,
@@ -386,7 +386,7 @@ internal fun LoginScreen(
                             }
                         }
 
-                        SafeMorphTextButton(
+                        MorphTextButton(
                             text = "Sign in to ${brand.label}",
                             onClick = { submit() },
                             modifier = Modifier.fillMaxWidth(),
@@ -423,7 +423,7 @@ internal fun LoginScreen(
                     verticalArrangement = Arrangement.spacedBy(GapGroup),
                 ) {
                     ActionRow {
-                        SafeMorphTextButton(
+                        MorphTextButton(
                             text = "Forgot password?",
                             onClick = {
                                 val forgotUrl = when (brand) {
@@ -439,10 +439,10 @@ internal fun LoginScreen(
                             },
                         )
                         if (onCancel != null) {
-                            SafeMorphTextButton(text = "Cancel", onClick = onCancel, emphasis = ButtonEmphasis.Deny)
+                            MorphTextButton(text = "Cancel", onClick = onCancel, emphasis = ButtonEmphasis.Deny)
                         }
                     }
-                    SafeMorphTextButton(
+                    MorphTextButton(
                         text = when {
                             updateChecking -> "Checking…"
                             updateAvailableUrl != null -> "Update available"

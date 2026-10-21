@@ -60,7 +60,7 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.GapPage
 import com.bloo.uicommon.confirmTone
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.container
 import com.bloo.uicommon.content
 import com.bloo.uicommon.MorphButton
@@ -243,7 +243,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                         Spacer(Modifier.height(GapHairline))
                         PlayStoreLinks()
                     } else ActionRow {
-                        SafeMorphTextButton(
+                        MorphTextButton(
                             "Check",
                             onClick = { vm.checkForUpdateManually() },
                             enabled = !state.updateChecking,
@@ -251,7 +251,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                             pending = state.updateChecking,
                             emphasis = ButtonEmphasis.Confirm,
                         )
-                        SafeMorphTextButton(
+                        MorphTextButton(
                             "GitHub",
                             onClick = {
                                 context.tryStart(
@@ -278,7 +278,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                 "No root needed.",
                         )
                         Spacer(Modifier.height(GapHairline))
-                        SafeMorphTextButton(
+                        MorphTextButton(
                             "Get Shizuku",
                             onClick = { openUrl(context, "https://shizuku.rikka.app/") },
                             icon = Icons.AutoMirrored.Filled.OpenInNew,

@@ -39,7 +39,6 @@ import com.bloo.bluelink.data.setAutoLockConfig
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.AnimatedSlider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -227,7 +226,7 @@ private fun AutoLockSetup(
 
         StepRow("1. Bluetooth permission", if (bluetoothOk) "Granted" else "Not granted")
         BodySmallText("Lets Bloo recognise your car's head unit. Without it, a disconnect cannot be matched to a car.")
-        SafeMorphTextButton(
+        MorphTextButton(
             if (bluetoothOk) "Granted" else "Allow Bluetooth",
             enabled = !bluetoothOk,
             onClick = onRequestPermissions,
@@ -235,7 +234,7 @@ private fun AutoLockSetup(
 
         StepRow("2. Notifications", if (notificationsOk) "Allowed" else "Not allowed")
         BodySmallText("Carries the progress and the result. AutoLock still locks the car without it, silently.")
-        SafeMorphTextButton(
+        MorphTextButton(
             if (notificationsOk) "Allowed" else "Allow notifications",
             enabled = !notificationsOk,
             onClick = onRequestPermissions,
@@ -243,7 +242,7 @@ private fun AutoLockSetup(
 
         StepRow("3. Background activity", if (backgroundOk) "Unrestricted" else "Restricted")
         BodySmallText("A battery-restricted app is asleep when you walk away, so it never sees the disconnect.")
-        SafeMorphTextButton(
+        MorphTextButton(
             "Allow background activity",
             enabled = !backgroundOk,
             onClick = onAllowBackground,
@@ -251,7 +250,7 @@ private fun AutoLockSetup(
 
         StepRow("4. Car Bluetooth device", deviceName ?: "Not set")
         BodySmallText("The one device Bloo watches. Pick the car's head unit, not your phone or earbuds.")
-        SafeMorphTextButton(
+        MorphTextButton(
             if (deviceName == null) "Choose device" else "Change device",
             enabled = permissionsOk && backgroundOk,
             onClick = onChooseDevice,
@@ -264,7 +263,7 @@ private fun AutoLockSetup(
         // leaves the "your car was locked" notice alone -- different channel.
         StepRow("Watcher notification", if (watcherHidden) "Hidden" else "Showing")
         BodySmallText("AutoLock keeps a quiet notification while it is on. Hide it if you would rather not see it.")
-        SafeMorphTextButton(
+        MorphTextButton(
             "Hide watcher notification",
             enabled = !watcherHidden,
             onClick = onHideWatcher,
@@ -312,7 +311,7 @@ private fun AutoLockSettings(
         // to every other reason an alert might or might not arrive.
         if (current.enabled) {
             StatusRow("Car Bluetooth device", current.deviceName ?: "Not set")
-            SafeMorphTextButton(
+            MorphTextButton(
                 "Change device",
                 onClick = { showDevicePicker = true },
             )
@@ -325,7 +324,7 @@ private fun AutoLockSettings(
                     "AutoLock has to keep running while Bloo is in the background, or it can't lock " +
                         "the car after you walk away. Allow background activity next.",
                 )
-                SafeMorphTextButton(
+                MorphTextButton(
                     "Allow background activity",
                     onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
                 )
@@ -382,7 +381,7 @@ private fun AutoLockSettings(
 
             // Trying it out lives with the settings it exercises.
             SectionDivider()
-            SafeMorphTextButton(
+            MorphTextButton(
                 "Simulate leaving",
                 enabled = current.isUsable,
                 onClick = { vm.simulateAutoLockLeaving(v) },

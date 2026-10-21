@@ -39,7 +39,6 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.SegmentOption
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -147,7 +146,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                     // Only while there is something to do: a watch that is already signed in has no sign-in button.
                     action = if (signedIn) null else {
                         {
-                            SafeMorphTextButton(
+                            MorphTextButton(
                                 "Sign watch in",
                                 onClick = { WatchSignIn.offer(context) },
                                 icon = Icons.Filled.Watch,
@@ -213,7 +212,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                     emphasis = ButtonEmphasis.Deny,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                SafeMorphTextButton("Keep", onClick = { removal = null }, modifier = Modifier.fillMaxWidth())
+                MorphTextButton("Keep", onClick = { removal = null }, modifier = Modifier.fillMaxWidth())
             },
         )
     }
@@ -260,7 +259,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                     emphasis = ButtonEmphasis.Confirm,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                SafeMorphTextButton(
+                MorphTextButton(
                     "Cancel",
                     onClick = { renaming = false },
                     modifier = Modifier.fillMaxWidth(),

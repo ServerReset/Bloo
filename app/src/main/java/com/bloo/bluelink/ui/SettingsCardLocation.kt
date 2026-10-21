@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
 
 /** The "Location" card: the place weather and "my location" follow. */
@@ -57,7 +57,7 @@ internal fun WeatherPlaceControls(appearance: SettingsStore.Appearance, vm: AppV
                 tint = MaterialTheme.colorScheme.primary,
                 title = place,
                 subtitle = "Weather and the map use this place",
-                trailing = { SafeMorphTextButton("Clear", onClick = { vm.clearWeatherLocation() }, fillOnPress = false, emphasis = ButtonEmphasis.Deny) },
+                trailing = { MorphTextButton("Clear", onClick = { vm.clearWeatherLocation() }, fillOnPress = false, emphasis = ButtonEmphasis.Deny) },
             )
         }
         BlooTextField(

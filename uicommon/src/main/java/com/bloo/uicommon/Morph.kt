@@ -221,8 +221,8 @@ fun MorphTextButton(
     groupWeight: Float = GroupWeightProportional,
     /** A toggle's "on" state: the primary fill. */
     active: Boolean = false,
-    /** See [MorphButton]'s own `expressive`. */
-    expressive: Boolean = false,
+    /** See [MorphButton]'s own `expressive`. On by default: every text button in the app presses the same way. */
+    expressive: Boolean = true,
     /** See [MorphButton]'s own `fillOnPress`; false when the button shares its row. */
     fillOnPress: Boolean = true,
 ) {
@@ -250,48 +250,6 @@ fun MorphTextButton(
         }
     }
 }
-
-/**
- * [MorphTextButton] with the press-grow feedback: the same button with `expressive = true`, kept as a name
- * only because 77 call sites use it. One implementation, so the two can never drift (this one had stopped
- * forwarding `active` once already).
- */
-@Composable
-fun SafeMorphTextButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    emphasis: ButtonEmphasis = ButtonEmphasis.Tonal,
-    containerColor: Color = Color.Unspecified,
-    contentColor: Color = Color.Unspecified,
-    icon: ImageVector? = null,
-    showIcon: Boolean = true,
-    /** See [MorphTextButton]'s own `active`. */
-    active: Boolean = false,
-    pending: Boolean = false,
-    groupWeight: Float = GroupWeightProportional,
-    /**
-     * False for a button sharing its row with other content: it keeps the small press push instead
-     * of widening.
-     */
-    fillOnPress: Boolean = true,
-) = MorphTextButton(
-    text = text,
-    onClick = onClick,
-    modifier = modifier,
-    enabled = enabled,
-    emphasis = emphasis,
-    containerColor = containerColor,
-    contentColor = contentColor,
-    icon = icon,
-    showIcon = showIcon,
-    pending = pending,
-    groupWeight = groupWeight,
-    active = active,
-    expressive = true,
-    fillOnPress = fillOnPress,
-)
 
 /** The standard action button: a glyph, a label and a tonal fill. [MorphTextButton] with the glyph required. */
 @Composable

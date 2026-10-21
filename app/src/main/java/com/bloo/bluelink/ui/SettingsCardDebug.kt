@@ -55,7 +55,7 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 
 /**
  * The "Debug" card: this device's diagnostics and the activity log, one place for support
@@ -82,13 +82,13 @@ internal fun DebugCardContent(
                 // Why the AI features are or are not offered. This is a diagnostic line only: nothing AI
                 // appears elsewhere unless this device reports a usable Gemini Nano.
                 StatusRow("On-device AI (Gemini Nano)", aiAvailability?.describe() ?: "Checking…")
-                SafeMorphTextButton("Check again", onClick = { vm.reprobeAi() })
+                MorphTextButton("Check again", onClick = { vm.reprobeAi() })
             }
             SettingsGroup("Activity log") {
                 BodySmallText("${logs.size} lines, newest last.")
                 ActionRow {
-                    SafeMorphTextButton("Copy", onClick = { copy("bloo logs", logs.joinToString("\n")) })
-                    SafeMorphTextButton("Clear", onClick = { vm.clearLogs() }, emphasis = ButtonEmphasis.Deny)
+                    MorphTextButton("Copy", onClick = { copy("bloo logs", logs.joinToString("\n")) })
+                    MorphTextButton("Clear", onClick = { vm.clearLogs() }, emphasis = ButtonEmphasis.Deny)
                 }
                 val scroll = rememberScrollState()
                 SelectionContainer {

@@ -29,7 +29,7 @@ import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.uicommon.RevealText
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.FieldShape
 import com.bloo.uicommon.content
 
@@ -77,7 +77,7 @@ internal fun buildSettingsSearchEntries(
     // unlike the registry-driven settings it needs its own search entry. "welcome cards" is exactly
     // what someone would type for it.
     add("Show welcome cards", "welcome cards onboarding intro tour replay walkthrough tips tutorial bring back show visuals") {
-        SafeMorphTextButton("Show welcome cards", onClick = { vm.showWelcomeCards() }, icon = Icons.Filled.Style)
+        MorphTextButton("Show welcome cards", onClick = { vm.showWelcomeCards() }, icon = Icons.Filled.Style)
     }
     // Every range and every picker, straight from the registry: no per-setting code here.
     (RangeSettings + ChoiceSettings).forEach { spec ->

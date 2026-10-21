@@ -31,7 +31,7 @@ import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.unitSystem
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 
 /**
  * The "Visuals" card: theme and colour, font, units, text scale, the search bubble, and the welcome
@@ -67,7 +67,7 @@ internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: 
             }
             SettingsGroup("Welcome cards") {
                 BodySmallText("The cards you swipe through on first open.")
-                SafeMorphTextButton("Show welcome cards", onClick = { vm.showWelcomeCards() }, icon = Icons.Filled.Style)
+                MorphTextButton("Show welcome cards", onClick = { vm.showWelcomeCards() }, icon = Icons.Filled.Style)
             }
         }
     }

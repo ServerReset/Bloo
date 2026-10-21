@@ -19,7 +19,6 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.content
 
 /**
@@ -127,7 +126,7 @@ private fun PebbleOrderControl(v: Vehicle, state: UiState, vm: AppViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         RevealText(order.joinToString(" · ") { sectionLabel(it) }, style = SecondaryTextStyle())
         BodySmallText("Drag pebbles on the car page to reorder them.")
-        SafeMorphTextButton(
+        MorphTextButton(
             "Reset to default order",
             enabled = state.sectionOrders[v.vin] != null && state.sectionOrders[v.vin] != DEFAULT_SECTIONS,
             onClick = { vm.setSectionOrder(v, DEFAULT_SECTIONS) },

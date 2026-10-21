@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.update.UpdateRuntime
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 
 /**
  * The two Google Play links, wherever the app points at Play: signing up for the testing (the testers' group,
@@ -20,12 +20,12 @@ import com.bloo.uicommon.SafeMorphTextButton
 internal fun PlayStoreLinks(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     ActionRow(modifier.fillMaxWidth()) {
-        SafeMorphTextButton(
+        MorphTextButton(
             "Join testing",
             onClick = { openUrl(context, UpdateRuntime.JOIN_TESTING_URL) },
             icon = Icons.Filled.GroupAdd,
         )
-        SafeMorphTextButton(
+        MorphTextButton(
             "Play Store",
             onClick = { openUrl(context, UpdateRuntime.PLAY_LISTING_URL) },
             icon = Icons.AutoMirrored.Filled.OpenInNew,

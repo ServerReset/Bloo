@@ -37,7 +37,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
 
 private enum class WatchSetupStep { Prepare, Pair, Install, Done }
@@ -75,7 +75,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
             buttons = {
                 Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                     PlayStoreLinks()
-                    ActionRow(spacing = GapGroup) { SafeMorphTextButton("Close", onClick = onDismiss) }
+                    ActionRow(spacing = GapGroup) { MorphTextButton("Close", onClick = onDismiss) }
                 }
             },
         )
@@ -300,7 +300,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                 )
                 WatchSetupStep.Done -> Unit
             }
-            SafeMorphTextButton(
+            MorphTextButton(
                 text = if (step == WatchSetupStep.Done) "Done" else "Close",
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),

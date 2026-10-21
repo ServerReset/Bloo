@@ -30,7 +30,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.AnimatedSlider
 
@@ -115,7 +115,7 @@ internal fun PaletteEditorDialog(
                 modifier = Modifier.fillMaxWidth(),
                 emphasis = ButtonEmphasis.Confirm,
             )
-            SafeMorphTextButton(
+            MorphTextButton(
                 "Cancel",
                 onDismiss,
                 modifier = Modifier.fillMaxWidth(),

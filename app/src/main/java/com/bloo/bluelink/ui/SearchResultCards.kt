@@ -34,7 +34,7 @@ import com.bloo.uicommon.ButtonIconSize
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.content
 import androidx.activity.result.contract.ActivityResultContracts
 
@@ -117,7 +117,7 @@ internal fun AiCommandProposal(
                     // MorphTextButton, not a bare Button: this was the one plain Material
                     // button left in the app, so it was the only standard button that neither
                     // morphed on press nor fired the click haptic every other button gives.
-                    SafeMorphTextButton(
+                    MorphTextButton(
                         text = if (running) "Working…" else "Run it",
                         onClick = {
                             running = true
@@ -189,7 +189,7 @@ internal fun AiSettingProposal(
                 style = SecondaryTextStyle(),
             )
             if (!already) {
-                SafeMorphTextButton(
+                MorphTextButton(
                     text = if (applied) "Done" else if (action.isAction) "Run" else "Apply",
                     onClick = {
                         if (action.needsLocationPermission) {

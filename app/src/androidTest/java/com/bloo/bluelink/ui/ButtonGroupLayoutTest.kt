@@ -20,7 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 
 /**
  * The button-group behaviour, measured on a real layout: lines of buttons fill their width edge to
@@ -44,7 +44,7 @@ class ButtonGroupLayoutTest {
                 Box(Modifier.width(rowWidth)) {
                     ExpressiveButtonRow(Modifier.fillMaxWidth(), spacing = 8.dp) {
                         labels.forEachIndexed { i, label ->
-                            SafeMorphTextButton(label, onClick = {}, modifier = Modifier.testTag("b$i"), showIcon = false)
+                            MorphTextButton(label, onClick = {}, modifier = Modifier.testTag("b$i"), showIcon = false)
                         }
                     }
                 }
@@ -71,7 +71,7 @@ class ButtonGroupLayoutTest {
             BlooTheme {
                 Box(Modifier.width(rowWidth)) {
                     ExpressiveButtonRow(Modifier.fillMaxWidth(), spacing = 8.dp) {
-                        SafeMorphTextButton("Sync now", onClick = {}, modifier = Modifier.testTag("lone"), showIcon = false)
+                        MorphTextButton("Sync now", onClick = {}, modifier = Modifier.testTag("lone"), showIcon = false)
                     }
                 }
             }
@@ -98,7 +98,7 @@ class ButtonGroupLayoutTest {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     Box(Modifier.width(rowWidth)) {
                         ExpressiveButtonRow(Modifier.fillMaxWidth(), spacing = 8.dp) {
-                            SafeMorphTextButton("Sync now", onClick = {}, modifier = Modifier.testTag("lone"), showIcon = false)
+                            MorphTextButton("Sync now", onClick = {}, modifier = Modifier.testTag("lone"), showIcon = false)
                         }
                     }
                 }

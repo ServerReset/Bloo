@@ -50,7 +50,7 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.SafeMorphTextButton
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.SegmentOption
 import com.bloo.uicommon.content
@@ -295,7 +295,7 @@ internal fun OnboardingAlertsPage(notif: SettingsStore.NotificationPrefs, vm: Ap
 internal fun OnboardingWatchPage() {
     var show by remember { mutableStateOf(false) }
     BodySmallText("Got a Wear OS watch? Bloo has a watch app with quick actions, a Tile and its own notifications. On the Play version it installs from Google Play; on this copy it installs straight from this phone.")
-    SafeMorphTextButton("Set up my watch", onClick = { show = true }, icon = Icons.Filled.Watch, emphasis = ButtonEmphasis.Confirm)
+    MorphTextButton("Set up my watch", onClick = { show = true }, icon = Icons.Filled.Watch, emphasis = ButtonEmphasis.Confirm)
     BodySmallText("No watch? Swipe on. You can set one up later from Settings → Backup & sync.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     if (show) SetupWatchDialog(phoneName = "this phone", onDismiss = { show = false })
 }
