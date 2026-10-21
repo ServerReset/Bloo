@@ -3,6 +3,7 @@ package com.bloo.bluelink.wear
 import com.bloo.uicommon.AppIcons
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.VehicleSnapshot
@@ -20,22 +21,31 @@ internal fun WearClimateList(
     onBack: () -> Unit,
 ) {
     val presets by WearPresets.presets.collectAsStateWithLifecycle()
+    val hints by WearSmartClimate.hints.collectAsStateWithLifecycle()
+    LaunchedEffect(car.vin, car.lat, car.lon) { WearSmartClimate.refresh(car) }
     val saved = presets[car.vin].orEmpty()
     WearBackable(onBack) {
         WearListScreen {
             item(key = "title") { WearCenteredText(title, style = MaterialTheme.typography.titleSmall) }
-            item(key = "smart") {
-                WearActionRow("Smart climate", AppIcons.SmartClimate) { onPick(WearFaceControls.CLIMATE_SMART_KEY) }
-            }
-            saved.forEach { preset ->
-                item(key = preset.id) {
-                    WearActionRow(preset.name, AppIcons.Thermostat) { onPick(WearFaceControls.PRESET_PREFIX + preset.id) }
-                }
-                item(key = preset.id + ":detail") { WearCaption(WearPresets.detail(preset.request), small = true, maxLines = 1) }
-            }
-            if (saved.isEmpty()) {
-                item(key = "none") {
-                    WearCaption("Presets you save in Bloo on your phone show up here.", maxLines = 3)
+            // The same two-line rows as the details page's Climate section: smart climate saying what it will set, then each preset
+            // saying what it sets.
+            item(key = "climate") {
+                WearPebble(title = "Climate", icon = AppIcons.Climate) {
+                    WearListRow(
+                        title = "Smart climate",
+                        subtitle = hints[car.vin]?.let(WearSmartClimate::describe) ?: "For the weather at the car",
+                        icon = AppIcons.SmartClimate,
+                    ) { onPick(WearFaceControls.CLIMATE_SMART_KEY) }
+                    saved.forEach { preset ->
+                        WearListRow(
+                            title = preset.name,
+                            subtitle = WearPresets.detail(preset.request),
+                            icon = AppIcons.Thermostat,
+                        ) { onPick(WearFaceControls.PRESET_PREFIX + preset.id) }
+                    }
+                    if (saved.isEmpty()) {
+                        WearCaption("Presets you save in Bloo on your phone show up here.", maxLines = 3)
+                    }
                 }
             }
         }
