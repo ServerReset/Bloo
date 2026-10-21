@@ -64,6 +64,8 @@ import com.bloo.uicommon.SwitchTrack
 import com.bloo.uicommon.TitleSubtitle
 import com.bloo.uicommon.LabelValueRow
 import com.bloo.uicommon.standardButtonIcon
+import com.bloo.uicommon.SecondaryTextStyle
+import com.bloo.uicommon.secondaryTextColor
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.Surface
@@ -387,7 +389,7 @@ fun WearListRow(
 ) {
     val scheme = MaterialTheme.colorScheme
     val tint = if (active) scheme.onPrimary else scheme.onSurface
-    val quiet = if (active) scheme.onPrimary.copy(alpha = 0.8f) else scheme.onSurfaceVariant
+    val quiet = if (active) scheme.onPrimary.copy(alpha = 0.8f) else secondaryTextColor()
     WearButton(
         active = active,
         enabled = enabled && !pending,
@@ -405,7 +407,7 @@ fun WearListRow(
         TitleSubtitle(
             title, subtitle, Modifier.weight(1f),
             titleStyle = MaterialTheme.typography.labelLarge, titleColor = tint, titleWeight = FontWeight.SemiBold,
-            subtitleStyle = MaterialTheme.typography.labelSmall, subtitleColor = quiet,
+            subtitleStyle = SecondaryTextStyle().copy(fontSize = MaterialTheme.typography.labelSmall.fontSize), subtitleColor = quiet,
             maxLines = 1,
         )
     }
@@ -429,8 +431,11 @@ fun WearCaption(text: String, modifier: Modifier = Modifier, small: Boolean = fa
     WearCenteredText(
         text,
         modifier = modifier,
-        style = if (small) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // The phone's secondary text (:uicommon's SecondaryTextStyle: semi-bold, with its halo) at the watch's own sizes.
+        style = SecondaryTextStyle().copy(
+            fontSize = (if (small) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall).fontSize,
+        ),
+        color = secondaryTextColor(),
         fontWeight = FontWeight.Normal,
         maxLines = maxLines,
     )
