@@ -2,6 +2,8 @@ package com.bloo.bluelink.wear
 
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.isDriving
+import com.bloo.bluelink.data.serviceCountdown
+import com.bloo.bluelink.data.serviceDue
 import java.util.Locale
 
 /**
@@ -32,13 +34,12 @@ internal object WearCarFacts {
         v.licensePlate?.takeIf { it.isNotBlank() }?.let { add("Plate" to it) }
     }
 
-    /** "Due in 2,500 mi" or "Overdue by 300 mi", from the last service, its interval and the odometer. */
+    /** "Due in 2,500 mi" or "Overdue by 300 mi", from the last service, its interval and the odometer (the shared arithmetic). */
     fun serviceLine(v: VehicleSnapshot): String? {
-        val last = v.lastServiceMiles ?: return null
         val interval = v.serviceIntervalMiles?.takeIf { it > 0 } ?: return null
-        val odo = v.odometer?.filter { it.isDigit() }?.toIntOrNull() ?: return null
-        val left = last + interval - odo
-        return if (left >= 0) "Due in ${miles(left)}" else "Overdue by ${miles(-left)}"
+        val odo = v.odometer?.filter { it.isDigit() }?.toIntOrNull()
+        val left = serviceDue(odo, v.lastServiceMiles, interval) ?: return null
+        return serviceCountdown(left) { miles(it) }
     }
 
     private fun miles(n: Int) = String.format(Locale.US, "%,d mi", n)

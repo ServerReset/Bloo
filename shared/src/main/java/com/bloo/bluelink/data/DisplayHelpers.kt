@@ -77,6 +77,13 @@ fun serviceDue(odometerMiles: Int?, lastServiceMiles: Int?, intervalMiles: Int?)
 }
 
 /**
+ * The service countdown in words -- "Due in 2,500 mi" or "Overdue by 300 mi" -- for [remaining] miles (negative once overdue),
+ * with the distance formatted by [distance] in the reader's own unit. Shared so the phone and the watch word a service alike.
+ */
+fun serviceCountdown(remaining: Int, distance: (Int) -> String): String =
+    if (remaining >= 0) "Due in ${distance(remaining)}" else "Overdue by ${distance(-remaining)}"
+
+/**
  * The ABSOLUTE odometer reading a service falls due at. Trivial arithmetic, and shared anyway for
  * one reason: [serviceDue] is defined as `nextServiceMiles - odometer`, so the relative countdown
  * ("in N mi") and the absolute figure ("at N mi") are two views of ONE number and must never
