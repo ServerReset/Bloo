@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.bloo.bluelink.data.relativeLabel
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 
 /**
@@ -18,17 +19,23 @@ import kotlinx.coroutines.delay
 fun rememberRelativeTime(millis: Long?): String? {
     if (millis == null) return null
     var label by remember(millis) { mutableStateOf(relativeLabel(millis)) }
-    LaunchedEffect(millis) {
-        while (true) {
-            val age = System.currentTimeMillis() - millis
-            delay(
-                when {
-                    age < 60_000L -> 10_000L
-                    age < 3_600_000L -> 60_000L
-                    else -> 900_000L
-                },
-            )
+    // Only while the app is on screen: a stopped activity keeps its composition, and a ticker that outlived it would wake the CPU for
+    // a label nobody reads. The label is made fresh again the moment it resumes.
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(millis, owner) {
+        owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
             label = relativeLabel(millis)
+            while (true) {
+                val age = System.currentTimeMillis() - millis
+                delay(
+                    when {
+                        age < 60_000L -> 10_000L
+                        age < 3_600_000L -> 60_000L
+                        else -> 900_000L
+                    },
+                )
+                label = relativeLabel(millis)
+            }
         }
     }
     return label

@@ -164,11 +164,12 @@ fun BoxScope.WearPullIndicator(state: WearPullState, refreshing: Boolean) {
     val sizePx = with(density) { DiscSize.toPx() }
     val restPx = with(density) { RestTop.toPx() }
     val scheme = MaterialTheme.colorScheme
+    // The State itself, read inside the Canvas: reading its value here recomposed the whole indicator on every frame of the spin.
     val spin = if (active) {
         rememberInfiniteTransition(label = "pullSpin").animateFloat(
             0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart), label = "pullSpinAngle",
-        ).value
-    } else 0f
+        )
+    } else null
     val stretch = over / (1f + over)
     Box(
         Modifier
@@ -189,7 +190,7 @@ fun BoxScope.WearPullIndicator(state: WearPullState, refreshing: Boolean) {
             val sweep = if (active) 110f else 300f * raw
             drawArc(
                 color = scheme.primary,
-                startAngle = -90f + spin,
+                startAngle = -90f + (spin?.value ?: 0f),
                 sweepAngle = sweep,
                 useCenter = false,
                 topLeft = Offset(stroke / 2, stroke / 2),

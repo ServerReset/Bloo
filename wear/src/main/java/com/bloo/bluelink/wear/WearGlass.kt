@@ -110,8 +110,8 @@ internal fun WearBackdrop(modifier: Modifier = Modifier, content: @Composable ()
 /** One drift cycle, in seconds: slow enough to read as ambient, not as animation. */
 private const val DriftSeconds = 70f
 
-/** Time between drift steps: about 4 a second (each step re-blurs the glass above, so it is kept low). */
-private const val DriftStepMs = 250L
+/** Time between drift steps: 2 a second (each step re-blurs the glass above, so it is kept low; the drift takes 70s a cycle, so it still reads as smooth). */
+private const val DriftStepMs = 500L
 
 /**
  * Frosted glass for a watch surface: the backdrop blurred behind [shape] when the device can and may (API 31+, not lean),

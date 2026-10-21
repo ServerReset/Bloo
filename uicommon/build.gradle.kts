@@ -54,6 +54,8 @@ dependencies {
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.animation:animation-core")
     implementation("androidx.compose.runtime:runtime")
+    // LocalLifecycleOwner, for the loops here that must stop when the app is not on screen (RelativeTime). Same version as :app.
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     // Icons needed for weatherIcon(); the material-icons artifact is pure ImageVector
     // data - no Material theme dependency - so it's safe to add here.
     implementation("androidx.compose.material:material-icons-extended")

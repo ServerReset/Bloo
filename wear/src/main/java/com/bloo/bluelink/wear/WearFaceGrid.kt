@@ -1,7 +1,6 @@
 package com.bloo.bluelink.wear
 
 import com.bloo.uicommon.LocalPowerPolicy
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -41,7 +40,7 @@ import com.bloo.uicommon.standardButtonIcon
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.DisposableEffect
@@ -155,16 +154,22 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
             enter.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow))
         }
     }
-    val breathe = if (action.active && policy.ambientMotion) {
-        androidx.compose.animation.core.rememberInfiniteTransition(label = "tileBreath").animateFloat(
-            0.86f, 1f,
-            androidx.compose.animation.core.infiniteRepeatable(
-                androidx.compose.animation.core.tween(1500, easing = FastOutSlowInEasing),
-                RepeatMode.Reverse,
-            ),
-            label = "tileBreathAlpha",
-        )
-    } else null
+    // A tile that is on breathes, but only its CONTENT: breathing the whole layer re-blurred the glass behind it on every frame, and
+    // only while the watch is in front of the wearer (a stopped activity keeps its composition).
+    val breathe = androidx.compose.runtime.remember { Animatable(1f) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(action.active, policy.ambientMotion, lifecycleOwner) {
+        if (!(action.active && policy.ambientMotion)) {
+            breathe.snapTo(1f)
+            return@LaunchedEffect
+        }
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            while (true) {
+                breathe.animateTo(0.86f, androidx.compose.animation.core.tween(1500, easing = FastOutSlowInEasing))
+                breathe.animateTo(1f, androidx.compose.animation.core.tween(1500, easing = FastOutSlowInEasing))
+            }
+        }
+    }
     // The glyph bounces when the tile's meaning changes (Lock becomes Unlock, Climate turns on).
     val glyphBump = androidx.compose.runtime.remember { Animatable(1f) }
     LaunchedEffect(action.label, action.active) {
@@ -182,7 +187,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
                 val s = 0.96f + 0.04f * e
                 scaleX = s
                 scaleY = s
-                alpha = e.coerceIn(0f, 1f) * (breathe?.value ?: 1f)
+                alpha = e.coerceIn(0f, 1f)
             }
             .wearGlassBlur(shape(0f))
             .wearGlassRim(shape(0f)),
@@ -207,7 +212,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
             2 -> Alignment.BottomStart
             else -> Alignment.BottomEnd
         }
-        Box(Modifier.fillMaxSize().padding(10.dp * unit), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().padding(10.dp * unit).graphicsLayer { alpha = breathe.value }, contentAlignment = Alignment.Center) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.align(BiasAlignment(biasX(toward), biasY(toward)))
