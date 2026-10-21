@@ -58,6 +58,8 @@ import androidx.wear.compose.material3.TimeText
 import com.bloo.uicommon.MorphButton
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.GroupHeading
+import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.SectionHeading
 import com.bloo.uicommon.LabelValueRow
 import com.bloo.uicommon.standardButtonIcon
@@ -166,14 +168,12 @@ fun WearPebble(
 /** A quiet heading inside a section, for a group of rows within it (the section has the one title; this names a part). */
 @Composable
 fun WearSubheading(text: String, modifier: Modifier = Modifier) {
-    RevealText(
+    GroupHeading(
         text,
         modifier = modifier.fillMaxWidth().padding(top = 6.dp).fitRound(),
-        textAlign = TextAlign.Center,
         style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.primary,
-        maxLines = 1,
+        weight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center,
     )
 }
 
@@ -559,9 +559,8 @@ private fun RoundChoice(icon: ImageVector, label: String, container: Color, cont
 /** The tinted circle a full screen's icon sits in. */
 @Composable
 private fun ScreenBadge(icon: ImageVector, tint: Color) {
-    Box(Modifier.size(44.dp).clip(CircleShape).background(tint.copy(alpha = 0.2f)).wearGlassRim(CircleShape), contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
-    }
+    // The phone's badge (:uicommon), sized for the watch and rimmed like its glass.
+    IconBadge(icon, tint, modifier = Modifier.wearGlassRim(CircleShape), containerColor = tint.copy(alpha = 0.2f), size = 44.dp, iconSize = 24.dp)
 }
 
 /** One label/value line in a pebble: the label muted on the start, the value on the end. */

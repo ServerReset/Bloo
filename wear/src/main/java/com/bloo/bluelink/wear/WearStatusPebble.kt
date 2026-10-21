@@ -5,7 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.isStale
-import com.bloo.bluelink.data.updatedLabel
+import com.bloo.uicommon.rememberRelativeTime
 
 /** The car's state now: label/value rows from [WearCarFacts], each shown only when the car reports it. */
 @Composable
@@ -20,7 +20,8 @@ internal fun WearStatusPebble(v: VehicleSnapshot) {
 internal fun WearCarCarePebble(v: VehicleSnapshot, refreshing: Boolean, canRefresh: Boolean, onRefresh: () -> Unit) {
     WearPebble(title = "Care", icon = AppIcons.Build) {
         WearCarFacts.care(v).forEach { (label, value) -> WearStatRow(label, value) }
-        val updated = v.updatedLabel()
+        // Live: the phone's own label (:uicommon), so "5 min ago" moves on while the page stays open.
+        val updated = rememberRelativeTime(v.fetchedAt)?.takeIf { it.isNotBlank() }
         if (refreshing || updated != null) {
             WearStatRow(
                 "Updated",

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.content.edit
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.climatePresetDetail
 import com.bloo.bluelink.data.degValue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,14 +65,6 @@ internal object WearPresets {
     /** A preset by id from any car (the chooser names a stored choice without knowing which car it is for). */
     fun findAny(id: String): ClimatePreset? = _presets.value.values.firstNotNullOfOrNull { l -> l.firstOrNull { it.id == id } }
 
-    /** "79° · Defrost · Heat": what a preset will set, as the phone words it. */
-    fun detail(req: ClimateRequest): String {
-        val parts = mutableListOf("${degValue(req.tempF.toDouble(), fahrenheit)}°")
-        if (req.defrost) parts += "Defrost"
-        val seats = listOf(req.seatFrontLeft, req.seatFrontRight, req.seatRearLeft, req.seatRearRight)
-        if (seats.any { it.isHeat }) parts += "Heat"
-        if (seats.any { it.isCool }) parts += "Cool"
-        if (req.steeringWheelHeat.isOn) parts += "Wheel"
-        return parts.joinToString(" · ")
-    }
+    /** "79° · Defrost · Heat": what a preset will set; the same words as the phone (see climatePresetDetail). */
+    fun detail(req: ClimateRequest): String = climatePresetDetail(req, fahrenheit)
 }

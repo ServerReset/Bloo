@@ -27,32 +27,9 @@ import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.AnimatedSlider
 import com.bloo.uicommon.content
 
-/**
- * Holds the LABEL in state rather than a clock, which is the whole efficiency of it. Under a minute
- * the text really does change every few seconds, so tick at 10s; under an hour it can only change
- * once a minute; past that it cannot change more than every quarter of an hour.
- */
+/** "5 min ago" for [millis], kept current without a clock in the caller (from :uicommon, shared with the watch). */
 @Composable
-internal fun rememberRelativeTime(millis: Long?): String? {
-    if (millis == null) return null
-    var label by remember(millis) {
-        mutableStateOf(com.bloo.bluelink.data.relativeLabel(millis))
-    }
-    LaunchedEffect(millis) {
-        while (true) {
-            val age = System.currentTimeMillis() - millis
-            delay(
-                when {
-                    age < 60_000L -> 10_000L
-                    age < 3_600_000L -> 60_000L
-                    else -> 900_000L
-                },
-            )
-            label = com.bloo.bluelink.data.relativeLabel(millis)
-        }
-    }
-    return label
-}
+internal fun rememberRelativeTime(millis: Long?): String? = com.bloo.uicommon.rememberRelativeTime(millis)
 
 /**
  * A clean, fully custom slider: a rounded track with an accent fill, subtle step ticks, and a

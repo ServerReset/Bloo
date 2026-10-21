@@ -127,20 +127,14 @@ internal fun TitleSmallText(
     RevealText(text, style = PrimaryTextStyle(), modifier = modifier, color = color, fontWeight = fontWeight)
 }
 
-/** The circular tinted container [IconBadge] draws into. */
+/** The circular tinted container [IconBadge] draws into (from :uicommon). */
 @Composable
 internal fun IconBadgeContainer(
     modifier: Modifier = Modifier,
     containerColor: Color,
     size: Dp = 40.dp,
     content: @Composable BoxScope.() -> Unit,
-) {
-    Box(
-        modifier.size(size).clip(CircleShape).background(containerColor),
-        contentAlignment = Alignment.Center,
-        content = content,
-    )
-}
+) = com.bloo.uicommon.IconBadgeContainer(modifier, containerColor, size, content)
 
 /**
  * [IconBadgeContainer] with a single centered [Icon]. [containerColor] defaults to a 14%-alpha tint
@@ -154,11 +148,7 @@ internal fun IconBadge(
     containerColor: Color = tint.copy(alpha = 0.14f),
     size: Dp = 40.dp,
     iconSize: Dp = size * 0.5f,
-) {
-    IconBadgeContainer(modifier = modifier, containerColor = containerColor, size = size) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(iconSize))
-    }
-}
+) = com.bloo.uicommon.IconBadge(icon, tint, modifier, containerColor, size, iconSize)
 
 /**
  * An [IconBadge] leading a title + optional muted subtitle, text column filling the row. [trailing]

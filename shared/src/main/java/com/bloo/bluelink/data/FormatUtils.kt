@@ -62,6 +62,18 @@ fun smartClimateLabel(ambientF: Int, fahrenheit: Boolean): String {
     return (if (smartClimateIsCooling(ambientF)) "Cool to " else "Heat to ") + target
 }
 
+/** A compact "79° · Defrost · Heat" summary of what a saved climate preset will set; the phone and the watch word it alike. */
+fun climatePresetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
+    // Bare "°" rather than degLabel's "°F"/"°C": the unit is established by context.
+    val parts = mutableListOf("${degValue(req.tempF.toDouble(), fahrenheit)}°")
+    if (req.defrost) parts += "Defrost"
+    val seats = listOf(req.seatFrontLeft, req.seatFrontRight, req.seatRearLeft, req.seatRearRight)
+    if (seats.any { it.isHeat }) parts += "Heat"
+    if (seats.any { it.isCool }) parts += "Cool"
+    if (req.steeringWheelHeat.isOn) parts += "Wheel"
+    return parts.joinToString(" · ")
+}
+
 /**
  * The valid range (in minutes) for a SINGLE remote-start climate command's duration -- the vendor
  * API itself rejects/clamps anything past 10 minutes per command. The default within this range

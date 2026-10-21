@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.GroupHeading
 import com.bloo.uicommon.LabelValueRow
 import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.GapHairline
@@ -94,12 +95,8 @@ internal fun StackedRow(label: String, value: String) {
 /** A small bold group heading used inside the Car-info pebble. */
 @Composable
 internal fun SectionLabel(text: String) {
-    TitleSmallText(
-        text,
-        // A heading to screen readers, as the Settings group titles already are.
-        modifier = Modifier.padding(top = 2.dp).semantics { heading() },
-        color = LocalContentColor.current.copy(alpha = 0.85f),
-    )
+    // The shared sub-heading (:uicommon's GroupHeading): a heading to screen readers, muted a little under its section's title.
+    GroupHeading(text, modifier = Modifier.padding(top = 2.dp), color = LocalContentColor.current.copy(alpha = 0.85f))
 }
 
 @Composable

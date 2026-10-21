@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.GroupHeading
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection
@@ -65,13 +66,7 @@ internal fun SettingsGroup(title: String? = null, content: @Composable ColumnSco
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         if (!title.isNullOrBlank()) {
-            RevealText(
-                title,
-                style = PrimaryTextStyle(),
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.semantics { heading() },
-            )
+            GroupHeading(title)
         }
         content()
     }

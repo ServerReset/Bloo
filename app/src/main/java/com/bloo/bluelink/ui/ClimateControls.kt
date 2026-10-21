@@ -55,6 +55,7 @@ import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WheelHeatLevel
+import com.bloo.bluelink.data.climatePresetDetail
 import com.bloo.bluelink.data.degValue
 import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.rememberConfirmArm
@@ -208,7 +209,7 @@ internal fun ClimatePresetSection(
                 ) {
                     PresetPill(
                         name = preset.name,
-                        detail = presetDetail(preset.request, fahrenheit),
+                        detail = climatePresetDetail(preset.request, fahrenheit),
                         active = preset.id == activeId,
                         onStart = { onStart(preset) },
                         onDelete = {
@@ -227,20 +228,6 @@ internal fun ClimatePresetSection(
             Spacer(Modifier.height(GapHairline))
         }
     }
-}
-
-/** A compact "79° · Defrost · Heat" summary of what a preset will set. */
-internal fun presetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
-    val parts = mutableListOf<String>()
-    // Bare "°" rather than degLabel's "°F"/"°C": the unit is established by context. Conversion is
-    // shared with degLabel.
-    parts += "${degValue(req.tempF.toDouble(), fahrenheit)}°"
-    if (req.defrost) parts += "Defrost"
-    val seats = listOf(req.seatFrontLeft, req.seatFrontRight, req.seatRearLeft, req.seatRearRight)
-    if (seats.any { it.isHeat }) parts += "Heat"
-    if (seats.any { it.isCool }) parts += "Cool"
-    if (req.steeringWheelHeat.isOn) parts += "Wheel"
-    return parts.joinToString(" · ")
 }
 
 /**
