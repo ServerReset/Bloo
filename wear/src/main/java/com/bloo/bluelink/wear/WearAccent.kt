@@ -38,5 +38,7 @@ internal object WearAccent {
             .putInt("tertiary", accent.tertiary)
             .apply()
         _accent.value = accent
+        // The tile draws in these colours too: ask it to draw again.
+        WearSurfaces.refresh(context)
     }
 }

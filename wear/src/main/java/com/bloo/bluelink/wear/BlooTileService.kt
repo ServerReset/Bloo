@@ -60,6 +60,8 @@ class BlooTileService : TileService() {
         }
 
     private suspend fun buildTile(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
+        // The phone's accent, read before anything is drawn (the tile has no Compose theme to carry it).
+        WearAccent.load(this)
                 // Sealed after a restart: the tile shows nothing about the car until the PIN is entered.
                 val sealed = runCatching { WearBootGate.isLocked(applicationContext) }.getOrDefault(true)
                 val snapshot = if (sealed) null
@@ -380,6 +382,7 @@ class BlooTileService : TileService() {
         const val STALE = 0xFFFF6B6B.toInt()
         const val HUB_ID = "refresh"
         const val QUIET = 0xFF1A1A20.toInt()
-        val ACTIVE = BlooColors.brandAccent
+        /** The colour of what is on or in motion: the phone's accent once it has sent one, else the brand's. */
+        val ACTIVE: Int get() = WearAccent.accent.value?.primary ?: BlooColors.brandAccent
     }
 }
