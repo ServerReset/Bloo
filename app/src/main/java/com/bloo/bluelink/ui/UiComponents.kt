@@ -127,19 +127,6 @@ internal fun TitleSmallText(
     RevealText(text, style = PrimaryTextStyle(), modifier = modifier, color = color, fontWeight = fontWeight)
 }
 
-/** The PRIMARY role as text (see :uicommon's TextRoles.kt). */
-@Composable
-internal fun PrimaryText(
-    text: String,
-    modifier: Modifier = Modifier,
-    maxLines: Int = Int.MAX_VALUE,
-    overflow: TextOverflow = TextOverflow.Clip,
-) = com.bloo.uicommon.PrimaryText(text, modifier, maxLines, overflow)
-
-/** The SECONDARY role as text: same as [BodySmallText]. */
-@Composable
-internal fun SecondaryText(text: String, modifier: Modifier = Modifier) = BodySmallText(text, modifier)
-
 /** The circular tinted container [IconBadge] draws into. */
 @Composable
 internal fun IconBadgeContainer(
