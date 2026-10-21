@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
@@ -31,17 +32,22 @@ internal fun WearFacePage(
     ScreenScaffold(timeText = { TimeText() }) {
         val pullState = remember { WearPullState() }
         Box(Modifier.fillMaxSize().wearPullToRefresh(pullState) { ui.repo.refresh() }) {
-            val actions = slotKeys.mapIndexed { slot, key ->
-                val control = WearFaceControls.byKey(key)?.takeIf { it.available(v) } ?: return@mapIndexed null
-                WearQuickAction(
-                    control.label(v), control.icon(v),
-                    active = control.active(v),
-                    pending = ui.isPending(control.action),
-                ) {
-                    when {
-                        control.needsChoice(v) -> onChooseClimate(slot)
-                        control.confirm(v) -> onConfirm(control.action)
-                        else -> ui.run(control)
+            // The four quarters are rebuilt only when what they show changes (the slots, the car, a command in flight), not on every
+            // redraw of the page; a tap reads the latest state when it happens, so nothing it does is stale.
+            val latest by rememberUpdatedState(ui)
+            val actions = remember(slotKeys, v, ui.pending, onChooseClimate, onConfirm) {
+                slotKeys.mapIndexed { slot, key ->
+                    val control = WearFaceControls.byKey(key)?.takeIf { it.available(v) } ?: return@mapIndexed null
+                    WearQuickAction(
+                        control.label(v), control.icon(v),
+                        active = control.active(v),
+                        pending = ui.isPending(control.action),
+                    ) {
+                        when {
+                            control.needsChoice(v) -> onChooseClimate(slot)
+                            control.confirm(v) -> onConfirm(control.action)
+                            else -> latest.run(control)
+                        }
                     }
                 }
             }
