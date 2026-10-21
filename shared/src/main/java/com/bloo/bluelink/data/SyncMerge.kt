@@ -194,7 +194,8 @@ object SyncMerge {
         /** Tombstones advertised by the remote file, carried forward -- see [buildRoot]. */
         priorRemoved: Set<String> = emptySet(),
     ): String {
-        val devices = mergeDevices(knownDevices, selfDevice, nowMs)
+        // The primary is always written on top, so the file's own order is the order every device shows.
+        val devices = orderDevices(mergeDevices(knownDevices, selfDevice, nowMs), primaryDeviceId)
         val root = buildRoot(prefs, dirtyKeys, photos, priorRemoved) {
             put("_hash", JsonPrimitive(hash))
             put("_fileId", JsonPrimitive(fileId))
@@ -276,6 +277,15 @@ object SyncMerge {
         if (self.id.isNotBlank()) byId[self.id] = self
         val cutoff = nowMs - retentionMs
         return byId.values.filter { it.id == self.id || it.lastSeenMs >= cutoff }
+    }
+
+    /**
+     * The registry in the one order every device shows it: the primary on top, every other device in the order the file keeps
+     * them. The file is the only place that order lives, so a device dragged to the top is in that place on every phone.
+     */
+    fun orderDevices(devices: List<SyncDevice>, primaryId: String?): List<SyncDevice> {
+        val primary = devices.firstOrNull { it.id == primaryId } ?: return devices
+        return listOf(primary) + devices.filterNot { it.id == primary.id }
     }
 
     // --- Decode ----------------------------------------------------------------

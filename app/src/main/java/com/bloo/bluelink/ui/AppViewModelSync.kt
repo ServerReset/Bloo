@@ -2,6 +2,7 @@ package com.bloo.bluelink.ui
 
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.SyncMerge
 import com.bloo.bluelink.data.exportSettingsJson
 import com.bloo.bluelink.data.importSettingsJson
 import com.bloo.bluelink.data.performMainToMainSync
@@ -192,7 +193,8 @@ fun AppViewModel.syncNow() {
 fun AppViewModel.setPrimaryDevice(id: String) {
     viewModelScope.launch {
         settingsStore.setPrimaryDevice(id)
-        _state.update { it.copy(syncPrimaryId = id) }
+        // Shown at once in the new order (the device on top, the old primary just under it); the next pass writes the same order.
+        _state.update { it.copy(syncPrimaryId = id, syncDevices = SyncMerge.orderDevices(it.syncDevices, id)) }
         runDriveSyncNow()
     }
 }

@@ -67,16 +67,9 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     val devices = state.syncDevices
     var renaming by remember { mutableStateOf(false) }
 
-    // Order the list so the primary is on top (that's the invariant the drag gesture maintains);
-    // everyone else falls in by most-recently-seen. Dragging a device to the top sets it primary,
-    // after which this same sort keeps it there - so the visual order and the "primary" concept
-    // stay in lockstep.
-    val ordered = remember(devices, state.syncPrimaryId) {
-        devices.sortedWith(
-            compareByDescending<SyncMerge.SyncDevice> { it.id == state.syncPrimaryId }
-                .thenByDescending { it.lastSeenMs },
-        )
-    }
+    // The one order every device shows: the primary on top, the rest in the order the shared file keeps them (see
+    // SyncMerge.orderDevices). Not by last seen, which differs from phone to phone.
+    val ordered = remember(devices, state.syncPrimaryId) { SyncMerge.orderDevices(devices, state.syncPrimaryId) }
 
     val primaryName = ordered.firstOrNull { it.id == state.syncPrimaryId }?.name?.ifBlank { null }
     val phones = remember(ordered) { ordered.filter { !it.isWatch } }
