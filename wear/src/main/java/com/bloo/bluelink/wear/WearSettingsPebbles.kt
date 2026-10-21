@@ -45,16 +45,14 @@ internal fun WearSettingsPebble(signedIn: Boolean) {
 
         // --- Effects: blur, the drifting aurora, springs and text animation off, as under Battery Saver ---
         WearSubheading("Effects")
-        WearToggleRow("Reduce effects", AppIcons.AutoAwesome, reduced) {
+        WearToggleRow(
+            "Reduce effects", AppIcons.AutoAwesome, reduced,
+            description = if (reduced) "No blur or animation, to save battery" else "Off by itself in Battery Saver",
+        ) {
             reduced = it
             WearLook.setReduceEffects(context, it)
             WearLook.sendToPhone(context)
         }
-        WearCaption(
-            if (reduced) "No blur, drifting colour or animation, which saves battery."
-            else "They switch off by themselves in Battery Saver.",
-            small = true,
-        )
 
         // --- Auto lock (beta): lock the car when the wearer walks away. It needs the car's sign-in on the watch. ---
         WearSubheading(if (WearAutoLock.BETA) "Auto lock · Beta" else "Auto lock")

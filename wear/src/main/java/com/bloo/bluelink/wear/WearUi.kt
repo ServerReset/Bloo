@@ -212,6 +212,8 @@ fun WearActionRow(
     switch: Boolean = false,
     /** The command is in flight: the glyph becomes the app's shared spinner. */
     pending: Boolean = false,
+    /** A line under the label saying what the row does (a switch's description, as on the phone). */
+    description: String? = null,
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -252,14 +254,13 @@ fun WearActionRow(
                 }
                 Spacer(Modifier.width(10.dp))
             }
-            RevealText(
-                label,
-                modifier = Modifier.weight(1f),
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.labelLarge,
-                color = tint,
+            // The phone's name-and-detail column (:uicommon): the label, and the description under it when there is one.
+            TitleSubtitle(
+                label, description, Modifier.weight(1f),
+                titleStyle = MaterialTheme.typography.labelLarge, titleColor = tint, titleWeight = FontWeight.SemiBold,
+                subtitleStyle = MaterialTheme.typography.labelSmall,
+                subtitleColor = if (active) scheme.onPrimary.copy(alpha = 0.8f) else scheme.onSurfaceVariant,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
         }
         if (switch) {
@@ -417,8 +418,10 @@ fun WearToggleRow(
     icon: ImageVector?,
     checked: Boolean,
     modifier: Modifier = Modifier,
+    /** What the switch does, under its label. */
+    description: String? = null,
     onChange: (Boolean) -> Unit,
-) = WearActionRow(label, icon, modifier = modifier, active = checked, switch = true) { onChange(!checked) }
+) = WearActionRow(label, icon, modifier = modifier, active = checked, switch = true, description = description) { onChange(!checked) }
 
 /** The quiet words under a row or a group: what it does, why, what is wrong. [small] is the finer print under a caption. */
 @Composable
