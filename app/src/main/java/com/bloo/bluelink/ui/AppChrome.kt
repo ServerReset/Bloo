@@ -81,6 +81,9 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.GapBlock
 import com.bloo.uicommon.content
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /** Shared app-wide chrome: the glass dialog shell and the animated aurora background. */
 
@@ -253,7 +256,7 @@ internal fun AuroraBackground(
     val currentSaver by rememberUpdatedState(saver)
     // The drift keeps moving while the car pager is dragged (freezing it read as a stall and jumped on
     // resume); it stands still only while the app is not on screen.
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     // Tilt-follow and drift always run, except under battery saver.
     val motionActive = !saver
     if (motionActive) {
@@ -304,14 +307,14 @@ internal fun AuroraBackground(
             }
             // Listening only while the app is on screen: the observer replays ON_START on attach, so this
             // registers at once when already started.
-            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            val observer = LifecycleEventObserver { _, event ->
                 when (event) {
-                    androidx.lifecycle.Lifecycle.Event.ON_START ->
+                    Lifecycle.Event.ON_START ->
                         // NORMAL (~5Hz), not UI (~15Hz): the tilt is a slow parallax on huge, slow
                         // blobs, so a third of the samples feeds the exact same motion while costing
                         // three times the wake-ups.
                         if (sensor != null) mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
-                    androidx.lifecycle.Lifecycle.Event.ON_STOP -> mgr.unregisterListener(listener)
+                    Lifecycle.Event.ON_STOP -> mgr.unregisterListener(listener)
                     else -> Unit
                 }
             }
@@ -376,7 +379,7 @@ internal fun AuroraBackground(
         while (true) {
             val now = System.nanoTime()
             if (currentPaused || currentSaver ||
-                !lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
             ) {
                 last = now
                 delay(120)

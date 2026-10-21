@@ -55,6 +55,7 @@ import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.content
+import androidx.compose.ui.text.font.FontWeight
 
 // --- Car info (status + service + links combined) -------------------------
 
@@ -176,7 +177,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
         RevealText(
             title,
             style = PrimaryTextStyle(),
-            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ExpressiveButtonRow(

@@ -25,6 +25,7 @@ import com.bloo.bluelink.data.WatchCommandResult
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
 import kotlinx.coroutines.delay
+import androidx.activity.compose.BackHandler
 
 /**
  * What a car's pages need to show and do, in one place: the car, whether the watch has its own sign-in, what is in flight,
@@ -108,7 +109,7 @@ internal fun WearCarPage(
     val pagerState = rememberPagerState(pageCount = { 2 })
     // Back from the details page goes to the face (where the car opens), not out of the app.
     val pageScope = rememberCoroutineScope()
-    androidx.activity.compose.BackHandler(enabled = pagerState.currentPage != 0) {
+    BackHandler(enabled = pagerState.currentPage != 0) {
         pageScope.launch { pagerState.animateScrollToPage(0) }
     }
 

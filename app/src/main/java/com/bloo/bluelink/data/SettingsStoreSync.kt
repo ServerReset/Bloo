@@ -8,6 +8,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.withLock
 import com.bloo.uicommon.content
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 
 // --- Drive main-to-main sync engine (extracted from SettingsStore) --
 
@@ -53,14 +56,14 @@ private fun SettingsStore.providerLastModifiedMs(parsed: android.net.Uri): Long?
 suspend fun SettingsStore.syncFileChangedRemotely(): Boolean {
     val uri = syncUri() ?: return false
     val parsed = uri.toUri()
-    val modified = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { providerLastModifiedMs(parsed) }
+    val modified = kotlinx.coroutines.withContext(Dispatchers.IO) { providerLastModifiedMs(parsed) }
     val now = android.os.SystemClock.elapsedRealtime()
     val due = modified == null && SyncPoll.contentPeekDue(now, lastContentPeekMs)
     if (due) lastContentPeekMs = now
     // The decision itself is SyncPoll.changed (unit-tested); this only supplies the facts. The file is
     // downloaded only if the provider gave no modified time and a peek is due.
     val remoteHash = suspend {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
             runCatching {
                 kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
                     context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
@@ -113,7 +116,7 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
             }
         }
     }.onFailure {
-        downloadError = if (it is kotlinx.coroutines.TimeoutCancellationException) "Timed out reading the Drive file" else it.message ?: "Couldn't read the Drive file"
+        downloadError = if (it is TimeoutCancellationException) "Timed out reading the Drive file" else it.message ?: "Couldn't read the Drive file"
     }.getOrNull()
     val remoteJson = remoteContent?.substringAfter('\n', "")?.takeIf { it.isNotBlank() }
     val remoteTs = fileModifiedMs ?: (remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L)
@@ -264,7 +267,7 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
                 AppLog.log("Drive sync: uploaded settings")
                 true
             }.onFailure {
-                uploadError = if (it is kotlinx.coroutines.TimeoutCancellationException) "Timed out writing the Drive file" else it.message ?: "Couldn't write the Drive file"
+                uploadError = if (it is TimeoutCancellationException) "Timed out writing the Drive file" else it.message ?: "Couldn't write the Drive file"
                 AppLog.log("⚠ Drive sync: upload failed: ${it.message}")
             }.getOrElse { false }
             if (uploaded) {
@@ -334,7 +337,7 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
                 }
             }
         }.getOrElse { e ->
-            val why = if (e is kotlinx.coroutines.TimeoutCancellationException) "timed out reading" else (e.message ?: "couldn't read")
+            val why = if (e is TimeoutCancellationException) "timed out reading" else (e.message ?: "couldn't read")
             return@withLock SettingsStore.SyncTestResult(false, "Couldn't read the Drive file ($why).")
         }
         // Write the SAME bytes back so user content is unchanged; only a genuinely empty file gets
@@ -351,7 +354,7 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
                 }
             }
         }.getOrElse { e ->
-            val why = if (e is kotlinx.coroutines.TimeoutCancellationException) "timed out writing" else (e.message ?: "write failed")
+            val why = if (e is TimeoutCancellationException) "timed out writing" else (e.message ?: "write failed")
             return@withLock SettingsStore.SyncTestResult(false, "Couldn't write the Drive file ($why).")
         }
         if (verified) {
@@ -369,8 +372,8 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
  */
 private suspend fun <T> SettingsStore.withDriveRetry(block: suspend () -> T): T = try {
     block()
-} catch (e: kotlinx.coroutines.CancellationException) {
-    if (e is kotlinx.coroutines.TimeoutCancellationException) {
+} catch (e: CancellationException) {
+    if (e is TimeoutCancellationException) {
         kotlinx.coroutines.delay(1000)
         block()
     } else {

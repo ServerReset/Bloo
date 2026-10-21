@@ -51,6 +51,10 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapPage
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.Haptics
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.ui.unit.Density
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * The "Me" button's action: centre the map on the phone. With no fix yet it asks for location (see
@@ -239,7 +243,7 @@ internal fun MapTopBar(
 
 /** How far the whole map sheet has been pulled up, in px (see [pullToRefreshOrDismiss]). */
 internal class MapPullState {
-    val up = androidx.compose.animation.core.Animatable(0f)
+    val up = Animatable(0f)
 }
 
 /**
@@ -248,12 +252,12 @@ internal class MapPullState {
  * the top and [refresh] fires; let go earlier and it just settles back.
  */
 internal fun Modifier.pullToRefreshOrDismiss(
-    dragPx: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    dragPx: Animatable<Float, AnimationVector1D>,
     pull: MapPullState,
     gapPx: Float,
-    scope: kotlinx.coroutines.CoroutineScope,
-    density: androidx.compose.ui.unit.Density,
-    spring: androidx.compose.animation.core.AnimationSpec<Float>,
+    scope: CoroutineScope,
+    density: Density,
+    spring: AnimationSpec<Float>,
     haptics: Haptics?,
     close: () -> Unit,
     refresh: () -> Unit,

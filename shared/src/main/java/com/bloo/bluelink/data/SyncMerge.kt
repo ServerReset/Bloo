@@ -9,6 +9,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.JsonObjectBuilder
 
 /**
  * Pure, Context-free core of the Drive-sync backup format: builds the export JSON and decodes
@@ -137,7 +138,7 @@ object SyncMerge {
         dirtyKeys: Set<String>,
         photos: Map<String, String>,
         priorRemoved: Set<String>,
-        extra: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit,
+        extra: JsonObjectBuilder.() -> Unit,
     ): JsonObject {
         val entries = portablePrefsObject(prefs)
         // Local tombstones are unioned with those already in the remote file: the dirty set is

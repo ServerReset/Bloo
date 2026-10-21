@@ -24,6 +24,9 @@ import androidx.wear.compose.material3.TimeText
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.uicommon.RevealText
 import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.unit.IntOffset
 
 /**
  * The face in miniature -- the same four quarters the main screen draws -- opened by pressing the face's centre.
@@ -42,14 +45,14 @@ internal fun WearFaceEditor(
     val haptics = LocalHapticFeedback.current
     WearBackable(onDone) {
         ScreenScaffold(timeText = { TimeText() }) {
-            androidx.compose.foundation.layout.BoxWithConstraints(
+            BoxWithConstraints(
                 Modifier.fillMaxSize().wearAuroraWash(scheme.primary),
                 contentAlignment = Alignment.Center,
             ) {
                 // The face, at two thirds of the display; its fixed sizes scale with it as they do on the main screen.
                 val face = minOf(maxWidth, maxHeight) * 0.6f
                 val press = rememberQuadrantPress()
-                androidx.compose.runtime.CompositionLocalProvider(LocalFaceUnit provides face / 201.dp) {
+                CompositionLocalProvider(LocalFaceUnit provides face / 201.dp) {
                     // Clear of the clock above, and of the bezel below at a large font setting.
                     Column(Modifier.padding(top = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(Modifier.size(face)) {
@@ -70,7 +73,7 @@ internal fun WearFaceEditor(
                                 color = scheme.background,
                                 modifier = Modifier
                                     .align(Alignment.Center)
-                                    .offset { androidx.compose.ui.unit.IntOffset((press.dx * face.roundToPx()).roundToInt(), (press.dy * face.roundToPx()).roundToInt()) },
+                                    .offset { IntOffset((press.dx * face.roundToPx()).roundToInt(), (press.dy * face.roundToPx()).roundToInt()) },
                                 onClick = {
                                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                                     onDone()

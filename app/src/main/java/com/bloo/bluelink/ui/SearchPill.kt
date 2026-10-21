@@ -206,7 +206,7 @@ internal fun SearchPill(
                                 singleLine = true,
                                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
                                 cursorBrush = SolidColor(scheme.primary),
-                                keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                 // Submitting puts the keyboard away so the answer panel above the
                                 // bar is visible.
                                 keyboardActions = KeyboardActions(onSearch = { onSubmit(); keyboard?.hide() }),

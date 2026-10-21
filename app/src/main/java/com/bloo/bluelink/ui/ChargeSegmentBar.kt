@@ -29,6 +29,8 @@ import androidx.compose.ui.layout.layout
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.SoftDamping
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /**
  * The hero's segmented charge bar and its layout math. Split out of HeroReadout.kt to separate this
@@ -199,9 +201,9 @@ private fun rememberSlowShimmer(periodMs: Long): State<Float> {
     val periodNanos = periodMs * 1_000_000L
     // Only while the app is on screen: the composition outlives the screen (a backgrounded app keeps its bar), and a loop that
     // outlived it would wake the CPU twenty times a second for a shimmer nobody can see.
-    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val owner = LocalLifecycleOwner.current
     LaunchedEffect(periodNanos, owner) {
-        owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+        owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             val start = System.nanoTime()
             while (true) {
                 // A plain delay, not withFrameNanos: waiting on every vsync kept the frame clock awake at the

@@ -41,6 +41,8 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.SegmentOption
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /**
  * Multi-device Drive sync UI: the device list/reorder section, per-device row, and the setup dialog
@@ -90,9 +92,9 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     val liveWatch by WatchPresence.watch.collectAsStateWithLifecycle()
     val signInState by WatchSignIn.state.collectAsStateWithLifecycle()
     // Only while the app is on screen (a backgrounded Settings keeps its composition, and the poll would keep asking the watch).
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 WatchPresence.refresh(context)
                 delay(WATCH_REFRESH_MS)

@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.LocalContentColor
 
 /**
  * The phone UI's shared design vocabulary: the sizes, colours and motion that more than one screen
@@ -31,9 +32,9 @@ internal const val MutedContentAlpha = 0.86f
  * The ambient content colour, muted: secondary text on any surface (tinted pebbles, glass, the map
  * pill).
  */
-@androidx.compose.runtime.Composable
-internal fun mutedContentColor(): androidx.compose.ui.graphics.Color =
-    androidx.compose.material3.LocalContentColor.current.copy(alpha = MutedContentAlpha)
+@Composable
+internal fun mutedContentColor(): Color =
+    LocalContentColor.current.copy(alpha = MutedContentAlpha)
 
 /**
  * Text and icons drawn on the hero card, which is always the OPPOSITE tone of the theme (a dark card in

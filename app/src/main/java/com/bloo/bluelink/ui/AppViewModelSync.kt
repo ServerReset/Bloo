@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.bloo.uicommon.content
+import androidx.core.content.FileProvider
 
 // --- Settings export/import and Drive auto-sync (extracted from AppViewModel) --
 
@@ -39,7 +40,7 @@ fun AppViewModel.exportSettings(context: android.content.Context) = viewModelSco
             val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
             val file = java.io.File(dir, "bloo_settings_backup.json")
             file.writeText(json)
-            androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         }.getOrNull()
     }
     if (uri == null) {

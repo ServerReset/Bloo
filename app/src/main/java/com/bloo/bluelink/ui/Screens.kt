@@ -55,6 +55,9 @@ import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.FieldShape
 import com.bloo.uicommon.Haptics
 import com.bloo.uicommon.SoftDamping
+import androidx.compose.animation.AnimatedVisibility
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /**
  * Root composable for the phone app: a gradient backdrop, a [Scaffold] that switches top-level
@@ -122,10 +125,10 @@ fun BlooApp(vm: AppViewModel) {
     // quiet.
     val busy by remember { derivedStateOf { state.loading || state.pending.isNotEmpty() } }
     // The compose-ui LocalLifecycleOwner is deprecated.
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(busy) {
         if (!busy) return@LaunchedEffect
-        lifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 haptics.loadingSweep()
                 delay(560)
@@ -365,7 +368,7 @@ fun BlooApp(vm: AppViewModel) {
     ShareIntakeHost(vm, stateHolder)
 
     // The welcome cards, when summoned from Settings: over the app, dismissed back to it.
-    androidx.compose.animation.AnimatedVisibility(
+    AnimatedVisibility(
         visible = welcomeCardsOpen,
         enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)),
         exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MotionShort)),
@@ -398,7 +401,7 @@ fun BlooApp(vm: AppViewModel) {
 // Owns the lock-overlay fade animation in its own small recompose scope, for the same reason as
 // [LockBlurLayer].
 
-internal val FieldShape: androidx.compose.foundation.shape.RoundedCornerShape
+internal val FieldShape: RoundedCornerShape
     get() = com.bloo.uicommon.FieldShape
 
 // --- Garage (main) --------------------------------------------------------

@@ -71,6 +71,7 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.content
 import com.bloo.uicommon.MorphButton
+import androidx.compose.animation.Crossfade
 
 @Composable
 internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
@@ -219,7 +220,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
         ) {
             // The biometric card, the PIN card and the fallback cross-fade into each other (switching to
             // "Use PIN" used to swap them with a hard cut).
-            androidx.compose.animation.Crossfade(
+            Crossfade(
                 targetState = if (showBiometric) 0 else if (pinInstalled) 1 else 2,
                 animationSpec = androidx.compose.animation.core.tween(MotionMedium),
                 label = "lockCard",

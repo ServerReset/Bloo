@@ -23,12 +23,13 @@ import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.platformOverridable
 import kotlinx.coroutines.flow.update
+import androidx.compose.runtime.Immutable
 
 /**
  * Keeps UiState STABLE for Compose: its List/Map/Set fields are interfaces, so without this every
  * pebble taking it would be non-skippable and recompose with each parent frame.
  */
-@androidx.compose.runtime.Immutable
+@Immutable
 data class UiState(
     // Loading, not Login: see Screen.Loading.
     val screen: Screen = Screen.Loading,

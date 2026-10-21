@@ -36,6 +36,11 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.content
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 
 /**
  * Live search over app settings and per-car data/fields. Tokenises the query (dropping filler
@@ -210,7 +215,7 @@ internal fun ResultGroup(heading: String, rows: @Composable () -> Unit) {
         RevealText(
             heading,
             style = SecondaryTextStyle(),
-            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = GapHairline),
         )
@@ -221,17 +226,17 @@ internal fun ResultGroup(heading: String, rows: @Composable () -> Unit) {
 /** One result: its icon, an optional muted caption (the car), then the result's own control. */
 @Composable
 internal fun ResultRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    tint: androidx.compose.ui.graphics.Color,
+    icon: ImageVector,
+    tint: Color,
     caption: String?,
     /** Makes the whole row a button (and adds the chevron): tapping it acts on the result. */
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     // Each row eases in the first time it appears, so a changing list grows and fades rather than popping.
-    EnterOnce(expandFrom = androidx.compose.ui.Alignment.Top) {
+    EnterOnce(expandFrom = Alignment.Top) {
     Column(Modifier.glassEdgeFocus()) {
-    androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     val haptics = LocalHaptics.current
     Row(
         Modifier
@@ -244,7 +249,7 @@ internal fun ResultRow(
                 },
             )
             .padding(vertical = GapGroup),
-        verticalAlignment = if (onClick != null) androidx.compose.ui.Alignment.CenterVertically else androidx.compose.ui.Alignment.Top,
+        verticalAlignment = if (onClick != null) Alignment.CenterVertically else Alignment.Top,
     ) {
         IconBadge(icon, tint = tint, size = 32.dp, iconSize = 17.dp)
         Spacer(Modifier.width(GapGroup))

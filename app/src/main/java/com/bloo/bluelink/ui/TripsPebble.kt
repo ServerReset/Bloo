@@ -30,6 +30,9 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 
 /**
  * Recent drives from the Hyundai/Genesis US trip-details feed: distance, time, speeds and (EVs) the
@@ -92,7 +95,7 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             RevealText(
                 tripDate(trip.startdate),
@@ -109,7 +112,7 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
                 )
             }
         }
-        androidx.compose.foundation.layout.FlowRow(
+        FlowRow(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(GapGroup),
             verticalArrangement = Arrangement.spacedBy(GapHairline),
@@ -127,7 +130,7 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
 
 /** One label-over-value stat in a trip's zone. */
 @Composable
-private fun TripStat(label: String, value: String, captionColor: androidx.compose.ui.graphics.Color) {
+private fun TripStat(label: String, value: String, captionColor: Color) {
     Column {
         RevealText(label, style = SecondaryTextStyle(), color = captionColor, maxLines = 1)
         RevealText(

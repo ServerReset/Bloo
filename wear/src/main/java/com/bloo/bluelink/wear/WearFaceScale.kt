@@ -9,6 +9,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.Spring
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 
 /*
  * The face's sizes and its press-and-give: the numbers every piece of the face shares, scaled to the display, and the state of
@@ -43,10 +49,10 @@ internal val LocalFaceUnit = androidx.compose.runtime.compositionLocalOf { 1f }
  * same push-and-give of a row of buttons on the phone. The cross is two springs, one per axis; they are read where
  * the face is laid out, so a press re-lays-out the tiles without recomposing them.
  */
-@androidx.compose.runtime.Stable
+@Stable
 internal class QuadrantPress(
-    internal val x: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
-    internal val y: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    internal val x: Animatable<Float, AnimationVector1D>,
+    internal val y: Animatable<Float, AnimationVector1D>,
 ) {
     var pressed by androidx.compose.runtime.mutableIntStateOf(NONE)
         private set
@@ -66,18 +72,18 @@ internal class QuadrantPress(
 internal fun rememberQuadrantPress(): QuadrantPress {
     val policy = LocalPowerPolicy.current
     val state = androidx.compose.runtime.remember {
-        QuadrantPress(androidx.compose.animation.core.Animatable(0f), androidx.compose.animation.core.Animatable(0f))
+        QuadrantPress(Animatable(0f), Animatable(0f))
     }
     val bouncy = androidx.compose.runtime.rememberUpdatedState(policy.bouncySprings)
     // `pressed` is read here, in a flow, and not in composition: a press then moves the cross (a layout) without recomposing
     // the face and its four tiles around it.
-    androidx.compose.runtime.LaunchedEffect(state) {
+    LaunchedEffect(state) {
         androidx.compose.runtime.snapshotFlow { state.pressed }.collectLatest { q ->
             // The pressed quarter's own corner stays put; the cross moves AWAY from it, which is what makes it bigger.
             val tx = when (q) { 0, 2 -> PressGrow; 1, 3 -> -PressGrow; else -> 0f }
             val ty = when (q) { 0, 1 -> PressGrow; 2, 3 -> -PressGrow; else -> 0f }
-            val spec: androidx.compose.animation.core.AnimationSpec<Float> =
-                if (bouncy.value) spring(dampingRatio = 0.8f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow) else snap()
+            val spec: AnimationSpec<Float> =
+                if (bouncy.value) spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow) else snap()
             kotlinx.coroutines.coroutineScope {
                 launch { state.x.animateTo(tx, spec) }
                 launch { state.y.animateTo(ty, spec) }

@@ -47,9 +47,11 @@ import kotlin.math.roundToInt
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.lowPowerAwareSpring
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.unit.Constraints
 
 /** Immutable and compared by value, so the hero's readout and numbers skip recomposing when nothing changed. */
-@androidx.compose.runtime.Immutable
+@Immutable
 internal data class ChargeReadout(
     val pctText: String,
     val rangeText: String?,
@@ -189,7 +191,7 @@ internal fun HeroCollapsedNumbers(
             // Keeps reporting its position but gives up its width as the card opens, so the name
             // isn't squeezed.
             .layout { measurable, constraints ->
-                val p = measurable.measure(constraints.copy(maxWidth = androidx.compose.ui.unit.Constraints.Infinity))
+                val p = measurable.measure(constraints.copy(maxWidth = Constraints.Infinity))
                 val w = (p.width * fade).roundToInt().coerceAtMost(constraints.maxWidth)
                 layout(w, p.height) { p.place(0, 0) }
             }

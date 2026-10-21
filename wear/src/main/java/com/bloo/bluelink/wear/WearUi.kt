@@ -63,6 +63,12 @@ import com.bloo.uicommon.SectionHeading
 import com.bloo.uicommon.SwitchTrack
 import com.bloo.uicommon.LabelValueRow
 import com.bloo.uicommon.standardButtonIcon
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.Surface
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
 
 /*
  * THE WATCH'S COMPONENT LIBRARY. Every screen on the watch is built from the pieces in this file and nothing else, so
@@ -117,9 +123,9 @@ fun WearListScreen(
  */
 @Composable
 internal fun WearBackable(onBack: () -> Unit, content: @Composable () -> Unit) {
-    androidx.activity.compose.BackHandler(onBack = onBack)
+    BackHandler(onBack = onBack)
     val current = androidx.compose.runtime.rememberUpdatedState(onBack)
-    androidx.compose.foundation.layout.Box(
+    Box(
         Modifier.fillMaxSize().pointerInput(Unit) {
             var travelled = 0f
             detectHorizontalDragGestures(
@@ -182,8 +188,8 @@ fun WearSubheading(text: String, modifier: Modifier = Modifier) {
  * between rows, a block gap between sections), so the watch breathes in the same units the phone does.
  */
 internal val ListInset = 26.dp
-internal val RowGap: androidx.compose.ui.unit.Dp @Composable get() = com.bloo.uicommon.GapRow
-internal val SectionGap: androidx.compose.ui.unit.Dp @Composable get() = com.bloo.uicommon.GapBlock
+internal val RowGap: Dp @Composable get() = com.bloo.uicommon.GapRow
+internal val SectionGap: Dp @Composable get() = com.bloo.uicommon.GapBlock
 
 /**
  * A single action inside a [WearPebble] -- the shared phone [MorphButtonCore], so the watch's tap
@@ -238,8 +244,8 @@ fun WearActionRow(
         // which left long rows ("Lock when I walk away", "Top left: Lock / unlock") as an icon and nothing else.
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             if (glyph != null) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    androidx.compose.material3.LocalContentColor provides tint,
+                CompositionLocalProvider(
+                    LocalContentColor provides tint,
                 ) {
                     MorphButtonLabel(icon = glyph, label = "", pending = pending, iconSize = 18.dp)
                 }
@@ -290,11 +296,11 @@ internal fun WearButton(
     content: @Composable RowScope.() -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val haptics = LocalHapticFeedback.current
     // The shape the button wears, animated by the same press the button itself morphs on: a full pill at rest, a rounded square
     // while pressed or on. The frosted layer behind it is clipped to this shape, so it changes with the button instead of
     // holding the pill and hiding the morph.
-    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val corner by animateFloatAsState(
         if (pressed || active) MorphedCorner else PillCorner,
@@ -320,7 +326,7 @@ internal fun WearButton(
         morphedCornerPercent = MorphedCorner,
         expressive = false,
         onClickHaptic = {
-            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         },
         content = content,
     )
@@ -340,7 +346,7 @@ fun WearRoundButton(
     onClick: () -> Unit,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    androidx.compose.material3.Surface(
+    Surface(
         onClick = onClick,
         shape = CircleShape,
         color = color,
@@ -388,7 +394,7 @@ fun WearListRow(
         onClick = onClick,
     ) {
         if (icon != null) {
-            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides tint) {
+            CompositionLocalProvider(LocalContentColor provides tint) {
                 MorphButtonLabel(icon = icon, label = "", pending = pending, iconSize = 20.dp)
             }
             Spacer(Modifier.width(12.dp))
@@ -445,7 +451,7 @@ fun WearCaption(text: String, modifier: Modifier = Modifier, small: Boolean = fa
 fun WearCenteredText(
     text: String,
     modifier: Modifier = Modifier,
-    style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleMedium,
+    style: TextStyle = MaterialTheme.typography.titleMedium,
     color: Color = MaterialTheme.colorScheme.onBackground,
     fontWeight: FontWeight? = FontWeight.SemiBold,
     maxLines: Int = 2,
@@ -573,7 +579,7 @@ internal fun WearStatRow(label: String, value: String, valueColor: Color? = null
         Modifier
             .fillMaxWidth()
             .fitRound()
-            .clip(androidx.compose.foundation.shape.CircleShape)
+            .clip(CircleShape)
             .background(scheme.surfaceContainerHigh.copy(alpha = 0.5f))
             .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,

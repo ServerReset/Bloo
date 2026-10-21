@@ -37,6 +37,9 @@ import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.lowPowerAwareSpring
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 private const val MaxToasts = 4
 
@@ -186,11 +189,11 @@ internal fun ToastHost(
 
     // One clock for the whole stack: it stops while the search results cover it, while the app is
     // not on screen, and while a finger holds any toast.
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    var resumed by remember { mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var resumed by remember { mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
     DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, _ ->
-            resumed = lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        val observer = LifecycleEventObserver { _, _ ->
+            resumed = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }

@@ -48,6 +48,7 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapPage
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.platform.LocalDensity
 
 // --- Full detail ----------------------------------------------------------
 
@@ -143,11 +144,11 @@ internal fun ExpandedCar(
         val edgeViewportPx = remember { androidx.compose.runtime.mutableIntStateOf(0) }
         val edgeWindowTop = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
         val edgeScroll = remember(pebblesScroll) { EdgeScroll(pebblesScroll, edgeViewportPx, edgeWindowTop) }
-        val edgeDensity = androidx.compose.ui.platform.LocalDensity.current
+        val edgeDensity = LocalDensity.current
         val edgeTopPx = with(edgeDensity) { topInset.toPx() }
         val edgeBottomPx = with(edgeDensity) { bottomInset.toPx() }
         val pagerIdle = LocalPagerIdle.current
-        androidx.compose.runtime.CompositionLocalProvider(LocalEdgeScroll provides edgeScroll) {
+        CompositionLocalProvider(LocalEdgeScroll provides edgeScroll) {
         Box(
             Modifier.fillMaxSize().onGloballyPositioned {
                 val origin = it.localToWindow(Offset.Zero)

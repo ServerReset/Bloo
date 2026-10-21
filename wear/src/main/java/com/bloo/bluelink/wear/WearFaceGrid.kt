@@ -39,6 +39,23 @@ import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.standardButtonIcon
 
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.BiasAlignment
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.Constraints
+import androidx.wear.compose.foundation.CurvedDirection
+import androidx.wear.compose.foundation.CurvedLayout
+import androidx.wear.compose.foundation.CurvedTextStyle
 
 /**
  * One of the car's actions on the watch face: one quarter of [WearCarFace]'s circle.
@@ -75,8 +92,8 @@ internal fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifie
     val slots = (0 until 4).map { actions.getOrNull(it) }
     val unit = LocalFaceUnit.current
     val gap = TileGap * unit
-    val rim = androidx.compose.ui.graphics.Brush.sweepGradient(WearRimStops + WearRimStops.first())
-    androidx.compose.ui.layout.Layout(
+    val rim = Brush.sweepGradient(WearRimStops + WearRimStops.first())
+    Layout(
         content = { for (q in 0 until 4) QuarterTile(q, slots[q], Modifier.fillMaxSize(), press) },
         modifier = modifier
             .clip(CircleShape)
@@ -99,7 +116,7 @@ internal fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifie
         val placeables = measurables.mapIndexed { q, m ->
             val tw = if (q % 2 == 0) leftW else rightW
             val th = if (q < 2) topH else bottomH
-            m.measure(androidx.compose.ui.unit.Constraints.fixed(tw, th))
+            m.measure(Constraints.fixed(tw, th))
         }
         layout(w, h) {
             placeables[0].place(0, 0)
@@ -120,40 +137,40 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
         Box(modifier.clip(shape(0f)).background(scheme.surfaceContainer.copy(alpha = 0.5f)))
         return
     }
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val haptics = LocalHapticFeedback.current
     val tint = if (action.active) scheme.onPrimary else scheme.onSurface
     val glyph = action.icon ?: standardButtonIcon(action.label)
     // --- The tile's motion: it pops in (staggered by quadrant), squashes under a finger and springs back, breathes
     // while it is on, and its glyph bounces when what it says changes. All gated by the watch's own power policy.
     val policy = LocalPowerPolicy.current
-    val interaction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val interaction = androidx.compose.runtime.remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     // A press is shown by the tile growing and the others giving way ([QuadrantPress]), not by squashing it.
-    androidx.compose.runtime.LaunchedEffect(pressed) { press?.press(quadrant, pressed) }
-    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { press?.press(quadrant, false) } }
-    val enter = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(if (policy.bouncySprings) 0f else 1f) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    LaunchedEffect(pressed) { press?.press(quadrant, pressed) }
+    DisposableEffect(Unit) { onDispose { press?.press(quadrant, false) } }
+    val enter = androidx.compose.runtime.remember { Animatable(if (policy.bouncySprings) 0f else 1f) }
+    LaunchedEffect(Unit) {
         if (enter.value < 1f) {
             kotlinx.coroutines.delay(quadrant * 70L)
-            enter.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = androidx.compose.animation.core.Spring.StiffnessLow))
+            enter.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow))
         }
     }
     val breathe = if (action.active && policy.ambientMotion) {
         androidx.compose.animation.core.rememberInfiniteTransition(label = "tileBreath").animateFloat(
             0.86f, 1f,
             androidx.compose.animation.core.infiniteRepeatable(
-                androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-                androidx.compose.animation.core.RepeatMode.Reverse,
+                androidx.compose.animation.core.tween(1500, easing = FastOutSlowInEasing),
+                RepeatMode.Reverse,
             ),
             label = "tileBreathAlpha",
         )
     } else null
     // The glyph bounces when the tile's meaning changes (Lock becomes Unlock, Climate turns on).
-    val glyphBump = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(1f) }
-    androidx.compose.runtime.LaunchedEffect(action.label, action.active) {
+    val glyphBump = androidx.compose.runtime.remember { Animatable(1f) }
+    LaunchedEffect(action.label, action.active) {
         if (policy.bouncySprings) {
             glyphBump.snapTo(1.04f)
-            glyphBump.animateTo(1f, spring(dampingRatio = 0.85f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium))
+            glyphBump.animateTo(1f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium))
         }
     }
     MorphButton(
@@ -181,7 +198,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
         contentPadding = PaddingValues(0.dp),
         minHeight = 0.dp,
         shapeForCorner = { morph, _ -> shape(morph) },
-        onClickHaptic = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) },
+        onClickHaptic = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
     ) {
         // The glyph sits in the middle of the quarter's visible area, a little away from the hub.
         val toward = when (quadrant) {
@@ -193,7 +210,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
         Box(Modifier.fillMaxSize().padding(10.dp * unit), contentAlignment = Alignment.Center) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.align(androidx.compose.ui.BiasAlignment(biasX(toward), biasY(toward)))
+                modifier = Modifier.align(BiasAlignment(biasX(toward), biasY(toward)))
                     .graphicsLayer { scaleX = glyphBump.value; scaleY = glyphBump.value },
             ) {
                 glyph?.let {
@@ -216,22 +233,22 @@ internal fun WearRingLabels(actions: List<WearQuickAction?>) {
     val anchors = floatArrayOf(225f, 315f, 135f, 45f)
     // The label is part of the drawing, so it is sized with the face (and ignores the font-size setting, which would
     // grow it past the arc it is curved along) -- 12dp on the 227dp design.
-    val labelSize = with(androidx.compose.ui.platform.LocalDensity.current) { (12f * LocalFaceUnit.current).dp.toSp() }
+    val labelSize = with(LocalDensity.current) { (12f * LocalFaceUnit.current).dp.toSp() }
     Box(Modifier.fillMaxSize()) {
         for (q in 0 until 4) {
             val action = actions.getOrNull(q) ?: continue
             val color = if (action.active) scheme.onPrimary else scheme.onSurface
-            androidx.wear.compose.foundation.CurvedLayout(
+            CurvedLayout(
                 modifier = Modifier.fillMaxSize(),
                 anchor = anchors[q],
-                angularDirection = if (q >= 2) androidx.wear.compose.foundation.CurvedDirection.Angular.Reversed
-                else androidx.wear.compose.foundation.CurvedDirection.Angular.Normal,
+                angularDirection = if (q >= 2) CurvedDirection.Angular.Reversed
+                else CurvedDirection.Angular.Normal,
             ) {
                 basicCurvedText(
                     // A preset's name is the phone's to choose: cut so it stays on its own quarter's arc.
                     action.label.let { if (it.length > 14) it.take(13) + "…" else it },
                     style = {
-                        androidx.wear.compose.foundation.CurvedTextStyle(
+                        CurvedTextStyle(
                             fontSize = labelSize,
                             fontWeight = FontWeight.SemiBold,
                             color = color,

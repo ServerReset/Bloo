@@ -35,6 +35,9 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.content
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.runtime.CompositionLocalProvider
 
 /**
  * Small status-chip widgets: MetaChip, StatusChip, the update-available chip/dot/badge family,
@@ -108,9 +111,9 @@ internal fun StatusChip(
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(GapRow))
         }
-        androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.material3.LocalContentColor provides tint,
-            androidx.compose.material3.LocalTextStyle provides
+        CompositionLocalProvider(
+            LocalContentColor provides tint,
+            LocalTextStyle provides
                 MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
         ) {
             label()
@@ -144,7 +147,7 @@ private fun UpdateAvailableDot(modifier: Modifier = Modifier) {
 internal fun UpdateBadgedCard(visible: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Box(modifier) {
         content()
-        androidx.compose.animation.AnimatedVisibility(
+        AnimatedVisibility(
             visible = visible,
             enter = androidx.compose.animation.scaleIn(
                 lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),

@@ -24,6 +24,10 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.hazeBlur
 import com.bloo.uicommon.canBlurBackdrops
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.Dp
 
 /**
  * Unified glass system: every floating surface takes its tint, blur, rim and shadow from here.
@@ -100,15 +104,15 @@ internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()):
     return this.drawWithCache {
         val outline = shape.createOutline(size, layoutDirection, this)
         val line = 1.25.dp.toPx()
-        val rim = androidx.compose.ui.graphics.Brush.linearGradient(
+        val rim = Brush.linearGradient(
             0f to highlight.copy(alpha = if (dark) 0.62f else 0.9f),
             0.38f to edge.copy(alpha = if (dark) 0.22f else 0.20f),
             0.62f to edge.copy(alpha = if (dark) 0.14f else 0.16f),
             1f to highlight.copy(alpha = if (dark) 0.28f else 0.55f),
-            start = androidx.compose.ui.geometry.Offset.Zero,
-            end = androidx.compose.ui.geometry.Offset(size.width, size.height),
+            start = Offset.Zero,
+            end = Offset(size.width, size.height),
         )
-        val lip = androidx.compose.ui.graphics.Brush.verticalGradient(
+        val lip = Brush.verticalGradient(
             0f to highlight.copy(alpha = if (dark) 0.14f else 0.35f),
             1f to Color.Transparent,
             endY = minOf(size.height, 28.dp.toPx()),
@@ -117,7 +121,7 @@ internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()):
             drawContent()
             // The lip is clipped to the shape's outline by drawing it as the outline's own fill.
             drawOutline(outline, lip)
-            drawOutline(outline, rim, style = androidx.compose.ui.graphics.drawscope.Stroke(line))
+            drawOutline(outline, rim, style = Stroke(line))
         }
     }
 }
@@ -237,7 +241,7 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
                 // and re-blur its backdrop on every frame of the post-swipe fade.
                 .graphicsLayer {
                     alpha = blur()
-                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
                 }
                 .drawWithContent { if (drawBlur.value) drawContent() }
                 .clip(shape)
@@ -281,8 +285,8 @@ private val CardBlurRadius = 22.dp
 @Composable
 internal fun Modifier.themedDropShadow(
     shape: Shape,
-    blurRadius: androidx.compose.ui.unit.Dp = 14.dp,
-    offsetY: androidx.compose.ui.unit.Dp = 4.dp,
+    blurRadius: Dp = 14.dp,
+    offsetY: Dp = 4.dp,
 ): Modifier = this.dropShadow(
     shape,
     color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.06f),

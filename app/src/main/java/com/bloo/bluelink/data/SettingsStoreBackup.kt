@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import com.bloo.uicommon.content
+import androidx.datastore.preferences.core.MutablePreferences
 
 // --- Settings backup export/import/merge (extracted from SettingsStore) --
 
@@ -198,7 +199,7 @@ internal suspend fun SettingsStore.adoptSettingsJson(json: String): Boolean {
  * for a string) throws ClassCastException on every launch and the app crash-loops until its data is cleared, with Drive
  * sync restoring the bad value. A value that disagrees with what is stored is skipped instead.
  */
-private fun androidx.datastore.preferences.core.MutablePreferences.putTyped(
+private fun MutablePreferences.putTyped(
     strings: Map<String, String>,
     bools: Map<String, Boolean>,
 ) {

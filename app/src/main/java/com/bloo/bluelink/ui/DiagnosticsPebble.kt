@@ -25,6 +25,7 @@ import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.uicommon.AppIcons
+import androidx.compose.ui.graphics.vector.ImageVector
 
 // --- Diagnostics ----------------------------------------------------------
 
@@ -145,7 +146,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
 }
 
 /** The headings of the Diagnostics pebble, in the order they appear. */
-internal enum class DiagGroup(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+internal enum class DiagGroup(val title: String, val icon: ImageVector) {
     Tires("Tires", Icons.Filled.TireRepair),
     Power("Battery & range", Icons.Filled.BatteryChargingFull),
     Fluids("Fluids & key", Icons.Filled.WaterDrop),

@@ -31,6 +31,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.RevealText
+import androidx.compose.animation.core.Animatable
+import androidx.compose.material3.Icon
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 /**
  * The watch's PIN entry: a 3x4 keypad that FITS the face it is on. On a correct PIN [onUnlocked]
@@ -53,11 +57,11 @@ fun WearPinScreen(
     var entered by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     // A wrist is often not looked at: a right PIN buzzes yes, a wrong one buzzes no, and the dots shake.
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    val shake = remember { androidx.compose.animation.core.Animatable(0f) }
+    val haptics = LocalHapticFeedback.current
+    val shake = remember { Animatable(0f) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     fun reject() {
-        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Reject)
+        haptics.performHapticFeedback(HapticFeedbackType.Reject)
         scope.launch {
             for (x in listOf(10f, -8f, 6f, -4f, 0f)) shake.animateTo(x, androidx.compose.animation.core.tween(45))
         }
@@ -66,7 +70,7 @@ fun WearPinScreen(
     fun submit(pin: String) {
         when (val result = store.verify(pin)) {
             is PinVerifyResult.Ok -> {
-                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
+                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                 entered = ""
                 message = null
                 onUnlocked()
@@ -191,7 +195,7 @@ private fun WearKey(label: String, size: Dp, onClick: () -> Unit) {
     WearRoundButton(size, spoken, onClick = onClick) {
         if (glyph != null) {
             // The glyph scales with the key, so a small key is a small key rather than a cropped big one.
-            androidx.compose.material3.Icon(glyph, contentDescription = null, modifier = Modifier.size(size * 0.46f))
+            Icon(glyph, contentDescription = null, modifier = Modifier.size(size * 0.46f))
         } else {
             Text(
                 label,

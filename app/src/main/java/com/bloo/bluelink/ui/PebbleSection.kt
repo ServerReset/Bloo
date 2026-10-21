@@ -23,6 +23,7 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.SectionHeading
+import androidx.compose.ui.graphics.Color
 
 /**
  * One headed group inside a pebble (Car info, Diagnostics): a heading with its glyph and, optionally, a one-word verdict at the
@@ -35,7 +36,7 @@ internal fun PebbleSection(
     icon: ImageVector,
     modifier: Modifier = Modifier,
     trailing: String? = null,
-    trailingColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    trailingColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     panel: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {

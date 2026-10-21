@@ -48,6 +48,11 @@ import com.bloo.uicommon.MotionLong
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapPage
 import com.bloo.uicommon.LocalHaptics
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /**
  * Every setup flow in the app: first run, newly detected cars, and the welcome cards summoned again
@@ -70,10 +75,10 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     // Next gate here, not only to the card's own button. Re-checked on resume so returning from the
     // system permission screen updates it without a relaunch.
     var notifGranted by remember { mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context)) }
-    val notifLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val notifLifecycle = LocalLifecycleOwner.current
     DisposableEffect(notifLifecycle) {
-        val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        val obs = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
                 notifGranted = com.bloo.bluelink.data.Notifications.hasPermission(context)
             }
         }
@@ -256,7 +261,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 // One standard card at a time, in a pager. The button section does not scroll by
                 // hand; the trailing information-only section does, and its final page hands off.
-                androidx.compose.foundation.pager.HorizontalPager(
+                HorizontalPager(
                     state = deck,
                     userScrollEnabled = swipeUnlocked,
                     modifier = Modifier.weight(1f).testTag(DECK_STEP_TAG),
@@ -266,7 +271,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                     // Centred and width-capped: on a wide screen (a tablet, a phone in landscape, a
                     // foldable's inner display) a full-bleed card stretched the whole way across and
                     // read as a wall of text. The garage caps its columns the same way.
-                    androidx.compose.foundation.layout.Box(
+                    Box(
                         Modifier.fillMaxSize(),
                         contentAlignment = Alignment.TopCenter,
                     ) {
@@ -321,7 +326,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 // on the last card, which keeps it. Without that the swipe section ends with no
                 // control on screen at all: the bar is gone, Back is gone, and the only way out is a
                 // gesture whose hand-off page is blank. Anyone it fails for is simply stuck.
-                androidx.compose.animation.AnimatedVisibility(
+                AnimatedVisibility(
                     visible = !inSwipe || isLast,
                     enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionShort)) +
                         androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(MotionShort)) { it },

@@ -102,6 +102,9 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.MorphSegmented
 import com.bloo.uicommon.SegmentOption
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import kotlinx.coroutines.CancellationException
 
 /**
  * Sign-in form for every brand (US, Canada, Europe) on one screen. Field state is local until
@@ -192,7 +195,7 @@ internal fun LoginScreen(
             CredentialManager.create(context)
                 .getCredential(context.findActivity(), GetCredentialRequest(listOf(GetPasswordOption())))
                 .credential
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: NoCredentialException) {
             if (!quiet) savedNote = "No saved login yet. Sign in once and your password manager will offer to keep it."
@@ -486,7 +489,7 @@ private fun LoginHero(subtitle: String, compact: Boolean, modifier: Modifier = M
                     .size(tileSize * 1.9f)
                     .graphicsLayer { scaleX = breath; scaleY = breath }
                     .background(
-                        Brush.radialGradient(listOf(scheme.primary.copy(alpha = 0.32f), androidx.compose.ui.graphics.Color.Transparent)),
+                        Brush.radialGradient(listOf(scheme.primary.copy(alpha = 0.32f), Color.Transparent)),
                         CircleShape,
                     ),
             )
@@ -536,7 +539,7 @@ private fun LoginHero(subtitle: String, compact: Boolean, modifier: Modifier = M
 
 /** A small heading for a block of the form: a tinted icon and the words. */
 @Composable
-private fun LoginSectionLabel(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+private fun LoginSectionLabel(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
         RevealText(text, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)

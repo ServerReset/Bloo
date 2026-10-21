@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import kotlin.math.roundToInt
+import androidx.compose.ui.unit.IntOffset
 
 /*
  * The watch face for one car: the charge (or fuel) as a ring around the very edge of the display, and inside it the car's four
@@ -78,7 +79,7 @@ fun WearCarFace(
                     val h = constraints.maxHeight
                     val hubSize = maxWidth * HubFraction
                     // The hub sits where the cross is, so it moves with the quarter that was pressed.
-                    Box(Modifier.offset { androidx.compose.ui.unit.IntOffset((press.dx * w).roundToInt(), (press.dy * h).roundToInt()) }) {
+                    Box(Modifier.offset { IntOffset((press.dx * w).roundToInt(), (press.dy * h).roundToInt()) }) {
                         WearFaceHub(value = value, caption = caption, tint = tint, size = hubSize, state = carState, status = status, onHold = onHubHold)
                     }
                 }

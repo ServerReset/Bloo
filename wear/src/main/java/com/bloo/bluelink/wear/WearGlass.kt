@@ -24,6 +24,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /*
  * The watch's two glass ingredients, shared by every screen so they all read as one language with the phone:
@@ -45,19 +54,19 @@ internal val LocalWearHaze = androidx.compose.runtime.staticCompositionLocalOf<H
  * times a second -- every step re-blurs the glass above it, so it is deliberately not 60fps) and stands still whenever the
  * device runs lean: Battery Saver, a hot watch, or the wearer's own reduce-effects switch.
  */
-@androidx.compose.runtime.Composable
-internal fun WearBackdrop(modifier: Modifier = Modifier, content: @androidx.compose.runtime.Composable () -> Unit) {
-    val scheme = androidx.compose.material3.MaterialTheme.colorScheme
+@Composable
+internal fun WearBackdrop(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
     val haze = androidx.compose.runtime.remember { HazeState() }
     val policy = LocalPowerPolicy.current
     var phase by androidx.compose.runtime.mutableFloatStateOf(0f)
-    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val owner = LocalLifecycleOwner.current
     val start = androidx.compose.runtime.remember { System.nanoTime() }
-    androidx.compose.runtime.LaunchedEffect(policy.ambientMotion) {
+    LaunchedEffect(policy.ambientMotion) {
         if (!policy.ambientMotion) return@LaunchedEffect
         // Only while the watch is in front of the wearer: a stopped or dimmed activity keeps its composition, and a loop
         // that outlived the screen would wake the CPU a few times a second for nothing.
-        owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+        owner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             while (true) {
                 phase = ((System.nanoTime() - start) / 1_000_000_000f) / DriftSeconds * (2f * Math.PI.toFloat())
                 kotlinx.coroutines.delay(DriftStepMs)
@@ -67,8 +76,8 @@ internal fun WearBackdrop(modifier: Modifier = Modifier, content: @androidx.comp
     val primary = scheme.primary
     val secondary = scheme.secondary
     val tertiary = scheme.tertiary
-    androidx.compose.foundation.layout.Box(modifier) {
-        androidx.compose.foundation.layout.Box(
+    Box(modifier) {
+        Box(
             Modifier
                 .fillMaxSize()
                 .hazeSource(haze)
@@ -76,7 +85,7 @@ internal fun WearBackdrop(modifier: Modifier = Modifier, content: @androidx.comp
                     drawRect(Color.Black)
                     val t = phase
                     fun blob(c: Color, fx: Float, fy: Float, r: Float) {
-                        val center = androidx.compose.ui.geometry.Offset(size.width * fx, size.height * fy)
+                        val center = Offset(size.width * fx, size.height * fy)
                         val radius = size.minDimension * r
                         drawCircle(Brush.radialGradient(listOf(c, Color.Transparent), center = center, radius = radius), radius, center)
                     }
@@ -88,13 +97,13 @@ internal fun WearBackdrop(modifier: Modifier = Modifier, content: @androidx.comp
                     drawRect(
                         Brush.radialGradient(
                             listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
-                            center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f),
+                            center = Offset(size.width / 2f, size.height / 2f),
                             radius = size.maxDimension * 0.62f,
                         ),
                     )
                 },
         )
-        androidx.compose.runtime.CompositionLocalProvider(LocalWearHaze provides haze) { content() }
+        CompositionLocalProvider(LocalWearHaze provides haze) { content() }
     }
 }
 
@@ -108,7 +117,7 @@ private const val DriftStepMs = 250L
  * Frosted glass for a watch surface: the backdrop blurred behind [shape] when the device can and may (API 31+, not lean),
  * else nothing -- the caller's own translucent fill and [wearGlassRim] then carry the look. Put it BEFORE the fill.
  */
-@androidx.compose.runtime.Composable
+@Composable
 fun Modifier.wearGlassBlur(shape: Shape): Modifier {
     val haze = LocalWearHaze.current
     if (haze == null || !canBlurBackdrops()) return this
@@ -133,9 +142,9 @@ fun Modifier.wearAuroraWash(tint: Color): Modifier = background(
  * size and one nearing the top or bottom narrows with the curve, instead of being clipped by the bezel or the
  * whole card being scaled as one.
  */
-@androidx.compose.runtime.Composable
+@Composable
 fun Modifier.fitRound(minScale: Float = 0.55f): Modifier {
-    val window = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
+    val window = LocalWindowInfo.current.containerSize
     var centreY by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(Float.NaN) }
     var width by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     var height by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }

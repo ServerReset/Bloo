@@ -244,4 +244,4 @@ internal val LocalForceExpanded = staticCompositionLocalOf { false }
  */
 internal val LocalPullFraction =
 
-    staticCompositionLocalOf<androidx.compose.runtime.MutableState<Float>> { mutableFloatStateOf(0f) }
+    staticCompositionLocalOf<MutableState<Float>> { mutableFloatStateOf(0f) }

@@ -41,6 +41,8 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.AnimatedSlider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 /**
  * The AutoLock countdown's own bounds: 0 (lock the moment the walk-away is confirmed) up to 30, in 5s
@@ -93,8 +95,8 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel, gen5w: Boolean 
     var recheck by remember(v.vin) { mutableIntStateOf(0) }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) recheck++
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) recheck++
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }

@@ -53,6 +53,10 @@ import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapPage
 import com.bloo.uicommon.LocalHaptics
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 
 /** How far right the pinned pebble must be dragged before releasing unpins it. */
 private val UnpinTravel = 88.dp
@@ -168,7 +172,7 @@ internal fun HotspotSlot(
                     // page when the pager moves, and a vertical drag on it scrolls the column like any other part of it. Only
                     // while it is dragged out does the column draw above the stack (see HotSeatDrag.pinnedActive).
                     if (secondaryPebble != null) PinnedPebble(v, stateSource, vm, secondaryPebble, hotDrag)
-                    androidx.compose.animation.AnimatedVisibility(
+                    AnimatedVisibility(
                         // Retreats the moment a released pebble starts its flight in (pendingPin), so
                         // the zone is already leaving as the pebble arrives rather than lingering under
                         // it once it has landed.
@@ -277,7 +281,7 @@ internal fun PinnedPebble(
     }
     // The column is drawn above the stack for as long as the pebble is dragged or flying, and its own drag state is the cue.
     LaunchedEffect(dragging, flying) { hotDrag?.pinnedActive = dragging || flying }
-    androidx.compose.runtime.DisposableEffect(hotDrag) { onDispose { hotDrag?.pinnedActive = false } }
+    DisposableEffect(hotDrag) { onDispose { hotDrag?.pinnedActive = false } }
     Box(
         Modifier
             .fillMaxWidth()
@@ -342,10 +346,10 @@ private fun EmptyDropZone(hovered: Boolean) {
                 val r = size.height.coerceAtMost(PebbleCornerCollapsed.toPx() * 2) / 2f
                 drawRoundRect(
                     color = outline,
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(r),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    cornerRadius = CornerRadius(r),
+                    style = Stroke(
                         width = stroke,
-                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(dash),
+                        pathEffect = PathEffect.dashPathEffect(dash),
                     ),
                 )
             }

@@ -7,9 +7,10 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import com.bloo.bluelink.data.BlooColors
+import androidx.compose.runtime.Immutable
 
 /** The charge bar's two stops, as the phone's bar and the watch's ring both draw them: darker where the fill starts, lighter at its end. */
-@androidx.compose.runtime.Immutable
+@Immutable
 class ChargeFillColors(private val dark: State<Color>, private val light: State<Color>) {
     val fillDark: Color get() = dark.value
     val fillLight: Color get() = light.value

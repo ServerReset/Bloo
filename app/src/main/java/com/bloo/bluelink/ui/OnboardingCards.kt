@@ -42,6 +42,7 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.content
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 /** What an onboarding card's header says: the same icon / title / summary a pebble carries. */
 internal data class OnboardingCardSpec(val icon: ImageVector, val title: String, val summary: String)
@@ -170,7 +171,7 @@ internal fun OnboardingBottomBar(
 ) {
     GlassSurface(
         // Match the step cards it sits under (PebbleShell's expanded corner), not the dialog radius.
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(PebbleCornerExpanded),
+        shape = RoundedCornerShape(PebbleCornerExpanded),
         hazeState = hazeState,
         modifier = Modifier.fillMaxWidth().padding(horizontal = GapPage, vertical = GapGroup),
     ) {

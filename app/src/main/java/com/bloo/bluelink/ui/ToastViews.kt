@@ -56,6 +56,7 @@ import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.canBlurBackdrops
+import androidx.compose.ui.graphics.TransformOrigin
 
 // --- The toast slot and card that ToastHost lays out ---
 
@@ -186,7 +187,7 @@ internal fun BoxScope.ToastSlot(
                 translationY = ty
                 scaleX = shrink
                 scaleY = stretch * shrink
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                transformOrigin = TransformOrigin(0.5f, 1f)
                 // Deeper than two behind the newest, a folded toast is not there at all.
                 alpha = 1f - (1f - e) * (s - 2f).coerceIn(0f, 1f)
             }

@@ -288,7 +288,7 @@ internal fun ColorPickerCanvas(
             // two corner radii, one dialog.
             isError = hexError,
             supportingText = if (hexError) { { RevealText("Not a valid colour") } } else null,
-            keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { commitHex() }),
             modifier = Modifier.fillMaxWidth().onFocusChanged { if (!it.isFocused) commitHex() },
         )

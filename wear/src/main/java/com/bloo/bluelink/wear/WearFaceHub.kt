@@ -29,6 +29,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
+import androidx.compose.animation.core.Spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
 
 /**
  * The centre of the face: the value where the four quarters meet (the charge or fuel, or the lock state), what the car is doing
@@ -46,11 +52,11 @@ fun WearFaceHub(
     onHold: (() -> Unit)? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    val interaction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val haptics = LocalHapticFeedback.current
+    val interaction = androidx.compose.runtime.remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     // The hub gives a little under a finger and springs back: less than it did, so the centre reads as steady.
-    val press by animateFloatAsState(if (pressed) 0.98f else 1f, spring(dampingRatio = 0.8f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium), label = "hubPress")
+    val press by animateFloatAsState(if (pressed) 0.98f else 1f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium), label = "hubPress")
     Box(
         Modifier
             .size(size)
@@ -66,7 +72,7 @@ fun WearFaceHub(
                             indication = null,
                             onClick = {},
                             onLongClick = {
-                                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onHold()
                             },
                         )
@@ -80,13 +86,13 @@ fun WearFaceHub(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             com.bloo.uicommon.AnimatedValue(
                 value = value,
-                style = androidx.compose.ui.text.TextStyle(
+                style = TextStyle(
                     fontWeight = FontWeight.Bold,
                     color = tint,
                     textAlign = TextAlign.Center,
                     // In dp-sized text: the hub is a fixed circle, so the value must not grow with the font setting.
                     // A long value ("Unlocked" for a car with no charge to show) shrinks to fit the hub instead of breaking mid-word.
-                    fontSize = with(androidx.compose.ui.platform.LocalDensity.current) {
+                    fontSize = with(LocalDensity.current) {
                         val base = (size.value * 0.30f).coerceIn(16f, 32f)
                         (if (value.length > 4) (base * 4.5f / value.length).coerceAtLeast(12f) else base).dp.toSp()
                     },
@@ -114,7 +120,7 @@ private fun HubLine(text: String, color: Color, hubSize: Dp) {
     RevealText(
         text,
         style = MaterialTheme.typography.labelSmall.copy(
-            fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (hubSize.value * 0.13f).coerceIn(9f, 12f).dp.toSp() },
+            fontSize = with(LocalDensity.current) { (hubSize.value * 0.13f).coerceIn(9f, 12f).dp.toSp() },
         ),
         color = color,
         textAlign = TextAlign.Center,

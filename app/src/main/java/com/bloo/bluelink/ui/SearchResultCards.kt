@@ -36,6 +36,7 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.SafeMorphTextButton
 import com.bloo.uicommon.content
+import androidx.activity.result.contract.ActivityResultContracts
 
 // --- The AI-answer and command-action cards shown under search results ---
 
@@ -167,7 +168,7 @@ internal fun AiSettingProposal(
     val target = action.describe(p.value)
     // Location for weather needs the permission first; the card asks for it, then runs the action.
     val locationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+        ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) { action.write(vm, p.value); applied = true } else vm.reportError("Location permission denied. Type a place instead")
     }

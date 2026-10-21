@@ -36,6 +36,12 @@ import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Watch
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.runtime.LaunchedEffect
 
 // The phone's design-system vocabulary that the button system is built on, moved here so the watch
 // can use the same one: the icon for a given button label, the spin used by an in-flight glyph, and
@@ -83,17 +89,17 @@ object AppIcons {
 }
 
 @Composable
-fun rememberSpinAngle(spinning: Boolean): androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D> {
-    val angle = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
-    androidx.compose.runtime.LaunchedEffect(spinning) {
+fun rememberSpinAngle(spinning: Boolean): Animatable<Float, AnimationVector1D> {
+    val angle = androidx.compose.runtime.remember { Animatable(0f) }
+    LaunchedEffect(spinning) {
         if (spinning) {
-            angle.animateTo(angle.value + 360f, androidx.compose.animation.core.tween(850, easing = androidx.compose.animation.core.FastOutLinearInEasing))
+            angle.animateTo(angle.value + 360f, androidx.compose.animation.core.tween(850, easing = FastOutLinearInEasing))
             while (true) {
-                angle.animateTo(angle.value + 360f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.LinearEasing))
+                angle.animateTo(angle.value + 360f, androidx.compose.animation.core.tween(600, easing = LinearEasing))
             }
         } else if (angle.value != 0f) {
             val target = kotlin.math.ceil(angle.value / 360f) * 360f
-            angle.animateTo(target, androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+            angle.animateTo(target, androidx.compose.animation.core.tween(700, easing = LinearOutSlowInEasing))
             angle.snapTo(0f)
         }
     }
