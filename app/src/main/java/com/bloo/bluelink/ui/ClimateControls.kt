@@ -56,6 +56,13 @@ import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.climatePresetDetail
 import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.TitleSubtitle
+import com.bloo.uicommon.MorphIconButton
+import com.bloo.uicommon.MorphButton
+import com.bloo.uicommon.IconBadge
+import com.bloo.uicommon.ButtonLabelStyle
 import com.bloo.uicommon.rememberConfirmArm
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -73,10 +80,8 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.ButtonPaddingH
 import com.bloo.uicommon.ChipPaddingH
 import com.bloo.uicommon.LocalHaptics
-import com.bloo.uicommon.denyTone
 import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.AnimatedSlider
-import com.bloo.uicommon.container
 import com.bloo.uicommon.content
 
 /**
@@ -229,9 +234,9 @@ internal fun ClimatePresetSection(
 }
 
 /**
- * A two-segment split button for a saved preset (M3 Expressive connected-button group): a wider
- * "start" half and a narrow "delete" half, pill on the outer edge and smaller radius on the inner,
- * separated by a real gap.
+ * One saved climate preset as a row: a full-width button that applies it (its badge, its name and what it sets, the primary
+ * fill while it is the one running), with a delete button beside it. Delete needs a second tap to confirm (auto-resets, like
+ * Sign out): a mis-aimed tap beside Apply dropped a preset for good. The row is the drag handle, so it re-ranks by holding it.
  */
 @Composable
 internal fun PresetPill(
@@ -243,49 +248,56 @@ internal fun PresetPill(
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHaptics.current
-    // Delete needs a second tap to confirm (auto-resets, like Sign out): a mis-aimed tap beside Apply dropped a preset
-    // for good.
     val confirm = rememberConfirmArm()
-    ButtonCluster(
-        listOf(
-            // Apply: snowflake plus the preset's name, primary fill when applied.
-            ClusterButton(
-                onClick = onStart,
-                onClickHaptic = { haptics?.click() },
-                active = active,
-                contentPadding = PaddingValues(horizontal = ChipPaddingH, vertical = 11.dp),
-                weight = 1f,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-                    Spacer(Modifier.width(ButtonIconGap))
-                    Column {
-                        RevealText(name, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        if (detail.isNotBlank()) {
-                            RevealText(detail, style = SecondaryTextStyle(), color = mutedContentColor(), maxLines = 1)
-                        }
-                    }
-                }
-            },
-            // Delete: the deny red while armed.
-            ClusterButton(
-                onClick = {
-                    haptics?.tick()
-                    if (confirm.armed) onDelete() else confirm.arm()
-                },
-                containerColor = if (confirm.armed) denyTone().container else buttonContainer(),
-                contentColor = if (confirm.armed) denyTone().content else MaterialTheme.colorScheme.onSurface,
-                contentPadding = PaddingValues(horizontal = 14.dp),
-            ) {
-                Icon(
-                    AppIcons.Close,
-                    contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
-                    modifier = Modifier.size(15.dp),
-                )
-            },
-        ),
+    val scheme = MaterialTheme.colorScheme
+    Row(
         modifier.fillMaxWidth(),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(GapRow),
+    ) {
+        MorphButton(
+            onClick = onStart,
+            onClickHaptic = { haptics?.click() },
+            active = active,
+            expressive = true,
+            fillOnPress = true,
+            contentPadding = PaddingValues(horizontal = ChipPaddingH, vertical = GapGroup),
+            minHeight = ButtonTargetHeight,
+            modifier = Modifier.weight(1f),
+        ) {
+            IconBadge(
+                icon = Icons.Filled.AcUnit,
+                tint = if (active) scheme.onPrimary else scheme.primary,
+                containerColor = if (active) scheme.onPrimary.copy(alpha = 0.18f) else scheme.primary.copy(alpha = 0.14f),
+                size = 36.dp,
+                iconSize = 19.dp,
+            )
+            Spacer(Modifier.width(GapGroup))
+            TitleSubtitle(
+                title = name,
+                subtitle = detail.ifBlank { null },
+                modifier = Modifier.weight(1f),
+                titleStyle = ButtonLabelStyle,
+                titleWeight = FontWeight.SemiBold,
+                subtitleColor = if (active) scheme.onPrimary.copy(alpha = 0.8f) else mutedContentColor(),
+                maxLines = 2,
+            )
+        }
+        MorphIconButton(
+            onClick = {
+                haptics?.tick()
+                if (confirm.armed) onDelete() else confirm.arm()
+            },
+            filled = confirm.armed,
+            emphasis = if (confirm.armed) ButtonEmphasis.Deny else ButtonEmphasis.Tonal,
+        ) {
+            Icon(
+                AppIcons.Close,
+                contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
+                modifier = Modifier.size(15.dp),
+            )
+        }
+    }
 }
 
 // --- Charge limits --------------------------------------------------------
