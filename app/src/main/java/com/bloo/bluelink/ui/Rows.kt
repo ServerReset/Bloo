@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.LabelValueRow
 import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
@@ -67,54 +68,13 @@ internal fun RowLabel(label: String, modifier: Modifier = Modifier) {
 
 @Composable
 internal fun StatusRow(label: String, value: String, valueMono: Boolean = false) {
-    Row(
-        Modifier.fillMaxWidth(),
-        // Top-align so a wrapped value leaves the label on the first line.
-        verticalAlignment = Alignment.Top,
-    ) {
-        // Natural width, not weight(1f): a 50/50 split starved the value (the long side) into
-        // wrapping. The value below is the row's one weighted child.
-        RowLabel(label)
-        Spacer(Modifier.width(GapRow))
-        // Right-aligning Box owns the label's leftover width: short values sit flush right, long
-        // ones (coordinates, VIN, email) use the extra width. A filling Box gives textAlign=End
-        // something to align against.
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-            // AnimatedValue (uicommon). Colour pinned to onSurface: Pebble's Card would otherwise
-            // give onSurfaceVariant, barely distinct from the dimmed label.
-            val baseStyle = LocalTextStyle.current
-            val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-            // Memoized to avoid recreating TextStyle.copy() every recomposition.
-            val valueStyle = remember(baseStyle, onSurfaceColor, valueMono) {
-                baseStyle.copy(
-                    fontWeight = FontWeight.Medium,
-                    color = onSurfaceColor,
-                    textAlign = TextAlign.End,
-                    fontFamily = if (valueMono) FontFamily.Monospace else baseStyle.fontFamily,
-                )
-            }
-            com.bloo.uicommon.AnimatedValue(
-                value = value,
-                style = valueStyle,
-                maxLines = 2,
-                reduceMotion = LocalReduceMotion.current,
-            )
-        }
-    }
-}
-
-/** A fact whose value is long (an address): the label above it and the value below, full width, instead of a squeezed half row. */
-@Composable
-internal fun StackedRow(label: String, value: String) {
-    Column(Modifier.fillMaxWidth()) {
-        RowLabel(label)
-        RevealText(
-            value,
-            style = SecondaryTextStyle(),
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
+    // The shared label-and-value row (:uicommon's LabelValueRow); the app only chooses the label's muted tone.
+    LabelValueRow(
+        label = label,
+        value = value,
+        labelColor = LocalContentColor.current.copy(alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha),
+        valueMono = valueMono,
+    )
 }
 
 /** A small bold group heading used inside the Car-info pebble. */
