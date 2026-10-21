@@ -62,6 +62,8 @@ object SyncMerge {
         /** "watch" for a Wear OS companion, "phone" otherwise; a watch cannot be the source
          *  of truth. Absent (null) entries read as "phone". */
         val kind: String = KIND_PHONE,
+        /** For a watch: the id of the phone it is attached to (blank for a phone, and for a watch written before this). */
+        val hostId: String = "",
     ) {
         val isWatch: Boolean get() = kind == KIND_WATCH
     }
@@ -210,6 +212,8 @@ object SyncMerge {
                         put("model", JsonPrimitive(d.model))
                         put("appVersion", JsonPrimitive(d.appVersion))
                         put("lastSeenMs", JsonPrimitive(d.lastSeenMs))
+                        put("kind", JsonPrimitive(d.kind))
+                        put("hostId", JsonPrimitive(d.hostId))
                     })
                 }
             })

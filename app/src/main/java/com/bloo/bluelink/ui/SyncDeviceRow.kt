@@ -81,12 +81,7 @@ internal fun SyncDeviceRow(
             // (SettingsPrimitives), not a per-row outline: four outlined boxes in a card read as four
             // boxes nested in a box, which is exactly the drift the onboarding section had.
             .innerGlassPanel(GapSection)
-            .then(
-                // The primary device is marked ONCE, by its chip and this tint. It used to be four
-                // signals for one fact -- a star icon, a tag, this tint AND a border -- which made the
-                // row busier than the thing it was saying.
-                if (isPrimary) Modifier.background(scheme.primaryContainer.copy(alpha = 0.35f), shape) else Modifier,
-            ),
+            ,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -130,14 +125,18 @@ internal fun SyncDeviceRow(
                     isSelf || health == DeviceHealth.ACTIVE -> "Active now"
                     else -> com.bloo.bluelink.data.relativeLabel(device.lastSeenMs).ifBlank { "Never synced" }
                 }
-                val line = listOf(device.model.takeIf { it.isNotBlank() && !it.equals(device.name, ignoreCase = true) }, seen, device.appVersion.takeIf { it.isNotBlank() }?.let { "v$it" })
-                    .filterNotNull().joinToString(" · ")
-                RollingNumber(
-                    line,
-                    style = SecondaryTextStyle(),
-                    fontWeight = FontWeight.Medium,
-                    color = if (health == DeviceHealth.STALE) scheme.error else scheme.onSurfaceVariant,
-                )
+                // Two short lines, each allowed to wrap: what it is, then when it was last seen and its version.
+                val model = device.model.takeIf { it.isNotBlank() && !it.equals(device.name, ignoreCase = true) }
+                val status = listOfNotNull(seen, device.appVersion.takeIf { it.isNotBlank() }?.let { "v$it" }).joinToString(" · ")
+                Column {
+                    model?.let { RevealText(it, style = SecondaryTextStyle(), color = scheme.onSurfaceVariant) }
+                    RollingNumber(
+                        status,
+                        style = SecondaryTextStyle(),
+                        fontWeight = FontWeight.Medium,
+                        color = if (health == DeviceHealth.STALE) scheme.error else scheme.onSurfaceVariant,
+                    )
+                }
             }
             if (health == DeviceHealth.STALE) {
                 RevealText(

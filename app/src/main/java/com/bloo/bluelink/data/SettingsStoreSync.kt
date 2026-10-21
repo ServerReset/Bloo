@@ -84,7 +84,11 @@ private var lastContentPeekMs = 0L
  * timestamp embedded in the file for providers that don't expose one), then upload our current
  * settings with a fresh timestamp.
  */
-suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncOutcome = mainToMainSyncMutex.withLock {
+suspend fun SettingsStore.performMainToMainSync(
+    /** The watch connected to THIS phone right now, if any: it is published in the registry, attached to this phone. */
+    connectedWatchId: String? = null,
+    connectedWatchName: String? = null,
+): SettingsStore.MainToMainSyncOutcome = mainToMainSyncMutex.withLock {
     // The periodic worker and the auto-sync-on-refresh collector can both fire within moments of
     // each other with no coordination otherwise -- this mutex makes them run one at a time instead
     // of racing to read/merge/upload the same Drive file.
@@ -189,7 +193,21 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
         // body is built.
         val uploadedDirtyKeys = dirtyKeys()
         val self = selfSyncDevice(now)
-        outcomeDevices = SyncMerge.mergeDevices(remoteDevices, self, now)
+        // This phone's connected watch, as the registry should hold it: attached to this phone, its "last seen" kept for the
+        // heartbeat (so an unchanged watch is not a registry change on every poll). A watch this phone no longer has drops out.
+        val watchEntry = connectedWatchId?.takeIf { it.isNotBlank() }?.let { id ->
+            val wid = "watch:$id"
+            val prior = remoteDevices.firstOrNull { it.id == wid }
+            SyncMerge.SyncDevice(
+                id = wid,
+                name = connectedWatchName.orEmpty(),
+                kind = SyncMerge.KIND_WATCH,
+                hostId = self.id,
+                lastSeenMs = if (prior != null && now - prior.lastSeenMs < REGISTRY_HEARTBEAT_MS) prior.lastSeenMs else now,
+            )
+        }
+        val registry = remoteDevices.filterNot { it.isWatch && it.hostId == self.id && it.id != watchEntry?.id } + listOfNotNull(watchEntry)
+        outcomeDevices = SyncMerge.mergeDevices(registry, self, now)
         // A pass that found the file "changed" but has nothing of its OWN to say must not rewrite it.
         // The foreground poll runs every few seconds, and our own upload advances the file's
         // modified time -- which the very next poll then reads as a remote change. An unconditional
@@ -248,7 +266,7 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
                 hash = localHash,
                 primaryDeviceId = primaryToWrite,
                 selfDevice = self,
-                knownDevices = remoteDevices,
+                knownDevices = registry,
                 nowMs = now,
                 fileId = resolvedFileId,
                 // Carry the remote file's OWN tombstones forward.

@@ -86,8 +86,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             primaryName?.let { append(" · $it is primary") }
         },
     )
-    BodySmallText("Drag to reorder. The top phone is the one every other device adopts.")
-    val watchHost = phones.firstOrNull { it.id == state.syncPrimaryId } ?: phones.firstOrNull()
+    BodySmallText("Drag to reorder. The top phone is primary.")
     val context = LocalContext.current
     val liveWatch by WatchPresence.watch.collectAsStateWithLifecycle()
     val signInState by WatchSignIn.state.collectAsStateWithLifecycle()
@@ -122,6 +121,11 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
         // this app is spaced (SettingsGroup, the seat list, the PIN form), and it was six Spacers here.
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             val isSelf = device.id == state.thisDeviceId
+            // The watches attached to THIS phone, as the shared registry holds them (a watch written before it had a phone sits
+            // under the primary). This phone's own live watch is drawn from the connection below, not twice.
+            val attached = registryWatches.filter { w ->
+                (w.hostId.ifBlank { state.syncPrimaryId }) == device.id && !(isSelf && isConnectedWatch(liveWatch, w))
+            }
             SyncDeviceRow(
                 device = device,
                 isSelf = isSelf,
@@ -133,7 +137,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             )
             // Drawn in the same item slot, after the phone row -- not reorderable items themselves.
             val live = liveWatch.takeIf { isSelf }
-            val registered = registryWatches.takeIf { device.id == watchHost?.id && live == null }.orEmpty()
+            val registered = attached
             live?.let { watch ->
                 WearCompanionRow(
                     name = watch.name,
@@ -271,6 +275,10 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
 private data class Removal(val id: String, val name: String, val watch: Boolean)
 
 /** How far a companion is inset under its phone row. */
-private val CompanionIndent = 22.dp
+private val CompanionIndent = 14.dp
 
 private const val WATCH_REFRESH_MS = 6_000L
+
+/** Whether a registry watch entry is the watch this phone is connected to right now. */
+private fun isConnectedWatch(connected: WatchPresence.ConnectedWatch?, entry: SyncMerge.SyncDevice): Boolean =
+    connected != null && entry.id == "watch:${connected.id}"

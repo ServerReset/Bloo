@@ -260,7 +260,10 @@ fun AppViewModel.testSync() {
  * immediately instead of waiting for the passive refresh collector.
  */
 internal suspend fun AppViewModel.runDriveSyncNow() {
-    val outcome = withContext(Dispatchers.IO) { settingsStore.performMainToMainSync() }
+    val watch = com.bloo.bluelink.wear.WatchPresence.watch.value
+    val outcome = withContext(Dispatchers.IO) {
+        settingsStore.performMainToMainSync(connectedWatchId = watch?.id, connectedWatchName = watch?.name)
+    }
     // Recompute the file biometric each pass; it is derived purely from the persisted URI.
     val fingerprint = withContext(Dispatchers.IO) { settingsStore.syncFileFingerprint() }
     if (outcome.ran) {
