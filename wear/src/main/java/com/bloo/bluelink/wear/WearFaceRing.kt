@@ -19,7 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.bloo.uicommon.rememberChargeFillColors
-import com.bloo.uicommon.rememberChargeFront
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -55,7 +54,8 @@ fun WearEdgeRing(
     val limit = limitPct?.takeIf { it in 1..99 }
     val frac = (progress ?: 0f).coerceIn(0f, 1f)
     val stuck = progress != null && limit != null && frac * 100f >= limit
-    val sheen = if (refreshing && policy.ambientMotion && progress != null) {
+    // A slight sheen over the charged part while the car charges, and the same for a refresh.
+    val sheen = if ((charging || refreshing) && policy.ambientMotion && progress != null) {
         rememberInfiniteTransition(label = "chargeSheen").animateFloat(
             0f, 1f,
             infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Restart),
@@ -64,15 +64,12 @@ fun WearEdgeRing(
     } else {
         null
     }
-    // The level lands with a bounce (it overshoots the new charge and settles), as the phone's bar does.
+    // The level glides to its new value without overshooting: a bounce on the charge reads as wobbly, not alive.
     val sweep by animateFloatAsState(
         frac,
-        animationSpec = if (policy.bouncySprings) spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow) else snap(),
+        animationSpec = if (policy.bouncySprings) tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing) else snap(),
         label = "edgeRing",
     )
-    // The charging "fill up": a lighter arc grows out of the fill's end on a bouncy spring, overshoots, rests a beat, and goes
-    // again -- the ring visibly keeps filling while the car charges.
-    val front by rememberChargeFront(charging && policy.ambientMotion && progress != null)
     // The phone's two stops of the fill: the darker end where it starts, the lighter where it ends.
     val fill = rememberChargeFillColors(stuck, if (policy.bouncySprings) tween(500) else snap())
     // The limit glides when it changes; the first value is where it starts, not an animation from nothing.
@@ -119,19 +116,8 @@ fun WearEdgeRing(
                     val span = minOf(26f, filledEnd - 2f * half)
                     if (span > 0f) {
                         val at = half + (filledEnd - 2f * half - span) * phase
-                        drawArc(Color.White.copy(alpha = 0.5f), at - 90f, span, false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
+                        drawArc(Color.White.copy(alpha = 0.25f), at - 90f, span, false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
                     }
-                }
-            }
-            // The growing front, in the room beyond the fill (up to the limit, or the end of the ring).
-            if (front > 0f && filledEnd > 0f) {
-                val room = (if (limit != null && !stuck) 360f * limitAnim.value else 360f) - filledEnd
-                val grow = (minOf(34f, room) * front).coerceIn(0f, maxOf(room, 0f))
-                if (grow > 2f * half) {
-                    drawArc(
-                        fill.fillLight.copy(alpha = 0.55f), filledEnd + half - 90f, grow - 2f * half, false, topLeft, arc,
-                        style = Stroke(w, cap = StrokeCap.Round),
-                    )
                 }
             }
             if (limit == null || stuck) {

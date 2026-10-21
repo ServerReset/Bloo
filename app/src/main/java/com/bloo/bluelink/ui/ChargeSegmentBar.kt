@@ -17,7 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.bloo.uicommon.rememberChargeFillColors
-import com.bloo.uicommon.rememberChargeFront
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.CornerRadius
@@ -47,6 +46,8 @@ internal fun ChargeSegmentBar(
     limitPct: Int?,
     stuckAtLimit: Boolean,
     charging: Boolean,
+    /** Plugged in (charging or not): the already-full part gets a slight sheen while it is. */
+    plugged: Boolean = charging,
     modifier: Modifier = Modifier,
     /**
      * True while the hero card is COLLAPSED (the small readout). The remaining/trailing track is
@@ -95,15 +96,11 @@ internal fun ChargeSegmentBar(
     // It steps at ~20fps rather than the display's rate (see rememberSlowShimmer): the band is a
     // wide, slow sweep, so 20 steps a second is smooth and it is a third of the redraws of a 60Hz
     // one -- a real drain on a phone that sits on the charge screen for an hour.
-    val shimmer: State<Float>? = if (charging && LocalPowerPolicy.current.ambientMotion) {
-        rememberSlowShimmer(periodMs = 1800L)
+    val shimmer: State<Float>? = if (plugged && LocalPowerPolicy.current.ambientMotion) {
+        rememberSlowShimmer(periodMs = 2600L)
     } else {
         null
     }
-    // The charging "fill up": a lighter piece grows out of the end of the fill toward the rest of the bar on a bouncy spring
-    // (it overshoots, settles, rests a beat, and starts again), so a charging car's bar visibly keeps filling. Only while it
-    // charges and the device allows motion; it is read in the draw phase, so it never recomposes the bar.
-    val front by rememberChargeFront(charging && LocalPowerPolicy.current.ambientMotion)
     // One Canvas pass costs nothing per frame that isn't already being paid for the fill's own
     // animateFloatAsState.
     Canvas(modifier.fillMaxWidth().height(ChargeBarHeight)) {
@@ -134,18 +131,6 @@ internal fun ChargeSegmentBar(
             // shimmerX. Drawn as a SECOND rounded rect the same size as the fill (rather than a
             // separate clip) -- drawRoundRect only lights up the pixels its own shape covers, so
             // this rides on top of the gradient above without needing to clip anything itself.
-            // The growing front, drawn in the room beyond the fill (never past the end of the bar).
-            val gapPx = ChargeSegmentGap.toPx()
-            val frontRoom = size.width - layout.fillWidth - gapPx
-            val frontWidth = (minOf(size.width * 0.16f, frontRoom) * front).coerceIn(0f, maxOf(frontRoom, 0f))
-            if (frontWidth > h * 0.5f) {
-                drawRoundRect(
-                    color = fill.fillLight.copy(alpha = 0.55f),
-                    topLeft = Offset(layout.fillWidth + gapPx, 0f),
-                    size = Size(frontWidth, h),
-                    cornerRadius = radius,
-                )
-            }
             if (shimmer != null) {
                 val bandWidth = layout.fillWidth * 0.35f
                 // -0.6 .. 1.6: starts off the left edge and runs off the right before the sawtooth
@@ -154,7 +139,7 @@ internal fun ChargeSegmentBar(
                 val bandCenter = layout.fillWidth * (-0.6f + shimmer.value * 2.2f)
                 drawRoundRect(
                     brush = Brush.linearGradient(
-                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.30f), Color.Transparent),
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.16f), Color.Transparent),
                         start = Offset(bandCenter - bandWidth, 0f),
                         end = Offset(bandCenter + bandWidth, 0f),
                     ),

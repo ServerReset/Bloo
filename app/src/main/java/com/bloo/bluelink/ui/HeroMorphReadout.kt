@@ -114,6 +114,7 @@ internal fun HeroMorphReadout(
             limitPct = data.limitPct,
             stuckAtLimit = data.stuckAtLimit,
             charging = data.charging,
+            plugged = data.plugged,
             // Darken the remaining track while collapsed so the fill reads against it.
             collapsed = t < 0.5f,
         )

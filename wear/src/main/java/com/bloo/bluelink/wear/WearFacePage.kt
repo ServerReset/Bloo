@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
+import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.isStale
 
@@ -56,9 +57,17 @@ internal fun WearFacePage(
                 stale = v.isStale(),
                 status = if (ui.refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
                 refreshing = ui.refreshing,
-                onHubClick = onEditFace,
+                carState = carStateLine(v),
+                onHubHold = onEditFace,
             )
             WearPullIndicator(pullState, ui.refreshing)
         }
     }
 }
+
+/** What the car is doing, in a few words for the centre of the face: running or parked, locked or not, the climate on. */
+internal fun carStateLine(v: VehicleSnapshot): String = listOfNotNull(
+    v.engineOn?.let { if (it) "Running" else "Parked" },
+    v.locked?.let { if (it) "Locked" else "Unlocked" },
+    if (v.climateOn == true) "Climate on" else null,
+).joinToString(" · ")

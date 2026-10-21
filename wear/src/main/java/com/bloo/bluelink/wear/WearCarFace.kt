@@ -47,7 +47,10 @@ fun WearCarFace(
     /** A refresh is in flight: the light travels the ring as it does while charging. */
     refreshing: Boolean = false,
     /** Pressing the centre (the app opens the face editor). Null leaves the hub as plain text. */
-    onHubClick: (() -> Unit)? = null,
+    /** What the car is doing, under the value in the centre (see [carStateLine]). */
+    carState: String = "",
+    /** Holding the centre (a long press, with a buzz) changes the four quarters. */
+    onHubHold: (() -> Unit)? = null,
 ) {
     // The aurora, at watch scale: a soft wash of the level's colour behind the tiles, as the phone's
     // background washes behind its cards. Drawn once, no animation.
@@ -76,7 +79,7 @@ fun WearCarFace(
                     val hubSize = maxWidth * HubFraction
                     // The hub sits where the cross is, so it moves with the quarter that was pressed.
                     Box(Modifier.offset { androidx.compose.ui.unit.IntOffset((press.dx * w).roundToInt(), (press.dy * h).roundToInt()) }) {
-                        WearFaceHub(value = value, caption = caption, tint = tint, size = hubSize, status = status, onClick = onHubClick)
+                        WearFaceHub(value = value, caption = caption, tint = tint, size = hubSize, state = carState, status = status, onHold = onHubHold)
                     }
                 }
             }

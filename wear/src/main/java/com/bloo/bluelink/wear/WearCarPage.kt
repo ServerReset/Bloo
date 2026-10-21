@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -104,6 +106,11 @@ internal fun WearCarPage(
     val faceStatus = rememberFaceStatus(ui)
     val update = rememberWearUpdateState()
     val pagerState = rememberPagerState(pageCount = { 2 })
+    // Back from the details page goes to the face (where the car opens), not out of the app.
+    val pageScope = rememberCoroutineScope()
+    androidx.activity.compose.BackHandler(enabled = pagerState.currentPage != 0) {
+        pageScope.launch { pagerState.animateScrollToPage(0) }
+    }
 
     confirmAction?.let { action ->
         WearConfirmScreen(

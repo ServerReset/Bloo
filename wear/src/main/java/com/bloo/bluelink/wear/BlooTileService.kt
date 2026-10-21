@@ -376,7 +376,7 @@ class BlooTileService : TileService() {
         /** The size the tile was drawn for (dp); every size scales by the display's real one over this. */
         val REFERENCE_SIDE = ReferenceFace.value
         /** The hub's share of the display: larger than the face's, so the value reads at a glance. */
-        const val HUB_FRACTION = 0.42f
+        const val HUB_FRACTION = 0.44f
         const val STALE = 0xFFFF6B6B.toInt()
         const val HUB_ID = "refresh"
         const val QUIET = 0xFF1A1A20.toInt()

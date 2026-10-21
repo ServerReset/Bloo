@@ -3,7 +3,7 @@ package com.bloo.bluelink.wear
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -30,15 +30,27 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
 
-/** The value where the four quarters meet: the charge or fuel (or the lock state), and the car's name under it. */
+/**
+ * The centre of the face: the value where the four quarters meet (the charge or fuel, or the lock state), what the car is doing
+ * under it ([state]: running, parked, locked), and the car's name -- or, for a moment, what just happened ([status]). Holding it
+ * (a long press, with a buzz) changes the four quarters.
+ */
 @Composable
-fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp, status: FaceStatus? = null, onClick: (() -> Unit)? = null) {
+fun WearFaceHub(
+    value: String,
+    caption: String,
+    tint: Color,
+    size: Dp,
+    state: String = "",
+    status: FaceStatus? = null,
+    onHold: (() -> Unit)? = null,
+) {
     val scheme = MaterialTheme.colorScheme
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val interaction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    // The hub squeezes under a finger and springs back, like the tiles round it.
-    val press by animateFloatAsState(if (pressed) 0.96f else 1f, spring(dampingRatio = 0.6f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium), label = "hubPress")
+    // The hub gives a little under a finger and springs back: less than it did, so the centre reads as steady.
+    val press by animateFloatAsState(if (pressed) 0.98f else 1f, spring(dampingRatio = 0.8f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium), label = "hubPress")
     Box(
         Modifier
             .size(size)
@@ -46,13 +58,18 @@ fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp, status: F
             .clip(CircleShape)
             .background(scheme.background)
             .then(
-                if (onClick != null) {
+                if (onHold != null) {
                     Modifier
-                        .semantics { contentDescription = "Change face controls" }
-                        .clickable(interactionSource = interaction, indication = null) {
-                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
-                            onClick()
-                        }
+                        .semantics { contentDescription = "Hold to change the four controls" }
+                        .combinedClickable(
+                            interactionSource = interaction,
+                            indication = null,
+                            onClick = {},
+                            onLongClick = {
+                                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                onHold()
+                            },
+                        )
                 } else {
                     Modifier
                 },
@@ -70,17 +87,30 @@ fun WearFaceHub(value: String, caption: String, tint: Color, size: Dp, status: F
                     // In dp-sized text: the hub is a fixed circle, so the value must not grow with the font setting.
                     // A long value ("Unlocked" for a car with no charge to show) shrinks to fit the hub instead of breaking mid-word.
                     fontSize = with(androidx.compose.ui.platform.LocalDensity.current) {
-                        val base = (size.value * 0.26f).coerceIn(14f, 26f)
-                        (if (value.length > 4) (base * 4.5f / value.length).coerceAtLeast(11f) else base).dp.toSp()
+                        val base = (size.value * 0.30f).coerceIn(16f, 32f)
+                        (if (value.length > 4) (base * 4.5f / value.length).coerceAtLeast(12f) else base).dp.toSp()
                     },
                 ),
                 maxLines = 1,
                 reduceMotion = false,
             )
+            if (state.isNotBlank() && status == null) {
+                RevealText(
+                    state,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (size.value * 0.13f).coerceIn(9f, 12f).dp.toSp() },
+                    ),
+                    color = scheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.width(size * 0.8f),
+                )
+            }
             RevealText(
                 status?.text ?: caption,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (size.value * 0.15f).coerceIn(9f, 12f).dp.toSp() },
+                    fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (size.value * 0.13f).coerceIn(9f, 12f).dp.toSp() },
                 ),
                 color = when {
                     status == null -> scheme.onSurfaceVariant

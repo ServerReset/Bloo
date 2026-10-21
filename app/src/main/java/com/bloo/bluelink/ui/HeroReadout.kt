@@ -40,6 +40,7 @@ import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.fmtMinutes
 import com.bloo.bluelink.data.formatDistance
+import com.bloo.bluelink.data.isPluggedOrCharging
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import kotlin.math.roundToInt
@@ -55,6 +56,8 @@ internal data class ChargeReadout(
     val statusLine: String,
     val statusColor: Color,
     val charging: Boolean,
+    /** Plugged in, charging or not: drives the sheen on the full part of the bar. */
+    val plugged: Boolean,
     /** Whether the state line is worth bolding: charging, or actually moving. */
     val emphasizeStatus: Boolean,
     /**
@@ -87,6 +90,7 @@ internal fun chargeReadoutOf(
     val pct = status?.percentFor(hasBattery)
     val range = status?.rangeMiFor(hasBattery)
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
+    val plugged = hasBattery && status?.evStatus.isPluggedOrCharging
     // displayChargeLimit, not targetForCurrentPlug: the latter is null when unplugged, which would
     // drop the split bar.
     val limitPct = status?.evStatus?.displayChargeLimit()?.takeIf { it in 1..99 }
@@ -127,6 +131,7 @@ internal fun chargeReadoutOf(
             }
         },
         charging = charging,
+        plugged = plugged,
         emphasizeStatus = charging || drivingLabel == "Driving",
         frac = ((pct ?: 0).coerceIn(0, 100)) / 100f,
         limitPct = limitPct,
@@ -138,11 +143,10 @@ internal fun chargeReadoutOf(
 /** The one spring the charge fill uses, so collapsed and expanded bars animate identically. */
 @Composable
 internal fun animatedChargeFrac(target: Float): Float {
-    // Deliberately bouncy: the fill overshoots the new charge a touch and springs back, which reads as the bar "landing" on
-    // the value. It also STARTS empty: the first time a bar is drawn it fills up to the charge, with the same bounce, instead of
-    // appearing already full.
+    // Glides to the charge without overshooting: a bounce on the bar read as wobbly. It STARTS empty, so the first time a bar is
+    // drawn it fills up to the charge instead of appearing already full.
     val spec = lowPowerAwareSpring<Float>(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
+        dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = Spring.StiffnessMediumLow,
     )
     val fill = remember { Animatable(0f) }

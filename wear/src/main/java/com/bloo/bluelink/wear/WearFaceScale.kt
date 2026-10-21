@@ -23,7 +23,7 @@ internal val RingGap = 5.dp
 internal val TileGap = 6.dp
 
 /** The hub's share of the inner circle's diameter. */
-internal const val HubFraction = 0.36f
+internal const val HubFraction = 0.44f
 
 /** The display the face's fixed sizes (ring, gaps, glyphs) were drawn for; every size scales by (real display / this). */
 internal val ReferenceFace = 227.dp
@@ -77,7 +77,7 @@ internal fun rememberQuadrantPress(): QuadrantPress {
             val tx = when (q) { 0, 2 -> PressGrow; 1, 3 -> -PressGrow; else -> 0f }
             val ty = when (q) { 0, 1 -> PressGrow; 2, 3 -> -PressGrow; else -> 0f }
             val spec: androidx.compose.animation.core.AnimationSpec<Float> =
-                if (bouncy.value) spring(dampingRatio = 0.38f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow) else snap()
+                if (bouncy.value) spring(dampingRatio = 0.8f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow) else snap()
             kotlinx.coroutines.coroutineScope {
                 launch { state.x.animateTo(tx, spec) }
                 launch { state.y.animateTo(ty, spec) }
