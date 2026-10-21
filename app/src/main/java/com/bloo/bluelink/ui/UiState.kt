@@ -20,6 +20,7 @@ import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.engineLabel
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.platformOverridable
 import kotlinx.coroutines.flow.update
@@ -342,9 +343,7 @@ data class UiState(
         return when {
             // Use isDriving, not a separate speed lookup, so the badge and the climate gate agree.
             isDriving(v) -> "Driving"
-            engine == true -> "Running"
-            engine == false -> "Parked"
-            else -> null
+            else -> engineLabel(engine)
         }
     }
 

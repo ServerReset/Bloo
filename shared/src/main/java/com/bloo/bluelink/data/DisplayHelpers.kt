@@ -49,6 +49,13 @@ fun doorLockLabel(locked: Boolean?): String? = when (locked) {
     null -> null
 }
 
+/** The engine word for the car: "Running" or "Parked", or null while the car has not said. Shared so the phone and the watch word it alike. */
+fun engineLabel(engineOn: Boolean?): String? = when (engineOn) {
+    true -> "Running"
+    false -> "Parked"
+    null -> null
+}
+
 /** The word for a car that is charging, shared by every surface that names the state. */
 const val CHARGING_WORD = "Charging"
 
