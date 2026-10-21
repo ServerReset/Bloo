@@ -84,8 +84,8 @@ internal object WearFaceControls {
             action = CarAction.CLIMATE_OFF,
         ),
         FaceControl(
-            key = "climate_smart", group = FaceGroup.Climate, hint = "For the weather at the car", choice = "Smart climate",
-            label = { if (it.climateOn == true) "Climate off" else "Smart climate" },
+            key = "climate_smart", group = FaceGroup.Climate, hint = "For the weather at the car", choice = CarLabels.SMART_CLIMATE,
+            label = { if (it.climateOn == true) "Climate off" else CarLabels.SMART_CLIMATE },
             icon = { AppIcons.SmartClimate }, action = CarAction.CLIMATE_SMART, active = { it.climateOn == true },
         ),
         // Choosing this in the quarter chooser opens the list of climate presets (smart climate among them), and the quarter

@@ -116,7 +116,7 @@ internal val CommandCatalog = listOf(
     ),
     CommandMetadata(
         id = "climate_smart",
-        title = "Smart climate",
+        title = CarLabels.SMART_CLIMATE,
         description = "Start climate based on current weather",
         category = CommandCategory.CLIMATE,
         icon = Icons.Filled.AcUnit,

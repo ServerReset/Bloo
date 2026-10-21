@@ -12,6 +12,7 @@ object CarLabels {
     const val START_CLIMATE = "Start climate"
     const val STOP_CLIMATE = "Stop climate"
     const val FLASH_LIGHTS = "Flash lights"
+    const val SMART_CLIMATE = "Smart climate"
 }
 
 /**

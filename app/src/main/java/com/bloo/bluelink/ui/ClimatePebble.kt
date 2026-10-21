@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
+import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
@@ -303,7 +304,7 @@ internal fun ClimatePebble(
         // normally, or the car's most aggressive setting on a genuinely extreme day, always within
         // what the car's own climate range actually accepts.
         Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            SectionLabel("Smart climate")
+            SectionLabel(CarLabels.SMART_CLIMATE)
             val w = weather
             if (w != null) {
                 val ambientF = ambientFahrenheit(w.tempC)
@@ -323,7 +324,7 @@ internal fun ClimatePebble(
             } else {
                 // No reading yet (no car location, or still loading): the button finds the weather itself when pressed.
                 MorphActionButton(
-                    label = "Smart climate",
+                    label = CarLabels.SMART_CLIMATE,
                     icon = Icons.Filled.AcUnit,
                     onClick = { vm.startSmartClimate(v) },
                     enabled = !pending && !climateOn,

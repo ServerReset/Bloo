@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.VehicleSnapshot
 
 /**
@@ -32,7 +33,7 @@ internal fun WearClimateList(
             item(key = "climate") {
                 WearPebble(title = "Climate", icon = AppIcons.Climate) {
                     WearListRow(
-                        title = "Smart climate",
+                        title = CarLabels.SMART_CLIMATE,
                         subtitle = hints[car.vin]?.let(WearSmartClimate::describe) ?: "For the weather at the car",
                         icon = AppIcons.SmartClimate,
                     ) { onPick(WearFaceControls.CLIMATE_SMART_KEY) }

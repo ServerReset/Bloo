@@ -35,7 +35,7 @@ internal fun WearClimatePebble(
             return@WearPebble
         }
         WearListRow(
-            title = "Smart climate",
+            title = CarLabels.SMART_CLIMATE,
             subtitle = hints[v.vin]?.let(WearSmartClimate::describe) ?: "For the weather at the car",
             icon = AppIcons.SmartClimate,
             pending = busy(CarAction.CLIMATE_SMART),
