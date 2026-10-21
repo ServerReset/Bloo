@@ -36,6 +36,21 @@ data class WatchSyncPayload(
     val climatePresets: Map<String, List<ClimatePreset>> = emptyMap(),
     /** Whether the phone shows temperatures in Fahrenheit, so a preset reads the same on the watch. */
     val fahrenheit: Boolean = true,
+    /** The colours of the phone's palette, so the watch wears the same ones (null from an older phone: the watch keeps the brand's). */
+    val accent: WatchAccent? = null,
+)
+
+/**
+ * The accent colours of the phone's current palette (its dark scheme: the watch is dark), as packed ARGB ints. The watch draws
+ * its buttons, headings and aurora from these, so a palette chosen on the phone (or Material You's, from its wallpaper) shows on
+ * the wrist too.
+ */
+@Serializable
+data class WatchAccent(
+    val primary: Int,
+    val onPrimary: Int,
+    val secondary: Int,
+    val tertiary: Int,
 )
 
 /**

@@ -38,11 +38,11 @@ fun AppViewModel.setThemeMode(mode: ThemeMode) = viewModelScope.launch {
     settingsStore.setThemeMode(mode)
 }
 fun AppViewModel.setFontChoice(choice: FontChoice) = viewModelScope.launch { settingsStore.setFontChoice(choice) }
-fun AppViewModel.setDynamicColor(enabled: Boolean) = viewModelScope.launch { settingsStore.setDynamicColor(enabled) }
-fun AppViewModel.setColorPalette(palette: ColorPalette) = viewModelScope.launch { settingsStore.setColorPalette(palette) }
-fun AppViewModel.saveCustomPalette(palette: CustomPaletteData) = viewModelScope.launch { settingsStore.saveCustomPalette(palette) }
+fun AppViewModel.setDynamicColor(enabled: Boolean) = viewModelScope.launch { settingsStore.setDynamicColor(enabled); pushPaletteToWatch() }
+fun AppViewModel.setColorPalette(palette: ColorPalette) = viewModelScope.launch { settingsStore.setColorPalette(palette); pushPaletteToWatch() }
+fun AppViewModel.saveCustomPalette(palette: CustomPaletteData) = viewModelScope.launch { settingsStore.saveCustomPalette(palette); pushPaletteToWatch() }
 fun AppViewModel.deleteCustomPalette(id: String) = viewModelScope.launch { settingsStore.deleteCustomPalette(id) }
-fun AppViewModel.setActiveCustomPaletteId(id: String?) = viewModelScope.launch { settingsStore.setActiveCustomPaletteId(id) }
+fun AppViewModel.setActiveCustomPaletteId(id: String?) = viewModelScope.launch { settingsStore.setActiveCustomPaletteId(id); pushPaletteToWatch() }
 
 /** Swap which dual-column side the "hot spot" pebble lives on. */
 fun AppViewModel.setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
@@ -58,7 +58,10 @@ fun AppViewModel.setGlassClaritySoon(value: Float) =
 fun AppViewModel.setUltraGlass(value: Boolean) =
     viewModelScope.launch { settingsStore.setUltraGlass(value) }
 fun AppViewModel.setVibrancySoon(value: Float) =
-    viewModelScope.launch { settingsStore.setVibrancy(value) }
+    viewModelScope.launch { settingsStore.setVibrancy(value); pushPaletteToWatch() }
+
+/** The watch wears the phone's palette (see WatchAccent), so a change to it is sent along at once. */
+private fun AppViewModel.pushPaletteToWatch() = com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
 fun AppViewModel.setHapticsEnabled(value: Boolean) = viewModelScope.launch { settingsStore.setHapticsEnabled(value) }
 
 // More of the same appearance-setter pattern described above the setThemeMode group: DataStore

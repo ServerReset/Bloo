@@ -1,6 +1,7 @@
 package com.bloo.bluelink.wear
 
 import android.content.Context
+import androidx.compose.ui.graphics.toArgb
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlooJson
 import com.bloo.bluelink.data.CarCommandRunner
@@ -9,6 +10,7 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WatchCommandRequest
 import com.bloo.bluelink.data.WatchCommandResult
+import com.bloo.bluelink.data.WatchAccent
 import com.bloo.bluelink.data.WatchLookPrefs
 import com.bloo.bluelink.data.WatchNotifyPrefs
 import com.bloo.bluelink.data.WatchSyncPayload
@@ -208,6 +210,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                     lastAdvice = Triple(watchUpdateRunNumber, watchUpdateApkUrl, watchUpdateNotes)
                 }
                 val advice = lastAdvice
+                val appearance = SettingsStore(app).appearance.first()
                 val payload = WatchSyncPayload(
                     vehicles = snapshot.vehicles,
                     selectedVin = snapshot.selectedVin,
@@ -221,7 +224,8 @@ class PhoneWatchSyncService : WearableListenerService() {
                     look = SettingsStore(app).watchLook(),
                     climatePresets = snapshot.vehicles.associate { it.vin to SettingsStore(app).climatePresets(it.vin) }
                         .filterValues { it.isNotEmpty() },
-                    fahrenheit = SettingsStore(app).appearance.first().useFahrenheit,
+                    fahrenheit = appearance.useFahrenheit,
+                    accent = watchAccentOf(app, appearance),
                 )
                 val jsonString = Json.encodeToString(WatchSyncPayload.serializer(), payload)
                 val req = PutDataMapRequest.create(WatchSyncProtocol.PATH_SNAPSHOT).apply {
@@ -236,3 +240,26 @@ class PhoneWatchSyncService : WearableListenerService() {
         }
     }
 }
+
+/**
+ * The phone's palette as the watch should wear it: the same colour scheme the phone resolves for its own screens (dark, as the
+ * watch is), with the same dynamic colour, palette, custom palette and vibrancy. Null if the scheme cannot be built (the watch
+ * then keeps what it has).
+ */
+private fun watchAccentOf(context: Context, appearance: SettingsStore.Appearance): WatchAccent? = runCatching {
+    val custom = if (!appearance.dynamicColor) appearance.customPalettes.find { it.id == appearance.activeCustomPaletteId } else null
+    val scheme = com.bloo.bluelink.ui.blooColorScheme(
+        context = context,
+        dark = true,
+        dynamicColor = appearance.dynamicColor,
+        colorPalette = appearance.colorPalette,
+        customPalette = custom,
+        vibrancy = appearance.vibrancy,
+    )
+    WatchAccent(
+        primary = scheme.primary.toArgb(),
+        onPrimary = scheme.onPrimary.toArgb(),
+        secondary = scheme.secondary.toArgb(),
+        tertiary = scheme.tertiary.toArgb(),
+    )
+}.getOrNull()

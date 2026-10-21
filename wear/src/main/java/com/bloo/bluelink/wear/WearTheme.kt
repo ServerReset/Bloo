@@ -16,15 +16,25 @@ import com.bloo.uicommon.reduceMotionCached
 /** The watch theme: a dark, high-contrast scheme for a small AMOLED watch face. */
 @Composable
 internal fun WearTheme(content: @Composable () -> Unit) {
-    val scheme = darkColorScheme(
-        primary = Color(com.bloo.bluelink.data.BlooColors.brandAccent),
-        onPrimary = Color.White,
-        secondaryContainer = Color(0xFF2A2A33),
-        onSecondaryContainer = Color.White,
-        surfaceContainer = Color(0xFF1C1C22),
-        background = Color.Black,
-        onBackground = Color.White,
-    )
+    // The phone's palette when it has sent one (a chosen palette, or Material You's from its wallpaper), else the brand's.
+    val appContext = LocalContext.current
+    remember(appContext) { WearAccent.load(appContext) }
+    val accent by WearAccent.accent.collectAsStateWithLifecycle()
+    val primary = accent?.let { Color(it.primary) } ?: Color(com.bloo.bluelink.data.BlooColors.brandAccent)
+    val onPrimary = accent?.let { Color(it.onPrimary) } ?: Color.White
+    val scheme = remember(accent) {
+        darkColorScheme(
+            primary = primary,
+            onPrimary = onPrimary,
+            secondary = accent?.let { Color(it.secondary) } ?: Color(0xFFCCC2DC),
+            tertiary = accent?.let { Color(it.tertiary) } ?: Color(0xFFEFB8C8),
+            secondaryContainer = Color(0xFF2A2A33),
+            onSecondaryContainer = Color.White,
+            surfaceContainer = Color(0xFF1C1C22),
+            background = Color.Black,
+            onBackground = Color.White,
+        )
+    }
     // The same device-condition locals the phone provides at its root, so the SHARED text component
     // behaves identically here: the line-by-line entrance is off under reduce-motion and off under
     // battery saver, exactly as on the phone -- and the watch is the device most likely to be in both.
@@ -46,8 +56,8 @@ internal fun WearTheme(content: @Composable () -> Unit) {
         // scroll and page indicators, the edge button) are Bloo-coloured rather than stock.
         androidx.wear.compose.material3.MaterialTheme(
             colorScheme = androidx.wear.compose.material3.ColorScheme(
-                primary = Color(com.bloo.bluelink.data.BlooColors.brandAccent),
-                onPrimary = Color.White,
+                primary = primary,
+                onPrimary = onPrimary,
                 background = Color.Black,
                 onBackground = Color.White,
             ),

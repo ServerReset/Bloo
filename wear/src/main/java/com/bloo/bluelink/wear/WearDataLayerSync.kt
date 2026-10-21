@@ -137,6 +137,7 @@ object WearDataLayerSync {
         WearNotificationPrefs(app).apply(payload.notify)
         WearLook.applyOrSeed(app, payload.look)
         WearPresets.update(app, payload.climatePresets, payload.fahrenheit)
+        WearAccent.apply(app, payload.accent)
         // A cold process has no cars in memory yet; what was stored last time is the "before", or a charge that completed while
         // the app was closed would raise nothing (a first sighting never alerts).
         val before = _vehicles.value.ifEmpty { runCatching { SnapshotStore(app).current().vehicles }.getOrDefault(emptyList()) }
