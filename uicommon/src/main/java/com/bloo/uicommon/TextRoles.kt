@@ -2,6 +2,7 @@ package com.bloo.uicommon
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
@@ -19,10 +20,12 @@ import androidx.compose.ui.Modifier
  * here, so the treatment is identical everywhere.
  */
 @Composable
-fun secondaryTextStyle(): TextStyle = MaterialTheme.typography.bodyMedium.copy(
-    fontWeight = FontWeight.SemiBold,
-    shadow = secondaryTextShadow(),
-)
+fun secondaryTextStyle(): TextStyle {
+    val base = MaterialTheme.typography.bodyMedium
+    val shadow = secondaryTextShadow()
+    // Remembered: a copy per recomposition, over a hundred call sites, built the same style again and again.
+    return remember(base, shadow) { base.copy(fontWeight = FontWeight.SemiBold, shadow = shadow) }
+}
 
 /**
  * THE two text roles of the app. Every line of text is one of these, so a reader always knows what it is:
@@ -32,7 +35,10 @@ fun secondaryTextStyle(): TextStyle = MaterialTheme.typography.bodyMedium.copy(
  * Figures (the big percentage, the range) are a third thing, drawn by their own components, not text in either role.
  */
 @Composable
-fun PrimaryTextStyle(): TextStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+fun PrimaryTextStyle(): TextStyle {
+    val base = MaterialTheme.typography.bodyLarge
+    return remember(base) { base.copy(fontWeight = FontWeight.Medium) }
+}
 
 @Composable
 fun SecondaryTextStyle(): TextStyle = secondaryTextStyle()
@@ -46,10 +52,10 @@ fun secondaryTextColor(): Color = MaterialTheme.colorScheme.onSurface.copy(alpha
  * shadow, so glyph edges lift off a busy background without a visible drop shadow.
  */
 @Composable
-fun secondaryTextShadow(): Shadow = Shadow(
-    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
-    blurRadius = SecondaryHaloBlurPx,
-)
+fun secondaryTextShadow(): Shadow {
+    val color = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
+    return remember(color) { Shadow(color = color, blurRadius = SecondaryHaloBlurPx) }
+}
 
 /** A decently strong halo, in device px (text shadows are not density-scaled). */
 internal const val SecondaryHaloBlurPx = 9f

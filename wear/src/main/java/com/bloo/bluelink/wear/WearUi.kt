@@ -58,6 +58,8 @@ import androidx.wear.compose.material3.TimeText
 import com.bloo.uicommon.MorphButton
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.SectionHeading
+import com.bloo.uicommon.LabelValueRow
 import com.bloo.uicommon.standardButtonIcon
 
 /*
@@ -146,24 +148,17 @@ fun WearPebble(
         modifier.fillMaxWidth().padding(horizontal = ListInset),
         verticalArrangement = Arrangement.spacedBy(RowGap),
     ) {
-        Row(
-            Modifier.fillMaxWidth().fitRound(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
-            RevealText(
-                title,
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.labelLarge,
-                // Explicit: the shared component draws with the phone Material3's Text, whose
-                // unspecified colour is its own LocalContentColor rather than this theme's.
-                color = scheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        // The same heading as the phone's sections (:uicommon), centred for the round face and in the watch's own tint and size.
+        SectionHeading(
+            title, icon,
+            modifier = Modifier.fitRound(),
+            centered = true,
+            iconTint = scheme.primary,
+            iconSize = 16.dp,
+            titleStyle = MaterialTheme.typography.labelLarge,
+            titleColor = scheme.onSurface,
+            titleWeight = FontWeight.SemiBold,
+        )
         body()
     }
 }
@@ -583,20 +578,11 @@ internal fun WearStatRow(label: String, value: String, valueColor: Color? = null
             .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RevealText(
-            label,
-            style = MaterialTheme.typography.bodySmall,
-            color = scheme.onSurfaceVariant,
-            maxLines = 1,
-            modifier = Modifier.weight(1f),
-        )
-        RevealText(
-            value,
-            style = MaterialTheme.typography.bodySmall,
-            color = valueColor ?: scheme.onSurface,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        LabelValueRow(
+            label = label,
+            value = value,
+            labelColor = scheme.onSurfaceVariant,
+            valueColor = valueColor ?: scheme.onSurface,
         )
     }
 }

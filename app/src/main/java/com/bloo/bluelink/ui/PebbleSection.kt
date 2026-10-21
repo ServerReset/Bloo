@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.SectionHeading
 
 /**
  * One headed group inside a pebble (Car info, Diagnostics): a heading with its glyph and, optionally, a one-word verdict at the
@@ -43,21 +44,7 @@ internal fun PebbleSection(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = LocalContentColor.current.copy(alpha = 0.7f))
-            Spacer(Modifier.width(GapRow))
-            Box(Modifier.weight(1f)) { SectionLabel(title) }
-            if (trailing != null) {
-                RevealText(
-                    trailing,
-                    style = PrimaryTextStyle(),
-                    fontWeight = FontWeight.SemiBold,
-                    color = trailingColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        SectionHeading(title, icon, trailing = trailing, trailingColor = trailingColor)
         if (panel) {
             Column(
                 Modifier

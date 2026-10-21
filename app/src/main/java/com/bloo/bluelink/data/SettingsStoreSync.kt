@@ -193,7 +193,14 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
         // upload here therefore became a Drive write every ~10 seconds, forever, feeding itself.
         // Only a pass with dirty keys, a registry/primary change, a first-ever sync, or a file we
         // have not written yet actually uploads; everything else is a no-op read.
-        val registryChanged = outcomeDevices != remoteDevices
+        // This device's own entry is stamped "seen now" on every pass, so comparing the whole registry always reads as changed and
+        // every poll rewrote the file. Only a REAL change counts: another device's entry, this device's own name/model/version, or
+        // the heartbeat falling due (so a quiet device still reads as active to the others).
+        val remoteSelf = remoteDevices.firstOrNull { it.id == self.id }
+        val selfChanged = remoteSelf == null || remoteSelf.copy(lastSeenMs = self.lastSeenMs) != self
+        val heartbeatDue = remoteSelf == null || now - remoteSelf.lastSeenMs >= REGISTRY_HEARTBEAT_MS
+        val othersChanged = outcomeDevices.filterNot { it.id == self.id } != remoteDevices.filterNot { it.id == self.id }
+        val registryChanged = selfChanged || heartbeatDue || othersChanged
         val primaryChanged = primaryToWrite != remoteMeta?.primaryDeviceId
         val fileAlreadyCarriesUs = remoteHasContent && remoteHash != null && remoteHash == syncLastHash()
         val nothingToUpload = !SyncPoll.shouldUpload(
@@ -373,3 +380,6 @@ private suspend fun <T> SettingsStore.withDriveRetry(block: suspend () -> T): T 
     kotlinx.coroutines.delay(1000)
     block()
 }
+
+/** How long this device may go without rewriting its "last seen" in the shared registry (kept under the "Active now" window). */
+private const val REGISTRY_HEARTBEAT_MS = 5L * 60 * 1000
