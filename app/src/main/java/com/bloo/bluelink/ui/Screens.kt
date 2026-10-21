@@ -368,7 +368,7 @@ fun BlooApp(vm: AppViewModel) {
     ShareIntakeHost(vm, stateHolder)
 
     // The welcome cards, when summoned from Settings: over the app, dismissed back to it.
-    AnimatedVisibility(
+    androidx.compose.animation.AnimatedVisibility(
         visible = welcomeCardsOpen,
         enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)),
         exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MotionShort)),

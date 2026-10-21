@@ -326,7 +326,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 // on the last card, which keeps it. Without that the swipe section ends with no
                 // control on screen at all: the bar is gone, Back is gone, and the only way out is a
                 // gesture whose hand-off page is blank. Anyone it fails for is simply stuck.
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     visible = !inSwipe || isLast,
                     enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionShort)) +
                         androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(MotionShort)) { it },

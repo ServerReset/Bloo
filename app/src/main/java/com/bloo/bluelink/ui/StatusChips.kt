@@ -147,7 +147,7 @@ private fun UpdateAvailableDot(modifier: Modifier = Modifier) {
 internal fun UpdateBadgedCard(visible: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Box(modifier) {
         content()
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = visible,
             enter = androidx.compose.animation.scaleIn(
                 lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),

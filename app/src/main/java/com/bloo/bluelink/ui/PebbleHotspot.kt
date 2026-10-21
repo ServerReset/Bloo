@@ -172,7 +172,7 @@ internal fun HotspotSlot(
                     // page when the pager moves, and a vertical drag on it scrolls the column like any other part of it. Only
                     // while it is dragged out does the column draw above the stack (see HotSeatDrag.pinnedActive).
                     if (secondaryPebble != null) PinnedPebble(v, stateSource, vm, secondaryPebble, hotDrag)
-                    AnimatedVisibility(
+                    androidx.compose.animation.AnimatedVisibility(
                         // Retreats the moment a released pebble starts its flight in (pendingPin), so
                         // the zone is already leaving as the pebble arrives rather than lingering under
                         // it once it has landed.
