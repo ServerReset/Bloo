@@ -36,6 +36,7 @@ import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.chargerLabel
 import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.degLabel
+import com.bloo.bluelink.data.doorLockLabel
 import com.bloo.bluelink.data.fmtMinutes
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.isGen5W
@@ -78,14 +79,14 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     // A null summary is omitted by Pebble, so the header simply carries no lock word until we
     // actually know -- rather than asserting a state as fact in visible text and to TalkBack.
     // Matches the lock control, which already handles unknown.
-    val infoSummary = status?.doorLock?.let { if (it) "Locked" else "Unlocked" }
+    val infoSummary = doorLockLabel(status?.doorLock)
     val glance = LocalForceExpanded.current
     Pebble(v, "info", "Car info", AppIcons.Info, state, vm, modifier, summary = infoSummary) {
         PebbleStatusGate(status, state.refreshing) { status ->
             val hasBattery = state.hasBattery(v)
             PebbleSection("Status", AppIcons.Info) {
                 status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
-                status.doorLock?.let { StatusRow("Doors", if (it) "Locked" else "Unlocked") }
+                doorLockLabel(status.doorLock)?.let { StatusRow("Doors", it) }
                 status.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
                     ?.let { StatusRow("Doors open", it.joinToString(", ")) }
                 status.windowOpen?.openLabels()?.takeIf { it.isNotEmpty() }

@@ -42,6 +42,13 @@ fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
  */
 const val KM_PER_MI = 1.609344
 
+/** The door-lock word for the car: "Locked" or "Unlocked", or null while the car has not said. Shared so the phone and the watch word it alike. */
+fun doorLockLabel(locked: Boolean?): String? = when (locked) {
+    true -> "Locked"
+    false -> "Unlocked"
+    null -> null
+}
+
 /**
  * Format a distance in miles as "mi" or "km" based on the unit system. The API's distance figures
  * are always miles, so metric users get a multiply by [KM_PER_MI] and a re-labelled unit; imperial

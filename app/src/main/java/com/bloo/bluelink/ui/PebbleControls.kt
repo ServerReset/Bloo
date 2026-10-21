@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.doorLockLabel
 import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
@@ -209,9 +210,7 @@ internal fun PrimaryActions(
     val highlighted = locked == false
     val stateText = when {
         pending -> "Sending…"
-        locked == true -> "Locked"
-        locked == false -> "Unlocked"
-        else -> "Unknown"
+        else -> doorLockLabel(locked) ?: "Unknown"
     }
     val stateColor = when {
         locked == false -> scheme.error

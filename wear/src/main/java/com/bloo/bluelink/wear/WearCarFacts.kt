@@ -1,6 +1,7 @@
 package com.bloo.bluelink.wear
 
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.doorLockLabel
 import com.bloo.bluelink.data.isDriving
 import com.bloo.bluelink.data.serviceCountdown
 import com.bloo.bluelink.data.serviceDue
@@ -16,7 +17,7 @@ internal object WearCarFacts {
     fun status(v: VehicleSnapshot): List<Pair<String, String>> = buildList {
         if (v.hasBattery) v.percent?.let { add("Battery" to "$it%") }
         v.rangeMi?.let { add("Range" to "$it mi") }
-        v.locked?.let { add("Doors" to (if (it) "Locked" else "Unlocked")) }
+        doorLockLabel(v.locked)?.let { add("Doors" to it) }
         v.climateOn?.let { add("Climate" to (if (it) "On" else "Off")) }
         if (v.hasBattery) {
             v.charging?.let { add("Charging" to (if (it) "Yes" else "No")) }

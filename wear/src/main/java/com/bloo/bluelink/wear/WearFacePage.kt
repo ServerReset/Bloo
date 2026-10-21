@@ -12,6 +12,7 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
+import com.bloo.bluelink.data.doorLockLabel
 import com.bloo.bluelink.data.isStale
 
 /**
@@ -75,6 +76,6 @@ internal fun WearFacePage(
 /** What the car is doing, in a few words for the centre of the face: running or parked, locked or not, the climate on. */
 internal fun carStateLine(v: VehicleSnapshot): String = listOfNotNull(
     v.engineOn?.let { if (it) "Running" else "Parked" },
-    v.locked?.let { if (it) "Locked" else "Unlocked" },
+    doorLockLabel(v.locked),
     if (v.climateOn == true) "Climate on" else null,
 ).joinToString(" · ")
