@@ -52,48 +52,25 @@ internal fun <T : Any> PebbleStatusGate(status: T?, refreshing: Boolean, content
     }
 }
 
-/**
- * The app's one style for "small text that is just there" -- captions, labels, muted one-liners.
- * Bigger and Medium-weight so it reads without squinting, full-strength onSurface so it clears the
- * contrast bar on glass, and a soft blurred halo in the surface colour behind the glyphs so it holds
- * its own over the aurora instead of melting into it. Every secondary-text helper routes through
- * here, so the treatment is identical everywhere.
- */
+/** The style of secondary text, from the shared roles in :uicommon (see TextRoles.kt). */
 @Composable
-internal fun secondaryTextStyle(): TextStyle = MaterialTheme.typography.bodyMedium.copy(
-    fontWeight = FontWeight.SemiBold,
-    shadow = secondaryTextShadow(),
-)
+internal fun secondaryTextStyle(): TextStyle = com.bloo.uicommon.SecondaryTextStyle()
 
-/**
- * THE two text roles of the app. Every line of text is one of these, so a reader always knows what it is:
- * - PRIMARY: what the line says (a name, a value, a title, a row's label). Body large, medium weight, full contrast.
- * - SECONDARY: what it is about (a caption, a status, a unit, a hint, an explanation). Body medium, semi-bold, muted,
- *   with the soft halo that lifts it off a busy backdrop.
- * Figures (the big percentage, the range) are a third thing, drawn by their own components, not text in either role.
- */
+/** The primary role's style, from :uicommon. */
 @Composable
-internal fun PrimaryTextStyle(): TextStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+internal fun PrimaryTextStyle(): TextStyle = com.bloo.uicommon.PrimaryTextStyle()
 
+/** The secondary role's style, from :uicommon. */
 @Composable
-internal fun SecondaryTextStyle(): TextStyle = secondaryTextStyle()
+internal fun SecondaryTextStyle(): TextStyle = com.bloo.uicommon.SecondaryTextStyle()
 
-/** Secondary text's colour: onSurface, barely eased -- contrast, not a grey wash. */
+/** Secondary text's colour, from :uicommon. */
 @Composable
-internal fun secondaryTextColor(): Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
+internal fun secondaryTextColor(): Color = com.bloo.uicommon.secondaryTextColor()
 
-/**
- * The halo behind secondary text: a blurred copy of the surface colour the text sits on, not a hard
- * shadow, so glyph edges lift off a busy background without a visible drop shadow.
- */
+/** The halo behind secondary text, from :uicommon. */
 @Composable
-internal fun secondaryTextShadow(): Shadow = Shadow(
-    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
-    blurRadius = SecondaryHaloBlurPx,
-)
-
-/** A decently strong halo, in device px (text shadows are not density-scaled). */
-private const val SecondaryHaloBlurPx = 9f
+internal fun secondaryTextShadow(): Shadow = com.bloo.uicommon.secondaryTextShadow()
 
 /** The muted secondary line; the same text as [BodySmallText] (one implementation for every muted line). */
 @Composable
@@ -149,6 +126,19 @@ internal fun TitleSmallText(
 ) {
     RevealText(text, style = PrimaryTextStyle(), modifier = modifier, color = color, fontWeight = fontWeight)
 }
+
+/** The PRIMARY role as text (see :uicommon's TextRoles.kt). */
+@Composable
+internal fun PrimaryText(
+    text: String,
+    modifier: Modifier = Modifier,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+) = com.bloo.uicommon.PrimaryText(text, modifier, maxLines, overflow)
+
+/** The SECONDARY role as text: same as [BodySmallText]. */
+@Composable
+internal fun SecondaryText(text: String, modifier: Modifier = Modifier) = BodySmallText(text, modifier)
 
 /** The circular tinted container [IconBadge] draws into. */
 @Composable
