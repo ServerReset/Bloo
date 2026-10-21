@@ -198,4 +198,19 @@ class SyncMergeDriveTest {
         assertEquals("realtophash", meta.hash)          // top-level _hash read from root
         assertNull(meta.writerDeviceId)                 // no top-level _writerDeviceId (it was inside prefs)
     }
+
+    // The registry is shown in one order everywhere: the primary on top, the rest in the order the file holds them.
+    @Test
+    fun orderDevicesPutsThePrimaryOnTopAndKeepsTheRestInFileOrder() {
+        val a = SyncMerge.SyncDevice(id = "a", name = "Fold")
+        val b = SyncMerge.SyncDevice(id = "b", name = "Pixel")
+        val c = SyncMerge.SyncDevice(id = "c", name = "Tablet")
+        assertEquals(listOf("b", "a", "c"), SyncMerge.orderDevices(listOf(a, b, c), "b").map { it.id })
+        // The old primary falls to second place when another device is dragged to the top.
+        val afterFirstDrag = SyncMerge.orderDevices(listOf(a, b, c), "b")
+        assertEquals(listOf("c", "b", "a"), SyncMerge.orderDevices(afterFirstDrag, "c").map { it.id })
+        // No primary, or one that is not in the list: the file's order stands.
+        assertEquals(listOf("a", "b", "c"), SyncMerge.orderDevices(listOf(a, b, c), null).map { it.id })
+        assertEquals(listOf("a", "b", "c"), SyncMerge.orderDevices(listOf(a, b, c), "zzz").map { it.id })
+    }
 }
