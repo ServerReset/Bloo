@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.dp
 // Was a phone-only re-declaration of the same hex values shared/BlooColors.kt already centralizes
 // (bit-identical today, one edit away from silently diverging like chargerLabel's text had).
 internal val ChargeGreen = Color(com.bloo.bluelink.data.BlooColors.chargeGreen)
-internal val ChargeGreenDark = Color(com.bloo.bluelink.data.BlooColors.chargeGreenDark)
 
 /** Climate seat/wheel tints, on the canonical semantic heat/cool tokens. */
 internal val Heat = Color(com.bloo.bluelink.data.BlooColors.heat)
@@ -24,13 +23,6 @@ internal val Cool = Color(com.bloo.bluelink.data.BlooColors.cool)
 
 /** The "something new" notification dot colour (the canonical warning amber). */
 internal val UpdateAvailableAmber = Color(com.bloo.bluelink.data.BlooColors.warn)
-
-/**
- * The charge bar's "topped up" state: the pack has reached its configured limit. See
- * ChargeSegmentBar.
- */
-internal val ChargeBlue = Color(com.bloo.bluelink.data.BlooColors.chargeBlue)
-internal val ChargeBlueDark = Color(com.bloo.bluelink.data.BlooColors.chargeBlueDark)
 
 /** The app's muted/secondary-text alpha over LocalContentColor. 0.86: strong enough to clear contrast on busy glass, still a step below full so a value can stand out beside its label. */
 internal const val MutedContentAlpha = 0.86f

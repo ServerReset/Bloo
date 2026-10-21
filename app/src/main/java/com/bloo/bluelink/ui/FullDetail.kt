@@ -232,12 +232,6 @@ private fun Modifier.hotSeatReveal(t: () -> Float): Modifier = this
         }
     }
 
-/** 0 until the reflow is mostly done, then a smoothstep up to 1: the pinned pebble comes in last. */
-private fun hotSeatArrival(t: Float): Float {
-    val x = ((t - 0.75f) / 0.25f).coerceIn(0f, 1f)
-    return x * x * (3f - 2f * x)
-}
-
 /** 0 until the reflow's midpoint, then a smoothstep up to 1 at the end. */
 private fun hotSeatFraction(t: Float): Float {
     val x = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f)
