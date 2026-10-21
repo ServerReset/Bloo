@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.climatePresetDetail
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatLevel
@@ -58,24 +59,24 @@ class ClimateLabelTest {
 
     @Test
     fun presetDetail_bareTemperatureWithUnitRespected() {
-        assertEquals("70°", presetDetail(req(70), fahrenheit = true))
+        assertEquals("70°", climatePresetDetail(req(70), fahrenheit = true))
         // Fahrenheit input converted per the shared degValue rule: 68°F -> 20°C.
-        assertEquals("20°", presetDetail(req(68), fahrenheit = false))
+        assertEquals("20°", climatePresetDetail(req(68), fahrenheit = false))
     }
 
     @Test
     fun presetDetail_defrostAndSeatsAppend() {
-        assertEquals("80° · Defrost", presetDetail(req(80, defrost = true), fahrenheit = true))
-        assertEquals("72° · Heat", presetDetail(req(72, heat = true), fahrenheit = true))
-        assertEquals("65° · Cool", presetDetail(req(65, cool = true), fahrenheit = true))
-        assertEquals("75° · Wheel", presetDetail(req(75, wheel = true), fahrenheit = true))
+        assertEquals("80° · Defrost", climatePresetDetail(req(80, defrost = true), fahrenheit = true))
+        assertEquals("72° · Heat", climatePresetDetail(req(72, heat = true), fahrenheit = true))
+        assertEquals("65° · Cool", climatePresetDetail(req(65, cool = true), fahrenheit = true))
+        assertEquals("75° · Wheel", climatePresetDetail(req(75, wheel = true), fahrenheit = true))
     }
 
     @Test
     fun presetDetail_rawTempTargetNeverLeaksIntoTheSummary() {
         // An unnamed temp target must never leak its raw value into the summary --
         // it should always carry a clean name or the generic word instead.
-        val d = presetDetail(req(70), fahrenheit = true)
+        val d = climatePresetDetail(req(70), fahrenheit = true)
         assertEquals("70°", d)
     }
 }
