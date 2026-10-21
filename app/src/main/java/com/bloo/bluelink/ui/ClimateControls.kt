@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
@@ -61,7 +62,6 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.TitleSubtitle
 import com.bloo.uicommon.MorphIconButton
 import com.bloo.uicommon.MorphButton
-import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.ButtonLabelStyle
 import com.bloo.uicommon.rememberConfirmArm
 import kotlin.math.roundToInt
@@ -180,9 +180,12 @@ internal fun ClimatePresetSection(
     onStart: (ClimatePreset) -> Unit,
     onDelete: (String) -> Unit,
     onReorder: (List<ClimatePreset>) -> Unit,
+    onRename: (id: String, name: String) -> Unit,
 ) {
     // Track IDs mid-exit so the item stays visible until its shrink animation ends.
     var deletingIds by remember { mutableStateOf(setOf<String>()) }
+    // The preset being renamed (the pencil), until its name is saved or the dialog is closed.
+    var renaming by remember { mutableStateOf<ClimatePreset?>(null) }
     val scope = rememberCoroutineScope()
 
     AnimatedVisibility(
@@ -215,6 +218,7 @@ internal fun ClimatePresetSection(
                         detail = climatePresetDetail(preset.request, fahrenheit),
                         active = preset.id == activeId,
                         onStart = { onStart(preset) },
+                        onEdit = { renaming = preset },
                         onDelete = {
                             val id = preset.id
                             scope.launch {
@@ -231,12 +235,43 @@ internal fun ClimatePresetSection(
             Spacer(Modifier.height(GapHairline))
         }
     }
+    renaming?.let { preset ->
+        var draft by remember(preset.id) { mutableStateOf(preset.name) }
+        GlassAlertDialog(
+            onDismissRequest = { renaming = null },
+            icon = Icons.Filled.Edit,
+            title = "Rename preset",
+            text = {
+                BlooTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    label = { RevealText("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            buttons = {
+                MorphTextButton(
+                    "Save",
+                    onClick = {
+                        if (draft.isNotBlank()) onRename(preset.id, draft)
+                        renaming = null
+                    },
+                    enabled = draft.isNotBlank(),
+                    emphasis = ButtonEmphasis.Confirm,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                MorphTextButton("Cancel", onClick = { renaming = null }, emphasis = ButtonEmphasis.Deny, modifier = Modifier.fillMaxWidth())
+            },
+        )
+    }
 }
 
 /**
- * One saved climate preset as a row: a full-width button that applies it (its badge, its name and what it sets, the primary
- * fill while it is the one running), with a delete button beside it. Delete needs a second tap to confirm (auto-resets, like
- * Sign out): a mis-aimed tap beside Apply dropped a preset for good. The row is the drag handle, so it re-ranks by holding it.
+ * One saved climate preset as a row, on the standard morph buttons: the preset's icon and its name (what it sets underneath),
+ * the primary fill while it is the one running, a pencil to rename it, and an X to delete it. Delete needs a second tap to
+ * confirm (auto-resets): a mis-aimed tap beside Apply dropped a preset for good. The row is the drag handle, so holding it
+ * re-ranks the presets.
  */
 @Composable
 internal fun PresetPill(
@@ -244,6 +279,7 @@ internal fun PresetPill(
     detail: String,
     active: Boolean,
     onStart: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -265,14 +301,8 @@ internal fun PresetPill(
             minHeight = ButtonTargetHeight,
             modifier = Modifier.weight(1f),
         ) {
-            IconBadge(
-                icon = Icons.Filled.AcUnit,
-                tint = if (active) scheme.onPrimary else scheme.primary,
-                containerColor = if (active) scheme.onPrimary.copy(alpha = 0.18f) else scheme.primary.copy(alpha = 0.14f),
-                size = 36.dp,
-                iconSize = 19.dp,
-            )
-            Spacer(Modifier.width(GapGroup))
+            Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+            Spacer(Modifier.width(ButtonIconGap))
             TitleSubtitle(
                 title = name,
                 subtitle = detail.ifBlank { null },
@@ -282,6 +312,9 @@ internal fun PresetPill(
                 subtitleColor = if (active) scheme.onPrimary.copy(alpha = 0.8f) else mutedContentColor(),
                 maxLines = 2,
             )
+        }
+        MorphIconButton(onClick = { haptics?.tick(); onEdit() }) {
+            Icon(Icons.Filled.Edit, contentDescription = "Rename $name", modifier = Modifier.size(ButtonIconSize))
         }
         MorphIconButton(
             onClick = {

@@ -294,6 +294,7 @@ internal fun ClimatePebble(
                 vm.deleteClimatePreset(v, id)
             },
             onReorder = { vm.reorderClimatePresets(v, it) },
+            onRename = { id, name -> vm.renameClimatePreset(v, id, name) },
         )
 
         // Smart climate: read the weather where the car is (falling back to home) and pick a target
