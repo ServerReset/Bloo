@@ -77,6 +77,20 @@ internal fun StatusRow(label: String, value: String, valueMono: Boolean = false)
     )
 }
 
+/** A fact whose value is long (an address): the label above it and the value below, full width, instead of a squeezed half row. */
+@Composable
+internal fun StackedRow(label: String, value: String) {
+    Column(Modifier.fillMaxWidth()) {
+        RowLabel(label)
+        RevealText(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
 /** A small bold group heading used inside the Car-info pebble. */
 @Composable
 internal fun SectionLabel(text: String) {
