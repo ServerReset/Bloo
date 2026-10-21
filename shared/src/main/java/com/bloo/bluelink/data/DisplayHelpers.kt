@@ -49,6 +49,9 @@ fun doorLockLabel(locked: Boolean?): String? = when (locked) {
     null -> null
 }
 
+/** The charging word for the car's widget and preview: "Charging" or "Not charging". */
+fun chargingLabel(charging: Boolean): String = if (charging) "Charging" else "Not charging"
+
 /**
  * Format a distance in miles as "mi" or "km" based on the unit system. The API's distance figures
  * are always miles, so metric users get a multiply by [KM_PER_MI] and a re-labelled unit; imperial

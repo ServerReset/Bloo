@@ -44,6 +44,7 @@ import coil.compose.AsyncImage
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
+import com.bloo.bluelink.data.chargingLabel
 import com.bloo.bluelink.data.stateLineOrParked
 
 /** The widget sizes the settings preview can show: launcher cells as the widget sees them (110dp is 2 cells). */
@@ -223,7 +224,7 @@ private fun PreviewChips(car: VehicleSnapshot?, max: Int) {
     val scheme = MaterialTheme.colorScheme
     val chips = buildList {
         add((if (car?.climateOn == true) "Climate on" else "Climate off") to (car?.climateOn == true))
-        if (car?.hasBattery != false) add((if (car?.charging == true) "Charging" else "Not charging") to (car?.charging == true))
+        if (car?.hasBattery != false) add(chargingLabel(car?.charging == true) to (car?.charging == true))
         car?.chargeLimitPct?.let { add("Limit $it%" to false) }
     }.take(max)
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
