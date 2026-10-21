@@ -11,12 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -66,7 +60,6 @@ import com.bloo.uicommon.standardButtonIcon
 import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.secondaryTextColor
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.Surface
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -218,7 +211,7 @@ fun WearActionRow(
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val tint = if (active) scheme.onPrimary else scheme.onSurface
+    val tint = if (active) scheme.primary else scheme.onSurface
     // The app's glyph for this label when the caller has none, and the app's own icon+label layout --
     // the one that drops the label rather than truncating a word, and swaps the glyph for the shared
     // in-flight spinner. Boxed because the label has to take the row's spare width here, so the
@@ -243,13 +236,12 @@ fun WearActionRow(
         // The glyph (or the in-flight spinner) and the label side by side, the label taking the row and wrapping to a
         // second line before it is ever cut. The shared icon-and-label layout DROPPED the label when it did not fit,
         // which left long rows ("Lock when I walk away", "Top left: Lock / unlock") as an icon and nothing else.
-        // The phone's switch (:uicommon's SwitchTrack). On, the row itself is filled with the accent, so the track is a
-        // lighter wash of the on-accent tone with the thumb in it; off, it is the muted pill the phone draws.
+        // The phone's switch (:uicommon's SwitchTrack), in the phone's own colours: the accent when on, the muted pill when off.
         val switchTrack: @Composable () -> Unit = {
             SwitchTrack(
                 checked = active,
-                trackOn = scheme.onPrimary.copy(alpha = 0.35f),
-                trackOff = scheme.onSurface.copy(alpha = 0.16f),
+                trackOn = scheme.primary,
+                trackOff = scheme.surfaceVariant,
                 thumbOn = scheme.onPrimary,
                 thumbOff = scheme.onSurfaceVariant,
             )
@@ -273,7 +265,7 @@ fun WearActionRow(
                         label, description, Modifier.weight(1f),
                         titleStyle = MaterialTheme.typography.labelLarge, titleColor = tint, titleWeight = FontWeight.SemiBold,
                         subtitleStyle = MaterialTheme.typography.labelSmall,
-                        subtitleColor = if (active) scheme.onPrimary.copy(alpha = 0.8f) else scheme.onSurfaceVariant,
+                        subtitleColor = scheme.onSurfaceVariant,
                         maxLines = 2,
                     )
                 }
@@ -304,30 +296,17 @@ internal fun WearButton(
 ) {
     val scheme = MaterialTheme.colorScheme
     val haptics = LocalHapticFeedback.current
-    // The shape the button wears, animated by the same press the button itself morphs on: a full pill at rest, a rounded square
-    // while pressed or on. The frosted layer behind it is clipped to this shape, so it changes with the button instead of
-    // holding the pill and hiding the morph.
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val corner by animateFloatAsState(
-        if (pressed || active) MorphedCorner else PillCorner,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
-        label = "buttonCorner",
-    )
+    // Plain, as the phone's setting rows are: no glass and no fill. The active state is carried by the text colour, and by the
+    // switch on a switch row, rather than by a filled container.
     MorphButton(
         onClick = onClick,
-        interactionSource = interaction,
-        // Frosted: the aurora behind the row, blurred (when the device allows), under the translucent fill below.
-        modifier = modifier.wearGlassBlur(RoundedCornerShape(corner.toInt().coerceIn(1, 50))),
+        modifier = modifier,
         enabled = enabled,
         active = active,
-        // Glass, as on the phone: a translucent pill that lets the aurora through; the filled primary is
-        // kept for a switch that is on.
-        // The phone's own default button colours (its Tonal emphasis: secondary container, on-secondary content), as glass.
-        containerColor = scheme.secondaryContainer.copy(alpha = 0.7f),
-        contentColor = scheme.onSecondaryContainer,
-        activeContainerColor = scheme.primary,
-        activeContentColor = scheme.onPrimary,
+        containerColor = Color.Transparent,
+        contentColor = scheme.onSurface,
+        activeContainerColor = Color.Transparent,
+        activeContentColor = scheme.primary,
         contentPadding = contentPadding,
         minHeight = RowMinHeight,
         pillCornerPercent = PillCorner,
@@ -392,8 +371,8 @@ fun WearListRow(
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val tint = if (active) scheme.onPrimary else scheme.onSurface
-    val quiet = if (active) scheme.onPrimary.copy(alpha = 0.8f) else secondaryTextColor()
+    val tint = if (active) scheme.primary else scheme.onSurface
+    val quiet = secondaryTextColor()
     WearButton(
         active = active,
         enabled = enabled && !pending,
