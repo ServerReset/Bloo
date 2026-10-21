@@ -129,6 +129,12 @@ data class UiState(
     val aiAvailability: com.bloo.bluelink.data.AiAvailability? = null,
     /** The car (VIN) whose photo someone just asked to change; the root photo host consumes it. */
     val photoPickRequest: String? = null,
+    /** A picture shared into the app from another app, waiting for the car it is for (see ShareIntake.kt). */
+    val sharedImageUri: String? = null,
+    /** The car a shared picture is for, once chosen; the crop step runs for it. */
+    val sharedImageVin: String? = null,
+    /** A settings file shared into the app that checked out as a Bloo backup, waiting for the wearer to confirm. */
+    val sharedSettingsUri: String? = null,
     /** Summarize each car on open/refresh without being asked. Off by default; only meaningful when [aiActive]. */
     val aiAutoSummarize: Boolean = false,
     val aiSummaries: Map<String, String> = emptyMap(),

@@ -7,7 +7,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
+import androidx.core.content.IntentCompat
 import android.os.Bundle
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -21,6 +23,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.data.StartupTrace
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.ui.offerSharedFile
 import com.bloo.bluelink.ui.recheckAiOnForeground
 import com.bloo.bluelink.ui.summarizeMissingOnForeground
 import com.bloo.bluelink.ui.AppViewModel
@@ -131,6 +134,7 @@ class MainActivity : FragmentActivity() {
         // silently on first launch.
         if (savedInstanceState == null) {
             handleShortcutIntent(intent)
+            handleShareIntent(intent)
             setIntent(Intent())
         }
         StartupTrace.mark("MainActivity: pre-setContent work done")
@@ -247,9 +251,19 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleShortcutIntent(intent)
+        handleShareIntent(intent)
     }
 
     /** Route an app-icon shortcut (lock/unlock/climate/open a car) to the VM. */
+    /** A picture or a settings file shared into the app from another app's share sheet; see ShareIntake.kt. */
+    private fun handleShareIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND) return
+        val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) ?: return
+        viewModel.offerSharedFile(uri, intent.type ?: contentResolver.getType(uri))
+        // Taken, so a later re-delivery of this same intent does not offer the file again.
+        intent.action = null
+    }
+
     private fun handleShortcutIntent(intent: Intent?) {
         if (intent?.action != Shortcuts.ACTION) return
         val vin = intent.getStringExtra(Shortcuts.EXTRA_VIN) ?: return

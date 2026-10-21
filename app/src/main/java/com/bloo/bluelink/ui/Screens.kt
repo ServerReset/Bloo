@@ -361,6 +361,9 @@ fun BlooApp(vm: AppViewModel) {
     // Choosing and cropping a car photo, for whichever page (or request) asked for one.
     CarPhotoPickerHost(vm, photoPickRequest)
 
+    // A picture or a settings file shared into the app from the share sheet.
+    ShareIntakeHost(vm, stateHolder)
+
     // The welcome cards, when summoned from Settings: over the app, dismissed back to it.
     androidx.compose.animation.AnimatedVisibility(
         visible = welcomeCardsOpen,

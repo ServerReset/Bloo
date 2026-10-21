@@ -31,11 +31,10 @@ suspend fun SettingsStore.exportSettingsJson(): String {
 }
 
 /**
- * Restores settings from a backup produced by [exportSettingsJson], overwriting matching keys.
- * Returns an error message, or null on success. Uses [editTracked] so restored values are pushed
- * by the next Drive sync; photo paths join the same mutation.
+ * Why [json] is not a settings backup this build can restore, or null when it is one. Shared by the import and by the share
+ * sheet, so a file is judged the same way whichever way it arrives.
  */
-suspend fun SettingsStore.importSettingsJson(json: String): String? {
+internal fun settingsBackupProblem(json: String): String? {
     val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }
         .getOrElse { return "Invalid settings file" }
     // `as?` casts, never `?.jsonPrimitive`: those accessors throw on a wrong kind, and these guards
@@ -48,7 +47,19 @@ suspend fun SettingsStore.importSettingsJson(json: String): String? {
         return "This backup was made with a newer version of Bloo. Update the app first"
     }
     if ((root["prefs"] as? JsonObject) == null) return "Settings file has no data"
-    // Key typing and tombstones come from [SyncMerge.parseBackup] (device-local keys excluded); non-null after the guards above.
+    if (SyncMerge.parseBackup(json) == null) return "Settings file has no data"
+    return null
+}
+
+/**
+ * Restores settings from a backup produced by [exportSettingsJson], overwriting matching keys.
+ * Returns an error message, or null on success. Uses [editTracked] so restored values are pushed
+ * by the next Drive sync; photo paths join the same mutation.
+ */
+suspend fun SettingsStore.importSettingsJson(json: String): String? {
+    settingsBackupProblem(json)?.let { return it }
+    val root = backupJson.parseToJsonElement(json).jsonObject
+    // Key typing and tombstones come from [SyncMerge.parseBackup] (device-local keys excluded); non-null after the check above.
     val plan = SyncMerge.parseBackup(json) ?: return "Settings file has no data"
     val photoPaths = SyncPhotos.apply(context, root["photos"] as? JsonObject)
     editTracked { mut ->
