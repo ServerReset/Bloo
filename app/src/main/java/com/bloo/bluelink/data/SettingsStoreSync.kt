@@ -214,8 +214,10 @@ suspend fun SettingsStore.performMainToMainSync(): SettingsStore.MainToMainSyncO
         } else if (nothingToUpload) {
             uploaded = false
             // The file already carries our content: record the revision we just saw, so the next
-            // poll's change check is a no-op instead of re-reading the file every few seconds.
-            fileModifiedMs?.let { setLastSyncMs(it) }
+            // poll's change check is a no-op instead of re-reading the file every few seconds. When Drive does not
+            // report a modified time, the check itself is the sync: it is recorded as now, not left at the last upload
+            // (which read as "Synced 15 hr ago" after every clean pass).
+            setLastSyncMs(fileModifiedMs ?: now)
         } else {
             // Snapshot the portable content ONCE (post-import): its SHA-256 is both the change gate
             // written into the file AND, being computed over the exact prefs/photos we upload,
