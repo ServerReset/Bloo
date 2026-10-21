@@ -2,7 +2,6 @@ package com.bloo.bluelink.wear
 
 import com.bloo.uicommon.LocalPowerPolicy
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.draw.clip
@@ -18,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import com.bloo.uicommon.frostedRim
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -39,8 +39,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
  * the hairline rim of a glass surface, and the soft wash of colour (the phone's aurora) behind a full screen.
  */
 
-/** A hairline rim, bright toward the top-left and again faintly at the bottom-right, like the phone's cards. */
-fun Modifier.wearGlassRim(shape: Shape): Modifier = border(1.dp, Brush.linearGradient(WearRimStops), shape)
+/** The hairline rim of a glass surface: the phone's own frosted rim (:uicommon), in white on the watch's black. */
+fun Modifier.wearGlassRim(shape: Shape): Modifier = frostedRim(shape, Color.White)
 
 /** The rim's light: bright, nearly gone, then faint. The face's circular rim sweeps the same stops, closed back to the first. */
 internal val WearRimStops = listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0.2f))
