@@ -1,15 +1,10 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.uicommon.MorphIconButton
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.Icons
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,7 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.uicommon.rememberConfirmArm
@@ -65,15 +59,7 @@ internal fun PaletteEditorDialog(
         title = if (editing == null) "New palette" else "Edit \"${editing.name}\"",
         titleTrailing = if (editing != null) {
             {
-                MorphIconButton(onClick = {
-                    if (confirmDeleteArm.armed) { onDelete(paletteId); onDismiss() } else { confirmDeleteArm.arm() }
-                }) {
-                    Icon(
-                        Icons.Filled.Delete,
-                        contentDescription = if (confirmDeleteArm.armed) "Confirm delete palette" else "Delete palette",
-                        tint = if (confirmDeleteArm.armed) MaterialTheme.colorScheme.error else LocalContentColor.current,
-                    )
-                }
+                ArmedDeleteButton(name = editing.name, onConfirm = { onDelete(paletteId); onDismiss() })
             }
         } else null,
         text = {

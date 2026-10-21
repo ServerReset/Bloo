@@ -29,7 +29,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -57,13 +56,13 @@ import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.climatePresetDetail
 import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.ArmedDeleteButton
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.TitleSubtitle
 import com.bloo.uicommon.MorphIconButton
 import com.bloo.uicommon.MorphButton
 import com.bloo.uicommon.ButtonLabelStyle
-import com.bloo.uicommon.rememberConfirmArm
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -284,7 +283,6 @@ internal fun PresetPill(
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHaptics.current
-    val confirm = rememberConfirmArm()
     val scheme = MaterialTheme.colorScheme
     Row(
         modifier.fillMaxWidth(),
@@ -316,20 +314,7 @@ internal fun PresetPill(
         MorphIconButton(onClick = { haptics?.tick(); onEdit() }) {
             Icon(Icons.Filled.Edit, contentDescription = "Rename $name", modifier = Modifier.size(ButtonIconSize))
         }
-        MorphIconButton(
-            onClick = {
-                haptics?.tick()
-                if (confirm.armed) onDelete() else confirm.arm()
-            },
-            filled = confirm.armed,
-            emphasis = if (confirm.armed) ButtonEmphasis.Deny else ButtonEmphasis.Tonal,
-        ) {
-            Icon(
-                AppIcons.Close,
-                contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
-                modifier = Modifier.size(15.dp),
-            )
-        }
+        ArmedDeleteButton(name = name, onConfirm = onDelete, glyphSize = 15.dp)
     }
 }
 
