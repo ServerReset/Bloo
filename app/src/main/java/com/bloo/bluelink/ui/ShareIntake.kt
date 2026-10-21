@@ -148,8 +148,8 @@ internal fun ShareIntakeHost(vm: AppViewModel, stateHolder: State<UiState>) {
 }
 
 /**
- * The cars a shared picture can go to: one row each, with the car's name and what it is (its model and year). The VIN stays
- * off the screen; nothing here needs it.
+ * The cars a shared picture can go to: one row each, with the car's name and its model. The VIN stays off the screen;
+ * nothing here needs it.
  */
 @Composable
 private fun SharedCarChooser(vehicles: List<Vehicle>, onPick: (Vehicle) -> Unit, onDismiss: () -> Unit) {
@@ -160,11 +160,9 @@ private fun SharedCarChooser(vehicles: List<Vehicle>, onPick: (Vehicle) -> Unit,
         text = {
             SecondaryText("Pick the car this photo is for. You can change it later in that car's settings.")
             vehicles.forEach { v ->
-                val what = listOfNotNull(v.modelYear, v.modelName ?: v.model.takeIf { it.isNotBlank() })
-                    .joinToString(" ")
                 ListButton(
                     title = v.name.ifBlank { v.model },
-                    subtitle = what.ifBlank { null },
+                    subtitle = v.model.ifBlank { null },
                     icon = AppIcons.DirectionsCar,
                     onClick = { onPick(v) },
                 )
