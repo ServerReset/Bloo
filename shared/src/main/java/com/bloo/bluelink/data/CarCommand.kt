@@ -3,6 +3,18 @@ package com.bloo.bluelink.data
 import kotlinx.serialization.Serializable
 
 /**
+ * The full titles of the car's commands, as the phone and the watch both name them. The watch stores
+ * its picked control by this text, so these strings must never change once shipped.
+ */
+object CarLabels {
+    const val START_CHARGING = "Start charging"
+    const val STOP_CHARGING = "Stop charging"
+    const val START_CLIMATE = "Start climate"
+    const val STOP_CLIMATE = "Stop climate"
+    const val FLASH_LIGHTS = "Flash lights"
+}
+
+/**
  * Stable command verbs understood by every command source (natural-language search, quick actions,
  * notification action buttons, AutoLock).
  */

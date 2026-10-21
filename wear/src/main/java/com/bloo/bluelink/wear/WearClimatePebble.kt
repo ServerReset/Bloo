@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.CarAction
+import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.uicommon.AppIcons
 
@@ -28,7 +29,7 @@ internal fun WearClimatePebble(
     fun busy(action: String) = WearCommands.key(v.vin, action) in pending
     WearPebble(title = "Climate", icon = AppIcons.Climate) {
         if (v.climateOn == true) {
-            WearActionRow("Stop climate", AppIcons.Close, pending = busy(CarAction.CLIMATE_OFF)) {
+            WearActionRow(CarLabels.STOP_CLIMATE, AppIcons.Close, pending = busy(CarAction.CLIMATE_OFF)) {
                 requestCommand { repo.command(v.vin, CarAction.CLIMATE_OFF) }
             }
             return@WearPebble

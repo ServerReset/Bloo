@@ -49,6 +49,7 @@ import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.R
 import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.CarAction
+import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
@@ -459,7 +460,7 @@ internal fun ActionButton(
         CarAction.TOGGLE_LOCK -> if (locked) "Unlock" else "Lock"
         CarAction.TOGGLE_CLIMATE -> "Climate"
         CarAction.TOGGLE_CHARGE -> "Charge"
-        CarAction.FLASH_LIGHTS -> "Flash lights"
+        CarAction.FLASH_LIGHTS -> CarLabels.FLASH_LIGHTS
         else -> action
     }
     // Armed is the pending UNLOCK: only the lock button is waiting on it. (It used to colour every button, so tapping

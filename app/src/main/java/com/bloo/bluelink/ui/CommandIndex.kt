@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.AppIcons
 
@@ -63,7 +64,7 @@ internal val CommandCatalog = listOf(
     // CHARGING COMMANDS
     CommandMetadata(
         id = "charge_on",
-        title = "Start charging",
+        title = CarLabels.START_CHARGING,
         description = "Begin charging the battery",
         category = CommandCategory.CHARGING,
         icon = AppIcons.Bolt,
@@ -72,7 +73,7 @@ internal val CommandCatalog = listOf(
     ),
     CommandMetadata(
         id = "charge_off",
-        title = "Stop charging",
+        title = CarLabels.STOP_CHARGING,
         description = "Stop the battery charging",
         category = CommandCategory.CHARGING,
         icon = AppIcons.Bolt,
@@ -94,7 +95,7 @@ internal val CommandCatalog = listOf(
     // CLIMATE COMMANDS
     CommandMetadata(
         id = "climate_on",
-        title = "Start climate",
+        title = CarLabels.START_CLIMATE,
         description = "Start the climate control system",
         category = CommandCategory.CLIMATE,
         icon = Icons.Filled.AcUnit,
@@ -106,7 +107,7 @@ internal val CommandCatalog = listOf(
     ),
     CommandMetadata(
         id = "climate_off",
-        title = "Stop climate",
+        title = CarLabels.STOP_CLIMATE,
         description = "Stop the climate control",
         category = CommandCategory.CLIMATE,
         icon = Icons.Filled.AcUnit,
@@ -135,7 +136,7 @@ internal val CommandCatalog = listOf(
     // LIGHTS COMMANDS
     CommandMetadata(
         id = "lights",
-        title = "Flash lights",
+        title = CarLabels.FLASH_LIGHTS,
         description = "Flash the headlights",
         category = CommandCategory.LIGHTS,
         icon = Icons.AutoMirrored.Filled.VolumeUp,

@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarLabels
+
 // --- Search vocabulary: stopwords, the synonym table and the token expander ---
 
 internal val SearchStopwords = setOf(
@@ -127,8 +129,8 @@ internal fun expandToken(t: String): List<String> {
 internal fun aiCommandLabel(cmd: String): String = when (cmd) {
     "lock" -> "Lock"
     "unlock" -> "Unlock"
-    "charge_on" -> "Start charging"
-    "charge_off" -> "Stop charging"
+    "charge_on" -> CarLabels.START_CHARGING
+    "charge_off" -> CarLabels.STOP_CHARGING
     "lights" -> "Flash the lights on"
     "horn" -> "Sound the horn on"
     "climate_on" -> "Start climate on"

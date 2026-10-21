@@ -230,7 +230,7 @@ object LiveCharge {
             putExtra(AlertActionReceiver.EXTRA_NOTIF_ID, id)
             // The confirmation must NOT land on `id`.
             putExtra(AlertActionReceiver.EXTRA_CONFIRM_ID, ("live_charge_confirm_$vin").hashCode())
-            putExtra(AlertActionReceiver.EXTRA_LABEL, "Stop charging")
+            putExtra(AlertActionReceiver.EXTRA_LABEL, CarLabels.STOP_CHARGING)
         }
         val stopPi = PendingIntent.getBroadcast(
             context, id, stopIntent,
@@ -272,7 +272,7 @@ object LiveCharge {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setRequestPromotedOngoing(true)
             .setStyle(style)
-            .addAction(androidx.core.app.NotificationCompat.Action.Builder(0, "Stop charging", stopPi).setAuthenticationRequired(true).build())
+            .addAction(androidx.core.app.NotificationCompat.Action.Builder(0, CarLabels.STOP_CHARGING, stopPi).setAuthenticationRequired(true).build())
             .setDeleteIntent(dismissPi)
             .apply { contentPi?.let { setContentIntent(it) } }
             // The STATUS BAR CHIP's text, and the piece the rebuild dropped. Reasoning from

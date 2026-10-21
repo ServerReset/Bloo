@@ -3,6 +3,7 @@ package com.bloo.bluelink.wear
 import com.bloo.uicommon.AppIcons
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.bloo.bluelink.data.CarAction
+import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.supportsHornLights
@@ -75,11 +76,11 @@ internal object WearFaceControls {
             icon = { AppIcons.Climate }, action = CarAction.TOGGLE_CLIMATE, active = { it.climateOn == true },
         ),
         FaceControl(
-            key = "climate_on", group = FaceGroup.Climate, hint = "Starts it on the usual settings", choice = "Start climate", label = { "Climate on" }, icon = { AppIcons.Climate },
+            key = "climate_on", group = FaceGroup.Climate, hint = "Starts it on the usual settings", choice = CarLabels.START_CLIMATE, label = { "Climate on" }, icon = { AppIcons.Climate },
             action = CarAction.CLIMATE_ON, active = { it.climateOn == true },
         ),
         FaceControl(
-            key = "climate_off", group = FaceGroup.Climate, hint = "Stops it", choice = "Stop climate", label = { "Climate off" }, icon = { AppIcons.Close },
+            key = "climate_off", group = FaceGroup.Climate, hint = "Stops it", choice = CarLabels.STOP_CLIMATE, label = { "Climate off" }, icon = { AppIcons.Close },
             action = CarAction.CLIMATE_OFF,
         ),
         FaceControl(
@@ -100,15 +101,15 @@ internal object WearFaceControls {
             available = { it.hasBattery }, active = { it.charging == true },
         ),
         FaceControl(
-            key = "charge_on", group = FaceGroup.Charging, hint = "Starts charging", choice = "Start charging", label = { "Charge" }, icon = { AppIcons.Bolt },
+            key = "charge_on", group = FaceGroup.Charging, hint = "Starts charging", choice = CarLabels.START_CHARGING, label = { "Charge" }, icon = { AppIcons.Bolt },
             action = CarAction.CHARGE_ON, available = { it.hasBattery }, active = { it.charging == true },
         ),
         FaceControl(
-            key = "charge_off", group = FaceGroup.Charging, hint = "Stops charging", choice = "Stop charging", label = { "Stop charge" }, icon = { AppIcons.Close },
+            key = "charge_off", group = FaceGroup.Charging, hint = "Stops charging", choice = CarLabels.STOP_CHARGING, label = { "Stop charge" }, icon = { AppIcons.Close },
             action = CarAction.CHARGE_OFF, available = { it.hasBattery },
         ),
         FaceControl(
-            key = "flash", group = FaceGroup.LightsAndHorn, hint = "Flashes the lights", choice = "Flash lights", label = { "Flash" }, icon = { AppIcons.Flash },
+            key = "flash", group = FaceGroup.LightsAndHorn, hint = "Flashes the lights", choice = CarLabels.FLASH_LIGHTS, label = { "Flash" }, icon = { AppIcons.Flash },
             action = CarAction.FLASH_LIGHTS, available = { it.toVehicle().supportsHornLights },
         ),
         FaceControl(
