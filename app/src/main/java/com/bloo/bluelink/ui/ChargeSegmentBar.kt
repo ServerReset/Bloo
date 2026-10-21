@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.Canvas
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -196,14 +197,19 @@ private const val ShimmerStepNanos = 50_000_000L
 private fun rememberSlowShimmer(periodMs: Long): State<Float> {
     val state = remember { mutableFloatStateOf(0f) }
     val periodNanos = periodMs * 1_000_000L
-    LaunchedEffect(periodNanos) {
-        val start = System.nanoTime()
-        while (true) {
-            // A plain delay, not withFrameNanos: waiting on every vsync kept the frame clock awake at the
-            // panel's full rate for as long as the car charged, only to skip most of those frames.
-            kotlinx.coroutines.delay(ShimmerStepNanos / 1_000_000L)
-            val now = System.nanoTime()
-            state.floatValue = ((now - start) % periodNanos).toFloat() / periodNanos.toFloat()
+    // Only while the app is on screen: the composition outlives the screen (a backgrounded app keeps its bar), and a loop that
+    // outlived it would wake the CPU twenty times a second for a shimmer nobody can see.
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(periodNanos, owner) {
+        owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            val start = System.nanoTime()
+            while (true) {
+                // A plain delay, not withFrameNanos: waiting on every vsync kept the frame clock awake at the
+                // panel's full rate for as long as the car charged, only to skip most of those frames.
+                kotlinx.coroutines.delay(ShimmerStepNanos / 1_000_000L)
+                val now = System.nanoTime()
+                state.floatValue = ((now - start) % periodNanos).toFloat() / periodNanos.toFloat()
+            }
         }
     }
     return state

@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.bloo.bluelink.data.SyncMerge
 import com.bloo.bluelink.data.WatchLockTiming
 import com.bloo.bluelink.data.relativeLabel
@@ -88,10 +89,14 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     val context = LocalContext.current
     val liveWatch by WatchPresence.watch.collectAsStateWithLifecycle()
     val signInState by WatchSignIn.state.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) {
-        while (true) {
-            WatchPresence.refresh(context)
-            delay(WATCH_REFRESH_MS)
+    // Only while the app is on screen (a backgrounded Settings keeps its composition, and the poll would keep asking the watch).
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while (true) {
+                WatchPresence.refresh(context)
+                delay(WATCH_REFRESH_MS)
+            }
         }
     }
     var showSetupWatch by remember { mutableStateOf(false) }
