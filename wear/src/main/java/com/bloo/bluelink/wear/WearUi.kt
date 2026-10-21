@@ -151,8 +151,6 @@ fun WearPebble(
         modifier.fillMaxWidth().padding(horizontal = ListInset),
         verticalArrangement = Arrangement.spacedBy(RowGap),
     ) {
-        // The heading sits clear of the clock at the top of the round face, rather than under it.
-        Spacer(Modifier.height(18.dp))
         // The same heading as the phone's sections (:uicommon), centred for the round face and in the watch's own tint and size.
         SectionHeading(
             title, icon,
