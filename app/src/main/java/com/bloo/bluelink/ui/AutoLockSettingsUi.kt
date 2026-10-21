@@ -431,7 +431,7 @@ private fun BluetoothDevicePicker(vm: AppViewModel, onPick: (PairedDevice) -> Un
             if (devices.isEmpty()) {
                 RevealText(
                     "No paired Bluetooth devices. Pair your car in Android's Bluetooth settings first.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = SecondaryTextStyle(),
                 )
             } else {
                 // The paired-device list is a handful of rows, not a feed.

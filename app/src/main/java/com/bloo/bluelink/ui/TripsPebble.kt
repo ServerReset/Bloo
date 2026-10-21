@@ -96,14 +96,14 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
         ) {
             RevealText(
                 tripDate(trip.startdate),
-                style = MaterialTheme.typography.titleSmall,
+                style = PrimaryTextStyle(),
                 fontWeight = FontWeight.Bold,
                 color = primaryColor,
             )
             trip.distance?.let {
                 RevealText(
                     formatTripDistance(it, metric),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = PrimaryTextStyle(),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -129,10 +129,10 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
 @Composable
 private fun TripStat(label: String, value: String, captionColor: androidx.compose.ui.graphics.Color) {
     Column {
-        RevealText(label, style = MaterialTheme.typography.labelSmall, color = captionColor, maxLines = 1)
+        RevealText(label, style = SecondaryTextStyle(), color = captionColor, maxLines = 1)
         RevealText(
             value,
-            style = MaterialTheme.typography.bodyMedium,
+            style = SecondaryTextStyle(),
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
         )

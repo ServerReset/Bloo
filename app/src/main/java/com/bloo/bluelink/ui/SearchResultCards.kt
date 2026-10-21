@@ -73,9 +73,9 @@ internal fun AiAnswer(
                     TitleSmallText("AI answer")
                 }
                 if (reply != null) {
-                    RevealText(reply, style = MaterialTheme.typography.bodyMedium)
+                    RevealText(reply, style = SecondaryTextStyle())
                 } else {
-                    RevealText("Thinking…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    RevealText("Thinking…", style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -109,7 +109,7 @@ internal fun AiCommandProposal(
                 }
                 RevealText(
                     ran ?: "${aiCommandLabel(p.first)} ${car?.name ?: "your car"}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = SecondaryTextStyle(),
                 )
                 if (ran == null && car != null) {
                     val scope = rememberCoroutineScope()
@@ -185,7 +185,7 @@ internal fun AiSettingProposal(
                     action.options.isEmpty() && action.min == null -> "Turn ${action.title} $target"
                     else -> "Set ${action.title} to $target"
                 } + if (already && !action.isAction) " (already set)" else "",
-                style = MaterialTheme.typography.bodyMedium,
+                style = SecondaryTextStyle(),
             )
             if (!already) {
                 SafeMorphTextButton(
@@ -270,7 +270,7 @@ internal fun CommandActionResult(
                     actionResult != null -> actionResult ?: "${command.label} ${targetVehicle.name}"
                     else -> "${command.label} ${targetVehicle.name}"
                 },
-                style = MaterialTheme.typography.bodyMedium,
+                style = SecondaryTextStyle(),
             )
         }
     }

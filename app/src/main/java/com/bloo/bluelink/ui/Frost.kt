@@ -39,7 +39,7 @@ internal fun FrostMessage(message: String, modifier: Modifier = Modifier) {
             Spacer(Modifier.width(GapRow))
             RevealText(
                 message,
-                style = MaterialTheme.typography.labelLarge,
+                style = PrimaryTextStyle(),
                 fontWeight = FontWeight.SemiBold,
             )
         }

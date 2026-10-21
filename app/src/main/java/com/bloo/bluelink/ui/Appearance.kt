@@ -109,7 +109,7 @@ internal fun PaletteSwatch(palette: ColorPalette, selected: Boolean, onClick: ()
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         SwatchDisc(palette.swatch, selected, palette.label, onClick)
         Spacer(Modifier.height(GapHairline))
-        RevealText(palette.label, style = MaterialTheme.typography.labelSmall, color = swatchLabelColor(selected))
+        RevealText(palette.label, style = SecondaryTextStyle(), color = swatchLabelColor(selected))
     }
 }
 
@@ -120,7 +120,7 @@ internal fun CustomPaletteSwatch(palette: CustomPaletteData, selected: Boolean, 
         SwatchDisc(Color(palette.primaryArgb.toLong() and 0xFFFFFFFFL), selected, palette.name, onClick)
         Spacer(Modifier.height(GapHairline))
         Row(horizontalArrangement = Arrangement.spacedBy(SplitSeam), verticalAlignment = Alignment.CenterVertically) {
-            RevealText(palette.name, style = MaterialTheme.typography.labelSmall, color = swatchLabelColor(selected))
+            RevealText(palette.name, style = SecondaryTextStyle(), color = swatchLabelColor(selected))
             // 32dp, not 48dp: it sits in a caption row inside a 58dp-wide swatch column in a tight
             // grid.
             MorphIconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {

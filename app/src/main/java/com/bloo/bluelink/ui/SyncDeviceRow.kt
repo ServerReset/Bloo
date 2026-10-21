@@ -108,7 +108,7 @@ internal fun SyncDeviceRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RevealText(
                     device.name.ifBlank { "Unnamed device" },
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = PrimaryTextStyle(),
                     fontWeight = if (isPrimary || isSelf) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -134,7 +134,7 @@ internal fun SyncDeviceRow(
                     .filterNotNull().joinToString(" · ")
                 RollingNumber(
                     line,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = SecondaryTextStyle(),
                     fontWeight = FontWeight.Medium,
                     color = if (health == DeviceHealth.STALE) scheme.error else scheme.onSurfaceVariant,
                 )
@@ -142,7 +142,7 @@ internal fun SyncDeviceRow(
             if (health == DeviceHealth.STALE) {
                 RevealText(
                     "Hasn't synced in a while. It may be on a different Drive file.",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = SecondaryTextStyle(),
                     color = scheme.onSurfaceVariant,
                 )
             }
@@ -161,7 +161,7 @@ internal fun SyncDeviceRow(
 internal fun DeviceTag(text: String, color: Color) {
     RevealText(
         text,
-        style = MaterialTheme.typography.labelSmall,
+        style = SecondaryTextStyle(),
         color = color,
         maxLines = 1,
         modifier = Modifier.padding(start = GapRow),

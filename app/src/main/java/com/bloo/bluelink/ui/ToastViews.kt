@@ -293,7 +293,7 @@ private fun ToastCard(
             SelectionContainer(Modifier.weight(1f)) {
                 RevealText(
                     toast.message,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = SecondaryTextStyle(),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )

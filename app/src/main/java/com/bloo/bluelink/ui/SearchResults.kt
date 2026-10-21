@@ -99,11 +99,11 @@ internal fun SettingsSearchResults(
 
     if (results.isEmpty() && suggestedCommands.isEmpty()) {
         Column(Modifier.fillMaxWidth().padding(vertical = GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            RevealText("No matches for \"$query\"", style = MaterialTheme.typography.titleSmall)
+            RevealText("No matches for \"$query\"", style = PrimaryTextStyle())
             // Not a dead end: point at the three kinds of thing the bar understands.
             RevealText(
                 "Try a car name, a setting, or a command like \"lock my car\".",
-                style = MaterialTheme.typography.bodySmall,
+                style = SecondaryTextStyle(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -124,7 +124,7 @@ internal fun SettingsSearchResults(
                         onClick = { onPick(if (cmd.requiresArg) cmd.title + " " else cmd.title, !cmd.requiresArg) },
                     ) {
                         TitleSmallText(cmd.title)
-                        RevealText(cmd.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        RevealText(cmd.description, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } }
             }
@@ -209,7 +209,7 @@ internal fun ResultGroup(heading: String, rows: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth()) {
         RevealText(
             heading,
-            style = MaterialTheme.typography.labelMedium,
+            style = SecondaryTextStyle(),
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = GapHairline),
@@ -250,7 +250,7 @@ internal fun ResultRow(
         Spacer(Modifier.width(GapGroup))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
             if (caption != null) {
-                RevealText(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                RevealText(caption, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             content()
         }

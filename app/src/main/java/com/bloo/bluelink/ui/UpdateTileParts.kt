@@ -146,7 +146,7 @@ internal fun UpdateReleaseNotes(
             }
             RevealText(
                 notes,
-                style = MaterialTheme.typography.bodySmall,
+                style = SecondaryTextStyle(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = if (expanded) {
                     // Expanded: the whole changelog inline, but BOUNDED and scrollable so a very

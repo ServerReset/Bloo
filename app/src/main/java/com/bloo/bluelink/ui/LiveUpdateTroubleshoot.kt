@@ -46,7 +46,7 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
         icon = AppIcons.Info,
         title = "Live update not showing?",
         text = {
-            RevealText("A few things to check, in order:", style = MaterialTheme.typography.bodyMedium)
+            RevealText("A few things to check, in order:", style = SecondaryTextStyle())
             Spacer(Modifier.height(GapGroup))
             TroubleshootStep(
                 1,
@@ -94,11 +94,11 @@ internal fun TroubleshootStep(number: Int, text: String) {
     Row(modifier = Modifier.padding(bottom = GapGroup)) {
         RevealText(
             "$number.",
-            style = MaterialTheme.typography.bodyMedium,
+            style = SecondaryTextStyle(),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.width(20.dp),
         )
-        RevealText(text, style = MaterialTheme.typography.bodyMedium)
+        RevealText(text, style = SecondaryTextStyle())
     }
 }

@@ -248,14 +248,14 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 Spacer(Modifier.height(GapPage))
                 RevealText(
                     "Bloo is locked",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = PrimaryTextStyle(),
                     fontWeight = FontWeight.Bold,
                     color = lockFg,
                 )
                 Spacer(Modifier.height(GapHairline))
                 RevealText(
                     if (pinInstalled) "Confirm it's you, or use your PIN." else "Confirm it's you to reach your vehicles.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = SecondaryTextStyle(),
                     color = lockFg.copy(alpha = 0.85f),
                 )
                 Spacer(Modifier.height(28.dp))
@@ -312,14 +312,14 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                             Column {
                                 RevealText(
                                     "Enter your PIN",
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = PrimaryTextStyle(),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 RevealText(
                                     if (bioAvailable) "Your biometrics or your PIN unlock Bloo."
                                     else "This device has no biometrics, so a PIN is required.",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = SecondaryTextStyle(),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -383,14 +383,14 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 Spacer(Modifier.height(GapSection))
                 RevealText(
                     "Bloo is locked",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = PrimaryTextStyle(),
                     fontWeight = FontWeight.Bold,
                     color = lockFg,
                 )
                 Spacer(Modifier.height(GapHairline))
                 RevealText(
                     "Open Bloo again.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = SecondaryTextStyle(),
                     color = lockFg.copy(alpha = 0.85f),
                 )
             }

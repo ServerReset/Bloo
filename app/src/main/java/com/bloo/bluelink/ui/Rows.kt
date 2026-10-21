@@ -58,7 +58,7 @@ internal fun RowLabel(label: String, modifier: Modifier = Modifier) {
     RevealText(
         label,
         modifier = modifier,
-        style = MaterialTheme.typography.bodyMedium,
+        style = SecondaryTextStyle(),
         color = LocalContentColor.current.copy(alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -110,7 +110,7 @@ internal fun StackedRow(label: String, value: String) {
         RowLabel(label)
         RevealText(
             value,
-            style = MaterialTheme.typography.bodyMedium,
+            style = SecondaryTextStyle(),
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -135,7 +135,7 @@ internal fun StepRow(label: String, value: String, valueColor: Color = Color.Uns
         RevealText(
             label,
             Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
+            style = SecondaryTextStyle(),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -147,7 +147,7 @@ internal fun StepRow(label: String, value: String, valueColor: Color = Color.Uns
                 (fadeIn() + slideInVertically { it / 2 }) togetherWith (fadeOut() + slideOutVertically { -it / 2 })
             },
             label = "stepValue",
-        ) { v -> RevealText(v, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1) }
+        ) { v -> RevealText(v, style = SecondaryTextStyle(), fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1) }
     }
 }
 
@@ -249,7 +249,7 @@ private fun ToggleRowControl(label: String, checked: Boolean, modifier: Modifier
         RevealText(
             label,
             Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
+            style = SecondaryTextStyle(),
             fontWeight = if (checked) FontWeight.Medium else FontWeight.Normal,
             // Cap at 2 lines; long labels wrap at spaces rather than growing the row.
             maxLines = 2,

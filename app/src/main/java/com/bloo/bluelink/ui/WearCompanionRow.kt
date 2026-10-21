@@ -39,9 +39,10 @@ import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.SafeMorphTextButton
 
 /**
- * A Wear OS companion shown UNDER the phone it belongs to, not as a peer row. Deliberately not a
- * [SyncDeviceRow]: a watch has no drag handle and no star, because it depends on its phone.
- * [onRemove] is null for a live Data Layer watch -- pairing is managed by Wear OS, not by Bloo.
+ * The watch, as one card under the phone it belongs to: its glyph, its name and status (PRIMARY and SECONDARY text), a remove
+ * button for a watch Bloo knows but is not connected to, and [action] under them when there is something to do (signing it in).
+ * Deliberately not a [SyncDeviceRow]: a watch has no drag handle and no star, because it depends on its phone. [onRemove] is null
+ * for a live Data Layer watch -- pairing is managed by Wear OS, not by Bloo.
  */
 @Composable
 fun WearCompanionRow(
@@ -49,48 +50,24 @@ fun WearCompanionRow(
     detail: String,
     modifier: Modifier = Modifier,
     onRemove: (() -> Unit)?,
+    action: (@Composable () -> Unit)? = null,
 ) {
-    Row(
+    Column(
         modifier
             .fillMaxWidth()
-            // The same inner-glass panel the phone rows use, one step down in size, rather than the
-            // outlinedPanel(10.dp) it had: a watch is part of its phone's row, not a different kind of
-            // box.
             .innerGlassPanel(GapGroup),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
-        // No SubdirectoryArrowRight: the indent IS the "belongs to the phone above" signal, and the
-        // Watch icon says what it is. Two leading icons for one row was one too many.
-        Icon(
-            Icons.Filled.Watch,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(GapGroup))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RevealText(
-                    name.ifBlank { "Watch" },
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                DeviceTag("Companion", MaterialTheme.colorScheme.primary)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(icon = Icons.Filled.Watch, tint = MaterialTheme.colorScheme.primary, size = 36.dp, iconSize = 18.dp)
+            Spacer(Modifier.width(GapGroup))
+            Column(Modifier.weight(1f)) {
+                PrimaryText(name.ifBlank { "Watch" }, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (detail.isNotBlank()) SecondaryText(detail)
             }
-            if (detail.isNotBlank()) {
-                RollingNumber(
-                    detail,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            if (onRemove != null) RemoveDeviceButton(name, "this watch", onRemove)
         }
-        if (onRemove != null) {
-            RemoveDeviceButton(name, "this watch", onRemove)
-        }
+        action?.invoke()
     }
 }
 
@@ -106,7 +83,7 @@ fun CompanionActionRow(label: String, caption: String, modifier: Modifier = Modi
         // button already wears the watch glyph.
         Column(Modifier.weight(1f)) {
             SafeMorphTextButton(label, onClick = onClick, icon = Icons.Filled.Watch)
-            BodySmallText(caption)
+            SecondaryText(caption)
         }
     }
 }
@@ -159,7 +136,7 @@ internal fun DriveSyncSetupDialog(
                 ) {
                     RevealText(
                         "Starts a new Drive file. Your devices stop sharing settings.",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = SecondaryTextStyle(),
                         color = scheme.onErrorContainer,
                     )
                     SafeMorphTextButton(

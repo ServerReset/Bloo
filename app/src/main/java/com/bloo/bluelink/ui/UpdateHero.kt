@@ -31,7 +31,7 @@ internal fun UpdateDeltaHero(currentBuild: Int, newBuild: Int, modifier: Modifie
         if (currentBuild > 0) {
             RollingNumber(
                 "$currentBuild",
-                style = MaterialTheme.typography.titleLarge,
+                style = PrimaryTextStyle(),
                 fontWeight = FontWeight.Normal,
                 color = scheme.onSurface,
             )

@@ -82,12 +82,12 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
     ) {
         WeatherGlyph(weather.condition, weather.isDay, 30.dp, describe = false)
         Column(Modifier.weight(1f)) {
-            RevealText(weather.condition.label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
-            RevealText(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            RevealText(weather.condition.label, fontWeight = FontWeight.SemiBold, style = PrimaryTextStyle())
+            RevealText(caption, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         RollingNumber(
             text = weather.tempLabel(fahrenheit),
-            style = MaterialTheme.typography.headlineSmall,
+            style = PrimaryTextStyle(),
             fontWeight = FontWeight.Bold,
         )
     }
@@ -127,9 +127,9 @@ internal fun WeatherBlock(
 private fun WeatherLocationHeading(title: String, subtitle: String?, weather: Weather) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
         WeatherGlyph(weather.condition, weather.isDay, 16.dp, describe = false)
-        RevealText(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        RevealText(title, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold)
         if (!subtitle.isNullOrBlank()) {
-            RevealText(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            RevealText(subtitle, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -156,7 +156,7 @@ private fun CurrentConditions(weather: Weather, fahrenheit: Boolean, tint: Color
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
             )
-            RevealText(weather.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            RevealText(weather.condition.label, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -173,7 +173,7 @@ private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
     val hours = weather.hourly.drop(startIndex).take(12)
     if (hours.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        RevealText("Next hours", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        RevealText("Next hours", style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         val scroll = rememberScrollState()
         val viewportPx = remember { androidx.compose.runtime.mutableIntStateOf(0) }
         val blurOk = canBlurBackdrops()
@@ -214,16 +214,16 @@ private fun HourCell(hour: HourPoint, fahrenheit: Boolean, label: String, modifi
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(GapHairline),
     ) {
-        RevealText(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        RevealText(label, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         WeatherGlyph(hour.condition, true, 22.dp)
         RevealText(
             com.bloo.bluelink.data.weatherTemp(hour.tempC, fahrenheit),
-            style = MaterialTheme.typography.labelLarge,
+            style = PrimaryTextStyle(),
             fontWeight = FontWeight.SemiBold,
         )
         RevealText(
             hour.precipProbability?.takeIf { it > 0 }?.let { "$it%" } ?: " ",
-            style = MaterialTheme.typography.labelSmall,
+            style = SecondaryTextStyle(),
             color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
         )
@@ -255,7 +255,7 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
     val weekLow = days.mapNotNull { dayTemp(it.lowC, fahrenheit) }.minOrNull()
     val weekHigh = days.mapNotNull { dayTemp(it.highC, fahrenheit) }.maxOrNull()
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        RevealText("This week", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        RevealText("This week", style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         days.forEachIndexed { i, day ->
             val hi = dayTemp(day.highC, fahrenheit)
             val lo = dayTemp(day.lowC, fahrenheit)
@@ -266,7 +266,7 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
             ) {
                 RevealText(
                     if (i == 0) "Today" else weekdayName(day.date),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = SecondaryTextStyle(),
                     fontWeight = if (i == 0) FontWeight.SemiBold else FontWeight.Normal,
                     modifier = Modifier.width(58.dp),
                     maxLines = 1,
@@ -285,7 +285,7 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
                         if (hi != null && lo != null) append(" / ")
                         if (lo != null) append("$lo°")
                     },
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = SecondaryTextStyle(),
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                 )

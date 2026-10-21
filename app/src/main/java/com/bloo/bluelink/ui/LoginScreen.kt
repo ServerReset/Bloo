@@ -402,7 +402,7 @@ internal fun LoginScreen(
                             ) { label ->
                                 RevealText(
                                     "Sent only to $label's servers; stored encrypted on this device.",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = SecondaryTextStyle(),
                                     color = scheme.onSurfaceVariant,
                                 )
                             }
@@ -517,7 +517,7 @@ private fun LoginHero(subtitle: String, compact: Boolean, modifier: Modifier = M
                 },
                 label = "loginSubtitle",
             ) { text ->
-                RevealText(text, style = MaterialTheme.typography.titleSmall, color = scheme.onSurfaceVariant)
+                RevealText(text, style = PrimaryTextStyle(), color = scheme.onSurfaceVariant)
             }
         }
     }
@@ -539,7 +539,7 @@ private fun LoginHero(subtitle: String, compact: Boolean, modifier: Modifier = M
 private fun LoginSectionLabel(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-        RevealText(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        RevealText(text, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 

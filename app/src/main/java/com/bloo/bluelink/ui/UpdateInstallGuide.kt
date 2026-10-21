@@ -35,21 +35,21 @@ internal fun UpdateInstallGuideDialog(
             Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 RevealText(
                     "Android will hand off to its installer. Two things to expect:",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = SecondaryTextStyle(),
                 )
                 RevealText(
                     "1. Tap \"Install\" on the system sheet.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = SecondaryTextStyle(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 RevealText(
                     "2. If it says \"Blocked by Play Protect\" (this copy was installed from a file, not from Google Play), tap \"More details\", then \"Install anyway\".",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = SecondaryTextStyle(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 RevealText(
                     "3. Confirm with your PIN, password or biometrics.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = SecondaryTextStyle(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

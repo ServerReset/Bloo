@@ -50,7 +50,7 @@ internal fun PebbleSection(
             if (trailing != null) {
                 RevealText(
                     trailing,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = PrimaryTextStyle(),
                     fontWeight = FontWeight.SemiBold,
                     color = trailingColor,
                     maxLines = 1,
@@ -84,14 +84,14 @@ internal fun WheelGrid(wheels: List<DiagRow>, modifier: Modifier = Modifier) {
                     Column(Modifier.weight(1f)) {
                         RevealText(
                             wheel.label,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = SecondaryTextStyle(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         RevealText(
                             wheel.value,
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = PrimaryTextStyle(),
                             fontWeight = FontWeight.SemiBold,
                             color = if (wheel.value == "OK") MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
                             maxLines = 1,

@@ -275,9 +275,9 @@ internal fun PresetPill(
                     Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
                     Spacer(Modifier.width(ButtonIconGap))
                     Column {
-                        RevealText(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        RevealText(name, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
                         if (detail.isNotBlank()) {
-                            RevealText(detail, style = MaterialTheme.typography.labelSmall, color = mutedContentColor(), maxLines = 1)
+                            RevealText(detail, style = SecondaryTextStyle(), color = mutedContentColor(), maxLines = 1)
                         }
                     }
                 }
@@ -341,8 +341,8 @@ internal fun ChargeLimitPill(
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
                         Spacer(Modifier.width(ButtonIconGap))
-                        RevealText(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        RollingNumber(text = "$limit%", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        RevealText(label, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        RollingNumber(text = "$limit%", style = PrimaryTextStyle(), fontWeight = FontWeight.Bold)
                     }
                 },
                 // "Set": sends the command; active while it is in flight.
@@ -354,7 +354,7 @@ internal fun ChargeLimitPill(
                     contentPadding = PaddingValues(horizontal = ButtonPaddingH),
                 ) {
                     if (pending) LoadingIndicator(Modifier.size(ButtonIconSize))
-                    else RevealText("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                    else RevealText("Set", fontWeight = FontWeight.Bold, style = PrimaryTextStyle())
                 }
             ),
             // The same target height as every other button (the 11dp content padding alone left

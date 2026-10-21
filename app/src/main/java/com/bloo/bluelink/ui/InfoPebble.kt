@@ -149,7 +149,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
                 if (lastSvc == null || interval == null) {
                     RevealText(
                         "Set last-service mileage and interval in Settings to track service.",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = SecondaryTextStyle(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -175,7 +175,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
         // A quiet subheading: the group of links is already under "<brand> owners".
         RevealText(
             title,
-            style = MaterialTheme.typography.labelLarge,
+            style = PrimaryTextStyle(),
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

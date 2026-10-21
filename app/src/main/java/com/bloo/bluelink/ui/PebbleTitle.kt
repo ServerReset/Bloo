@@ -167,7 +167,7 @@ internal fun PebbleTitleRow(
         // -- always native titleMedium.
         RevealText(
             title,
-            style = MaterialTheme.typography.titleMedium,
+            style = PrimaryTextStyle(),
             modifier = titleBaseModifier,
             color = titleColor,
             fontWeight = FontWeight.Bold,

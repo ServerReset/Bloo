@@ -62,7 +62,7 @@ private fun DebugInfoItem(
             // Theme typography so it scales with the user's font-size setting.
             RevealText(
                 text = info.label,
-                style = MaterialTheme.typography.labelSmall,
+                style = SecondaryTextStyle(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -157,7 +157,7 @@ fun DebugSettingsPanel(
     Column(modifier.fillMaxWidth()) {
         RevealText(
             "Tap a copyable value to copy it to the clipboard.",
-            style = MaterialTheme.typography.bodySmall,
+            style = SecondaryTextStyle(),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(GapRow))
@@ -186,7 +186,7 @@ fun DebugSettingsPanel(
                     )
                     RevealText(
                         text = "Share only when support asks.",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = SecondaryTextStyle(),
                         color = MaterialTheme.colorScheme.error,
                     )
                 }

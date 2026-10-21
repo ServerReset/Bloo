@@ -264,7 +264,7 @@ internal fun ClimatePebble(
             if (climateOn) {
                 RevealText(
                     "On at the car. Read-only while the car is running.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = SecondaryTextStyle(),
                     color = mutedContentColor(),
                 )
                 status.airTemp?.let { t ->
@@ -279,7 +279,7 @@ internal fun ClimatePebble(
             } else {
                 RevealText(
                     "Climate can't be started while the car is running.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = SecondaryTextStyle(),
                     color = mutedContentColor(),
                 )
             }
@@ -319,7 +319,7 @@ internal fun ClimatePebble(
                 )
                 RevealText(
                     "It's $ambientLabel by your car. Smart climate targets $targetLabel.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = SecondaryTextStyle(),
                     color = mutedContentColor(),
                 )
             } else {
@@ -332,7 +332,7 @@ internal fun ClimatePebble(
                 )
                 RevealText(
                     "Sets the temperature for the weather where your car is parked.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = SecondaryTextStyle(),
                     color = mutedContentColor(),
                 )
             }

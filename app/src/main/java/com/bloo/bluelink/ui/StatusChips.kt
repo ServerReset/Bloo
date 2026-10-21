@@ -69,7 +69,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
             }
             RevealText(
                 text,
-                style = MaterialTheme.typography.labelMedium,
+                style = SecondaryTextStyle(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

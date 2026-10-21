@@ -95,7 +95,7 @@ internal fun SeatConfigRow(
         RevealText(
             label,
             Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
+            style = SecondaryTextStyle(),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )

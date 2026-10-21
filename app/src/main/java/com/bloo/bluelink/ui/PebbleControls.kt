@@ -255,7 +255,7 @@ internal fun PrimaryActions(
             ) { text ->
                 RevealText(
                     text,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = PrimaryTextStyle(),
                     fontWeight = FontWeight.Bold,
                     color = stateColor,
                     maxLines = 1,

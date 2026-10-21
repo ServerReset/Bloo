@@ -328,7 +328,7 @@ internal fun OnboardingPebbleDemo() {
                 Spacer(Modifier.width(GapRow))
                 RevealText(
                     "Charge",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = PrimaryTextStyle(),
                     fontWeight = FontWeight.Bold,
                     color = scheme.onSurface,
                 )
@@ -342,7 +342,7 @@ internal fun OnboardingPebbleDemo() {
             AnimatedVisibility(visible = open) {
                 RevealText(
                     "That is a pebble. Tap it for details, hold to reorder, and swipe its top row to change cars.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = SecondaryTextStyle(),
                     color = scheme.onSurfaceVariant,
                 )
             }

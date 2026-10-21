@@ -140,16 +140,19 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                     detail = if (signedIn) "Signed in · runs your car on its own" else "Connected · not signed in yet",
                     modifier = Modifier.padding(start = CompanionIndent),
                     onRemove = null,
+                    // Only while there is something to do: a watch that is already signed in has no sign-in button.
+                    action = if (signedIn) null else {
+                        {
+                            SafeMorphTextButton(
+                                "Sign watch in",
+                                onClick = { WatchSignIn.offer(context) },
+                                icon = Icons.Filled.Watch,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            SecondaryText("Lets it run your car without this phone")
+                        }
+                    },
                 )
-                // Only while there is something to do: a watch that is already signed in has no sign-in button.
-                if (!signedIn) {
-                    CompanionActionRow(
-                        label = "Sign watch in",
-                        caption = "Lets it run your car without this phone",
-                        modifier = Modifier.padding(start = CompanionIndent),
-                        onClick = { WatchSignIn.offer(context) },
-                    )
-                }
             }
             registered.forEach { watch ->
                 WearCompanionRow(

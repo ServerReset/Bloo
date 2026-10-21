@@ -63,7 +63,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
         Spacer(Modifier.width(GapRow))
         RevealText(
             text = action.action,
-            style = MaterialTheme.typography.labelMedium,
+            style = SecondaryTextStyle(),
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -75,7 +75,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
             Spacer(Modifier.width(GapRow))
             RevealText(
                 text = action.details,
-                style = MaterialTheme.typography.labelSmall,
+                style = SecondaryTextStyle(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -87,7 +87,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
         Spacer(Modifier.width(GapRow))
         RevealText(
             text = shortTime(action.timestamp, use24Hour),
-            style = MaterialTheme.typography.labelSmall,
+            style = SecondaryTextStyle(),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -132,7 +132,7 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
             // state is the only feedback that the press did something.
             RevealText(
                 text = "No remote actions yet",
-                style = MaterialTheme.typography.labelSmall,
+                style = SecondaryTextStyle(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = GapHairline),
             )
@@ -145,7 +145,7 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
         if (actions.size > max) {
             RevealText(
                 text = "+${actions.size - max} more in the last $REMOTE_ACTION_HISTORY_DAYS days",
-                style = MaterialTheme.typography.labelSmall,
+                style = SecondaryTextStyle(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp),
             )

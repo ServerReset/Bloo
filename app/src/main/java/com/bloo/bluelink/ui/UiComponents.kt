@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -64,6 +65,19 @@ internal fun secondaryTextStyle(): TextStyle = MaterialTheme.typography.bodyMedi
     shadow = secondaryTextShadow(),
 )
 
+/**
+ * THE two text roles of the app. Every line of text is one of these, so a reader always knows what it is:
+ * - PRIMARY: what the line says (a name, a value, a title, a row's label). Body large, medium weight, full contrast.
+ * - SECONDARY: what it is about (a caption, a status, a unit, a hint, an explanation). Body medium, semi-bold, muted,
+ *   with the soft halo that lifts it off a busy backdrop.
+ * Figures (the big percentage, the range) are a third thing, drawn by their own components, not text in either role.
+ */
+@Composable
+internal fun PrimaryTextStyle(): TextStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+
+@Composable
+internal fun SecondaryTextStyle(): TextStyle = secondaryTextStyle()
+
 /** Secondary text's colour: onSurface, barely eased -- contrast, not a grey wash. */
 @Composable
 internal fun secondaryTextColor(): Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
@@ -96,16 +110,36 @@ internal fun PebbleMessage(text: String, modifier: Modifier = Modifier) = BodySm
 /** The app's ONE muted secondary text: [secondaryTextStyle] (bodyMedium, semi-bold, with a soft halo) in the muted colour. */
 @Composable
 internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: Color = secondaryTextColor()) {
-    RevealText(text, style = secondaryTextStyle(), modifier = modifier, color = color)
+    RevealText(text, style = SecondaryTextStyle(), modifier = modifier, color = color)
 }
 
-/** Body text (bodyMedium, onSurface) -- regular secondary content. */
+/** The PRIMARY role as text: what a line says, in the full text colour. */
+@Composable
+internal fun PrimaryText(
+    text: String,
+    modifier: Modifier = Modifier,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+) = RevealText(
+    text,
+    style = PrimaryTextStyle(),
+    modifier = modifier,
+    color = MaterialTheme.colorScheme.onSurface,
+    maxLines = maxLines,
+    overflow = overflow,
+)
+
+/** The SECONDARY role as text: what a line is about. Same as [BodySmallText]. */
+@Composable
+internal fun SecondaryText(text: String, modifier: Modifier = Modifier) = BodySmallText(text, modifier)
+
+/** The PRIMARY role as a line, in the full text colour. */
 @Composable
 internal fun BodyMediumText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
-    RevealText(text, style = MaterialTheme.typography.bodyMedium, modifier = modifier, color = color)
+    RevealText(text, style = PrimaryTextStyle(), modifier = modifier, color = color)
 }
 
-/** Title text (titleSmall) -- section headers and card titles; bold by default. */
+/** The PRIMARY role as a heading line: bold, for a section or card title. */
 @Composable
 internal fun TitleSmallText(
     text: String,
@@ -113,7 +147,7 @@ internal fun TitleSmallText(
     color: Color = MaterialTheme.colorScheme.onSurface,
     fontWeight: FontWeight = FontWeight.Bold,
 ) {
-    RevealText(text, style = MaterialTheme.typography.titleSmall, modifier = modifier, color = color, fontWeight = fontWeight)
+    RevealText(text, style = PrimaryTextStyle(), modifier = modifier, color = color, fontWeight = fontWeight)
 }
 
 /** The circular tinted container [IconBadge] draws into. */

@@ -81,7 +81,7 @@ private fun CarOrderControl(state: UiState, vm: AppViewModel) {
         BodySmallText("Move a car up or down; the garage uses this order.")
         state.vehicles.forEachIndexed { i, v ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                RevealText("${i + 1}. ${v.name}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                RevealText("${i + 1}. ${v.name}", style = SecondaryTextStyle(), modifier = Modifier.weight(1f))
                 MorphIconButton(
                     onClick = { vm.reorderVehicles(state.vehicles.toMutableList().also { it.add(i - 1, it.removeAt(i)) }) },
                     enabled = i > 0,
@@ -126,7 +126,7 @@ private fun PinnedPebbleControl(v: Vehicle, state: UiState, vm: AppViewModel) {
 private fun PebbleOrderControl(v: Vehicle, state: UiState, vm: AppViewModel) {
     val order = state.sectionsFor(v).filter { state.isSectionAvailable(v, it) }
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        RevealText(order.joinToString(" · ") { sectionLabel(it) }, style = MaterialTheme.typography.bodyMedium)
+        RevealText(order.joinToString(" · ") { sectionLabel(it) }, style = SecondaryTextStyle())
         BodySmallText("Drag pebbles on the car page to reorder them.")
         SafeMorphTextButton(
             "Reset to default order",

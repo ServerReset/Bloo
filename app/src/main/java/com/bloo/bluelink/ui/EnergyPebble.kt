@@ -97,7 +97,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
         if (running) {
             RevealText(
                 "Unavailable while the car is running.",
-                style = MaterialTheme.typography.bodySmall,
+                style = SecondaryTextStyle(),
                 color = mutedContentColor(),
             )
         }

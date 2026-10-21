@@ -99,7 +99,7 @@ internal fun ClimateControlsSection(
             BodySmallText("Temperature")
             RollingNumber(
                 text = degLabel(tempF.toString(), fahrenheit),
-                style = MaterialTheme.typography.bodySmall,
+                style = SecondaryTextStyle(),
                 fontWeight = FontWeight.Bold,
                 color = tempColor,
             )
@@ -129,7 +129,7 @@ internal fun ClimateControlsSection(
             RevealText(
                 "Run time",
                 Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
+                style = SecondaryTextStyle(),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -139,7 +139,7 @@ internal fun ClimateControlsSection(
             // slider you're actively dragging both ways.
             RollingNumber(
                 text = "$duration min",
-                style = MaterialTheme.typography.bodyMedium,
+                style = SecondaryTextStyle(),
                 fontWeight = FontWeight.Medium,
             )
         }

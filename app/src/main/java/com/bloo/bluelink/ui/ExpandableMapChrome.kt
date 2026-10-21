@@ -179,13 +179,13 @@ internal fun MapTopBar(
                 Column {
                     RollingNumber(
                         vehicleName,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = PrimaryTextStyle(),
                         fontWeight = FontWeight.Bold,
                     )
                     if (statusLine != null) {
                         RollingNumber(
                             statusLine,
-                            style = MaterialTheme.typography.labelLarge,
+                            style = PrimaryTextStyle(),
                             fontWeight = FontWeight.Medium,
                             color = mutedContentColor(),
                         )

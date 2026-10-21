@@ -306,7 +306,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                             if (idx == swipeStart) {
                                 RevealText(
                                     "Swipe to continue.",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = SecondaryTextStyle(),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(start = GapGroup, top = GapGroup),
                                 )

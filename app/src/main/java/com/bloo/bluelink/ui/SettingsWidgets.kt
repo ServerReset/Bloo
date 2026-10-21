@@ -243,7 +243,7 @@ internal fun SettingsCard(
                 {
                     RevealText(
                         it,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = SecondaryTextStyle(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -327,7 +327,7 @@ internal fun ListButton(
         }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
             RevealText(title, style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
-            if (subtitle != null) RevealText(subtitle, style = MaterialTheme.typography.bodySmall)
+            if (subtitle != null) RevealText(subtitle, style = SecondaryTextStyle())
         }
         if (showCheck) {
             AnimatedVisibility(

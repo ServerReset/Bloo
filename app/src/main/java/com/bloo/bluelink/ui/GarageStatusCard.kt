@@ -150,7 +150,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                     )
                     RevealText(
                         body,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = SecondaryTextStyle(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )

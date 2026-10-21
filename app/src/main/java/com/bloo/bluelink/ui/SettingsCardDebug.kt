@@ -94,7 +94,7 @@ internal fun DebugCardContent(
                 SelectionContainer {
                     RevealText(
                         text = logs.joinToString("\n").ifBlank { "No activity yet." },
-                        style = MaterialTheme.typography.bodySmall,
+                        style = SecondaryTextStyle(),
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -201,7 +201,7 @@ private fun CreditRow(entry: CreditEntry) {
             iconSize = 20.dp,
         )
         Column(Modifier.weight(1f)) {
-            RevealText(entry.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            RevealText(entry.name, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(2.dp))
             BodySmallText(
                 entry.description,
@@ -222,7 +222,7 @@ private fun CreditRow(entry: CreditEntry) {
             ) {
                 RevealText(
                     entry.url.removePrefix("https://").removePrefix("http://"),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = SecondaryTextStyle(),
                     color = MaterialTheme.colorScheme.primary,
                     textDecoration = TextDecoration.Underline,
                 )

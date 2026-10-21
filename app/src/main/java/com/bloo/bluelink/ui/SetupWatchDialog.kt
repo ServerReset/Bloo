@@ -220,7 +220,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
             status?.let {
                 RevealText(
                     it,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = SecondaryTextStyle(),
                     color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

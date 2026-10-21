@@ -153,7 +153,7 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
                 transitionSpec = { expandContentTransform() },
                 label = "statusHeaderText",
             ) { s ->
-                RevealText(s, style = MaterialTheme.typography.labelMedium, color = animTint, fontWeight = FontWeight.Medium)
+                RevealText(s, style = SecondaryTextStyle(), color = animTint, fontWeight = FontWeight.Medium)
             }
         }
     }
@@ -193,14 +193,14 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                 Column(Modifier.weight(1f)) {
                     RevealText(
                         "Bloo",
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = PrimaryTextStyle(),
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         softWrap = false,
                     )
                     RevealText(
                         if (carCount == 0) "No vehicles yet" else "$carCount car${if (carCount == 1) "" else "s"}",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = SecondaryTextStyle(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -308,7 +308,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                             ) {
                                 RevealText(
                                     "Update available",
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = PrimaryTextStyle(),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )

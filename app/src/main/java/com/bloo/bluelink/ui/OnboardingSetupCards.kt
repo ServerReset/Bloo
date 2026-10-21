@@ -60,7 +60,7 @@ internal fun OnboardingPinForm(
         if (attempted && (pin.length < PinCrypto.PIN_MIN_DIGITS || pin != confirm)) {
             RevealText(
                 "PINs must be 4-8 digits and match.",
-                style = MaterialTheme.typography.bodySmall,
+                style = SecondaryTextStyle(),
                 color = scheme.error,
             )
         }

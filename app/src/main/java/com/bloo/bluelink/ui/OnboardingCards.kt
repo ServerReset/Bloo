@@ -143,7 +143,7 @@ internal fun OnboardingStepCard(spec: OnboardingCardSpec, content: @Composable (
     ) {
         RevealText(
             spec.summary,
-            style = MaterialTheme.typography.bodyMedium,
+            style = SecondaryTextStyle(),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         content()

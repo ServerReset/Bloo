@@ -67,7 +67,7 @@ internal fun SettingsGroup(title: String? = null, content: @Composable ColumnSco
         if (!title.isNullOrBlank()) {
             RevealText(
                 title,
-                style = MaterialTheme.typography.labelLarge,
+                style = PrimaryTextStyle(),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.semantics { heading() },

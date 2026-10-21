@@ -210,7 +210,7 @@ internal fun SettingsScreen(
           Spacer(Modifier.height(GapRow))
           RevealText(
               "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
-              style = MaterialTheme.typography.labelSmall,
+              style = SecondaryTextStyle(),
               color = MaterialTheme.colorScheme.onSurfaceVariant,
               textAlign = TextAlign.Center,
               modifier = Modifier.fillMaxWidth(),

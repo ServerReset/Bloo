@@ -159,7 +159,7 @@ private fun DialogCard(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             RevealText(
                 title,
-                style = MaterialTheme.typography.headlineSmall,
+                style = PrimaryTextStyle(),
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )

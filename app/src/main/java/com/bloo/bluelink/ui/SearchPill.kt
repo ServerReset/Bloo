@@ -218,7 +218,7 @@ internal fun SearchPill(
                                     if (query.isEmpty()) {
                                         RevealText(
                                             "Search settings, commands & data",
-                                            style = MaterialTheme.typography.bodyLarge,
+                                            style = PrimaryTextStyle(),
                                             color = scheme.onSurfaceVariant,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
@@ -243,7 +243,7 @@ internal fun SearchPill(
                     ) {
                         Icon(AppIcons.Search, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(GapGroup))
-                        RevealText("Search", style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                        RevealText("Search", style = PrimaryTextStyle(), maxLines = 1)
                     }
                     // Closed BUBBLE: the glyph alone; contentDescription is on the icon since there
                     // is no label.
@@ -283,7 +283,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
     }
     RevealText(
         "Ask for anything",
-        style = MaterialTheme.typography.titleSmall,
+        style = PrimaryTextStyle(),
         color = scheme.onSurface,
     )
     if (actions.isNotEmpty()) {
@@ -291,7 +291,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
             actions.forEach { cmd ->
                 ResultRow(cmd.icon, scheme.secondary, caption = null, onClick = { onPick(cmd.title, true) }) {
                     TitleSmallText(cmd.title)
-                    if (!compact) RevealText(cmd.description, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                    if (!compact) RevealText(cmd.description, style = SecondaryTextStyle(), color = scheme.onSurfaceVariant)
                 }
             }
         }

@@ -171,7 +171,7 @@ internal fun UiScaleSlider(appearance: SettingsStore.Appearance, vm: AppViewMode
 @Composable
 private fun ColorPickerSection(label: String, color: Color, onColor: (Color) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        RevealText(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        RevealText(label, style = PrimaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         ColorPickerCanvas(color, onColor)
     }
 }

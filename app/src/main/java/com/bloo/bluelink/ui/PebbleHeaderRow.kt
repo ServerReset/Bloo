@@ -137,7 +137,7 @@ internal fun PebbleHeaderRow(
                     label = "pebbleSummary",
                 ) { s -> RollingNumber(
                     s,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = SecondaryTextStyle(),
                     fontWeight = FontWeight.Medium,
                     color = mutedContentColor(),
                     maxLines = if (density.fontScale >= 1.3f) 2 else 1,

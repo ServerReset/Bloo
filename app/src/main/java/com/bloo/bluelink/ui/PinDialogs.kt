@@ -83,7 +83,7 @@ internal fun PinDialogs(
                 "current" -> {
                     RevealText(
                         "Enter your current PIN to continue.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = SecondaryTextStyle(),
                         color = scheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(GapGroup))
@@ -102,7 +102,7 @@ internal fun PinDialogs(
                             {
                                 RevealText(
                                     "Incorrect PIN. Wrong attempts count toward a lockout.",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = SecondaryTextStyle(),
                                     color = scheme.error,
                                 )
                             }
@@ -115,7 +115,7 @@ internal fun PinDialogs(
                         "set" -> {
                             RevealText(
                                 "Choose a new 4-8 digit PIN.",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = SecondaryTextStyle(),
                                 color = scheme.onSurfaceVariant,
                             )
                             Spacer(Modifier.height(GapGroup))
@@ -130,7 +130,7 @@ internal fun PinDialogs(
                                     "Removing the PIN leaves biometrics as the only way to lock the app."
                                 else
                                     "This device has no biometrics, so removing the PIN means the app can never lock.",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = SecondaryTextStyle(),
                                 color = scheme.onSurfaceVariant,
                             )
                             Spacer(Modifier.height(GapSection))

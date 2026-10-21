@@ -76,13 +76,13 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
                         if (bulleted) {
                             RevealText(
                                 "•",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = SecondaryTextStyle(),
                                 color = mutedContentColor(),
                             )
                         }
                         RevealText(
                             if (bulleted) line.substring(2) else line,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = SecondaryTextStyle(),
                         )
                     }
                 }
@@ -90,13 +90,13 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
         } else {
             RevealText(
                 "Summarizes this car's latest status, on your device.",
-                style = MaterialTheme.typography.bodyMedium,
+                style = SecondaryTextStyle(),
                 color = mutedContentColor(),
             )
         }
         RevealText(
             "Reflects the last refresh. Tap Summarize to update.",
-            style = MaterialTheme.typography.bodySmall,
+            style = SecondaryTextStyle(),
             color = mutedContentColor(),
         )
     }

@@ -167,19 +167,19 @@ internal fun UpdateAvailableTile(
                             if (!state.shizukuAvailable || !LocalAppearance.current.seamlessInstallShizuku) {
                                 RevealText(
                                     "Shizuku is off, so Android asks you to confirm each update. On the next screen tap \"More details\" to expand it, then \"Install anyway\".",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = SecondaryTextStyle(),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                             RevealText(
                                 if (hasDirectDownload) "1. Tap \"Update\", then \"Install\" once it downloads" else "1. Download the APK, then open it",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = SecondaryTextStyle(),
                             )
                             // Play Protect flags any non-Play-Store APK; the tip stops "Blocked by
                             // Play Protect" reading as a failure.
                             RevealText(
                                 "2. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = SecondaryTextStyle(),
                             )
                         }
                     }
