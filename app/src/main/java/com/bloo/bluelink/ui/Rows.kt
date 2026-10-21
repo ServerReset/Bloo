@@ -39,6 +39,7 @@ import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.SettingRow
 
 // --- Settings -------------------------------------------------------------
 // (The settings screen lives in SettingsScreen.kt's family.)
@@ -203,25 +204,25 @@ internal fun InlineToggle(checked: Boolean, modifier: Modifier = Modifier, onCha
 
 @Composable
 private fun ToggleRowControl(label: String, checked: Boolean, modifier: Modifier = Modifier, onChange: (Boolean) -> Unit) {
-    Row(
+    SettingRow(
         modifier
             .fillMaxWidth()
             // toggleable gives a Role.Switch + checked node; the track clears its own so TalkBack
             // sees one toggle.
             .hapticToggleable(checked, onChange)
             .padding(vertical = GapHairline),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RevealText(
-            label,
-            Modifier.weight(1f),
-            style = SecondaryTextStyle(),
-            fontWeight = if (checked) FontWeight.Medium else FontWeight.Normal,
-            // Cap at 2 lines; long labels wrap at spaces rather than growing the row.
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.width(GapGroup))
-        MorphToggleTrack(checked)
-    }
+        gap = GapGroup,
+        label = { labelModifier ->
+            RevealText(
+                label,
+                labelModifier,
+                style = SecondaryTextStyle(),
+                fontWeight = if (checked) FontWeight.Medium else FontWeight.Normal,
+                // Cap at 2 lines; long labels wrap at spaces rather than growing the row.
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        trailing = { MorphToggleTrack(checked) },
+    )
 }

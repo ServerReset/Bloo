@@ -57,6 +57,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GroupHeading
 import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.SectionHeading
+import com.bloo.uicommon.SettingRow
 import com.bloo.uicommon.SwitchTrack
 import com.bloo.uicommon.switchSemantics
 import com.bloo.uicommon.TitleSubtitle
@@ -242,28 +243,9 @@ fun WearActionRow(
         // The glyph (or the in-flight spinner) and the label side by side, the label taking the row and wrapping to a
         // second line before it is ever cut. The shared icon-and-label layout DROPPED the label when it did not fit,
         // which left long rows ("Lock when I walk away", "Top left: Lock / unlock") as an icon and nothing else.
-        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            if (glyph != null) {
-                CompositionLocalProvider(
-                    LocalContentColor provides tint,
-                ) {
-                    MorphButtonLabel(icon = glyph, label = "", pending = pending, iconSize = 18.dp)
-                }
-                Spacer(Modifier.width(10.dp))
-            }
-            // The phone's name-and-detail column (:uicommon): the label, and the description under it when there is one.
-            TitleSubtitle(
-                label, description, Modifier.weight(1f),
-                titleStyle = MaterialTheme.typography.labelLarge, titleColor = tint, titleWeight = FontWeight.SemiBold,
-                subtitleStyle = MaterialTheme.typography.labelSmall,
-                subtitleColor = if (active) scheme.onPrimary.copy(alpha = 0.8f) else scheme.onSurfaceVariant,
-                maxLines = 2,
-            )
-        }
-        if (switch) {
-            Spacer(Modifier.width(8.dp))
-            // The phone's switch (:uicommon's SwitchTrack). On, the row itself is filled with the accent, so the track is a
-            // lighter wash of the on-accent tone with the thumb in it; off, it is the muted pill the phone draws.
+        // The phone's switch (:uicommon's SwitchTrack). On, the row itself is filled with the accent, so the track is a
+        // lighter wash of the on-accent tone with the thumb in it; off, it is the muted pill the phone draws.
+        val switchTrack: @Composable () -> Unit = {
             SwitchTrack(
                 checked = active,
                 trackOn = scheme.onPrimary.copy(alpha = 0.35f),
@@ -272,6 +254,32 @@ fun WearActionRow(
                 thumbOff = scheme.onSurfaceVariant,
             )
         }
+        // The shared setting layout (:uicommon's SettingRow): the label takes the row, and the switch, when there is one, sits on the end.
+        SettingRow(
+            modifier = Modifier.weight(1f),
+            gap = 8.dp,
+            label = { labelModifier ->
+                Row(labelModifier, verticalAlignment = Alignment.CenterVertically) {
+                    if (glyph != null) {
+                        CompositionLocalProvider(
+                            LocalContentColor provides tint,
+                        ) {
+                            MorphButtonLabel(icon = glyph, label = "", pending = pending, iconSize = 18.dp)
+                        }
+                        Spacer(Modifier.width(10.dp))
+                    }
+                    // The phone's name-and-detail column (:uicommon): the label, and the description under it when there is one.
+                    TitleSubtitle(
+                        label, description, Modifier.weight(1f),
+                        titleStyle = MaterialTheme.typography.labelLarge, titleColor = tint, titleWeight = FontWeight.SemiBold,
+                        subtitleStyle = MaterialTheme.typography.labelSmall,
+                        subtitleColor = if (active) scheme.onPrimary.copy(alpha = 0.8f) else scheme.onSurfaceVariant,
+                        maxLines = 2,
+                    )
+                }
+            },
+            trailing = if (switch) switchTrack else null,
+        )
     }
 }
 
