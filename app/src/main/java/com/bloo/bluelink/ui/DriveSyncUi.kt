@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -93,6 +94,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     val watchHost = phones.firstOrNull { it.id == state.syncPrimaryId } ?: phones.firstOrNull()
     val context = LocalContext.current
     val liveWatch by WatchPresence.watch.collectAsStateWithLifecycle()
+    val signInState by WatchSignIn.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         while (true) {
             WatchPresence.refresh(context)
@@ -100,6 +102,10 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
         }
     }
     var showSetupWatch by remember { mutableStateOf(false) }
+    // The one device or watch the wearer is being asked to remove (the dialog below says what that does).
+    var removal by remember { mutableStateOf<Removal?>(null) }
+    // Read again when the sign-in moves on, so the sign-in button goes away the moment the watch acknowledges it.
+    val signedIn = remember(liveWatch, signInState) { liveWatch?.let { WatchSignIn.isSignedIn(context, it.id) } ?: false }
 
     ReorderColumn(
         items = phones,
@@ -123,7 +129,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                 dragging = dragging,
                 modifier = itemDragHandle,
                 onRename = { renaming = true },
-                onRemove = { vm.removeSyncedDevice(device.id) },
+                onRemove = { removal = Removal(device.id, device.name, watch = false) },
             )
             // Drawn in the same item slot, after the phone row -- not reorderable items themselves.
             val live = liveWatch.takeIf { isSelf }
@@ -131,16 +137,19 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             live?.let { watch ->
                 WearCompanionRow(
                     name = watch.name,
-                    detail = "Connected to this phone",
+                    detail = if (signedIn) "Signed in · runs your car on its own" else "Connected · not signed in yet",
                     modifier = Modifier.padding(start = CompanionIndent),
                     onRemove = null,
                 )
-                CompanionActionRow(
-                    label = "Sign watch in",
-                    caption = "Lets it run your car without this phone",
-                    modifier = Modifier.padding(start = CompanionIndent),
-                    onClick = { WatchSignIn.offer(context) },
-                )
+                // Only while there is something to do: a watch that is already signed in has no sign-in button.
+                if (!signedIn) {
+                    CompanionActionRow(
+                        label = "Sign watch in",
+                        caption = "Lets it run your car without this phone",
+                        modifier = Modifier.padding(start = CompanionIndent),
+                        onClick = { WatchSignIn.offer(context) },
+                    )
+                }
             }
             registered.forEach { watch ->
                 WearCompanionRow(
@@ -148,7 +157,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                     detail = listOf(watch.model, relativeLabel(watch.lastSeenMs))
                         .filter { it.isNotBlank() }.joinToString(" · "),
                     modifier = Modifier.padding(start = CompanionIndent),
-                    onRemove = { vm.removeSyncedDevice(watch.id) },
+                    onRemove = { removal = Removal(watch.id, watch.name, watch = true) },
                 )
             }
             if (isSelf && live == null && registered.isEmpty()) {
@@ -180,6 +189,27 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
         }
     }
     WatchSignInDialog()
+    removal?.let { r ->
+        GlassAlertDialog(
+            onDismissRequest = { removal = null },
+            icon = if (r.watch) Icons.Filled.Watch else Icons.Filled.Smartphone,
+            title = "Remove ${r.name.ifBlank { if (r.watch) "this watch" else "this phone" }}?",
+            text = {
+                BodyMediumText(
+                    "It leaves the list on every synced device. If it syncs again it comes back: Bloo never locks a device out of your sync.",
+                )
+            },
+            buttons = {
+                MorphTextButton(
+                    "Remove",
+                    onClick = { vm.removeSyncedDevice(r.id); removal = null },
+                    emphasis = ButtonEmphasis.Deny,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SafeMorphTextButton("Keep", onClick = { removal = null }, modifier = Modifier.fillMaxWidth())
+            },
+        )
+    }
     if (showSetupWatch) {
         SetupWatchDialog(
             phoneName = phones.firstOrNull { it.id == state.thisDeviceId }?.name?.ifBlank { null } ?: "this phone",
@@ -233,6 +263,9 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
         )
     }
 }
+
+/** A device or watch the wearer has asked to remove, until they confirm or keep it. */
+private data class Removal(val id: String, val name: String, val watch: Boolean)
 
 /** How far a companion is inset under its phone row. */
 private val CompanionIndent = 22.dp

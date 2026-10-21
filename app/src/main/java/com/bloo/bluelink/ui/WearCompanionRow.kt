@@ -89,7 +89,7 @@ fun WearCompanionRow(
             }
         }
         if (onRemove != null) {
-            ConfirmRemoveButton(name, "this watch", onRemove)
+            RemoveDeviceButton(name, "this watch", onRemove)
         }
     }
 }

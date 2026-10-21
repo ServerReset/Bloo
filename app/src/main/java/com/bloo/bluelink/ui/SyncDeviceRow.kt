@@ -26,7 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SyncMerge
-import com.bloo.uicommon.rememberConfirmArm
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.ButtonIconSize
 import com.bloo.uicommon.GapRow
@@ -49,7 +48,7 @@ private fun healthOf(lastSeenMs: Long, isSelf: Boolean, now: Long): DeviceHealth
 /**
  * One phone in the drag-to-reorder devices list, in an outlined box of its own: drag handle, a star
  * for the primary, the name with "This device" / "Primary" tags, a health dot with the model and
- * last-seen line, and rename (this device) or tap-twice remove (any other).
+ * last-seen line, and rename (this device) or remove (any other; the remove dialog is in DriveSyncUi).
  */
 @Composable
 internal fun SyncDeviceRow(
@@ -153,7 +152,7 @@ internal fun SyncDeviceRow(
                 Icon(Icons.Filled.Edit, contentDescription = "Rename this device", modifier = Modifier.size(ButtonIconSize))
             }
         } else {
-            ConfirmRemoveButton(device.name, "this device", onRemove)
+            RemoveDeviceButton(device.name, "this device", onRemove)
         }
     }
 }
@@ -170,18 +169,17 @@ internal fun DeviceTag(text: String, color: Color) {
 }
 
 /**
- * The close button on a synced-device row: tap once to arm (it turns red), again to remove.
- * Auto-resets.
+ * The remove button on a synced-device row. It only asks: the confirm dialog in DriveSyncUi says what removing does, so the
+ * button itself is a plain action, not a tap-twice trap.
  */
 @Composable
-internal fun ConfirmRemoveButton(name: String, fallbackNoun: String, onRemove: () -> Unit) {
-    val confirm = rememberConfirmArm()
+internal fun RemoveDeviceButton(name: String, fallbackNoun: String, onRemove: () -> Unit) {
     val who = name.ifBlank { fallbackNoun }
-    MorphIconButton(onClick = { if (confirm.armed) onRemove() else confirm.arm() }) {
+    MorphIconButton(onClick = onRemove) {
         Icon(
             Icons.Filled.Delete,
-            contentDescription = if (confirm.armed) "Tap again to remove $who" else "Remove $who from synced devices",
-            tint = if (confirm.armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            contentDescription = "Remove $who from synced devices",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(ButtonIconSize),
         )
     }

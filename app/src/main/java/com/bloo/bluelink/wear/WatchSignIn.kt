@@ -38,6 +38,24 @@ object WatchSignIn {
     val state: StateFlow<State> = _state
     private val scope = ioScope()
 
+    private const val SIGNED_IN_PREFS = "bloo_watch_signin"
+    private const val KEY_SIGNED_IN = "signed_in_nodes"
+
+    /** The watch whose sign-in is in flight; it is remembered as signed in only once it acknowledges. */
+    private var awaitingNodeId: String? = null
+    private var appContext: Context? = null
+
+    /** Whether the watch with [nodeId] has acknowledged a sign-in from this phone (kept across launches). */
+    fun isSignedIn(context: Context, nodeId: String): Boolean =
+        context.applicationContext.getSharedPreferences(SIGNED_IN_PREFS, Context.MODE_PRIVATE)
+            .getStringSet(KEY_SIGNED_IN, emptySet()).orEmpty().contains(nodeId)
+
+    private fun rememberSignedIn(context: Context, nodeId: String) {
+        val prefs = context.applicationContext.getSharedPreferences(SIGNED_IN_PREFS, Context.MODE_PRIVATE)
+        val nodes = prefs.getStringSet(KEY_SIGNED_IN, emptySet()).orEmpty()
+        prefs.edit().putStringSet(KEY_SIGNED_IN, HashSet(nodes) + nodeId).apply()
+    }
+
     /** Ask the connected watch to start a sign-in. */
     fun offer(context: Context) {
         val app = context.applicationContext
@@ -76,6 +94,8 @@ object WatchSignIn {
         val pending = _state.value as? State.Confirm ?: return
         val app = context.applicationContext
         _state.value = State.Sending
+        awaitingNodeId = pending.nodeId
+        appContext = app
         scope.launch {
             runCatching {
                 val envelope = WatchCredentialTransfer.seal(pending.publicKey, bundle(app))
@@ -91,7 +111,12 @@ object WatchSignIn {
 
     /** The watch opened the envelope and saved the accounts. */
     fun onAck() {
-        if (_state.value == State.Sending) _state.value = State.Done
+        if (_state.value != State.Sending) return
+        _state.value = State.Done
+        val node = awaitingNodeId
+        val context = appContext
+        if (node != null && context != null) rememberSignedIn(context, node)
+        awaitingNodeId = null
     }
 
     /**

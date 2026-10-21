@@ -212,9 +212,17 @@ fun AppViewModel.pullFromPrimary() {
  * (name changes ride the registry heartbeat).
  */
 fun AppViewModel.renameThisDevice(name: String) {
+    val trimmed = name.trim()
     viewModelScope.launch {
         settingsStore.setSyncDeviceName(name)
-        _state.update { it.copy(syncDeviceName = name.trim()) }
+        // The devices list draws each row's name from the device entries, not from syncDeviceName, so the entry is renamed
+        // here too; otherwise the row keeps the old name until the next Drive pass.
+        _state.update { s ->
+            s.copy(
+                syncDeviceName = trimmed,
+                syncDevices = s.syncDevices.map { if (it.id == s.thisDeviceId) it.copy(name = trimmed) else it },
+            )
+        }
         runDriveSyncNow()
     }
 }
