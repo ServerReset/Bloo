@@ -221,13 +221,7 @@ object LiveCharge {
             pluggedInLabel?.takeIf { it.isNotBlank() && !it.startsWith("Not ") },
         ).joinToString(" · ")
 
-        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        val contentPi = launch?.let {
-            PendingIntent.getActivity(
-                context, id, it,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-        }
+        val contentPi = com.bloo.bluelink.Shortcuts.openCardPendingIntent(context, vin, requestCode = id)
         val stopIntent = Intent(context, AlertActionReceiver::class.java).apply {
             action = AlertActionReceiver.ACTION_RUN
             data = "bloo://live_charge/$vin".toUri()

@@ -1,5 +1,7 @@
 package com.bloo.bluelink
 
+import android.app.PendingIntent
+
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -18,6 +20,29 @@ object Shortcuts {
 
     /** Selectable per-car shortcut actions (toggles + open), in priority order. */
     val ACTIONS = listOf("doors", "climate", "open")
+
+    /**
+     * The one intent every tap on a Bloo notification or widget fires: the app, on the car's card in the garage (the car is
+     * selected and the garage shown; a locked app waits for its unlock first, as a shortcut does). Without a [vin] it opens the
+     * garage on whichever car was last selected. The data uri makes each car's intent distinct, because Android treats two intents
+     * that differ only in extras as the same one -- two notifications for two cars would otherwise share a tap.
+     */
+    fun openCardIntent(context: Context, vin: String?): Intent {
+        val intent = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (vin.isNullOrBlank()) return intent.setData(android.net.Uri.parse("bloo://garage"))
+        return intent
+            .setAction(ACTION)
+            .setData(android.net.Uri.parse("bloo://car/${android.net.Uri.encode(vin)}"))
+            .putExtra(EXTRA_VIN, vin)
+            .putExtra(EXTRA_CMD, "open")
+    }
+
+    /** The tap for a notification or widget that has no car of its own: the app, on the garage. */
+    fun openCardPendingIntent(context: Context, vin: String?, requestCode: Int = 0): PendingIntent =
+        PendingIntent.getActivity(
+            context, requestCode, openCardIntent(context, vin),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 
     /**
      * Human-readable label for a shortcut command, used in the in-app shortcut picker UI (distinct

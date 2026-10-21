@@ -24,11 +24,7 @@ object BootReauthNotice {
                 description = "Asks you to sign in to Bloo after your phone restarts."
             },
         )
-        val open = PendingIntent.getActivity(
-            app, 0,
-            Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+        val open = com.bloo.bluelink.Shortcuts.openCardPendingIntent(app, vin = null)
         val n = NotificationCompat.Builder(app, CHANNEL)
             .setSmallIcon(com.bloo.bluelink.R.drawable.ic_stat_bloo)
             .setContentTitle("Sign in to Bloo")

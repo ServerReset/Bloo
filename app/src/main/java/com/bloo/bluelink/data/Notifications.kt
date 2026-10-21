@@ -172,13 +172,7 @@ object Notifications {
     ): Boolean {
         if (!hasPermission(context)) return false
         ensureChannel(context, channelId)
-        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        val pi = launch?.let {
-            PendingIntent.getActivity(
-                context, 0, it,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-        }
+        val pi = com.bloo.bluelink.Shortcuts.openCardPendingIntent(context, vin = null)
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_bloo)
             .setColor(ACCENT)

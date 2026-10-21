@@ -53,7 +53,7 @@ object AutoLockNotification {
     // genuinely serves every car; actionIntent is cached per (vin, action), since those DO
     // vary. Neither cache is ever invalidated: nothing about "how do I open the app" or "run
     // this action for this VIN" changes for the life of the process.
-    @Volatile private var cachedOpenAppIntent: PendingIntent? = null
+    private val openAppIntents = java.util.concurrent.ConcurrentHashMap<String, PendingIntent>()
     private val actionIntents = java.util.concurrent.ConcurrentHashMap<String, PendingIntent>()
 
     fun build(context: Context, vin: String, carName: String, state: DetectionState, graceRemaining: Int): Notification {
@@ -77,7 +77,7 @@ object AutoLockNotification {
             .setOngoing(!state.isTerminal)
             .setAutoCancel(state.isTerminal)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setContentIntent(openAppIntent(context))
+            .setContentIntent(openAppIntent(context, vin))
         if (state == DetectionState.GRACE) {
             builder.addAction(0, "Lock now", actionIntent(context, vin, AutoLockService.ACTION_LOCK_NOW))
         }
@@ -87,13 +87,9 @@ object AutoLockNotification {
         return builder.build()
     }
 
-    private fun openAppIntent(context: Context): PendingIntent =
-        cachedOpenAppIntent ?: run {
-            val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_IMMUTABLE else 0
-            PendingIntent.getActivity(context, 0, intent, flags).also { cachedOpenAppIntent = it }
-        }
+    // The car's own card (the tap a lock or unlock notification opens), not a bare launch of the app.
+    private fun openAppIntent(context: Context, vin: String): PendingIntent =
+        openAppIntents.getOrPut(vin) { com.bloo.bluelink.Shortcuts.openCardPendingIntent(context, vin, requestCode = notificationId(vin)) }
 
     private fun actionIntent(context: Context, vin: String, action: String): PendingIntent =
         actionIntents.getOrPut("$vin:$action") {

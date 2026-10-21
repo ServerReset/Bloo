@@ -84,15 +84,7 @@ object AutoLockEventNotifier {
             "AutoLock sent the lock command after you walked away."
         }
 
-        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        val contentIntent = launch?.let {
-            PendingIntent.getActivity(
-                context,
-                notificationId(vin),
-                it,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-        }
+        val contentIntent = com.bloo.bluelink.Shortcuts.openCardPendingIntent(context, vin, requestCode = notificationId(vin))
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_bloo)
