@@ -263,7 +263,9 @@ fun WearActionRow(
                     // The phone's name-and-detail column (:uicommon): the label, and the description under it when there is one.
                     TitleSubtitle(
                         label, description, Modifier.weight(1f),
-                        titleStyle = MaterialTheme.typography.labelLarge, titleColor = tint, titleWeight = FontWeight.SemiBold,
+                        // A switch row's label shares its line with the switch, so it takes the smaller step: "Charging" must not break mid-word.
+                        titleStyle = if (switch) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
+                        titleColor = tint, titleWeight = FontWeight.SemiBold,
                         subtitleStyle = MaterialTheme.typography.labelSmall,
                         subtitleColor = scheme.onSurfaceVariant,
                         maxLines = 2,

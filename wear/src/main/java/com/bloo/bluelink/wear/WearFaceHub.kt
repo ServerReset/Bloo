@@ -100,7 +100,8 @@ fun WearFaceHub(
                 maxLines = 1,
                 reduceMotion = false,
             )
-            if (state.isNotBlank() && status == null) HubLine(state, scheme.onSurface, size)
+            // The car's state can run to two lines ("Parked · Locked · Climate on"); cut to one it read as "Parked · L…".
+            if (state.isNotBlank() && status == null) HubLine(state, scheme.onSurface, size, maxLines = 2)
             HubLine(
                 status?.text ?: caption,
                 when {
@@ -116,7 +117,7 @@ fun WearFaceHub(
 
 /** One small line under the hub's value: a fixed share of the hub's size (never the font setting), one line, within 80% of its width. */
 @Composable
-private fun HubLine(text: String, color: Color, hubSize: Dp) {
+private fun HubLine(text: String, color: Color, hubSize: Dp, maxLines: Int = 1) {
     RevealText(
         text,
         style = MaterialTheme.typography.labelSmall.copy(
@@ -124,7 +125,7 @@ private fun HubLine(text: String, color: Color, hubSize: Dp) {
         ),
         color = color,
         textAlign = TextAlign.Center,
-        maxLines = 1,
+        maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.width(hubSize * 0.8f),
     )
