@@ -147,16 +147,27 @@ internal fun ShareIntakeHost(vm: AppViewModel, stateHolder: State<UiState>) {
     }
 }
 
-/** The cars a shared picture can go to, one button each. */
+/**
+ * The cars a shared picture can go to: one row each, with the car's name and what it is (its model and year). The VIN stays
+ * off the screen; nothing here needs it.
+ */
 @Composable
 private fun SharedCarChooser(vehicles: List<Vehicle>, onPick: (Vehicle) -> Unit, onDismiss: () -> Unit) {
     GlassAlertDialog(
         onDismissRequest = onDismiss,
         icon = AppIcons.DirectionsCar,
-        title = "Set this photo for which car?",
+        title = "Use this photo for",
         text = {
+            SecondaryText("Pick the car this photo is for. You can change it later in that car's settings.")
             vehicles.forEach { v ->
-                ListButton(title = v.name.ifBlank { v.model }, subtitle = v.vin, onClick = { onPick(v) })
+                val what = listOfNotNull(v.modelYear, v.modelName ?: v.model.takeIf { it.isNotBlank() })
+                    .joinToString(" ")
+                ListButton(
+                    title = v.name.ifBlank { v.model },
+                    subtitle = what.ifBlank { null },
+                    icon = AppIcons.DirectionsCar,
+                    onClick = { onPick(v) },
+                )
             }
         },
         buttons = { MorphTextButton("Cancel", onClick = onDismiss, modifier = Modifier.fillMaxWidth()) },

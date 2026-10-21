@@ -116,7 +116,7 @@ fun WearEdgeRing(
                     val span = minOf(26f, filledEnd - 2f * half)
                     if (span > 0f) {
                         val at = half + (filledEnd - 2f * half - span) * phase
-                        drawArc(Color.White.copy(alpha = 0.25f), at - 90f, span, false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
+                        drawArc(Color.White.copy(alpha = 0.45f), at - 90f, span, false, topLeft, arc, style = Stroke(w, cap = StrokeCap.Round))
                     }
                 }
             }

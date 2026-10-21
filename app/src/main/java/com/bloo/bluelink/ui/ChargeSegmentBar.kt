@@ -139,7 +139,7 @@ internal fun ChargeSegmentBar(
                 val bandCenter = layout.fillWidth * (-0.6f + shimmer.value * 2.2f)
                 drawRoundRect(
                     brush = Brush.linearGradient(
-                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.16f), Color.Transparent),
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.38f), Color.Transparent),
                         start = Offset(bandCenter - bandWidth, 0f),
                         end = Offset(bandCenter + bandWidth, 0f),
                     ),
