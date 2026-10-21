@@ -60,7 +60,7 @@ class SettingsSearchTest {
         // means 20C, not 20F) -- so it must NOT come back as the literal 20.
         val f = parseClimateTemperature("start climate at 20", metric = true)
         assertNotNull(f)
-        assertTrue(f!! > 20, "expected a Celsius-to-Fahrenheit conversion, got $f")
+        assertTrue(f > 20, "expected a Celsius-to-Fahrenheit conversion, got $f")
     }
 
     @Test

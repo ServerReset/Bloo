@@ -35,7 +35,7 @@ object WearFacePrefs {
     internal fun parse(saved: String?): List<String> {
         val slots = saved?.split(",")
         val valid = slots != null && slots.size == 4 && slots.all { it == WearFaceControls.NONE || WearFaceControls.byKey(it) != null }
-        return if (valid) slots!! else WearFaceControls.defaults
+        return if (valid) slots else WearFaceControls.defaults
     }
 
     fun save(context: Context, slots: List<String>) {

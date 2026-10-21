@@ -41,7 +41,7 @@ class SettingActionsTest {
                 a.isAction -> assertEquals("", v, a.id)
                 a.text -> assertTrue(v.isNotEmpty(), a.id)
                 a.options.isNotEmpty() -> assertTrue(a.options.any { it.key == v }, "${a.id} reads '$v', not one of ${a.options.map { it.key }}")
-                a.min != null -> assertTrue(v.toDouble() in a.min!!..a.max!!, "${a.id} reads $v outside ${a.min}..${a.max}")
+                a.min != null -> assertTrue(v.toDouble() in a.min..a.max!!, "${a.id} reads $v outside ${a.min}..${a.max}")
                 else -> assertTrue(v == "on" || v == "off", "${a.id} reads '$v'")
             }
         }
@@ -63,7 +63,7 @@ class SettingActionsTest {
                     assertNotNull(AiSettingResolver.parse("${a.id}|${a.min}", candidates), "${a.id} lower bound")
                     assertNotNull(AiSettingResolver.parse("${a.id}|${a.max}", candidates), "${a.id} upper bound")
                     assertEquals(null, AiSettingResolver.parse("${a.id}|${a.max!! + 1}", candidates), "${a.id} above range")
-                    assertEquals(null, AiSettingResolver.parse("${a.id}|${a.min!! - 1}", candidates), "${a.id} below range")
+                    assertEquals(null, AiSettingResolver.parse("${a.id}|${a.min - 1}", candidates), "${a.id} below range")
                 }
                 else -> {
                     assertEquals(AiSettingResolver.Resolution(a.id, "on"), AiSettingResolver.parse("${a.id}|on", candidates))
