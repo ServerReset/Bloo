@@ -94,36 +94,34 @@ fun WearFaceHub(
                 maxLines = 1,
                 reduceMotion = false,
             )
-            if (state.isNotBlank() && status == null) {
-                RevealText(
-                    state,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (size.value * 0.13f).coerceIn(9f, 12f).dp.toSp() },
-                    ),
-                    color = scheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.width(size * 0.8f),
-                )
-            }
-            RevealText(
+            if (state.isNotBlank() && status == null) HubLine(state, scheme.onSurface, size)
+            HubLine(
                 status?.text ?: caption,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (size.value * 0.13f).coerceIn(9f, 12f).dp.toSp() },
-                ),
-                color = when {
+                when {
                     status == null -> scheme.onSurfaceVariant
                     status.error -> scheme.error
                     else -> scheme.primary
                 },
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.width(size * 0.8f),
+                size,
             )
         }
     }
+}
+
+/** One small line under the hub's value: a fixed share of the hub's size (never the font setting), one line, within 80% of its width. */
+@Composable
+private fun HubLine(text: String, color: Color, hubSize: Dp) {
+    RevealText(
+        text,
+        style = MaterialTheme.typography.labelSmall.copy(
+            fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (hubSize.value * 0.13f).coerceIn(9f, 12f).dp.toSp() },
+        ),
+        color = color,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.width(hubSize * 0.8f),
+    )
 }
 
 /** A moment's line in the hub, in place of the car's name: what just happened, or why to doubt the reading. */

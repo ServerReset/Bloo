@@ -61,6 +61,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GroupHeading
 import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.SectionHeading
+import com.bloo.uicommon.SwitchTrack
 import com.bloo.uicommon.LabelValueRow
 import com.bloo.uicommon.standardButtonIcon
 
@@ -257,13 +258,14 @@ fun WearActionRow(
         }
         if (switch) {
             Spacer(Modifier.width(8.dp))
-            // A filled dot when on, a hollow ring when off -- drawn rather than an icon so it reads at
-            // 16dp, where a glyph-based switch icon turns to mud.
-            Spacer(
-                Modifier
-                    .size(16.dp)
-                    .background(if (active) tint else Color.Transparent, CircleShape)
-                    .border(2.dp, tint, CircleShape),
+            // The phone's switch (:uicommon's SwitchTrack). On, the row itself is filled with the accent, so the track is a
+            // lighter wash of the on-accent tone with the thumb in it; off, it is the muted pill the phone draws.
+            SwitchTrack(
+                checked = active,
+                trackOn = scheme.onPrimary.copy(alpha = 0.35f),
+                trackOff = scheme.onSurface.copy(alpha = 0.16f),
+                thumbOn = scheme.onPrimary,
+                thumbOff = scheme.onSurfaceVariant,
             )
         }
     }

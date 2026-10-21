@@ -47,8 +47,8 @@ import com.bloo.uicommon.content
 internal fun <T : Any> PebbleStatusGate(status: T?, refreshing: Boolean, content: @Composable (T) -> Unit) {
     when {
         status != null -> content(status)
-        refreshing -> PebbleMessage("Fetching live status…")
-        else -> PebbleMessage("No status yet.")
+        refreshing -> SecondaryText("Fetching live status…")
+        else -> SecondaryText("No status yet.")
     }
 }
 
@@ -71,18 +71,6 @@ internal fun secondaryTextColor(): Color = com.bloo.uicommon.secondaryTextColor(
 /** The halo behind secondary text, from :uicommon. */
 @Composable
 internal fun secondaryTextShadow(): Shadow = com.bloo.uicommon.secondaryTextShadow()
-
-/** The muted secondary line; the same text as [BodySmallText] (one implementation for every muted line). */
-@Composable
-internal fun LabelText(text: String, modifier: Modifier = Modifier) = BodySmallText(text, modifier)
-
-/**
- * A muted one-liner for a pebble body with nothing to show yet (loading or empty). One component so
- * every "fetching…" / "no data" line in the app reads the same, instead of each call site picking
- * its own style and colour.
- */
-@Composable
-internal fun PebbleMessage(text: String, modifier: Modifier = Modifier) = BodySmallText(text, modifier)
 
 /** The app's ONE muted secondary text: [secondaryTextStyle] (bodyMedium, semi-bold, with a soft halo) in the muted colour. */
 @Composable

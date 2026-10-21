@@ -142,7 +142,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
     ) {
         // See diagSummary above.
         if (rows.isEmpty()) {
-            PebbleMessage("No diagnostics yet.")
+            SecondaryText("No diagnostics yet.")
         }
         // Grouped by what the reading is about, in the order a person would check them; a group with nothing to say is left out.
         DiagGroup.entries.forEach { group ->

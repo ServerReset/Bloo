@@ -224,7 +224,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.width(GapGroup))
-                LabelText(label, modifier = Modifier.padding(bottom = GapRow))
+                SecondaryText(label, modifier = Modifier.padding(bottom = GapRow))
             }
             AnimatedVisibility(
                 visible = expanded,

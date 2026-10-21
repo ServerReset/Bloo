@@ -147,7 +147,7 @@ private fun PaletteChooser(appearance: SettingsStore.Appearance, vm: AppViewMode
     var editing by remember { mutableStateOf<CustomPaletteData?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        LabelText("Built-in palettes")
+        SecondaryText("Built-in palettes")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(GapRow), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             ColorPalette.entries.forEach { palette ->
                 PaletteSwatch(
@@ -157,7 +157,7 @@ private fun PaletteChooser(appearance: SettingsStore.Appearance, vm: AppViewMode
                 )
             }
         }
-        LabelText("Custom palettes")
+        SecondaryText("Custom palettes")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(GapRow), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             appearance.customPalettes.forEach { palette ->
                 CustomPaletteSwatch(

@@ -169,7 +169,7 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         PebbleStatusGate(status, state.refreshing) { status ->
             fuelPct?.let { StatusRow("Fuel level", "$it%") }
             range?.let { StatusRow("Range (distance to empty)", formatDistance(it, metric)) }
-            if (fuelPct == null && range == null) PebbleMessage("No fuel data reported.")
+            if (fuelPct == null && range == null) SecondaryText("No fuel data reported.")
         }
     }
 }

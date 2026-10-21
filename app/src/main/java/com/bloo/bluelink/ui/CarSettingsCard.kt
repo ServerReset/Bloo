@@ -96,13 +96,13 @@ internal fun CarSettingsCard(
         }
 
         SettingsGroup("Vehicle") {
-            LabelText("Powertrain")
+            SecondaryText("Powertrain")
             PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
             // Only Hyundai/Genesis US vehicles have a real head-unit generation to confirm -- see
             // Vehicle.platformOverridable. Everywhere else it resolves the same way regardless, so
             // a picker there would be a control with no effect.
             if (v.platformOverridable) {
-                LabelText("Head unit")
+                SecondaryText("Head unit")
                 BodySmallText("Confirm this car's head unit. The service can't always tell, and some features only appear when supported.")
                 PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
             }
@@ -119,7 +119,7 @@ internal fun CarSettingsCard(
                 Column {
                     SectionDivider()
                     Spacer(Modifier.height(GapRow))
-                    LabelText("Default start")
+                    SecondaryText("Default start")
                     BodySmallText("What the Start button runs: smart climate, or one of your presets.")
                     val carPresets = state.climatePresets[v.vin].orEmpty()
                     MorphSegmented(

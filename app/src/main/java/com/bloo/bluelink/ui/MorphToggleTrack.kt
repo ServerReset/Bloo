@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.SwitchTrack
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.SoftDamping
@@ -37,46 +38,14 @@ import com.bloo.uicommon.SoftDamping
  */
 @Composable
 internal fun MorphToggleTrack(checked: Boolean) {
-    val trackColor by androidx.compose.animation.animateColorAsState(
-        if (checked) MaterialTheme.colorScheme.primary else buttonContainer(),
-        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
-        label = "toggleTrackBg",
+    // The shared switch (:uicommon's SwitchTrack), in the phone's colours.
+    SwitchTrack(
+        checked = checked,
+        trackOn = MaterialTheme.colorScheme.primary,
+        trackOff = buttonContainer(),
+        thumbOn = MaterialTheme.colorScheme.onPrimary,
+        thumbOff = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    val thumbColor by androidx.compose.animation.animateColorAsState(
-        if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
-        label = "toggleThumbFg",
-    )
-    val trackWidth = 44.dp
-    val trackHeight = 26.dp
-    val inset = 3.dp
-    val thumbSize by animateDpAsState(
-        if (checked) 20.dp else 16.dp,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-        label = "toggleThumbSize",
-    )
-    val thumbOffset by animateDpAsState(
-        if (checked) trackWidth - thumbSize - inset else inset,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-        label = "toggleThumbOffset",
-    )
-    Box(
-        Modifier
-            .size(trackWidth, trackHeight)
-            .clip(CircleShape)
-            .background(trackColor)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)), CircleShape)
-            .clearAndSetSemantics {},
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Box(
-            Modifier
-                .padding(start = thumbOffset)
-                .size(thumbSize)
-                .clip(CircleShape)
-                .background(thumbColor),
-        )
-    }
 }
 
 /** One seat's heat + cool capability toggles, shown as two compact filter chips. */
