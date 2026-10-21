@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 /**
  * Pins for the small pure string layer that renders climate summaries --
  * the running pebble header / AI confirm card. The conversions
- * (["presetDetail"]) had a documented history of re-inlining the °F->°C
+ * (["climatePresetDetail"]) had a documented history of re-inlining the °F->°C
  * rule and drifting from [degValue]; the shared-rule pin is what makes a
  * future drift fail loudly instead of displaying 68° in Celsius.
  */
@@ -45,7 +45,7 @@ class ClimateLabelTest {
         assertEquals("1 min", climateChunksLabel(0))
     }
 
-    // --- presetDetail ----------------------------------------------------------
+    // --- climatePresetDetail ----------------------------------------------------------
 
     private fun req(tempF: Int, defrost: Boolean = false, heat: Boolean = false, cool: Boolean = false, wheel: Boolean = false) =
         ClimateRequest(
@@ -58,14 +58,14 @@ class ClimateLabelTest {
         )
 
     @Test
-    fun presetDetail_bareTemperatureWithUnitRespected() {
+    fun climatePresetDetail_bareTemperatureWithUnitRespected() {
         assertEquals("70°", climatePresetDetail(req(70), fahrenheit = true))
         // Fahrenheit input converted per the shared degValue rule: 68°F -> 20°C.
         assertEquals("20°", climatePresetDetail(req(68), fahrenheit = false))
     }
 
     @Test
-    fun presetDetail_defrostAndSeatsAppend() {
+    fun climatePresetDetail_defrostAndSeatsAppend() {
         assertEquals("80° · Defrost", climatePresetDetail(req(80, defrost = true), fahrenheit = true))
         assertEquals("72° · Heat", climatePresetDetail(req(72, heat = true), fahrenheit = true))
         assertEquals("65° · Cool", climatePresetDetail(req(65, cool = true), fahrenheit = true))
@@ -73,7 +73,7 @@ class ClimateLabelTest {
     }
 
     @Test
-    fun presetDetail_rawTempTargetNeverLeaksIntoTheSummary() {
+    fun climatePresetDetail_rawTempTargetNeverLeaksIntoTheSummary() {
         // An unnamed temp target must never leak its raw value into the summary --
         // it should always carry a clean name or the generic word instead.
         val d = climatePresetDetail(req(70), fahrenheit = true)
