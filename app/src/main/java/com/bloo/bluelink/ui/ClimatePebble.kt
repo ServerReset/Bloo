@@ -36,6 +36,7 @@ import com.bloo.bluelink.data.saveClimatePreset
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.bluelink.data.smartClimateLabel
 import com.bloo.bluelink.data.smartClimateTargetF
+import com.bloo.bluelink.data.smartClimateTargetLine
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.RevealText
@@ -307,8 +308,6 @@ internal fun ClimatePebble(
             if (w != null) {
                 val ambientF = ambientFahrenheit(w.tempC)
                 val smartTarget = smartClimateTargetF(ambientF)
-                val targetLabel = degLabel(smartTarget.toString(), fahrenheit)
-                val ambientLabel = degLabel(ambientF.toString(), fahrenheit)
                 val smartLabel = smartClimateLabel(ambientF, fahrenheit)
                 MorphActionButton(
                     label = smartLabel,
@@ -317,7 +316,7 @@ internal fun ClimatePebble(
                     enabled = !pending && !climateOn,
                 )
                 RevealText(
-                    "It's $ambientLabel by your car. Smart climate targets $targetLabel.",
+                    smartClimateTargetLine(ambientF, fahrenheit),
                     style = SecondaryTextStyle(),
                     color = mutedContentColor(),
                 )

@@ -62,6 +62,13 @@ fun smartClimateLabel(ambientF: Int, fahrenheit: Boolean): String {
     return (if (smartClimateIsCooling(ambientF)) "Cool to " else "Heat to ") + target
 }
 
+/** The sentence under the smart-climate row on the phone: the ambient reading, then the target it will set. */
+fun smartClimateTargetLine(ambientF: Int, fahrenheit: Boolean): String {
+    val ambient = degLabel(ambientF.toString(), fahrenheit)
+    val target = degLabel(smartClimateTargetF(ambientF).toString(), fahrenheit)
+    return "It's $ambient by your car. Smart climate targets $target."
+}
+
 /** A compact "79° · Defrost · Heat" summary of what a saved climate preset will set; the phone and the watch word it alike. */
 fun climatePresetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
     // Bare "°" rather than degLabel's "°F"/"°C": the unit is established by context.
