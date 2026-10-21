@@ -320,8 +320,9 @@ internal fun WearButton(
         active = active,
         // Glass, as on the phone: a translucent pill that lets the aurora through; the filled primary is
         // kept for a switch that is on.
-        containerColor = scheme.surfaceContainerHigh.copy(alpha = 0.6f),
-        contentColor = scheme.onSurface,
+        // The phone's own default button colours (its Tonal emphasis: secondary container, on-secondary content), as glass.
+        containerColor = scheme.secondaryContainer.copy(alpha = 0.7f),
+        contentColor = scheme.onSecondaryContainer,
         activeContainerColor = scheme.primary,
         activeContentColor = scheme.onPrimary,
         contentPadding = contentPadding,
