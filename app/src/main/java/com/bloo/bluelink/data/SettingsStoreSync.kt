@@ -282,7 +282,8 @@ suspend fun SettingsStore.performMainToMainSync(
                         if (verify != body) error("Upload didn't verify: the Drive file doesn't match what was written")
                     }
                 }
-                AppLog.log("Drive sync: uploaded settings")
+                // Which document this device actually wrote: two phones that look like one file must show the same name here.
+                AppLog.log("Drive sync: uploaded settings to ${parsed.lastPathSegment}")
                 true
             }.onFailure {
                 uploadError = if (it is TimeoutCancellationException) "Timed out writing the Drive file" else it.message ?: "Couldn't write the Drive file"
