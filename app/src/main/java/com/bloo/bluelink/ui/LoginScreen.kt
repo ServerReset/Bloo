@@ -439,7 +439,7 @@ internal fun LoginScreen(
                             },
                         )
                         if (onCancel != null) {
-                            MorphTextButton(text = "Cancel", onClick = onCancel, emphasis = ButtonEmphasis.Deny)
+                            MorphTextButton(text = "Cancel", onClick = onCancel)
                         }
                     }
                     MorphTextButton(

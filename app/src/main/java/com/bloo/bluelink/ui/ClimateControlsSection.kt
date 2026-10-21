@@ -61,7 +61,7 @@ internal fun ClimateControlsSection(
     onRearLeft: (SeatLevel) -> Unit,
     rearRight: SeatLevel,
     onRearRight: (SeatLevel) -> Unit,
-    onSaveAsPreset: () -> Unit,
+    onSaveAsPreset: (() -> Unit)?,
 ) {
     LockedControls(locked = locked, message = "Stop climate to change settings.") {
         // No "Controls" heading: the pebble is already called Climate, so a heading that repeats it
@@ -185,11 +185,14 @@ internal fun ClimateControlsSection(
         }
 
         // No "Save" heading either: the button below already says what it does.
-        MorphTextButton(
-            text = "Save as preset",
-            onClick = onSaveAsPreset,
-            modifier = Modifier.fillMaxWidth(),
-            emphasis = ButtonEmphasis.Confirm,
-        )
+        // The editor for a saved preset passes no save: it already has its own Save.
+        if (onSaveAsPreset != null) {
+            MorphTextButton(
+                text = "Save as preset",
+                onClick = onSaveAsPreset,
+                modifier = Modifier.fillMaxWidth(),
+                emphasis = ButtonEmphasis.Confirm,
+            )
+        }
     }
 }

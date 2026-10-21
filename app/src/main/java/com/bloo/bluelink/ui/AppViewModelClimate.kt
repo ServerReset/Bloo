@@ -51,15 +51,15 @@ fun AppViewModel.saveClimatePreset(v: Vehicle, name: String, req: ClimateRequest
     }
 }
 
-/** Rename one saved preset, keeping what it sets (the same save, under its own id). */
-fun AppViewModel.renameClimatePreset(v: Vehicle, id: String, name: String) {
+/** Save one preset's name and what it sets (the same save, under its own id). */
+fun AppViewModel.updateClimatePreset(v: Vehicle, id: String, name: String, req: ClimateRequest) {
     val current = _state.value.climatePresets[v.vin].orEmpty().firstOrNull { it.id == id } ?: return
-    val renamed = current.copy(name = name.trim().ifBlank { current.name })
+    val updated = current.copy(name = name.trim().ifBlank { current.name }, request = req)
     _state.update {
-        it.copy(climatePresets = it.climatePresets + (v.vin to it.climatePresets[v.vin].orEmpty().map { p -> if (p.id == id) renamed else p }))
+        it.copy(climatePresets = it.climatePresets + (v.vin to it.climatePresets[v.vin].orEmpty().map { p -> if (p.id == id) updated else p }))
     }
     viewModelScope.launch {
-        settingsStore.saveClimatePreset(v.vin, renamed)
+        settingsStore.saveClimatePreset(v.vin, updated)
         com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
     }
 }

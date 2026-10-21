@@ -73,8 +73,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                 "Cancel",
                 vm::kiaCancelOtp,
                 enabled = !loading,
-                modifier = Modifier.fillMaxWidth(),
-                emphasis = ButtonEmphasis.Deny,
+                modifier = Modifier.fillMaxWidth()
             )
         },
     )
@@ -111,8 +110,7 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
                 "Cancel",
                 vm::canadaCancelOtp,
                 enabled = !loading,
-                modifier = Modifier.fillMaxWidth(),
-                emphasis = ButtonEmphasis.Deny,
+                modifier = Modifier.fillMaxWidth()
             )
         },
     )

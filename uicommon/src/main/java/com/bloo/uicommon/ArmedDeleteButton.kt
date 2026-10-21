@@ -27,7 +27,7 @@ fun ArmedDeleteButton(
         onClick = { if (confirm.armed) onConfirm() else confirm.arm() },
         modifier = modifier,
         filled = confirm.armed,
-        emphasis = if (confirm.armed) ButtonEmphasis.Deny else ButtonEmphasis.Tonal,
+        emphasis = ButtonEmphasis.Deny,
     ) {
         Icon(
             Icons.Filled.Delete,

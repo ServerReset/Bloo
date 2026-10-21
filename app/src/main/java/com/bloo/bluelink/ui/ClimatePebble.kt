@@ -32,7 +32,6 @@ import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.climatePresets
 import com.bloo.bluelink.data.degLabel
 import com.bloo.bluelink.data.deleteClimatePreset
-import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.saveClimatePreset
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.bluelink.data.smartClimateLabel
@@ -66,6 +65,8 @@ internal fun ClimatePebble(
 ) {
     val pending = state.isPending(v.vin, "climate")
     val fahrenheit = LocalAppearance.current.useFahrenheit
+    // Seats show only where the car has them, and not on a Gen 5 EV that never reports them. Shared by the controls and the preset editor.
+    val showSeatControls = seats.any && !(state.isGen5WEffective(v) && state.powertrainOf(v) == com.bloo.bluelink.data.Powertrain.EV)
     var tempF by remember(v.vin) { mutableIntStateOf(DEFAULT_CLIMATE_TEMP_F) }
     var duration by remember(v.vin) { mutableIntStateOf(DEFAULT_CLIMATE_DURATION_MIN) }
     var defrost by remember(v.vin) { mutableStateOf(false) }
@@ -296,7 +297,9 @@ internal fun ClimatePebble(
                 vm.deleteClimatePreset(v, id)
             },
             onReorder = { vm.reorderClimatePresets(v, it) },
-            onRename = { id, name -> vm.renameClimatePreset(v, id, name) },
+            onUpdate = { id, name, request -> vm.updateClimatePreset(v, id, name, request) },
+            seats = seats,
+            showSeats = showSeatControls,
         )
 
         // Smart climate: read the weather where the car is (falling back to home) and pick a target
@@ -337,7 +340,6 @@ internal fun ClimatePebble(
             }
         }
 
-        val isGen5W = state.isGen5WEffective(v)
         ClimateControlsSection(
             locked = climateOn,
             fahrenheit = fahrenheit,
@@ -348,7 +350,7 @@ internal fun ClimatePebble(
             seats = seats,
             // state.powertrainOf, not the raw v.isEv: a user's powertrain override is honoured here
             // too.
-            showSeats = seats.any && !(isGen5W && state.powertrainOf(v) == com.bloo.bluelink.data.Powertrain.EV),
+            showSeats = showSeatControls,
             driver = driver, onDriver = { driver = it },
             passenger = passenger, onPassenger = { passenger = it },
             rearLeft = rearLeft, onRearLeft = { rearLeft = it },
@@ -387,8 +389,7 @@ internal fun ClimatePebble(
                     MorphTextButton(
                         "Cancel",
                         onClick = { showAddPreset = false },
-                        modifier = Modifier.fillMaxWidth(),
-                        emphasis = ButtonEmphasis.Deny,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 },
             )

@@ -135,8 +135,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
             ExpressiveButtonRow(spacing = GapGroup) {
                 MorphTextButton(
                     "Cancel",
-                    onClick = onCancel,
-                    emphasis = ButtonEmphasis.Deny,
+                    onClick = onCancel
                 )
                 val confirmSource = remember { MutableInteractionSource() }
                 MorphButton(

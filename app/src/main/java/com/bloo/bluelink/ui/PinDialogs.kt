@@ -148,7 +148,7 @@ internal fun PinDialogs(
                     spacing = GapRow,
                     equalWidths = true,
                 ) {
-                    MorphTextButton("Cancel", onDismiss, emphasis = ButtonEmphasis.Deny)
+                    MorphTextButton("Cancel", onDismiss)
                     // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text had no
                     // `style`, so it rendered at a different size than "Cancel" right beside it in
                     // this same row, confirmed by audit.

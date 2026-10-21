@@ -106,8 +106,7 @@ internal fun PaletteEditorDialog(
             MorphTextButton(
                 "Cancel",
                 onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-                emphasis = ButtonEmphasis.Deny,
+                modifier = Modifier.fillMaxWidth()
             )
         },
     )

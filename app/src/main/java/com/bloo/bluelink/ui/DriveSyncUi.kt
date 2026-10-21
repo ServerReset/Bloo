@@ -262,8 +262,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                 MorphTextButton(
                     "Cancel",
                     onClick = { renaming = false },
-                    modifier = Modifier.fillMaxWidth(),
-                    emphasis = ButtonEmphasis.Deny,
+                    modifier = Modifier.fillMaxWidth()
                 )
             },
         )

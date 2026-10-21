@@ -26,8 +26,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.Icon
@@ -35,6 +38,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -53,11 +57,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
 import com.bloo.bluelink.data.ClimatePreset
+import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.climatePresetDetail
 import com.bloo.uicommon.ReorderColumn
-import com.bloo.uicommon.ArmedDeleteButton
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.TitleSubtitle
@@ -181,13 +186,24 @@ internal fun ClimatePresetSection(
     onStart: (ClimatePreset) -> Unit,
     onDelete: (String) -> Unit,
     onReorder: (List<ClimatePreset>) -> Unit,
-    onRename: (id: String, name: String) -> Unit,
+    onUpdate: (id: String, name: String, request: ClimateRequest) -> Unit,
+    seats: SeatConfig,
+    showSeats: Boolean,
 ) {
     // Track IDs mid-exit so the item stays visible until its shrink animation ends.
     var deletingIds by remember { mutableStateOf(setOf<String>()) }
-    // The preset being renamed (the pencil), until its name is saved or the dialog is closed.
-    var renaming by remember { mutableStateOf<ClimatePreset?>(null) }
+    // The preset being edited (the pencil), until it is saved, deleted or the popup is closed.
+    var editing by remember { mutableStateOf<ClimatePreset?>(null) }
     val scope = rememberCoroutineScope()
+    // Delete with the row's shrink: the id is held mid-exit until the animation ends, then the preset goes.
+    val removePreset: (String) -> Unit = { id ->
+        scope.launch {
+            deletingIds = deletingIds + id
+            delay(240)
+            onDelete(id)
+            deletingIds = deletingIds - id
+        }
+    }
 
     AnimatedVisibility(
         visible = presets.isNotEmpty(),
@@ -219,16 +235,7 @@ internal fun ClimatePresetSection(
                         detail = climatePresetDetail(preset.request, fahrenheit),
                         active = preset.id == activeId,
                         onStart = { onStart(preset) },
-                        onEdit = { renaming = preset },
-                        onDelete = {
-                            val id = preset.id
-                            scope.launch {
-                                deletingIds = deletingIds + id
-                                delay(240)
-                                onDelete(id)
-                                deletingIds = deletingIds - id
-                            }
-                        },
+                        onEdit = { editing = preset },
                         modifier = itemDragHandle,
                     )
                 }
@@ -236,43 +243,98 @@ internal fun ClimatePresetSection(
             Spacer(Modifier.height(GapHairline))
         }
     }
-    renaming?.let { preset ->
-        var draft by remember(preset.id) { mutableStateOf(preset.name) }
+    editing?.let { preset ->
+        var name by remember(preset.id) { mutableStateOf(preset.name) }
+        var tempF by remember(preset.id) { mutableIntStateOf(preset.request.tempF) }
+        var duration by remember(preset.id) { mutableIntStateOf(preset.request.durationMinutes) }
+        var defrost by remember(preset.id) { mutableStateOf(preset.request.defrost) }
+        var steeringHeat by remember(preset.id) { mutableStateOf(preset.request.steeringWheelHeat) }
+        var driver by remember(preset.id) { mutableStateOf(preset.request.seatFrontLeft) }
+        var passenger by remember(preset.id) { mutableStateOf(preset.request.seatFrontRight) }
+        var rearLeft by remember(preset.id) { mutableStateOf(preset.request.seatRearLeft) }
+        var rearRight by remember(preset.id) { mutableStateOf(preset.request.seatRearRight) }
         GlassAlertDialog(
-            onDismissRequest = { renaming = null },
+            onDismissRequest = { editing = null },
             icon = Icons.Filled.Edit,
-            title = "Rename preset",
+            title = "Edit preset",
+            // Delete is the popup's red action, in its title row. The popup is itself the deliberate step, so it does not arm.
+            titleTrailing = {
+                MorphIconButton(
+                    onClick = {
+                        editing = null
+                        removePreset(preset.id)
+                    },
+                    emphasis = ButtonEmphasis.Deny,
+                ) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete ${preset.name}", modifier = Modifier.size(ButtonIconSize))
+                }
+            },
             text = {
-                BlooTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    label = { RevealText("Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Column(
+                    Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(GapRow),
+                ) {
+                    BlooTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { RevealText("Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    // What the preset does: the same controls the climate section uses, with its save button left out.
+                    ClimateControlsSection(
+                        locked = false,
+                        fahrenheit = fahrenheit,
+                        tempF = tempF, onTempF = { tempF = it },
+                        duration = duration, onDuration = { duration = it },
+                        defrost = defrost, onDefrost = { defrost = it },
+                        steeringHeat = steeringHeat, onSteeringHeat = { steeringHeat = it },
+                        seats = seats,
+                        showSeats = showSeats,
+                        driver = driver, onDriver = { driver = it },
+                        passenger = passenger, onPassenger = { passenger = it },
+                        rearLeft = rearLeft, onRearLeft = { rearLeft = it },
+                        rearRight = rearRight, onRearRight = { rearRight = it },
+                        onSaveAsPreset = null,
+                    )
+                }
             },
             buttons = {
                 MorphTextButton(
                     "Save",
                     onClick = {
-                        if (draft.isNotBlank()) onRename(preset.id, draft)
-                        renaming = null
+                        if (name.isNotBlank()) {
+                            onUpdate(
+                                preset.id,
+                                name.trim(),
+                                ClimateRequest(
+                                    tempF = tempF,
+                                    defrost = defrost,
+                                    durationMinutes = duration,
+                                    steeringWheelHeat = steeringHeat,
+                                    seatFrontLeft = driver,
+                                    seatFrontRight = passenger,
+                                    seatRearLeft = rearLeft,
+                                    seatRearRight = rearRight,
+                                ),
+                            )
+                            editing = null
+                        }
                     },
-                    enabled = draft.isNotBlank(),
+                    enabled = name.isNotBlank(),
                     emphasis = ButtonEmphasis.Confirm,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                MorphTextButton("Cancel", onClick = { renaming = null }, emphasis = ButtonEmphasis.Deny, modifier = Modifier.fillMaxWidth())
+                MorphTextButton("Cancel", onClick = { editing = null }, modifier = Modifier.fillMaxWidth())
             },
         )
     }
 }
 
 /**
- * One saved climate preset as a row, on the standard morph buttons: the preset's icon and its name (what it sets underneath),
- * the primary fill while it is the one running, a pencil to rename it, and an X to delete it. Delete needs a second tap to
- * confirm (auto-resets): a mis-aimed tap beside Apply dropped a preset for good. The row is the drag handle, so holding it
- * re-ranks the presets.
+ * One saved climate preset as a cluster of two buttons: the preset's name, with what it sets underneath and the primary fill
+ * while it is the one running, and a pencil beside it that opens the preset's editor. The row is the drag handle, so holding
+ * it re-ranks the presets.
  */
 @Composable
 internal fun PresetPill(
@@ -281,43 +343,41 @@ internal fun PresetPill(
     active: Boolean,
     onStart: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
-    Row(
-        modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(GapRow),
-    ) {
-        MorphButton(
-            onClick = onStart,
-            onClickHaptic = { haptics?.click() },
-            active = active,
-            expressive = true,
-            fillOnPress = true,
-            contentPadding = PaddingValues(horizontal = ChipPaddingH, vertical = GapGroup),
-            minHeight = ButtonTargetHeight,
-            modifier = Modifier.weight(1f),
-        ) {
-            Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-            Spacer(Modifier.width(ButtonIconGap))
-            TitleSubtitle(
-                title = name,
-                subtitle = detail.ifBlank { null },
-                modifier = Modifier.weight(1f),
-                titleStyle = ButtonLabelStyle,
-                titleWeight = FontWeight.SemiBold,
-                subtitleColor = if (active) scheme.onPrimary.copy(alpha = 0.8f) else mutedContentColor(),
-                maxLines = 2,
-            )
-        }
-        MorphIconButton(onClick = { haptics?.tick(); onEdit() }) {
-            Icon(Icons.Filled.Edit, contentDescription = "Rename $name", modifier = Modifier.size(ButtonIconSize))
-        }
-        ArmedDeleteButton(name = name, onConfirm = onDelete, glyphSize = 15.dp)
-    }
+    ButtonCluster(
+        listOf(
+            ClusterButton(
+                onClick = onStart,
+                onClickHaptic = { haptics?.click() },
+                active = active,
+                weight = 1f,
+                contentPadding = PaddingValues(horizontal = ChipPaddingH, vertical = GapGroup),
+                content = {
+                    Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+                    Spacer(Modifier.width(ButtonIconGap))
+                    TitleSubtitle(
+                        title = name,
+                        subtitle = detail.ifBlank { null },
+                        modifier = Modifier.weight(1f),
+                        titleStyle = ButtonLabelStyle,
+                        titleWeight = FontWeight.SemiBold,
+                        subtitleColor = if (active) scheme.onPrimary.copy(alpha = 0.8f) else mutedContentColor(),
+                        maxLines = 2,
+                    )
+                },
+            ),
+            ClusterButton(
+                onClick = { haptics?.tick(); onEdit() },
+                content = {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit $name", modifier = Modifier.size(ButtonIconSize))
+                },
+            ),
+        ),
+        modifier = modifier.fillMaxWidth(),
+    )
 }
 
 // --- Charge limits --------------------------------------------------------

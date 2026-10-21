@@ -152,7 +152,7 @@ internal fun DriveSyncSetupDialog(
             }
         },
         buttons = {
-            MorphTextButton("Cancel", onClick = onDismissRequest, modifier = Modifier.fillMaxWidth(), emphasis = ButtonEmphasis.Deny)
+            MorphTextButton("Cancel", onClick = onDismissRequest, modifier = Modifier.fillMaxWidth())
         },
     )
 }
