@@ -277,8 +277,14 @@ suspend fun SettingsStore.performMainToMainSync(
                 withDriveRetry {
                     kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
                         val beforeMs = providerLastModifiedMs(parsed)
-                        context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(body.toByteArray()) }
-                            ?: error("Couldn't open the Drive file for writing")
+                        // Read-write-truncate, flushed to disk before the descriptor closes. A plain "wt" stream can close
+                        // before the provider has the bytes, leaving the previous version in place.
+                        context.contentResolver.openFileDescriptor(parsed, "rwt")?.use { pfd ->
+                            val out = java.io.FileOutputStream(pfd.fileDescriptor)
+                            out.write(body.toByteArray())
+                            out.flush()
+                            pfd.fileDescriptor.sync()
+                        } ?: error("Couldn't open the Drive file for writing")
                         val verify = context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
                         if (verify != body) error("Upload didn't verify: the Drive file doesn't match what was written")
                         // Reading the bytes back can pass from a local copy, so also require the file's own timestamp to move:
