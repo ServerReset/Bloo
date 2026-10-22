@@ -273,7 +273,14 @@ suspend fun SettingsStore.performMainToMainSync(
                 priorRemoved = carriedTombstones,
             )
             val body = "$now\n$driveBody"
-            uploaded = runCatching {
+            // Re-read the file just before writing. If it changed since this pass read it, another phone wrote a newer copy:
+            // overwriting it would drop that phone's update, so this pass waits and merges the newer copy on the next one.
+            val fileChangedMidPass = context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() } != remoteContent
+            if (fileChangedMidPass) {
+                AppLog.log("Drive sync: the file changed during this pass; not overwriting it, the next pass merges the newer copy")
+                uploadError = "The Drive file changed during sync; it will retry."
+            }
+            uploaded = !fileChangedMidPass && runCatching {
                 withDriveRetry {
                     kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
                         // Read-write-truncate, flushed to disk before the descriptor closes. A plain "wt" stream can close
