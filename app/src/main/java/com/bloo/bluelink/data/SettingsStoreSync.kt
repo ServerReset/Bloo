@@ -284,6 +284,7 @@ suspend fun SettingsStore.performMainToMainSync(
                         // Reading the bytes back can pass from a local copy, so also require the file's own timestamp to move:
                         // a write that the storage provider keeps locally without advancing the file is not a saved write.
                         val afterMs = providerLastModifiedMs(parsed)
+                        AppLog.log("Drive sync: file time before=$beforeMs after=$afterMs (bytes ${body.length})")
                         if (beforeMs != null && afterMs != null && afterMs <= beforeMs) {
                             error("Drive didn't save the change: the file's modified time didn't move. Check the Drive app on this phone.")
                         }
