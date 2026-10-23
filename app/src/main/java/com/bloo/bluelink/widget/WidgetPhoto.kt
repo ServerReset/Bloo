@@ -50,14 +50,36 @@ internal object WidgetPhoto {
     }
 
     private fun soften(src: Bitmap, blur: Int): Bitmap {
+        // Larger than before: at a few dozen pixels the launcher's stretch read as mush, and the photo was unrecognisable.
         val w = when (blur) {
-            BLUR_LIGHT -> 120
-            BLUR_STRONG -> 36
-            else -> 64
+            BLUR_LIGHT -> 240
+            BLUR_STRONG -> 96
+            else -> 160
         }
         val h = (src.height * w / src.width.coerceAtLeast(1)).coerceAtLeast(1)
         val small = Bitmap.createScaledBitmap(src, w, h, true).copy(Bitmap.Config.ARGB_8888, true)
-        return boxBlur(small, radius = if (blur == BLUR_LIGHT) 1 else 2, passes = 2)
+        val blurred = when (blur) {
+            BLUR_LIGHT -> small
+            BLUR_STRONG -> boxBlur(small, radius = 2, passes = 2)
+            else -> boxBlur(small, radius = 1, passes = 1)
+        }
+        return withTextScrim(blurred)
+    }
+
+    /**
+     * A soft dark band over the lower part of the photo, baked in once: the widget's words sit there, and this keeps them
+     * readable without blurring the photo under them. A widget cannot re-blur live behind text, so the band is static.
+     */
+    private fun withTextScrim(bmp: Bitmap): Bitmap {
+        val canvas = android.graphics.Canvas(bmp)
+        val paint = android.graphics.Paint().apply {
+            shader = android.graphics.LinearGradient(
+                0f, bmp.height * 0.35f, 0f, bmp.height.toFloat(),
+                intArrayOf(0x00000000, 0x8C000000.toInt()), null, android.graphics.Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat(), paint)
+        return bmp
     }
 
     /** A separable box blur on a small bitmap, in place. */
