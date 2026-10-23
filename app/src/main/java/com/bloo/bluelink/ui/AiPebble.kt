@@ -48,14 +48,15 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
             val brush = remember(scheme.tertiaryContainer, scheme.primaryContainer, scheme.secondaryContainer, dark) {
                 // The text on the card is the theme's own: light on a dark theme, dark on a light one. So the gradient is
                 // lightened toward white on a light theme and darkened toward black on a dark one, keeping that text readable.
+                // Opaque: a see-through stop let the dark page behind mute the text, which read as unreadable.
                 fun tone(c: Color, amount: Float): Color = if (dark) lerp(c, Color.Black, amount) else lerp(c, Color.White, amount)
                 Brush.linearGradient(
                     // Diagonal rather than vertical: a pebble is much wider than it is tall when
                     // collapsed, so a vertical sweep would compress to a flat band and read as a
                     // slightly-off solid fill.
                     0f to tone(scheme.tertiaryContainer, 0.45f),
-                    0.55f to tone(scheme.primaryContainer, 0.5f).copy(alpha = 0.8f),
-                    1f to tone(scheme.secondaryContainer, 0.4f).copy(alpha = 0.85f),
+                    0.55f to tone(scheme.primaryContainer, 0.5f),
+                    1f to tone(scheme.secondaryContainer, 0.4f),
                     start = Offset.Zero,
                     end = Offset.Infinite,
                 )
