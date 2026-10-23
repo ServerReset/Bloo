@@ -112,7 +112,13 @@ internal fun AppViewModel.coldStartAutoLogin() {
                 )
             }
             _state.update { it.copy(appPinSet = appPinSet, pinLockout = lockout) }
-            if (lockMechanisms) {
+            // Straight after a reboot the device's own unlock is the one just passed (the app only starts once it is unlocked),
+            // so asking for the app's fingerprint again is a second prompt for the same person. Only in that window, and only
+            // once the device is unlocked: any later cold start still locks.
+            val keyguard = getApplication<android.app.Application>().getSystemService(android.content.Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+            val justBooted = android.os.SystemClock.elapsedRealtime() < JUST_BOOTED_MS
+            val skipAppLockAfterBoot = justBooted && !keyguard.isDeviceLocked
+            if (lockMechanisms && !skipAppLockAfterBoot) {
                 logStartup("Cold start: lock screen required, deferring garage load until unlock")
                 _state.update { it.copy(locked = true) }
             }
@@ -197,3 +203,6 @@ internal fun AppViewModel.recheckAiOnForeground() {
 
 /** The Debug card's "Check again": probe now, whatever the last result was. */
 fun AppViewModel.reprobeAi() = probeAi(restart = true)
+
+/** How long after boot the device's own unlock counts as the app's unlock too (see the cold-start lock). */
+private const val JUST_BOOTED_MS = 10L * 60_000L
