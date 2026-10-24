@@ -21,6 +21,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -110,16 +115,46 @@ internal fun HeroPhotoBackdrop(
 ) {
     Box(Modifier.fillMaxWidth()) {
         HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio)
-        // The scrim is the card's own opposite tone: darkening in the light theme (light text), lightening in the
-        // dark theme (dark text). A colour wash with no photo needs only a gentle one.
+        // Frost behind the text, not a wash over the whole photo: a blurred copy of the same photo, shown only in the top and
+        // bottom bands where the title, the numbers and the charge bar sit, fading out so the car in the middle stays sharp.
+        // It is a GPU blur on the photo's own layer, so it follows the content with no extra recomposition. (On a phone
+        // that cannot blur, the tint below is all there is.) A transparent cut-out PNG has no backdrop to frost.
+        val frostable = !imageUrl.isNullOrBlank() && !imageUrl.endsWith(".png", ignoreCase = true)
+        if (frostable) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val photoModel = rememberPhotoModel(imageUrl)
+            val frostRequest = remember(photoModel) {
+                coil.request.ImageRequest.Builder(context).data(photoModel).size(540, 540).crossfade(true).build()
+            }
+            val frostMask = remember {
+                Brush.verticalGradient(
+                    0f to Color.Black, 0.30f to Color.Transparent, 0.55f to Color.Transparent, 1f to Color.Black,
+                )
+            }
+            AsyncImage(
+                model = frostRequest,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize()
+                    .clip(RoundedCornerShape(corner))
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(frostMask, blendMode = BlendMode.DstIn)
+                    }
+                    .blur(16.dp, BlurredEdgeTreatment.Unbounded),
+            )
+        }
+        // A light tint at the edges, in the card's own opposite tone (lightening in the dark theme, darkening in the light
+        // one), so the text keeps its contrast over the frost. Gentle: the photo is the point, not the wash.
         val dark = appIsDarkTheme()
         val gentle = imageUrl.isNullOrBlank()
         val scrim = remember(gentle, dark) {
             val tone = if (dark) Color.White else Color.Black
             val (top, mid, low, bottom) = when {
                 gentle -> listOf(0.10f, 0.02f, 0.04f, 0.16f)
-                dark -> listOf(0.55f, 0.22f, 0.28f, 0.62f)
-                else -> listOf(0.5f, 0.16f, 0.2f, 0.62f)
+                dark -> listOf(0.34f, 0.0f, 0.0f, 0.40f)
+                else -> listOf(0.30f, 0.0f, 0.0f, 0.40f)
             }
             Brush.verticalGradient(
                 0f to tone.copy(alpha = top),
