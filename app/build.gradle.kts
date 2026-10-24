@@ -221,6 +221,12 @@ composeCompiler {
     )
 }
 
+// One version of error_prone_annotations for the app and its instrumented tests. The image codecs' transitive
+// dependencies pinned it strictly to 2.15.0, which the test libraries (espresso) cannot resolve alongside.
+configurations.all {
+    resolutionStrategy.force("com.google.errorprone:error_prone_annotations:2.30.0")
+}
+
 dependencies {
     val composeUi = "1.12.1"
 
