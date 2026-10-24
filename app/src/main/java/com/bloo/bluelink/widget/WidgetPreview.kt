@@ -71,10 +71,11 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
         planWidget(size.width.value, size.height.value, us, choice.compact, valueText.length, actions, choice.refresh)
     }
     val pad = widgetPad(choice.compact).dp
+    // The real widget's photo is sharper than it was (see WidgetPhoto), so the preview blurs only a little.
     val blurRadius = when (choice.blur) {
-        WidgetPhoto.BLUR_LIGHT -> 6.dp
-        WidgetPhoto.BLUR_STRONG -> 28.dp
-        else -> 14.dp
+        WidgetPhoto.BLUR_LIGHT -> 0.dp
+        WidgetPhoto.BLUR_STRONG -> 8.dp
+        else -> 2.dp
     }
     val levelColor = if (choice.levelTint) {
         Color(BlooColors.levelColor(car?.percent ?: 80, car?.charging == true, 0xFF888888.toInt()))
@@ -96,9 +97,17 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
                     model = if (photoUrl.startsWith("/")) java.io.File(photoUrl) else photoUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().scale(1.15f).blur(blurRadius),
+                    modifier = Modifier.fillMaxSize().scale(1.15f).then(if (blurRadius > 0.dp) Modifier.blur(blurRadius) else Modifier),
                 )
                 Box(Modifier.fillMaxSize().background(scheme.surface.copy(alpha = if (isSystemInDarkTheme()) 0.55f else 0.65f)))
+                // The soft band the real widget bakes into its photo under the text, in the veil's own colour.
+                Box(
+                    Modifier.fillMaxSize().background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            0f to Color.Transparent, 0.35f to Color.Transparent, 1f to scheme.surface.copy(alpha = 0.35f),
+                        ),
+                    ),
+                )
             }
             Box(Modifier.fillMaxSize().padding(pad)) {
                 val header: @Composable () -> Unit = { PreviewHeader(car, choice, plan.nameSp * us) }

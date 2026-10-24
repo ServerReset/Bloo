@@ -133,9 +133,10 @@ private fun WidgetContent(data: WidgetData) {
     // The photo loads inside the session (not in provideGlance), so changing the car or the option in the
     // settings swaps it right away.
     var photo by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null) }
-    val photoKey = if (opts.photo && car != null) "${car.vin}:${opts.blur}" else null
+    val night = WidgetPhoto.isNight(context)
+    val photoKey = if (opts.photo && car != null) "${car.vin}:${opts.blur}:$night" else null
     androidx.compose.runtime.LaunchedEffect(photoKey) {
-        photo = if (photoKey != null && car != null) WidgetPhoto.load(context, car.vin, opts.blur) else null
+        photo = if (photoKey != null && car != null) WidgetPhoto.load(context, car.vin, opts.blur, night) else null
     }
     val pad = widgetPad(opts.compact).dp
     Box(

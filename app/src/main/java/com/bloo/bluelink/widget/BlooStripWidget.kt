@@ -103,9 +103,10 @@ private fun StripContent(cars: List<VehicleSnapshot>) {
     val us = opts.textSize.scale
     // The photo loads inside the session, so changing the car or the option in the settings swaps it at once.
     var photo by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null) }
-    val photoKey = if (opts.photo && car != null) "${car.vin}:${opts.blur}" else null
+    val night = WidgetPhoto.isNight(context)
+    val photoKey = if (opts.photo && car != null) "${car.vin}:${opts.blur}:$night" else null
     androidx.compose.runtime.LaunchedEffect(photoKey) {
-        photo = if (photoKey != null && car != null) WidgetPhoto.load(context, car.vin, opts.blur) else null
+        photo = if (photoKey != null && car != null) WidgetPhoto.load(context, car.vin, opts.blur, night) else null
     }
     Box(
         GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(stripCorner(prefs, size.height)).clickable(open),

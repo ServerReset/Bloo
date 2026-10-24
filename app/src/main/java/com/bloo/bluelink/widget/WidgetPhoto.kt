@@ -24,11 +24,16 @@ internal object WidgetPhoto {
     const val BLUR_STRONG = 2
 
     /** The blurred photo for [vin], or null when the car has no photo (or it cannot be read). */
-    suspend fun load(context: Context, vin: String, blur: Int): Bitmap? = withContext(Dispatchers.IO) {
+    /** Whether the phone is in its dark theme: the widget's veil, and so the band baked into the photo, follow it. */
+    fun isNight(context: Context): Boolean =
+        (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+    suspend fun load(context: Context, vin: String, blur: Int, night: Boolean): Bitmap? = withContext(Dispatchers.IO) {
         runCatching {
             val url = SettingsStore(context).imageUrl(vin)?.takeIf { it.isNotBlank() } ?: return@runCatching null
             val source = if (url.startsWith("/")) decodeSmall(File(url)) else fetch(context, url)
-            source?.let { soften(it, blur) }
+            source?.let { soften(it, blur, night) }
         }.getOrNull()
     }
 
@@ -49,7 +54,7 @@ internal object WidgetPhoto {
         return (result as? coil.request.SuccessResult)?.drawable?.toBitmap()
     }
 
-    private fun soften(src: Bitmap, blur: Int): Bitmap {
+    private fun soften(src: Bitmap, blur: Int, night: Boolean): Bitmap {
         // Larger than before: at a few dozen pixels the launcher's stretch read as mush, and the photo was unrecognisable.
         val w = when (blur) {
             BLUR_LIGHT -> 240
@@ -63,19 +68,22 @@ internal object WidgetPhoto {
             BLUR_STRONG -> boxBlur(small, radius = 2, passes = 2)
             else -> boxBlur(small, radius = 1, passes = 1)
         }
-        return withTextScrim(blurred)
+        return withTextScrim(blurred, night)
     }
 
     /**
-     * A soft dark band over the lower part of the photo, baked in once: the widget's words sit there, and this keeps them
-     * readable without blurring the photo under them. A widget cannot re-blur live behind text, so the band is static.
+     * A soft band over the lower part of the photo, baked in once: the widget's words sit there, and this keeps them
+     * readable without blurring the photo under them. The band is the colour of the widget's veil (white by day, black
+     * by night), so it deepens the veil under the text instead of fighting it. A widget cannot re-blur live behind
+     * text, so the band is static.
      */
-    private fun withTextScrim(bmp: Bitmap): Bitmap {
+    private fun withTextScrim(bmp: Bitmap, night: Boolean): Bitmap {
         val canvas = android.graphics.Canvas(bmp)
         val paint = android.graphics.Paint().apply {
             shader = android.graphics.LinearGradient(
                 0f, bmp.height * 0.35f, 0f, bmp.height.toFloat(),
-                intArrayOf(0x00000000, 0x8C000000.toInt()), null, android.graphics.Shader.TileMode.CLAMP,
+                if (night) intArrayOf(0x00000000, 0x59000000) else intArrayOf(0x00FFFFFF, 0x59FFFFFF),
+                null, android.graphics.Shader.TileMode.CLAMP,
             )
         }
         canvas.drawRect(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat(), paint)
