@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,14 +31,15 @@ internal fun CarPhotoPickerHost(vm: AppViewModel, request: String?) {
     // The crop screen is shown by this flag, not by cropUri itself, so it can fade out with its content
     // intact: the picked image and target are cleared only after the exit has played.
     var showCrop by remember { mutableStateOf(false) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+    // A document picker, so every image type is offered (AVIF and JPEG XL included); the system photo picker lists only some.
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && pickTarget != null) { cropUri = uri; showCrop = true } else pickTarget = null
     }
     LaunchedEffect(request) {
         if (request != null) {
             pickTarget = request
             vm.clearPhotoPickRequest()
-            launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            launcher.launch(arrayOf("image/*"))
         }
     }
     LaunchedEffect(showCrop) {

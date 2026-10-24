@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -76,13 +75,8 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
         bmp = withContext(Dispatchers.IO) {
             runCatching {
                 val uri = uriString.toUri()
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-                var sample = 1
-                while (bounds.outWidth / sample > 2200 || bounds.outHeight / sample > 2200) sample *= 2
-                val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-                val raw = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
-                    ?: return@runCatching null
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
+                val raw = com.bloo.bluelink.data.PhotoDecoder.decode(bytes, 2200) ?: return@runCatching null
                 // Apply the photo's EXIF orientation.
                 val orientation = context.contentResolver.openInputStream(uri)?.use {
                     androidx.exifinterface.media.ExifInterface(it).getAttributeInt(

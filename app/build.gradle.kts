@@ -300,6 +300,9 @@ dependencies {
 
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // AVIF and JPEG XL photos: the platform decodes neither everywhere, so these two decoders read them.
+    implementation("io.github.awxkee:avif-coder:3.0.0")
+    implementation("io.github.awxkee:jxl-coder:3.0.0-alpha05")
 
     // Real backdrop blur for StatusBarScrim (Widgets.kt) -- Modifier.blur() only
     // affects what the modifier's OWN node draws, which for a scrim is just its own
