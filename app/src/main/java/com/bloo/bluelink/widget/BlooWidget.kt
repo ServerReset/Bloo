@@ -458,10 +458,12 @@ internal fun ActionButton(
         CarAction.FLASH_LIGHTS -> R.drawable.ic_widget_flash
         else -> R.drawable.ic_widget_bolt
     }
+    // What a tap will DO, in the app's own words (a screen reader hears this, and "Climate" alone said nothing about whether
+    // it starts or stops it).
     val spoken = when (action) {
         CarAction.TOGGLE_LOCK -> if (locked) "Unlock" else "Lock"
-        CarAction.TOGGLE_CLIMATE -> "Climate"
-        CarAction.TOGGLE_CHARGE -> "Charge"
+        CarAction.TOGGLE_CLIMATE -> if (active) CarLabels.STOP_CLIMATE else CarLabels.START_CLIMATE
+        CarAction.TOGGLE_CHARGE -> if (active) CarLabels.STOP_CHARGING else CarLabels.START_CHARGING
         CarAction.FLASH_LIGHTS -> CarLabels.FLASH_LIGHTS
         else -> action
     }
