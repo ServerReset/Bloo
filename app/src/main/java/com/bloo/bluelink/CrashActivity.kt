@@ -1,5 +1,6 @@
 package com.bloo.bluelink
 
+import com.bloo.bluelink.data.downloadLabel
 import android.content.ClipData
 import android.content.Intent
 import android.os.Bundle
@@ -240,7 +241,7 @@ class CrashActivity : ComponentActivity() {
             if (info != null) {
                 Text("Build ${info.run.runNumber} is available.", style = MaterialTheme.typography.bodySmall)
                 MorphTextButton(
-                    text = if (downloading) "Downloading… ${(downloadProgress * 100).toInt()}%" else "Download build ${info.run.runNumber}",
+                    text = if (downloading) downloadLabel(downloadProgress) else "Download build ${info.run.runNumber}",
                     enabled = !downloading,
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {

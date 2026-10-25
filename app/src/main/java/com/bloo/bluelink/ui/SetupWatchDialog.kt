@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.downloadLabel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -198,7 +199,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                             modifier = Modifier.fillMaxWidth(),
                         )
                     } else if (apk == null) {
-                        BodySmallText("Fetching the watch app… ${(downloadProgress * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        BodySmallText(downloadLabel(downloadProgress, "Fetching the watch app…"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         LinearProgressIndicator(progress = { downloadProgress }, modifier = Modifier.fillMaxWidth())
                     }
                     BodySmallText(

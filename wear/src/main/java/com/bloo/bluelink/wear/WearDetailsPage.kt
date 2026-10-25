@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.downloadLabel
 import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.MaterialTheme
@@ -66,7 +67,7 @@ internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState) {
             item {
                 WearPebble(title = "Update available", icon = AppIcons.SystemUpdate) {
                     if (update.downloading) {
-                        WearCenteredText("Downloading… ${(update.progress * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
+                        WearCenteredText(downloadLabel(update.progress), style = MaterialTheme.typography.bodyMedium)
                     } else {
                         WearActionRow("Update now", AppIcons.Download) {
                             scope.launch { WearUpdateChecker.downloadAndInstall(context) }

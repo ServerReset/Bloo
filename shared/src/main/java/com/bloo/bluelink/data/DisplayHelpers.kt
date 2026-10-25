@@ -139,3 +139,6 @@ fun shouldRelockAfter(elapsedMs: Long, timingKey: String, screenTurnedOff: Boole
     "10min" -> elapsedMs >= 600_000L
     else -> true
 }
+
+/** "Downloading… 42%" for a [progress] fraction (0..1); [verb] swaps the first word where a screen says something else. */
+fun downloadLabel(progress: Float, verb: String = "Downloading…"): String = "$verb ${(progress * 100).toInt()}%"
