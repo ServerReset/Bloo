@@ -83,8 +83,11 @@ fun AppViewModel.importSettings(context: android.content.Context, uri: android.n
     }
 }
 
-/** Set up auto-sync: store a Drive URI for automatic backup on each refresh. */
-fun AppViewModel.setSyncUri(uri: android.net.Uri) = viewModelScope.launch {
+/**
+ * Keeps the picked sync file reachable after the process dies: without a PERSISTED grant the picker's temporary access is
+ * lost and every sync fails with a SecurityException, so sync is refused (with a message) rather than claimed enabled.
+ */
+private fun AppViewModel.persistSyncUriOrReport(uri: android.net.Uri): Boolean {
     val granted = runCatching {
         getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
             uri,
@@ -92,12 +95,15 @@ fun AppViewModel.setSyncUri(uri: android.net.Uri) = viewModelScope.launch {
         )
     }.isSuccess
     if (!granted) {
-        // Without a PERSISTED grant the picker's temporary access dies with the process and every
-        // sync fails with a SecurityException; refuse to enable sync instead.
         AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
         _state.update { it.copy(message = "Couldn't keep access to that file. Try picking it again.", messageType = ToastKind.ERROR) }
-        return@launch
     }
+    return granted
+}
+
+/** Set up auto-sync: store a Drive URI for automatic backup on each refresh. */
+fun AppViewModel.setSyncUri(uri: android.net.Uri) = viewModelScope.launch {
+    if (!persistSyncUriOrReport(uri)) return@launch
     AppLog.log("Drive auto-sync enabled")
     // Reset per-file sync gate state before pointing at the file: stale
     // hash/synced-ever/lastSync/dirty would block adoption and convergence. This re-arms join-adopt
@@ -138,20 +144,7 @@ internal suspend fun AppViewModel.importSettingsAndSyncSuspend(context: android.
         runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.isSuccess
     }
     if (!readable) AppLog.log("⚠ Drive sync: couldn't read the picked file (will still try to enable sync)")
-    val granted = runCatching {
-        getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
-            uri,
-            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-        )
-    }.isSuccess
-    if (!granted) {
-        // Without a persisted grant sync fails once the process dies, so don't claim it is enabled.
-        AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
-        _state.update {
-            it.copy(message = "Couldn't keep access to that file. Try picking it again.", messageType = ToastKind.ERROR)
-        }
-        return false
-    }
+    if (!persistSyncUriOrReport(uri)) return false
     // Reset per-file gate state (synced_ever cleared) so join-adopt arms, then point sync at it.
     settingsStore.resetSyncStateForNewFile()
     settingsStore.setSyncUri(uri.toString())

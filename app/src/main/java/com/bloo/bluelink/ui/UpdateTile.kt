@@ -108,21 +108,7 @@ internal fun UpdateAvailableTile(
                 active = state.updateApkReady,
                 activeContainer = confirmTone().container,
                 activeContent = confirmTone().content,
-                onClick = {
-                    when {
-                        state.updateApkReady -> vm.installDownloadedUpdate()
-                        hasDirectDownload -> vm.downloadUpdateInBackground()
-                        else -> {
-                            // Dismiss ONLY if the page really opened. Swallowing an
-                            // ActivityNotFoundException and dismissing anyway meant a tap did
-                            // visibly nothing AND cost the user the tile.
-                            val opened = context.tryStart(
-                                Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri()),
-                            )
-                            if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
-                        }
-                    }
-                },
+                onClick = { runUpdateAction(state, vm, info, context) },
             ),
         ) {
             val scheme = MaterialTheme.colorScheme
@@ -229,6 +215,8 @@ internal fun runUpdateAction(
         state.updateApkReady -> vm.installDownloadedUpdate()
         info.run.phoneApkUrl != null -> vm.downloadUpdateInBackground()
         else -> {
+            // Dismiss ONLY if the page really opened. Swallowing an ActivityNotFoundException and dismissing anyway meant a tap
+            // did visibly nothing AND cost the user the tile.
             val opened = context.tryStart(
                 Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri()),
             )

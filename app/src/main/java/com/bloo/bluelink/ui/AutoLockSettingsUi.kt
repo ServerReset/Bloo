@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import android.Manifest
 import android.app.NotificationManager
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -150,12 +149,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel, gen5w: Boolean 
 
     /** The watcher notification lives on its own channel, so hiding it is a system-screen trip. */
     fun openWatcherChannel() {
-        context.tryStart(
-            Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
-                putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
-                putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, AutoLockNotification.CHANNEL_ID)
-            },
-        )
+        context.openChannelSettings(AutoLockNotification.CHANNEL_ID)
     }
 
     if (showSetup) {

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.widget
 
+import com.bloo.bluelink.ui.rememberPhotoModel
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Context
@@ -346,7 +347,7 @@ private fun CarCard(car: VehicleSnapshot, photoUrl: String?, selected: Boolean, 
         ) {
             if (photoUrl != null) {
                 AsyncImage(
-                    model = if (photoUrl.startsWith("/")) java.io.File(photoUrl) else photoUrl,
+                    model = rememberPhotoModel(photoUrl),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
@@ -383,7 +384,7 @@ private fun StripPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Choic
     ) {
         if (choice.photo && photoUrl != null) {
             AsyncImage(
-                model = if (photoUrl.startsWith("/")) java.io.File(photoUrl) else photoUrl,
+                model = rememberPhotoModel(photoUrl),
                 contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
             )
             Box(Modifier.fillMaxSize().background(scheme.surface.copy(alpha = 0.6f)))

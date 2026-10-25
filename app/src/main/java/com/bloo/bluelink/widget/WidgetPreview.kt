@@ -1,5 +1,6 @@
 package com.bloo.bluelink.widget
 
+import com.bloo.bluelink.ui.rememberPhotoModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -94,7 +95,7 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
         ) {
             if (choice.photo && photoUrl != null) {
                 AsyncImage(
-                    model = if (photoUrl.startsWith("/")) java.io.File(photoUrl) else photoUrl,
+                    model = rememberPhotoModel(photoUrl),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().scale(1.15f).then(if (blurRadius > 0.dp) Modifier.blur(blurRadius) else Modifier),

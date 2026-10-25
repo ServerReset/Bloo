@@ -162,14 +162,7 @@ internal fun NotificationsCardContent(
                             )
                             MorphTextButton(
                                 "Hide watcher notification",
-                                onClick = {
-                                    context.tryStart(
-                                        Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
-                                            putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                            putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, AutoLockNotification.CHANNEL_ID)
-                                        },
-                                    )
-                                },
+                                onClick = { context.openChannelSettings(AutoLockNotification.CHANNEL_ID) },
                                 // The tonal emphasis already pairs the container with its own
                                 // legible on-colour; letting it do that is the fix.
                                 icon = Icons.Filled.NotificationsOff,

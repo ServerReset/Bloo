@@ -19,6 +19,14 @@ internal fun Context.tryStart(intent: Intent): Boolean = runCatching {
     startActivity(intent)
 }.isSuccess
 
+/** Opens the system's settings page for this app's notification channel [channelId] (to hide or re-style that notification). */
+internal fun Context.openChannelSettings(channelId: String): Boolean = tryStart(
+    Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+        putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)
+        putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, channelId)
+    },
+)
+
 /**
  * The one permission check. Five objects kept a `fun hasPermission(context)` that differed only in
  * the permission string and the OS level where the check stops being needed - and each had to be
