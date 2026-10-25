@@ -77,6 +77,9 @@ internal fun CollapsedGaragePager(
         // than one car's column, however many share the screen with it, and SettingsScreen's own
         // LazyColumn is a single column at any width to begin with.
         val total = slots + 1
+        // Every car's photo is decoded (and its text tone measured) before its page is swiped to, so a page never shows a
+        // placeholder where its photo is about to be.
+        PrefetchHeroPhotos(remember(state) { androidx.compose.runtime.derivedStateOf { state.value.imageUrls } })
         // Always the car (or status card) currentIndex was already parked on: this pager opens
         // there, never on the Settings page at the end of it.
         val initialItem = currentIndex.value.coerceIn(0, slots - 1)

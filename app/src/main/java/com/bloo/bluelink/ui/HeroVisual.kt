@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import coil.imageLoader
 import com.bloo.uicommon.MotionMedium
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
@@ -98,8 +99,61 @@ internal fun Modifier.carTonalBackground(scheme: ColorScheme): Modifier {
  * Coil model for a stored car photo: a [java.io.File] for a cropped local path, else the raw URL.
  */
 @Composable
-internal fun rememberPhotoModel(url: String): Any =
-    remember(url) { if (url.startsWith("/")) java.io.File(url) else url }
+internal fun rememberPhotoModel(url: String): Any = remember(url) { photoModelOf(url) }
+
+/** [rememberPhotoModel] outside composition. */
+internal fun photoModelOf(url: String): Any = if (url.startsWith("/")) java.io.File(url) else url
+
+/**
+ * Which hero photos have already been decoded this session (by the page that showed them, or by [PrefetchHeroPhotos]). A page showing one
+ * of them skips the load-stagger and the fade-in: it is in the memory cache, so it is drawn on the first frame instead of vanishing
+ * behind a placeholder and fading back.
+ */
+internal object HeroPhotoReady {
+    private val keys = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    fun has(key: String) = key in keys
+    fun add(key: String) { keys.add(key) }
+}
+
+/** The one request for a hero photo, so the page and the prefetch share a memory-cache entry. */
+internal fun heroImageRequest(context: android.content.Context, model: Any): ImageRequest =
+    ImageRequest.Builder(context)
+        .data(model)
+        // Explicit decode cap (not Coil's automatic sizing): photos from older builds or Drive sync may be larger than the crop
+        // export's 1080px, and two large decodes stall the main thread. Never trust the input, always cap the output.
+        .size(1080, 1080)
+        .build()
+
+/**
+ * Warms every car's hero photo before its page is swiped to: decodes it into Coil's memory cache (the sizes the hero and its frost
+ * layer ask for) and measures the tone its text is chosen from. A page then draws its photo and its text colours on the first
+ * frame. The decodes run one after another off the main thread, so a multi-car account never decodes them in one frame.
+ */
+@Composable
+internal fun PrefetchHeroPhotos(imageUrls: androidx.compose.runtime.State<Map<String, String>>) {
+    val context = LocalContext.current
+    // Read here, in this small scope, so a change to the photo list recomposes this and not the screen that hosts it.
+    val urls = remember(imageUrls.value) { imageUrls.value.values.filter { it.isNotBlank() }.distinct().sorted() }
+    LaunchedEffect(urls) {
+        val loader = context.imageLoader
+        for (url in urls) {
+            val model = photoModelOf(url)
+            val key = model.toString()
+            if (!HeroPhotoReady.has(key)) {
+                val result = loader.execute(heroImageRequest(context, model))
+                if (result is coil.request.SuccessResult) HeroPhotoReady.add(key)
+            }
+            if (!url.endsWith(".png", ignoreCase = true)) {
+                loader.enqueue(frostImageRequest(context, model))
+                measureHeroToneCached(context, model)
+            }
+        }
+    }
+}
+
+/** The blurred copy behind the hero's text asks for this one. */
+internal fun frostImageRequest(context: android.content.Context, model: Any): ImageRequest =
+    ImageRequest.Builder(context).data(model).size(540, 540).crossfade(true).build()
 
 // collapseEnter / collapseExit (the app's one collapse spec) live in UiTokens.kt.
 
@@ -129,9 +183,7 @@ internal fun HeroPhotoBackdrop(
         if (frostable) {
             val context = androidx.compose.ui.platform.LocalContext.current
             val photoModel = rememberPhotoModel(imageUrl)
-            val frostRequest = remember(photoModel) {
-                coil.request.ImageRequest.Builder(context).data(photoModel).size(540, 540).crossfade(true).build()
-            }
+            val frostRequest = remember(photoModel) { frostImageRequest(context, photoModel) }
             val frostMask = remember {
                 Brush.verticalGradient(
                     0f to Color.Black, 0.30f to Color.Transparent, 0.55f to Color.Transparent, 1f to Color.Black,
@@ -238,8 +290,11 @@ internal fun HeroVisual(
         val transparent = imageUrl.endsWith(".png", ignoreCase = true)
         // The photo arrives with a fade+slide+scale rather than popping (same language as
         // ReorderColumn's intro).
+        val photoKey = remember(model) { model.toString() }
+        // Already decoded this session (see HeroPhotoReady): shown at once, no stagger, no fade.
+        val warm = remember(model) { HeroPhotoReady.has(photoKey) }
         var loadedFrom by remember(model) { mutableStateOf<DataSource?>(null) }
-        val entrance = remember(model) { Animatable(0f) }
+        val entrance = remember(model) { Animatable(if (warm) 1f else 0f) }
         LaunchedEffect(loadedFrom) {
             when (loadedFrom) {
                 null -> {} // still loading -- nothing to animate to yet.
@@ -251,11 +306,12 @@ internal fun HeroVisual(
         // recomposition), and only actually delays anything when another hero load just started
         // within the same short burst window -- an isolated load (expanding one car well after cold
         // start, say) claims 0ms and starts immediately.
-        var staggerReady by remember(model) { mutableStateOf(false) }
+        var staggerReady by remember(model) { mutableStateOf(warm) }
         // Cold-start diagnostic: marks when AsyncImage starts so Success can log this photo's own
         // decode time.
         var loadStartedAtMs by remember(model) { mutableLongStateOf(0L) }
         LaunchedEffect(model) {
+            if (warm) { loadStartedAtMs = System.currentTimeMillis(); return@LaunchedEffect }
             val delayMs = HeroLoadStagger.claimDelayMs()
             if (delayMs > 0) delay(delayMs)
             loadStartedAtMs = System.currentTimeMillis()
@@ -264,15 +320,7 @@ internal fun HeroVisual(
         // Memoized like the map tiles: a fresh ImageRequest per recomposition would reload and
         // flicker.
         val context = LocalContext.current
-        val imageRequest = remember(model) {
-            ImageRequest.Builder(context)
-                .data(model)
-                // Explicit decode cap (not Coil's automatic sizing): photos from older builds or
-                // Drive sync may be larger than the crop export's 1080px, and two large decodes
-                // stall the main thread. Never trust the input, always cap the output.
-                .size(1080, 1080)
-                .build()
-        }
+        val imageRequest = remember(model) { heroImageRequest(context, model) }
         if (!staggerReady) {
             // Same tonal fallback the no-photo branch above shows -- a car whose hero load is being
             // held back by the stagger looks exactly like one that simply hasn't loaded yet, for
@@ -292,6 +340,7 @@ internal fun HeroVisual(
                 onState = { state ->
                     if (state is AsyncImagePainter.State.Success) {
                         loadedFrom = state.result.dataSource
+                        HeroPhotoReady.add(photoKey)
                         // Cold-start trace: when the photo finished decoding, keyed per-VIN with
                         // elapsed time and source file size, to diagnose bitmap-decode memory.
                         val elapsedMs = if (loadStartedAtMs > 0) System.currentTimeMillis() - loadStartedAtMs else -1

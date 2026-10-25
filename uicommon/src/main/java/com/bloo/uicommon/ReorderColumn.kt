@@ -133,8 +133,9 @@ fun <T> ReorderColumn(
     var dragHapticAt by remember { mutableLongStateOf(0L) }
     // Consumed the instant this key is first read, so navigating back to the garage (or a second
     // car's column composing) later never replays it.
+    // Only inside the app's first moments (ColdStartWindow): a car swiped to later arrives already in place.
     val playIntro = remember(introKey) {
-        staggerInOnColdStart && coldStartIntroPlayed.add(introKey)
+        staggerInOnColdStart && ColdStartWindow.isOpen() && coldStartIntroPlayed.add(introKey)
     }
     // Set while a released item is FLYING to a drop target: its pick-up lift eases back to 1.0 during
     // the flight, so the element that lands matches the one the caller then draws in place (no pop).

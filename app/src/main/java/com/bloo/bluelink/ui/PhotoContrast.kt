@@ -134,6 +134,15 @@ private const val SampleW = 160
 private const val SampleH = 90
 
 /** What the photo [model] looks like behind the hero's text, or null when it cannot be loaded. The size and crop match the card. */
+private val toneCache = java.util.concurrent.ConcurrentHashMap<String, HeroPhotoTone>()
+
+/** [measureHeroTone], remembered for the session so a page swiped to later has its text colours on the first frame. */
+internal suspend fun measureHeroToneCached(context: Context, model: Any): HeroPhotoTone? {
+    val key = model.toString()
+    toneCache[key]?.let { return it }
+    return measureHeroTone(context, model)?.also { toneCache[key] = it }
+}
+
 private suspend fun measureHeroTone(context: Context, model: Any): HeroPhotoTone? = withContext(Dispatchers.Default) {
     runCatching {
         val request = ImageRequest.Builder(context)
@@ -154,8 +163,8 @@ private suspend fun measureHeroTone(context: Context, model: Any): HeroPhotoTone
 internal fun rememberHeroPhotoTone(imageUrl: String?): State<HeroPhotoTone> {
     val context = androidx.compose.ui.platform.LocalContext.current
     val model = if (imageUrl.isNullOrBlank() || imageUrl.endsWith(".png", ignoreCase = true)) null else rememberPhotoModel(imageUrl)
-    return produceState(HeroPhotoTone.None, model) {
-        value = model?.let { measureHeroTone(context, it) } ?: HeroPhotoTone.None
+    return produceState(model?.let { toneCache[it.toString()] } ?: HeroPhotoTone.None, model) {
+        value = model?.let { measureHeroToneCached(context, it) } ?: HeroPhotoTone.None
     }
 }
 
