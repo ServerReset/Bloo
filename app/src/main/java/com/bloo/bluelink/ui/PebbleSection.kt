@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -44,11 +45,7 @@ internal fun PebbleSection(
         SectionHeading(title, icon, trailing = trailing, trailingColor = trailingColor)
         if (panel) {
             Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(LocalContentColor.current.copy(alpha = 0.06f))
-                    .padding(horizontal = GapGroup, vertical = GapGroup),
+                Modifier.tintedPanel(LocalContentColor.current.copy(alpha = 0.06f), RoundedCornerShape(20.dp), PaddingValues(GapGroup)),
                 verticalArrangement = Arrangement.spacedBy(GapGroup),
                 content = content,
             )

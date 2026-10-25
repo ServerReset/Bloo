@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,16 @@ internal fun Modifier.outlinedPanel(padding: Dp = 12.dp): Modifier =
     this.clip(StandardShape)
         .border(1.dp, hairlineColor(), StandardShape)
         .padding(padding)
+
+/**
+ * A full-width callout: a rounded [shape] filled with a [color] that is already translucent (an alpha of a container role), padded
+ * by [padding]. One definition for the warning banner, the "update available" panel and the sections' inset panel.
+ */
+internal fun Modifier.tintedPanel(
+    color: androidx.compose.ui.graphics.Color,
+    shape: androidx.compose.ui.graphics.Shape = StandardShape,
+    padding: PaddingValues = PaddingValues(GapSection),
+): Modifier = this.fillMaxWidth().clip(shape).background(color).padding(padding)
 
 /**
  * The app's ONE inner glass panel: a soft tonal fill with the shared frosted rim, for a group of things

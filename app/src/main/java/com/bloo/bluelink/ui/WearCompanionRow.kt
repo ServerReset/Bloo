@@ -124,11 +124,7 @@ internal fun DriveSyncSetupDialog(
             if (warnNewFile) {
                 // The trap, spelled out, with the safe alternative one tap away.
                 Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(StandardShape)
-                        .background(scheme.errorContainer.copy(alpha = 0.5f))
-                        .padding(GapSection),
+                    Modifier.tintedPanel(scheme.errorContainer.copy(alpha = 0.5f)),
                     verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
                     RevealText(

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.Dot
 import com.bloo.uicommon.MorphIconButton
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.foundation.background
@@ -120,7 +121,7 @@ internal fun SyncDeviceRow(
                     DeviceHealth.STALE -> scheme.error
                     DeviceHealth.UNKNOWN -> scheme.outlineVariant
                 }
-                Box(Modifier.size(7.dp).clip(CircleShape).background(dot))
+                Dot(dot, 7.dp)
                 Spacer(Modifier.width(GapRow))
                 val seen = when {
                     isSelf || health == DeviceHealth.ACTIVE -> "Active now"

@@ -299,11 +299,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                             // One tinted panel, no second outline: the version jump is already the
                             // big number above.
                             Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clip(StandardShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f))
-                                    .padding(GapSection),
+                                Modifier.tintedPanel(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)),
                                 verticalArrangement = Arrangement.spacedBy(GapRow),
                             ) {
                                 RevealText(

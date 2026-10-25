@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.Dot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,11 +56,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
             .padding(vertical = GapHairline),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(6.dp)
-                .background(statusColor(action.status), CircleShape),
-        )
+        Dot(statusColor(action.status), 6.dp)
         Spacer(Modifier.width(GapRow))
         RevealText(
             text = action.action,

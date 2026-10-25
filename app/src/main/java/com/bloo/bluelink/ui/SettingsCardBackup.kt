@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.PaddingValues
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -140,11 +141,10 @@ internal fun BackupSyncCardContent(
 @Composable
 private fun SyncErrorBanner(message: String) {
     Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(StandardShape)
-            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
-            .padding(horizontal = GapGroup, vertical = GapRow),
+        Modifier.tintedPanel(
+            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+            padding = PaddingValues(horizontal = GapGroup, vertical = GapRow),
+        ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Filled.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(ButtonIconSize))

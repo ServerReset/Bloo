@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.uicommon.Dot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -114,7 +115,7 @@ fun WearPinScreen(
             // does not jump down when the first digit lands.
             Row(Modifier.height(12.dp).graphicsLayer { translationX = shake.value * density }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 repeat(entered.length.coerceAtMost(8)) {
-                    Box(Modifier.size(10.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+                    Dot(MaterialTheme.colorScheme.primary, 10.dp)
                 }
             }
             rows.forEach { row ->
