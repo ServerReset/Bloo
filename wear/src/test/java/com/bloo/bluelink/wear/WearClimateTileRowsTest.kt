@@ -40,4 +40,11 @@ class WearClimateTileRowsTest {
         val rows = WearClimateTileRows.rows(car(climateOn = false), emptyList(), detail)
         assertEquals(listOf("climate_smart"), rows.map { it.key })
     }
+
+    @Test fun anOldReadingOfARunningClimateOffersTheStartsAgain() {
+        val old = car(climateOn = true).copy(fetchedAt = System.currentTimeMillis() - 2 * 3_600_000L)
+        val rows = WearClimateTileRows.rows(old, listOf(preset("1", "Warm")), detail)
+        assertEquals(2, rows.size)
+        assertEquals(WearFaceControls.CLIMATE_SMART_KEY, rows.first().key)
+    }
 }

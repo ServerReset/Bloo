@@ -14,6 +14,7 @@ import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.ioScope
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.launch
@@ -31,7 +32,8 @@ internal object WearClimateTileRows {
     const val MAX_ROWS = 3
 
     fun rows(car: VehicleSnapshot, presets: List<ClimatePreset>, detail: (ClimateRequest) -> String): List<ClimateTileRow> {
-        if (car.climateOn == true) return listOf(ClimateTileRow("climate_off", CarLabels.STOP_CLIMATE, "Running", active = true))
+        // An old reading cannot say the climate still runs (a timed session ends by itself), so it offers the starts.
+        if (car.climateOn == true && !car.isStale()) return listOf(ClimateTileRow("climate_off", CarLabels.STOP_CLIMATE, "Running", active = true))
         val rows = mutableListOf(
             ClimateTileRow(WearFaceControls.CLIMATE_SMART_KEY, CarLabels.SMART_CLIMATE, "Matches the weather", active = false),
         )
