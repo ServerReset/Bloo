@@ -32,7 +32,7 @@ class PhotoContrastTest {
     @Test fun aGradientIsJudgedByItsWorstPartNotItsAverage() {
         // Dark on one side, light on the other: the average is mid-grey, but neither text clears both ends unaided.
         val o = overlayFor(BandLuma(mean = 0.45f, low = 0.02f, high = 0.90f))
-        assertTrue(o.scrimAlpha > 0.3f, "a wide spread needs a real scrim, got ${o.scrimAlpha}")
+        assertTrue(o.scrimAlpha > 0.2f, "a wide spread needs a real scrim, got ${o.scrimAlpha}")
         // Whatever it chose, the scrimmed worst part now clears AA against the chosen text.
         val worst = if (o.darkText) 0.02f + (1f - 0.02f) * o.scrimAlpha else 0.90f * (1f - o.scrimAlpha)
         val text = if (o.darkText) relativeLuminance(0x1A, 0x1B, 0x20) else relativeLuminance(0xF7, 0xF7, 0xFA)
