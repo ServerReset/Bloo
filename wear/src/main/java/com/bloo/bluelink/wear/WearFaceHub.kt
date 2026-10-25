@@ -144,7 +144,3 @@ fun faceTint(percent: Int?, charging: Boolean, fallback: Color): Color =
 /** [faceTint] as a plain ARGB int, so the Tile (which draws without Compose) colours its ring the same way. */
 fun levelColorArgb(percent: Int?, charging: Boolean, fallback: Int): Int =
     com.bloo.bluelink.data.BlooColors.levelColor(percent, charging, fallback)
-
-/** Levels below which the ring warns (amber) and then alarms (red). */
-const val LowLevel = com.bloo.bluelink.data.BlooColors.LOW_LEVEL
-const val WarnLevel = com.bloo.bluelink.data.BlooColors.WARN_LEVEL

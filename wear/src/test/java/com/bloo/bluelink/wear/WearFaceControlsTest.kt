@@ -61,7 +61,6 @@ class WearFaceControlsTest {
     }
 
     @Test fun `an unknown stored choice names nothing`() {
-        assertEquals("Empty", WearFaceControls.choiceName("nonsense"))
         assertEquals(null, WearFaceControls.byKey("nonsense"))
     }
 

@@ -164,7 +164,4 @@ internal object WearFaceControls {
 
     /** Whether a stored key is one of the climate ones that the "Climate preset…" entry stands for. */
     fun isClimatePick(key: String) = key == CLIMATE_PICK || key == CLIMATE_SMART_KEY || key.startsWith(PRESET_PREFIX)
-
-    /** The name for a stored choice, in the chooser and the settings row. */
-    fun choiceName(key: String): String = byKey(key)?.choice ?: "Empty"
 }
