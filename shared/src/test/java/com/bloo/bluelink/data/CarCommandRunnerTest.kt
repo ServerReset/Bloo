@@ -6,8 +6,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 /**
- * Pure-JVM tests for [CarCommandRunner]'s pure functions -- [resolveToggle],
- * [optimistic], [stateFor] and [withState]. They had no coverage at all, which is a
+ * Pure-JVM tests for [CarCommandRunner]'s pure functions -- [resolveToggle]
+ * and [optimistic]. They had no coverage at all, which is a
  * poor place for this app to have none: between them they decide whether a tap
  * sends LOCK or UNLOCK to somebody's car, and every
  * command surface routes through them.
@@ -189,97 +189,7 @@ class CarCommandRunnerTest {
         }
     }
 
-    // ---- stateFor / withState: reverting a failed command ----
-
-    /** [stateFor] reads the field the action's prediction will overwrite, and reads
-     *  the RIGHT one -- given three same-shaped branches over three same-typed
-     *  fields, a crossed wire here would revert the wrong thing and be invisible in
-     *  every other test. Checked with three distinct values so no two can be
-     *  confused. */
-    @Test
-    fun stateForReadsTheFieldTheActionTouches() {
-        val s = snap(locked = true, climateOn = false, charging = null)
-
-        for (a in listOf(CarAction.TOGGLE_LOCK, CarAction.LOCK, CarAction.UNLOCK)) {
-            assertEquals(true, CarCommandRunner.stateFor(s, a), "wrong field for $a")
-        }
-        for (a in listOf(CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_ON, CarAction.CLIMATE_OFF)) {
-            assertEquals(false, CarCommandRunner.stateFor(s, a), "wrong field for $a")
-        }
-        for (a in listOf(CarAction.TOGGLE_CHARGE, CarAction.CHARGE_ON, CarAction.CHARGE_OFF)) {
-            assertNull(CarCommandRunner.stateFor(s, a), "wrong field for $a")
-        }
-        // Verbs that touch no stateful field have nothing to capture.
-        for (a in listOf(CarAction.FLASH_LIGHTS, CarAction.SET_CHARGE_LIMITS, CarAction.REFRESH)) {
-            assertNull(CarCommandRunner.stateFor(s, a))
-        }
-    }
-
-    /** [withState] writes back to the same field [stateFor] read from, and leaves
-     *  the other two alone -- the other half of the crossed-wire check above. */
-    @Test
-    fun withStateWritesOnlyTheFieldTheActionTouches() {
-        val s = snap(locked = true, climateOn = true, charging = true)
-
-        val l = CarCommandRunner.withState(s, CarAction.LOCK, null)
-        assertNull(l.locked)
-        assertEquals(true, l.climateOn)
-        assertEquals(true, l.charging)
-
-        val c = CarCommandRunner.withState(s, CarAction.CLIMATE_OFF, false)
-        assertEquals(false, c.climateOn)
-        assertEquals(true, c.locked)
-        assertEquals(true, c.charging)
-
-        val ch = CarCommandRunner.withState(s, CarAction.TOGGLE_CHARGE, null)
-        assertNull(ch.charging)
-        assertEquals(true, ch.locked)
-        assertEquals(true, ch.climateOn)
-
-        assertSame(s, CarCommandRunner.withState(s, CarAction.FLASH_LIGHTS, false))
-    }
-
-    /**
-     * THE reason [stateFor] and [withState] exist, and the bug they replaced.
-     *
-     * The revert sites that used to call these -- WidgetActions' WidgetCommandWorker
-     * and MainToSecondaryComms' runStandalone, both since removed -- captured before
-     * the optimistic flip and restored after a failure. This asserts the full round
-     * trip holds for EVERY tri-state starting value, including null.
-     *
-     * Null is the case that used to break. The revert was
-     * `optimistic(snap, inverse(action))`, which is an undo only when the flip
-     * changed something: on a car that had never reported its doors, the flip wrote
-     * `true` over a null and the inverse wrote `false`, so a failed command left a
-     * surface stating that a car it knew nothing about was unlocked. The
-     * information needed to do better was gone by then -- optimistic() writes an
-     * absolute value. Capturing beforehand is what makes null recoverable, and it is
-     * worth recovering: the phone UI draws nothing at all for an unknown
-     * lock state rather than guess, and the old revert quietly defeated that.
-     */
-    @Test
-    fun captureThenRestoreRoundTripsEveryTriState() {
-        for (before in listOf(true, false, null)) {
-            for (toggle in listOf(CarAction.TOGGLE_LOCK, CarAction.TOGGLE_CLIMATE, CarAction.TOGGLE_CHARGE)) {
-                val start = when (toggle) {
-                    CarAction.TOGGLE_LOCK -> snap(locked = before)
-                    CarAction.TOGGLE_CLIMATE -> snap(climateOn = before)
-                    else -> snap(charging = before)
-                }
-                // Exactly the sequence both call sites run.
-                val resolved = CarCommandRunner.resolveToggle(start, toggle)
-                val captured = CarCommandRunner.stateFor(start, resolved)
-                val flipped = CarCommandRunner.optimistic(start, resolved)
-                val reverted = CarCommandRunner.withState(flipped, resolved, captured)
-
-                assertEquals(before, captured, "$toggle captured the wrong value from $before")
-                assertEquals(start, reverted, "$toggle failed to round-trip from $before")
-            }
-        }
-    }
-
-    /** The optimistic flip must actually CHANGE something, or the revert would have
-     *  nothing to undo and the round-trip test above would pass trivially. */
+    /** The optimistic flip must actually CHANGE the field, from every tri-state starting value (null included). */
     @Test
     fun theOptimisticFlipAlwaysChangesTheCapturedField() {
         for (before in listOf(true, false, null)) {
@@ -291,12 +201,10 @@ class CarCommandRunnerTest {
     }
 
     @Test
-    fun smartClimateIsAClimateToggleForTheStateHelpers() {
+    fun smartClimateIsAClimateToggle() {
         assertEquals(CarAction.CLIMATE_OFF, CarCommandRunner.resolveToggle(snap(climateOn = true), CarAction.CLIMATE_SMART))
         assertEquals(CarAction.CLIMATE_ON, CarCommandRunner.resolveToggle(snap(climateOn = false), CarAction.CLIMATE_SMART))
-        assertEquals(false, CarCommandRunner.stateFor(snap(climateOn = false), CarAction.CLIMATE_SMART))
         assertEquals(true, CarCommandRunner.optimistic(snap(climateOn = false), CarAction.CLIMATE_SMART).climateOn)
-        assertEquals(false, CarCommandRunner.withState(snap(climateOn = true), CarAction.CLIMATE_SMART, false).climateOn)
     }
 
     @Test

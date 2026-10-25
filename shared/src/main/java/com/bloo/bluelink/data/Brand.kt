@@ -156,12 +156,6 @@ enum class Brand(
             else -> listOf(HYUNDAI, GENESIS, KIA)
         }
 
-        fun regionOf(brand: Brand): String = when {
-            brand.isCanada -> REGION_CA
-            brand.isEurope -> REGION_EU
-            else -> REGION_US
-        }
-
         /**
          * The brand's label without its region suffix, for a picker that already says which region
          * you are in. "Hyundai (Canada)" -> "Hyundai".

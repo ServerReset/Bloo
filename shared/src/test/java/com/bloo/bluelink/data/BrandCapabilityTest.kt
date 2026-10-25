@@ -126,18 +126,6 @@ class BrandCapabilityTest {
         assertEquals(offered.size, offered.toSet().size, "no brand in two regions")
     }
 
-    /** regionOf is the inverse of brandsForRegion, so a picker handed any brand
-     *  opens on the region that actually lists it. */
-    @Test
-    fun `regionOf round-trips with brandsForRegion`() {
-        for (b in Brand.entries) {
-            assertTrue(
-                b in Brand.brandsForRegion(Brand.regionOf(b)),
-                "$b should be listed by its own region ${Brand.regionOf(b)}",
-            )
-        }
-    }
-
     /** The picker already names the region, so the label should not repeat it. */
     @Test
     fun `short labels drop the region suffix`() {

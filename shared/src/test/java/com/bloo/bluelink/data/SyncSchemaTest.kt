@@ -48,13 +48,6 @@ class SyncSchemaTest {
     }
 
     @Test
-    fun aVinIsNormalisedAndSplitFromTheRestOfAKey() {
-        assertTrue(SettingsCatalog.vinOf("svc_last_ abc123 ") == "ABC123")
-        assertTrue(SettingsCatalog.vinOf("seat_abc123_sw") == "ABC123")
-        assertTrue(SettingsCatalog.vinOf("theme_mode") == null)
-    }
-
-    @Test
     fun everyFamilyIsDeclaredOnce() {
         val keys = SettingsCatalog.families.map { it.scope to it.key }
         assertTrue(keys.size == keys.toSet().size)

@@ -89,7 +89,7 @@ object CarCommandRunner {
                     CarAction.CHARGE_OFF -> { repo.stopCharge(v); snap.copy(charging = false) }
                     CarAction.SET_CHARGE_LIMITS -> { repo.setChargeTargets(v, command.acLimit, command.dcLimit); snap }
                     // Momentary, not stateful -- no snap field to flip, so these fall through
-                    // optimistic()/resolveToggle()/ stateFor() below untouched (their `else`
+                    // optimistic()/resolveToggle() below untouched (their `else`
                     // branches).
                     CarAction.FLASH_LIGHTS -> { repo.flashLights(v); snap }
                     CarAction.HORN_AND_LIGHTS -> { repo.hornAndLights(v); snap }
@@ -114,25 +114,6 @@ object CarCommandRunner {
         CarAction.TOGGLE_CHARGE ->
             if (snap.charging == true) CarAction.CHARGE_OFF else CarAction.CHARGE_ON
         else -> action
-    }
-
-    /**
-     * Accepts TOGGLE_* as well as the resolved verbs so it can be called on either side of
-     * [resolveToggle].
-     */
-    fun stateFor(snap: VehicleSnapshot, action: String): Boolean? = when (action) {
-        CarAction.TOGGLE_LOCK, CarAction.LOCK, CarAction.UNLOCK -> snap.locked
-        CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_SMART, CarAction.CLIMATE_ON, CarAction.CLIMATE_OFF -> snap.climateOn
-        CarAction.TOGGLE_CHARGE, CarAction.CHARGE_ON, CarAction.CHARGE_OFF -> snap.charging
-        else -> null
-    }
-
-    /** Puts a value read by [stateFor] back into the field [action] touches - the revert half. */
-    fun withState(snap: VehicleSnapshot, action: String, value: Boolean?): VehicleSnapshot = when (action) {
-        CarAction.TOGGLE_LOCK, CarAction.LOCK, CarAction.UNLOCK -> snap.copy(locked = value)
-        CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_SMART, CarAction.CLIMATE_ON, CarAction.CLIMATE_OFF -> snap.copy(climateOn = value)
-        CarAction.TOGGLE_CHARGE, CarAction.CHARGE_ON, CarAction.CHARGE_OFF -> snap.copy(charging = value)
-        else -> snap
     }
 
     /**

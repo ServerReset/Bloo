@@ -210,16 +210,6 @@ object SettingsCatalog {
         raw.toString().isBlank() -> "Not set"
         else -> raw.toString()
     }
-
-    /**
-     * The VIN a per-car key belongs to, or null for an app-wide key. [CarKeys] normalises it the way
-     * the stores do, so a lookup is not defeated by case or stray whitespace.
-     */
-    fun vinOf(prefName: String): String? {
-        val family = carFamilies.firstOrNull { prefName.startsWith(it.key) } ?: return null
-        // A VIN has no underscore; per-car keys may append more after it (seat_<vin>_<flag>).
-        return CarKeys.normaliseVin(prefName.removePrefix(family.key).substringBefore('_'))
-    }
 }
 
 /** How a VIN appears in a key: trimmed and upper-case, so two devices never split one car in two. */
