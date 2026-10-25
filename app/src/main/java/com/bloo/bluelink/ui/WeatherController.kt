@@ -91,20 +91,20 @@ internal class WeatherController(
             return@launch
         }
         val cached = state.value.homeWeather
-        if (!force && cached != null &&
-            com.bloo.bluelink.data.withinWindow(System.currentTimeMillis(), cached.fetchedAt, WEATHER_TTL_MS)
-        ) return@launch
+        if (isFresh(cached?.fetchedAt, force)) return@launch
         WeatherApi.fetch(lat, lon)?.let { w -> state.update { it.copy(homeWeather = w) } }
     }
+
+    /** True when a reading fetched at [fetchedAt] is still within the weather TTL and nobody asked for a [force]d refresh. */
+    private fun isFresh(fetchedAt: Long?, force: Boolean): Boolean =
+        !force && fetchedAt != null && com.bloo.bluelink.data.withinWindow(System.currentTimeMillis(), fetchedAt, WEATHER_TTL_MS)
 
     /** Fetch weather at a car's last-known location, if any. */
     fun loadCarWeather(v: Vehicle, force: Boolean = false) = scope.launch {
         val loc = state.value.locations[v.vin] ?: return@launch
         val cached = state.value.carWeather[v.vin]
         // Same guard as loadHomeWeather above.
-        if (!force && cached != null &&
-            com.bloo.bluelink.data.withinWindow(System.currentTimeMillis(), cached.fetchedAt, WEATHER_TTL_MS)
-        ) return@launch
+        if (isFresh(cached?.fetchedAt, force)) return@launch
         WeatherApi.fetch(loc.latitude, loc.longitude)?.let { w ->
             state.update { it.copy(carWeather = it.carWeather + (v.vin to w)) }
         }
@@ -118,9 +118,7 @@ internal class WeatherController(
     fun loadPhoneWeather(force: Boolean = false) = scope.launch {
         val loc = state.value.deviceLocation ?: return@launch
         val cached = state.value.phoneWeather
-        if (!force && cached != null &&
-            com.bloo.bluelink.data.withinWindow(System.currentTimeMillis(), cached.fetchedAt, WEATHER_TTL_MS)
-        ) return@launch
+        if (isFresh(cached?.fetchedAt, force)) return@launch
         WeatherApi.fetch(loc.latitude, loc.longitude)?.let { w ->
             state.update { it.copy(phoneWeather = w) }
         }

@@ -157,7 +157,7 @@ class SessionStore(private val context: Context) {
     }
 
     suspend fun loggedInBrands(): List<Brand> =
-        brandNames(vault()).mapNotNull { runCatching { Brand.valueOf(it) }.getOrNull() }
+        brandNames(vault()).mapNotNull { enumOrNull<Brand>(it) }
 
     /** Rewrites just the access/refresh tokens after a successful refresh, in one write. */
     suspend fun updateAccessToken(brand: Brand, access: String, refresh: String?) {

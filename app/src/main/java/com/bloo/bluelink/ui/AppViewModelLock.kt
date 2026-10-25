@@ -143,11 +143,7 @@ fun AppViewModel.refreshPinState() {
     // critical path.
     viewModelScope.launch(Dispatchers.IO) {
         val pinSet = credentialStore.getPinRecord() != null
-        val lockout = PinLockout(
-            credentialStore.getPinFailures(),
-            credentialStore.getPinLockedUntil(),
-            credentialStore.getPinLockedUntilElapsed(),
-        )
+        val lockout = credentialStore.pinLockout()
         _state.update { it.copy(appPinSet = pinSet, pinLockout = lockout) }
     }
 }
@@ -198,11 +194,7 @@ fun AppViewModel.verifyAppPin(pin: String) {
         val record = PinRecord.decode(credentialStore.getPinRecord()) ?: return@launch
         val now = System.currentTimeMillis()
         val nowElapsed = android.os.SystemClock.elapsedRealtime()
-        var lockout = PinLockout(
-            credentialStore.getPinFailures(),
-            credentialStore.getPinLockedUntil(),
-            credentialStore.getPinLockedUntilElapsed(),
-        )
+        var lockout = credentialStore.pinLockout()
         if (lockout.isLocked(now, nowElapsed)) {
             _state.update { it.copy(pinAttemptRejected = true) }
             return@launch

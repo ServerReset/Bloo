@@ -151,12 +151,12 @@ class SettingsStore(internal val context: Context) {
                 "AMOLED" -> ThemeMode.DARK
                 "SYSTEM_AMOLED" -> ThemeMode.SYSTEM
                 null -> ThemeMode.SYSTEM
-                else -> runCatching { ThemeMode.valueOf(raw) }.getOrDefault(ThemeMode.SYSTEM)
+                else -> enumOrNull<ThemeMode>(raw) ?: ThemeMode.SYSTEM
             },
-            fontChoice = prefs[Keys.FONT]?.let { runCatching { FontChoice.valueOf(it) }.getOrNull() }
+            fontChoice = enumOrNull<FontChoice>(prefs[Keys.FONT])
                 ?: FontChoice.SYSTEM,
             dynamicColor = prefs[Keys.DYNAMIC]?.toBooleanStrictOrNull() ?: true,
-            colorPalette = prefs[Keys.PALETTE]?.let { runCatching { ColorPalette.valueOf(it) }.getOrNull() }
+            colorPalette = enumOrNull<ColorPalette>(prefs[Keys.PALETTE])
                 ?: ColorPalette.BLUE,
             customPalettes = prefs[Keys.CUSTOM_PALETTES]?.let { json ->
                 decodeJsonOr(paletteJson, paletteListSerializer, json, emptyList())
@@ -167,7 +167,7 @@ class SettingsStore(internal val context: Context) {
             weatherLabel = prefs[Keys.WEATHER_LABEL],
             weatherFollowsDevice = prefs[Keys.WEATHER_FOLLOWS_DEVICE]?.toBoolean() ?: false,
             biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
-            lockTiming = prefs[Keys.LOCK_TIMING]?.let { runCatching { LockTiming.valueOf(it) }.getOrNull() }
+            lockTiming = enumOrNull<LockTiming>(prefs[Keys.LOCK_TIMING])
                 ?: LockTiming.IMMEDIATE,
             columnsFlipped = prefs[Keys.FLIPPED]?.toBooleanStrictOrNull() ?: false,
             // Clamp on read: a corrupt/hand-edited/foreign backup with e.g. ui_scale="10" would

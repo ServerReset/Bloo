@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
-import com.bloo.bluelink.data.PinLockout
 import com.bloo.bluelink.data.aiAutoSummarize
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.rethrowIfCancellation
@@ -104,11 +103,7 @@ internal fun AppViewModel.coldStartAutoLogin() {
                 Triple(
                     (appearance.biometricLock && canUseBiometrics()) || pinSet,
                     pinSet,
-                    PinLockout(
-                        credentialStore.getPinFailures(),
-                        credentialStore.getPinLockedUntil(),
-                        credentialStore.getPinLockedUntilElapsed(),
-                    ),
+                    credentialStore.pinLockout(),
                 )
             }
             _state.update { it.copy(appPinSet = appPinSet, pinLockout = lockout) }

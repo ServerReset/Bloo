@@ -64,7 +64,7 @@ class CredentialStore(context: Context) {
 
     private fun loadAllUncached(): List<Credentials> {
         return brandSet().mapNotNull { name ->
-            runCatching { Brand.valueOf(name) }.getOrNull()?.let { load(it) }
+            enumOrNull<Brand>(name)?.let { load(it) }
         }
     }
 
@@ -150,6 +150,9 @@ class CredentialStore(context: Context) {
     fun getPinLockedUntil(): Long = vault.getString(KEY_PIN_LOCKED_UNTIL)?.toLongOrNull() ?: 0L
 
     fun getPinLockedUntilElapsed(): Long = vault.getString(KEY_PIN_LOCKED_UNTIL_ELAPSED)?.toLongOrNull() ?: 0L
+
+    /** The whole stored [PinLockout] state: the counterpart of [setPinLockout]. */
+    fun pinLockout(): PinLockout = PinLockout(getPinFailures(), getPinLockedUntil(), getPinLockedUntilElapsed())
 
     /** Persists the whole [PinLockout] state atomically. */
     fun setPinLockout(lockout: PinLockout) {

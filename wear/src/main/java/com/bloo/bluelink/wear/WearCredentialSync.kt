@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.enumOrNull
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -117,7 +118,7 @@ object WearCredentialSync {
         WearDataLayerSync.reloadFromStore(app, null)
     }
 
-    private fun brandOf(name: String): Brand? = runCatching { Brand.valueOf(name) }.getOrNull()
+    private fun brandOf(name: String): Brand? = enumOrNull<Brand>(name)
 
     private fun keyStore() = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
