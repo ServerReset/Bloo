@@ -143,7 +143,7 @@ internal fun PrefetchHeroPhotos(imageUrls: androidx.compose.runtime.State<Map<St
                 val result = loader.execute(heroImageRequest(context, model))
                 if (result is coil.request.SuccessResult) HeroPhotoReady.add(key)
             }
-            if (!url.endsWith(".png", ignoreCase = true)) {
+            if (!isCutoutPhoto(url)) {
                 loader.enqueue(frostImageRequest(context, model))
                 measureHeroToneCached(context, model)
             }
@@ -179,7 +179,7 @@ internal fun HeroPhotoBackdrop(
         // bottom bands where the title, the numbers and the charge bar sit, fading out so the car in the middle stays sharp.
         // It is a GPU blur on the photo's own layer, so it follows the content with no extra recomposition. (On a phone
         // that cannot blur, the tint below is all there is.) A transparent cut-out PNG has no backdrop to frost.
-        val frostable = !imageUrl.isNullOrBlank() && !imageUrl.endsWith(".png", ignoreCase = true)
+        val frostable = !imageUrl.isNullOrBlank() && !isCutoutPhoto(imageUrl)
         if (frostable) {
             val context = androidx.compose.ui.platform.LocalContext.current
             val photoModel = rememberPhotoModel(imageUrl)
@@ -287,7 +287,7 @@ internal fun HeroVisual(
         val model: Any = rememberPhotoModel(imageUrl)
         // A transparent PNG renders edge-to-edge with no opaque box, so it blends seamlessly into
         // the pebble (fit, not crop, so the whole subject shows).
-        val transparent = imageUrl.endsWith(".png", ignoreCase = true)
+        val transparent = isCutoutPhoto(imageUrl)
         // The photo arrives with a fade+slide+scale rather than popping (same language as
         // ReorderColumn's intro).
         val photoKey = remember(model) { model.toString() }

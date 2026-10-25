@@ -162,7 +162,7 @@ private suspend fun measureHeroTone(context: Context, model: Any): HeroPhotoTone
 @Composable
 internal fun rememberHeroPhotoTone(imageUrl: String?): State<HeroPhotoTone> {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val model = if (imageUrl.isNullOrBlank() || imageUrl.endsWith(".png", ignoreCase = true)) null else rememberPhotoModel(imageUrl)
+    val model = if (imageUrl.isNullOrBlank() || isCutoutPhoto(imageUrl)) null else rememberPhotoModel(imageUrl)
     return produceState(model?.let { toneCache[it.toString()] } ?: HeroPhotoTone.None, model) {
         value = model?.let { measureHeroToneCached(context, it) } ?: HeroPhotoTone.None
     }

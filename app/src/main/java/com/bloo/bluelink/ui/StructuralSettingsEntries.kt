@@ -158,6 +158,7 @@ private fun CarPhotoControl(v: Vehicle, state: UiState, vm: AppViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         StatusRow("Photo", if (hasPhoto) "Custom photo set" else "Using the default")
         CarPhotoButtons(hasPhoto, onPick = { vm.requestPhotoPick(v.vin) }, onClear = { vm.setVehicleImage(v.vin, "") })
+        CarPictureButton(v, state.imageUrls[v.vin], vm)
     }
 }
 

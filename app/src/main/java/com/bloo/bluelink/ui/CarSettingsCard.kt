@@ -93,6 +93,7 @@ internal fun CarSettingsCard(
                 )
             }
             CarPhotoButtons(hasPhoto, onPick = onPickPhoto, onClear = { vm.setVehicleImage(v.vin, "") })
+            CarPictureButton(v, storedImage, vm)
         }
 
         SettingsGroup("Vehicle") {
