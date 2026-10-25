@@ -26,7 +26,10 @@ import dev.chrisbanes.haze.blur.hazeBlur
 import com.bloo.uicommon.canBlurBackdrops
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import com.bloo.uicommon.LocalPowerPolicy
+import com.bloo.uicommon.LocalReduceMotion
 import androidx.compose.ui.unit.Dp
 
 /**
@@ -93,14 +96,18 @@ internal fun Modifier.pebbleCardEdge(shape: Shape): Modifier {
 /**
  * The liquid-glass edge: a thin line brightest where light would catch it (the top-left), fading through the
  * middle to a fainter catch at the bottom-right, plus a soft inner glow along the top lip. It is what makes a
- * frosted card read as a pane of glass lying OVER the page, and it is a static draw (one stroke, one gradient
- * per size), so every card can wear it.
+ * frosted card read as a pane of glass lying OVER the page. The static part is drawn once per size; when the
+ * phone is tilted a narrow glint slides along the edge (see [edgeGlint]), which costs one extra stroke only
+ * while tilting and nothing at all under battery saver.
  */
 @Composable
 internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()): Modifier {
     val scheme = MaterialTheme.colorScheme
     val highlight = Color.White
     val edge = scheme.outline
+    // Resolved here and read in the draw phase, so a tilt sample redraws the rim without recomposing anything.
+    val motion = LocalPowerPolicy.current.ambientMotion && !LocalReduceMotion.current
+    val tilt = if (motion) LocalTilt.current else null
     return this.drawWithCache {
         val outline = shape.createOutline(size, layoutDirection, this)
         val line = 1.25.dp.toPx()
@@ -122,8 +129,48 @@ internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()):
             // The lip is clipped to the shape's outline by drawing it as the outline's own fill.
             drawOutline(outline, lip)
             drawOutline(outline, rim, style = Stroke(line))
+            if (tilt != null) {
+                edgeGlint(tilt.x, tilt.y, if (dark) GlintPeakDark else GlintPeakLight)?.let { glint ->
+                    drawOutline(outline, glint, style = Stroke(line))
+                }
+            }
         }
     }
+}
+
+/** How bright the tilt glint gets at full tilt, on a dark and on a light pebble: a little, not a flash. */
+private const val GlintPeakDark = 0.34f
+private const val GlintPeakLight = 0.55f
+
+/** Half-width of the glint along the rim's diagonal (fraction of it). */
+private const val GlintHalfWidth = 0.16f
+
+/** How hard the phone is tilted, 0 (held still) to 1 (the most the tilt reaches): the glint's brightness. */
+internal fun glintStrength(tiltX: Float, tiltY: Float): Float = (kotlin.math.hypot(tiltX, tiltY) / TiltMax).coerceIn(0f, 1f)
+
+/** Where along the rim's diagonal the glint sits, 0 (top-left) to 1 (bottom-right): tilting right or down moves it toward the bottom-right. */
+internal fun glintCentre(tiltX: Float, tiltY: Float): Float =
+    (0.5f + (tiltX + tiltY) / (2f * TiltMax) * 0.4f).coerceIn(GlintHalfWidth, 1f - GlintHalfWidth)
+
+/**
+ * A narrow bright band that slides along the rim's top-left-to-bottom-right axis as the phone tilts, as light would across a
+ * pane of glass, brighter the harder the tilt. Null while the phone is held still, so a resting pebble draws nothing extra. The
+ * tilt is high-passed, so the glint blooms as the phone moves and fades as the hold settles.
+ */
+private fun DrawScope.edgeGlint(tiltX: Float, tiltY: Float, peak: Float): Brush? {
+    val strength = glintStrength(tiltX, tiltY)
+    if (strength < 0.04f) return null
+    val centre = glintCentre(tiltX, tiltY)
+    val clear = Color.White.copy(alpha = 0f)
+    return Brush.linearGradient(
+        0f to clear,
+        (centre - GlintHalfWidth) to clear,
+        centre to Color.White.copy(alpha = peak * strength),
+        (centre + GlintHalfWidth) to clear,
+        1f to clear,
+        start = Offset.Zero,
+        end = Offset(size.width, size.height),
+    )
 }
 
 // ---- One floating-glass surface, everywhere -------------------------------

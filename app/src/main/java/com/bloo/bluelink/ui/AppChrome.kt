@@ -16,11 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.animation.animateContentSize
-import android.content.Context
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -62,7 +57,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -82,7 +76,6 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.GapBlock
 import com.bloo.uicommon.content
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /** Shared app-wide chrome: the glass dialog shell and the animated aurora background. */
@@ -212,11 +205,6 @@ private fun Modifier.dialogScrollbar(state: ScrollState): Modifier {
     }
 }
 
-/** Tilt-parallax of the aurora blobs: gain per m/s^2 of tilt, the most they may shift (fraction of the screen), and the easing. */
-private const val TiltGain = 0.012f
-private const val TiltMax = 0.06f
-private const val TiltEase = 0.12f
-
 /** Animated gradient-blob backdrop for login, onboarding and (optionally) the garage. */
 @Composable
 internal fun AuroraBackground(
@@ -243,11 +231,9 @@ internal fun AuroraBackground(
     // running, not even a wake-up to ask whether it should keep running.
     val ambient = LocalAmbientActivity.current
 
-    // "Motion" follows the phone's tilt (like a lock-screen wallpaper parallax); "Static" ignores
-    // tilt entirely and instead gets its own slow, small ambient drift (see p1/p2/p3 below) so it
-    // still reads as alive when the phone is sitting still, rather than a literally frozen frame.
-    var tiltX by remember { mutableFloatStateOf(0f) }
-    var tiltY by remember { mutableFloatStateOf(0f) }
+    // The aurora follows the phone's tilt (like a lock-screen wallpaper parallax) through the app-wide tilt source; it is silent
+    // under battery saver and once the app has gone idle (see rememberTilt).
+    val tilt = LocalTilt.current
     // Live pause flag: the sensor callback and coroutines start once and must see the newest value.
     val currentPaused by rememberUpdatedState(paused)
     // The clock loop below outlives any one composition's value, so it reads the live battery-saver state (a plain `saver`
@@ -257,78 +243,6 @@ internal fun AuroraBackground(
     // The drift keeps moving while the car pager is dragged (freezing it read as a stall and jumped on
     // resume); it stands still only while the app is not on screen.
     val lifecycleOwner = LocalLifecycleOwner.current
-    // Tilt-follow and drift always run, except under battery saver.
-    val motionActive = !saver
-    if (motionActive) {
-        val ctx = LocalContext.current
-        DisposableEffect(ctx, lifecycleOwner) {
-            val mgr = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-            val sensor = mgr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-            // Raw accelerometer values include gravity (~±9.8) from how the phone is held. raw*
-            // tracks the sensor, base* a much slower average; tilt is their difference, so it stays
-            // centred whatever the resting angle.
-            var rawX = 0f; var rawY = 0f
-            var baseX = 0f; var baseY = 0f
-            val listener = object : SensorEventListener {
-                override fun onSensorChanged(event: SensorEvent) {
-                    // No writes while paused: samples stall instead of invalidating.
-                    if (currentPaused) return
-                    // And none once the backdrop has gone idle: a tilt only moves a backdrop that is
-                    // already not moving, so past the idle mark the samples are pure redraw for
-                    // nothing. The whole sensor path is cheap, but its WRITES are a full-screen
-                    // redraw plus a re-blur under every card, which is exactly the idle heat.
-                    if (ambient != null &&
-                        android.os.SystemClock.uptimeMillis() - ambient.lastTouchMs > AmbientIdleMs
-                    ) return
-                    val fastAlpha = 0.08f
-                    val slowAlpha = 0.01f
-                    val x = -event.values[0]
-                    val y = event.values[1]
-                    rawX = rawX * (1 - fastAlpha) + x * fastAlpha
-                    rawY = rawY * (1 - fastAlpha) + y * fastAlpha
-                    baseX = baseX * (1 - slowAlpha) + x * slowAlpha
-                    baseY = baseY * (1 - slowAlpha) + y * slowAlpha
-                    // A subtle parallax, never a displacement: the old gain (0.06 per m/s^2, unbounded) pushed the
-                    // blobs up to half a screen away whenever the hold on the phone changed -- the aurora "left"
-                    // the moment a finger lifted, then drifted back as the slow baseline caught up. Now small,
-                    // capped, and eased so a change of grip glides instead of jumping.
-                    val targetX = ((rawX - baseX) * TiltGain).coerceIn(-TiltMax, TiltMax)
-                    val targetY = ((rawY - baseY) * TiltGain).coerceIn(-TiltMax, TiltMax)
-                    val nx = tiltX + (targetX - tiltX) * TiltEase
-                    val ny = tiltY + (targetY - tiltY) * TiltEase
-                    // Writes only when it has actually moved, and only past a threshold the eye can
-                    // see: every write redraws the whole backdrop AND re-blurs it under every glass
-                    // card, so a jitter of a thousandth of a screen was pure heat for no visible
-                    // change.
-                    if (kotlin.math.abs(nx - tiltX) > 0.004f) tiltX = nx
-                    if (kotlin.math.abs(ny - tiltY) > 0.004f) tiltY = ny
-                }
-                override fun onAccuracyChanged(s: Sensor, acc: Int) {}
-            }
-            // Listening only while the app is on screen: the observer replays ON_START on attach, so this
-            // registers at once when already started.
-            val observer = LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_START ->
-                        // NORMAL (~5Hz), not UI (~15Hz): the tilt is a slow parallax on huge, slow
-                        // blobs, so a third of the samples feeds the exact same motion while costing
-                        // three times the wake-ups.
-                        if (sensor != null) mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
-                    Lifecycle.Event.ON_STOP -> mgr.unregisterListener(listener)
-                    else -> Unit
-                }
-            }
-            lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose {
-                lifecycleOwner.lifecycle.removeObserver(observer)
-                mgr.unregisterListener(listener)
-            }
-        }
-    } else {
-        // Not tracking tilt in Static mode -- reset so a mode switch away from Motion doesn't leave
-        // the blobs stuck at a stale offset.
-        LaunchedEffect(motionActive) { tiltX = 0f; tiltY = 0f }
-    }
 
     // Remembered on the inputs the derivation actually reads, so the HSV round-trips don't re-run
     // on every frame of the pull-to-refresh explosion animation (this composable recomposes each of
@@ -496,8 +410,8 @@ internal fun AuroraBackground(
                     // The lean is OPPOSITE the navigation: scroll down and the glow drifts to the top,
                     // swipe right and it drifts left, so the aurora answers the gesture. Added to the
                     // tilt parallax, so it also dances with how the phone is held.
-                    var cx = size.width * ((bx + ax * sin(t * f1 + ph) + tiltX * (if (ph > 2f) -1f else 1f)) * explodeSpread()) - size.width * leanX * 0.11f
-                    var cy = size.height * ((by + ay * sin(t * f2 + ph * 1.3f) + tiltY * (if (ph > 2f) -1f else 1f)) * explodeSpread()) - size.height * leanY * 0.11f
+                    var cx = size.width * ((bx + ax * sin(t * f1 + ph) + (tilt?.x ?: 0f) * (if (ph > 2f) -1f else 1f)) * explodeSpread()) - size.width * leanX * 0.11f
+                    var cy = size.height * ((by + ay * sin(t * f2 + ph * 1.3f) + (tilt?.y ?: 0f) * (if (ph > 2f) -1f else 1f)) * explodeSpread()) - size.height * leanY * 0.11f
                     if (e > 0.001f) {
                         val dx = finger.x - cx
                         val dy = finger.y - cy
@@ -590,7 +504,7 @@ internal class AmbientActivity {
 internal val LocalAmbientActivity = androidx.compose.runtime.staticCompositionLocalOf<AmbientActivity?> { null }
 
 /** How long with no touch before the ambient drift stops, sparing the idle phone the redraw. */
-private const val AmbientIdleMs = 8_000L
+internal const val AmbientIdleMs = 8_000L
 
 /**
  * Runs for every pointer event anywhere in the app WITHOUT consuming it (the Initial pass sees all

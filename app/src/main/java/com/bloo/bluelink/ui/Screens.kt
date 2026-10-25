@@ -117,6 +117,10 @@ fun BlooApp(vm: AppViewModel) {
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
 
+    // The phone's tilt, read once for the aurora and the pebbles' glass edges. Silent under battery saver, with animations off in
+    // Accessibility, or once the app has sat untouched (see rememberTilt).
+    val tilt = rememberTilt(active = powerPolicy.ambientMotion && !com.bloo.uicommon.reduceMotionCached(context), ambient = ambientActivity)
+
     // One haptics engine; written in a SideEffect because composition-time writes can be discarded.
     val haptics = remember { Haptics(context.applicationContext) }
     SideEffect { haptics.enabled = appearance.hapticsEnabled }
@@ -164,6 +168,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalBackdropHaze provides backdropHaze,
         LocalAmbientActivity provides ambientActivity,
         LocalPowerPolicy provides powerPolicy,
+        LocalTilt provides tilt,
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
         LocalAppearance provides appearance,
@@ -199,6 +204,8 @@ fun BlooApp(vm: AppViewModel) {
         val target = if (addingAccount) Screen.Login else screen
         // Hoisted above the screen switch: the aurora pauses while search is open.
         var searchOpen by remember { mutableStateOf(false) }
+        // The search panel's IME animation freezes the tilt, sparing the redraws it would cause under the blur.
+        SideEffect { tilt.paused = searchOpen }
         AnimatedContent(
             targetState = target,
             transitionSpec = {
