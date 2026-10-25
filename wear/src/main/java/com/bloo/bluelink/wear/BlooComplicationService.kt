@@ -74,20 +74,20 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
         RangedValueComplicationData.Builder(value, 0f, 100f, PlainComplicationText.Builder(description).build())
             .setText(PlainComplicationText.Builder(shown).build())
             // The bolt marks a car that is charging; a car that is not shows the number alone.
-            .apply { if (charging) setMonochromeImage(bolt()) }
+            .apply { if (charging) setMonochromaticImage(bolt()) }
             .setTapAction(open())
             .build()
 
     private fun text(shown: String, description: String): ComplicationData =
         ShortTextComplicationData.Builder(PlainComplicationText.Builder(shown).build(), PlainComplicationText.Builder(description).build())
-            .setMonochromeImage(bolt())
+            .setMonochromaticImage(bolt())
             .setTapAction(open())
             .build()
 
     private fun longText(title: String, line: String, description: String): ComplicationData =
         LongTextComplicationData.Builder(PlainComplicationText.Builder(line).build(), PlainComplicationText.Builder(description).build())
             .setTitle(PlainComplicationText.Builder(title).build())
-            .setMonochromeImage(bolt())
+            .setMonochromaticImage(bolt())
             .setTapAction(open())
             .build()
 
@@ -147,7 +147,7 @@ abstract class BlooTextComplication(
         ShortTextComplicationData.Builder(
             PlainComplicationText.Builder(shown.first).build(), PlainComplicationText.Builder(shown.second).build(),
         )
-            .setMonochromeImage(image(res))
+            .setMonochromaticImage(image(res))
             .setTapAction(tap())
             .build()
 
