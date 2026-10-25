@@ -4,28 +4,30 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** The pebble edge's tilt glint: absent when held still, brighter the harder the tilt, and slides toward the side the phone leans to. */
+/** The pebble edge's sheen: always present, slides with the way the phone is held, and swells while it moves. */
 class EdgeGlintTest {
-    @Test fun heldStillHasNoGlint() {
+    @Test fun motionIsZeroWhenHeldStillAndCapsAtOne() {
         assertEquals(0f, glintStrength(0f, 0f))
-        assertTrue(glintStrength(0.001f, 0.001f) < 0.04f, "a hair of tilt stays below the draw threshold")
-    }
-
-    @Test fun strengthRisesWithTiltAndCapsAtOne() {
         assertTrue(glintStrength(0.03f, 0f) < glintStrength(0.06f, 0f))
         assertEquals(1f, glintStrength(TiltMax, TiltMax))
     }
 
-    @Test fun theGlintCentresWhenLevelAndSlidesWithTheLean() {
-        assertEquals(0.5f, glintCentre(0f, 0f), 0.0001f)
-        assertTrue(glintCentre(0.04f, 0.04f) > 0.5f, "leaning right/down moves it toward the bottom-right")
-        assertTrue(glintCentre(-0.04f, -0.04f) < 0.5f, "leaning left/up moves it toward the top-left")
+    @Test fun theSheenIsVisibleAtRestAndSwellsWithMotion() {
+        assertTrue(sheenStrength(0f) > 0.4f, "a held phone still shows a sheen")
+        assertTrue(sheenStrength(1f) > sheenStrength(0f))
+        assertEquals(1f, sheenStrength(5f), 0.0001f)
     }
 
-    @Test fun theGlintNeverLeavesTheRim() {
-        for (t in listOf(-TiltMax, -0.03f, 0f, 0.03f, TiltMax)) {
-            val c = glintCentre(t, t)
-            assertTrue(c in 0f..1f, "centre $c")
+    @Test fun theSheenCentresWhenLevelAndSlidesWithTheLean() {
+        assertEquals(0.5f, sheenCentre(0f, 0f), 0.0001f)
+        assertTrue(sheenCentre(0.8f, 0.8f) > 0.5f, "leaning right/forward moves it toward the bottom-right")
+        assertTrue(sheenCentre(-0.8f, -0.8f) < 0.5f, "leaning left/back moves it toward the top-left")
+    }
+
+    @Test fun theSheenNeverLeavesTheRim() {
+        for (t in listOf(-1f, -0.5f, 0f, 0.5f, 1f)) {
+            assertTrue(sheenCentre(t, t) in 0f..1f)
+            assertTrue(sheenCentre(t, -t) in 0f..1f)
         }
     }
 }

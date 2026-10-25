@@ -97,8 +97,8 @@ internal fun Modifier.pebbleCardEdge(shape: Shape): Modifier {
  * The liquid-glass edge: a thin line brightest where light would catch it (the top-left), fading through the
  * middle to a fainter catch at the bottom-right, plus a soft inner glow along the top lip. It is what makes a
  * frosted card read as a pane of glass lying OVER the page. The static part is drawn once per size; when the
- * phone is tilted a narrow glint slides along the edge (see [edgeGlint]), which costs one extra stroke only
- * while tilting and nothing at all under battery saver.
+ * phone is tilted a soft sheen slides along the edge (see [edgeSheen]) with the way the phone is held, swelling
+ * while it moves; it costs one extra stroke and nothing at all under battery saver.
  */
 @Composable
 internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()): Modifier {
@@ -130,48 +130,46 @@ internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()):
             drawOutline(outline, lip)
             drawOutline(outline, rim, style = Stroke(line))
             if (tilt != null) {
-                edgeGlint(tilt.x, tilt.y, if (dark) GlintPeakDark else GlintPeakLight)?.let { glint ->
-                    drawOutline(outline, glint, style = Stroke(line))
-                }
+                // The sheen follows the way the phone is held and swells while it moves; it is always there, so the edge is
+                // never a flat line.
+                val sheen = edgeSheen(tilt.holdX, tilt.holdY, glintStrength(tilt.x, tilt.y), if (dark) SheenPeakDark else SheenPeakLight)
+                drawOutline(outline, sheen, style = Stroke(line * 1.4f))
             }
         }
     }
 }
 
-/** How bright the tilt glint gets at full tilt, on a dark and on a light pebble: a little, not a flash. */
-private const val GlintPeakDark = 0.34f
-private const val GlintPeakLight = 0.55f
+/** How bright the sheen is at the middle of its band, held and at full motion: dark pebbles catch less, light ones more. */
+private const val SheenPeakDark = 0.6f
+private const val SheenPeakLight = 0.85f
 
-/** Half-width of the glint along the rim's diagonal (fraction of it). */
-private const val GlintHalfWidth = 0.16f
+/** Half-width of the sheen along the rim's diagonal (fraction of it): a wide soft sweep, not a pinpoint. */
+private const val SheenHalfWidth = 0.3f
 
-/** How hard the phone is tilted, 0 (held still) to 1 (the most the tilt reaches): the glint's brightness. */
-internal fun glintStrength(tiltX: Float, tiltY: Float): Float = (kotlin.math.hypot(tiltX, tiltY) / TiltMax).coerceIn(0f, 1f)
+/** Where along the rim's diagonal the sheen sits, 0 (top-left) to 1 (bottom-right): leaning right or forward slides it toward the bottom-right. */
+internal fun sheenCentre(holdX: Float, holdY: Float): Float =
+    (0.5f + (holdX + holdY) * 0.5f * 0.45f).coerceIn(SheenHalfWidth * 0.5f, 1f - SheenHalfWidth * 0.5f)
 
-/** Where along the rim's diagonal the glint sits, 0 (top-left) to 1 (bottom-right): tilting right or down moves it toward the bottom-right. */
-internal fun glintCentre(tiltX: Float, tiltY: Float): Float =
-    (0.5f + (tiltX + tiltY) / (2f * TiltMax) * 0.4f).coerceIn(GlintHalfWidth, 1f - GlintHalfWidth)
+/** The sheen's strength: a steady base from the held angle, swelling with recent motion (0..1). */
+internal fun sheenStrength(motion: Float): Float = 0.55f + 0.45f * motion.coerceIn(0f, 1f)
 
-/**
- * A narrow bright band that slides along the rim's top-left-to-bottom-right axis as the phone tilts, as light would across a
- * pane of glass, brighter the harder the tilt. Null while the phone is held still, so a resting pebble draws nothing extra. The
- * tilt is high-passed, so the glint blooms as the phone moves and fades as the hold settles.
- */
-private fun DrawScope.edgeGlint(tiltX: Float, tiltY: Float, peak: Float): Brush? {
-    val strength = glintStrength(tiltX, tiltY)
-    if (strength < 0.04f) return null
-    val centre = glintCentre(tiltX, tiltY)
+/** A soft band of light that slides along the rim as the phone is tilted, like light sweeping across a pane of glass. */
+private fun DrawScope.edgeSheen(holdX: Float, holdY: Float, motion: Float, peak: Float): Brush {
+    val centre = sheenCentre(holdX, holdY)
     val clear = Color.White.copy(alpha = 0f)
     return Brush.linearGradient(
         0f to clear,
-        (centre - GlintHalfWidth) to clear,
-        centre to Color.White.copy(alpha = peak * strength),
-        (centre + GlintHalfWidth) to clear,
+        (centre - SheenHalfWidth).coerceAtLeast(0.001f) to clear,
+        centre to Color.White.copy(alpha = peak * sheenStrength(motion)),
+        (centre + SheenHalfWidth).coerceAtMost(0.999f) to clear,
         1f to clear,
         start = Offset.Zero,
         end = Offset(size.width, size.height),
     )
 }
+
+/** How hard the phone is moving, 0 (held still) to 1 (the most the tilt reaches): how far the sheen swells. */
+internal fun glintStrength(tiltX: Float, tiltY: Float): Float = (kotlin.math.hypot(tiltX, tiltY) / TiltMax).coerceIn(0f, 1f)
 
 // ---- One floating-glass surface, everywhere -------------------------------
 
