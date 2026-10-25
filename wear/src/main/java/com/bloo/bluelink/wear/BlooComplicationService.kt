@@ -193,6 +193,7 @@ internal object WearSurfaces {
     fun refresh(context: Context) {
         val app = context.applicationContext
         runCatching { TileService.getUpdater(app).requestUpdate(BlooTileService::class.java) }
+        runCatching { TileService.getUpdater(app).requestUpdate(BlooClimateTileService::class.java) }
         listOf(
             BlooComplicationService::class.java, BlooLockComplicationService::class.java,
             BlooRangeComplicationService::class.java, BlooClimateComplicationService::class.java,

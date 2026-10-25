@@ -74,6 +74,20 @@
                 android:resource="@drawable/ic_stat_bloo" />
         </service>
 
+        <!-- A second tile for the one thing worth its own: starting the climate (smart climate and the phone's presets). -->
+        <service
+            android:name=".BlooClimateTileService"
+            android:exported="true"
+            android:label="@string/tile_climate_label"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/tile_climate" />
+        </service>
+
         <!-- The car's charge on any watch face: a ring, short text, a long line, or the glyph alone. -->
         <service
             android:name=".BlooComplicationService"
