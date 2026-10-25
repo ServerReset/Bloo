@@ -121,6 +121,8 @@ fun VehicleSnapshot.merged(status: VehicleStatus, location: GeoLocation? = null)
         // Not the `new ?: old` shape: only a status with no evStatus keeps the old value.
         // displayChargeLimit (not targetForCurrentPlug) so an unplugged EV still resolves to its configured limit.
         chargeLimitPct = if (ev != null) ev.displayChargeLimit() else chargeLimitPct,
+        // Time left belongs to the charge session this status describes, so a status with an evStatus replaces it (or clears it).
+        chargeMinutes = if (ev != null) ev.minutesToFull?.takeIf { ev.batteryCharge == true && it > 0 } else chargeMinutes,
         // A just-fetched status makes the data current.
         fetchedAt = System.currentTimeMillis(),
     )
@@ -136,6 +138,8 @@ internal fun VehicleSnapshot.keepingStatusOf(old: VehicleSnapshot): VehicleSnaps
     rangeMi = rangeMi ?: old.rangeMi,
     locked = locked ?: old.locked,
     charging = charging ?: old.charging,
+    // Time left goes with the charging flag: a snapshot that says whether the car charges owns its figure.
+    chargeMinutes = if (charging != null) chargeMinutes else old.chargeMinutes,
     climateOn = climateOn ?: old.climateOn,
     engineOn = engineOn ?: old.engineOn,
     lat = lat ?: old.lat,

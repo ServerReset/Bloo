@@ -50,7 +50,7 @@ class VehicleSnapshotTextTest {
         assertNull(car(charging = true).chargeLeftLabel())
         assertNull(car(charging = true, chargeMinutes = 0).chargeLeftLabel())
         assertEquals(
-            "Locked · Charging · 1h 55m · 270 mi",
+            "Locked · Charging · 1h 55m left · 270 mi",
             car(percent = 76, locked = true, charging = true, rangeMi = 270, chargeMinutes = 115).stateLine(),
         )
     }
@@ -73,5 +73,13 @@ class VehicleSnapshotTextTest {
         assertFalse(car().isStale(now), "never read")
         assertFalse(car(fetchedAt = now - 30 * 60_000L).isStale(now), "exactly 30 minutes is not yet stale")
         assertTrue(car(fetchedAt = now - 31 * 60_000L).isStale(now))
+    }
+
+    @Test fun keepingStatusCarriesChargeTimeOnlyWhenTheNewSnapshotIsSilentAboutCharging() {
+        val old = car(charging = true, chargeMinutes = 115)
+        // A new snapshot that says the car is charging, with no time, owns that: the old figure is not carried over.
+        assertNull(car(charging = true).keepingStatusOf(old).chargeMinutes)
+        // One that says nothing about charging keeps the old reading whole.
+        assertEquals(115, car().keepingStatusOf(old).chargeMinutes)
     }
 }

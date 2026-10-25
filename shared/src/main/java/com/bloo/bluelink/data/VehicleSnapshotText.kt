@@ -20,7 +20,7 @@ fun VehicleSnapshot.bigValue(): String =
 fun VehicleSnapshot.stateLine(): String? = listOfNotNull(
     locked?.let { if (it) "Locked" else "Unlocked" }.takeIf { percent != null },
     if (charging == true) "Charging" else null,
-    chargeLeftLabel(),
+    chargeLeftLabel()?.let { "$it left" },
     rangeMi?.let { "$it mi" },
 ).joinToString(" · ").ifBlank { null }
 

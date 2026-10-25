@@ -55,8 +55,8 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
             ComplicationType.RANGED_VALUE -> car.percent?.let {
                 ranged(it.coerceIn(0, 100).toFloat(), car.bigValue(), description, charging = car.charging == true)
             } ?: NoDataComplicationData()
-            ComplicationType.SHORT_TEXT -> text(car.bigValue(), description)
-            ComplicationType.LONG_TEXT -> longText(if (age != null) "${car.name} · $age" else car.name, complicationLongLine(car), description)
+            ComplicationType.SHORT_TEXT -> text(car.bigValue(), description, charging = car.charging == true)
+            ComplicationType.LONG_TEXT -> longText(if (age != null) "${car.name} · $age" else car.name, complicationLongLine(car), description, charging = car.charging == true)
             ComplicationType.MONOCHROMATIC_IMAGE -> glyph(description)
             else -> NoDataComplicationData()
         }
@@ -78,16 +78,17 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
             .setTapAction(open())
             .build()
 
-    private fun text(shown: String, description: String): ComplicationData =
+    // The bolt says "charging": a car that is not (or has no battery) shows its figure without it.
+    private fun text(shown: String, description: String, charging: Boolean = true): ComplicationData =
         ShortTextComplicationData.Builder(PlainComplicationText.Builder(shown).build(), PlainComplicationText.Builder(description).build())
-            .setMonochromaticImage(bolt())
+            .apply { if (charging) setMonochromaticImage(bolt()) }
             .setTapAction(open())
             .build()
 
-    private fun longText(title: String, line: String, description: String): ComplicationData =
+    private fun longText(title: String, line: String, description: String, charging: Boolean = true): ComplicationData =
         LongTextComplicationData.Builder(PlainComplicationText.Builder(line).build(), PlainComplicationText.Builder(description).build())
             .setTitle(PlainComplicationText.Builder(title).build())
-            .setMonochromaticImage(bolt())
+            .apply { if (charging) setMonochromaticImage(bolt()) }
             .setTapAction(open())
             .build()
 
@@ -128,7 +129,11 @@ abstract class BlooTextComplication(
         }
         if (WearBootGate.isLocked(applicationContext)) return NoDataComplicationData()
         val car = runCatching { SnapshotStore(applicationContext).current().selected }.getOrNull() ?: return NoDataComplicationData()
-        val reading = text(car) ?: return NoDataComplicationData()
+        val reading = text(car)
+        // The glyph alone needs only the car's state (a padlock shows with or without a word to go with it).
+        if (reading == null) {
+            return if (request.complicationType == ComplicationType.MONOCHROMATIC_IMAGE) glyph(car.name, icon(car)) else NoDataComplicationData()
+        }
         // An old reading says so aloud, so a glance at stale data is not heard as current.
         val shown = reading.first to reading.second + (if (car.isStale()) car.updatedLabel()?.let { ", updated $it" } ?: "" else "")
         return if (request.complicationType == ComplicationType.MONOCHROMATIC_IMAGE) glyph(shown.second, icon(car)) else build(shown, icon(car))
