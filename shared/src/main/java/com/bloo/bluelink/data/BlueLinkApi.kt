@@ -1,5 +1,7 @@
 package com.bloo.bluelink.data
 
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
 import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -111,6 +113,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         val decodeStartedAt = System.currentTimeMillis()
         val parsed = json.decodeFromString(EnrollmentResponse.serializer(), body)
         val vehicles = parsed.enrolledVehicleDetails.map { it.vehicleDetails.toVehicle(brand) }
+        logVehicleFieldNames(body)
         val decodeMs = System.currentTimeMillis() - decodeStartedAt
         if (decodeMs > 200) {
             AppLog.log("BlueLinkApi.vehicles(): decode + map took ${decodeMs}ms")
@@ -396,3 +399,17 @@ private fun VehicleDetails.toVehicle(brand: Brand): Vehicle = Vehicle(
     isEv = evStatus.equals("E", ignoreCase = true),
     odometer = odometer,
 )
+
+/**
+ * Logs WHICH fields the account lists for its cars (names only, never values), so what the API offers beyond what the app reads --
+ * paint colour, trim, image links -- can be seen from a log instead of guessed at. Best effort: a body in any other shape logs nothing.
+ */
+private fun logVehicleFieldNames(body: String) {
+    val names = runCatching {
+        val cars = BlooJson.parseToJsonElement(body).jsonObject["enrolledVehicleDetails"]?.jsonArray ?: return
+        cars.mapNotNull { (it as? kotlinx.serialization.json.JsonObject)?.get("vehicleDetails") as? kotlinx.serialization.json.JsonObject }
+            .flatMap { it.keys }
+            .toSortedSet()
+    }.getOrNull() ?: return
+    if (names.isNotEmpty()) AppLog.log("Account vehicle fields (names only): ${names.joinToString()}")
+}
