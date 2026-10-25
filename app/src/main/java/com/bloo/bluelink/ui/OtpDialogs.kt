@@ -59,22 +59,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
         buttons = {
             // Verify shown only once a code's been sent; Cancel always. Stacked full-width (primary
             // on top) per the shell's convention.
-            if (otp.sentTo != null) {
-                MorphTextButton(
-                    text = "Verify",
-                    onClick = { vm.kiaVerifyOtp(code) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !loading && code.isNotBlank(),
-                    pending = loading,
-                    emphasis = ButtonEmphasis.Confirm,
-                )
-            }
-            MorphTextButton(
-                "Cancel",
-                vm::kiaCancelOtp,
-                enabled = !loading,
-                modifier = Modifier.fillMaxWidth()
-            )
+            OtpButtons(loading, code, showVerify = otp.sentTo != null, onVerify = { vm.kiaVerifyOtp(code) }, onCancel = vm::kiaCancelOtp)
         },
     )
 }
@@ -98,20 +83,7 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
             OtpCodeField(code) { code = it }
         },
         buttons = {
-            MorphTextButton(
-                text = "Verify",
-                onClick = { vm.canadaVerifyOtp(code) },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loading && code.isNotBlank(),
-                pending = loading,
-                emphasis = ButtonEmphasis.Confirm,
-            )
-            MorphTextButton(
-                "Cancel",
-                vm::canadaCancelOtp,
-                enabled = !loading,
-                modifier = Modifier.fillMaxWidth()
-            )
+            OtpButtons(loading, code, showVerify = true, onVerify = { vm.canadaVerifyOtp(code) }, onCancel = vm::canadaCancelOtp)
         },
     )
 }
@@ -130,4 +102,20 @@ internal fun OtpCodeField(code: String, onCodeChange: (String) -> Unit) {
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.fillMaxWidth(),
     )
+}
+
+/** The one-time-code dialog's buttons, stacked full-width with the primary on top: Verify (once a code was sent) and Cancel. */
+@Composable
+private fun OtpButtons(loading: Boolean, code: String, showVerify: Boolean, onVerify: () -> Unit, onCancel: () -> Unit) {
+    if (showVerify) {
+        MorphTextButton(
+            text = "Verify",
+            onClick = onVerify,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !loading && code.isNotBlank(),
+            pending = loading,
+            emphasis = ButtonEmphasis.Confirm,
+        )
+    }
+    MorphTextButton("Cancel", onCancel, enabled = !loading, modifier = Modifier.fillMaxWidth())
 }
