@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -73,22 +72,6 @@ internal fun secondaryTextShadow(): Shadow = com.bloo.uicommon.secondaryTextShad
 internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: Color = secondaryTextColor()) {
     RevealText(text, style = SecondaryTextStyle(), modifier = modifier, color = color)
 }
-
-/** The PRIMARY role as text: what a line says, in the full text colour. */
-@Composable
-internal fun PrimaryText(
-    text: String,
-    modifier: Modifier = Modifier,
-    maxLines: Int = Int.MAX_VALUE,
-    overflow: TextOverflow = TextOverflow.Clip,
-) = RevealText(
-    text,
-    style = PrimaryTextStyle(),
-    modifier = modifier,
-    color = MaterialTheme.colorScheme.onSurface,
-    maxLines = maxLines,
-    overflow = overflow,
-)
 
 /** The SECONDARY role as text: what a line is about. Same as [BodySmallText]. */
 @Composable
