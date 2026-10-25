@@ -50,7 +50,7 @@ internal data class BandLuma(val mean: Float, val low: Float, val high: Float)
 
 /** What a band wants: dark or light text, and the opposite-tone scrim (0..1) that makes that text legible against the band's worst part. */
 @Immutable
-internal data class BandOverlay(val darkText: Boolean, val scrimAlpha: Float) {
+internal data class BandOverlay(val darkText: Boolean, val scrimAlpha: Float, val behind: BandLuma) {
     val textColor: Color get() = if (darkText) HeroDarkText else HeroLightText
 
     /** The scrim is the opposite tone of the text: a white wash behind dark text, a black one behind light text. */
@@ -91,7 +91,13 @@ internal fun overlayFor(band: BandLuma): BandOverlay {
             (1f - required / band.high.coerceAtLeast(0.0001f)).coerceIn(0f, MaxScrim)
         }
     }
-    return BandOverlay(darkText, alpha)
+    return BandOverlay(darkText, alpha, band.under(scrimLight = darkText, alpha = alpha))
+}
+
+/** What the band's brightness becomes once a scrim of [alpha] is laid over it: white ([scrimLight]) lifts it, black sinks it. */
+internal fun BandLuma.under(scrimLight: Boolean, alpha: Float): BandLuma {
+    fun f(v: Float) = if (scrimLight) v + (1f - v) * alpha else v * (1f - alpha)
+    return BandLuma(f(mean), f(low), f(high))
 }
 
 /** The decision for the two bands the hero's text sits in; a null band means "not measured", and the theme's own tone applies. */

@@ -122,7 +122,7 @@ internal fun HeroHeader(
     // What the photo looks like behind the title and the readout decides their colours (dark text on a light photo, light on a dark
     // one), and a gradient or a photo that changes behind the text is covered by judging each band's worst part.
     val photoTone by rememberHeroPhotoTone(imageUrl)
-    val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, heroTitleOnPhoto(photoTone), titleStep)
+    val heroTitleColorNow = heroTitleColor(photoTone, titleStep)
     CompositionLocalProvider(LocalHeroTone provides photoTone) {
         PebbleShell(
             expanded = heroShown,

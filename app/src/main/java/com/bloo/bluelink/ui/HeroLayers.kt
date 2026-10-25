@@ -119,9 +119,10 @@ internal fun BoxScope.HeroBackground(
     ) {
         // The readout sits on the photo once the card is open and reads LocalContentColor, so it
         // needs this provider.
+        val tone = LocalHeroTone.current
         CompositionLocalProvider(
-            LocalContentColor provides
-                lerp(MaterialTheme.colorScheme.onSurface, heroReadoutOnPhoto(), heroT),
+            LocalContentColor provides heroReadoutColor(tone, heroT),
+            LocalBackdropBand provides heroReadoutBand(tone, heroT),
         ) {
             HeroMorphReadout(
                 readout,
@@ -157,9 +158,10 @@ internal fun HeroForeground(
         Box(
             Modifier.offset { IntOffset(x.roundToInt(), y.roundToInt()) },
         ) {
+            val tone = LocalHeroTone.current
             CompositionLocalProvider(
-                LocalContentColor provides
-                    lerp(MaterialTheme.colorScheme.onSurface, heroReadoutOnPhoto(), heroT),
+                LocalContentColor provides heroReadoutColor(tone, heroT),
+                LocalBackdropBand provides heroReadoutBand(tone, heroT),
             ) {
                 HeroNumbers(
                     readout, heroT,

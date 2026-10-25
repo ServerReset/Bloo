@@ -253,8 +253,7 @@ internal fun HeroNumbers(
             FontWeight.Bold,
             // Collapsed charging shows in colour (no room for the word); it fades to content colour
             // on open.
-            color = if (data.charging) lerp(ChargeGreen, LocalContentColor.current, t)
-            else LocalContentColor.current,
+            color = (if (data.charging) lerp(ChargeGreen, LocalContentColor.current, t) else LocalContentColor.current).legible(),
         )
         Spacer(Modifier.width(lerp(8.dp, 14.dp, t)))
         Column(horizontalAlignment = Alignment.End) {
@@ -275,7 +274,7 @@ internal fun HeroNumbers(
             ) {
                 if (t > 0.01f) {
                     val statusColor by androidx.compose.animation.animateColorAsState(
-                        data.statusColor.takeOrElse { LocalContentColor.current },
+                        data.statusColor.takeOrElse { LocalContentColor.current }.legible(),
                         animationSpec = tween(MotionMedium), label = "statusLineColor",
                     )
                     RollingNumber(
