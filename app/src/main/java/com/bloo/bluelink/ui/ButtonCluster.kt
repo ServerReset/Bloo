@@ -19,7 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -142,7 +141,3 @@ internal fun connectedShape(first: Boolean, last: Boolean, outerPercent: Int, st
     val end = if (last) outer else seamCorner(endSeamMorph)
     return RoundedCornerShape(topStart = start, bottomStart = start, topEnd = end, bottomEnd = end)
 }
-
-/** The silhouette of button [index] in a cluster: round at the cluster's ends, a seam corner wherever it meets a neighbour. */
-internal fun clusterShape(buttons: List<ClusterButton>, index: Int, morph: Float, cornerPercent: Int): Shape =
-    connectedShape(index == 0, index == buttons.lastIndex, cornerPercent, morph, morph)

@@ -119,7 +119,7 @@ data class WindowOpen(
     val backRight: Int? = null,
 ) {
     val anyOpen: Boolean
-        get() = listOf(frontLeft, frontRight, backLeft, backRight).any { it == 1 }
+        get() = anyOpen(frontLeft, frontRight, backLeft, backRight)
 }
 
 @Serializable
@@ -139,6 +139,9 @@ data class TirePressure(
     val all: Int? = null,
 )
 
+/** Whether any of the 0 (closed) / 1 (open) readings says open. */
+private fun anyOpen(vararg readings: Int?): Boolean = readings.any { it == 1 }
+
 /** Per-door open state. The API encodes each door as 0 (closed) or 1 (open). */
 @Serializable
 data class DoorOpen(
@@ -148,7 +151,7 @@ data class DoorOpen(
     val backRight: Int? = null,
 ) {
     val anyOpen: Boolean
-        get() = listOf(frontLeft, frontRight, backLeft, backRight).any { it == 1 }
+        get() = anyOpen(frontLeft, frontRight, backLeft, backRight)
 }
 
 /**

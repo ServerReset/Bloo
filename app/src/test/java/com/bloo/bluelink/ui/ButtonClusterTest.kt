@@ -20,7 +20,7 @@ class ButtonClusterTest {
 
     @Test
     fun aLoneButtonIsFullyRound() {
-        val s = clusterShape(listOf(button()), 0, 0f, 50)
+        val s = connectedShape(true, 0 == listOf(button()).lastIndex, 50, 0f, 0f)
         assertEquals(pill, px(s) { it.topStart }, 0.01f)
         assertEquals(pill, px(s) { it.topEnd }, 0.01f)
     }
@@ -28,8 +28,8 @@ class ButtonClusterTest {
     @Test
     fun twoButtonsAreRoundOutsideAndSoftInside() {
         val bs = listOf(button(), button())
-        val first = clusterShape(bs, 0, 0f, 50)
-        val last = clusterShape(bs, 1, 0f, 50)
+        val first = connectedShape(true, 0 == bs.lastIndex, 50, 0f, 0f)
+        val last = connectedShape(false, 1 == bs.lastIndex, 50, 0f, 0f)
         assertEquals(pill, px(first) { it.topStart }, 0.01f)
         assertNotEquals(pill, px(first) { it.topEnd })
         assertNotEquals(pill, px(last) { it.topStart })
@@ -39,19 +39,19 @@ class ButtonClusterTest {
     @Test
     fun threeOrMoreButtonsHaveSeamsOnBothSidesOfTheMiddle() {
         val bs = List(4) { button() }
-        val middle = clusterShape(bs, 1, 0f, 50)
+        val middle = connectedShape(false, 1 == bs.lastIndex, 50, 0f, 0f)
         val seam = px(middle) { it.topStart }
         assertNotEquals(pill, seam)
         assertEquals(seam, px(middle) { it.topEnd }, 0.01f)
-        assertEquals(pill, px(clusterShape(bs, 0, 0f, 50)) { it.topStart }, 0.01f)
-        assertEquals(pill, px(clusterShape(bs, 3, 0f, 50)) { it.topEnd }, 0.01f)
+        assertEquals(pill, px(connectedShape(true, 0 == bs.lastIndex, 50, 0f, 0f)) { it.topStart }, 0.01f)
+        assertEquals(pill, px(connectedShape(false, 3 == bs.lastIndex, 50, 0f, 0f)) { it.topEnd }, 0.01f)
     }
 
     @Test
     fun seamsOpenAsAButtonIsPressed() {
         val bs = List(3) { button() }
-        val rest = px(clusterShape(bs, 1, 0f, 50)) { it.topStart }
-        val pressed = px(clusterShape(bs, 1, 1f, 50)) { it.topStart }
+        val rest = px(connectedShape(false, 1 == bs.lastIndex, 50, 0f, 0f)) { it.topStart }
+        val pressed = px(connectedShape(false, 1 == bs.lastIndex, 50, 1f, 1f)) { it.topStart }
         assert(pressed > rest)
     }
 }
