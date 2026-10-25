@@ -56,20 +56,11 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
                 ranged(it.coerceIn(0, 100).toFloat(), car.bigValue(), description, charging = car.charging == true)
             } ?: NoDataComplicationData()
             ComplicationType.SHORT_TEXT -> text(car.bigValue(), description)
-            ComplicationType.LONG_TEXT -> longText(if (age != null) "${car.name} · $age" else car.name, longLine(car), description)
+            ComplicationType.LONG_TEXT -> longText(if (age != null) "${car.name} · $age" else car.name, complicationLongLine(car), description)
             ComplicationType.MONOCHROMATIC_IMAGE -> glyph(description)
             else -> NoDataComplicationData()
         }
     }
-
-    /** "80% · 248 mi · Locked": what a face with room for a line says about the car, leaving out what it does not know. */
-    private fun longLine(car: VehicleSnapshot): String =
-        listOfNotNull(
-            car.bigValue(),
-            // Charging says how long is left; otherwise the range.
-            car.chargeLeftLabel()?.let { "$it left" } ?: car.rangeMi?.let { "$it mi" },
-            doorLockLabel(car.locked),
-        ).joinToString(" · ")
 
     private fun open(): PendingIntent = PendingIntent.getActivity(
         applicationContext, 0, Intent(applicationContext, WearMainActivity::class.java),
@@ -187,6 +178,17 @@ class BlooClimateComplicationService : BlooTextComplication(("Off" to "Climate o
     }
     override fun icon(car: VehicleSnapshot) = R.drawable.tile_climate
 }
+
+/**
+ * "80% · 248 mi · Locked": what a face with room for a line says about the car, leaving out what it does not know. While the
+ * car charges it says how long is left in place of the range.
+ */
+internal fun complicationLongLine(car: VehicleSnapshot): String =
+    listOfNotNull(
+        car.bigValue(),
+        car.chargeLeftLabel()?.let { "$it left" } ?: car.rangeMi?.let { "$it mi" },
+        doorLockLabel(car.locked),
+    ).joinToString(" · ")
 
 /** Asks the watch's glanceable surfaces (the Tile and the complication) to redraw from the latest snapshot. */
 internal object WearSurfaces {
