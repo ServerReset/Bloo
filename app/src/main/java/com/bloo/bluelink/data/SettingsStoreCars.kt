@@ -31,7 +31,7 @@ fun SettingsStore.lastServiceMiles(vin: String, p: Preferences): Int? =
 suspend fun SettingsStore.setLastServiceMiles(vin: String, value: Int?) {
     editTracked {
         val key = stringPreferencesKey("svc_last_$vin")
-        if (value == null) it.remove(key) else it[key] = value.toString()
+        it.putOrRemove(key, value)
     }
 }
 
@@ -44,7 +44,7 @@ fun SettingsStore.serviceIntervalMiles(vin: String, p: Preferences): Int? =
 suspend fun SettingsStore.setServiceIntervalMiles(vin: String, value: Int?) {
     editTracked {
         val key = stringPreferencesKey("svc_interval_$vin")
-        if (value == null) it.remove(key) else it[key] = value.toString()
+        it.putOrRemove(key, value)
     }
 }
 
@@ -288,7 +288,7 @@ fun SettingsStore.hotspots(vin: String, p: Preferences): String? {
 suspend fun SettingsStore.setHotspots(vin: String, section: String?) {
     editTracked {
         val key = stringPreferencesKey("hotspots_$vin")
-        if (section.isNullOrBlank()) it.remove(key) else it[key] = section
+        it.putNonBlank(key, section)
     }
 }
 

@@ -1,6 +1,7 @@
 package com.bloo.bluelink.data
 
 import kotlinx.coroutines.flow.flowOn
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -87,4 +88,14 @@ internal suspend fun SettingsStore.clearDirtyKeys(keys: Set<String>) {
         val remaining = prefs.dirtyKeySet() - keys
         if (remaining.isEmpty()) prefs.remove(dirtyKey) else prefs[dirtyKey] = remaining.joinToString(",")
     }
+}
+
+/** Stores [value] under [key], or removes [key] when [value] is null or blank. */
+internal fun MutablePreferences.putNonBlank(key: Preferences.Key<String>, value: String?) {
+    if (value.isNullOrBlank()) remove(key) else this[key] = value
+}
+
+/** Stores [value] as text under [key], or removes [key] when [value] is null. */
+internal fun MutablePreferences.putOrRemove(key: Preferences.Key<String>, value: Any?) {
+    if (value == null) remove(key) else this[key] = value.toString()
 }

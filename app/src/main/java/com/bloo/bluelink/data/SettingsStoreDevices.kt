@@ -65,7 +65,7 @@ internal suspend fun SettingsStore.setSyncFileId(id: String) {
 suspend fun SettingsStore.setSyncUri(uri: String?) {
     editTracked {
         val key = stringPreferencesKey("sync_uri")
-        if (uri.isNullOrBlank()) it.remove(key) else it[key] = uri
+        it.putNonBlank(key, uri)
     }
 }
 
@@ -157,7 +157,7 @@ suspend fun SettingsStore.syncLastHash(): String? =
 suspend fun SettingsStore.setSyncLastHash(hash: String?) {
     context.settingsDataStore.edit {
         val k = stringPreferencesKey("sync_last_hash")
-        if (hash.isNullOrBlank()) it.remove(k) else it[k] = hash
+        it.putNonBlank(k, hash)
     }
 }
 
@@ -210,7 +210,7 @@ fun SettingsStore.syncPrimaryDeviceId(p: Preferences): String? =
 internal suspend fun SettingsStore.setSyncPrimaryCache(id: String?) {
     context.settingsDataStore.edit {
         val k = stringPreferencesKey("sync_primary_cache")
-        if (id.isNullOrBlank()) it.remove(k) else it[k] = id
+        it.putNonBlank(k, id)
     }
 }
 
@@ -226,7 +226,7 @@ internal suspend fun SettingsStore.syncPrimaryPending(): String? =
 internal suspend fun SettingsStore.setSyncPrimaryPending(id: String?) {
     context.settingsDataStore.edit {
         val k = stringPreferencesKey("sync_primary_pending")
-        if (id.isNullOrBlank()) it.remove(k) else it[k] = id
+        it.putNonBlank(k, id)
     }
 }
 

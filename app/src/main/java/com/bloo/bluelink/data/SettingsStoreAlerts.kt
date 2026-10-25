@@ -79,7 +79,7 @@ suspend fun SettingsStore.doorOpenSince(vin: String): Long? =
 suspend fun SettingsStore.setDoorOpenSince(vin: String, value: Long?) {
     editTracked {
         val k = stringPreferencesKey("door_since_$vin")
-        if (value == null) it.remove(k) else it[k] = value.toString()
+        it.putOrRemove(k, value)
     }
 }
 
@@ -111,7 +111,7 @@ suspend fun SettingsStore.engineOnSince(vin: String): Long? =
 suspend fun SettingsStore.setEngineOnSince(vin: String, value: Long?) {
     editTracked {
         val k = stringPreferencesKey("engine_since_$vin")
-        if (value == null) it.remove(k) else it[k] = value.toString()
+        it.putOrRemove(k, value)
     }
 }
 
@@ -121,7 +121,7 @@ suspend fun SettingsStore.unlockedSince(vin: String): Long? =
 suspend fun SettingsStore.setUnlockedSince(vin: String, value: Long?) {
     editTracked {
         val k = stringPreferencesKey("unlocked_since_$vin")
-        if (value == null) it.remove(k) else it[k] = value.toString()
+        it.putOrRemove(k, value)
     }
 }
 
@@ -238,6 +238,6 @@ fun SettingsStore.defaultClimatePreset(vin: String, p: Preferences): String? =
 suspend fun SettingsStore.setDefaultClimatePreset(vin: String, id: String?) {
     editTracked {
         val key = stringPreferencesKey(SettingsStore.Keys.DEFAULT_CLIMATE_PRESET_PREFIX + vin)
-        if (id.isNullOrBlank()) it.remove(key) else it[key] = id
+        it.putNonBlank(key, id)
     }
 }
