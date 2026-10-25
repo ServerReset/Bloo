@@ -1,19 +1,10 @@
 package com.bloo.bluelink.wear
 
-import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
-import android.graphics.drawable.Icon
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
-import androidx.wear.watchface.complications.data.LongTextComplicationData
-import androidx.wear.watchface.complications.data.MonochromaticImage
-import androidx.wear.watchface.complications.data.MonochromaticImageComplicationData
 import androidx.wear.watchface.complications.data.NoDataComplicationData
-import androidx.wear.watchface.complications.data.PlainComplicationText
-import androidx.wear.watchface.complications.data.RangedValueComplicationData
-import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
@@ -35,10 +26,10 @@ import com.bloo.bluelink.data.updatedLabel
 class BlooComplicationService : SuspendingComplicationDataSourceService() {
 
     override fun getPreviewData(type: ComplicationType): ComplicationData? = when (type) {
-        ComplicationType.RANGED_VALUE -> ranged(80f, "80%", "Battery", charging = false)
-        ComplicationType.SHORT_TEXT -> text("80%", "Battery")
-        ComplicationType.LONG_TEXT -> longText("Daisy", "80% · 248 mi · Locked", "Daisy, 80%")
-        ComplicationType.MONOCHROMATIC_IMAGE -> glyph("Battery")
+        ComplicationType.RANGED_VALUE -> rangedData(80f, "80%", "Battery", null, tap())
+        ComplicationType.SHORT_TEXT -> shortTextData("80%", "Battery", bolt(), tap())
+        ComplicationType.LONG_TEXT -> longTextData("Daisy", "80% · 248 mi · Locked", "Daisy, 80%", bolt(), tap())
+        ComplicationType.MONOCHROMATIC_IMAGE -> glyphData(bolt(), "Battery", tap())
         else -> null
     }
 
@@ -48,54 +39,26 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
         val car: VehicleSnapshot = snapshot.selected ?: return NoDataComplicationData()
         // An old reading says so (aloud, and in the long line's title) instead of passing as current.
         val age = if (car.isStale()) car.updatedLabel() else null
-        val description = "${car.name}, ${car.bigValue()}" + (age?.let { ", updated $it" } ?: "")
+        val description = "${car.name}, ${car.bigValue()}" + car.spokenAge()
+        // The bolt says "charging": a car that is not (or has no battery) shows its figure without it.
+        val icon = if (car.charging == true) bolt() else null
         return when (request.complicationType) {
             // A request is answered in the type it asked for: no level means no data for a ranged one (the system
             // rejects another type), not a text fallback.
             ComplicationType.RANGED_VALUE -> car.percent?.let {
-                ranged(it.coerceIn(0, 100).toFloat(), car.bigValue(), description, charging = car.charging == true)
+                rangedData(it.coerceIn(0, 100).toFloat(), car.bigValue(), description, icon, tap())
             } ?: NoDataComplicationData()
-            ComplicationType.SHORT_TEXT -> text(car.bigValue(), description, charging = car.charging == true)
-            ComplicationType.LONG_TEXT -> longText(if (age != null) "${car.name} · $age" else car.name, complicationLongLine(car), description, charging = car.charging == true)
-            ComplicationType.MONOCHROMATIC_IMAGE -> glyph(description)
+            ComplicationType.SHORT_TEXT -> shortTextData(car.bigValue(), description, icon, tap())
+            ComplicationType.LONG_TEXT ->
+                longTextData(if (age != null) "${car.name} · $age" else car.name, complicationLongLine(car), description, icon, tap())
+            ComplicationType.MONOCHROMATIC_IMAGE -> glyphData(bolt(), description, tap())
             else -> NoDataComplicationData()
         }
     }
 
-    private fun open(): PendingIntent = PendingIntent.getActivity(
-        applicationContext, 0, Intent(applicationContext, WearMainActivity::class.java),
-        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-    )
+    private fun tap() = applicationContext.complicationTap(0)
 
-    private fun bolt(): MonochromaticImage =
-        MonochromaticImage.Builder(Icon.createWithResource(applicationContext, R.drawable.tile_bolt)).build()
-
-    private fun ranged(value: Float, shown: String, description: String, charging: Boolean): ComplicationData =
-        RangedValueComplicationData.Builder(value, 0f, 100f, PlainComplicationText.Builder(description).build())
-            .setText(PlainComplicationText.Builder(shown).build())
-            // The bolt marks a car that is charging; a car that is not shows the number alone.
-            .apply { if (charging) setMonochromaticImage(bolt()) }
-            .setTapAction(open())
-            .build()
-
-    // The bolt says "charging": a car that is not (or has no battery) shows its figure without it.
-    private fun text(shown: String, description: String, charging: Boolean = true): ComplicationData =
-        ShortTextComplicationData.Builder(PlainComplicationText.Builder(shown).build(), PlainComplicationText.Builder(description).build())
-            .apply { if (charging) setMonochromaticImage(bolt()) }
-            .setTapAction(open())
-            .build()
-
-    private fun longText(title: String, line: String, description: String, charging: Boolean = true): ComplicationData =
-        LongTextComplicationData.Builder(PlainComplicationText.Builder(line).build(), PlainComplicationText.Builder(description).build())
-            .setTitle(PlainComplicationText.Builder(title).build())
-            .apply { if (charging) setMonochromaticImage(bolt()) }
-            .setTapAction(open())
-            .build()
-
-    private fun glyph(description: String): ComplicationData =
-        MonochromaticImageComplicationData.Builder(bolt(), PlainComplicationText.Builder(description).build())
-            .setTapAction(open())
-            .build()
+    private fun bolt() = applicationContext.complicationIcon(R.drawable.tile_bolt)
 }
 
 /**
@@ -118,48 +81,27 @@ abstract class BlooTextComplication(
     protected abstract fun icon(car: VehicleSnapshot): Int
 
     override fun getPreviewData(type: ComplicationType): ComplicationData? = when (type) {
-        ComplicationType.SHORT_TEXT -> build(preview, previewIcon)
-        ComplicationType.MONOCHROMATIC_IMAGE -> glyph(preview.second, previewIcon)
+        ComplicationType.SHORT_TEXT -> shortTextData(preview.first, preview.second, glyph(previewIcon), tap())
+        ComplicationType.MONOCHROMATIC_IMAGE -> glyphData(glyph(previewIcon), preview.second, tap())
         else -> null
     }
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
-        if (request.complicationType != ComplicationType.SHORT_TEXT && request.complicationType != ComplicationType.MONOCHROMATIC_IMAGE) {
-            return NoDataComplicationData()
-        }
+        val glyphOnly = request.complicationType == ComplicationType.MONOCHROMATIC_IMAGE
+        if (request.complicationType != ComplicationType.SHORT_TEXT && !glyphOnly) return NoDataComplicationData()
         if (WearBootGate.isLocked(applicationContext)) return NoDataComplicationData()
         val car = runCatching { SnapshotStore(applicationContext).current().selected }.getOrNull() ?: return NoDataComplicationData()
         val reading = text(car)
         // The glyph alone needs only the car's state (a padlock shows with or without a word to go with it).
-        if (reading == null) {
-            return if (request.complicationType == ComplicationType.MONOCHROMATIC_IMAGE) glyph(car.name, icon(car)) else NoDataComplicationData()
-        }
+        if (glyphOnly) return glyphData(glyph(icon(car)), (reading?.second ?: car.name) + car.spokenAge(), tap())
+        reading ?: return NoDataComplicationData()
         // An old reading says so aloud, so a glance at stale data is not heard as current.
-        val shown = reading.first to reading.second + (if (car.isStale()) car.updatedLabel()?.let { ", updated $it" } ?: "" else "")
-        return if (request.complicationType == ComplicationType.MONOCHROMATIC_IMAGE) glyph(shown.second, icon(car)) else build(shown, icon(car))
+        return shortTextData(reading.first, reading.second + car.spokenAge(), glyph(icon(car)), tap())
     }
 
-    private fun tap(): PendingIntent {
-        val intent = Intent(applicationContext, WearMainActivity::class.java)
-        tapKey?.let { intent.putExtra(WearMainActivity.EXTRA_ACTION, it) }
-        return PendingIntent.getActivity(applicationContext, requestCode, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-    }
+    private fun tap() = applicationContext.complicationTap(requestCode, tapKey)
 
-    private fun image(res: Int): MonochromaticImage =
-        MonochromaticImage.Builder(Icon.createWithResource(applicationContext, res)).build()
-
-    private fun build(shown: Pair<String, String>, res: Int): ComplicationData =
-        ShortTextComplicationData.Builder(
-            PlainComplicationText.Builder(shown.first).build(), PlainComplicationText.Builder(shown.second).build(),
-        )
-            .setMonochromaticImage(image(res))
-            .setTapAction(tap())
-            .build()
-
-    private fun glyph(description: String, res: Int): ComplicationData =
-        MonochromaticImageComplicationData.Builder(image(res), PlainComplicationText.Builder(description).build())
-            .setTapAction(tap())
-            .build()
+    private fun glyph(res: Int) = applicationContext.complicationIcon(res)
 }
 
 /** The lock state ("Locked" or "Open") with a closed or open padlock; a tap runs the lock control. */
