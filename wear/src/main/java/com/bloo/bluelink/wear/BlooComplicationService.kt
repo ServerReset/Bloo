@@ -23,6 +23,8 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.chargeLeftLabel
 import com.bloo.bluelink.data.doorLockLabel
+import com.bloo.bluelink.data.isStale
+import com.bloo.bluelink.data.updatedLabel
 
 /**
  * The car's charge (or fuel) on any watch face, in every shape a face offers: a ring-with-value, short text, a long line
@@ -44,7 +46,9 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
         if (WearBootGate.isLocked(applicationContext)) return NoDataComplicationData()
         val snapshot = runCatching { SnapshotStore(applicationContext).current() }.getOrNull() ?: return NoDataComplicationData()
         val car: VehicleSnapshot = snapshot.selected ?: return NoDataComplicationData()
-        val description = "${car.name}, ${car.bigValue()}"
+        // An old reading says so (aloud, and in the long line's title) instead of passing as current.
+        val age = if (car.isStale()) car.updatedLabel() else null
+        val description = "${car.name}, ${car.bigValue()}" + (age?.let { ", updated $it" } ?: "")
         return when (request.complicationType) {
             // A request is answered in the type it asked for: no level means no data for a ranged one (the system
             // rejects another type), not a text fallback.
@@ -52,7 +56,7 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
                 ranged(it.coerceIn(0, 100).toFloat(), car.bigValue(), description, charging = car.charging == true)
             } ?: NoDataComplicationData()
             ComplicationType.SHORT_TEXT -> text(car.bigValue(), description)
-            ComplicationType.LONG_TEXT -> longText(car.name, longLine(car), description)
+            ComplicationType.LONG_TEXT -> longText(if (age != null) "${car.name} · $age" else car.name, longLine(car), description)
             ComplicationType.MONOCHROMATIC_IMAGE -> glyph(description)
             else -> NoDataComplicationData()
         }
@@ -133,7 +137,9 @@ abstract class BlooTextComplication(
         }
         if (WearBootGate.isLocked(applicationContext)) return NoDataComplicationData()
         val car = runCatching { SnapshotStore(applicationContext).current().selected }.getOrNull() ?: return NoDataComplicationData()
-        val shown = text(car) ?: return NoDataComplicationData()
+        val reading = text(car) ?: return NoDataComplicationData()
+        // An old reading says so aloud, so a glance at stale data is not heard as current.
+        val shown = reading.first to reading.second + (if (car.isStale()) car.updatedLabel()?.let { ", updated $it" } ?: "" else "")
         return if (request.complicationType == ComplicationType.MONOCHROMATIC_IMAGE) glyph(shown.second, icon(car)) else build(shown, icon(car))
     }
 
