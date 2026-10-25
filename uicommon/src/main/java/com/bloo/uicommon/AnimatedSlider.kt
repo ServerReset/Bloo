@@ -97,8 +97,14 @@ fun AnimatedSlider(
     var settling by remember { mutableStateOf(false) }
     var settleJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
+    // A value that changes from outside (a preset or smart climate setting the sliders) bounces the thumb to it with the same
+    // spring a release settles with, instead of jumping; the logical value is already the new one, so nothing downstream sees
+    // the in-between positions.
     LaunchedEffect(value) {
-        if (!dragging && !settling && !anim.isRunning && anim.value != value) anim.snapTo(value)
+        if (!dragging && !settling && anim.value != value) {
+            if (currentReduceMotion) anim.snapTo(value)
+            else anim.animateTo(value, animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow))
+        }
     }
 
     // 0 at rest, 1 while held: the thumb narrows, glows, and nearby dots swell.

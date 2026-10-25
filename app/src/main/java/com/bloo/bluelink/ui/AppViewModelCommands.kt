@@ -268,13 +268,15 @@ fun AppViewModel.setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
  * app yet (smart climate must not depend on a pebble having been open). The lookup happens before the command takes the account
  * lock; with no location or no weather it says so instead of doing nothing.
  */
-fun AppViewModel.startSmartClimate(v: Vehicle) {
+fun AppViewModel.startSmartClimate(v: Vehicle, onResolved: (ClimateRequest) -> Unit = {}) {
     viewModelScope.launch {
         val request = com.bloo.bluelink.data.smartClimateRequestFor(getApplication(), v.vin)
         if (request == null) {
             _state.update { it.copy(message = "Smart climate needs your car's location and the weather there.", messageType = ToastKind.ERROR) }
             return@launch
         }
+        // Told before the start goes out, so the sliders can bounce to what it sets.
+        onResolved(request)
         startClimate(v, request)
     }
 }
@@ -292,6 +294,9 @@ internal fun AppViewModel.runCommand(
 ) {
     val key = "$vin:$action"
     viewModelScope.launch {
+        // One request per action at a time: a second press while the first is still in flight used to fire a second request
+        // and raise its notice again. (The controls are disabled meanwhile; this covers every other way in.)
+        if (key in _state.value.pending) return@launch
         val startedAt = System.currentTimeMillis()
         _state.update { it.copy(pending = it.pending + key, message = null) }
         // Snapshot the pre-command status so a failure can revert locally (no network).

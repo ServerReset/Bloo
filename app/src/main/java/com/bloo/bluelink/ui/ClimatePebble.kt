@@ -101,7 +101,8 @@ internal fun ClimatePebble(
     var activePresetId by remember(v.vin) { mutableStateOf<String?>(null) }
     // Start at [target] degrees F with defrost off, clearing any highlighted preset: the one-tap
     // "smart" start.
-    val startAtTarget: (Int, ClimateRequest) -> Unit = { target, base ->
+    val startAtTarget: (Int, ClimateRequest) -> Unit = start@{ target, base ->
+        if (pending) return@start
         form.tempF = target; form.defrost = false; activePresetId = null
         startClimateWithEngineCheck(base.copy(tempF = target, defrost = false))
     }
@@ -171,7 +172,9 @@ internal fun ClimatePebble(
     }
 
     // Starting a saved preset, or stopping the one running.
-    val startPreset: (com.bloo.bluelink.data.ClimatePreset) -> Unit = { preset ->
+    val startPreset: (com.bloo.bluelink.data.ClimatePreset) -> Unit = start@{ preset ->
+        // A request is still in flight: pressing again would send a second one (and a second notice).
+        if (pending) return@start
         if (activePresetId == preset.id && climateOn) {
             vm.stopClimate(v)
             activePresetId = null
@@ -301,7 +304,11 @@ internal fun ClimatePebble(
                 MorphActionButton(
                     label = CarLabels.SMART_CLIMATE,
                     icon = Icons.Filled.AcUnit,
-                    onClick = { vm.startSmartClimate(v) },
+                    onClick = {
+                        if (!pending) vm.startSmartClimate(v) { req ->
+                            form.load(req); activePresetId = null; lastSent = req to System.currentTimeMillis()
+                        }
+                    },
                     enabled = !pending && !climateOn,
                 )
                 RevealText(
