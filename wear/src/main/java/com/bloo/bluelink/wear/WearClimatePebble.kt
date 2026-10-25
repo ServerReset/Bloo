@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.CarAction
+import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.uicommon.AppIcons
@@ -34,24 +35,49 @@ internal fun WearClimatePebble(
             }
             return@WearPebble
         }
+        WearClimateRows(
+            smartSubtitle = hints[v.vin]?.let(WearSmartClimate::describe),
+            saved = saved,
+            smartPending = busy(CarAction.CLIMATE_SMART),
+            presetPending = busy(CarAction.CLIMATE_ON),
+            smallCaption = true,
+            onSmart = { requestCommand { repo.command(v.vin, CarAction.CLIMATE_SMART) } },
+            onPreset = { preset -> requestCommand { repo.command(v.vin, CarAction.CLIMATE_ON, preset.request) } },
+        )
+    }
+}
+
+/**
+ * The rows every climate list on the watch shows: smart climate saying what it will set, then each of the phone's presets
+ * saying what it sets, or a caption when there are none. The details page and the climate picker differ only in what a press does.
+ */
+@Composable
+internal fun WearClimateRows(
+    smartSubtitle: String?,
+    saved: List<ClimatePreset>,
+    smartPending: Boolean = false,
+    presetPending: Boolean = false,
+    smallCaption: Boolean = false,
+    onSmart: () -> Unit,
+    onPreset: (ClimatePreset) -> Unit,
+) {
+    WearListRow(
+        title = CarLabels.SMART_CLIMATE,
+        subtitle = smartSubtitle ?: "For the weather at the car",
+        icon = AppIcons.SmartClimate,
+        pending = smartPending,
+        onClick = onSmart,
+    )
+    saved.forEach { preset ->
         WearListRow(
-            title = CarLabels.SMART_CLIMATE,
-            subtitle = hints[v.vin]?.let(WearSmartClimate::describe) ?: "For the weather at the car",
-            icon = AppIcons.SmartClimate,
-            pending = busy(CarAction.CLIMATE_SMART),
-        ) {
-            requestCommand { repo.command(v.vin, CarAction.CLIMATE_SMART) }
-        }
-        saved.forEach { preset ->
-            WearListRow(
-                title = preset.name,
-                subtitle = WearPresets.detail(preset.request),
-                icon = AppIcons.Thermostat,
-                pending = busy(CarAction.CLIMATE_ON),
-            ) {
-                requestCommand { repo.command(v.vin, CarAction.CLIMATE_ON, preset.request) }
-            }
-        }
-        if (saved.isEmpty()) WearCaption("Presets you save in Bloo on your phone show up here.", small = true)
+            title = preset.name,
+            subtitle = WearPresets.detail(preset.request),
+            icon = AppIcons.Thermostat,
+            pending = presetPending,
+        ) { onPreset(preset) }
+    }
+    if (saved.isEmpty()) {
+        val text = "Presets you save in Bloo on your phone show up here."
+        if (smallCaption) WearCaption(text, small = true) else WearCaption(text, maxLines = 3)
     }
 }

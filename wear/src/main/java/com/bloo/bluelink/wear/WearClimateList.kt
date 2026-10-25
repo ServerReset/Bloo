@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.VehicleSnapshot
 
 /**
@@ -32,21 +31,12 @@ internal fun WearClimateList(
             // saying what it sets.
             item(key = "climate") {
                 WearPebble(title = "Climate", icon = AppIcons.Climate) {
-                    WearListRow(
-                        title = CarLabels.SMART_CLIMATE,
-                        subtitle = hints[car.vin]?.let(WearSmartClimate::describe) ?: "For the weather at the car",
-                        icon = AppIcons.SmartClimate,
-                    ) { onPick(WearFaceControls.CLIMATE_SMART_KEY) }
-                    saved.forEach { preset ->
-                        WearListRow(
-                            title = preset.name,
-                            subtitle = WearPresets.detail(preset.request),
-                            icon = AppIcons.Thermostat,
-                        ) { onPick(WearFaceControls.PRESET_PREFIX + preset.id) }
-                    }
-                    if (saved.isEmpty()) {
-                        WearCaption("Presets you save in Bloo on your phone show up here.", maxLines = 3)
-                    }
+                    WearClimateRows(
+                        smartSubtitle = hints[car.vin]?.let(WearSmartClimate::describe),
+                        saved = saved,
+                        onSmart = { onPick(WearFaceControls.CLIMATE_SMART_KEY) },
+                        onPreset = { preset -> onPick(WearFaceControls.PRESET_PREFIX + preset.id) },
+                    )
                 }
             }
         }
