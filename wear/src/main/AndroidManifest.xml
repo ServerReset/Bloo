@@ -74,7 +74,7 @@
                 android:resource="@drawable/ic_stat_bloo" />
         </service>
 
-        <!-- The car's charge on any watch face, as a ring or as short text. -->
+        <!-- The car's charge on any watch face: a ring, short text, a long line, or the glyph alone. -->
         <service
             android:name=".BlooComplicationService"
             android:exported="true"
@@ -86,13 +86,13 @@
             </intent-filter>
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="RANGED_VALUE,SHORT_TEXT" />
+                android:value="RANGED_VALUE,SHORT_TEXT,LONG_TEXT,MONOCHROMATIC_IMAGE" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="300" />
         </service>
 
-        <!-- More complications: lock state, range and climate, as short text. A tap on lock or climate opens the app on that control. -->
+        <!-- More complications: lock state, range and climate, as short text or the glyph alone. A tap on lock or climate opens the app on that control. -->
         <service
             android:name=".BlooLockComplicationService"
             android:exported="true"
@@ -104,7 +104,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SHORT_TEXT" />
+                android:value="SHORT_TEXT,MONOCHROMATIC_IMAGE" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="300" />
@@ -121,7 +121,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SHORT_TEXT" />
+                android:value="SHORT_TEXT,MONOCHROMATIC_IMAGE" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="300" />
@@ -138,7 +138,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SHORT_TEXT" />
+                android:value="SHORT_TEXT,MONOCHROMATIC_IMAGE" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="300" />
