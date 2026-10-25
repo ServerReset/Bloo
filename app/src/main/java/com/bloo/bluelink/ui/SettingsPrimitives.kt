@@ -42,6 +42,7 @@ internal fun Modifier.outlinedPanel(padding: Dp = 12.dp): Modifier =
  * A full-width callout: a rounded [shape] filled with a [color] that is already translucent (an alpha of a container role), padded
  * by [padding]. One definition for the warning banner, the "update available" panel and the sections' inset panel.
  */
+@Composable
 internal fun Modifier.tintedPanel(
     color: androidx.compose.ui.graphics.Color,
     shape: androidx.compose.ui.graphics.Shape = StandardShape,
