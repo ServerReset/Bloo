@@ -187,7 +187,8 @@ internal fun complicationLongLine(car: VehicleSnapshot): String =
     listOfNotNull(
         car.bigValue(),
         car.chargeLeftLabel()?.let { "$it left" } ?: car.rangeMi?.let { "$it mi" },
-        doorLockLabel(car.locked),
+        // With no charge to lead with, the main value already IS the lock state; saying it twice reads as a stutter.
+        doorLockLabel(car.locked).takeIf { car.percent != null },
     ).joinToString(" · ")
 
 /** Asks the watch's glanceable surfaces (the Tile and the complication) to redraw from the latest snapshot. */

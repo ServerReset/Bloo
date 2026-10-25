@@ -34,6 +34,7 @@ class WearComplicationTextTest {
         assertEquals("80% · 248 mi", complicationLongLine(car(percent = 80, rangeMi = 248)))
         // A charging car that reports no time still shows its range.
         assertEquals("65% · 200 mi", complicationLongLine(car(percent = 65, rangeMi = 200, charging = true)))
-        assertEquals("Locked", complicationLongLine(car(locked = true)).substringBefore(" ·"))
+        // With no charge reading the main value is the lock state, so it is not repeated.
+        assertEquals("Locked", complicationLongLine(car(locked = true)))
     }
 }
