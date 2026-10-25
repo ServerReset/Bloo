@@ -20,8 +20,13 @@ fun VehicleSnapshot.bigValue(): String =
 fun VehicleSnapshot.stateLine(): String? = listOfNotNull(
     locked?.let { if (it) "Locked" else "Unlocked" }.takeIf { percent != null },
     if (charging == true) "Charging" else null,
+    chargeLeftLabel(),
     rangeMi?.let { "$it mi" },
 ).joinToString(" · ").ifBlank { null }
+
+/** "1h 55m" while the car charges and says how long is left; null otherwise (a car that is not charging has no time to show). */
+fun VehicleSnapshot.chargeLeftLabel(): String? =
+    chargeMinutes?.takeIf { charging == true && it > 0 }?.let { fmtMinutes(it) }
 
 /** [stateLine], never blank: "Parked" when the car reports nothing (for a surface with a fixed slot). */
 fun VehicleSnapshot.stateLineOrParked(): String = stateLine() ?: "Parked"

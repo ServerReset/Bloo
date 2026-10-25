@@ -21,6 +21,7 @@ import androidx.wear.tiles.TileService
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
+import com.bloo.bluelink.data.chargeLeftLabel
 import com.bloo.bluelink.data.doorLockLabel
 
 /**
@@ -59,7 +60,12 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
 
     /** "80% · 248 mi · Locked": what a face with room for a line says about the car, leaving out what it does not know. */
     private fun longLine(car: VehicleSnapshot): String =
-        listOfNotNull(car.bigValue(), car.rangeMi?.let { "$it mi" }, doorLockLabel(car.locked)).joinToString(" · ")
+        listOfNotNull(
+            car.bigValue(),
+            // Charging says how long is left; otherwise the range.
+            car.chargeLeftLabel()?.let { "$it left" } ?: car.rangeMi?.let { "$it mi" },
+            doorLockLabel(car.locked),
+        ).joinToString(" · ")
 
     private fun open(): PendingIntent = PendingIntent.getActivity(
         applicationContext, 0, Intent(applicationContext, WearMainActivity::class.java),

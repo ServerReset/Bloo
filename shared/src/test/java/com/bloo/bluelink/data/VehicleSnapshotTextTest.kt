@@ -17,9 +17,11 @@ class VehicleSnapshotTextTest {
         charging: Boolean? = null,
         rangeMi: Int? = null,
         fetchedAt: Long = 0L,
+        chargeMinutes: Int? = null,
     ) = VehicleSnapshot(
         vin = "V", name = "Car", model = "M", isEv = true,
         percent = percent, locked = locked, charging = charging, rangeMi = rangeMi, fetchedAt = fetchedAt,
+        chargeMinutes = chargeMinutes,
     )
 
     @Test fun bigValuePrefersChargeThenLockThenADash() {
@@ -38,6 +40,19 @@ class VehicleSnapshotTextTest {
         assertEquals("Charging", car(charging = true).stateLine())
         assertEquals("270 mi", car(rangeMi = 270).stateLine())
         assertNull(car().stateLine())
+    }
+
+    @Test fun chargeLeftIsSaidOnlyWhileTheCarCharges() {
+        assertEquals("1h 55m", car(charging = true, chargeMinutes = 115).chargeLeftLabel())
+        assertEquals("45 min", car(charging = true, chargeMinutes = 45).chargeLeftLabel())
+        // A car that is not charging has no time left to show, even if an old figure is carried.
+        assertNull(car(charging = false, chargeMinutes = 115).chargeLeftLabel())
+        assertNull(car(charging = true).chargeLeftLabel())
+        assertNull(car(charging = true, chargeMinutes = 0).chargeLeftLabel())
+        assertEquals(
+            "Locked · Charging · 1h 55m · 270 mi",
+            car(percent = 76, locked = true, charging = true, rangeMi = 270, chargeMinutes = 115).stateLine(),
+        )
     }
 
     @Test fun stateLineOrParkedIsNeverBlank() {

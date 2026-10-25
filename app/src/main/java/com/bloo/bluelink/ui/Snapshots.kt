@@ -64,6 +64,7 @@ import com.bloo.bluelink.data.toGeoLocation
             lastServiceMiles = state.lastServiceMiles[v.vin],
             serviceIntervalMiles = state.serviceIntervalMiles[v.vin],
             chargeLimitPct = status?.evStatus?.displayChargeLimit(),
+            chargeMinutes = status?.evStatus?.takeIf { it.batteryCharge == true }?.minutesToFull?.takeIf { it > 0 },
         )
     }
 

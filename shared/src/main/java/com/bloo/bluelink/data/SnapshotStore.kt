@@ -63,6 +63,11 @@ data class VehicleSnapshot(
      * notification both show.
      */
     val chargeLimitPct: Int? = null,
+    /**
+     * Minutes until the charge is complete, while the car charges and reports it; null otherwise. Mirrored so the glanceable
+     * surfaces (the watch's tile and complications, the phone's widget) can say "1h 55m" without the app open.
+     */
+    val chargeMinutes: Int? = null,
 ) {
     /** Rebuild the command-capable Vehicle. */
     fun toVehicle(): Vehicle = Vehicle(

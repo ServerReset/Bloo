@@ -18,6 +18,7 @@ import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
+import com.bloo.bluelink.data.chargeLeftLabel
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.ioScope
@@ -262,7 +263,10 @@ class BlooTileService : TileService() {
                 // 24sp fits a percentage; a word ("Unlocked") would be cut off in the hub, so it is smaller.
                 tileText(car.bigValue(), if (car.bigValue().length > 4) 16f else 28f, if (car.percent != null) tint(car) else WHITE, bold = true),
                 // An old reading says so (in red, as the face does) instead of passing as current; otherwise the name.
-                if (stale != null) tileText(stale, 10f, STALE, bold = true) else tileText(car.name, 13f, WHITE, bold = true),
+                // A car that is charging says how long is left, in the level's colour, in place of the name.
+                if (stale != null) tileText(stale, 10f, STALE, bold = true)
+                else car.chargeLeftLabel()?.let { tileText("$it left", 12f, tint(car), bold = true) }
+                    ?: tileText(car.name, 13f, WHITE, bold = true),
             ),
             width = dp(size),
             height = dp(size),
