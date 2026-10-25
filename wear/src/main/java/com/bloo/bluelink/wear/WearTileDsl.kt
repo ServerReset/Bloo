@@ -1,5 +1,7 @@
 package com.bloo.bluelink.wear
 
+import android.content.Context
+import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DimensionBuilders.ContainerDimension
@@ -10,6 +12,10 @@ import androidx.wear.protolayout.DimensionBuilders.wrap
 import androidx.wear.protolayout.LayoutElementBuilders
 import androidx.wear.protolayout.LayoutElementBuilders.LayoutElement
 import androidx.wear.protolayout.ModifiersBuilders
+import androidx.wear.tiles.TileBuilders
+import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /*
  * The tile's building blocks. A tile cannot use Compose, and protolayout's builders are verbose enough that a layout written
@@ -127,3 +133,47 @@ internal fun tileModifiers(
         }
         if (padding != null) setPadding(ModifiersBuilders.Padding.Builder().setAll(dp(padding)).build())
     }.build()
+
+/**
+ * A tap that opens the watch app, on the face control [actionKey] (and, when a quarter was pressed, its [slot]) so the app runs
+ * exactly what a press on the face would, through the same PIN gate. With neither, it just opens the app.
+ */
+internal fun Context.tileLaunch(actionKey: String? = null, slot: Int? = null): ActionBuilders.Action {
+    val activity = ActionBuilders.AndroidActivity.Builder()
+        .setPackageName(packageName)
+        .setClassName(WearMainActivity::class.java.name)
+    if (actionKey != null) {
+        activity.addKeyToExtraMapping(
+            WearMainActivity.EXTRA_ACTION,
+            ActionBuilders.AndroidStringExtra.Builder().setValue(actionKey).build(),
+        )
+    }
+    if (slot != null) {
+        activity.addKeyToExtraMapping(
+            WearMainActivity.EXTRA_SLOT,
+            ActionBuilders.AndroidIntExtra.Builder().setValue(slot).build(),
+        )
+    }
+    return ActionBuilders.LaunchAction.Builder().setAndroidActivity(activity.build()).build()
+}
+
+/**
+ * Answers a tile request with [build], or with [fallback] when it throws: whatever happens the request is answered, because
+ * an unset completer leaves the tile spinning for good. [name] only labels the future.
+ */
+internal fun answerTile(
+    scope: CoroutineScope,
+    name: String,
+    fallback: () -> TileBuilders.Tile,
+    build: suspend () -> TileBuilders.Tile,
+): ListenableFuture<TileBuilders.Tile> =
+    CallbackToFutureAdapter.getFuture { completer ->
+        scope.launch {
+            try {
+                completer.set(build())
+            } catch (t: Throwable) {
+                completer.set(fallback())
+            }
+        }
+        name
+    }

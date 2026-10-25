@@ -48,17 +48,7 @@ class BlooTileService : TileService() {
     private val scope = ioScope()
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> =
-        CallbackToFutureAdapter.getFuture { completer ->
-            scope.launch {
-                // Whatever throws, the request is answered: an unset completer leaves the tile spinning for good.
-                try {
-                    completer.set(buildTile(requestParams))
-                } catch (t: Throwable) {
-                    completer.set(tileOf(layoutFor(null)))
-                }
-            }
-            "BlooTile"
-        }
+        answerTile(scope, "BlooTile", fallback = { tileOf(layoutFor(null)) }) { buildTile(requestParams) }
 
     private suspend fun buildTile(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
         // The phone's accent, read before anything is drawn (the tile has no Compose theme to carry it).
@@ -142,7 +132,7 @@ class BlooTileService : TileService() {
     private fun layoutFor(car: VehicleSnapshot?, sealed: Boolean = false, refreshing: Boolean = false, side: Float = REFERENCE_SIDE): LayoutElement {
         // The whole tile opens the app. The quarters and the hub are clickables of their own inside it, and the system
         // routes the innermost hit, so a tap on "Charge" charges and a tap anywhere else opens Bloo.
-        val open = tileModifiers(clickableId = "open", onClick = launchAction(null))
+        val open = tileModifiers(clickableId = "open", onClick = tileLaunch(null))
         if (car != null) return faceLayout(car, open, refreshing, side)
 
         // No car: say why. A sealed watch has been set up and is only waiting for its PIN; "add a car" read as not set up.
@@ -233,7 +223,7 @@ class BlooTileService : TileService() {
             height = dp(size),
             modifiers = tileModifiers(
                 background = fill, corner = corner, border = RIM,
-                clickableId = "act_$index", onClick = launchAction(action.key, index), description = action.label,
+                clickableId = "act_$index", onClick = tileLaunch(action.key, index), description = action.label,
             ),
         )
     }
@@ -335,25 +325,6 @@ class BlooTileService : TileService() {
             .setColor(argb(color))
             .setStrokeCap(LayoutElementBuilders.STROKE_CAP_ROUND)
             .build()
-
-    private fun launchAction(actionKey: String?, slot: Int? = null): ActionBuilders.Action {
-        val activity = ActionBuilders.AndroidActivity.Builder()
-            .setPackageName(packageName)
-            .setClassName(WearMainActivity::class.java.name)
-        if (actionKey != null) {
-            activity.addKeyToExtraMapping(
-                WearMainActivity.EXTRA_ACTION,
-                ActionBuilders.AndroidStringExtra.Builder().setValue(actionKey).build(),
-            )
-        }
-        if (slot != null) {
-            activity.addKeyToExtraMapping(
-                WearMainActivity.EXTRA_SLOT,
-                ActionBuilders.AndroidIntExtra.Builder().setValue(slot).build(),
-            )
-        }
-        return ActionBuilders.LaunchAction.Builder().setAndroidActivity(activity.build()).build()
-    }
 
     private companion object {
         const val RESOURCES_VERSION = "3"

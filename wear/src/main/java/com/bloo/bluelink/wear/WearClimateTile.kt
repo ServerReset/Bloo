@@ -1,7 +1,6 @@
 package com.bloo.bluelink.wear
 
 import androidx.concurrent.futures.CallbackToFutureAdapter
-import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.LayoutElementBuilders.LayoutElement
 import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.TimelineBuilders
@@ -17,7 +16,6 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.ioScope
 import com.google.common.util.concurrent.ListenableFuture
-import kotlinx.coroutines.launch
 
 /** One row on the climate tile: what it says, the control key the app runs when it is pressed, and whether it is lit. */
 internal data class ClimateTileRow(val key: String, val title: String, val subtitle: String?, val active: Boolean)
@@ -53,17 +51,7 @@ class BlooClimateTileService : TileService() {
     private val scope = ioScope()
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> =
-        CallbackToFutureAdapter.getFuture { completer ->
-            scope.launch {
-                // Whatever throws, the request is answered: an unset completer leaves the tile spinning for good.
-                try {
-                    completer.set(buildTile(requestParams))
-                } catch (t: Throwable) {
-                    completer.set(tileOf(messageLayout("Open Bloo")))
-                }
-            }
-            "BlooClimateTile"
-        }
+        answerTile(scope, "BlooClimateTile", fallback = { tileOf(messageLayout("Open Bloo")) }) { buildTile(requestParams) }
 
     private suspend fun buildTile(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
         WearAccent.load(this)
@@ -99,7 +87,7 @@ class BlooClimateTileService : TileService() {
                 tileText(line, 13f, MUTED),
                 modifiers = tileModifiers(description = "Bloo. $line."),
             ),
-            modifiers = tileModifiers(clickableId = "open", onClick = launchAction(null)),
+            modifiers = tileModifiers(clickableId = "open", onClick = tileLaunch(null)),
         )
 
     private fun listLayout(car: VehicleSnapshot, rows: List<ClimateTileRow>, side: Float): LayoutElement {
@@ -117,7 +105,7 @@ class BlooClimateTileService : TileService() {
         }
         return tileBox(
             tileColumn(*children.toTypedArray()),
-            modifiers = tileModifiers(clickableId = "open", onClick = launchAction(null)),
+            modifiers = tileModifiers(clickableId = "open", onClick = tileLaunch(null)),
         )
     }
 
@@ -135,23 +123,10 @@ class BlooClimateTileService : TileService() {
                 corner = tileCorner(height / 2f),
                 border = RIM,
                 clickableId = "climate_$index",
-                onClick = launchAction(row.key),
+                onClick = tileLaunch(row.key),
                 description = listOfNotNull(row.title, row.subtitle, car.name).joinToString(". "),
             ),
         )
-    }
-
-    private fun launchAction(actionKey: String?): ActionBuilders.Action {
-        val activity = ActionBuilders.AndroidActivity.Builder()
-            .setPackageName(packageName)
-            .setClassName(WearMainActivity::class.java.name)
-        if (actionKey != null) {
-            activity.addKeyToExtraMapping(
-                WearMainActivity.EXTRA_ACTION,
-                ActionBuilders.AndroidStringExtra.Builder().setValue(actionKey).build(),
-            )
-        }
-        return ActionBuilders.LaunchAction.Builder().setAndroidActivity(activity.build()).build()
     }
 
     private companion object {
