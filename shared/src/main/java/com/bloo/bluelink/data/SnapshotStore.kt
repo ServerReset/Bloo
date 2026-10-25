@@ -230,35 +230,21 @@ class SnapshotStore(private val context: Context) {
      */
     suspend fun saveVehiclesKeepingStatus(vehicles: List<VehicleSnapshot>) {
         if (vehicles.isEmpty()) return
-        // IO: decodes/re-encodes the whole payload, called per car from Main.immediate coroutines.
-        withContext(Dispatchers.IO) {
-            context.snapshotDataStore.edit { prefs ->
-                val existing = decode(prefs[Keys.PAYLOAD])
-                val known = existing.vehicles.associateBy { it.vin }
-                val merged = vehicles.map { fresh -> known[fresh.vin]?.let { fresh.keepingStatusOf(it) } ?: fresh }
-                val selected = existing.selectedVin?.takeIf { sel -> merged.any { it.vin == sel } }
-                    ?: merged.firstOrNull()?.vin
-                prefs[Keys.PAYLOAD] = json.encodeToString(
-                    SnapshotPayload.serializer(),
-                    SnapshotPayload(merged, selected),
-                )
-            }
+        editPayload { existing ->
+            val known = existing.vehicles.associateBy { it.vin }
+            val merged = vehicles.map { fresh -> known[fresh.vin]?.let { fresh.keepingStatusOf(it) } ?: fresh }
+            val selected = existing.selectedVin?.takeIf { sel -> merged.any { it.vin == sel } }
+                ?: merged.firstOrNull()?.vin
+            SnapshotPayload(merged, selected)
         }
     }
 
     /** Replace the entire vehicle list. Keeps the selected VIN if still present, else selects the first car. */
     suspend fun saveVehicles(vehicles: List<VehicleSnapshot>) {
-        // IO, as in saveVehiclesKeepingStatus.
-        withContext(Dispatchers.IO) {
-            context.snapshotDataStore.edit { prefs ->
-                val existing = decode(prefs[Keys.PAYLOAD])
-                val selected = existing.selectedVin?.takeIf { sel -> vehicles.any { it.vin == sel } }
-                    ?: vehicles.firstOrNull()?.vin
-                prefs[Keys.PAYLOAD] = json.encodeToString(
-                    SnapshotPayload.serializer(),
-                    SnapshotPayload(vehicles, selected),
-                )
-            }
+        editPayload { existing ->
+            val selected = existing.selectedVin?.takeIf { sel -> vehicles.any { it.vin == sel } }
+                ?: vehicles.firstOrNull()?.vin
+            SnapshotPayload(vehicles, selected)
         }
     }
 
@@ -272,16 +258,7 @@ class SnapshotStore(private val context: Context) {
      */
     suspend fun updateVehicles(snapshots: List<VehicleSnapshot>) {
         if (snapshots.isEmpty()) return
-        // IO, as in saveVehiclesKeepingStatus.
-        withContext(Dispatchers.IO) {
-            context.snapshotDataStore.edit { prefs ->
-                val existing = decode(prefs[Keys.PAYLOAD])
-                prefs[Keys.PAYLOAD] = json.encodeToString(
-                    SnapshotPayload.serializer(),
-                    SnapshotPayload(mergeVehicleUpdates(existing.vehicles, snapshots), existing.selectedVin),
-                )
-            }
-        }
+        editPayload { existing -> SnapshotPayload(mergeVehicleUpdates(existing.vehicles, snapshots), existing.selectedVin) }
     }
 
     /**
@@ -292,20 +269,25 @@ class SnapshotStore(private val context: Context) {
      */
     suspend fun mergeStatuses(statuses: Map<String, VehicleStatus>) {
         if (statuses.isEmpty()) return
-        // IO, as in saveVehiclesKeepingStatus.
+        editPayload { existing ->
+            if (existing.vehicles.isEmpty()) return@editPayload null
+            SnapshotPayload(
+                existing.vehicles.map { snap -> statuses[snap.vin]?.let { snap.merged(it) } ?: snap },
+                existing.selectedVin,
+            )
+        }
+    }
+
+    /**
+     * The one read-modify-write of the stored payload: [transform] sees the decoded payload inside the edit transaction (so there is
+     * no race with another writer) and returns what to store, or null to leave the store as it is. IO because it decodes and
+     * re-encodes the whole payload, and is called per car from Main.immediate coroutines.
+     */
+    private suspend fun editPayload(transform: (SnapshotData) -> SnapshotPayload?) {
         withContext(Dispatchers.IO) {
             context.snapshotDataStore.edit { prefs ->
-                val existing = decode(prefs[Keys.PAYLOAD])
-                if (existing.vehicles.isEmpty()) return@edit
-                prefs[Keys.PAYLOAD] = json.encodeToString(
-                    SnapshotPayload.serializer(),
-                    SnapshotPayload(
-                        existing.vehicles.map { snap ->
-                            statuses[snap.vin]?.let { snap.merged(it) } ?: snap
-                        },
-                        existing.selectedVin,
-                    ),
-                )
+                val next = transform(decode(prefs[Keys.PAYLOAD])) ?: return@edit
+                prefs[Keys.PAYLOAD] = json.encodeToString(SnapshotPayload.serializer(), next)
             }
         }
     }
