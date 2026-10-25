@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -118,72 +119,77 @@ internal fun HeroHeader(
     // built for; snapping would flash a white name on a white card.
     // In eighths: the card itself recomposes eight times over the morph for its title colour, not every frame.
     val titleStep by remember { androidx.compose.runtime.derivedStateOf { (heroTState.value * 8f).roundToInt() / 8f } }
-    val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, heroOnPhoto(), titleStep)
-    PebbleShell(
-        expanded = heroShown,
-        onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
-        icon = AppIcons.DirectionsCar,
-        title = v.name,
-        modifier = modifier,
-        titleColor = heroTitleColorNow,
-        // The hero's own expand/collapse chevron, unless a header control was supplied (the grid's
-        // full-screen button), which takes that slot: one trailing control, never two.
-        headerAction = headerAction,
-        canToggle = headerAction == null,
-        // The ONLY pebble that grows its title. Here the title is the car's NAME and the card
-        // becomes a photo of that car, so the name scaling up reads as the card taking over. On
-        // "Location" or "Diagnostics" it is a heading resizing for no reason.
-        growTitleOnExpand = true,
-        // No `summary`: the bar is the summary. The photo is the card's BACKGROUND, running behind
-        // the header row, with the title and chevron overlaid.
-        background = {
-            val t = heroTState.value
-            HeroBackground(cardCoords, v, imageUrl, heroShown, height, t, false, readout, hoisted, statusAlpha(t), report(expandedNumbers))
-        },
-        // The travelling numbers: a plain lerp between the two anchors in this Box's space.
-        // Rendered as `foreground` so they cross the header row above its buttons, not under.
-        foreground = {
-            val t = heroTState.value
-            HeroForeground(collapsedNumbers, expandedNumbers, hoisted, t, readout, statusAlpha(t))
-        },
-        // Collapsed: name, percentage and range on one row, with the bar directly under it. No
-        // shared element: SharedTransitionLayout is a LookaheadScope, which adds a lookahead pass
-        // per placement and costs car-swipe frames.
-        titleTrailing = if (trailingGone && !hoisted) null else {
-            {
-                HeroCollapsedNumbers(
-                    readout, heroTState.value,
-                    onPositioned = report(collapsedNumbers),
-                    hoisted = hoisted,
+    // What the photo looks like behind the title and the readout decides their colours (dark text on a light photo, light on a dark
+    // one), and a gradient or a photo that changes behind the text is covered by judging each band's worst part.
+    val photoTone by rememberHeroPhotoTone(imageUrl)
+    val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, heroTitleOnPhoto(photoTone), titleStep)
+    CompositionLocalProvider(LocalHeroTone provides photoTone) {
+        PebbleShell(
+            expanded = heroShown,
+            onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
+            icon = AppIcons.DirectionsCar,
+            title = v.name,
+            modifier = modifier,
+            titleColor = heroTitleColorNow,
+            // The hero's own expand/collapse chevron, unless a header control was supplied (the grid's
+            // full-screen button), which takes that slot: one trailing control, never two.
+            headerAction = headerAction,
+            canToggle = headerAction == null,
+            // The ONLY pebble that grows its title. Here the title is the car's NAME and the card
+            // becomes a photo of that car, so the name scaling up reads as the card taking over. On
+            // "Location" or "Diagnostics" it is a heading resizing for no reason.
+            growTitleOnExpand = true,
+            // No `summary`: the bar is the summary. The photo is the card's BACKGROUND, running behind
+            // the header row, with the title and chevron overlaid.
+            background = {
+                val t = heroTState.value
+                HeroBackground(cardCoords, v, imageUrl, heroShown, height, t, false, readout, hoisted, statusAlpha(t), report(expandedNumbers))
+            },
+            // The travelling numbers: a plain lerp between the two anchors in this Box's space.
+            // Rendered as `foreground` so they cross the header row above its buttons, not under.
+            foreground = {
+                val t = heroTState.value
+                HeroForeground(collapsedNumbers, expandedNumbers, hoisted, t, readout, statusAlpha(t))
+            },
+            // Collapsed: name, percentage and range on one row, with the bar directly under it. No
+            // shared element: SharedTransitionLayout is a LookaheadScope, which adds a lookahead pass
+            // per placement and costs car-swipe frames.
+            titleTrailing = if (trailingGone && !hoisted) null else {
+                {
+                    HeroCollapsedNumbers(
+                        readout, heroTState.value,
+                        onPositioned = report(collapsedNumbers),
+                        hoisted = hoisted,
+                    )
+                }
+            },
+            summary = null,
+            headerContent = {
+                // A reservation, not content: stops the header text from sitting on the readout while
+                // the card is short. Derived from the readout's tokens (pct line + gap + bar), not a
+                // constant.
+                val collapsedReadoutHeight = 2.dp + ChargeBarHeight
+                // + the readout's own bottom inset. The readout occupies collapsedReadoutHeight of
+                // CONTENT and then sits HeroReadoutBottomInset above the card's edge, so reserving only
+                // the content left the reservation one gap short and the readout's top edge crossed
+                // into the title's row.
+                val full = collapsedReadoutHeight + HeroReadoutBottomInset
+                // The reservation shrinks in the LAYOUT phase (the morph is read there, not in this slot's
+                // composition), so the header content is re-measured per frame but never recomposed. No
+                // graphicsLayer: an alpha on an empty Box is a layer allocation per frame for no pixels.
+                Spacer(
+                    Modifier.fillMaxWidth().layout { measurable, constraints ->
+                        val h = lerp(full, 0.dp, heroTState.value).roundToPx().coerceAtLeast(0)
+                        val p = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
+                        layout(p.width, h) { p.place(0, 0) }
+                    },
                 )
-            }
-        },
-        summary = null,
-        headerContent = {
-            // A reservation, not content: stops the header text from sitting on the readout while
-            // the card is short. Derived from the readout's tokens (pct line + gap + bar), not a
-            // constant.
-            val collapsedReadoutHeight = 2.dp + ChargeBarHeight
-            // + the readout's own bottom inset. The readout occupies collapsedReadoutHeight of
-            // CONTENT and then sits HeroReadoutBottomInset above the card's edge, so reserving only
-            // the content left the reservation one gap short and the readout's top edge crossed
-            // into the title's row.
-            val full = collapsedReadoutHeight + HeroReadoutBottomInset
-            // The reservation shrinks in the LAYOUT phase (the morph is read there, not in this slot's
-            // composition), so the header content is re-measured per frame but never recomposed. No
-            // graphicsLayer: an alpha on an empty Box is a layer allocation per frame for no pixels.
-            Spacer(
-                Modifier.fillMaxWidth().layout { measurable, constraints ->
-                    val h = lerp(full, 0.dp, heroTState.value).roundToPx().coerceAtLeast(0)
-                    val p = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
-                    layout(p.width, h) { p.place(0, 0) }
-                },
-            )
-        },
-    ) {
-        // Empty by design. Everything the expanded state adds -- the photo and the readout over its
-        // lower edge -- is in `background`, because both need to be positioned against the IMAGE
-        // rather than stacked under the header.
-        Spacer(Modifier.height(0.dp))
+            },
+        ) {
+            // Empty by design. Everything the expanded state adds -- the photo and the readout over its
+            // lower edge -- is in `background`, because both need to be positioned against the IMAGE
+            // rather than stacked under the header.
+            Spacer(Modifier.height(0.dp))
+        }
     }
 }

@@ -2,6 +2,8 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -21,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.bloo.uicommon.MotionMedium
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
@@ -100,6 +103,9 @@ internal fun rememberPhotoModel(url: String): Any =
 
 // collapseEnter / collapseExit (the app's one collapse spec) live in UiTokens.kt.
 
+/** The faintest tint kept on a measured photo, so its edges still sit together when no scrim is needed. */
+private const val MinPhotoScrim = 0.08f
+
 /**
  * The car photo plus a contrast scrim so overlaid text (title, chevron, charge readout) stays
  * legible on any photo. The gradient covers the FULL height and never reaches transparent; heaviest
@@ -145,24 +151,30 @@ internal fun HeroPhotoBackdrop(
                     .blur(16.dp, BlurredEdgeTreatment.Unbounded),
             )
         }
-        // A light tint at the edges, in the card's own opposite tone (lightening in the dark theme, darkening in the light
-        // one), so the text keeps its contrast over the frost. Gentle: the photo is the point, not the wash.
+        // A tint at the top and bottom edges in the OPPOSITE tone of the text there, as strong as that band's worst-case contrast needs
+        // (see overlayFor): a light photo gets almost none under dark text, a busy or mid-tone one gets enough to hold the text
+        // up. The two bands are judged apart, so a photo that is light at the top and dark at the bottom gets dark text above
+        // and light text below. Until the photo is measured (and for no photo or a cut-out) the theme's own tone is the fallback.
+        val tone = LocalHeroTone.current
         val dark = appIsDarkTheme()
         val gentle = imageUrl.isNullOrBlank()
-        val scrim = remember(gentle, dark) {
-            val tone = if (dark) Color.White else Color.Black
-            val (top, mid, low, bottom) = when {
-                gentle -> listOf(0.10f, 0.02f, 0.04f, 0.16f)
-                dark -> listOf(0.34f, 0.0f, 0.0f, 0.40f)
-                else -> listOf(0.30f, 0.0f, 0.0f, 0.40f)
-            }
-            Brush.verticalGradient(
-                0f to tone.copy(alpha = top),
-                0.30f to tone.copy(alpha = mid),
-                0.62f to tone.copy(alpha = low),
-                1f to tone.copy(alpha = bottom),
-            )
+        val themeTone = if (dark) Color.White else Color.Black
+        val (themeTop, themeBottom) = when {
+            gentle -> 0.10f to 0.16f
+            dark -> 0.34f to 0.40f
+            else -> 0.30f to 0.40f
         }
+        val topTone by animateColorAsState(tone.top?.scrimTone ?: themeTone, tween(MotionMedium), label = "scrimTopTone")
+        val bottomTone by animateColorAsState(tone.bottom?.scrimTone ?: themeTone, tween(MotionMedium), label = "scrimBottomTone")
+        val topAlpha by animateFloatAsState(tone.top?.scrimAlpha?.coerceAtLeast(MinPhotoScrim) ?: themeTop, tween(MotionMedium), label = "scrimTopAlpha")
+        val bottomAlpha by animateFloatAsState(tone.bottom?.scrimAlpha?.coerceAtLeast(MinPhotoScrim) ?: themeBottom, tween(MotionMedium), label = "scrimBottomAlpha")
+        val midAlpha = if (gentle) 0.02f else 0f
+        val scrim = Brush.verticalGradient(
+            0f to topTone.copy(alpha = topAlpha),
+            0.30f to topTone.copy(alpha = midAlpha),
+            0.62f to bottomTone.copy(alpha = midAlpha),
+            1f to bottomTone.copy(alpha = bottomAlpha),
+        )
         Spacer(Modifier.matchParentSize().background(scrim))
     }
 }

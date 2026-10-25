@@ -121,7 +121,7 @@ internal fun BoxScope.HeroBackground(
         // needs this provider.
         CompositionLocalProvider(
             LocalContentColor provides
-                lerp(MaterialTheme.colorScheme.onSurface, heroOnPhoto(), heroT),
+                lerp(MaterialTheme.colorScheme.onSurface, heroReadoutOnPhoto(), heroT),
         ) {
             HeroMorphReadout(
                 readout,
@@ -159,7 +159,7 @@ internal fun HeroForeground(
         ) {
             CompositionLocalProvider(
                 LocalContentColor provides
-                    lerp(MaterialTheme.colorScheme.onSurface, heroOnPhoto(), heroT),
+                    lerp(MaterialTheme.colorScheme.onSurface, heroReadoutOnPhoto(), heroT),
             ) {
                 HeroNumbers(
                     readout, heroT,
