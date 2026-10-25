@@ -239,7 +239,7 @@ internal fun OnboardingRestorePage(vm: AppViewModel) {
     // This card is in the BUTTON section of the deck, where the pager's userScrollEnabled is false:
     // telling anyone to "swipe on" here was an instruction they could not follow. The swipeable part
     // comes later and says so itself.
-    BodySmallText("New here? Tap Next to set up fresh.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    MutedText("New here? Tap Next to set up fresh.")
 }
 
 /**
@@ -259,7 +259,7 @@ internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppVie
         selectedKey = appearance.unitSystem,
         onSelect = { vm.setUnitSystem(it) },
     )
-    BodySmallText("Both live in Settings as well.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    MutedText("Both live in Settings as well.")
 }
 
 /**
@@ -296,7 +296,7 @@ internal fun OnboardingWatchPage() {
     var show by remember { mutableStateOf(false) }
     BodySmallText("Got a Wear OS watch? Bloo has a watch app with quick actions, a Tile and its own notifications. On the Play version it installs from Google Play; on this copy it installs straight from this phone.")
     MorphTextButton("Set up my watch", onClick = { show = true }, icon = Icons.Filled.Watch, emphasis = ButtonEmphasis.Confirm)
-    BodySmallText("No watch? Swipe on. You can set one up later from Settings → Backup & sync.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    MutedText("No watch? Swipe on. You can set one up later from Settings → Backup & sync.")
     if (show) SetupWatchDialog(phoneName = "this phone", onDismiss = { show = false })
 }
 

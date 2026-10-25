@@ -171,11 +171,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
             }
             // Gated on the toggle alone: RemoteActionsInline draws its own empty state, and a
             // silent no-op reads as a missing gesture.
-            AnimatedVisibility(
-                visible = showHistory,
-                enter = expandEnterSized(Alignment.Top),
-                exit = expandExitSized(Alignment.Top),
-            ) {
+            ExpandVisibility(showHistory) {
                 RemoteActionsInline(history)
             }
         }

@@ -73,6 +73,12 @@ internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: C
     RevealText(text, style = SecondaryTextStyle(), modifier = modifier, color = color)
 }
 
+/** Secondary text in the muted on-surface-variant tone: the caption under a heading, a hint, a "nothing here" line. */
+@Composable
+internal fun MutedText(text: String, modifier: Modifier = Modifier) {
+    BodySmallText(text, modifier, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
 /** The SECONDARY role as text: what a line is about. Same as [BodySmallText]. */
 @Composable
 internal fun SecondaryText(text: String, modifier: Modifier = Modifier) = BodySmallText(text, modifier)

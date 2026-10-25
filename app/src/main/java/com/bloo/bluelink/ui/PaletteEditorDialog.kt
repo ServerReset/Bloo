@@ -74,11 +74,11 @@ internal fun PaletteEditorDialog(
                 // Optional accents use ToggleRow (not a hand-rolled label + Switch): the same layout, plus the morph track,
                 // haptics and single-focus-stop TalkBack semantics every other boolean setting has.
                 ToggleRow("Custom secondary", useSecondary) { useSecondary = it }
-                AnimatedVisibility(useSecondary, enter = expandEnterSized(), exit = expandExitSized()) {
+                ExpandVisibility(useSecondary) {
                     ColorPickerSection("Secondary colour", secondaryColor) { secondaryColor = it }
                 }
                 ToggleRow("Custom tertiary", useTertiary) { useTertiary = it }
-                AnimatedVisibility(useTertiary, enter = expandEnterSized(), exit = expandExitSized()) {
+                ExpandVisibility(useTertiary) {
                     ColorPickerSection("Tertiary colour", tertiaryColor) { tertiaryColor = it }
                 }
         },

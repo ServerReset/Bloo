@@ -58,11 +58,7 @@ internal fun AiAnswer(
     }
     val thinking = "search" in state.aiBusy
     val reply = state.aiSearchReply
-    AnimatedVisibility(
-        visible = thinking || reply != null,
-        enter = expandEnterSized(Alignment.Bottom),
-        exit = expandExitSized(Alignment.Bottom),
-    ) {
+    ExpandVisibility(thinking || reply != null, from = Alignment.Bottom) {
         GlassSurface(
             shape = StandardShape,
             modifier = Modifier.fillMaxWidth(),
@@ -72,7 +68,7 @@ internal fun AiAnswer(
                 if (reply != null) {
                     RevealText(reply, style = SecondaryTextStyle())
                 } else {
-                    RevealText("Thinking…", style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    MutedText("Thinking…")
                 }
             }
         }

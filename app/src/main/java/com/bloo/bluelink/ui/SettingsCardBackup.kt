@@ -129,7 +129,7 @@ internal fun BackupSyncCardContent(
 
             // A one-shot export/import file is a power-user fallback next to the always-on sync
             // above, which is what most people want and shouldn't be buried.
-            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 1), enter = expandEnterSized(), exit = expandExitSized()) {
+            ExpandVisibility(staggeredAdvancedVisible(advanced, 1)) {
                 ManualBackup(vm, context)
             }
         }
@@ -161,7 +161,7 @@ private fun SyncErrorBanner(message: String) {
 private fun SyncDiagnostics(state: UiState, vm: AppViewModel) {
     var open by rememberSaveable { mutableStateOf(false) }
     MorphTextButton(if (open) "Hide diagnostics" else "Diagnostics", onClick = { open = !open })
-    AnimatedVisibility(visible = open, enter = expandEnterSized(Alignment.Bottom), exit = expandExitSized(Alignment.Bottom)) {
+    ExpandVisibility(open, from = Alignment.Bottom) {
         SettingsGroup("Diagnostics") {
             val lastSync = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
             StatusRow("Last synced", lastSync.ifBlank { "Never" })

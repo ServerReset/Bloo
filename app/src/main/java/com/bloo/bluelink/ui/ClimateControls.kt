@@ -204,11 +204,7 @@ internal fun ClimatePresetSection(
         }
     }
 
-    AnimatedVisibility(
-        visible = presets.isNotEmpty(),
-        enter = expandEnterSized(Alignment.Bottom),
-        exit = expandExitSized(Alignment.Bottom),
-    ) {
+    ExpandVisibility(presets.isNotEmpty(), from = Alignment.Bottom) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // The heading lives inside the visibility gate so an empty section shows no heading and
             // it animates away with the last preset.

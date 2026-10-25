@@ -145,20 +145,12 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
         ),
     ) {
         val glance = LocalForceExpanded.current
-        AnimatedVisibility(
-            visible = location == null,
-            enter = expandEnterSized(Alignment.Bottom),
-            exit = expandExitSized(Alignment.Bottom),
-        ) {
+        ExpandVisibility(location == null, from = Alignment.Bottom) {
             RevealText("Tap Locate to query the car's current position.")
         }
         // Mirror of the "not located yet" AnimatedVisibility above -- same pebble, same boolean
         // flip, only the empty side had the treatment.
-        AnimatedVisibility(
-            visible = location != null,
-            enter = expandEnterSized(Alignment.Bottom),
-            exit = expandExitSized(Alignment.Bottom),
-        ) {
+        ExpandVisibility(location != null, from = Alignment.Bottom) {
             val loc = location
             if (loc != null) {
                 // Live device-location tracking runs app-wide (started in loadGarageInner), not per

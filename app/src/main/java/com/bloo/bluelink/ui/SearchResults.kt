@@ -129,7 +129,7 @@ internal fun SettingsSearchResults(
                         onClick = { onPick(if (cmd.requiresArg) cmd.title + " " else cmd.title, !cmd.requiresArg) },
                     ) {
                         TitleSmallText(cmd.title)
-                        RevealText(cmd.description, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        MutedText(cmd.description)
                     }
                 } }
             }
@@ -255,7 +255,7 @@ internal fun ResultRow(
         Spacer(Modifier.width(GapGroup))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
             if (caption != null) {
-                RevealText(caption, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                MutedText(caption)
             }
             content()
         }

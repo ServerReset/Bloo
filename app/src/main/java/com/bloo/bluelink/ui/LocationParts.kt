@@ -83,7 +83,7 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
         WeatherGlyph(weather.condition, weather.isDay, 30.dp, describe = false)
         Column(Modifier.weight(1f)) {
             RevealText(weather.condition.label, fontWeight = FontWeight.SemiBold, style = PrimaryTextStyle())
-            RevealText(caption, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            MutedText(caption)
         }
         RollingNumber(
             text = weather.tempLabel(fahrenheit),
@@ -173,7 +173,7 @@ private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
     val hours = weather.hourly.drop(startIndex).take(12)
     if (hours.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        RevealText("Next hours", style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        MutedText("Next hours")
         val scroll = rememberScrollState()
         val viewportPx = remember { androidx.compose.runtime.mutableIntStateOf(0) }
         val blurOk = canBlurBackdrops()
@@ -255,7 +255,7 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
     val weekLow = days.mapNotNull { dayTemp(it.lowC, fahrenheit) }.minOrNull()
     val weekHigh = days.mapNotNull { dayTemp(it.highC, fahrenheit) }.maxOrNull()
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        RevealText("This week", style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        MutedText("This week")
         days.forEachIndexed { i, day ->
             val hi = dayTemp(day.highC, fahrenheit)
             val lo = dayTemp(day.lowC, fahrenheit)

@@ -168,3 +168,17 @@ fun pebbleRowOvershoot(t: Float): Float {
     val x = t - 1f
     return 1f + c3 * x * x * x + overshoot * x * x
 }
+
+/**
+ * Shows [content] with the app's one expand/collapse transition: it grows [from] that edge as it appears and shrinks back
+ * toward it as it goes. Every show/hide of a block of controls uses this rather than spelling out the enter/exit pair.
+ */
+@Composable
+internal fun ExpandVisibility(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    from: Alignment.Vertical = Alignment.Top,
+    content: @Composable AnimatedVisibilityScope.() -> Unit,
+) {
+    AnimatedVisibility(visible, modifier, enter = expandEnterSized(from), exit = expandExitSized(from), content = content)
+}

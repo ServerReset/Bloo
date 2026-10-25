@@ -365,11 +365,7 @@ internal fun LoginScreen(
                             modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.Password },
                         )
 
-                        AnimatedVisibility(
-                            visible = brand.requiresPin,
-                            enter = expandEnterSized(Alignment.Bottom),
-                            exit = expandExitSized(Alignment.Bottom),
-                        ) {
+                        ExpandVisibility(brand.requiresPin, from = Alignment.Bottom) {
                             Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                                 PinField(
                                     value = pin,

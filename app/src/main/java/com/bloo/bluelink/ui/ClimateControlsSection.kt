@@ -147,11 +147,7 @@ internal fun ClimateControlsSection(
         // was a word with no meaning.
 
         // Show the set temperature when climate is running, with an animated entrance.
-        AnimatedVisibility(
-            visible = locked,
-            enter = expandEnterSized(),
-            exit = expandExitSized(),
-        ) {
+        ExpandVisibility(locked) {
             Row(Modifier.fillMaxWidth().padding(bottom = GapRow), horizontalArrangement = Arrangement.SpaceBetween) {
                 BodySmallText("Set temperature")
                 // color resolved explicitly to onSurface -- same fix, same reason as the update
@@ -232,11 +228,7 @@ internal fun ClimateControlsSection(
             valueRange = CLIMATE_EXTENDED_DURATION_RANGE.first.toFloat()..CLIMATE_EXTENDED_DURATION_RANGE.last.toFloat(),
             steps = CLIMATE_EXTENDED_DURATION_RANGE.last - CLIMATE_EXTENDED_DURATION_RANGE.first - 1,
         )
-        AnimatedVisibility(
-            visible = duration > CLIMATE_DURATION_RANGE.last,
-            enter = expandEnterSized(Alignment.Bottom),
-            exit = expandExitSized(Alignment.Bottom),
-        ) {
+        ExpandVisibility(duration > CLIMATE_DURATION_RANGE.last, from = Alignment.Bottom) {
             BodySmallText(
                 "Sent as ${climateChunksLabel(duration)}, continued automatically",
             )
