@@ -148,7 +148,7 @@ suspend fun EuApi.stopClimate(session: EuSession, v: EuVehicleSummary, controlTo
 suspend fun EuApi.startClimate(
     session: EuSession, v: EuVehicleSummary, controlToken: String, req: ClimateRequest,
 ) {
-    val celsius = Math.round((req.tempF - 32) * 5.0 / 9.0 * 2) / 2.0
+    val celsius = Math.round(fToC(req.tempF.toDouble()) * 2) / 2.0
     val driveSide = deviceDriveSide()
     val driverSeat =
         if (driveSide == DriveSide.RIGHT) req.seatFrontRight else req.seatFrontLeft

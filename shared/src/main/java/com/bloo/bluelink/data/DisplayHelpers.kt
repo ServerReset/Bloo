@@ -31,9 +31,15 @@ fun weatherLabel(code: Int): String = when (code) {
  *  Rounds in both branches (truncating made readings up to a degree cold). Not routed through
  *  [degValue]: the °C -> °F -> °C float round trip lands on the wrong side of some half-degree ties
  *  (24.5 -> 24.499999999999996). Metric rounds the Celsius it was given. */
+/** °C as °F: the one conversion every temperature in the app goes through. */
+fun cToF(c: Double): Double = c * 9.0 / 5.0 + 32.0
+
+/** °F as °C. */
+fun fToC(f: Double): Double = (f - 32.0) * 5.0 / 9.0
+
 fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
 
-    if (fahrenheit) "${(tempC * 9 / 5 + 32).roundToInt()}°F" else "${tempC.roundToInt()}°C"
+    if (fahrenheit) "${cToF(tempC).roundToInt()}°F" else "${tempC.roundToInt()}°C"
 
 /**
  * The one mile/kilometre conversion factor, exact. Those are not reciprocals -- 1 / 0.621371 =

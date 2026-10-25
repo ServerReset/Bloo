@@ -32,7 +32,7 @@ fun formatPlaceName(a: android.location.Address): GeocodedPlace? {
 fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
 
 /** °C -> whole-degree °F (rounded), the [ambientF] input for smart-climate calculations. */
-fun ambientFahrenheit(tempC: Double): Int = (tempC * 9.0 / 5.0 + 32.0).roundToInt()
+fun ambientFahrenheit(tempC: Double): Int = cToF(tempC).roundToInt()
 
 /** The Fahrenheit range every supported car's climate target can be set to. */
 val CLIMATE_TEMP_RANGE_F = 62..82
@@ -242,7 +242,7 @@ fun degLabel(valueF: String, fahrenheit: Boolean, sourceUnit: Int? = null): Stri
         if (fahrenheit) return "${raw.roundToInt()}°F"
         return "${trimTrailingZero(raw)}°C"
     }
-    val converted = if (fahrenheit) raw * 9 / 5.0 + 32 else (raw - 32) * 5 / 9.0
+    val converted = if (fahrenheit) cToF(raw) else fToC(raw)
     return "${converted.roundToInt()}°${if (fahrenheit) "F" else "C"}"
 }
 
@@ -257,7 +257,7 @@ private fun trimTrailingZero(v: Double): String =
  */
 fun degValue(valueF: Double, fahrenheit: Boolean): Int =
 
-    if (fahrenheit) valueF.roundToInt() else ((valueF - 32) * 5 / 9.0).roundToInt()
+    if (fahrenheit) valueF.roundToInt() else fToC(valueF).roundToInt()
 
 /**
  * Whether temperatures render in Fahrenheit, from a unit-system string. Imperial is the

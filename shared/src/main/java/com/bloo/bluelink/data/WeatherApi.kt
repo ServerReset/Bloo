@@ -35,11 +35,11 @@ data class Weather(
     val daily: List<DayPoint> = emptyList(),
     val fetchedAt: Long = System.currentTimeMillis(),
 ) {
-    fun feelsLikeF(): Double = feelsLikeC * 9 / 5 + 32
+    fun feelsLikeF(): Double = cToF(feelsLikeC)
     // highC/lowC are nullable (Open-Meteo's daily block can be absent), so these propagate null
     // through rather than converting a missing reading into 32°F.
-    fun highF(): Double? = highC?.let { it * 9 / 5 + 32 }
-    fun lowF(): Double? = lowC?.let { it * 9 / 5 + 32 }
+    fun highF(): Double? = highC?.let(::cToF)
+    fun lowF(): Double? = lowC?.let(::cToF)
 
     /**
      * Temperature as a rounded, unit-suffixed string. Delegates to the shared [weatherTemp] so the

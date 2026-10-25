@@ -182,7 +182,7 @@ suspend fun CanadaApi.startClimate(
  *  the nearest half-degree Celsius value's *index* into the model-year's
  *  lookup table, hex-formatted as e.g. "0AH". */
 internal fun CanadaApi.tempToHex(tempF: Int, modelYear: Int?): String {
-    val celsius = (tempF - 32) * 5.0 / 9.0
+    val celsius = fToC(tempF.toDouble())
     val table = if ((modelYear ?: TEMP_RANGE_MODEL_YEAR) >= TEMP_RANGE_MODEL_YEAR) TEMP_RANGE_NEW else TEMP_RANGE_OLD
     val rounded = Math.round(celsius * 2) / 2.0
     val clamped = rounded.coerceIn(table.first(), table.last())
@@ -202,5 +202,5 @@ internal fun CanadaApi.hexTempToF(raw: String?, unit: Int?, modelYear: Int?): St
     val index = raw.dropLast(1).toIntOrNull(16) ?: return raw
     val table = if ((modelYear ?: TEMP_RANGE_MODEL_YEAR) >= TEMP_RANGE_MODEL_YEAR) TEMP_RANGE_NEW else TEMP_RANGE_OLD
     val celsius = table.getOrNull(index) ?: return raw
-    return (celsius * 9.0 / 5.0 + 32.0).toString()
+    return cToF(celsius).toString()
 }
