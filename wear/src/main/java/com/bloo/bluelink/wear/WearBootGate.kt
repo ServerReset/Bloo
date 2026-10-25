@@ -1,12 +1,11 @@
 package com.bloo.bluelink.wear
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import androidx.core.app.NotificationCompat
+import com.bloo.bluelink.data.cancelNotice
+import com.bloo.bluelink.data.postSealedNotice
 import com.bloo.bluelink.data.BootGate
 
 /**
@@ -35,33 +34,29 @@ object WearBootGate {
 
 /** The one notification allowed while the watch is sealed: it asks for the PIN. */
 object WearBootNotice {
-    private const val CHANNEL = "bloo_watch_reauth"
     private const val ID = 4108
 
     fun post(context: Context) {
         val app = context.applicationContext
-        val nm = app.getSystemService(NotificationManager::class.java) ?: return
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Enter PIN after restart", NotificationManager.IMPORTANCE_HIGH))
-        val open = PendingIntent.getActivity(
-            app, 0,
-            // No activity flags: the system launches a notification's content intent in the app's own
-            // task, and Wear's own lint flags NEW_TASK|CLEAR_TOP here (WearRecents).
-            Intent(app, WearMainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        postSealedNotice(
+            app,
+            channelId = "bloo_watch_reauth",
+            channelName = "Enter PIN after restart",
+            id = ID,
+            smallIcon = R.drawable.ic_stat_bloo,
+            title = "Bloo is locked",
+            text = "Your watch restarted. Open Bloo and enter your PIN.",
+            contentIntent = PendingIntent.getActivity(
+                app, 0,
+                // No activity flags: the system launches a notification's content intent in the app's own
+                // task, and Wear's own lint flags NEW_TASK|CLEAR_TOP here (WearRecents).
+                Intent(app, WearMainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            ),
         )
-        val n = NotificationCompat.Builder(app, CHANNEL)
-            .setSmallIcon(R.drawable.ic_stat_bloo)
-            .setContentTitle("Bloo is locked")
-            .setContentText("Your watch restarted. Open Bloo and enter your PIN.")
-            .setContentIntent(open)
-            .setAutoCancel(true)
-            .build()
-        runCatching { nm.notify(ID, n) }
     }
 
-    fun cancel(context: Context) {
-        runCatching { context.getSystemService(NotificationManager::class.java)?.cancel(ID) }
-    }
+    fun cancel(context: Context) = cancelNotice(context, ID)
 }
 
 /** After a reboot, posts the PIN reminder when the watch is sealed. */
