@@ -4,6 +4,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -67,12 +68,7 @@ internal fun AiAnswer(
             modifier = Modifier.fillMaxWidth(),
             hazeState = hazeState,
         ) {
-            Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(AppIcons.AutoAwesome, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-                    Spacer(Modifier.width(GapRow))
-                    TitleSmallText("AI answer")
-                }
+            ResultCardColumn(AppIcons.AutoAwesome, "AI answer") {
                 if (reply != null) {
                     RevealText(reply, style = SecondaryTextStyle())
                 } else {
@@ -102,12 +98,7 @@ internal fun AiCommandProposal(
     if (p != null) {
         val car = state.vehicles.firstOrNull { it.vin == p.second }
         ResultCard(hazeState) {
-            Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(AppIcons.Bolt, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-                    Spacer(Modifier.width(GapRow))
-                    TitleSmallText("Did you mean?")
-                }
+            ResultCardColumn(AppIcons.Bolt, "Did you mean?") {
                 RevealText(
                     ran ?: "${aiCommandLabel(p.first)} ${car?.name ?: "your car"}",
                     style = SecondaryTextStyle(),
@@ -173,12 +164,7 @@ internal fun AiSettingProposal(
         if (granted) { action.write(vm, p.value); applied = true } else vm.reportError("Location permission denied. Type a place instead")
     }
     ResultCard(hazeState) {
-        Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(AppIcons.AutoAwesome, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-                Spacer(Modifier.width(GapRow))
-                TitleSmallText("Did you mean?")
-            }
+        ResultCardColumn(AppIcons.AutoAwesome, "Did you mean?") {
             RevealText(
                 when {
                     action.isAction -> action.title
@@ -255,12 +241,7 @@ internal fun CommandActionResult(
         }
     }
     ResultCard(hazeState) {
-        Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(AppIcons.Bolt, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-                Spacer(Modifier.width(GapRow))
-                TitleSmallText("Action")
-            }
+        ResultCardColumn(AppIcons.Bolt, "Action") {
             RevealText(
                 when {
                     targetVehicle == null -> {
@@ -282,5 +263,18 @@ internal fun CommandActionResult(
 private fun ResultCard(hazeState: dev.chrisbanes.haze.HazeState?, content: @Composable () -> Unit) {
     EnterOnce {
         GlassSurface(shape = StandardShape, modifier = Modifier.fillMaxWidth(), hazeState = hazeState, content = { content() })
+    }
+}
+
+/** The inside of a result card: a glyph and [title] on top, then [content], all on the app's card padding and row gap. */
+@Composable
+private fun ResultCardColumn(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+            Spacer(Modifier.width(GapRow))
+            TitleSmallText(title)
+        }
+        content()
     }
 }
