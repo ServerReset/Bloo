@@ -1,7 +1,6 @@
-# GitHub Pages config for the published privacy policy.
-#
-# A theme from Pages' supported whitelist, so the Markdown renders as HTML without the build failing
-# on a theme it does not ship.
+# GitHub Pages config. The home page (index.html) and the privacy policy (privacy.html) are hand-built static pages
+# styled by assets/site.css; the theme below only dresses the remaining Markdown files, and is a theme from Pages'
+# supported whitelist so the build never fails on one it does not ship.
 theme: jekyll-theme-primer
 title: Bloo
 description: An independent Bluelink client for Hyundai, Genesis and Kia.

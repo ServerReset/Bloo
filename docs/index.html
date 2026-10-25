@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bloo - Lock, climate and charge your Hyundai, Genesis or Kia</title>
+<meta name="description" content="An independent Android and Wear OS client for Bluelink and Connected Car. Fast, private, and built for phones, foldables and watches.">
+<meta name="theme-color" content="#07080d">
+<meta property="og:title" content="Bloo - Lock, climate and charge your Hyundai, Genesis or Kia">
+<meta property="og:description" content="An independent Android and Wear OS client for Bluelink and Connected Car. Fast, private, and built for phones, foldables and watches.">
+<meta property="og:image" content="img/feature-graphic.png">
+<link rel="icon" href="img/icon.png">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="glow"></div>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="./"><img src="img/icon.png" alt="" width="32" height="32">Bloo</a>
+  <nav aria-label="Main"><a href="./#features">Features</a><a href="./#look">Look</a><a href="./#devices">Devices</a><a href="./#privacy">Privacy</a><a href="./#faq">FAQ</a></nav>
+  <a class="btn primary" href="./#get">Get Bloo</a>
+</div></header>
+<main>
+<section class="hero wrap">
+  <span class="eyebrow"><i></i>Closed testing on Google Play</span>
+  <h1>Your car,<br><span class="rot grad" data-words="locked.|cooled.|charged.|found.|handled."><span>locked.</span></span></h1>
+  <p class="lede">An independent Android and Wear OS client for Bluelink and Connected Car. Instant controls, live status, and nothing sent anywhere it doesn't need to go.</p>
+  <div class="cta">
+    <a class="btn primary" href="#get">Join the test</a>
+    <a class="btn" href="#features">See what it does</a>
+  </div>
+  <p class="fine">Hyundai · Genesis · Kia &nbsp;|&nbsp; US · Canada · Europe &nbsp;|&nbsp; Phones, foldables, tablets and Wear OS</p>
+
+  <div class="stage">
+    <span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span>
+    <div class="phone p1 float"><figure class="slot " data-ph="hero-left.png&#10;phone screenshot"><img src="img/garage.png" alt="The garage, light theme" loading="lazy" onerror="this.parentNode.classList.add('empty')"></figure></div>
+    <div class="phone p2 float"><figure class="slot " data-ph="hero-center.png&#10;phone screenshot"><img src="img/garage-dark.png" alt="The garage, dark theme" loading="lazy" onerror="this.parentNode.classList.add('empty')"></figure></div>
+    <div class="phone p3 float"><figure class="slot " data-ph="hero-right.png&#10;phone screenshot"><img src="img/lock-dark.png" alt="The app lock, dark theme" loading="lazy" onerror="this.parentNode.classList.add('empty')"></figure></div>
+  </div>
+</section>
+
+<div class="ticker" aria-hidden="true"><div class="track"><span>Lock and unlock</span><span>Remote climate</span><span>Charge limits</span><span>Live location</span><span>Trips</span><span>On-device AI</span><span>AutoLock</span><span>Drive sync</span><span>Foldables</span><span>Wear OS tiles</span><span>Home-screen widgets</span><span>Multiple accounts</span><span>Lock and unlock</span><span>Remote climate</span><span>Charge limits</span><span>Live location</span><span>Trips</span><span>On-device AI</span><span>AutoLock</span><span>Drive sync</span><span>Foldables</span><span>Wear OS tiles</span><span>Home-screen widgets</span><span>Multiple accounts</span></div></div>
+
+<section class="wrap" id="numbers">
+  <span class="kicker reveal">The short version</span>
+  <h2 class="reveal">Fast to use. Quiet about your data.</h2>
+  <div class="stats">
+    <div class="stat reveal"><b data-count="3">3</b><span>brands: Hyundai, Genesis, Kia</span></div>
+    <div class="stat reveal"><b data-count="3">3</b><span>regions: US, Canada, Europe</span></div>
+    <div class="stat reveal"><b data-count="0">0</b><span>trackers, ads or analytics</span></div>
+    <div class="stat reveal"><b data-count="256">256</b><span>-bit AES-GCM credential vault</span></div>
+  </div>
+</section>
+
+<section class="wrap" id="features">
+  <span class="kicker reveal">Features</span>
+  <h2 class="reveal">Everything the car can do, one tap away.</h2>
+  <p class="sub reveal">Built from scratch in Jetpack Compose with Material 3 Expressive. Every screen talks to live servers; none of it is a mock-up.</p>
+  <div class="bento">
+    <article class="card c3 reveal"><h3>Control</h3><p>Lock, unlock, start climate, set charge limits. Try the switch.</p>
+      <div class="viz"><div class="lockviz"><button class="sw" id="lockSwitch" aria-pressed="true" aria-label="Toggle lock"></button><output id="lockState">Locked</output></div></div></article>
+    <article class="card c3 reveal"><h3>Remote climate</h3><p>Presets, smart climate that sets the temperature for the weather where the car is parked, seats and wheel heat. Tap the dial.</p>
+      <div class="viz"><button class="dial" id="dial" aria-label="Change temperature" style="border:0;cursor:pointer;color:inherit"><b id="dialTemp">72°</b></button></div></article>
+    <article class="card c2 reveal"><h3>Live charge</h3><p>Level, range, time left, and the limit marked on the bar.</p>
+      <div class="viz"><div class="bar"><i style="--w:76%"></i></div></div></article>
+    <article class="card c2 reveal"><h3>On-device AI</h3><p>Gemini Nano summaries and plain-language commands, on the phone. Nothing leaves it.</p>
+      <div class="viz"><div class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div></article>
+    <article class="card c2 reveal"><h3>AutoLock</h3><p>Locks the car when you walk away from it.</p>
+      <div class="viz"><div class="radar"><b></b></div></div></article>
+    <article class="card c3 reveal"><h3>Sync through your own Drive</h3><p>Settings and photos follow you across devices through a file in your Google Drive. The app has no server of its own.</p>
+      <div class="viz"><div class="sync"><i></i><em></em><i></i><em></em><i></i></div></div></article>
+    <article class="card c3 reveal"><h3>Made for every screen</h3><p>Foldables and tablets get a multi-column layout with reorderable pebbles, custom palettes, an animated background, and edges that catch light as you tilt the phone.</p></article>
+    <article class="card c2 reveal"><h3>Widgets</h3><p>Lock, charge and climate from the home screen, with your car's photo behind them.</p></article>
+    <article class="card c2 reveal"><h3>Wear OS</h3><p>A watch face with four quick controls, tiles, and complications for charge, lock, range and climate.</p></article>
+    <article class="card c2 reveal"><h3>Multiple accounts</h3><p>Sign in to several accounts at once and switch between every car with a swipe.</p></article>
+  </div>
+</section>
+
+<section class="wrap" id="look">
+  <div class="showcase">
+    <div>
+      <span class="kicker reveal">Look</span>
+      <h2 class="reveal">Light, dark, and the car you actually drive.</h2>
+      <p class="sub reveal">Your own photo fills the card, with text that switches between light and dark to stay readable on any picture. Frosted glass, a living background, and a palette that follows your phone.</p>
+      <div class="seg reveal" role="group" aria-label="Theme"><button data-theme="light" aria-pressed="true">Light</button><button data-theme="dark" aria-pressed="false">Dark</button></div>
+    </div>
+    <div class="shot-stack reveal">
+      <div class="phone" data-theme="light"><figure class="slot " data-ph="showcase-light.png&#10;phone screenshot"><img src="img/garage.png" alt="The garage, light theme" loading="lazy" onerror="this.parentNode.classList.add('empty')"></figure></div>
+      <div class="phone" data-theme="dark"><figure class="slot " data-ph="showcase-dark.png&#10;phone screenshot"><img src="img/garage-dark.png" alt="The garage, dark theme" loading="lazy" onerror="this.parentNode.classList.add('empty')"></figure></div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" id="devices">
+  <span class="kicker reveal">Devices</span>
+  <h2 class="reveal">One app, from wrist to tablet.</h2>
+  <div class="devices">
+    <div class="device phone-d reveal"><figure class="slot " data-ph="device-phone.png&#10;phone screenshot"><img src="img/device-phone.png" alt="Bloo on a phone" loading="lazy" onerror="this.parentNode.classList.add('empty')"></figure><h3>Phone</h3><p>The garage, pebbles for every part of the car, widgets on your home screen.</p></div>
+    <div class="device fold reveal"><figure class="slot " data-ph="device-fold.png&#10;unfolded foldable,&#10;2 cars side by side"><img src="img/device-fold.png" alt="Bloo on a foldable" loading="lazy" onerror="this.parentNode.classList.add('empty')"></figure><h3>Foldables and tablets</h3><p>Several cars side by side, each reflowing to two columns when there is room.</p></div>
+    <div class="device watch reveal"><figure class="slot " data-ph="device-watch.png&#10;round watch face&#10;with 4 controls"><img src="img/device-watch.png" alt="Bloo on a watch" loading="lazy" onerror="this.parentNode.classList.add('empty')"></figure><h3>Wear OS</h3><p>Lock, climate, charge and more from your wrist, plus tiles and watch-face complications.</p></div>
+  </div>
+</section>
+
+<section class="wrap" id="get">
+  <span class="kicker reveal">Get it</span>
+  <h2 class="reveal">Three steps to your first lock.</h2>
+  <div class="steps">
+    <div class="step reveal"><h3>Join the group</h3><p>This puts your Google account on the tester list. <a href="https://groups.google.com/g/bloo-testing">Join the testing group</a>.</p></div>
+    <div class="step reveal"><h3>Install from Play</h3><p>Tap Become a tester, then install. Play keeps it updated. <a href="https://play.google.com/store/apps/details?id=com.bloo.bluelink">Open Google Play</a>.</p></div>
+    <div class="step reveal"><h3>Sign in</h3><p>Use your Bluelink or Kia Connect account, set a PIN if you want one, and your cars appear.</p></div>
+  </div>
+  <p class="sub reveal">No Play services? Install the APK straight from the newest release: <a href="https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk">Bloo.apk</a> for the phone and <a href="https://github.com/ServerReset/Bloo/releases/latest/download/Bloo-watch.apk">Bloo-watch.apk</a> for the watch. A Play copy and an APK copy are signed differently and can't update each other; moving between them means one uninstall.</p>
+</section>
+
+<section class="wrap" id="privacy">
+  <span class="kicker reveal">Privacy</span>
+  <h2 class="reveal">Your keys never leave your phone.</h2>
+  <div class="vault reveal">
+    <div>
+      <p class="sub" style="margin-top:0">Credentials, service PINs, session tokens and the app-lock PIN live in one AES-256-GCM vault, sealed by the hardware-backed Android Keystore.</p>
+      <ul>
+        <li><b>No server.</b> The app talks to your manufacturer's service and nowhere else.</li>
+        <li><b>No tracking.</b> No analytics, no ads, no crash-reporting SDK.</li>
+        <li><b>AI stays local.</b> Summaries run on the phone with Gemini Nano.</li>
+        <li><b>Your Drive, your file.</b> Sync, if you turn it on, writes to your own Google Drive.</li>
+      </ul>
+      <p style="margin-top:22px"><a class="btn" href="privacy.html">Read the privacy policy</a></p>
+    </div>
+    <div class="lockart" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="#9db8ff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><rect x="12" y="28" width="40" height="28" rx="7"/><path d="M20 28v-7a12 12 0 0 1 24 0v7"/><circle cx="32" cy="42" r="3.5" fill="#9db8ff"/></svg></div>
+  </div>
+</section>
+
+<section class="wrap" id="faq">
+  <span class="kicker reveal">Questions</span>
+  <h2 class="reveal">Straight answers.</h2>
+  <div class="faq">
+    <details class="reveal"><summary>Is this the official app?</summary><p>No. Bloo is independent and not affiliated with Hyundai, Genesis or Kia. It uses your own account to talk to the same services the official app does.</p></details>
+    <details class="reveal"><summary>Where do my password and PIN go?</summary><p>They are stored on your device in an encrypted vault and sent only to the manufacturer's own service, to sign in and send commands. Nothing goes to a Bloo server, because there isn't one.</p></details>
+    <details class="reveal"><summary>Which cars and regions work?</summary><p>Hyundai, Genesis and Kia with Bluelink or Connected Car in the US and Canada, plus Hyundai Europe. A feature only shows if your car supports it.</p></details>
+    <details class="reveal"><summary>Play or APK?</summary><p>Same features. Play updates the app and installs the watch app for you. The APK updates itself (silently with Shizuku) and pushes the watch app over wireless debugging. They can't update each other.</p></details>
+    <details class="reveal"><summary>Does the AI send my data anywhere?</summary><p>No. Summaries and natural-language commands run on the phone with Gemini Nano.</p></details>
+    <details class="reveal"><summary>What about iPhone?</summary><p>Bloo is Android and Wear OS only.</p></details>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="final reveal">
+    <h2 class="grad">Get in the car.</h2>
+    <p class="sub" style="margin-inline:auto">Closed testing is open. Join the group, install, and sign in.</p>
+    <div class="cta"><a class="btn primary" href="https://groups.google.com/g/bloo-testing">Join the group</a><a class="btn" href="https://play.google.com/store/apps/details?id=com.bloo.bluelink">Google Play</a><a class="btn" href="https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk">Download the APK</a></div>
+  </div>
+</section>
+</main>
+<footer><div class="wrap">
+  <div>Unofficial. Not affiliated with, endorsed by, or operated by Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries.</div>
+  <div class="links"><a href="privacy.html">Privacy policy</a><a href="https://github.com/ServerReset/Bloo">GitHub</a><a href="https://groups.google.com/g/bloo-testing">Testing group</a></div>
+</div></footer>
+<script src="assets/site.js" defer></script>
+</body>
+</html>
