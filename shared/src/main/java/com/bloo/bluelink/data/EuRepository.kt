@@ -20,7 +20,7 @@ class EuRepository(
     private val credentialStore: CredentialStore,
 ) : VehicleRepository {
 
-    private val summaries = java.util.concurrent.ConcurrentHashMap<String, EuVehicleSummary>()
+    private val summaries = SummaryCache<EuVehicleSummary>()
     private val controlTokens = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     // --- Sign-in -------------------------------------------------------------
@@ -63,7 +63,7 @@ class EuRepository(
 
     // --- Vehicles / status ---------------------------------------------------
 
-    override suspend fun vehicles(): List<Vehicle> = withSession { s -> fetchSummaries(s).map { it.toVehicle() } }
+    override suspend fun vehicles(): List<Vehicle> = withSession { s -> fetchSummaries(s).map { it.toVehicle(brand) } }
 
     override suspend fun status(v: Vehicle, refresh: Boolean): VehicleStatus? = withSession { s ->
         api.status(s, summaryFor(s, v), refresh)
@@ -99,28 +99,9 @@ class EuRepository(
 
     // --- Plumbing ------------------------------------------------------------
 
-    private fun EuVehicleSummary.toVehicle() = Vehicle(
-        vin = vin,
-        regId = id,
-        name = name,
-        model = model,
-        // CCS2 EU cars are all modern head units; no Gen5W concept applies (see
-        // Brand.isGen5W, which already excludes Europe).
-        generation = "",
-        brandIndicator = brand.code,
-        isEv = isEv,
-    )
+    private suspend fun fetchSummaries(s: EuSession): List<EuVehicleSummary> = summaries.refresh { api.vehicles(s) }
 
-    private suspend fun fetchSummaries(s: EuSession): List<EuVehicleSummary> =
-        api.vehicles(s).also { list ->
-            summaries.clear()
-            list.forEach { summaries[it.vin] = it }
-        }
-
-    private suspend fun summaryFor(s: EuSession, v: Vehicle): EuVehicleSummary =
-        summaries[v.vin]
-            ?: fetchSummaries(s).firstOrNull { it.vin == v.vin }
-            ?: throw BlueLinkException("Vehicle not found on this account")
+    private suspend fun summaryFor(s: EuSession, v: Vehicle): EuVehicleSummary = summaries.require(v.vin) { api.vehicles(s) }
 
     private fun SessionStore.Session.toEu() =
         EuSession(

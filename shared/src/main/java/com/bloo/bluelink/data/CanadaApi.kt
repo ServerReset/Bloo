@@ -35,13 +35,13 @@ data class CanadaSession(
  * against (see [CanadaApi.tempToHex]).
  */
 data class CanadaVehicleSummary(
-    val id: String,
-    val name: String,
-    val model: String,
-    val vin: String,
+    override val id: String,
+    override val name: String,
+    override val model: String,
+    override val vin: String,
     val year: Int?,
-    val isEv: Boolean,
-)
+    override val isEv: Boolean,
+) : AccountVehicle
 
 /**
  * Outcome of step 1 of Canada sign-in: a ready session (device already remembered from a prior

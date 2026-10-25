@@ -45,13 +45,13 @@ data class EuSession(
 )
 
 data class EuVehicleSummary(
-    val id: String,
-    val name: String,
-    val model: String,
-    val vin: String,
-    val isEv: Boolean,
+    override val id: String,
+    override val name: String,
+    override val model: String,
+    override val vin: String,
+    override val isEv: Boolean,
     val ccs2: Int,
-)
+) : AccountVehicle
 
 /**
  * Client for Hyundai Bluelink Europe on the CCAPI platform ("CCS2" - E-GMP / 2023+ cars). One

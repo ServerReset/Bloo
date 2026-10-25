@@ -10,7 +10,7 @@ class CanadaRepository(
     private val credentialStore: CredentialStore,
 ) : VehicleRepository {
 
-    private val summaries = java.util.concurrent.ConcurrentHashMap<String, CanadaVehicleSummary>()
+    private val summaries = SummaryCache<CanadaVehicleSummary>()
     private val pAuths = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     /**
@@ -60,7 +60,7 @@ class CanadaRepository(
 
     // --- Vehicles / status ---------------------------------------------------
 
-    override suspend fun vehicles(): List<Vehicle> = withSession { s -> fetchSummaries(s).map { it.toVehicle() } }
+    override suspend fun vehicles(): List<Vehicle> = withSession { s -> fetchSummaries(s).map { it.toVehicle(brand) } }
 
     override suspend fun status(v: Vehicle, refresh: Boolean): VehicleStatus? = withSession { s ->
         api.status(s, summaryFor(s, v), refresh)
@@ -93,26 +93,9 @@ class CanadaRepository(
 
     // --- Plumbing --------------------------------------------------------
 
-    private fun CanadaVehicleSummary.toVehicle() = Vehicle(
-        vin = vin,
-        regId = id,
-        name = name,
-        model = model,
-        generation = "",
-        brandIndicator = brand.code,
-        isEv = isEv,
-    )
+    private suspend fun fetchSummaries(s: CanadaSession): List<CanadaVehicleSummary> = summaries.refresh { api.vehicles(s) }
 
-    private suspend fun fetchSummaries(s: CanadaSession): List<CanadaVehicleSummary> =
-        api.vehicles(s).also { list ->
-            summaries.clear()
-            list.forEach { summaries[it.vin] = it }
-        }
-
-    private suspend fun summaryFor(s: CanadaSession, v: Vehicle): CanadaVehicleSummary =
-        summaries[v.vin]
-            ?: fetchSummaries(s).firstOrNull { it.vin == v.vin }
-            ?: throw BlueLinkException("Vehicle not found on this account")
+    private suspend fun summaryFor(s: CanadaSession, v: Vehicle): CanadaVehicleSummary = summaries.require(v.vin) { api.vehicles(s) }
 
     private fun SessionStore.Session.toCanada() =
         CanadaSession(accessToken, refreshToken, deviceId ?: CanadaApi.newDeviceId(), pin)

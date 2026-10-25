@@ -211,3 +211,44 @@ class BlueLinkRepository(
         }
     }
 }
+
+/** What a Canada or EU account lists for each of its cars: enough to identify one and to build a [Vehicle] from. */
+interface AccountVehicle {
+    val id: String
+    val name: String
+    val model: String
+    val vin: String
+    val isEv: Boolean
+}
+
+/** The app's [Vehicle] for this account car, under [brand]. Canada and EU cars are all modern head units, so no generation applies. */
+internal fun AccountVehicle.toVehicle(brand: Brand) = Vehicle(
+    vin = vin,
+    regId = id,
+    name = name,
+    model = model,
+    generation = "",
+    brandIndicator = brand.code,
+    isEv = isEv,
+)
+
+/**
+ * The account's cars by VIN, refilled whenever the list is fetched. [require] answers from the cache and only goes to the
+ * network ([fetch]) for a car it has not seen, throwing when the account does not have it.
+ */
+internal class SummaryCache<S : AccountVehicle> {
+    private val byVin = java.util.concurrent.ConcurrentHashMap<String, S>()
+
+    fun clear() = byVin.clear()
+
+    suspend fun refresh(fetch: suspend () -> List<S>): List<S> =
+        fetch().also { list ->
+            byVin.clear()
+            list.forEach { byVin[it.vin] = it }
+        }
+
+    suspend fun require(vin: String, fetch: suspend () -> List<S>): S =
+        byVin[vin]
+            ?: refresh(fetch).firstOrNull { it.vin == vin }
+            ?: throw BlueLinkException("Vehicle not found on this account")
+}
