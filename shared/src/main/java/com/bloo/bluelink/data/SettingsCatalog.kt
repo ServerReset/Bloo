@@ -211,8 +211,3 @@ object SettingsCatalog {
         else -> raw.toString()
     }
 }
-
-/** How a VIN appears in a key: trimmed and upper-case, so two devices never split one car in two. */
-object CarKeys {
-    fun normaliseVin(raw: String): String = raw.trim().uppercase()
-}
