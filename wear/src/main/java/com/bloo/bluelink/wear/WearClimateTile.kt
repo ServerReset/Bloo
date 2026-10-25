@@ -33,7 +33,7 @@ internal object WearClimateTileRows {
     fun rows(car: VehicleSnapshot, presets: List<ClimatePreset>, detail: (ClimateRequest) -> String): List<ClimateTileRow> {
         if (car.climateOn == true) return listOf(ClimateTileRow("climate_off", CarLabels.STOP_CLIMATE, "Running", active = true))
         val rows = mutableListOf(
-            ClimateTileRow(WearFaceControls.CLIMATE_SMART_KEY, CarLabels.SMART_CLIMATE, "For the weather at the car", active = false),
+            ClimateTileRow(WearFaceControls.CLIMATE_SMART_KEY, CarLabels.SMART_CLIMATE, "Matches the weather", active = false),
         )
         presets.take(MAX_ROWS - 1).forEach {
             rows += ClimateTileRow(WearFaceControls.PRESET_PREFIX + it.id, it.name, detail(it.request).ifBlank { null }, active = false)

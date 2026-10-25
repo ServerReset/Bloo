@@ -29,6 +29,7 @@ internal fun tileText(value: String, size: Float, color: Int, bold: Boolean = fa
                 .build(),
         )
         .setMaxLines(1)
+        .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
         .build()
 
 /** A tinted image from the tile's resources ([resourceId] is the name the resources were registered under). */
