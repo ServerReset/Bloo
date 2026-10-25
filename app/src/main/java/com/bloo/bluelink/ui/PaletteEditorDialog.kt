@@ -51,7 +51,6 @@ internal fun PaletteEditorDialog(
     var tertiaryColor by remember(editing) {
         mutableStateOf(editing?.tertiaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: ColorPalette.TEAL.swatch)
     }
-    val confirmDeleteArm = rememberConfirmArm()
     // Standardized on the shared GlassAlertDialog shell. No leading icon (the dialog is title-led);
     // the delete affordance rides the shell's titleTrailing slot; the shell already scrolls its
     // body (max 360dp), so the inner verticalScroll is dropped to avoid a nested-scroll conflict.

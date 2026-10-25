@@ -5,7 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
-import com.bloo.bluelink.data.Notifications
+import com.bloo.bluelink.data.postUpdateAvailable
 import com.bloo.bluelink.data.UpdateStore
 import com.bloo.bluelink.update.UpdateCheckResult
 import com.bloo.bluelink.update.UpdateChecker
@@ -49,14 +49,7 @@ class UpdateReminderWorker(context: Context, params: WorkerParameters) : Corouti
         }
         if (result is UpdateCheckResult.Available) {
             val run = result.info.run
-            Notifications.post(
-                ctx,
-                id = NOTIF_ID,
-                title = "Bloo update available",
-                text = (run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${run.runNumber}") +
-                    ". Open Bloo to download and install.",
-                channelId = Notifications.CHANNEL_UPDATES,
-            )
+            postUpdateAvailable(ctx, NOTIF_ID, run)
         }
         return Result.success()
     }

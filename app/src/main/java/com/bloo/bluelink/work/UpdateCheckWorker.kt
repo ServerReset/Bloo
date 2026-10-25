@@ -6,6 +6,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.Notifications
+import com.bloo.bluelink.data.postUpdateAvailable
 import com.bloo.bluelink.data.UpdateStore
 import com.bloo.bluelink.update.UpdateCheckResult
 import com.bloo.bluelink.update.UpdateChecker
@@ -76,14 +77,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
         // between posting and recording now re-notifies on the next tick. That is the right
         // way round here, and it costs nothing: NOTIF_ID is fixed, so a repeat REPLACES the
         // existing notification with identical text rather than stacking a second one.
-        val posted = Notifications.post(
-            ctx,
-            id = NOTIF_ID,
-            title = "Bloo update available",
-            text = (run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${run.runNumber}") +
-                ". Open Bloo to download and install.",
-            channelId = Notifications.CHANNEL_UPDATES,
-        )
+        val posted = postUpdateAvailable(ctx, NOTIF_ID, run)
         if (posted) store.setLastNotifiedRun(run.runNumber)
         return Result.success()
     }

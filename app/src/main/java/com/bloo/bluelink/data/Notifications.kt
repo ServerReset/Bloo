@@ -243,3 +243,12 @@ internal fun postBuilt(context: Context, id: Int, builder: androidx.core.app.Not
     }
     return runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }.isSuccess
 }
+
+/** The "Bloo update available" notice both update workers post for [run], on the updates channel; false when it could not be posted. */
+internal fun postUpdateAvailable(context: Context, id: Int, run: WorkflowRun): Boolean = Notifications.post(
+    context,
+    id = id,
+    title = "Bloo update available",
+    text = (run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${run.runNumber}") + ". Open Bloo to download and install.",
+    channelId = Notifications.CHANNEL_UPDATES,
+)
