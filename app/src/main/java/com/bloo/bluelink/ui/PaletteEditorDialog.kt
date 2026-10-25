@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.uicommon.rememberConfirmArm
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.roundToInt
