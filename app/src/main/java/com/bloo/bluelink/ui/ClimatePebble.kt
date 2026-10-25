@@ -11,7 +11,6 @@ import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -20,8 +19,6 @@ import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.ClimateRequest
-import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
-import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.TempValue
@@ -67,28 +64,12 @@ internal fun ClimatePebble(
     val fahrenheit = LocalAppearance.current.useFahrenheit
     // Seats show only where the car has them, and not on a Gen 5 EV that never reports them. Shared by the controls and the preset editor.
     val showSeatControls = seats.any && !(state.isGen5WEffective(v) && state.powertrainOf(v) == com.bloo.bluelink.data.Powertrain.EV)
-    var tempF by remember(v.vin) { mutableIntStateOf(DEFAULT_CLIMATE_TEMP_F) }
-    var duration by remember(v.vin) { mutableIntStateOf(DEFAULT_CLIMATE_DURATION_MIN) }
-    var defrost by remember(v.vin) { mutableStateOf(false) }
-    var steeringHeat by remember(v.vin) { mutableStateOf(WheelHeatLevel.OFF) }
-    var driver by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
-    var passenger by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
-    var rearLeft by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
-    var rearRight by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
+    val form = rememberClimateForm(v.vin)
     var settingsLoaded by remember(v.vin) { mutableStateOf(false) }
 
     // Copies a ClimateRequest into the slider state; shared by restore and preset-apply. The
     // cross-composition sync below maps through SeatLevel.fromApi, so it doesn't reuse this.
-    val applyRequest: (ClimateRequest) -> Unit = { r ->
-        tempF = r.tempF
-        duration = r.durationMinutes
-        defrost = r.defrost
-        steeringHeat = r.steeringWheelHeat
-        driver = r.seatFrontLeft
-        passenger = r.seatFrontRight
-        rearLeft = r.seatRearLeft
-        rearRight = r.seatRearRight
-    }
+    val applyRequest: (ClimateRequest) -> Unit = form::load
 
     // Restore the car's last-used climate settings the first time the pebble shows.
     LaunchedEffect(v.vin) {
@@ -96,16 +77,7 @@ internal fun ClimatePebble(
         settingsLoaded = true
     }
 
-    val currentReq = ClimateRequest(
-        tempF = tempF,
-        defrost = defrost,
-        durationMinutes = duration,
-        steeringWheelHeat = steeringHeat,
-        seatFrontLeft = driver,
-        seatFrontRight = passenger,
-        seatRearLeft = rearLeft,
-        seatRearRight = rearRight,
-    )
+    val currentReq = form.toRequest()
 
     val presets = state.climatePresets[v.vin].orEmpty()
     var showAddPreset by remember { mutableStateOf(false) }
@@ -130,7 +102,7 @@ internal fun ClimatePebble(
     // Start at [target] degrees F with defrost off, clearing any highlighted preset: the one-tap
     // "smart" start.
     val startAtTarget: (Int, ClimateRequest) -> Unit = { target, base ->
-        tempF = target; defrost = false; activePresetId = null
+        form.tempF = target; form.defrost = false; activePresetId = null
         startClimateWithEngineCheck(base.copy(tempF = target, defrost = false))
     }
     LaunchedEffect(currentReq, activePresetId, presets) {
@@ -143,14 +115,14 @@ internal fun ClimatePebble(
     val remoteClimate = state.climateSync[v.vin]
     LaunchedEffect(remoteClimate) {
         val r = remoteClimate ?: return@LaunchedEffect
-        tempF = r.tempF
-        duration = r.durationMinutes
-        defrost = r.defrost
-        steeringHeat = WheelHeatLevel.fromApi(r.steering)
-        driver = SeatLevel.fromApi(r.seatFrontLeft)
-        passenger = SeatLevel.fromApi(r.seatFrontRight)
-        rearLeft = SeatLevel.fromApi(r.seatRearLeft)
-        rearRight = SeatLevel.fromApi(r.seatRearRight)
+        form.tempF = r.tempF
+        form.duration = r.durationMinutes
+        form.defrost = r.defrost
+        form.steeringHeat = WheelHeatLevel.fromApi(r.steering)
+        form.driver = SeatLevel.fromApi(r.seatFrontLeft)
+        form.passenger = SeatLevel.fromApi(r.seatFrontRight)
+        form.rearLeft = SeatLevel.fromApi(r.seatRearLeft)
+        form.rearRight = SeatLevel.fromApi(r.seatRearRight)
         activePresetId = r.activePresetId
     }
     // Persist + publish once settings stop changing, not per drag tick (which recomposed the whole
@@ -184,9 +156,9 @@ internal fun ClimatePebble(
             )
         // The car still shows its OLD settings after a start: keep what was sent until it reports them.
         if (carCaughtUp) {
-            carTempF?.let { tempF = it.coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last) }
-            carDefrost?.let { defrost = it }
-            carWheelHeat?.let { steeringHeat = WheelHeatLevel.fromApi(it) }
+            carTempF?.let { form.tempF = it.coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last) }
+            carDefrost?.let { form.defrost = it }
+            carWheelHeat?.let { form.steeringHeat = WheelHeatLevel.fromApi(it) }
         }
     }
     LaunchedEffect(climateOn, carTempF, carDefrost, carWheelHeat) { if (climateOn) syncFromCar() }
@@ -341,20 +313,13 @@ internal fun ClimatePebble(
         }
 
         ClimateControlsSection(
+            form = form,
             locked = climateOn,
             fahrenheit = fahrenheit,
-            tempF = tempF, onTempF = { tempF = it },
-            duration = duration, onDuration = { duration = it },
-            defrost = defrost, onDefrost = { defrost = it },
-            steeringHeat = steeringHeat, onSteeringHeat = { steeringHeat = it },
             seats = seats,
             // state.powertrainOf, not the raw v.isEv: a user's powertrain override is honoured here
             // too.
             showSeats = showSeatControls,
-            driver = driver, onDriver = { driver = it },
-            passenger = passenger, onPassenger = { passenger = it },
-            rearLeft = rearLeft, onRearLeft = { rearLeft = it },
-            rearRight = rearRight, onRearRight = { rearRight = it },
             onSaveAsPreset = { presetName = ""; showAddPreset = true },
         )
 

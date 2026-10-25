@@ -38,7 +38,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -245,14 +244,7 @@ internal fun ClimatePresetSection(
     }
     editing?.let { preset ->
         var name by remember(preset.id) { mutableStateOf(preset.name) }
-        var tempF by remember(preset.id) { mutableIntStateOf(preset.request.tempF) }
-        var duration by remember(preset.id) { mutableIntStateOf(preset.request.durationMinutes) }
-        var defrost by remember(preset.id) { mutableStateOf(preset.request.defrost) }
-        var steeringHeat by remember(preset.id) { mutableStateOf(preset.request.steeringWheelHeat) }
-        var driver by remember(preset.id) { mutableStateOf(preset.request.seatFrontLeft) }
-        var passenger by remember(preset.id) { mutableStateOf(preset.request.seatFrontRight) }
-        var rearLeft by remember(preset.id) { mutableStateOf(preset.request.seatRearLeft) }
-        var rearRight by remember(preset.id) { mutableStateOf(preset.request.seatRearRight) }
+        val form = rememberClimateForm(preset.id, preset.request)
         GlassAlertDialog(
             onDismissRequest = { editing = null },
             icon = Icons.Filled.Edit,
@@ -283,18 +275,11 @@ internal fun ClimatePresetSection(
                     )
                     // What the preset does: the same controls the climate section uses, with its save button left out.
                     ClimateControlsSection(
+                        form = form,
                         locked = false,
                         fahrenheit = fahrenheit,
-                        tempF = tempF, onTempF = { tempF = it },
-                        duration = duration, onDuration = { duration = it },
-                        defrost = defrost, onDefrost = { defrost = it },
-                        steeringHeat = steeringHeat, onSteeringHeat = { steeringHeat = it },
                         seats = seats,
                         showSeats = showSeats,
-                        driver = driver, onDriver = { driver = it },
-                        passenger = passenger, onPassenger = { passenger = it },
-                        rearLeft = rearLeft, onRearLeft = { rearLeft = it },
-                        rearRight = rearRight, onRearRight = { rearRight = it },
                         onSaveAsPreset = null,
                     )
                 }
@@ -307,16 +292,7 @@ internal fun ClimatePresetSection(
                             onUpdate(
                                 preset.id,
                                 name.trim(),
-                                ClimateRequest(
-                                    tempF = tempF,
-                                    defrost = defrost,
-                                    durationMinutes = duration,
-                                    steeringWheelHeat = steeringHeat,
-                                    seatFrontLeft = driver,
-                                    seatFrontRight = passenger,
-                                    seatRearLeft = rearLeft,
-                                    seatRearRight = rearRight,
-                                ),
+                                form.toRequest(),
                             )
                             editing = null
                         }

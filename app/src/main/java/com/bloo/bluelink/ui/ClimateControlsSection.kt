@@ -11,6 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.onClick
@@ -18,6 +24,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
+import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
+import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
 import com.bloo.bluelink.data.CLIMATE_EXTENDED_DURATION_RANGE
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.SeatConfig
@@ -34,6 +43,76 @@ import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.AnimatedSlider
 import com.bloo.uicommon.AnimatedValue
 import com.bloo.uicommon.tempColor
+
+/**
+ * The editable state behind the climate controls -- temperature, duration, defrost, wheel heat and the four seats -- in one
+ * holder, so the pebble and the preset editor wire the same eight values once instead of each carrying their own copy.
+ */
+@Stable
+internal class ClimateFormState(initial: ClimateRequest? = null) {
+    var tempF by mutableIntStateOf(initial?.tempF ?: DEFAULT_CLIMATE_TEMP_F)
+    var duration by mutableIntStateOf(initial?.durationMinutes ?: DEFAULT_CLIMATE_DURATION_MIN)
+    var defrost by mutableStateOf(initial?.defrost ?: false)
+    var steeringHeat by mutableStateOf(initial?.steeringWheelHeat ?: WheelHeatLevel.OFF)
+    var driver by mutableStateOf(initial?.seatFrontLeft ?: SeatLevel.OFF)
+    var passenger by mutableStateOf(initial?.seatFrontRight ?: SeatLevel.OFF)
+    var rearLeft by mutableStateOf(initial?.seatRearLeft ?: SeatLevel.OFF)
+    var rearRight by mutableStateOf(initial?.seatRearRight ?: SeatLevel.OFF)
+
+    /** Copies [r] into the form (restoring saved settings, applying a preset). */
+    fun load(r: ClimateRequest) {
+        tempF = r.tempF
+        duration = r.durationMinutes
+        defrost = r.defrost
+        steeringHeat = r.steeringWheelHeat
+        driver = r.seatFrontLeft
+        passenger = r.seatFrontRight
+        rearLeft = r.seatRearLeft
+        rearRight = r.seatRearRight
+    }
+
+    /** What the form says right now, as a request. */
+    fun toRequest() = ClimateRequest(
+        tempF = tempF,
+        defrost = defrost,
+        durationMinutes = duration,
+        steeringWheelHeat = steeringHeat,
+        seatFrontLeft = driver,
+        seatFrontRight = passenger,
+        seatRearLeft = rearLeft,
+        seatRearRight = rearRight,
+    )
+}
+
+/** A [ClimateFormState] that lives as long as [key] stays the same, starting from [initial]. */
+@Composable
+internal fun rememberClimateForm(key: Any?, initial: ClimateRequest? = null): ClimateFormState =
+    remember(key) { ClimateFormState(initial) }
+
+/** The climate controls wired to a [form]: every slider and switch reads and writes it. */
+@Composable
+internal fun ClimateControlsSection(
+    form: ClimateFormState,
+    locked: Boolean,
+    fahrenheit: Boolean,
+    seats: SeatConfig,
+    showSeats: Boolean,
+    onSaveAsPreset: (() -> Unit)?,
+) = ClimateControlsSection(
+    locked = locked,
+    fahrenheit = fahrenheit,
+    tempF = form.tempF, onTempF = { form.tempF = it },
+    duration = form.duration, onDuration = { form.duration = it },
+    defrost = form.defrost, onDefrost = { form.defrost = it },
+    steeringHeat = form.steeringHeat, onSteeringHeat = { form.steeringHeat = it },
+    seats = seats,
+    showSeats = showSeats,
+    driver = form.driver, onDriver = { form.driver = it },
+    passenger = form.passenger, onPassenger = { form.passenger = it },
+    rearLeft = form.rearLeft, onRearLeft = { form.rearLeft = it },
+    rearRight = form.rearRight, onRearRight = { form.rearRight = it },
+    onSaveAsPreset = onSaveAsPreset,
+)
 
 /**
  * The climate pebble's controls -- temperature, run time, defrost, steering-wheel and seat heat,
