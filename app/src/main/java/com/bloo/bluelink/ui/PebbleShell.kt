@@ -35,6 +35,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.State
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
@@ -297,4 +303,13 @@ internal fun PebbleShell(
             }
         }
     }
+}
+
+/**
+ * A rounded rectangle whose corner is read when the outline is drawn, not when it is composed, so an animated
+ * corner reshapes the clip without recomposing the card that wears it.
+ */
+internal class AnimatedCornerShape(private val corner: State<Dp>) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
+        RoundedCornerShape(corner.value).createOutline(size, layoutDirection, density)
 }
