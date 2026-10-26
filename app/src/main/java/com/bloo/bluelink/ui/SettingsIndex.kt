@@ -272,12 +272,8 @@ internal class ParsedVehicleCommand(val cmd: String, val climateTarget: String =
  * to the ends of [CLIMATE_TEMP_RANGE_F].
  */
 internal fun parseClimateTemperature(q: String, metric: Boolean): Int? {
-    if (RxColdest.containsMatchIn(q)) {
-        return CLIMATE_TEMP_RANGE_F.first
-    }
-    if (RxWarmest.containsMatchIn(q)) {
-        return CLIMATE_TEMP_RANGE_F.last
-    }
+    if (RxColdest.containsMatchIn(q)) return CLIMATE_TEMP_RANGE_F.first
+    if (RxWarmest.containsMatchIn(q)) return CLIMATE_TEMP_RANGE_F.last
     val m = RxTempAtTo.find(q)
         ?: RxTempDegrees.find(q)
         ?: return null

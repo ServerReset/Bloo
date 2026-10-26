@@ -127,9 +127,7 @@ class AutoLockService : Service() {
             return START_NOT_STICKY
         }
         val vin = intent.getStringExtra(EXTRA_VIN)
-        if (vin == null) {
-            return START_NOT_STICKY
-        }
+        if (vin == null) return START_NOT_STICKY
 
         when (intent.action) {
             ACTION_CANCEL -> {

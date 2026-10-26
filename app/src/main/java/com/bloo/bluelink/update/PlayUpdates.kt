@@ -58,9 +58,7 @@ internal object PlayUpdates {
         runCatching {
             manager.appUpdateInfo.addOnSuccessListener { info ->
                 if (prompted) return@addOnSuccessListener
-                if (info.updateAvailability() != UpdateAvailability.UPDATE_AVAILABLE) {
-                    return@addOnSuccessListener
-                }
+                if (info.updateAvailability() != UpdateAvailability.UPDATE_AVAILABLE) return@addOnSuccessListener
                 // Play decides which flow this update may use. Prefer the quiet one: a flexible update
                 // downloads while the app carries on, rather than stopping the user in their tracks the
                 // way an immediate one does.

@@ -40,13 +40,9 @@ internal fun SettingsStore.settingsBackupProblem(json: String): String? {
         .getOrElse { return "Invalid settings file" }
     // `as?` casts, never `?.jsonPrimitive`: those accessors throw on a wrong kind, and these guards
     // vet a hand-editable file whose `_format`/`prefs` may be the wrong type.
-    if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") {
-        return "Not a Bloo settings backup"
-    }
+    if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") return "Not a Bloo settings backup"
     val version = (root["_version"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 1
-    if (version > BACKUP_VERSION) {
-        return "This backup was made with a newer version of Bloo. Update the app first"
-    }
+    if (version > BACKUP_VERSION) return "This backup was made with a newer version of Bloo. Update the app first"
     if ((root["prefs"] as? JsonObject) == null) return "Settings file has no data"
     if (SyncMerge.parseBackup(json) == null) return "Settings file has no data"
     return null

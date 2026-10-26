@@ -183,9 +183,7 @@ class EuApi(private val brand: Brand) {
     suspend fun refresh(session: EuSession): EuSession = withContext(Dispatchers.IO) {
         // A OneApp/CCI session refreshes through the CCI token set, not the legacy OAuth
         // refresh_token grant (the CCS token can't be refreshed on its own). See [refreshCci].
-        if (session.cciAccessToken != null || session.nonCcsToken != null) {
-            return@withContext refreshCci(session)
-        }
+        if (session.cciAccessToken != null || session.nonCcsToken != null) return@withContext refreshCci(session)
         val refresh = session.refreshToken
             ?: throw BlueLinkException("Session expired - please sign in again", code = 401)
         val form = FormBody.Builder()

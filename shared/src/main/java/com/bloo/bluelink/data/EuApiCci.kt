@@ -106,9 +106,7 @@ internal suspend fun EuApi.loginCci(username: String, password: String, deviceId
     val cciAccess = cci.path("accessToken").str().orEmpty()
     val nonCcs = cci.path("nonCcsToken").str().orEmpty()
     val exchangeable = cci.path("exchangeableAccessToken").str().orEmpty()
-    if (cciAccess.isBlank()) {
-        throw BlueLinkException("Europe sign-in: CCI token exchange returned no access token")
-    }
+    if (cciAccess.isBlank()) throw BlueLinkException("Europe sign-in: CCI token exchange returned no access token")
 
     // 5. exchange the CCI token for a CCS token (usable on the legacy ccapi:8080 endpoints).
     val ccs = ccsExchange(deviceId, cciAccess, nonCcs, exchangeable)

@@ -114,9 +114,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : BlooWor
         // AlertWorker's next half-hourly tick happened to re-kick it. Bounded by
         // runAttemptCount so a genuinely broken session can't retry forever; after that
         // the chain stops and AlertWorker re-kicks it as it always did.
-        if (!learnedSomething) {
-            return if (runAttemptCount < MAX_RETRIES) Result.retry() else Result.success()
-        }
+        if (!learnedSomething) return if (runAttemptCount < MAX_RETRIES) Result.retry() else Result.success()
         if (anyStillCharging) scheduleNext(applicationContext)
         return Result.success()
     }

@@ -353,9 +353,7 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
             it.uri.toString() == uri && it.isReadPermission && it.isWritePermission
         }
     }.getOrDefault(false)
-    if (!granted) {
-        return SettingsStore.SyncTestResult(false, "Lost access to the Drive file. Set up sync again.")
-    }
+    if (!granted) return SettingsStore.SyncTestResult(false, "Lost access to the Drive file. Set up sync again.")
     // Serialize with real syncs so the read-then-write-back can't interleave with a concurrent
     // performMainToMainSync writing different content.
     return mainToMainSyncMutex.withLock {

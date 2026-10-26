@@ -83,9 +83,7 @@ class WatchPinStore(private val context: Context) {
         val now = System.currentTimeMillis()
         val nowElapsed = SystemClock.elapsedRealtime()
         val current = lockout()
-        if (current.isLocked(now, nowElapsed)) {
-            return PinVerifyResult.LockedOut(current.remainingMs(now, nowElapsed))
-        }
+        if (current.isLocked(now, nowElapsed)) return PinVerifyResult.LockedOut(current.remainingMs(now, nowElapsed))
         if (record?.verify(pin) == true) {
             save(current.onSuccess())
             return PinVerifyResult.Ok
