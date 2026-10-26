@@ -240,24 +240,10 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                 // --- Classic biometric prompt ---------------------------------
-                Icon(
+                LockMessage(
                     Icons.Filled.Fingerprint,
-                    contentDescription = null,
-                    modifier = Modifier.size(72.dp),
-                    tint = lockFg,
-                )
-                Spacer(Modifier.height(GapPage))
-                RevealText(
-                    "Bloo is locked",
-                    style = PrimaryTextStyle(),
-                    fontWeight = FontWeight.Bold,
-                    color = lockFg,
-                )
-                Spacer(Modifier.height(GapHairline))
-                RevealText(
                     if (pinInstalled) "Confirm it's you, or use your PIN." else "Confirm it's you to reach your vehicles.",
-                    style = SecondaryTextStyle(),
-                    color = lockFg.copy(alpha = 0.85f),
+                    lockFg, GapPage,
                 )
                 Spacer(Modifier.height(28.dp))
                 val unlockSource = remember { MutableInteractionSource() }
@@ -375,28 +361,20 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             } else {
                 // No mechanism at all -- should not be reachable (the lock gate refuses to engage
                 // without one); a calm fallback so the overlay never dead-ends silently.
-                Icon(
-                    AppIcons.Lock,
-                    contentDescription = null,
-                    modifier = Modifier.size(72.dp),
-                    tint = lockFg,
-                )
-                Spacer(Modifier.height(GapSection))
-                RevealText(
-                    "Bloo is locked",
-                    style = PrimaryTextStyle(),
-                    fontWeight = FontWeight.Bold,
-                    color = lockFg,
-                )
-                Spacer(Modifier.height(GapHairline))
-                RevealText(
-                    "Open Bloo again.",
-                    style = SecondaryTextStyle(),
-                    color = lockFg.copy(alpha = 0.85f),
-                )
+                LockMessage(AppIcons.Lock, "Open Bloo again.", lockFg, GapSection)
             }
             }
             }
         }
     }
+}
+
+/** The lock screen's icon, "Bloo is locked" and a line under it, in [fg]; [iconGap] sits between the icon and the title. */
+@Composable
+private fun LockMessage(icon: androidx.compose.ui.graphics.vector.ImageVector, subtitle: String, fg: androidx.compose.ui.graphics.Color, iconGap: androidx.compose.ui.unit.Dp) {
+    Icon(icon, contentDescription = null, modifier = Modifier.size(72.dp), tint = fg)
+    Spacer(Modifier.height(iconGap))
+    RevealText("Bloo is locked", style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, color = fg)
+    Spacer(Modifier.height(GapHairline))
+    RevealText(subtitle, style = SecondaryTextStyle(), color = fg.copy(alpha = 0.85f))
 }

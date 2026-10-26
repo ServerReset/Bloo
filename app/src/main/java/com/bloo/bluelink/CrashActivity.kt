@@ -154,11 +154,7 @@ class CrashActivity : ComponentActivity() {
         // and can this artifact install anything itself (see UpdateRuntime).
         if (!UpdateRuntime.usesGitHub(context)) {
             SettingsGroup("Update") {
-                Text(
-                    "Google Play keeps this copy up to date.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                com.bloo.bluelink.ui.MutedText("Google Play keeps this copy up to date.")
                 com.bloo.bluelink.ui.PlayStoreLinks()
             }
             return
@@ -180,11 +176,7 @@ class CrashActivity : ComponentActivity() {
         var statusMessage by remember { mutableStateOf<String?>(null) }
 
         SettingsGroup("Update") {
-            Text(
-                "Grab a fresh build without leaving this screen.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            com.bloo.bluelink.ui.MutedText("Grab a fresh build without leaving this screen.")
 
             MorphTextButton(
                 text = if (checking) "Checking…" else "Check for updates",
@@ -285,11 +277,7 @@ class CrashActivity : ComponentActivity() {
         val clipboard = LocalClipboard.current
         val clipboardScope = rememberCoroutineScope()
         SettingsGroup("Crash report") {
-            Text(
-                "Copy this and send it back: the crash, your device, and what the app was doing.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            com.bloo.bluelink.ui.MutedText("Copy this and send it back: the crash, your device, and what the app was doing.")
             MorphTextButton(
                 "Copy",
                 icon = Icons.Filled.ContentCopy,

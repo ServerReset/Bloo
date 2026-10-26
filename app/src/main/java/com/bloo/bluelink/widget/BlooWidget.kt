@@ -130,23 +130,11 @@ private fun WidgetContent(data: WidgetData) {
     val car = if (data.sealed) null else data.cars.firstOrNull { it.vin == prefs[WidgetKeys.VIN] } ?: data.cars.firstOrNull()
     // Tapping the widget opens the app on THIS car, not just the app.
     val open = actionStartActivity(openCarIntent(context, car?.vin))
-    // The photo loads inside the session (not in provideGlance), so changing the car or the option in the
-    // settings swaps it right away.
-    var photo by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null) }
-    val night = WidgetPhoto.isNight(context)
-    val photoKey = if (opts.photo && car != null) "${car.vin}:${opts.blur}:$night" else null
-    androidx.compose.runtime.LaunchedEffect(photoKey) {
-        photo = if (photoKey != null && car != null) WidgetPhoto.load(context, car.vin, opts.blur, night) else null
-    }
     val pad = widgetPad(opts.compact).dp
     Box(
         GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(opts.corner.dp.dp).clickable(open),
     ) {
-        photo?.let { bmp ->
-            Image(ImageProvider(bmp), null, modifier = GlanceModifier.fillMaxSize(), contentScale = androidx.glance.layout.ContentScale.Crop)
-            // A theme-matched veil over the photo so the text keeps its contrast in light and dark.
-            Box(GlanceModifier.fillMaxSize().background(androidx.glance.color.ColorProvider(day = PhotoVeilDay, night = PhotoVeilNight))) {}
-        }
+        WidgetPhotoLayer(car, opts)
         val root = GlanceModifier.fillMaxSize().padding(pad)
         if (data.sealed) {
             Message(root, "Open Bloo to sign in", "Your phone restarted")
@@ -155,12 +143,8 @@ private fun WidgetContent(data: WidgetData) {
         } else {
             val pending = prefs[WidgetKeys.PENDING]
             val now = System.currentTimeMillis()
-            val armed = prefs[WidgetKeys.ARMED]?.split("|")?.takeIf {
-                it.size == 2 && it[0] == car.vin && now - (it[1].toLongOrNull() ?: 0L) < UNLOCK_CONFIRM_MS
-            } != null
-            val note = prefs[WidgetKeys.NOTE]?.split("|")?.takeIf {
-                it.size == 2 && now - (it[1].toLongOrNull() ?: 0L) < NOTE_MS
-            }?.get(0)
+            val armed = prefs.unlockArmedFor(car.vin, now)
+            val note = prefs.freshNote(now)
             AdaptiveBody(root, car, pending, armed, note, opts)
         }
     }

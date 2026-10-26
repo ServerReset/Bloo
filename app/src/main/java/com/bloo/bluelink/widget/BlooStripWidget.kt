@@ -101,23 +101,10 @@ private fun StripContent(cars: List<VehicleSnapshot>) {
     val fontScale = context.resources.configuration.fontScale * opts.textSize.scale
     val tall = size.height.value >= 96f * fontScale.coerceAtLeast(1f)
     val us = opts.textSize.scale
-    // The photo loads inside the session, so changing the car or the option in the settings swaps it at once.
-    var photo by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null) }
-    val night = WidgetPhoto.isNight(context)
-    val photoKey = if (opts.photo && car != null) "${car.vin}:${opts.blur}:$night" else null
-    androidx.compose.runtime.LaunchedEffect(photoKey) {
-        photo = if (photoKey != null && car != null) WidgetPhoto.load(context, car.vin, opts.blur, night) else null
-    }
     Box(
         GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(stripCorner(prefs, size.height)).clickable(open),
     ) {
-        photo?.let { bmp ->
-            androidx.glance.Image(
-                androidx.glance.ImageProvider(bmp), null,
-                modifier = GlanceModifier.fillMaxSize(), contentScale = androidx.glance.layout.ContentScale.Crop,
-            )
-            Box(GlanceModifier.fillMaxSize().background(androidx.glance.color.ColorProvider(day = PhotoVeilDay, night = PhotoVeilNight))) {}
-        }
+        WidgetPhotoLayer(car, opts)
         Row(
             GlanceModifier.fillMaxSize().padding(horizontal = 14.dp, vertical = if (tall) 10.dp else 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -131,14 +118,10 @@ private fun StripContent(cars: List<VehicleSnapshot>) {
             }
             val now = System.currentTimeMillis()
             val pending = prefs[WidgetKeys.PENDING]
-            val armed = prefs[WidgetKeys.ARMED]?.split("|")?.takeIf {
-                it.size == 2 && it[0] == car.vin && now - (it[1].toLongOrNull() ?: 0L) < UNLOCK_CONFIRM_MS
-            } != null
+            val armed = prefs.unlockArmedFor(car.vin, now)
             // A failed command's note (the full widget's red line) takes the name's place for a few seconds, so a refused
             // lock or unlock is not silent on the strip.
-            val note = prefs[WidgetKeys.NOTE]?.split("|")?.takeIf {
-                it.size == 2 && now - (it[1].toLongOrNull() ?: 0L) < NOTE_MS
-            }?.get(0)
+            val note = prefs.freshNote(now)
             val levelColor = if (opts.levelTint && car.percent != null) levelTint(car) else null
             Column(GlanceModifier.defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
