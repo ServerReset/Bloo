@@ -128,10 +128,7 @@ internal fun SettingsModeTab(
     ) {
         GlassSurface(shape = StandardShape, modifier = Modifier.width(172.dp), hazeState = hazeState) {
             com.bloo.uicommon.MorphSegmented(
-                options = listOf(
-                    SegmentOption("simple", "Simple", null),
-                    SegmentOption("advanced", "Advanced", null),
-                ),
+                options = listOf(SegmentOption("simple", "Simple", null), SegmentOption("advanced", "Advanced", null)),
                 selectedKey = settingsMode,
                 onSelect = onSettingsModeChange,
                 containerColor = Color.Transparent,

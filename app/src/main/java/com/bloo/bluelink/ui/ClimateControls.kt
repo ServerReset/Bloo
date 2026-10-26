@@ -283,11 +283,7 @@ internal fun ClimatePresetSection(
                     "Save",
                     onClick = {
                         if (name.isNotBlank()) {
-                            onUpdate(
-                                preset.id,
-                                name.trim(),
-                                form.toRequest(),
-                            )
+                            onUpdate(preset.id, name.trim(), form.toRequest())
                             editing = null
                         }
                     },

@@ -35,7 +35,7 @@ internal fun OnboardingAurora(hazeState: HazeState, accent: Color, modifier: Mod
             .hazeSource(hazeState)
             .drawBehind {
                 drawRect(
-                    Brush.verticalGradient(listOf(scheme.surfaceContainerHigh, scheme.surface, scheme.surfaceContainerLow), ))
+                    Brush.verticalGradient(listOf(scheme.surfaceContainerHigh, scheme.surface, scheme.surfaceContainerLow)))
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) {
                     val center = Offset(size.width * fx, size.height * fy)
                     val radius = size.minDimension * r

@@ -210,9 +210,7 @@ internal fun runUpdateAction(
         else -> {
             // Dismiss ONLY if the page really opened. Swallowing an ActivityNotFoundException and dismissing anyway meant a tap
             // did visibly nothing AND cost the user the tile.
-            val opened = context.tryStart(
-                Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri()),
-            )
+            val opened = context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri()))
             if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
         }
     }

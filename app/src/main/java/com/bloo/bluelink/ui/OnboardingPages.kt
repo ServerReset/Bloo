@@ -252,10 +252,7 @@ internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppVie
     ThemeModeSegmentedRow(appearance) { vm.setThemeMode(it) }
     SettingsSegmentedRow(
         label = "Units",
-        options = listOf(
-            SegmentOption("imperial", "Imperial", null),
-            SegmentOption("metric", "Metric", null),
-        ),
+        options = listOf(SegmentOption("imperial", "Imperial", null), SegmentOption("metric", "Metric", null)),
         selectedKey = appearance.unitSystem,
         onSelect = { vm.setUnitSystem(it) },
     )

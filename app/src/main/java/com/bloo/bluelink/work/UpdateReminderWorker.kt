@@ -67,9 +67,7 @@ class UpdateReminderWorker(context: Context, params: WorkerParameters) : BlooWor
                 // The only network worker in this package that lacked the constraint every
                 // other one carries -- so it was the only one that could fire with no
                 // connection, fail, and burn a one-shot reminder doing it.
-                .setConstraints(
-                    connectedConstraints(),
-                )
+                .setConstraints(connectedConstraints())
                 .build()
             WorkManagerInit.of(context).enqueueUniqueWork(
                 NAME,

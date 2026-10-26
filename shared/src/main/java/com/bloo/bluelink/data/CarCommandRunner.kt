@@ -35,10 +35,7 @@ object CarCommandRunner {
             val snap = store.current().vehicles.firstOrNull { it.vin == command.vin }
                 ?: return@withLock CarCommandResult(command.vin, command.action, ok = false, message = "Car not found")
             val v = snap.toVehicle()
-            val repo = repositoryFor(
-                Brand.fromIndicator(v.brandIndicator),
-                SessionStore(context), CredentialStore(context),
-            )
+            val repo = repositoryFor(Brand.fromIndicator(v.brandIndicator), SessionStore(context), CredentialStore(context))
             val climate = ClimateRequest(
                 tempF = command.tempF,
                 defrost = command.defrost,

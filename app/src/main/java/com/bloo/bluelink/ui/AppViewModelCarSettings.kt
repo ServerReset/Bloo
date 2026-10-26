@@ -24,9 +24,7 @@ import kotlinx.coroutines.launch
 /** Set (or, with a blank string, clear) a custom car photo URL. */
 fun AppViewModel.setVehicleImage(vin: String, url: String) {
     _state.update {
-        it.copy(
-            imageUrls = if (url.isBlank()) it.imageUrls - vin else it.imageUrls + (vin to url.trim()),
-        )
+        it.copy(imageUrls = if (url.isBlank()) it.imageUrls - vin else it.imageUrls + (vin to url.trim()))
     }
     viewModelScope.launch { settingsStore.setImageUrl(vin, url) }
 }
@@ -109,9 +107,7 @@ fun AppViewModel.setHotspot(v: Vehicle, section: String) {
         val current = it.hotspotSections[v.vin]
         // Toggle: if the section is already in the secondary slot, unpin it; otherwise pin it
         val updated = if (current == section) null else section
-        it.copy(
-            hotspotSections = if (updated == null) it.hotspotSections - v.vin else it.hotspotSections + (v.vin to updated),
-        )
+        it.copy(hotspotSections = if (updated == null) it.hotspotSections - v.vin else it.hotspotSections + (v.vin to updated))
     }
     viewModelScope.launch { settingsStore.setHotspots(v.vin, _state.value.hotspotSections[v.vin]) }
 }

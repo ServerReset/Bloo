@@ -208,10 +208,7 @@ object AutoLockController {
                 // reader looking for a car that was there all along. A stale or empty snapshot (a
                 // fresh sign-in, or an app that has not been opened since) is the usual cause, and
                 // ensureVehicleCached has already gone to the account once before saying this.
-                fail(
-                    vin,
-                    "AutoLock can't find $vin in your account, so it can't check the car before locking.",
-                )
+                fail(vin, "AutoLock can't find $vin in your account, so it can't check the car before locking.")
                 return@withLock
             }
             val v = snapshot.toVehicle()

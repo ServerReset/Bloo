@@ -208,18 +208,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun logSnapshot(): List<String> = AppLog.snapshot()
 
     val appearance: StateFlow<SettingsStore.Appearance> =
-        settingsStore.appearance.stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            SettingsStore.Appearance(),
-        )
+        settingsStore.appearance.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.Appearance())
 
     val notifications: StateFlow<SettingsStore.NotificationPrefs> =
-        settingsStore.notifications.stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            SettingsStore.NotificationPrefs(),
-        )
+        settingsStore.notifications.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.NotificationPrefs())
 
     /** Write the current live status/location maps to disk (survives restart). */
     internal fun persistCache() {

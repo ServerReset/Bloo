@@ -75,10 +75,7 @@ internal fun BoxScope.HeroBackground(
         // reads as an object arriving rather than filling in.
         enter = expandEnterSized() +
             slideInVertically(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
+                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
             ) { with(heroPhotoDensity) { -HeroPhotoSlideDistance.roundToPx() } } +
             scaleIn(
                 initialScale = 0.85f,
@@ -91,7 +88,7 @@ internal fun BoxScope.HeroBackground(
             slideOutVertically(
                 animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
             ) { with(heroPhotoDensity) { -HeroPhotoSlideDistance.roundToPx() } } +
-            scaleOut(targetScale = 0.9f, animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(), )) {
+            scaleOut(targetScale = 0.9f, animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec())) {
         HeroPhotoBackdrop(v, imageUrl, height, aspectRatio = 16f / 9f)
     }
     // The expanded readout at the BOTTOM of the card: a sibling of the photo, not a child, so it

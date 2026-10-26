@@ -104,9 +104,7 @@ object Notifications {
      */
     fun hasPermission(context: Context, channelId: String = CHANNEL): Boolean {
         @Suppress("InlinedApi") // gated by the minSdk arg below
-        val runtimeGranted = context.hasPermission(
-            Manifest.permission.POST_NOTIFICATIONS, Build.VERSION_CODES.TIRAMISU,
-        )
+        val runtimeGranted = context.hasPermission(Manifest.permission.POST_NOTIFICATIONS, Build.VERSION_CODES.TIRAMISU)
         if (!runtimeGranted) return false
         val mgr = NotificationManagerCompat.from(context)
         if (!mgr.areNotificationsEnabled()) return false

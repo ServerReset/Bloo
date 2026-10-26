@@ -111,9 +111,7 @@ class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : BlooWorker(
                 // possible so the worker is scheduled to run as often as intended
                 // and only skips the actual network call when the user's own
                 // preference says to.
-                .setConstraints(
-                    connectedConstraints(),
-                )
+                .setConstraints(connectedConstraints())
                 // Explicit (rather than relying on the platform default) so a
                 // transient failure is retried within a minute, not the
                 // default's much longer first backoff step.

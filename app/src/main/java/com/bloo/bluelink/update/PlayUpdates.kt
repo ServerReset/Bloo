@@ -72,12 +72,7 @@ internal object PlayUpdates {
                 }
                 prompted = true
                 runCatching {
-                    manager.startUpdateFlowForResult(
-                        info,
-                        activity,
-                        AppUpdateOptions.newBuilder(type).build(),
-                        REQUEST_CODE,
-                    )
+                    manager.startUpdateFlowForResult(info, activity, AppUpdateOptions.newBuilder(type).build(), REQUEST_CODE)
                 }
             }
         }

@@ -105,9 +105,7 @@ fun AppViewModel.togglePebble(v: Vehicle, section: String) {
     val key = "${v.vin}:$section"
     val collapsedNow = key !in _state.value.collapsedPebbles
     _state.update {
-        it.copy(
-            collapsedPebbles = if (collapsedNow) it.collapsedPebbles + key else it.collapsedPebbles - key,
-        )
+        it.copy(collapsedPebbles = if (collapsedNow) it.collapsedPebbles + key else it.collapsedPebbles - key)
     }
     viewModelScope.launch { settingsStore.setSectionCollapsed(v.vin, section, collapsedNow) }
 }

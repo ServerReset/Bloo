@@ -208,9 +208,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
          */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<AlertWorker>(30, TimeUnit.MINUTES)
-                .setConstraints(
-                    connectedConstraints(),
-                )
+                .setConstraints(connectedConstraints())
                 .build()
             WorkManagerInit.of(context).enqueueUniquePeriodicWork(
                 "bloo_alerts",
