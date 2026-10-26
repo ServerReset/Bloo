@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Modifier
 import com.bloo.bluelink.data.SettingsCatalog
 import androidx.compose.ui.draw.alpha
@@ -255,13 +256,17 @@ internal fun SearchPill(
 }
 
 /**
- * Example queries shown while the search bar is focused but empty, to show that search answers data
- * questions and runs commands, not just finds settings.
+ * Example queries shown while the search bar is focused but empty, to show that search answers data questions and runs commands,
+ * not just finds settings. Every example is a pill: tap to run an action or fill the box with a lookup.
  */
 @Composable
-internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: (String, Boolean) -> Unit) {
-    // The same grouped rows the results use, so the empty state and the answers read as one surface.
-    // Every row is a button: tap to run an action or fill the box with a lookup.
+internal fun SearchSuggestions(
+    state: UiState,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    hazeState: HazeState? = null,
+    onPick: (String, Boolean) -> Unit,
+) {
     val scheme = MaterialTheme.colorScheme
     val actions = remember(state.vehicles) {
         getAvailableCommands(state.vehicles).filter { !it.requiresArg }.take(if (compact) 3 else 4)
@@ -274,29 +279,27 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
             if (state.vehicles.size > 1) add("Where is my car" to Icons.Filled.Place)
         }.take(if (compact) 2 else 4)
     }
-    RevealText("Ask for anything", style = PrimaryTextStyle(), color = scheme.onSurface)
-    if (actions.isNotEmpty()) {
-        ResultGroup("Actions") {
+    val listState = rememberLazyListState()
+    SearchPillList(modifier, listState) {
+        pillItem("hello", listState) { MessagePill("Ask for anything", null, hazeState) }
+        if (actions.isNotEmpty()) {
+            pillItem("head:actions", listState) { SearchHeading("Actions", hazeState) }
             actions.forEach { cmd ->
-                ResultRow(cmd.icon, scheme.secondary, caption = null, onClick = { onPick(cmd.title, true) }) {
-                    TitleSmallText(cmd.title)
-                    if (!compact) RevealText(cmd.description, style = SecondaryTextStyle(), color = scheme.onSurfaceVariant)
+                pillItem("cmd:${cmd.id}", listState) {
+                    ActionPill(cmd.icon, cmd.title, if (compact) null else cmd.description, scheme.secondary, hazeState) { onPick(cmd.title, true) }
                 }
             }
         }
-    }
-    ResultGroup("Look up") {
+        pillItem("head:lookup", listState) { SearchHeading("Look up", hazeState) }
         lookups.forEach { (label, icon) ->
-            ResultRow(icon, scheme.primary, caption = null, onClick = { onPick(label, true) }) { TitleSmallText(label) }
+            pillItem("look:$label", listState) { ActionPill(icon, label, null, scheme.primary, hazeState) { onPick(label, true) } }
         }
-    }
-    if (!compact) {
-        ResultGroup("Settings") {
-            // Titles read from the catalog, never typed here: these were literals ("Text scale", "Glass style") that
-            // matched nothing, so the first suggestion a person tapped was "No matches". A unit test now checks
-            // every one of these finds itself.
+        if (!compact) {
+            pillItem("head:settings", listState) { SearchHeading("Settings", hazeState) }
+            // Titles read from the catalog, never typed here: these were literals ("Text scale", "Glass style") that matched
+            // nothing, so the first suggestion a person tapped was "No matches". A unit test checks every one finds itself.
             SuggestedSettingKeys.mapNotNull { SettingsCatalog.titleOf(it) }.forEach { label ->
-                ResultRow(AppIcons.Settings, scheme.primary, caption = null, onClick = { onPick(label, false) }) { TitleSmallText(label) }
+                pillItem("set:$label", listState) { ActionPill(AppIcons.Settings, label, null, scheme.primary, hazeState) { onPick(label, false) } }
             }
         }
     }

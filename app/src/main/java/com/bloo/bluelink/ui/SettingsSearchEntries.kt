@@ -85,8 +85,9 @@ internal fun buildSettingsSearchEntries(
         add(spec.title, "${spec.keywords} ${spec.phrases}") { spec.content(appearance, notif, state, vm) }
     }
     // --- Per-car ---
+    // What each car KNOWS (battery, range, odometer, lock, location...) is answered as live facts by [carFacts], above the
+    // settings; only the settings and controls belong in this index.
     state.vehicles.forEach { v ->
-        val st = state.statusFor(v)
         val plate = state.licensePlates[v.vin] ?: ""
         add("Licence plate · ${v.name}", "plate licence registration ${v.name} $plate") {
             BlooTextField(
@@ -96,27 +97,9 @@ internal fun buildSettingsSearchEntries(
                 singleLine = true, shape = FieldShape, modifier = Modifier.fillMaxWidth(),
             )
         }
-        parseOdometerMiles(v.odometer)?.let { odoInt ->
-            add("Odometer · ${v.name}", "odometer mileage miles ${v.name}") { StatusRow("Odometer", formatDistance(odoInt, appearance.metricDistance)) }
-        }
         // The last six digits as their own word: that is how a VIN is usually quoted.
         add("VIN · ${v.name}", "vin identification ${v.name} ${v.vin} ${v.vin.takeLast(6)}") {
             SelectionContainer { StatusRow("VIN", v.vin) }
-        }
-        // One source of truth for "what range do we show for this powertrain".
-        st?.rangeMiFor(state.hasBattery(v))?.let { r ->
-            add("Range · ${v.name}", "range distance dte empty ${v.name}") { StatusRow("Range", formatDistance(r, appearance.metricDistance)) }
-        }
-        if (state.hasBattery(v)) {
-            st?.evStatus?.batteryStatus?.let { b ->
-                add("Battery · ${v.name}", "battery charge soc percent ${v.name}") { StatusRow("Battery", "$b%") }
-            }
-            val limit = st?.evStatus?.displayChargeLimit()
-            limit?.let { l -> add("Charge limit · ${v.name}", "charge limit target ${v.name}") { StatusRow("Charge limit", "$l%") } }
-        } else {
-            st?.fuelLevel?.let { f ->
-                add("Fuel · ${v.name}", "fuel gas tank percent ${v.name}") { StatusRow("Fuel", "$f%") }
-            }
         }
         // rememberRelativeTime itself (not its result) has to stay inside the entry's own
         // @Composable content lambda -- it's a live, ticking value (its own LaunchedEffect
@@ -125,9 +108,6 @@ internal fun buildSettingsSearchEntries(
             add("Last refreshed · ${v.name}", "updated refreshed time ${v.name}") {
                 rememberRelativeTime(state.fetchedAt(v))?.let { rel -> StatusRow("Last refreshed", rel) }
             }
-        }
-        (state.placeNames[v.vin] ?: state.locations[v.vin]?.coordString(4))?.let { loc ->
-            add("Location · ${v.name}", "location where place gps ${v.name}") { StatusRow("Location", loc) }
         }
         add("Powertrain · ${v.name}", "powertrain ev gas hybrid phev ${v.name}") {
             PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }

@@ -9,6 +9,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.slideInVertically
+import com.bloo.uicommon.MotionFast
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.AnimatedContent
@@ -163,80 +165,52 @@ internal fun SearchLayer(
             enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
             exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
         ) {
-            // Frosts the page rather than blacking it out: a blur plus a faint veil keeps the pebbles at
-            // their own brightness, where a flat 32% black made the page grey and the glass pebbles
-            // look lit by comparison.
+            // The whole search interface sits on ONE uniform frost: a full blur of the page plus an even veil of the theme's own
+            // surface, so whatever is behind (pebbles, photos, the aurora) is softened the same everywhere and the pills read
+            // cleanly on top of it. Without the blur (older phones, battery saver) the veil alone is denser.
             val frostScrim = hazeState != null && canBlurBackdrops()
             Box(
                 Modifier
                     .fillMaxSize()
-                    .then(if (frostScrim) Modifier.appHazeEffect(hazeState, cheap = true) else Modifier)
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = if (frostScrim) 0.08f else 0.24f))
+                    .then(if (frostScrim) Modifier.appHazeEffect(hazeState) else Modifier)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = if (frostScrim) 0.46f else 0.9f))
                     .noRippleClickable { query = ""; focused = false },
             )
         }
 
-        // Results / suggestions, anchored to the bottom rather than to the element: the element is
-        // always bottom-centre while open, so this never has to chase a bubble around the screen.
+        // Results / suggestions, anchored to the bottom rather than to the element: the element is always bottom-centre while
+        // open, so this never has to chase a bubble around the screen. Every result is its own floating pill (see SearchPills.kt),
+        // so there is no panel: the pills move, enter and leave one at a time over the frosted page.
         AnimatedVisibility(
             visible = open,
-            enter = expandEnter(Alignment.Bottom),
-            exit = expandExit(Alignment.Bottom),
+            enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) + slideInVertically(tween(MotionMedium)) { it / 8 },
+            exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) + slideOutVertically(tween(MotionFast)) { it / 8 },
             modifier = Modifier.align(Alignment.BottomCenter)
                 .padding(bottom = barH + SearchEdge + bottomInset + GapRow),
         ) {
-            GlassSurface(
-                shape = ExtraLargeShape,
-                modifier = Modifier.width(barW).animateContentSize(spring(dampingRatio = GentleDamping, stiffness = Spring.StiffnessMediumLow)),
-                hazeState = hazeState,
-                // Flat blur, not the liquid-glass refraction: results need to be legible, not
-                // bent, so this is a near-solid surface over a straight blur behind it.
-                liquid = false,
-                tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
-                    alpha = if (hazeState != null && canBlurBackdrops()) 0.88f else 0.98f,
-                ),
-            ) {
-                val listScroll = rememberScrollState()
-                val listViewportPx = remember { mutableIntStateOf(0) }
-                val listWindowTop = remember { mutableFloatStateOf(0f) }
-                val edgeScroll = remember(listScroll) { EdgeScroll(listScroll, listViewportPx, listWindowTop) }
-                CompositionLocalProvider(LocalEdgeScroll provides edgeScroll) {
-                    Column(
-                        Modifier.fillMaxWidth().heightIn(max = minOf(480.dp, freeAbovePill))
-                            .onGloballyPositioned {
-                                listViewportPx.intValue = it.size.height
-                                listWindowTop.floatValue = it.positionInWindow().y
-                            }
-                            .verticalScroll(listScroll)
-                            .padding(GapSection),
-                    ) {
-                        // Suggestions and results are two states of one list: they cross-fade and
-                        // slide into each other while the panel itself eases to the new height.
-                        AnimatedContent(
-                            targetState = query.isNotBlank(),
-                            transitionSpec = {
-                                (fadeIn(tween(MotionMedium, delayMillis = MotionFast)) +
-                                    slideInVertically(tween(MotionMedium, delayMillis = MotionFast)) { it / 14 }) togetherWith
-                                    fadeOut(tween(MotionFast)) using SizeTransform(clip = false)
-                            },
-                            label = "searchPanelState",
-                        ) { hasQuery ->
-                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                                if (hasQuery) {
-                                    SettingsSearchResults(
-                                        query, submitted, vm, state.value, appearance, notif,
-                                        limit = if (keyboardUp) 4 else Int.MAX_VALUE,
-                                        hazeState = hazeState,
-                                        onPick = { text, run -> query = text; if (run) submitted = text },
-                                    )
-                                } else {
-                                    SearchSuggestions(state.value, compact = keyboardUp) { picked, run ->
-                                        query = picked
-                                        if (run) submitted = picked
-                                    }
-                                }
-                            }
-                        }
+            val panel = Modifier.width(barW).heightIn(max = minOf(560.dp, freeAbovePill))
+            // Suggestions and results are two states of one list: they cross-fade into each other.
+            AnimatedContent(
+                targetState = query.isNotBlank(),
+                transitionSpec = {
+                    (fadeIn(tween(MotionMedium, delayMillis = MotionFast)) +
+                        slideInVertically(tween(MotionMedium, delayMillis = MotionFast)) { it / 14 }) togetherWith
+                        fadeOut(tween(MotionFast)) using SizeTransform(clip = false)
+                },
+                label = "searchPanelState",
+            ) { hasQuery ->
+                if (hasQuery) {
+                    SettingsSearchResults(
+                        query, submitted, vm, state.value, appearance, notif,
+                        limit = if (keyboardUp) 6 else Int.MAX_VALUE,
+                        hazeState = hazeState,
+                        onPick = { text, run -> query = text; if (run) submitted = text },
+                        modifier = panel,
+                    )
+                } else {
+                    SearchSuggestions(state.value, panel, compact = keyboardUp, hazeState = hazeState) { picked, run ->
+                        query = picked
+                        if (run) submitted = picked
                     }
                 }
             }

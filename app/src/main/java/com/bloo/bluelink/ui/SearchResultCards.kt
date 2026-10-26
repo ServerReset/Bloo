@@ -49,13 +49,9 @@ internal fun AiAnswer(state: UiState, vm: AppViewModel, submittedQuery: String, 
     val thinking = "search" in state.aiBusy
     val reply = state.aiSearchReply
     ExpandVisibility(thinking || reply != null, from = Alignment.Bottom) {
-        GlassSurface(shape = StandardShape, modifier = Modifier.fillMaxWidth(), hazeState = hazeState) {
+        SearchGlassPill(hazeState) {
             ResultCardColumn(AppIcons.AutoAwesome, "AI answer") {
-                if (reply != null) {
-                    RevealText(reply, style = SecondaryTextStyle())
-                } else {
-                    MutedText("Thinking…")
-                }
+                if (reply != null) RevealText(reply, style = SecondaryTextStyle()) else MutedText("Thinking…")
             }
         }
     }
@@ -236,11 +232,11 @@ internal fun CommandActionResult(
     }
 }
 
-/** One answer card in the search results: glass, full width, and eased in when it arrives like every other card. */
+/** One answer card under the search results: a glass pill like every result, eased in when it arrives. */
 @Composable
 private fun ResultCard(hazeState: dev.chrisbanes.haze.HazeState?, content: @Composable () -> Unit) {
     EnterOnce {
-        GlassSurface(shape = StandardShape, modifier = Modifier.fillMaxWidth(), hazeState = hazeState, content = { content() })
+        SearchGlassPill(hazeState) { content() }
     }
 }
 
