@@ -455,20 +455,21 @@ internal fun LoginScreen(
 private fun LoginHero(subtitle: String, compact: Boolean, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     val moving = LocalPowerPolicy.current.ambientMotion
+    // Read inside graphicsLayer, so the breathing redraws the glow and does not recompose the hero each frame.
     val breath = if (moving) {
         rememberInfiniteTransition(label = "heroBreath").animateFloat(
             0.9f, 1.08f,
             infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
             label = "heroBreathScale",
-        ).value
-    } else 1f
+        )
+    } else null
     val tileSize = if (compact) 52.dp else 76.dp
     val tile: @Composable () -> Unit = {
         Box(contentAlignment = Alignment.Center) {
             // The glow: a radial wash of the accent behind the tile, larger than it and breathing.
             Box(
                 Modifier.size(tileSize * 1.9f)
-                    .graphicsLayer { scaleX = breath; scaleY = breath }
+                    .graphicsLayer { val b = breath?.value ?: 1f; scaleX = b; scaleY = b }
                     .background(
                         Brush.radialGradient(listOf(scheme.primary.copy(alpha = 0.32f), Color.Transparent)),
                         CircleShape,
