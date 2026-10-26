@@ -32,11 +32,7 @@ import com.bloo.uicommon.content
  * a valid new PIN.
  */
 @Composable
-internal fun OnboardingPinForm(
-    existing: Boolean,
-    onSet: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+internal fun OnboardingPinForm(existing: Boolean, onSet: (String) -> Unit, modifier: Modifier = Modifier) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
     var pin by remember { mutableStateOf("") }

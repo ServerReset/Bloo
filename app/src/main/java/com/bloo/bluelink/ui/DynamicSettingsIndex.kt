@@ -36,10 +36,7 @@ internal val ADVANCED_ONLY_SETTINGS = setOf(
  * Check if a setting should be visible in the current mode. Returns true if the setting is
  * available, false if hidden in current mode.
  */
-internal fun isSettingAvailableInMode(
-    settingTitle: String,
-    settingsMode: String,
-): Boolean {
+internal fun isSettingAvailableInMode(settingTitle: String, settingsMode: String): Boolean {
     if (settingsMode == "advanced") return true
     // Check for exact match or prefix match (for per-car settings with car names)
     return !ADVANCED_ONLY_SETTINGS.any { prefix ->

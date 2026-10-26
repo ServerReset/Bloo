@@ -51,13 +51,7 @@ fun MorphIconButton(
  * selected.
  */
 @Composable
-fun MorphChip(
-    selected: Boolean,
-    onClick: () -> Unit,
-    label: String,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-) {
+fun MorphChip(selected: Boolean, onClick: () -> Unit, label: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     val haptics = LocalHaptics.current
     val chipSelected = selected
     // Wrapped like every other button so a chip presses the same way (takes width from neighbours

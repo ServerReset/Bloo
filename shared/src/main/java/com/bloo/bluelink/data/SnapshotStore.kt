@@ -173,10 +173,7 @@ private val Context.snapshotDataStore by safePreferencesDataStore("bloo_snapshot
  * list's (user-visible pager order); VINs not in [existing] are ignored, not appended; the last
  * duplicate in [updates] wins.
  */
-internal fun mergeVehicleUpdates(
-    existing: List<VehicleSnapshot>,
-    updates: List<VehicleSnapshot>,
-): List<VehicleSnapshot> {
+internal fun mergeVehicleUpdates(existing: List<VehicleSnapshot>, updates: List<VehicleSnapshot>): List<VehicleSnapshot> {
     if (updates.isEmpty()) return existing
     val byVin = updates.associateBy { it.vin }
     return existing.map { byVin[it.vin] ?: it }

@@ -91,10 +91,7 @@ internal fun rememberShowMyLocation(
  * uses ([ExpressiveButtonRow] of [MorphActionButton]s) -- the app's standard labelled-button row.
  */
 @Composable
-internal fun MapFeatureRow(
-    features: List<MapFeature>,
-    modifier: Modifier = Modifier,
-) {
+internal fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modifier) {
     Box(modifier.padding(horizontal = GapGroup, vertical = GapRow)) {
         ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow, lineSpacing = GapRow) {
             features.forEach { feature ->

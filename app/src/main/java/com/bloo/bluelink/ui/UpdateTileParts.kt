@@ -73,10 +73,7 @@ import com.bloo.uicommon.content
  * on the update surfaces.
  */
 @Composable
-internal fun NestedGlassPanel(
-    hazeState: dev.chrisbanes.haze.HazeState?,
-    content: @Composable () -> Unit,
-) {
+internal fun NestedGlassPanel(hazeState: dev.chrisbanes.haze.HazeState?, content: @Composable () -> Unit) {
     GlassSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = SmallShape,
@@ -164,11 +161,7 @@ internal fun UpdateReleaseNotes(
 }
 
 @Composable
-internal fun UpdateDismissRow(
-    state: UiState,
-    vm: AppViewModel,
-    modifier: Modifier = Modifier,
-) {
+internal fun UpdateDismissRow(state: UiState, vm: AppViewModel, modifier: Modifier = Modifier) {
     val busy = state.updateDownloading || state.updateInstalling
     ActionRow(modifier) {
         MorphTextButton(

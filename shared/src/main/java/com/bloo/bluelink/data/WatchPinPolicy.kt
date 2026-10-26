@@ -34,11 +34,7 @@ object WatchPinPolicy {
      * opened" flag. It only ever satisfies the OPEN gate -- "opening the app" is a per-session
      * gate, so an open-unlock unlocks the session.
      */
-    fun requiresUnlock(
-        timing: WatchLockTiming,
-        event: GateEvent,
-        alreadyUnlockedThisSession: Boolean,
-    ): Boolean = when (event) {
+    fun requiresUnlock(timing: WatchLockTiming, event: GateEvent, alreadyUnlockedThisSession: Boolean): Boolean = when (event) {
         // "Opening the app" is a per-session gate: it asks unless this session already proved the
         // PIN at least once.
         GateEvent.OPEN_APP ->

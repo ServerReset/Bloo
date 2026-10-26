@@ -198,13 +198,7 @@ internal fun HotspotSlot(
  * flies to its own slot in the stack, and only then commits the unpin.
  */
 @Composable
-internal fun PinnedPebble(
-    v: Vehicle,
-    stateSource: State<UiState>,
-    vm: AppViewModel,
-    section: String,
-    hotDrag: HotSeatDrag?,
-) {
+internal fun PinnedPebble(v: Vehicle, stateSource: State<UiState>, vm: AppViewModel, section: String, hotDrag: HotSeatDrag?) {
     val haptics = LocalHaptics.current
     val scope = rememberCoroutineScope()
     val unpinPx = with(LocalDensity.current) { UnpinTravel.toPx() }

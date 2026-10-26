@@ -100,12 +100,7 @@ fun standardButtonIcon(label: String): ImageVector? = when (label) {
  * [pending], so the button width never changes just from loading.
  */
 @Composable
-private fun MorphButtonGlyph(
-    icon: ImageVector,
-    pending: Boolean,
-    iconSize: Dp,
-    spinning: Boolean,
-) {
+private fun MorphButtonGlyph(icon: ImageVector, pending: Boolean, iconSize: Dp, spinning: Boolean) {
     if (pending) {
         LoadingIndicator(Modifier.size(iconSize))
     } else {
@@ -167,10 +162,7 @@ fun MorphButtonLabel(
         },
         measurePolicy = remember(gap) {
             object : MeasurePolicy {
-                override fun MeasureScope.measure(
-                    measurables: List<Measurable>,
-                    constraints: Constraints,
-                ): MeasureResult {
+                override fun MeasureScope.measure(measurables: List<Measurable>, constraints: Constraints): MeasureResult {
                     val gapPx = gap.roundToPx()
                     val free = constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity, minHeight = 0)
                     val glyph = measurables[0].measure(free)

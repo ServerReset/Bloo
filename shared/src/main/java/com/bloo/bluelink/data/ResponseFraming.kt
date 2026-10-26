@@ -30,10 +30,7 @@ object ResponseFraming {
      * Runs [call] on [request]; if it fails with a framing failure, retries ONCE on a fresh
      * connection and returns that result. Anything else propagates untouched.
      */
-    fun <T> retryOnceOnFreshConnection(
-        request: Request,
-        call: (Request) -> T,
-    ): T {
+    fun <T> retryOnceOnFreshConnection(request: Request, call: (Request) -> T): T {
         return try {
             call(request)
         } catch (t: Throwable) {

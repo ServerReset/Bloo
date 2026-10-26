@@ -30,13 +30,7 @@ import com.bloo.uicommon.MorphTextButton
  * CURRENT PIN, then either enter a new one (set/change) or confirm removal.
  */
 @Composable
-internal fun PinDialogs(
-    mode: String?,
-    onDismiss: () -> Unit,
-    vm: AppViewModel,
-    state: UiState,
-    canBio: Boolean,
-) {
+internal fun PinDialogs(mode: String?, onDismiss: () -> Unit, vm: AppViewModel, state: UiState, canBio: Boolean) {
     if (mode == null) return
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme

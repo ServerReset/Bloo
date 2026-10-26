@@ -46,12 +46,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
  * be typed and never confirmed. Sizing from the real constraints means it fits on every face.
  */
 @Composable
-fun WearPinScreen(
-    store: WatchPinStore,
-    title: String,
-    modifier: Modifier = Modifier,
-    onUnlocked: () -> Unit,
-) {
+fun WearPinScreen(store: WatchPinStore, title: String, modifier: Modifier = Modifier, onUnlocked: () -> Unit) {
     var entered by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     // A wrist is often not looked at: a right PIN buzzes yes, a wrong one buzzes no, and the dots shake.

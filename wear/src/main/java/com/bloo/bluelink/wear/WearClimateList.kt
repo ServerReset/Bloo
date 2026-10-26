@@ -14,12 +14,7 @@ import com.bloo.bluelink.data.VehicleSnapshot
  * or "preset:" and the id -- and the caller decides what that means: assign it to a face quarter, or start it now.
  */
 @Composable
-internal fun WearClimateList(
-    car: VehicleSnapshot,
-    title: String,
-    onPick: (String) -> Unit,
-    onBack: () -> Unit,
-) {
+internal fun WearClimateList(car: VehicleSnapshot, title: String, onPick: (String) -> Unit, onBack: () -> Unit) {
     val presets by WearPresets.presets.collectAsStateWithLifecycle()
     val hints by WearSmartClimate.hints.collectAsStateWithLifecycle()
     LaunchedEffect(car.vin, car.lat, car.lon) { WearSmartClimate.refresh(car) }

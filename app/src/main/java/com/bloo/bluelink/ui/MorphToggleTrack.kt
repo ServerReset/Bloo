@@ -38,13 +38,7 @@ internal fun MorphToggleTrack(checked: Boolean) {
 
 /** One seat's heat + cool capability toggles, shown as two compact filter chips. */
 @Composable
-internal fun SeatConfigRow(
-    label: String,
-    heat: Boolean,
-    cool: Boolean,
-    onHeat: (Boolean) -> Unit,
-    onCool: (Boolean) -> Unit,
-) {
+internal fun SeatConfigRow(label: String, heat: Boolean, cool: Boolean, onHeat: (Boolean) -> Unit, onCool: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         RevealText(label, Modifier.weight(1f), style = SecondaryTextStyle(), maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.width(GapRow))

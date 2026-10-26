@@ -38,12 +38,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 
 /** The on-device AI's plain-language answer to the submitted query. */
 @Composable
-internal fun AiAnswer(
-    state: UiState,
-    vm: AppViewModel,
-    submittedQuery: String,
-    hazeState: dev.chrisbanes.haze.HazeState?,
-) {
+internal fun AiAnswer(state: UiState, vm: AppViewModel, submittedQuery: String, hazeState: dev.chrisbanes.haze.HazeState?) {
     LaunchedEffect(submittedQuery) {
         if (submittedQuery.isNotBlank()) {
             vm.askAi(submittedQuery)

@@ -69,13 +69,7 @@ object LiveCharge {
             NotificationManagerCompat.from(context).canPostPromotedNotifications()
 
     /** Convenience overload: derive the five charge fields from an [EvStatus] and delegate. */
-    suspend fun sync(
-        context: Context,
-        settings: SettingsStore,
-        vin: String,
-        carName: String,
-        ev: EvStatus?,
-    ) = sync(
+    suspend fun sync(context: Context, settings: SettingsStore, vin: String, carName: String, ev: EvStatus?) = sync(
         context = context,
         settings = settings,
         vin = vin,
@@ -95,12 +89,7 @@ object LiveCharge {
      * background workers reach it: each wrote out `sync(context = applicationContext, settings =
      * settings, vin = v.vin, carName = v.name, ev = ev)` verbatim.
      */
-    suspend fun sync(
-        context: Context,
-        settings: SettingsStore,
-        v: Vehicle,
-        ev: EvStatus?,
-    ) = sync(
+    suspend fun sync(context: Context, settings: SettingsStore, v: Vehicle, ev: EvStatus?) = sync(
         context = context,
         settings = settings,
         vin = v.vin,

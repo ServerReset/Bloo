@@ -198,12 +198,7 @@ internal fun updateAction(state: UiState, info: UpdateInfo, seamless: Boolean): 
 )
 
 /** Runs the update's primary action -- download, install, or open the release page. */
-internal fun runUpdateAction(
-    state: UiState,
-    vm: AppViewModel,
-    info: UpdateInfo,
-    context: android.content.Context,
-) {
+internal fun runUpdateAction(state: UiState, vm: AppViewModel, info: UpdateInfo, context: android.content.Context) {
     when {
         state.updateApkReady -> vm.installDownloadedUpdate()
         info.run.phoneApkUrl != null -> vm.downloadUpdateInBackground()

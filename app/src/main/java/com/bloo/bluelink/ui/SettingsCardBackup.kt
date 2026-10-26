@@ -46,12 +46,7 @@ import com.bloo.uicommon.SegmentOption
  * the state of the first.
  */
 @Composable
-internal fun BackupSyncCardContent(
-    state: UiState,
-    vm: AppViewModel,
-    context: Context,
-    advanced: Boolean,
-) {
+internal fun BackupSyncCardContent(state: UiState, vm: AppViewModel, context: Context, advanced: Boolean) {
     val configured = state.syncUri != null
     val failed = configured && state.syncError != null
     val status = when {

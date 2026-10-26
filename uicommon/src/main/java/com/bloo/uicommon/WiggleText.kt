@@ -46,13 +46,7 @@ private val UNIT_SUFFIXES = charArrayOf('F', 'C', '°')
  * default this used to have cost three call sites.
  */
 @Composable
-fun WiggleText(
-    text: String,
-    style: TextStyle,
-    reduceMotion: Boolean,
-    modifier: Modifier = Modifier,
-    maxLines: Int = 1,
-) {
+fun WiggleText(text: String, style: TextStyle, reduceMotion: Boolean, modifier: Modifier = Modifier, maxLines: Int = 1) {
     // Fires only when the trimmed text is exactly one of WIGGLE_NUMBERS, optionally
     // followed by a single trailing unit character ("67", "67°", "67F", "42mi").
     // Matching the whole string this way -- rather than filtering digits out and
@@ -233,11 +227,7 @@ internal fun rollingTokens(value: String): List<RollToken> {
  * parity that matters most for a component this widely applied.
  */
 @Composable
-private fun RollingTokenRow(
-    value: String,
-    style: TextStyle,
-    modifier: Modifier = Modifier,
-) {
+private fun RollingTokenRow(value: String, style: TextStyle, modifier: Modifier = Modifier) {
     // Direction is derived from AnimatedContent's own initialState/targetState
     // per digit run, the same way :app's original roll did (and NOT from a
     // separately-tracked "previous value"): the derived direction can never lag

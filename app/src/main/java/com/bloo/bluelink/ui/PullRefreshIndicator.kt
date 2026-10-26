@@ -79,11 +79,7 @@ private const val OverPullTravel = 0.35f
 
 /** The single floating indicator. */
 @Composable
-internal fun PullRefreshIndicatorHost(
-    state: RefreshIndicatorState,
-    hazeState: HazeState?,
-    modifier: Modifier = Modifier,
-) {
+internal fun PullRefreshIndicatorHost(state: RefreshIndicatorState, hazeState: HazeState?, modifier: Modifier = Modifier) {
     // Held once the pull is released into a refresh (either the real flag or the synchronous
     // request), driven by the finger otherwise.
     val active = state.refreshing || state.requested

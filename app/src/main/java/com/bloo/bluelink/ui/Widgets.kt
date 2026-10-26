@@ -112,11 +112,7 @@ internal fun StatusBarScrim(haze: HazeState? = LocalBackdropHaze.current) {
  * Settings mode (Simple/Advanced) toggle hanging flush from the status bar as one piece of chrome.
  */
 @Composable
-internal fun SettingsModeTab(
-    settingsMode: String,
-    onSettingsModeChange: (String) -> Unit,
-    hazeState: HazeState? = null,
-) {
+internal fun SettingsModeTab(settingsMode: String, onSettingsModeChange: (String) -> Unit, hazeState: HazeState? = null) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
 

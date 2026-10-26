@@ -39,12 +39,7 @@ internal const val RestingPressReserve = 0.18f
  * neighbour's slack above its content need, and a defensive floor never lets content shrink below
  * what it needs.
  */
-internal fun redistributeForPress(
-    memberIdx: List<Int>,
-    base: DoubleArray,
-    basis: IntArray,
-    press: FloatArray,
-): DoubleArray {
+internal fun redistributeForPress(memberIdx: List<Int>, base: DoubleArray, basis: IntArray, press: FloatArray): DoubleArray {
     val exact = DoubleArray(basis.size)
     for (i in memberIdx) exact[i] = base[i]
     for (k in 0 until memberIdx.size - 1) {

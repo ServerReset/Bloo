@@ -151,11 +151,7 @@ val ThemeModeOptions = ThemeMode.entries.map { SegmentOption(it.name, it.name.lo
  * onboarding.
  */
 @Composable
-fun ThemeModeSegmentedRow(
-    appearance: SettingsStore.Appearance,
-    modifier: Modifier = Modifier,
-    onSelect: (ThemeMode) -> Unit,
-) {
+fun ThemeModeSegmentedRow(appearance: SettingsStore.Appearance, modifier: Modifier = Modifier, onSelect: (ThemeMode) -> Unit) {
     SettingsSegmentedRow(
         label = "Appearance",
         options = ThemeModeOptions,

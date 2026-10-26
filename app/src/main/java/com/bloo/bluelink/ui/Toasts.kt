@@ -178,12 +178,7 @@ internal class ToastState {
  * from the centre to a side SLIDES the stack from "above it" to "beside it" instead of snapping.
  */
 @Composable
-internal fun ToastHost(
-    state: ToastState,
-    hazeState: HazeState,
-    onCopy: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+internal fun ToastHost(state: ToastState, hazeState: HazeState, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
     val density = LocalDensity.current
     val anchor = LocalSearchAnchor.current
 

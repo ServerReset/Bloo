@@ -136,12 +136,7 @@ object VehicleCommandRunner {
      * BEFORE [run] takes [BlueLinkGate.statusMutex], so the weather lookup doesn't hold an app-wide
      * lock on the car's session hostage.
      */
-    private suspend fun prepareSmartClimate(
-        ctx: Context,
-        vin: String,
-        cmd: String,
-        target: String,
-    ): ClimateRequest? {
+    private suspend fun prepareSmartClimate(ctx: Context, vin: String, cmd: String, target: String): ClimateRequest? {
         if (target != "smart") return null
         if (cmd != "climate" && cmd != "climate_on") return null
         val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin } ?: return null

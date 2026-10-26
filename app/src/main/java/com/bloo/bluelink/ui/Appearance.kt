@@ -139,11 +139,7 @@ internal fun CustomPaletteSwatch(palette: CustomPaletteData, selected: Boolean, 
  * [color] and never re-synced; drags report via [onColorChange].
  */
 @Composable
-internal fun ColorPickerCanvas(
-    color: Color,
-    onColorChange: (Color) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+internal fun ColorPickerCanvas(color: Color, onColorChange: (Color) -> Unit, modifier: Modifier = Modifier) {
     // Internal HSV state initialised from the incoming colour once.
     var hue by remember {
         val hsv = FloatArray(3)

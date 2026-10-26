@@ -148,9 +148,7 @@ suspend fun EuApi.stopClimate(session: EuSession, v: EuVehicleSummary, controlTo
  * Start climate / pre-conditioning. Temperature arrives as Fahrenheit ([ClimateRequest.tempF]) and
  * is sent as a Celsius half-degree. Body shape from ApiImplType1's ccs2 temperature start.
  */
-suspend fun EuApi.startClimate(
-    session: EuSession, v: EuVehicleSummary, controlToken: String, req: ClimateRequest,
-) {
+suspend fun EuApi.startClimate(session: EuSession, v: EuVehicleSummary, controlToken: String, req: ClimateRequest) {
     val celsius = Math.round(fToC(req.tempF.toDouble()) * 2) / 2.0
     val driveSide = deviceDriveSide()
     val driverSeat =

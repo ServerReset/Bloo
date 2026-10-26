@@ -221,9 +221,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      * Shared body for the form-urlencoded commands (lock/unlock): a minimal `userName=...&vin=...`
      * body posted with [formMedia], on top of the usual [baseRequest] auth/vehicle headers.
      */
-    internal suspend fun formCommand(
-        path: String, token: String, username: String, pin: String, v: Vehicle,
-    ): String = execute {
+    internal suspend fun formCommand(path: String, token: String, username: String, pin: String, v: Vehicle): String = execute {
         val form = "userName=$username&vin=${v.vin}".toRequestBody(formMedia)
         val request = baseRequest(path, token, username, pin, v)
             .post(form)
@@ -235,9 +233,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      * Same userName+vin payload as [formCommand], but JSON -- the horn/lights endpoints reject the
      * form-urlencoded body lock/unlock use.
      */
-    internal suspend fun jsonCommand(
-        path: String, token: String, username: String, pin: String, v: Vehicle,
-    ): String = execute {
+    internal suspend fun jsonCommand(path: String, token: String, username: String, pin: String, v: Vehicle): String = execute {
         val body = json.encodeToString(
             kotlinx.serialization.json.JsonObject.serializer(),
             kotlinx.serialization.json.buildJsonObject {

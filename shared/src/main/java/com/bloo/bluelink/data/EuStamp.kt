@@ -40,11 +40,7 @@ object EuStamp {
      * shipped constants but are injectable so the pure algorithm can be
      * unit-tested against fixed vectors.
      */
-    fun generate(
-        appId: String = APP_ID,
-        cfbBase64: String = CFB,
-        unixSeconds: Long,
-    ): String {
+    fun generate(appId: String = APP_ID, cfbBase64: String = CFB, unixSeconds: Long): String {
         val cfb = Base64.getDecoder().decode(cfbBase64)
         val raw = "$appId:$unixSeconds".toByteArray()
         // zip(CFB, raw): truncate to the shorter of the two, XOR pairwise.

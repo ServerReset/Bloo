@@ -58,12 +58,7 @@ private fun choice(
 ) = SettingAction(id, SettingsCatalog.titleOf(key) ?: key, hintOf(key, phrases), options = options, read = read, write = write)
 
 /** A one-shot action the request can run: it has no value, only "run". */
-private fun action(
-    id: String,
-    title: String,
-    hint: String,
-    run: (AppViewModel) -> Unit,
-) = SettingAction(
+private fun action(id: String, title: String, hint: String, run: (AppViewModel) -> Unit) = SettingAction(
     id, title, hint, options = listOf(Option("run", title)), isAction = true,
     read = { "" }, write = { vm, _ -> run(vm) },
 )

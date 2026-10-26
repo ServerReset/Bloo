@@ -140,12 +140,7 @@ internal fun WearBackable(onBack: () -> Unit, content: @Composable () -> Unit) {
  * The body is a slot, so a section is whatever the caller puts under its title -- a list of rows, a block of text, a readout.
  */
 @Composable
-fun WearPebble(
-    title: String,
-    icon: ImageVector,
-    modifier: Modifier = Modifier,
-    body: @Composable () -> Unit,
-) {
+fun WearPebble(title: String, icon: ImageVector, modifier: Modifier = Modifier, body: @Composable () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Column(modifier.fillMaxWidth().padding(horizontal = ListInset), verticalArrangement = Arrangement.spacedBy(RowGap)) {
         // The same heading as the phone's sections (:uicommon), centred for the round face and in the watch's own tint and size.

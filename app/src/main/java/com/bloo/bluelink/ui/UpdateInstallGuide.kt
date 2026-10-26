@@ -23,10 +23,7 @@ import com.bloo.uicommon.MorphActionButton
  * [GlassAlertDialog].
  */
 @Composable
-internal fun UpdateInstallGuideDialog(
-    onDismiss: () -> Unit,
-    onContinue: () -> Unit,
-) {
+internal fun UpdateInstallGuideDialog(onDismiss: () -> Unit, onContinue: () -> Unit) {
     GlassAlertDialog(
         onDismissRequest = onDismiss,
         title = "Install the update",

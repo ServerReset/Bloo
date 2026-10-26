@@ -93,13 +93,7 @@ import com.bloo.uicommon.content
  */
 
 @Composable
-internal fun SeatControl(
-    label: String,
-    level: SeatLevel,
-    canCool: Boolean,
-    canHeat: Boolean,
-    onChange: (SeatLevel) -> Unit,
-) {
+internal fun SeatControl(label: String, level: SeatLevel, canCool: Boolean, canHeat: Boolean, onChange: (SeatLevel) -> Unit) {
     val range = SeatLevel.rangeFor(canCool, canHeat)
     if (range.size <= 1) return
     val index = range.indexOf(level).let { if (it < 0) range.indexOf(SeatLevel.OFF) else it }

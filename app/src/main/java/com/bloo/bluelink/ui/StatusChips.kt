@@ -86,12 +86,7 @@ internal fun StatusChip(text: String, tint: Color, modifier: Modifier = Modifier
  * are applied through LocalContentColor / LocalTextStyle so they match a static chip.
  */
 @Composable
-internal fun StatusChip(
-    tint: Color,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    label: @Composable () -> Unit,
-) {
+internal fun StatusChip(tint: Color, modifier: Modifier = Modifier, icon: ImageVector? = null, label: @Composable () -> Unit) {
     Row(
         modifier
             .clip(CircleShape)

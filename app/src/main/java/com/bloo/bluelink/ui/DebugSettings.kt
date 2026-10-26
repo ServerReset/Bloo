@@ -40,10 +40,7 @@ data class DebugInfo(
 
 /** Single debug information row: label, value, optional icon and copy. */
 @Composable
-private fun DebugInfoItem(
-    info: DebugInfo,
-    onCopy: ((String) -> Unit)? = null,
-) {
+private fun DebugInfoItem(info: DebugInfo, onCopy: ((String) -> Unit)? = null) {
     Row(
         modifier = Modifier.fillMaxWidth().then(
                 if (info.copyable && onCopy != null) {
@@ -140,10 +137,7 @@ fun getDebugInfo(): List<DebugInfo> {
  * is called when the user copies a value.
  */
 @Composable
-fun DebugSettingsPanel(
-    modifier: Modifier = Modifier,
-    onCopyToClipboard: ((String) -> Unit)? = null,
-) {
+fun DebugSettingsPanel(modifier: Modifier = Modifier, onCopyToClipboard: ((String) -> Unit)? = null) {
     val debugInfo = getDebugInfo()
 
     // No self-styled card: it renders inside SettingsCard("Debug", ...), whose title row already

@@ -200,10 +200,7 @@ internal fun Modifier.noRippleClickable(onClickLabel: String? = null, onClick: (
  * let the drag reach the pager. A real tap never exceeds the touch slop, so the tap still wins.
  */
 @Composable
-internal fun Modifier.hapticClickable(
-    onClickLabel: String? = null,
-    onClick: () -> Unit,
-): Modifier {
+internal fun Modifier.hapticClickable(onClickLabel: String? = null, onClick: () -> Unit): Modifier {
     val haptics = LocalHaptics.current
     val source = remember { MutableInteractionSource() }
     return clickable(interactionSource = source, indication = null, onClickLabel = onClickLabel) { haptics?.click(); onClick() }

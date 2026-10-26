@@ -35,12 +35,7 @@ import androidx.compose.ui.unit.IntOffset
  * choice is on screen when the list closes.
  */
 @Composable
-internal fun WearFaceEditor(
-    car: VehicleSnapshot,
-    slots: List<String>,
-    onPickSlot: (Int) -> Unit,
-    onDone: () -> Unit,
-) {
+internal fun WearFaceEditor(car: VehicleSnapshot, slots: List<String>, onPickSlot: (Int) -> Unit, onDone: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val haptics = LocalHapticFeedback.current
     WearBackable(onDone) {

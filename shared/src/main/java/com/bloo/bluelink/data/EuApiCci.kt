@@ -18,12 +18,7 @@ private const val MOZILLA_UA =
         "(KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
 
 /** CCI/OneApp sign-in (Hyundai EU): the flow that bypasses the IDPConnect WAF. */
-internal suspend fun EuApi.loginCci(
-    username: String,
-    password: String,
-    deviceId: String,
-    pin: String?,
-): EuSession {
+internal suspend fun EuApi.loginCci(username: String, password: String, deviceId: String, pin: String?): EuSession {
     // One cookie jar across the handshake; two clients over it that differ only in
     // redirect-following (signin must NOT follow, so its 302 Location carrying the code is
     // readable).

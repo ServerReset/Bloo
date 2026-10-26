@@ -331,11 +331,7 @@ private val CardBlurRadius = 22.dp
  * shadow in light (a heavy black one on a pale surface reads as a smudge).
  */
 @Composable
-internal fun Modifier.themedDropShadow(
-    shape: Shape,
-    blurRadius: Dp = 14.dp,
-    offsetY: Dp = 4.dp,
-): Modifier = this.dropShadow(
+internal fun Modifier.themedDropShadow(shape: Shape, blurRadius: Dp = 14.dp, offsetY: Dp = 4.dp): Modifier = this.dropShadow(
     shape,
     color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.06f),
     blurRadius = blurRadius,
