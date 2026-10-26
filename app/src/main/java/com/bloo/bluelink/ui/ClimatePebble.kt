@@ -81,7 +81,6 @@ internal fun ClimatePebble(
 
     val presets = state.climatePresets[v.vin].orEmpty()
     var showAddPreset by remember { mutableStateOf(false) }
-    var presetName by remember { mutableStateOf("") }
 
     // Warn if the engine is on before changing climate settings.
     // What was last sent and when: the car's own reading of its set temperature lags a command by a refresh, and
@@ -277,47 +276,17 @@ internal fun ClimatePebble(
             showSeats = showSeatControls,
         )
 
-        // Smart climate: read the weather where the car is (falling back to home) and pick a target
-        // -- see smartClimateTargetF, the same rule the tile command runner uses: ~10°F off ambient
-        // normally, or the car's most aggressive setting on a genuinely extreme day, always within
-        // what the car's own climate range actually accepts.
-        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            SectionLabel(CarLabels.SMART_CLIMATE)
-            val w = weather
-            if (w != null) {
-                val ambientF = ambientFahrenheit(w.tempC)
-                val smartTarget = smartClimateTargetF(ambientF)
-                val smartLabel = smartClimateLabel(ambientF, fahrenheit)
-                MorphActionButton(
-                    label = smartLabel,
-                    icon = Icons.Filled.AcUnit,
-                    onClick = { startAtTarget(smartTarget, currentReq) },
-                    enabled = !pending && !climateOn,
-                )
-                RevealText(
-                    smartClimateTargetLine(ambientF, fahrenheit),
-                    style = SecondaryTextStyle(),
-                    color = mutedContentColor(),
-                )
-            } else {
-                // No reading yet (no car location, or still loading): the button finds the weather itself when pressed.
-                MorphActionButton(
-                    label = CarLabels.SMART_CLIMATE,
-                    icon = Icons.Filled.AcUnit,
-                    onClick = {
-                        if (!pending) vm.startSmartClimate(v) { req ->
-                            form.load(req); activePresetId = null; lastSent = req to System.currentTimeMillis()
-                        }
-                    },
-                    enabled = !pending && !climateOn,
-                )
-                RevealText(
-                    "Sets the temperature for the weather where your car is parked.",
-                    style = SecondaryTextStyle(),
-                    color = mutedContentColor(),
-                )
-            }
-        }
+        SmartClimateSection(
+            ambientF = weather?.let { ambientFahrenheit(it.tempC) },
+            fahrenheit = fahrenheit,
+            enabled = !pending && !climateOn,
+            onStartAtTarget = { target -> startAtTarget(target, currentReq) },
+            onStartUnread = {
+                if (!pending) vm.startSmartClimate(v) { req ->
+                    form.load(req); activePresetId = null; lastSent = req to System.currentTimeMillis()
+                }
+            },
+        )
 
         ClimateControlsSection(
             form = form,
@@ -327,46 +296,75 @@ internal fun ClimatePebble(
             // state.powertrainOf, not the raw v.isEv: a user's powertrain override is honoured here
             // too.
             showSeats = showSeatControls,
-            onSaveAsPreset = { presetName = ""; showAddPreset = true },
+            onSaveAsPreset = { showAddPreset = true },
         )
 
         if (showAddPreset) {
-            // Shared GlassAlertDialog shell (stacked buttons).
-            GlassAlertDialog(
-                onDismissRequest = { showAddPreset = false },
-                icon = Icons.Filled.Thermostat,
-                title = "Save preset",
-                text = {
-                    BlooTextField(
-                        value = presetName,
-                        onValueChange = { presetName = it },
-                        label = { RevealText("Name") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                },
-                buttons = {
-                    MorphTextButton(
-                        "Save",
-                        onClick = {
-                            if (presetName.isNotBlank()) {
-                                vm.saveClimatePreset(v, presetName.trim(), currentReq)
-                                showAddPreset = false
-                            }
-                        },
-                        enabled = presetName.isNotBlank(),
-                        emphasis = ButtonEmphasis.Confirm,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    MorphTextButton(
-                        "Cancel",
-                        onClick = { showAddPreset = false },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
+            SavePresetDialog(
+                onSave = { name -> vm.saveClimatePreset(v, name, currentReq); showAddPreset = false },
+                onDismiss = { showAddPreset = false },
             )
         }
     }
+}
+
+/**
+ * Smart climate: the weather where the car is (falling back to home) picks a target, by [smartClimateTargetF], the same rule the
+ * tile command runner uses: about 10°F off ambient, or the car's most aggressive setting on a genuinely extreme day, always within
+ * what the car's climate range accepts. With no reading yet ([ambientF] null) the button finds the weather itself when pressed.
+ */
+@Composable
+private fun SmartClimateSection(
+    ambientF: Int?,
+    fahrenheit: Boolean,
+    enabled: Boolean,
+    onStartAtTarget: (Int) -> Unit,
+    onStartUnread: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        SectionLabel(CarLabels.SMART_CLIMATE)
+        MorphActionButton(
+            label = ambientF?.let { smartClimateLabel(it, fahrenheit) } ?: CarLabels.SMART_CLIMATE,
+            icon = Icons.Filled.AcUnit,
+            onClick = { if (ambientF != null) onStartAtTarget(smartClimateTargetF(ambientF)) else onStartUnread() },
+            enabled = enabled,
+        )
+        RevealText(
+            ambientF?.let { smartClimateTargetLine(it, fahrenheit) } ?: "Sets the temperature for the weather where your car is parked.",
+            style = SecondaryTextStyle(),
+            color = mutedContentColor(),
+        )
+    }
+}
+
+/** Names and saves the climate settings on screen as a preset. */
+@Composable
+private fun SavePresetDialog(onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    GlassAlertDialog(
+        onDismissRequest = onDismiss,
+        icon = Icons.Filled.Thermostat,
+        title = "Save preset",
+        text = {
+            BlooTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { RevealText("Name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        buttons = {
+            MorphTextButton(
+                "Save",
+                onClick = { if (name.isNotBlank()) onSave(name.trim()) },
+                enabled = name.isNotBlank(),
+                emphasis = ButtonEmphasis.Confirm,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            MorphTextButton("Cancel", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+        },
+    )
 }
 
 private fun TempValue.asFahrenheit(): Int? {

@@ -243,6 +243,24 @@ fun <T> ReorderColumn(
                     // A swap moves the item past a neighbour AND the gap between them, so the drag offset
                     // is corrected by both (by the neighbour alone it jumped one gap per swap).
                     val gapPx = spacing.toPx()
+                    // Springs the item back into its slot from wherever it was let go (sideways included), then clears the
+                    // drag; [landed] runs once it is home.
+                    val settleHome: (() -> Unit)? -> Unit = { landed ->
+                        settlingKey = k
+                        settleJob = scope.launch {
+                            val ax = Animatable(offsetX)
+                            val ay = Animatable(offsetY)
+                            coroutineScope {
+                                launch { ax.animateTo(0f, DragSettleSpec) { offsetX = value } }
+                                launch { ay.animateTo(0f, DragSettleSpec) { offsetY = value } }
+                            }
+                            if (draggingKey == k) {
+                                draggingKey = null; flyingKey = null; settlingKey = null
+                                offsetX = 0f; offsetY = 0f
+                            }
+                            landed?.invoke()
+                        }
+                    }
                     detectDragGesturesAfterLongPress(
                         onDragStart = {
                             // Picking up an item that is still settling takes over from where it is.
@@ -298,37 +316,12 @@ fun <T> ReorderColumn(
                                 // drop in the wrong place flies back instead of snapping. settlingKey
                                 // drives the landing bounce (see the lift spec above).
                                 if (handled) onDragReleaseCommitNow?.invoke(k) else onReorderNow(order)
-                                settlingKey = k
-                                settleJob = scope.launch {
-                                    val ax = Animatable(offsetX)
-                                    val ay = Animatable(offsetY)
-                                    coroutineScope {
-                                        launch { ax.animateTo(0f, DragSettleSpec) { offsetX = value } }
-                                        launch { ay.animateTo(0f, DragSettleSpec) { offsetY = value } }
-                                    }
-                                    if (draggingKey == k) {
-                                        draggingKey = null; flyingKey = null; settlingKey = null
-                                        offsetX = 0f; offsetY = 0f
-                                    }
-                                    onLandedNow?.invoke()
-                                }
+                                settleHome({ onLandedNow?.invoke() })
                             }
                         },
                         onDragCancel = {
                             onDragCancelNow?.invoke(k)
-                            settlingKey = k
-                            settleJob = scope.launch {
-                                val ax = Animatable(offsetX)
-                                val ay = Animatable(offsetY)
-                                coroutineScope {
-                                    launch { ax.animateTo(0f, DragSettleSpec) { offsetX = value } }
-                                    launch { ay.animateTo(0f, DragSettleSpec) { offsetY = value } }
-                                }
-                                if (draggingKey == k) {
-                                    draggingKey = null; flyingKey = null; settlingKey = null
-                                    offsetX = 0f; offsetY = 0f
-                                }
-                            }
+                            settleHome(null)
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
