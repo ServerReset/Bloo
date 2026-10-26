@@ -31,44 +31,23 @@ internal fun SettingsStore.decodeNotificationPrefs(p: Preferences): SettingsStor
 suspend fun SettingsStore.notificationPrefs(): SettingsStore.NotificationPrefs =
     decodeNotificationPrefs(context.settingsDataStore.data.first())
 
-// One setter per SettingsStore.NotificationPrefs field; `.let {}` just discards editTracked's Unit
-// return so these can stay one-expression functions (`=` body) rather than needing an explicit
-// block body.
-suspend fun SettingsStore.setNotifyService(v: Boolean) =
-    editTracked { it[booleanPreferencesKey("notify_service")] = v }.let {}
+// One setter per SettingsStore.NotificationPrefs field: the switches are stored as booleans, the minute thresholds as text.
+private suspend fun SettingsStore.putSwitch(key: String, v: Boolean) { editTracked { it[booleanPreferencesKey(key)] = v } }
 
-suspend fun SettingsStore.setNotifyDoor(v: Boolean) =
-    editTracked { it[booleanPreferencesKey("notify_door")] = v }.let {}
+private suspend fun SettingsStore.putMinutes(key: String, v: Int) { editTracked { it[stringPreferencesKey(key)] = v.toString() } }
 
-suspend fun SettingsStore.setDoorOpenMinutes(v: Int) =
-    editTracked { it[stringPreferencesKey("notify_door_min")] = v.toString() }.let {}
-
-suspend fun SettingsStore.setNotifyRunning(v: Boolean) =
-    editTracked { it[booleanPreferencesKey("notify_running")] = v }.let {}
-
-suspend fun SettingsStore.setRunningMinutes(v: Int) =
-    editTracked { it[stringPreferencesKey("notify_running_min")] = v.toString() }.let {}
-
-suspend fun SettingsStore.setNotifyUnlocked(v: Boolean) =
-    editTracked { it[booleanPreferencesKey("notify_unlocked")] = v }.let {}
-
-suspend fun SettingsStore.setUnlockedMinutes(v: Int) =
-    editTracked { it[stringPreferencesKey("notify_unlocked_min")] = v.toString() }.let {}
-
-suspend fun SettingsStore.setNotifyCharging(v: Boolean) =
-    editTracked { it[booleanPreferencesKey("notify_charging")] = v }.let {}
-
-suspend fun SettingsStore.setNotifyAutoLock(v: Boolean) =
-    editTracked { it[booleanPreferencesKey("notify_autolock")] = v }.let {}
-
-suspend fun SettingsStore.setNotifyCarStarted(v: Boolean) =
-    editTracked { it[booleanPreferencesKey("notify_start")] = v }.let {}
-
-suspend fun SettingsStore.setNotifyChargeComplete(v: Boolean) =
-    editTracked { it[booleanPreferencesKey("notify_charge_complete")] = v }.let {}
-
-suspend fun SettingsStore.setNotifyWatchLowBattery(v: Boolean) =
-    editTracked { it[booleanPreferencesKey("notify_watch_low")] = v }.let {}
+suspend fun SettingsStore.setNotifyService(v: Boolean) = putSwitch("notify_service", v)
+suspend fun SettingsStore.setNotifyDoor(v: Boolean) = putSwitch("notify_door", v)
+suspend fun SettingsStore.setDoorOpenMinutes(v: Int) = putMinutes("notify_door_min", v)
+suspend fun SettingsStore.setNotifyRunning(v: Boolean) = putSwitch("notify_running", v)
+suspend fun SettingsStore.setRunningMinutes(v: Int) = putMinutes("notify_running_min", v)
+suspend fun SettingsStore.setNotifyUnlocked(v: Boolean) = putSwitch("notify_unlocked", v)
+suspend fun SettingsStore.setUnlockedMinutes(v: Int) = putMinutes("notify_unlocked_min", v)
+suspend fun SettingsStore.setNotifyCharging(v: Boolean) = putSwitch("notify_charging", v)
+suspend fun SettingsStore.setNotifyAutoLock(v: Boolean) = putSwitch("notify_autolock", v)
+suspend fun SettingsStore.setNotifyCarStarted(v: Boolean) = putSwitch("notify_start", v)
+suspend fun SettingsStore.setNotifyChargeComplete(v: Boolean) = putSwitch("notify_charge_complete", v)
+suspend fun SettingsStore.setNotifyWatchLowBattery(v: Boolean) = putSwitch("notify_watch_low", v)
 
 // Mechanism: when AlertWorker (see work/AlertWorker.kt) first observes a door open (or engine
 // running), it stamps "door_since_$vin"/"engine_since_$vin" with the current time via the setters

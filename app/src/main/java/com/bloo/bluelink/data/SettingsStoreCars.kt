@@ -24,28 +24,18 @@ suspend fun SettingsStore.setLicensePlate(vin: String, value: String) {
 
 suspend fun SettingsStore.lastServiceMiles(vin: String): Int? = lastServiceMiles(vin, context.settingsDataStore.data.first())
 
-fun SettingsStore.lastServiceMiles(vin: String, p: Preferences): Int? =
-
-    p[stringPreferencesKey("svc_last_$vin")]?.toIntOrNull()
+fun SettingsStore.lastServiceMiles(vin: String, p: Preferences): Int? = p[stringPreferencesKey("svc_last_$vin")]?.toIntOrNull()
 
 suspend fun SettingsStore.setLastServiceMiles(vin: String, value: Int?) {
-    editTracked {
-        val key = stringPreferencesKey("svc_last_$vin")
-        it.putOrRemove(key, value)
-    }
+    editTracked { it.putOrRemove(stringPreferencesKey("svc_last_$vin"), value) }
 }
 
 suspend fun SettingsStore.serviceIntervalMiles(vin: String): Int? = serviceIntervalMiles(vin, context.settingsDataStore.data.first())
 
-fun SettingsStore.serviceIntervalMiles(vin: String, p: Preferences): Int? =
-
-    p[stringPreferencesKey("svc_interval_$vin")]?.toIntOrNull()
+fun SettingsStore.serviceIntervalMiles(vin: String, p: Preferences): Int? = p[stringPreferencesKey("svc_interval_$vin")]?.toIntOrNull()
 
 suspend fun SettingsStore.setServiceIntervalMiles(vin: String, value: Int?) {
-    editTracked {
-        val key = stringPreferencesKey("svc_interval_$vin")
-        it.putOrRemove(key, value)
-    }
+    editTracked { it.putOrRemove(stringPreferencesKey("svc_interval_$vin"), value) }
 }
 
 suspend fun SettingsStore.lastVehicleVin(): String? = lastVehicleVin(context.settingsDataStore.data.first())
