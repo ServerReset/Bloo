@@ -70,10 +70,7 @@ suspend fun SettingsStore.importSettingsJson(json: String): String? {
         // types, since this file mixes string/boolean prefs under the same name) so a deletion
         // converges instead of the key resurrecting from this device's stale copy.
         // DEVICE_LOCAL_KEYS are already excluded by parseBackup.
-        plan.removes.forEach { name ->
-            mut.remove(stringPreferencesKey(name))
-            mut.remove(booleanPreferencesKey(name))
-        }
+        mut.removeNamed(plan.removes)
     }
     return null
 }
@@ -111,16 +108,9 @@ suspend fun SettingsStore.pruneOrphanPhotos(): Int = withContext(Dispatchers.IO)
  * values are not re-marked as local changes. Returns whether anything was applied.
  */
 internal suspend fun SettingsStore.mergeSettingsJson(json: String, protect: Set<String>): Boolean {
-    // Validate up front: a bad remote file returns false (the upload half still proceeds) and logs a newer format.
-    val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }.getOrNull() ?: return false
-    if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") return false
-    val version = (root["_version"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 1
-    if (version > BACKUP_VERSION) {
-        // Newer format: skip the import half this round and wait for an update.
-        AppLog.log("⚠ Drive sync: remote backup is a newer format ($version > $BACKUP_VERSION), skipping import")
-        return false
-    }
-    if ((root["prefs"] as? JsonObject) == null) return false
+    // Validate up front: a bad remote file returns false (the upload half still proceeds); a newer format skips the import half
+    // this round and waits for an update.
+    val root = readableBackup(json, "import") ?: return false
     // Photos are guarded by `protect` plus every photo this device chose itself: once uploaded, the key
     // leaves the dirty set, and a peer's lossy 640px JPEG transport copy would overwrite the original
     // (the orphan sweep would then delete it). Only non-synced-filename photos are protected, so genuine
@@ -149,10 +139,7 @@ internal suspend fun SettingsStore.mergeSettingsJson(json: String, protect: Set<
         // (locally changed since our last sync, or live-dirty within this transaction) or a
         // device-local key -- mergePlan already dropped both from removes; both key types removed
         // since names are shared.
-        plan.removes.forEach { name ->
-            mut.remove(stringPreferencesKey(name))
-            mut.remove(booleanPreferencesKey(name))
-        }
+        mut.removeNamed(plan.removes)
     }
     return true
 }
@@ -164,14 +151,7 @@ internal suspend fun SettingsStore.mergeSettingsJson(json: String, protect: Set<
  * adopted values being re-uploaded as local changes.
  */
 internal suspend fun SettingsStore.adoptSettingsJson(json: String): Boolean {
-    val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }.getOrNull() ?: return false
-    if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") return false
-    val version = (root["_version"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 1
-    if (version > BACKUP_VERSION) {
-        AppLog.log("⚠ Drive sync: remote backup is a newer format ($version > $BACKUP_VERSION), skipping adopt")
-        return false
-    }
-    if ((root["prefs"] as? JsonObject) == null) return false
+    val root = readableBackup(json, "adopt") ?: return false
     // Protect the user's own local car photos across a join-adopt.
     val localImgKeys = context.settingsDataStore.data.first().asMap().keys
         .map { it.name }.filter { it.startsWith("img_") }.toSet()
@@ -181,10 +161,7 @@ internal suspend fun SettingsStore.adoptSettingsJson(json: String): Boolean {
     context.settingsDataStore.edit { mut ->
         mut.putTyped(plan.stringPuts, plan.boolPuts)
         photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
-        plan.removes.forEach { name ->
-            mut.remove(stringPreferencesKey(name))
-            mut.remove(booleanPreferencesKey(name))
-        }
+        mut.removeNamed(plan.removes)
         // Clear the dirty set in the SAME transaction: the adopted values are the file's, not
         // pending local changes, so they must not be re-uploaded as edits (and must not protect
         // themselves on the next merge).
@@ -209,4 +186,21 @@ private fun MutablePreferences.putTyped(strings: Map<String, String>, bools: Map
         val now = held[name]
         if (now == null || now is Boolean) this[booleanPreferencesKey(name)] = value
     }
+}
+
+/** The parsed backup when [json] is a settings file this build can read, else null (a newer format is logged as skipping [what]). */
+private fun readableBackup(json: String, what: String): JsonObject? {
+    val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }.getOrNull() ?: return null
+    if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") return null
+    val version = (root["_version"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 1
+    if (version > BACKUP_VERSION) {
+        AppLog.log("⚠ Drive sync: remote backup is a newer format ($version > $BACKUP_VERSION), skipping $what")
+        return null
+    }
+    return root.takeIf { it["prefs"] is JsonObject }
+}
+
+/** Drops each named setting whichever type it is stored as (names are shared between the string and boolean keys). */
+private fun MutablePreferences.removeNamed(names: Collection<String>) {
+    names.forEach { remove(stringPreferencesKey(it)); remove(booleanPreferencesKey(it)) }
 }
