@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
@@ -77,8 +79,8 @@ internal fun SearchPill(
     query: String,
     focused: Boolean,
     form: SearchForm,
-    width: Dp,
-    height: Dp,
+    width: () -> Dp,
+    height: () -> Dp,
     onQueryChange: (String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
     onSubmit: () -> Unit,
@@ -111,7 +113,14 @@ internal fun SearchPill(
     val latestDrag = androidx.compose.runtime.rememberUpdatedState(onDrag)
     val latestDragStart = androidx.compose.runtime.rememberUpdatedState(onDragStart)
     val latestDragEnd = androidx.compose.runtime.rememberUpdatedState(onDragEnd)
-    Box(modifier.size(width, height)) {
+    Box(
+        modifier.layout { measurable, _ ->
+            val w = width().roundToPx()
+            val h = height().roundToPx()
+            val placeable = measurable.measure(Constraints.fixed(w, h))
+            layout(w, h) { placeable.place(0, 0) }
+        },
+    ) {
         // canBlur/pillShape are hoisted so the fill and the blur layer agree.
         val pillShape = CircleShape
         val canBlur = hazeState != null && canBlurBackdrops()

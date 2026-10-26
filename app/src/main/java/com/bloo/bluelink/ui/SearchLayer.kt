@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
@@ -287,19 +288,21 @@ private fun BoxScope.SearchElement(
     var dragX by remember { mutableStateOf(Float.NaN) }
     var lastDx by remember { mutableFloatStateOf(0f) }
 
+    // The four springs are read in layout and draw (lambdas below), never here, so a morph or a drag moves the pill
+    // without recomposing it every frame.
     // Two springs: SIZE overshoots a little, POSITION is bouncier still so the edge-snap reads as
     // landing. Numbers are the shared PebbleBounce tokens.
     val sizeSpec = lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
-    val w = animateDpAsState(targetW, sizeSpec, label = "searchW").value
-    val h = animateDpAsState(targetH, sizeSpec, label = "searchH").value
+    val w = animateDpAsState(targetW, sizeSpec, label = "searchW")
+    val h = animateDpAsState(targetH, sizeSpec, label = "searchH")
     // A spring is wrong for a drag (it trails the finger); position snaps 1:1 while the finger is
     // down.
     val posSpec = if (dragging) snap<Dp>() else {
         lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
     }
     val targetX = if (dragging && !dragX.isNaN()) dragX.dp.coerceIn(minX, dragMaxX) else restX
-    val x = animateDpAsState(targetX, posSpec, label = "searchX").value
-    val y = animateDpAsState(restY, posSpec, label = "searchY").value
+    val x = animateDpAsState(targetX, posSpec, label = "searchX")
+    val y = animateDpAsState(restY, posSpec, label = "searchY")
 
     // Publish only the RESTING rect to the shared anchor. Never the dragged position, so a drag
     // never invalidates anything that reads the anchor.
@@ -318,14 +321,14 @@ private fun BoxScope.SearchElement(
         query = query,
         focused = focused,
         form = form,
-        width = w,
-        height = h,
+        width = { w.value },
+        height = { h.value },
         onQueryChange = onQueryChange,
         onFocusChange = onFocusChange,
         onSubmit = onSubmit,
         onDrag = if (form != SearchForm.BAR) {
             { dx, _ ->
-                dragX = ((if (dragX.isNaN()) x else dragX.dp) + dx).coerceIn(minX, dragMaxX).value
+                dragX = ((if (dragX.isNaN()) x.value else dragX.dp) + dx).coerceIn(minX, dragMaxX).value
                 lastDx = dx.value
             }
         } else null,
@@ -336,12 +339,12 @@ private fun BoxScope.SearchElement(
         },
         onDragEnd = {
             val widthNow = if (form == SearchForm.PILL) pillWidth else bubble
-            val center = (if (dragX.isNaN()) x else dragX.dp) + widthNow / 2
+            val center = (if (dragX.isNaN()) x.value else dragX.dp) + widthNow / 2
             onDockChange(SearchDock.landing((center / containerWidth).coerceIn(0f, 1f), lastDx, dock))
             dragX = Float.NaN
             dragging = false
         },
-        modifier = Modifier.align(Alignment.TopStart).offset(x, y),
+        modifier = Modifier.align(Alignment.TopStart).offset { IntOffset(x.value.roundToPx(), y.value.roundToPx()) },
         hazeState = hazeState,
     )
 }
