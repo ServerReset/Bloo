@@ -215,8 +215,8 @@ internal fun PebbleShell(
             cornerAnim.animateTo(cornerTarget, cornerSpec)
         }
     }
-    val corner = cornerAnim.value
-    val pebbleShape = RoundedCornerShape(corner)
+    // Read when drawn, so the open/close spring reshapes the card without recomposing it every frame.
+    val pebbleShape = remember { AnimatedCornerShape(cornerAnim.asState()) }
     Box(Modifier.fillMaxWidth()) {
         Card(
             Modifier.fillMaxWidth()

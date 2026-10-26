@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.FlashOn
@@ -115,7 +114,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     // The corner follows only its own revealed history, never LocalForceExpanded: with no body to
     // disclose it would otherwise show expanded corners while collapsed.
     val expanded = showHistory
-    val corner by animateDpAsState(
+    val corner = animateDpAsState(
         targetValue = if (expanded) PebbleCornerExpanded else PebbleCornerCollapsed,
         animationSpec = if (expanded) {
             lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
@@ -124,7 +123,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
         },
         label = "controlsPebbleCorner",
     )
-    val shape = RoundedCornerShape(corner)
+    val shape = remember { AnimatedCornerShape(corner) }
     Surface(
         modifier = Modifier.fillMaxWidth().then(modifier)
             .pointerInput(v.vin) { detectTapGestures { showHistory = !showHistory } }
