@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -156,7 +158,10 @@ internal fun HeroForeground(
         val y = androidx.compose.ui.util.lerp(from.top, to.top, heroT)
         val w = androidx.compose.ui.util.lerp(from.width, to.width, heroT)
         Box(
-            Modifier.offset { IntOffset(x.roundToInt(), y.roundToInt()) },
+            Modifier
+                .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
+                // The one copy a screen reader hears, as a sentence.
+                .clearAndSetSemantics { contentDescription = readout.spoken() },
         ) {
             val tone = LocalHeroTone.current
             CompositionLocalProvider(

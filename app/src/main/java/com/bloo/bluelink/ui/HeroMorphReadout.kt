@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -82,7 +83,8 @@ internal fun HeroMorphReadout(
                     alpha = if (numbersHoisted) 0f
                     else ((t - 0.35f) / 0.65f).coerceIn(0f, 1f)
                 }
-                .onGloballyPositioned(onNumbersPositioned),
+                .onGloballyPositioned(onNumbersPositioned)
+                .then(if (numbersHoisted) Modifier.clearAndSetSemantics {} else Modifier),
             verticalAlignment = Alignment.Bottom,
         ) {
             // One definition of the numbers shared with the collapsed anchor and overlay (see

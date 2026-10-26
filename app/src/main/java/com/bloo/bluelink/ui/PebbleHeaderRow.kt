@@ -2,6 +2,9 @@ package com.bloo.bluelink.ui
 
 /** The pebble header row, split out of PebbleShell.kt. */
 
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -98,10 +101,13 @@ internal fun PebbleHeaderRow(
             }
             .then(
                 if (forceExpanded || !canToggle) Modifier
-                else Modifier.clickable {
-                    if (expanded) haptics?.tick() else haptics?.click()
-                    onToggle()
-                },
+                else Modifier
+                    // A screen reader says whether the pebble is open, and what a tap will do.
+                    .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
+                    .clickable(onClickLabel = if (expanded) "Collapse" else "Expand", role = Role.Button) {
+                        if (expanded) haptics?.tick() else haptics?.click()
+                        onToggle()
+                    },
             )
             .then(modifier)
             .heightIn(min = PebbleHeaderHeight)

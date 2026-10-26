@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
@@ -51,6 +52,14 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.lowPowerAwareSpring
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Constraints
+
+/** What a screen reader says for the readout: the charge, the range and the state, in one sentence instead of three loose numbers. */
+internal fun ChargeReadout.spoken(): String = listOfNotNull(
+    pctText.takeIf { it.any(Char::isDigit) }?.let { "$it charge" },
+    rangeText?.takeIf { it.any(Char::isDigit) }?.let { "$it range" },
+    fuelPct?.let { "$it% fuel" },
+    statusLine.takeIf { it.isNotBlank() }?.replace(" · ", ", "),
+).joinToString(", ")
 
 /** Immutable and compared by value, so the hero's readout and numbers skip recomposing when nothing changed. */
 @Immutable
@@ -203,7 +212,9 @@ internal fun HeroCollapsedNumbers(
             }
             .graphicsLayer { alpha = if (hoisted) 0f else fade }
             .padding(start = GapRow)
-            .onGloballyPositioned(onPositioned),
+            .onGloballyPositioned(onPositioned)
+            // Once the overlay draws (and speaks) the numbers, this measuring copy stays silent.
+            .then(if (hoisted) Modifier.clearAndSetSemantics {} else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         HeroNumbers(data, t = 0f, verticalAlign = Alignment.CenterVertically)
