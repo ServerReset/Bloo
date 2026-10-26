@@ -319,10 +319,8 @@ fun MorphSegmented(
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     opt.icon?.let { icon ->
                         Image(
-                            painter = rememberVectorPainter(icon),
-                            contentDescription = null,
-                            colorFilter = ColorFilter.tint(fg),
-                            modifier = Modifier.size(16.dp),
+                            painter = rememberVectorPainter(icon), contentDescription = null,
+                            colorFilter = ColorFilter.tint(fg), modifier = Modifier.size(16.dp),
                         )
                         if (!iconsOnly) Spacer(Modifier.width(6.dp))
                     }

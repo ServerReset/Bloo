@@ -127,12 +127,8 @@ internal fun PebbleHeaderRow(
         Spacer(Modifier.width(ButtonIconGap))
         Column(Modifier.weight(1f)) {
             PebbleTitleRow(
-                title = title,
-                expanded = expanded,
-                growTitleOnExpand = growTitleOnExpand,
-                titleColor = titleColor,
-                titleTrailing = titleTrailing,
-                titleTrailingAtEnd = titleTrailingAtEnd,
+                title = title, expanded = expanded, growTitleOnExpand = growTitleOnExpand, titleColor = titleColor,
+                titleTrailing = titleTrailing, titleTrailingAtEnd = titleTrailingAtEnd,
             )
             if (summary != null) {
                 AnimatedContent(
@@ -163,10 +159,7 @@ internal fun PebbleHeaderRow(
                 // Renders the action half regardless; canToggle decides whether the chevron half
                 // comes with it (see SplitExpandButton).
                 SplitExpandButton(
-                    action = headerAction,
-                    expanded = expanded,
-                    onToggle = onToggle,
-                    canToggle = canToggle,
+                    action = headerAction, expanded = expanded, onToggle = onToggle, canToggle = canToggle,
                     modifier = Modifier.widthIn(max = headerActionMaxWidth),
                     onChevronPressChange = onChevronPressChange,
                 )

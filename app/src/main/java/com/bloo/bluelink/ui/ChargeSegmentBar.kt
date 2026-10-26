@@ -275,11 +275,8 @@ internal fun chargeBarLayout(
         val trackStart = minOf(totalWidth, filledXRaw + halfGap)
         val trackWidth = (totalWidth - trackStart).coerceAtLeast(0f)
         return ChargeBarLayout(
-            fillWidth = fillWidth,
-            hasSingleTrack = true,
-            singleTrackStart = trackStart,
-            singleTrackWidth = trackWidth,
-            singleTrackDim = limitFrac != null,
+            fillWidth = fillWidth, hasSingleTrack = true, singleTrackStart = trackStart,
+            singleTrackWidth = trackWidth, singleTrackDim = limitFrac != null,
             midStart = 0f, midWidth = 0f, farStart = 0f, farWidth = 0f,
         )
     }
@@ -290,10 +287,8 @@ internal fun chargeBarLayout(
     val farStart = (limitXRaw + halfGap).coerceIn(limitXRaw, totalWidth)
     val farWidth = (totalWidth - farStart).coerceAtLeast(0f)
     return ChargeBarLayout(
-        fillWidth = fillWidth,
-        hasSingleTrack = false,
+        fillWidth = fillWidth, hasSingleTrack = false,
         singleTrackStart = 0f, singleTrackWidth = 0f, singleTrackDim = false,
-        midStart = midStart, midWidth = midWidth,
-        farStart = farStart, farWidth = farWidth,
+        midStart = midStart, midWidth = midWidth, farStart = farStart, farWidth = farWidth,
     )
 }

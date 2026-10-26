@@ -44,8 +44,7 @@ object WearTileActions {
         (0 until 4).map { i ->
             val control = slots.getOrNull(i)?.let { WearFaceControls.byKey(it) }?.takeIf { it.available(car) } ?: return@map null
             WearTileAction(
-                label = tileLabel(control.label(car)),
-                key = control.key,
+                label = tileLabel(control.label(car)), key = control.key,
                 active = control.active(car) || (control.key == "lock" && car.locked == true),
                 glyph = tileGlyph(control.key, car),
             )

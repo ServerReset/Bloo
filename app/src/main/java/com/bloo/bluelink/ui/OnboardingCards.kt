@@ -185,10 +185,7 @@ internal fun OnboardingBottomBar(
             ActionRow(spacing = GapGroup) {
                 onBack?.let { back -> MorphTextButton(text = "Back", onClick = back) }
                 MorphActionButton(
-                    label = nextLabel,
-                    icon = nextIcon,
-                    onClick = onNext,
-                    enabled = nextEnabled,
+                    label = nextLabel, icon = nextIcon, onClick = onNext, enabled = nextEnabled,
                     emphasis = ButtonEmphasis.Confirm,
                 )
             }

@@ -56,9 +56,7 @@ private fun DebugInfoItem(info: DebugInfo, onCopy: ((String) -> Unit)? = null) {
         Column(modifier = Modifier.weight(1f)) {
             // Theme typography so it scales with the user's font-size setting.
             RevealText(
-                text = info.label,
-                style = SecondaryTextStyle(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = info.label, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold,
             )
             RollingNumber(
@@ -160,10 +158,8 @@ fun DebugSettingsPanel(modifier: Modifier = Modifier, onCopyToClipboard: ((Strin
                 Spacer(Modifier.height(GapRow))
                 Row(horizontalArrangement = Arrangement.spacedBy(GapRow), verticalAlignment = Alignment.Top) {
                     Icon(
-                        imageVector = Icons.Filled.Security,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 2.dp).size(16.dp),
+                        imageVector = Icons.Filled.Security, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 2.dp).size(16.dp),
                     )
                     RevealText(
                         text = "Share only when support asks.",

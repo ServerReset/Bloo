@@ -102,12 +102,8 @@ class BlueLinkRepository(
     suspend fun login(username: String, password: String, pin: String) {
         val token = api.login(username, password)
         val session = SessionStore.Session.of(
-            accessToken = token.accessToken,
-            refreshToken = token.refreshToken,
-            deviceId = null,
-            username = username,
-            pin = pin,
-            brand = brand,
+            accessToken = token.accessToken, refreshToken = token.refreshToken, deviceId = null, username = username,
+            pin = pin, brand = brand,
         )
         store.save(session)
         cachedSession = session

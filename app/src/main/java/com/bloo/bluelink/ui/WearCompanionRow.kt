@@ -108,10 +108,8 @@ internal fun DriveSyncSetupDialog(
             // making it the emphasized (active) card steers people away from accidentally creating
             // a second file.
             DriveSyncChoiceRow(
-                icon = Icons.Filled.FileOpen,
-                title = "Open from Drive",
-                subtitle = "Use the file another device already set up.",
-                emphasized = hasExistingSync,
+                icon = Icons.Filled.FileOpen, title = "Open from Drive",
+                subtitle = "Use the file another device already set up.", emphasized = hasExistingSync,
                 onClick = onOpenFromDrive,
             )
             if (warnNewFile) {
@@ -126,10 +124,8 @@ internal fun DriveSyncSetupDialog(
                         color = scheme.onErrorContainer,
                     )
                     MorphTextButton(
-                        text = "Create a new file anyway",
-                        onClick = onSaveToDrive,
-                        modifier = Modifier.fillMaxWidth(),
-                        emphasis = ButtonEmphasis.Deny,
+                        text = "Create a new file anyway", onClick = onSaveToDrive,
+                        modifier = Modifier.fillMaxWidth(), emphasis = ButtonEmphasis.Deny,
                     )
                 }
             } else {

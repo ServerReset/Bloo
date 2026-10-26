@@ -210,16 +210,10 @@ object WeatherApi {
                 val c = parsed.current ?: return@use null
                 val temp = c.temperature ?: return@use null
                 Weather(
-                    tempC = temp,
-                    feelsLikeC = c.apparent ?: temp,
-                    highC = parsed.daily?.max?.firstOrNull(),
-                    lowC = parsed.daily?.min?.firstOrNull(),
-                    windKph = c.windKph ?: 0.0,
-                    humidity = c.humidity,
-                    isDay = (c.isDay ?: 1) == 1,
-                    code = c.weatherCode ?: -1,
-                    hourly = parsed.hourly?.toPoints().orEmpty(),
-                    daily = parsed.daily?.toPoints().orEmpty(),
+                    tempC = temp, feelsLikeC = c.apparent ?: temp, highC = parsed.daily?.max?.firstOrNull(),
+                    lowC = parsed.daily?.min?.firstOrNull(), windKph = c.windKph ?: 0.0, humidity = c.humidity,
+                    isDay = (c.isDay ?: 1) == 1, code = c.weatherCode ?: -1,
+                    hourly = parsed.hourly?.toPoints().orEmpty(), daily = parsed.daily?.toPoints().orEmpty(),
                 )
             }
         }.getOrNull()
@@ -237,9 +231,7 @@ object WeatherApi {
             val t = times.getOrNull(i) ?: return@mapNotNull null
             val temp = temps.getOrNull(i) ?: return@mapNotNull null
             HourPoint(
-                time = t,
-                tempC = temp,
-                code = weatherCode?.getOrNull(i) ?: -1,
+                time = t, tempC = temp, code = weatherCode?.getOrNull(i) ?: -1,
                 precipProbability = precipProbability?.getOrNull(i),
             )
         }

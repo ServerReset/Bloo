@@ -342,9 +342,7 @@ private fun CarCard(car: VehicleSnapshot, photoUrl: String?, selected: Boolean, 
         Box(Modifier.fillMaxWidth().height(84.dp).background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary)))) {
             if (photoUrl != null) {
                 AsyncImage(
-                    model = rememberPhotoModel(photoUrl),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                    model = rememberPhotoModel(photoUrl), contentDescription = null, contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {

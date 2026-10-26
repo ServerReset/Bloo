@@ -28,13 +28,8 @@ data class ClimateSync(
  */
 fun ClimateRequest.toClimateSync(activePresetId: String?): ClimateSync =
     ClimateSync(
-        activePresetId = activePresetId,
-        tempF = tempF,
-        durationMinutes = durationMinutes,
-        defrost = defrost,
-        steering = steeringWheelHeat.apiValue,
-        seatFrontLeft = seatFrontLeft.apiValue,
-        seatFrontRight = seatFrontRight.apiValue,
-        seatRearLeft = seatRearLeft.apiValue,
+        activePresetId = activePresetId, tempF = tempF, durationMinutes = durationMinutes, defrost = defrost,
+        steering = steeringWheelHeat.apiValue, seatFrontLeft = seatFrontLeft.apiValue,
+        seatFrontRight = seatFrontRight.apiValue, seatRearLeft = seatRearLeft.apiValue,
         seatRearRight = seatRearRight.apiValue,
     )

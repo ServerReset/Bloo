@@ -96,10 +96,7 @@ internal fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modi
         ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow, lineSpacing = GapRow) {
             features.forEach { feature ->
                 MorphActionButton(
-                    label = feature.label,
-                    icon = feature.icon,
-                    onClick = feature.onClick,
-                    enabled = feature.enabled,
+                    label = feature.label, icon = feature.icon, onClick = feature.onClick, enabled = feature.enabled,
                 )
             }
         }

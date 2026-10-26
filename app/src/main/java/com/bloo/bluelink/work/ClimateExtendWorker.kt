@@ -39,16 +39,12 @@ class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : BlooWorker(c
         if (remainingMinutes <= 0) return Result.success()
 
         val command = CarCommand(
-            vin = vin,
-            action = CarAction.CLIMATE_ON,
-            tempF = inputData.getInt(KEY_TEMP_F, DEFAULT_CLIMATE_TEMP_F),
+            vin = vin, action = CarAction.CLIMATE_ON, tempF = inputData.getInt(KEY_TEMP_F, DEFAULT_CLIMATE_TEMP_F),
             durationMinutes = remainingMinutes.coerceAtMost(CLIMATE_DURATION_RANGE.last),
             defrost = inputData.getBoolean(KEY_DEFROST, false),
             steeringWheelHeat = inputData.getInt(KEY_STEERING_HEAT, 0),
-            seatFrontLeft = inputData.getInt(KEY_SEAT_FL, 0),
-            seatFrontRight = inputData.getInt(KEY_SEAT_FR, 0),
-            seatRearLeft = inputData.getInt(KEY_SEAT_RL, 0),
-            seatRearRight = inputData.getInt(KEY_SEAT_RR, 0),
+            seatFrontLeft = inputData.getInt(KEY_SEAT_FL, 0), seatFrontRight = inputData.getInt(KEY_SEAT_FR, 0),
+            seatRearLeft = inputData.getInt(KEY_SEAT_RL, 0), seatRearRight = inputData.getInt(KEY_SEAT_RR, 0),
         )
         val result = runCatching { CarCommandRunner.execute(applicationContext, command) }.getOrNull()
         if (result?.ok != true) {

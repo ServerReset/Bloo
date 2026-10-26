@@ -172,10 +172,8 @@ internal fun ClimateControlsSection(
         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             BodySmallText("Temperature")
             RollingNumber(
-                text = degLabel(tempF.toString(), fahrenheit),
-                style = SecondaryTextStyle(),
-                fontWeight = FontWeight.Bold,
-                color = tempColor,
+                text = degLabel(tempF.toString(), fahrenheit), style = SecondaryTextStyle(),
+                fontWeight = FontWeight.Bold, color = tempColor,
             )
         }
         if (fahrenheit) {
@@ -254,9 +252,7 @@ internal fun ClimateControlsSection(
         // The editor for a saved preset passes no save: it already has its own Save.
         if (onSaveAsPreset != null) {
             MorphTextButton(
-                text = "Save as preset",
-                onClick = onSaveAsPreset,
-                modifier = Modifier.fillMaxWidth(),
+                text = "Save as preset", onClick = onSaveAsPreset, modifier = Modifier.fillMaxWidth(),
                 emphasis = ButtonEmphasis.Confirm,
             )
         }

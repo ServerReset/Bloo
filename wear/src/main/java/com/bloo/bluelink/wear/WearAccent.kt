@@ -21,10 +21,8 @@ internal object WearAccent {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.contains("primary")) return
         _accent.value = WatchAccent(
-            primary = prefs.getInt("primary", 0),
-            onPrimary = prefs.getInt("onPrimary", 0),
-            secondary = prefs.getInt("secondary", 0),
-            tertiary = prefs.getInt("tertiary", 0),
+            primary = prefs.getInt("primary", 0), onPrimary = prefs.getInt("onPrimary", 0),
+            secondary = prefs.getInt("secondary", 0), tertiary = prefs.getInt("tertiary", 0),
         )
     }
 

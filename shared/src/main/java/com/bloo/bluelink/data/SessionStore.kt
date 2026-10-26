@@ -120,12 +120,8 @@ class SessionStore(private val context: Context) {
         brand: Brand,
     ) = save(
         Session.of(
-            accessToken = accessToken,
-            refreshToken = refreshToken,
-            deviceId = deviceId,
-            username = username,
-            pin = pin,
-            brand = brand,
+            accessToken = accessToken, refreshToken = refreshToken, deviceId = deviceId, username = username,
+            pin = pin, brand = brand,
         ),
     )
 

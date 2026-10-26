@@ -39,14 +39,10 @@ suspend fun EuApi.vehicles(session: EuSession): List<EuVehicleSummary> = withCon
         logAccountCar(o)
         val type = o["type"]?.str()?.uppercase(Locale.US)
         EuVehicleSummary(
-            id = id,
-            name = o["nickname"]?.str() ?: o["vehicleName"]?.str() ?: id.takeLast(6),
-            model = o["vehicleName"]?.str() ?: "Car",
-            vin = o["vin"]?.str() ?: id,
+            id = id, name = o["nickname"]?.str() ?: o["vehicleName"]?.str() ?: id.takeLast(6),
+            model = o["vehicleName"]?.str() ?: "Car", vin = o["vin"]?.str() ?: id,
             isEv = type == "EV" || type == "PHEV" || type == "PE",
-            ccs2 = o["ccuCCS2ProtocolSupport"]?.intLoose() ?: 0,
-            colour = paintOf(o).colour,
-            trim = paintOf(o).trim,
+            ccs2 = o["ccuCCS2ProtocolSupport"]?.intLoose() ?: 0, colour = paintOf(o).colour, trim = paintOf(o).trim,
         )
     }
 }

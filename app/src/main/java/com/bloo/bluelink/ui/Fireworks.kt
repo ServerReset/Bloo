@@ -53,12 +53,8 @@ internal fun FireworksOverlay(modifier: Modifier = Modifier, bursts: Int = 7) {
         val r = kotlin.random.Random(System.nanoTime())
         List(bursts) {
             Burst(
-                x = r.nextFloat() * 0.8f + 0.1f,
-                y = r.nextFloat() * 0.5f + 0.12f,
-                start = r.nextFloat() * 0.55f,
-                life = r.nextFloat() * 0.25f + 0.35f,
-                hue = r.nextFloat() * 360f,
-                count = 18 + r.nextInt(14),
+                x = r.nextFloat() * 0.8f + 0.1f, y = r.nextFloat() * 0.5f + 0.12f, start = r.nextFloat() * 0.55f,
+                life = r.nextFloat() * 0.25f + 0.35f, hue = r.nextFloat() * 360f, count = 18 + r.nextInt(14),
                 maxR = r.nextFloat() * 0.12f + 0.14f,
             )
         }

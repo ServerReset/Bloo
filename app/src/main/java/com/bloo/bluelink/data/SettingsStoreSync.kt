@@ -199,10 +199,7 @@ suspend fun SettingsStore.performMainToMainSync(
             val wid = "watch:$id"
             val prior = remoteDevices.firstOrNull { it.id == wid }
             SyncMerge.SyncDevice(
-                id = wid,
-                name = connectedWatchName.orEmpty(),
-                kind = SyncMerge.KIND_WATCH,
-                hostId = self.id,
+                id = wid, name = connectedWatchName.orEmpty(), kind = SyncMerge.KIND_WATCH, hostId = self.id,
                 lastSeenMs = if (prior != null && now - prior.lastSeenMs < REGISTRY_HEARTBEAT_MS) prior.lastSeenMs else now,
             )
         }
@@ -333,10 +330,7 @@ suspend fun SettingsStore.performMainToMainSync(
     setLastSyncError(error)
     return SettingsStore.MainToMainSyncOutcome(
         ran = true, imported = imported, uploaded = uploaded, syncedAtMs = if (uploaded) now else lastSyncMs(),
-        error = error,
-        devices = outcomeDevices,
-        primaryDeviceId = primaryToWrite,
-        selfDeviceId = syncDeviceId(),
+        error = error, devices = outcomeDevices, primaryDeviceId = primaryToWrite, selfDeviceId = syncDeviceId(),
     )
 }
 

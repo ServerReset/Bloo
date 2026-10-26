@@ -372,11 +372,8 @@ internal fun AppViewModel.runCommand(
  */
 internal fun AppViewModel.recordRemoteAction(vin: String, action: String, status: String, details: String? = null) {
     val entry = RemoteAction(
-        id = java.util.UUID.randomUUID().toString(),
-        action = action,
-        timestamp = java.time.Instant.now().toString(),
-        status = status,
-        details = details,
+        id = java.util.UUID.randomUUID().toString(), action = action, timestamp = java.time.Instant.now().toString(),
+        status = status, details = details,
     )
     // Pruned by age on every write (the only sweep). An unparseable timestamp is kept rather than
     // dropped.

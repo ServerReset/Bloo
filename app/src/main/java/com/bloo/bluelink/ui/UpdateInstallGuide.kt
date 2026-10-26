@@ -40,9 +40,7 @@ internal fun UpdateInstallGuideDialog(onDismiss: () -> Unit, onContinue: () -> U
             ActionRow(spacing = GapGroup) {
                 MorphTextButton(text = "Cancel", onClick = onDismiss)
                 MorphActionButton(
-                    label = "Continue",
-                    icon = AppIcons.Check,
-                    onClick = onContinue,
+                    label = "Continue", icon = AppIcons.Check, onClick = onContinue,
                     emphasis = ButtonEmphasis.Confirm,
                 )
             }

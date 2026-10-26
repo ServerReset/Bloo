@@ -115,19 +115,11 @@ fun MorphButtonCore(
         contentAlignment = Alignment.Center,
     ) {
         MorphChrome(
-            pressed = pressed,
-            active = active,
-            interactionSource = interactionSource,
-            pillCornerPercent = pillCornerPercent,
-            morphedCornerPercent = morphedCornerPercent,
-            shapeForCorner = shapeForCorner,
-            activeContainerColor = activeContainerColor,
-            containerColor = containerColor,
-            disabledContainerColor = disabledContainerColor,
-            disabledBorder = disabledBorder,
-            border = border,
-            enabled = enabled,
-            onLongClick = onLongClick,
+            pressed = pressed, active = active, interactionSource = interactionSource,
+            pillCornerPercent = pillCornerPercent, morphedCornerPercent = morphedCornerPercent,
+            shapeForCorner = shapeForCorner, activeContainerColor = activeContainerColor,
+            containerColor = containerColor, disabledContainerColor = disabledContainerColor,
+            disabledBorder = disabledBorder, border = border, enabled = enabled, onLongClick = onLongClick,
             onClick = onClick,
         )
         // Stable content drawn over the chrome; taps reach the chrome below. Wrap-content: gives the button its size.

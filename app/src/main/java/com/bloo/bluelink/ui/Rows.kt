@@ -67,8 +67,7 @@ internal fun RowLabel(label: String, modifier: Modifier = Modifier) {
 internal fun StatusRow(label: String, value: String, valueMono: Boolean = false) {
     // The shared label-and-value row (:uicommon's LabelValueRow); the app only chooses the label's muted tone.
     LabelValueRow(
-        label = label,
-        value = value,
+        label = label, value = value,
         labelColor = LocalContentColor.current.copy(alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha),
         valueMono = valueMono,
     )

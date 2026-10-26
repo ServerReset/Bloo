@@ -122,10 +122,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                 com.bloo.bluelink.data.CarCommandResult(request.command.vin, request.command.action, ok = false, message = it.message)
             }
         val out = WatchCommandResult(
-            requestId = request.requestId,
-            vin = result.vin,
-            action = result.action,
-            ok = result.ok,
+            requestId = request.requestId, vin = result.vin, action = result.action, ok = result.ok,
             message = result.message,
         )
         pushBytes(WatchSyncProtocol.PATH_COMMAND_RESULT, json.encodeToString(WatchCommandResult.serializer(), out))
@@ -256,9 +253,7 @@ private fun watchAccentOf(context: Context, appearance: SettingsStore.Appearance
         vibrancy = appearance.vibrancy,
     )
     WatchAccent(
-        primary = scheme.primary.toArgb(),
-        onPrimary = scheme.onPrimary.toArgb(),
-        secondary = scheme.secondary.toArgb(),
-        tertiary = scheme.tertiary.toArgb(),
+        primary = scheme.primary.toArgb(), onPrimary = scheme.onPrimary.toArgb(),
+        secondary = scheme.secondary.toArgb(), tertiary = scheme.tertiary.toArgb(),
     )
 }.getOrNull()

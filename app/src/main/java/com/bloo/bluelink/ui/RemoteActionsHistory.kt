@@ -52,23 +52,16 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
         Dot(statusColor(action.status), 6.dp)
         Spacer(Modifier.width(GapRow))
         RevealText(
-            text = action.action,
-            style = SecondaryTextStyle(),
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
+            text = action.action, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
         )
         // Details ride on the SAME line, muted, and give up their space first -- a failure reason
         // is worth showing but never worth a row of its own here.
         if (action.details != null) {
             Spacer(Modifier.width(GapRow))
             RevealText(
-                text = action.details,
-                style = SecondaryTextStyle(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                text = action.details, style = SecondaryTextStyle(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
         } else {
@@ -113,8 +106,7 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
             // commanded yet made a working gesture indistinguishable from a missing one. The empty
             // state is the only feedback that the press did something.
             RevealText(
-                text = "No remote actions yet",
-                style = SecondaryTextStyle(),
+                text = "No remote actions yet", style = SecondaryTextStyle(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = GapHairline),
             )

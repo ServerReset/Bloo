@@ -60,12 +60,9 @@ fun WearCarFace(
         val press = rememberQuadrantPress()
         CompositionLocalProvider(LocalFaceUnit provides unit) {
             WearEdgeRing(
-                progress = progress,
-                limitPct = limitPct,
-                modifier = Modifier.fillMaxSize().alpha(if (stale) 0.5f else 1f),
-                stroke = RingStroke * unit,
-                charging = charging,
-                refreshing = refreshing,
+                progress = progress, limitPct = limitPct,
+                modifier = Modifier.fillMaxSize().alpha(if (stale) 0.5f else 1f), stroke = RingStroke * unit,
+                charging = charging, refreshing = refreshing,
             )
             Box(Modifier.fillMaxSize().padding((RingStroke + RingGap) * unit), contentAlignment = Alignment.Center) {
                 WearQuadrantGrid(actions = actions, modifier = Modifier.fillMaxSize(), press = press)

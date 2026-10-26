@@ -28,11 +28,8 @@ import com.bloo.uicommon.GapRow
 internal fun MorphToggleTrack(checked: Boolean) {
     // The shared switch (:uicommon's SwitchTrack), in the phone's colours.
     SwitchTrack(
-        checked = checked,
-        trackOn = MaterialTheme.colorScheme.primary,
-        trackOff = buttonContainer(),
-        thumbOn = MaterialTheme.colorScheme.onPrimary,
-        thumbOff = MaterialTheme.colorScheme.onSurfaceVariant,
+        checked = checked, trackOn = MaterialTheme.colorScheme.primary, trackOff = buttonContainer(),
+        thumbOn = MaterialTheme.colorScheme.onPrimary, thumbOff = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 

@@ -95,9 +95,7 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
         ) {
             if (choice.photo && photoUrl != null) {
                 AsyncImage(
-                    model = rememberPhotoModel(photoUrl),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                    model = rememberPhotoModel(photoUrl), contentDescription = null, contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().scale(1.15f).then(if (blurRadius > 0.dp) Modifier.blur(blurRadius) else Modifier),
                 )
                 Box(Modifier.fillMaxSize().background(scheme.surface.copy(alpha = if (isSystemInDarkTheme()) 0.55f else 0.65f)))

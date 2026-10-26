@@ -179,9 +179,7 @@ private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
         ) {
             hours.forEachIndexed { i, h ->
                 HourCell(
-                    hour = h,
-                    fahrenheit = fahrenheit,
-                    label = if (i == 0) "Now" else hourLabel(h.hour),
+                    hour = h, fahrenheit = fahrenheit, label = if (i == 0) "Now" else hourLabel(h.hour),
                     modifier = Modifier.scrollEdgeBlur(scroll, viewportPx, blurOk),
                 )
             }

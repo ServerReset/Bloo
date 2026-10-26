@@ -194,11 +194,8 @@ private val DarkExpressive = darkColorScheme(
 // Expressive shapes: generous rounded corners, with a cut-corner accent on the smallest slot to
 // create the intentional "visual tension" of mixed geometry.
 val ExpressiveShapes = Shapes(
-    extraSmall = CutCornerShape(6.dp),
-    small = RoundedCornerShape(16.dp),
-    medium = RoundedCornerShape(24.dp),
-    large = RoundedCornerShape(32.dp),
-    extraLarge = RoundedCornerShape(40.dp),
+    extraSmall = CutCornerShape(6.dp), small = RoundedCornerShape(16.dp), medium = RoundedCornerShape(24.dp),
+    large = RoundedCornerShape(32.dp), extraLarge = RoundedCornerShape(40.dp),
 )
 
 /** Map each weight of a variable font via fontVariationSettings (wght axis). */

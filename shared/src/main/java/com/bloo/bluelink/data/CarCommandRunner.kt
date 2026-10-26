@@ -36,9 +36,7 @@ object CarCommandRunner {
             val v = snap.toVehicle()
             val repo = repositoryFor(Brand.fromIndicator(v.brandIndicator), SessionStore(context), CredentialStore(context))
             val climate = ClimateRequest(
-                tempF = command.tempF,
-                defrost = command.defrost,
-                durationMinutes = command.durationMinutes,
+                tempF = command.tempF, defrost = command.defrost, durationMinutes = command.durationMinutes,
                 steeringWheelHeat = WheelHeatLevel.fromApi(command.steeringWheelHeat),
                 seatFrontLeft = SeatLevel.fromApi(command.seatFrontLeft),
                 seatFrontRight = SeatLevel.fromApi(command.seatFrontRight),

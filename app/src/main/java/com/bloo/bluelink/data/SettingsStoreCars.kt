@@ -138,14 +138,12 @@ fun SettingsStore.seatConfig(vin: String, p: Preferences): SeatConfig {
     val oldRearCool = b("seat_rc_$vin")
     return SeatConfig(
         driverHeat = b("seat_dh_$vin") ?: oldFrontHeat ?: true,
-        driverCool = b("seat_dc_$vin") ?: oldFrontCool ?: false,
-        passHeat = b("seat_ph_$vin") ?: oldFrontHeat ?: true,
+        driverCool = b("seat_dc_$vin") ?: oldFrontCool ?: false, passHeat = b("seat_ph_$vin") ?: oldFrontHeat ?: true,
         passCool = b("seat_pc_$vin") ?: oldFrontCool ?: false,
         rearLeftHeat = b("seat_rlh_$vin") ?: oldRearHeat ?: false,
         rearLeftCool = b("seat_rlc_$vin") ?: oldRearCool ?: false,
         rearRightHeat = b("seat_rrh_$vin") ?: oldRearHeat ?: false,
-        rearRightCool = b("seat_rrc_$vin") ?: oldRearCool ?: false,
-        steeringWheel = b("seat_sw_$vin") ?: false,
+        rearRightCool = b("seat_rrc_$vin") ?: oldRearCool ?: false, steeringWheel = b("seat_sw_$vin") ?: false,
     )
 }
 

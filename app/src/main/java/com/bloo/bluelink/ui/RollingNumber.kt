@@ -32,10 +32,7 @@ internal fun RollingNumber(
         else -> androidx.compose.material3.LocalContentColor.current
     }
     AnimatedValue(
-        value = text,
-        style = style.merge(TextStyle(fontWeight = fontWeight, color = resolved)),
-        maxLines = maxLines,
-        reduceMotion = LocalReduceMotion.current,
-        modifier = modifier,
+        value = text, style = style.merge(TextStyle(fontWeight = fontWeight, color = resolved)), maxLines = maxLines,
+        reduceMotion = LocalReduceMotion.current, modifier = modifier,
     )
 }

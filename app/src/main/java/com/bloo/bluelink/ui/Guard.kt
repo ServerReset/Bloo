@@ -276,10 +276,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     Column(Modifier.padding(horizontal = GapBlock, vertical = GapPage)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapSection)) {
                             IconBadge(
-                                icon = AppIcons.Lock,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                size = 46.dp,
+                                icon = AppIcons.Lock, tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                containerColor = MaterialTheme.colorScheme.primaryContainer, size = 46.dp,
                                 iconSize = 24.dp,
                             )
                             Column {

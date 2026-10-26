@@ -123,14 +123,8 @@ internal object DebugSampleGarage {
      */
     fun apply(state: UiState, locked: Boolean): UiState {
         val car = Vehicle(
-            vin = SAMPLE_VIN,
-            regId = "sample-vehicle",
-            name = "My Car",
-            model = "IONIQ 5",
-            generation = "1",
-            brandIndicator = "H",
-            isEv = true,
-            odometer = "12,480 mi",
+            vin = SAMPLE_VIN, regId = "sample-vehicle", name = "My Car", model = "IONIQ 5", generation = "1",
+            brandIndicator = "H", isEv = true, odometer = "12,480 mi",
         )
         val status = VehicleStatus(
             doorLock = true,

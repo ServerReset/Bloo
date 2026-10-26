@@ -81,8 +81,7 @@ internal fun CarSettingsCard(
             // A live preview, so the effect of a change is visible without leaving Settings.
             if (hasPhoto) {
                 AsyncImage(
-                    model = rememberPhotoModel(storedImage),
-                    contentDescription = null,
+                    model = rememberPhotoModel(storedImage), contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxWidth().height(120.dp).clip(StandardShape),
                 )

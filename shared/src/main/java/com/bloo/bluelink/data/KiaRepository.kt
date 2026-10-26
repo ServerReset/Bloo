@@ -53,12 +53,8 @@ class KiaRepository(
     private suspend fun save(session: KiaSession, username: String, pin: String) {
         store.save(
             SessionStore.Session.of(
-                accessToken = session.sid,
-                refreshToken = session.rmtoken,
-                deviceId = session.deviceId,
-                username = username,
-                pin = pin,
-                brand = Brand.KIA,
+                accessToken = session.sid, refreshToken = session.rmtoken, deviceId = session.deviceId,
+                username = username, pin = pin, brand = Brand.KIA,
             )
         )
     }

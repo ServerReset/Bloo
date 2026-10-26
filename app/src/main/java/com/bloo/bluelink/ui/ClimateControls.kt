@@ -257,11 +257,7 @@ internal fun ClimatePresetSection(
                     LabeledField(name, { name = it }, "Name")
                     // What the preset does: the same controls the climate section uses, with its save button left out.
                     ClimateControlsSection(
-                        form = form,
-                        locked = false,
-                        fahrenheit = fahrenheit,
-                        seats = seats,
-                        showSeats = showSeats,
+                        form = form, locked = false, fahrenheit = fahrenheit, seats = seats, showSeats = showSeats,
                         onSaveAsPreset = null,
                     )
                 }

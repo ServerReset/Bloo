@@ -102,12 +102,8 @@ internal fun OtpCodeField(code: String, onCodeChange: (String) -> Unit) {
 private fun OtpButtons(loading: Boolean, code: String, showVerify: Boolean, onVerify: () -> Unit, onCancel: () -> Unit) {
     if (showVerify) {
         MorphTextButton(
-            text = "Verify",
-            onClick = onVerify,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !loading && code.isNotBlank(),
-            pending = loading,
-            emphasis = ButtonEmphasis.Confirm,
+            text = "Verify", onClick = onVerify, modifier = Modifier.fillMaxWidth(),
+            enabled = !loading && code.isNotBlank(), pending = loading, emphasis = ButtonEmphasis.Confirm,
         )
     }
     MorphTextButton("Cancel", onCancel, enabled = !loading, modifier = Modifier.fillMaxWidth())

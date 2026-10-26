@@ -75,10 +75,7 @@ import com.bloo.uicommon.content
 @Composable
 internal fun NestedGlassPanel(hazeState: dev.chrisbanes.haze.HazeState?, content: @Composable () -> Unit) {
     GlassSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = SmallShape,
-        hazeState = hazeState,
-        shadow = false,
+        modifier = Modifier.fillMaxWidth(), shape = SmallShape, hazeState = hazeState, shadow = false,
         content = content,
     )
 }

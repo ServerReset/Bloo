@@ -231,11 +231,8 @@ fun WearActionRow(
         // The phone's switch (:uicommon's SwitchTrack), in the phone's own colours: the accent when on, the muted pill when off.
         val switchTrack: @Composable () -> Unit = {
             SwitchTrack(
-                checked = active,
-                trackOn = scheme.primary,
-                trackOff = scheme.surfaceVariant,
-                thumbOn = scheme.onPrimary,
-                thumbOff = scheme.onSurfaceVariant,
+                checked = active, trackOn = scheme.primary, trackOff = scheme.surfaceVariant,
+                thumbOn = scheme.onPrimary, thumbOff = scheme.onSurfaceVariant,
             )
         }
         // The shared setting layout (:uicommon's SettingRow): the label takes the row, and the switch, when there is one, sits on the end.
@@ -553,9 +550,7 @@ internal fun WearStatRow(label: String, value: String, valueColor: Color? = null
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LabelValueRow(
-            label = label,
-            value = value,
-            labelColor = scheme.onSurfaceVariant,
+            label = label, value = value, labelColor = scheme.onSurfaceVariant,
             valueColor = valueColor ?: scheme.onSurface,
         )
     }

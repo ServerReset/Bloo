@@ -56,20 +56,11 @@ fun AppViewModel.logout(brand: Brand) {
             // keyed per VIN, so it is account state and not preserved.
             val keep = _state.value
             _state.value = UiState(
-                screen = Screen.Login,
-                aiSupported = keep.aiSupported,
-                aiEnabled = keep.aiEnabled,
-                aiAutoSummarize = keep.aiAutoSummarize,
-                aiAvailability = keep.aiAvailability,
-                shizukuAvailable = keep.shizukuAvailable,
-                settingsMode = keep.settingsMode,
-                syncUri = keep.syncUri,
-                lastSyncMs = keep.lastSyncMs,
-                syncWifiOnly = keep.syncWifiOnly,
-                syncError = keep.syncError,
-                syncDevices = keep.syncDevices,
-                syncPrimaryId = keep.syncPrimaryId,
-                thisDeviceId = keep.thisDeviceId,
+                screen = Screen.Login, aiSupported = keep.aiSupported, aiEnabled = keep.aiEnabled,
+                aiAutoSummarize = keep.aiAutoSummarize, aiAvailability = keep.aiAvailability,
+                shizukuAvailable = keep.shizukuAvailable, settingsMode = keep.settingsMode, syncUri = keep.syncUri,
+                lastSyncMs = keep.lastSyncMs, syncWifiOnly = keep.syncWifiOnly, syncError = keep.syncError,
+                syncDevices = keep.syncDevices, syncPrimaryId = keep.syncPrimaryId, thisDeviceId = keep.thisDeviceId,
                 syncDeviceName = keep.syncDeviceName,
             )
         } else {

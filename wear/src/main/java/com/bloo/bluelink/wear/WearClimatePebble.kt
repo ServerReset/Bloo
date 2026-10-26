@@ -62,11 +62,8 @@ internal fun WearClimateRows(
     onPreset: (ClimatePreset) -> Unit,
 ) {
     WearListRow(
-        title = CarLabels.SMART_CLIMATE,
-        subtitle = smartSubtitle ?: "For the weather at the car",
-        icon = AppIcons.SmartClimate,
-        pending = smartPending,
-        onClick = onSmart,
+        title = CarLabels.SMART_CLIMATE, subtitle = smartSubtitle ?: "For the weather at the car",
+        icon = AppIcons.SmartClimate, pending = smartPending, onClick = onSmart,
     )
     saved.forEach { preset ->
         WearListRow(
