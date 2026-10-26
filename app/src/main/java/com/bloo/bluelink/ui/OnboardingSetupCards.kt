@@ -48,7 +48,7 @@ internal fun OnboardingPinForm(
         PinField(
             value = pin,
             onValueChange = { pin = it; attempted = false },
-            placeholder = "4–8 digit PIN",
+            placeholder = "4 to 8 digit PIN",
             isError = attempted && pin.isNotEmpty() && pin.length < PinCrypto.PIN_MIN_DIGITS,
         )
         PinField(

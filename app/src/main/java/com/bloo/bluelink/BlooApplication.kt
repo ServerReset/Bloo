@@ -139,7 +139,7 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                 }
             }
         }.apply { priority = Thread.MIN_PRIORITY }.start()
-        AppLog.log("▶ App starting -- ${deviceSummary()}")
+        AppLog.log("▶ App starting: ${deviceSummary()}")
         // Watch presence + the live snapshot push (see app/.../wear/). Off the main thread, guarded
         // internally: a phone with no watch, or no Play Services at all, just reads as "no watch
         // paired" and the push is a no-op.
@@ -171,7 +171,7 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                     val logLines = AppLog.snapshot()
                     appendLine("--- App log (most recent ${logLines.size} lines) ---")
                     if (logLines.isEmpty()) {
-                        append("(empty -- crashed before anything logged, or log() was never reached)")
+                        append("(empty: crashed before anything logged, or log() was never reached)")
                     } else {
                         append(logLines.joinToString("\n"))
                     }

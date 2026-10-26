@@ -21,6 +21,8 @@ data class KiaVehicleSummary(
     val model: String,
     val key: String,
     val isEv: Boolean,
+    val colour: String? = null,
+    val trim: String? = null,
 )
 
 /** Outcome of a Kia US login: a ready session, or an OTP challenge to solve. */

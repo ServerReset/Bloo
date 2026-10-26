@@ -101,9 +101,9 @@ class SettingsStore(internal val context: Context) {
         val lockTiming: LockTiming = LockTiming.IMMEDIATE,
         /** In the wide expanded view, put pebbles on the left, controls right. */
         val columnsFlipped: Boolean = false,
-        /** Text/UI scale multiplier (0.85–1.3). */
+        /** Text/UI scale multiplier (0.85 to 1.3). */
         val uiScale: Float = 1f,
-        /** Colour vibrancy multiplier (0.5–1.6, 1 = default). */
+        /** Colour vibrancy multiplier (0.5 to 1.6, 1 = default). */
         val vibrancy: Float = 1f,
         /**
          * How transparent the backing of floating glass is: 0 = solid, 1 = none (one of

@@ -29,6 +29,17 @@ class CarPictureMatchTest {
         assertEquals("IONIQ 5", matchCarPicture("2025 IONIQ 5", "", "Cyber Grey", pictures)?.group)
     }
 
+    @Test fun aLooserNameStillFindsItsPaintWhenOnlyOneFits() {
+        val set = pictures + pic("IONIQ 5", "Glacial White Pearl") + pic("IONIQ 5", "Digital Teal")
+        assertEquals("Glacial White Pearl", matchCarPicture("2024 IONIQ 5", "", "Glacial White", set)?.colour)
+        assertEquals("Digital Teal", matchCarPicture("2024 IONIQ 5", "", "Digital Teal Metallic", set)?.colour)
+    }
+
+    @Test fun twoPaintsThatFitEquallyChooseNothing() {
+        val set = pictures + pic("IONIQ 5", "Gravity Gold Matte") + pic("IONIQ 5", "Gravity Silver Metal")
+        assertNull(matchCarPicture("2024 IONIQ 5", "", "Gravity Gold Silver", set))
+    }
+
     @Test fun noGuessWithoutAColourOrWithAModelThatIsNotBundled() {
         assertNull(matchCarPicture("2024 IONIQ 5", "", null, pictures))
         assertNull(matchCarPicture("2024 IONIQ 5", "", "Hot Pink", pictures))

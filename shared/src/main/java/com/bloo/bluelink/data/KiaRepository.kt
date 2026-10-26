@@ -132,6 +132,8 @@ class KiaRepository(
         generation = "",
         brandIndicator = Brand.KIA.code,
         isEv = isEv,
+        colour = colour,
+        trim = trim,
     )
 
     // Fetches the account's full vehicle-summary list from the API and replaces the entire

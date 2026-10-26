@@ -83,25 +83,33 @@ internal object CarPictures {
  */
 internal fun matchCarPicture(model: String, name: String, colour: String?, pictures: List<CarPicture>): CarPicture? {
     fun squash(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
+    fun words(s: String) = s.lowercase().split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() && it != "matte" }.toSet()
     val wanted = colour?.let(::squash)?.takeIf { it.isNotEmpty() } ?: return null
+    val wantedWords = words(colour)
     val said = squash("$model $name")
     val wantsN = said.contains("ioniq5n")
     val wantsMatte = wanted.contains("matte")
-    return pictures
+    val scored = pictures
         .filter { said.contains(squash(it.group.substringBefore(" (").removeSuffix(" N"))) }
         .filter { (it.group.contains(" N")) == wantsN }
         .mapNotNull { p ->
             val c = squash(p.colour)
+            val shared = words(p.colour).intersect(wantedWords).size
             val score = when {
-                c == wanted -> 3
-                c.removeSuffix("matte") == wanted.removeSuffix("matte") && (wantsMatte == c.endsWith("matte")) -> 3
-                c.contains(wanted) || wanted.contains(c) -> 2
+                c == wanted -> 4
+                c.removeSuffix("matte") == wanted.removeSuffix("matte") && (wantsMatte == c.endsWith("matte")) -> 4
+                c.contains(wanted) || wanted.contains(c) -> 3
+                // "Glacial White" for "Glacial White Pearl": two shared words is the same paint, one ("white") is not.
+                shared >= 2 -> 2
                 else -> 0
             }
             if (score == 0) null else Triple(p, score, if ("(" in p.group) 0 else 1)
         }
-        .maxWithOrNull(compareBy<Triple<CarPicture, Int, Int>>({ it.second }, { it.third }))
-        ?.first
+    val best = scored.maxOfOrNull { it.second } ?: return null
+    val top = scored.filter { it.second == best }
+    // A loose match must be the only one: two different paints that fit equally means the account has not said which.
+    if (best < 3 && top.map { it.first.colour }.distinct().size > 1) return null
+    return top.maxWithOrNull(compareBy<Triple<CarPicture, Int, Int>> { it.third }.thenBy { if (wantsMatte == it.first.colour.endsWith("Matte")) 1 else 0 })?.first
 }
 
 /** A cut-out picture is drawn whole against the pebble (not cropped, not frosted): a PNG the user chose, or a bundled one. */

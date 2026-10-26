@@ -173,12 +173,15 @@ class KiaUsaApi {
         list.mapNotNull { e ->
             val o = e.obj() ?: return@mapNotNull null
             val id = o["vehicleIdentifier"]?.str() ?: return@mapNotNull null
+            logAccountCar(o)
             KiaVehicleSummary(
                 id = id,
                 name = vehicleDisplayName(o["nickName"]?.str(), o["modelName"]?.str(), id),
                 model = o["modelName"]?.str()?.takeIf { it.isNotBlank() } ?: "Kia",
                 key = o["vehicleKey"]?.str().orEmpty(),
                 isEv = o["fuelType"]?.int() == 4,
+                colour = paintOf(o).colour,
+                trim = paintOf(o).trim,
             )
         }
     }

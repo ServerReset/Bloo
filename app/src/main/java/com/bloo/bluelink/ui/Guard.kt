@@ -329,7 +329,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                         PinField(
                             value = pin,
                             onValueChange = { pin = it },
-                            placeholder = "4–8 digit PIN",
+                            placeholder = "4 to 8 digit PIN",
                             onDone = { attemptPin() },
                             supportingText = {
                                 when {

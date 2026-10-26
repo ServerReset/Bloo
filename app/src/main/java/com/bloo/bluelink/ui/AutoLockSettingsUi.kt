@@ -325,7 +325,7 @@ private fun AutoLockSettings(
             } else if (!notificationsOk) {
                 BodySmallText(
                     "Without the notification permission AutoLock still locks the car, but you get " +
-                        "no progress and no result -- it happens silently.",
+                        "no progress and no result, so it happens silently.",
                 )
             }
 
