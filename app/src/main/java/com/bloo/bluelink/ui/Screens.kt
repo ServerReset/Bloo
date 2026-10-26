@@ -432,6 +432,9 @@ internal const val TWO_COLUMN_MIN_DP = 600
 /** Window width from which the garage shows two car columns side by side. */
 internal const val THREE_COLUMN_MIN_DP = 900
 
+/** Window width from which the garage shows four car columns side by side: a desktop or ChromeOS window, an unfolded tablet in landscape. */
+internal const val FOUR_COLUMN_MIN_DP = 1500
+
 /**
  * How many car columns a window [widthDp] wide gets side by side: 1 on a phone, 2 on a foldable or
  * small tablet, 3 on a wide tablet or desktop. This is the GRID -- multiple cars visible at once.
@@ -441,6 +444,7 @@ internal const val THREE_COLUMN_MIN_DP = 900
  * wrong: a large screen wants MORE columns, not fewer.)
  */
 internal fun carColumnsFor(widthDp: Float): Int = when {
+    widthDp >= FOUR_COLUMN_MIN_DP -> 4
     widthDp >= THREE_COLUMN_MIN_DP -> 3
     widthDp >= TWO_COLUMN_MIN_DP -> 2
     else -> 1

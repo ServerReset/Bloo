@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -121,6 +122,17 @@ internal fun HeroHeader(
     // What the photo looks like behind the title and the readout decides their colours (dark text on a light photo, light on a dark
     // one), and a gradient or a photo that changes behind the text is covered by judging each band's worst part.
     val photoTone by rememberHeroPhotoTone(imageUrl)
+    // A screen reader's actions menu on the readout: the three things most wanted of a car, without hunting for the buttons.
+    val doorLocked = status?.doorLock
+    val spokenActions = remember(v.vin, v.name, doorLocked) {
+        listOf(
+            CustomAccessibilityAction("Refresh ${v.name}") { vm.refreshStatus(v); true },
+            CustomAccessibilityAction(if (doorLocked == true) "Unlock ${v.name}" else "Lock ${v.name}") {
+                if (doorLocked == true) vm.unlock(v) else vm.lock(v)
+                true
+            },
+        )
+    }
     val heroTitleColorNow = heroTitleColor(photoTone, titleStep)
     CompositionLocalProvider(LocalHeroTone provides photoTone) {
         PebbleShell(
@@ -148,7 +160,7 @@ internal fun HeroHeader(
             // Rendered as `foreground` so they cross the header row above its buttons, not under.
             foreground = {
                 val t = heroTState.value
-                HeroForeground(collapsedNumbers, expandedNumbers, hoisted, t, readout, statusAlpha(t))
+                HeroForeground(collapsedNumbers, expandedNumbers, hoisted, t, readout, statusAlpha(t), actions = spokenActions)
             },
             // Collapsed: name, percentage and range on one row, with the bar directly under it. No
             // shared element: SharedTransitionLayout is a LookaheadScope, which adds a lookahead pass

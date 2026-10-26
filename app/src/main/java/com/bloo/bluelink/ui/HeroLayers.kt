@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.animation.AnimatedVisibility
@@ -150,6 +152,8 @@ internal fun HeroForeground(
     heroT: Float,
     readout: ChargeReadout,
     statusAlpha: Float,
+    /** What a screen reader offers on the readout beyond reading it (refresh, lock or unlock). */
+    actions: List<CustomAccessibilityAction> = emptyList(),
 ) {
     val from = collapsedNumbers.value ?: expandedNumbers.value
     val to = expandedNumbers.value ?: collapsedNumbers.value
@@ -161,7 +165,7 @@ internal fun HeroForeground(
             Modifier
                 .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
                 // The one copy a screen reader hears, as a sentence.
-                .clearAndSetSemantics { contentDescription = readout.spoken() },
+                .clearAndSetSemantics { contentDescription = readout.spoken(); customActions = actions },
         ) {
             val tone = LocalHeroTone.current
             CompositionLocalProvider(
