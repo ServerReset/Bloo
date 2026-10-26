@@ -1,18 +1,17 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.bloo.uicommon.GapRow
@@ -47,7 +46,8 @@ internal fun LockedControls(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { },
+                    // A tap swallower, not a button: as a clickable it told a screen reader there was something to activate.
+                    .pointerInput(Unit) { detectTapGestures { } },
                 contentAlignment = Alignment.Center,
             ) {
                 FrostMessage(message)

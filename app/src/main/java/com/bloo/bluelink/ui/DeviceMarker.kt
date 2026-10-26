@@ -54,7 +54,7 @@ internal fun BoxScope.DeviceMarker(
                 .offset { IntOffset(ex.roundToInt(), ey.roundToInt()) }
                 .size(30.dp)
                 .background(color, CircleShape)
-                .clickable(onClick = onCenter)
+                .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onCenter)
                 .semantics { contentDescription = "Your location is off screen. Tap to centre on it" },
             contentAlignment = Alignment.Center,
         ) {
