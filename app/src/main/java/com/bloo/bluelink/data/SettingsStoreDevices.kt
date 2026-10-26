@@ -151,8 +151,9 @@ suspend fun SettingsStore.setSyncDeviceName(name: String) {
 }
 
 /** Hash of the portable content this device last saw or wrote (the change gate). */
-suspend fun SettingsStore.syncLastHash(): String? =
-    context.settingsDataStore.data.first()[stringPreferencesKey("sync_last_hash")]?.takeIf { it.isNotBlank() }
+suspend fun SettingsStore.syncLastHash(): String? = syncLastHash(context.settingsDataStore.data.first())
+
+fun SettingsStore.syncLastHash(p: Preferences): String? = p[stringPreferencesKey("sync_last_hash")]?.takeIf { it.isNotBlank() }
 
 suspend fun SettingsStore.setSyncLastHash(hash: String?) {
     context.settingsDataStore.edit {

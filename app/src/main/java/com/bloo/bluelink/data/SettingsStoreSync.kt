@@ -54,7 +54,9 @@ private fun SettingsStore.providerLastModifiedMs(parsed: android.net.Uri): Long?
  * there is no sync file.
  */
 suspend fun SettingsStore.syncFileChangedRemotely(): Boolean {
-    val uri = syncUri() ?: return false
+    // One read of the store for the whole check (this runs on every foreground poll tick), so the three facts also agree.
+    val prefs = context.settingsDataStore.data.first()
+    val uri = syncUri(prefs) ?: return false
     val parsed = uri.toUri()
     val modified = kotlinx.coroutines.withContext(Dispatchers.IO) { providerLastModifiedMs(parsed) }
     val now = android.os.SystemClock.elapsedRealtime()
@@ -72,7 +74,7 @@ suspend fun SettingsStore.syncFileChangedRemotely(): Boolean {
         }?.substringAfter('\n', "")?.takeIf { it.isNotBlank() }?.let { SyncMerge.parseMeta(it)?.hash }
     }
     val hash = if (due) remoteHash() else null
-    return SyncPoll.changed(modified, lastSyncMs(), due, { hash }, syncLastHash())
+    return SyncPoll.changed(modified, lastSyncMs(prefs), due, { hash }, syncLastHash(prefs))
 }
 
 /** When [syncFileChangedRemotely] last downloaded the file to compare hashes (providers with no modified time). */
