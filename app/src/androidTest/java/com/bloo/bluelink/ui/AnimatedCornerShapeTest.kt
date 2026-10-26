@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
@@ -37,12 +38,12 @@ class AnimatedCornerShapeTest {
         rule.waitForIdle()
         val before = compositions
         val square = rule.onNodeWithTag("card").captureToImage()
-        assertEquals("square corner is filled", Color.Red.toArgb(), square.pixelAt(1, 1).toArgb())
+        assertEquals("square corner is filled", Color.Red.toArgb(), square.toPixelMap()[1, 1].toArgb())
 
         corner.value = 50.dp
         rule.waitForIdle()
         val round = rule.onNodeWithTag("card").captureToImage()
-        assertNotEquals("round corner is clipped away", Color.Red.toArgb(), round.pixelAt(1, 1).toArgb())
+        assertNotEquals("round corner is clipped away", Color.Red.toArgb(), round.toPixelMap()[1, 1].toArgb())
         assertEquals("the card did not recompose", before, compositions)
     }
 }
