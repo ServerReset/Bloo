@@ -189,7 +189,7 @@ private fun MutablePreferences.putTyped(strings: Map<String, String>, bools: Map
 }
 
 /** The parsed backup when [json] is a settings file this build can read, else null (a newer format is logged as skipping [what]). */
-private fun readableBackup(json: String, what: String): JsonObject? {
+private fun SettingsStore.readableBackup(json: String, what: String): JsonObject? {
     val root = runCatching { backupJson.parseToJsonElement(json).jsonObject }.getOrNull() ?: return null
     if ((root["_format"] as? JsonPrimitive)?.contentOrNull != "bloo-settings") return null
     val version = (root["_version"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 1
