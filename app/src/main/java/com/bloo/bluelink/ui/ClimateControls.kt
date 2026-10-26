@@ -254,13 +254,7 @@ internal fun ClimatePresetSection(
                     Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
-                    BlooTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { RevealText("Name") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    LabeledField(name, { name = it }, "Name")
                     // What the preset does: the same controls the climate section uses, with its save button left out.
                     ClimateControlsSection(
                         form = form,

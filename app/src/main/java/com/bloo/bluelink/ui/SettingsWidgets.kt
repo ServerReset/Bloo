@@ -310,9 +310,7 @@ internal fun ListButton(
         contentPadding = PaddingValues(horizontal = ChipPaddingH, vertical = GapGroup),
         minHeight = ButtonTargetHeight,
         modifier = modifier.fillMaxWidth(),
-        expressive = true,
-        fillOnPress = true,
-        groupWeight = GroupWeightProportional,
+        expressive = true, fillOnPress = true, groupWeight = GroupWeightProportional,
     ) {
         if (icon != null) {
             ButtonIcon(icon)

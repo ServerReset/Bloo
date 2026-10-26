@@ -34,7 +34,6 @@ import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.settingsMode
-import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.GapRow
@@ -148,13 +147,7 @@ internal fun CarSettingsCard(
             if (advanced) {
                 SectionDivider()
                 SelectionContainer { StatusRow("VIN", v.vin) }
-                BlooTextField(
-                    value = state.licensePlates[v.vin] ?: "",
-                    onValueChange = { vm.setLicensePlate(v.vin, it) },
-                    label = { RevealText("Licence plate") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                LabeledField(state.licensePlates[v.vin] ?: "", { vm.setLicensePlate(v.vin, it) }, "Licence plate")
             }
         }
       }

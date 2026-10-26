@@ -36,7 +36,6 @@ import com.bloo.bluelink.data.smartClimateTargetF
 import com.bloo.bluelink.data.smartClimateTargetLine
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
-import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.denyTone
 import com.bloo.uicommon.ButtonEmphasis
@@ -334,13 +333,7 @@ private fun SavePresetDialog(onSave: (String) -> Unit, onDismiss: () -> Unit) {
         icon = Icons.Filled.Thermostat,
         title = "Save preset",
         text = {
-            BlooTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { RevealText("Name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            LabeledField(name, { name = it }, "Name")
         },
         buttons = {
             MorphTextButton(

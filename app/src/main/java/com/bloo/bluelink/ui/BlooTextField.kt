@@ -112,3 +112,13 @@ internal fun RevealToggle(shown: Boolean, noun: String, onToggle: () -> Unit) {
         )
     }
 }
+
+/** The common field: one line, full width, with a text label (a name, a plate, a code). */
+@Composable
+internal fun LabeledField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+) = BlooTextField(value, onValueChange, modifier.fillMaxWidth(), label = { RevealText(label) }, singleLine = true, keyboardOptions = keyboardOptions)

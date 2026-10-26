@@ -163,9 +163,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                 enabled = bmp != null,
                 interactionSource = confirmSource,
                 contentPadding = StandardButtonPadding,
-                    expressive = true,
-                fillOnPress = true,
-                groupWeight = GroupWeightProportional,
+                    expressive = true, fillOnPress = true, groupWeight = GroupWeightProportional,
             ) { RevealText("Use photo", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
             }
         }

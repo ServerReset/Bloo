@@ -94,14 +94,7 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
  */
 @Composable
 internal fun OtpCodeField(code: String, onCodeChange: (String) -> Unit) {
-    BlooTextField(
-        value = code,
-        onValueChange = onCodeChange,
-        label = { RevealText("Code") },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth(),
-    )
+    LabeledField(code, onCodeChange, "Code", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
 }
 
 /** The one-time-code dialog's buttons, stacked full-width with the primary on top: Verify (once a code was sent) and Cancel. */
