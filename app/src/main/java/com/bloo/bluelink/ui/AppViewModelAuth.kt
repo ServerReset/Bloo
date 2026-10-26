@@ -94,12 +94,9 @@ fun AppViewModel.kiaSendOtp(notifyType: String) {
 fun AppViewModel.kiaVerifyOtp(code: String) {
     val otp = _state.value.kiaOtp ?: return
     val creds = kiaPending ?: return
-    if (code.isBlank()) {
-        _state.update { it.copy(message = "Enter the code you received.", messageType = ToastKind.ERROR) }
-        return
-    }
+    val typed = codeOrComplain(code) ?: return
     launchBusy {
-        kiaRepo().verifyOtp(creds.email, creds.password, creds.pin, code.trim(), otp.challenge)
+        kiaRepo().verifyOtp(creds.email, creds.password, creds.pin, typed, otp.challenge)
         kiaPending = null
         _state.update { it.copy(kiaOtp = null) }
         finishKiaLogin(creds)
@@ -144,12 +141,9 @@ private fun AppViewModel.loginCanada(username: String, password: String, pin: St
 fun AppViewModel.canadaVerifyOtp(code: String) {
     val otp = _state.value.canadaOtp ?: return
     val creds = canadaPending ?: return
-    if (code.isBlank()) {
-        _state.update { it.copy(message = "Enter the code you received.", messageType = ToastKind.ERROR) }
-        return
-    }
+    val typed = codeOrComplain(code) ?: return
     launchBusy {
-        canadaRepo(otp.brand).verifyOtp(creds.email, creds.pin, code.trim(), otp.challenge)
+        canadaRepo(otp.brand).verifyOtp(creds.email, creds.pin, typed, otp.challenge)
         canadaPending = null
         _state.update { it.copy(canadaOtp = null) }
         finishCanadaLogin(creds)
@@ -198,4 +192,10 @@ fun AppViewModel.cancelAddAccount() = _state.update { s ->
 internal fun AppViewModel.finishSignIn() {
     val accounts = credentialStore.loadAll()
     _state.update { it.copy(accounts = accounts, addingAccount = false, locked = it.locked || it.lockedToLogin, lockedToLogin = false) }
+}
+
+/** The one-time code as typed, or null (after saying so) when it is blank. */
+private fun AppViewModel.codeOrComplain(code: String): String? = code.trim().ifBlank {
+    _state.update { it.copy(message = "Enter the code you received.", messageType = ToastKind.ERROR) }
+    null
 }

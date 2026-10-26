@@ -19,22 +19,22 @@ import com.bloo.bluelink.data.setServiceIntervalMiles
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** This per-car map with [vin]'s entry set to [value], or dropped when [value] is null. */
+private fun <V> Map<String, V>.withEntry(vin: String, value: V?): Map<String, V> = if (value == null) this - vin else this + (vin to value)
+
 // --- Per-car identity, service, seats, powertrain and layout settings (extracted from AppViewModel) --
 
 /** Set (or, with a blank string, clear) a custom car photo URL. */
 fun AppViewModel.setVehicleImage(vin: String, url: String) {
     _state.update {
-        it.copy(imageUrls = if (url.isBlank()) it.imageUrls - vin else it.imageUrls + (vin to url.trim()))
+        it.copy(imageUrls = it.imageUrls.withEntry(vin, url.trim().ifBlank { null }))
     }
     viewModelScope.launch { settingsStore.setImageUrl(vin, url) }
 }
 
 fun AppViewModel.setLicensePlate(vin: String, plate: String) {
     _state.update {
-        it.copy(
-            licensePlates = if (plate.isBlank()) it.licensePlates - vin
-            else it.licensePlates + (vin to plate.trim()),
-        )
+        it.copy(licensePlates = it.licensePlates.withEntry(vin, plate.trim().ifBlank { null }))
     }
     // Store write immediate (durability), cross-surface publish debounced -- see publishDebounced.
     // Still republishes rather than waiting for the next status refresh to rebuild the snapshot;
@@ -45,10 +45,7 @@ fun AppViewModel.setLicensePlate(vin: String, plate: String) {
 
 fun AppViewModel.setLastServiceMiles(vin: String, miles: Int?) {
     _state.update {
-        it.copy(
-            lastServiceMiles = if (miles == null) it.lastServiceMiles - vin
-            else it.lastServiceMiles + (vin to miles),
-        )
+        it.copy(lastServiceMiles = it.lastServiceMiles.withEntry(vin, miles))
     }
     viewModelScope.launch { settingsStore.setLastServiceMiles(vin, miles) }
     publishDebounced("lastService:$vin")
@@ -56,10 +53,7 @@ fun AppViewModel.setLastServiceMiles(vin: String, miles: Int?) {
 
 fun AppViewModel.setServiceIntervalMiles(vin: String, miles: Int?) {
     _state.update {
-        it.copy(
-            serviceIntervalMiles = if (miles == null) it.serviceIntervalMiles - vin
-            else it.serviceIntervalMiles + (vin to miles),
-        )
+        it.copy(serviceIntervalMiles = it.serviceIntervalMiles.withEntry(vin, miles))
     }
     viewModelScope.launch { settingsStore.setServiceIntervalMiles(vin, miles) }
     publishDebounced("serviceInterval:$vin")
@@ -107,7 +101,7 @@ fun AppViewModel.setHotspot(v: Vehicle, section: String) {
         val current = it.hotspotSections[v.vin]
         // Toggle: if the section is already in the secondary slot, unpin it; otherwise pin it
         val updated = if (current == section) null else section
-        it.copy(hotspotSections = if (updated == null) it.hotspotSections - v.vin else it.hotspotSections + (v.vin to updated))
+        it.copy(hotspotSections = it.hotspotSections.withEntry(v.vin, updated))
     }
     viewModelScope.launch { settingsStore.setHotspots(v.vin, _state.value.hotspotSections[v.vin]) }
 }
