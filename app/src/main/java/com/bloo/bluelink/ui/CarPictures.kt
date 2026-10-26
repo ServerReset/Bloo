@@ -163,13 +163,14 @@ private fun CarPictureGrid(
                 MorphTextButton(g, onClick = { onGroup(g) }, emphasis = if (g == group) ButtonEmphasis.Confirm else ButtonEmphasis.Tonal)
             }
         }
+        val shown = remember(pictures, group) { pictures.filter { it.group == group } }
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier.fillMaxWidth().height(340.dp),
             horizontalArrangement = Arrangement.spacedBy(GapRow),
             verticalArrangement = Arrangement.spacedBy(GapRow),
         ) {
-            items(pictures.filter { it.group == group }, key = { it.url }) { p ->
+            items(shown, key = { it.url }) { p ->
                 Column(
                     Modifier.clip(StandardShape).clickable { onPick(p.url) },
                     verticalArrangement = Arrangement.spacedBy(2.dp),
