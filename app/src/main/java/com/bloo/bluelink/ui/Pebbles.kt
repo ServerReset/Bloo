@@ -237,9 +237,7 @@ internal fun PebbleList(
                     // optional summary line, and at a large accessibility font that stacked text is
                     // taller than ControlHeight -- a hard height clipped it.
                     Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = PebbleHeaderHeight)
+                        Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight)
                             // A quiet pill, not a hole: on a tall screen these rows ARE on screen for the
                             // length of a swipe, and an empty gap reads as broken.
                             .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.35f), RoundedCornerShape(PebbleCornerCollapsed))

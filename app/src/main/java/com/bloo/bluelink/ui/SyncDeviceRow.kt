@@ -66,9 +66,7 @@ internal fun SyncDeviceRow(
     val shape = StandardShape
     val health = healthOf(device.lastSeenMs, isSelf, System.currentTimeMillis())
     Row(
-        Modifier
-            .fillMaxWidth()
-            .then(
+        Modifier.fillMaxWidth().then(
                 if (dragging) {
                     Modifier.themedDropShadow(shape)
                 } else {

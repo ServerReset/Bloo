@@ -202,9 +202,7 @@ internal fun SearchLayer(
                 val edgeScroll = remember(listScroll) { EdgeScroll(listScroll, listViewportPx, listWindowTop) }
                 CompositionLocalProvider(LocalEdgeScroll provides edgeScroll) {
                     Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = minOf(480.dp, freeAbovePill))
+                        Modifier.fillMaxWidth().heightIn(max = minOf(480.dp, freeAbovePill))
                             .onGloballyPositioned {
                                 listViewportPx.intValue = it.size.height
                                 listWindowTop.floatValue = it.positionInWindow().y

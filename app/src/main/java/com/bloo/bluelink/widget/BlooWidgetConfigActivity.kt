@@ -334,10 +334,7 @@ private fun CarCard(car: VehicleSnapshot, photoUrl: String?, selected: Boolean, 
     val ring by animateColorAsState(if (selected) scheme.primary else Color.Transparent, label = "carRing")
     val lift by animateFloatAsState(if (selected) 1f else 0.94f, spring(dampingRatio = 0.6f), label = "carLift")
     Column(
-        Modifier
-            .width(150.dp)
-            .scale(lift)
-            .clip(RoundedCornerShape(22.dp))
+        Modifier.width(150.dp).scale(lift).clip(RoundedCornerShape(22.dp))
             .border(BorderStroke(2.dp, ring), RoundedCornerShape(22.dp))
             .background(if (selected) scheme.secondaryContainer else scheme.surfaceContainerHighest)
             .clickable(onClick = onSelect),

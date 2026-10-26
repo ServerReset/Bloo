@@ -96,10 +96,7 @@ internal fun DebugCardContent(
                         text = logs.joinToString("\n").ifBlank { "No activity yet." },
                         style = SecondaryTextStyle(),
                         fontFamily = FontFamily.Monospace,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 300.dp)
-                            .fadingEdges(scroll)
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp).fadingEdges(scroll)
                             .verticalScroll(scroll),
                     )
                 }
@@ -211,8 +208,7 @@ private fun CreditRow(entry: CreditEntry) {
             // wrapContentWidth, so the tap target doesn't stretch across empty space to the card's
             // far edge.
             Row(
-                Modifier
-                    .clip(TinyShape)
+                Modifier.clip(TinyShape)
                     .hapticClickable { openUrl(context, entry.url) }
                     .wrapContentWidth(),
                 verticalAlignment = Alignment.CenterVertically,

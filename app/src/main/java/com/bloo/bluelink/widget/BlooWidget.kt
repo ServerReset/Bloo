@@ -268,8 +268,7 @@ private fun StatusChips(car: VehicleSnapshot, maxChips: Int = 3) {
         chips.forEachIndexed { i, (text, on) ->
             if (i > 0) Spacer(GlanceModifier.width(6.dp))
             Box(
-                GlanceModifier
-                    .height(WIDGET_CHIP_DP.dp)
+                GlanceModifier.height(WIDGET_CHIP_DP.dp)
                     .cornerRadius((WIDGET_CHIP_DP / 2).dp)
                     .background(if (on) GlanceTheme.colors.primaryContainer else GlanceTheme.colors.secondaryContainer)
                     .padding(horizontal = 12.dp),
@@ -358,10 +357,7 @@ private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptio
 private fun RefreshButton(car: VehicleSnapshot, pending: String?) {
     val busy = pending == "${car.vin}:${CarAction.REFRESH}"
     Box(
-        modifier = GlanceModifier
-            .size(32.dp)
-            .cornerRadius(16.dp)
-            .background(GlanceTheme.colors.secondaryContainer)
+        modifier = GlanceModifier.size(32.dp).cornerRadius(16.dp).background(GlanceTheme.colors.secondaryContainer)
             .clickable(actionFor(car, CarAction.REFRESH, busy)),
         contentAlignment = Alignment.Center,
     ) {

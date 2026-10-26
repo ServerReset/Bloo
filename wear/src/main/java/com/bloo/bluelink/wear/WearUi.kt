@@ -559,10 +559,7 @@ internal fun WearStatRow(label: String, value: String, valueColor: Color? = null
     val scheme = MaterialTheme.colorScheme
     // A glass pill, like the phone's status rows.
     Row(
-        Modifier
-            .fillMaxWidth()
-            .fitRound()
-            .clip(CircleShape)
+        Modifier.fillMaxWidth().fitRound().clip(CircleShape)
             .background(scheme.surfaceContainerHigh.copy(alpha = 0.5f))
             .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,

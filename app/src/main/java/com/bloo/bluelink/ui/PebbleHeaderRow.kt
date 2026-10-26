@@ -91,8 +91,7 @@ internal fun PebbleHeaderRow(
         rowWidthDp - 12.dp - 18.dp - ButtonIconGap - 8.dp - 10.dp - HeaderActionTitleFloor
         ).coerceAtLeast(0.dp)
     Row(
-        Modifier
-            .fillMaxWidth()
+        Modifier.fillMaxWidth()
             // Feeds collapsedCorner: this row's height is the collapsed card height and is stable
             // across the animation. Also feeds headerActionMaxWidth from the same callback (see
             // rowWidthDp).

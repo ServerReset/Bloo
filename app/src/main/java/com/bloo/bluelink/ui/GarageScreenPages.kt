@@ -215,8 +215,7 @@ internal fun CollapsedGaragePager(
             ) { page ->
                 val real = realItem(page)
                 Box(
-                    Modifier
-                        .fillMaxSize()
+                    Modifier.fillMaxSize()
                         // The app's page-turn, gentler than the deck's: a car leans away and fades
                         // as it leaves the centre. Read in the draw phase, so a drag never
                         // recomposes the page.

@@ -93,8 +93,7 @@ private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean
     LaunchedEffect(entry) { if (hasKeyboard) runCatching { cardFocus.requestFocus() } }
     val screenHeightPx = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp().toPx() }
     Box(
-        Modifier
-            .fillMaxSize()
+        Modifier.fillMaxSize()
             // A screen reader reads the dialog first, ahead of the page it covers.
             .semantics { isTraversalGroup = true; traversalIndex = -1f }
             // A leaving dialog swallows touches, so a second tap cannot land on what it covers.
@@ -110,8 +109,7 @@ private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean
     ) {
         // The page behind, dimmed in step with the card; tapping it dismisses.
         Box(
-            Modifier
-                .fillMaxSize()
+            Modifier.fillMaxSize()
                 .drawBehind { drawRect(Color.Black, alpha = DialogScrimAlpha * progress.value.coerceIn(0f, 1f)) }
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
@@ -129,10 +127,7 @@ private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean
                 // Frosted rather than clear: enough of the theme's surface over the blur that the
                 // text reads whatever is behind. Denser where the blur is unavailable.
                 tint = scheme.surfaceContainerHigh.copy(alpha = if (canBlurBackdrops()) 0.58f else 0.97f),
-                modifier = Modifier
-                    .padding(horizontal = GapBlock)
-                    .widthIn(max = 560.dp)
-                    .fillMaxWidth()
+                modifier = Modifier.padding(horizontal = GapBlock).widthIn(max = 560.dp).fillMaxWidth()
                     .focusRequester(cardFocus)
                     .focusable()
                     // Rises from below the screen.

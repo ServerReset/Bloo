@@ -128,9 +128,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     )
     val shape = RoundedCornerShape(corner)
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(modifier)
+        modifier = Modifier.fillMaxWidth().then(modifier)
             .pointerInput(v.vin) { detectTapGestures { showHistory = !showHistory } }
             .semantics {
                 customActions = listOf(
@@ -214,9 +212,7 @@ internal fun PrimaryActions(
     val density = LocalDensity.current
     val groupMaxWidth = (rowWidthDp - 120.dp - GapGroup).coerceAtLeast(0.dp)
     Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(contentPadding)
+        Modifier.fillMaxWidth().padding(contentPadding)
             // heightIn(min): the status and button text outgrow ControlHeight at large font sizes.
             .heightIn(min = ControlHeight)
             .onSizeChanged { rowWidthDp = with(density) { it.width.toDp() } },

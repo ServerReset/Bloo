@@ -163,10 +163,7 @@ internal fun ExpandedCar(
             contentAlignment = Alignment.TopCenter,
         ) {
             Column(
-                Modifier
-                    .fillMaxSize()
-                    .widthIn(max = 960.dp)
-                    .verticalScroll(pebblesScroll)
+                Modifier.fillMaxSize().widthIn(max = 960.dp).verticalScroll(pebblesScroll)
                     .padding(horizontal = ScreenGutter),
             ) {
                 Spacer(Modifier.height(topInset))

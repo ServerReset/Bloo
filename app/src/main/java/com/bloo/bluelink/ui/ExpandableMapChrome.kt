@@ -162,10 +162,7 @@ internal fun MapTopBar(
         // the theme and custom palettes.
     ) {
         Box(
-            Modifier
-                .fillMaxWidth()
-                .then(dragModifier)
-                .heightIn(min = 60.dp)
+            Modifier.fillMaxWidth().then(dragModifier).heightIn(min = 60.dp)
                 .padding(horizontal = GapPage),
         ) {
             // Reserves room on the end for the refresh icon (never under it) regardless of
@@ -173,9 +170,7 @@ internal fun MapTopBar(
             // space-distribution. The car icon, its name, and under it the charge and range: the
             // pill says which car this map is and how it is doing, not just what it is called.
             Row(
-                Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(end = if (onRefreshLocation != null) 48.dp else 0.dp),
+                Modifier.align(Alignment.CenterStart).padding(end = if (onRefreshLocation != null) 48.dp else 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(GapGroup),
             ) {
@@ -227,8 +222,7 @@ internal fun MapTopBar(
                     Icon(
                         Icons.Filled.Refresh,
                         contentDescription = null,
-                        modifier = Modifier
-                            .size(22.dp)
+                        modifier = Modifier.size(22.dp)
                             .graphicsLayer { rotationZ = angle.value },
                     )
                 }

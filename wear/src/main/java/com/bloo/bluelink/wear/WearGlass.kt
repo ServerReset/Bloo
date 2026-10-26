@@ -78,9 +78,7 @@ internal fun WearBackdrop(modifier: Modifier = Modifier, content: @Composable ()
     val tertiary = scheme.tertiary
     Box(modifier) {
         Box(
-            Modifier
-                .fillMaxSize()
-                .hazeSource(haze)
+            Modifier.fillMaxSize().hazeSource(haze)
                 .drawBehind {
                     drawRect(Color.Black)
                     val t = phase

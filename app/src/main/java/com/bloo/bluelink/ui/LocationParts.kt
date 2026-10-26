@@ -74,9 +74,7 @@ internal fun weatherTint(code: WeatherCode, isDay: Boolean): Color =
 @Composable
 internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: String) {
     Row(
-        Modifier
-            .fillMaxWidth()
-            .outlinedPanel(14.dp),
+        Modifier.fillMaxWidth().outlinedPanel(14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
@@ -176,9 +174,7 @@ private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
         // The strip runs to the pebble's own edges (the cards still start at its content inset), so cards melt
         // out and in at the true edge of the card, not at the inset text column.
         Row(
-            Modifier
-                .fillMaxWidth()
-                .bleedHorizontally(PebbleContentInset)
+            Modifier.fillMaxWidth().bleedHorizontally(PebbleContentInset)
                 .onSizeChanged { viewportPx.intValue = it.width }
                 .horizontalScroll(scroll)
                 .padding(horizontal = PebbleContentInset),

@@ -148,9 +148,7 @@ internal fun UpdateBadgedCard(visible: Boolean, modifier: Modifier = Modifier, c
                 lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
             ) + androidx.compose.animation.fadeIn(),
             exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset(x = 4.dp, y = (-4).dp),
+            modifier = Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-4).dp),
         ) {
             UpdateAvailableDot()
         }

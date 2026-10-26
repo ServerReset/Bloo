@@ -153,8 +153,7 @@ internal fun BoxScope.ToastSlot(
     val toggle by androidx.compose.runtime.rememberUpdatedState(onSetExpanded)
     var vDrag by remember(toast.id) { androidx.compose.runtime.mutableFloatStateOf(0f) }
     Box(
-        Modifier
-            .align(Alignment.BottomStart)
+        Modifier.align(Alignment.BottomStart)
             // A leaving toast goes behind every other one (and so behind the search bar, which is drawn after the stack).
             .zIndex(if (toast.leaving) -1f else 0f)
             .fillMaxWidth()
@@ -274,8 +273,7 @@ private fun ToastCard(
         // A pile fans out or folds when tapped.
         onClick = onTap,
         tint = scheme.surface.copy(alpha = if (canBlurBackdrops()) 0.16f else 0.96f),
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = Modifier.fillMaxWidth()
             // At least the search element's height: normally it is exactly the bar it emerged
             // from, but a long message may wrap to a second line and grow past it.
             .heightIn(min = ChromeBarHeight)
@@ -283,9 +281,7 @@ private fun ToastCard(
             .testTag(ToastCardTag),
     ) {
         Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(start = GapGroup, end = GapHairline, top = GapHairline, bottom = GapHairline)
+            Modifier.fillMaxWidth().padding(start = GapGroup, end = GapHairline, top = GapHairline, bottom = GapHairline)
                 .graphicsLayer { alpha = contentAlpha() },
             verticalAlignment = Alignment.CenterVertically,
         ) {

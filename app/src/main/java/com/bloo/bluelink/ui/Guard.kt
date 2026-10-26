@@ -84,9 +84,7 @@ internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
     // RenderEffect, but it still forces the whole app tree into its own graphicsLayer on every
     // frame -- for the entire life of the process, to serve a lock screen that is almost never up.
     Box(
-        Modifier
-            .fillMaxSize()
-            .then(if (lockBlur.value > 0f) Modifier.blur(lockBlur.value.dp) else Modifier),
+        Modifier.fillMaxSize().then(if (lockBlur.value > 0f) Modifier.blur(lockBlur.value.dp) else Modifier),
     ) {
         content()
     }
@@ -194,8 +192,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
         label = "lockBackdropAlpha",
     )
     Box(
-        Modifier
-            .fillMaxSize()
+        Modifier.fillMaxSize()
             // Darken the blur for legibility, and swallow taps to the app behind.
             .drawBehind { drawRect(lockBg.copy(alpha = backdropAlpha)) }
             .noRippleClickable {},
@@ -206,16 +203,11 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             onClick = { haptics?.click(); vm.lockToLogin() },
             containerColor = lockFg.copy(alpha = 0.16f),
             contentColor = lockFg,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .statusBarsPadding(),
+            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding(),
         )
 
         Column(
-            Modifier
-                .align(Alignment.Center)
-                .widthIn(max = 420.dp)
-                .padding(horizontal = GapHero, vertical = GapBlock),
+            Modifier.align(Alignment.Center).widthIn(max = 420.dp).padding(horizontal = GapHero, vertical = GapBlock),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // The biometric card, the PIN card and the fallback cross-fade into each other (switching to

@@ -82,8 +82,7 @@ internal fun SettingsScreen(
         // one of them unconditionally (a plain Column's only option) would be real, avoidable work
         // paid on every visit regardless of which sections are actually open.
         Box(
-            Modifier
-                .fillMaxSize(),
+            Modifier.fillMaxSize(),
             contentAlignment = Alignment.TopCenter
         ) {
         // Hoisted out of the list content (not a composable scope) so an advanced-only card is
@@ -94,9 +93,7 @@ internal fun SettingsScreen(
         val advTransition1 = rememberGridItemVisibility(advVisible[1])
         LazyColumn(
             state = settingsListState,
-            modifier = Modifier
-                .widthIn(max = 1100.dp)
-                .fillMaxWidth()
+            modifier = Modifier.widthIn(max = 1100.dp).fillMaxWidth()
                 // Rows scroll right up under the status bar and the Simple/Advanced tab, clipped by the
                 // list like any other scrolling content. They used to fade to nothing well BELOW the
                 // status bar -- an offscreen DstIn mask, 44dp tall, starting at the inset -- which read

@@ -172,9 +172,7 @@ fun BoxScope.WearPullIndicator(state: WearPullState, refreshing: Boolean) {
     } else null
     val stretch = over / (1f + over)
     Box(
-        Modifier
-            .align(Alignment.TopCenter)
-            .size(DiscSize)
+        Modifier.align(Alignment.TopCenter).size(DiscSize)
             .graphicsLayer {
                 // Drops from off the top edge and lands below the clock; past the arm point it stretches.
                 translationY = -sizePx + t * (sizePx + restPx)

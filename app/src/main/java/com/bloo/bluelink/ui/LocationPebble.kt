@@ -166,10 +166,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 val ownMapState = remember { CarMapState() }
                 CarMap(
                     loc,
-                    Modifier
-                        .fillMaxWidth()
-                        .height(if (glance) 130.dp else 220.dp)
-                        .clip(StandardShape)
+                    Modifier.fillMaxWidth().height(if (glance) 130.dp else 220.dp).clip(StandardShape)
                         .semantics { contentDescription = "Map showing where ${v.name} is" }
                         .then(
                             if (expandedMap == null) Modifier else Modifier

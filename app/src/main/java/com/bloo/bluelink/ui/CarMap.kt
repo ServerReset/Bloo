@@ -229,8 +229,7 @@ internal fun CarMap(
         // makes zooming feel fluid instead of jumping between the whole levels a fresh tile fetch
         // actually needs.
         Box(
-            Modifier
-                .fillMaxSize()
+            Modifier.fillMaxSize()
                 .graphicsLayer {
                     // Pan is one layer translation; children are placed at pan-independent
                     // positions. Divide by `scale` to bring tile-space pan into parent space (keeps
@@ -274,8 +273,7 @@ internal fun CarMap(
                         model = request,
                         contentDescription = null,
                         colorFilter = darkMapFilter,
-                        modifier = Modifier
-                            .size(tileDp)
+                        modifier = Modifier.size(tileDp)
                             // Layout-phase placement: no recomposition per pan frame.
                             // Pan-independent placement; the container's graphicsLayer applies pan.
                             .offset {
@@ -308,8 +306,7 @@ internal fun CarMap(
                 Icons.Filled.LocationOn,
                 contentDescription = "Car and your location",
                 tint = lerp(pinColor, deviceLocationColor, 0.5f),
-                modifier = Modifier
-                    .align(Alignment.Center)
+                modifier = Modifier.align(Alignment.Center)
                     .offset { IntOffset((dx / 2f).roundToInt(), (dy / 2f).roundToInt()) }
                     .size(40.dp)
                     .offset(y = (-20).dp),
@@ -320,8 +317,7 @@ internal fun CarMap(
                 Icons.Filled.LocationOn,
                 contentDescription = "Car location",
                 tint = pinColor,
-                modifier = Modifier
-                    .align(Alignment.Center)
+                modifier = Modifier.align(Alignment.Center)
                     // The car is the map's pan origin, so the container's own translation already
                     // puts it dead-centre -- no per-frame offset here any more.
                     .size(40.dp)

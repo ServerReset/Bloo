@@ -180,10 +180,7 @@ internal fun OnboardingBottomBar(
             ) {
                 repeat(total.coerceAtLeast(1)) { i ->
                     Box(
-                        Modifier
-                            .weight(1f)
-                            .height(5.dp)
-                            .clip(CircleShape)
+                        Modifier.weight(1f).height(5.dp).clip(CircleShape)
                             .background(
                                 if (i <= current) accent
                                 else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),

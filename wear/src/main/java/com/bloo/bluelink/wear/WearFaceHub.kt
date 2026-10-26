@@ -58,8 +58,7 @@ fun WearFaceHub(
     // The hub gives a little under a finger and springs back: less than it did, so the centre reads as steady.
     val press by animateFloatAsState(if (pressed) 0.98f else 1f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium), label = "hubPress")
     Box(
-        Modifier
-            .size(size)
+        Modifier.size(size)
             .graphicsLayer { scaleX = press; scaleY = press }
             .clip(CircleShape)
             .background(scheme.background)

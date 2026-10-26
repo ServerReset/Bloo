@@ -213,8 +213,7 @@ internal fun PebbleShell(
     val pebbleShape = RoundedCornerShape(corner)
     Box(Modifier.fillMaxWidth()) {
         Card(
-            Modifier
-                .fillMaxWidth()
+            Modifier.fillMaxWidth()
                 // The card's bounding box is glass (GlassCardBackdrop, its first child below, so the blur
                 // can be skipped while the pager moves); its own panels stay solid.
                 .pebbleCardEdge(pebbleShape),

@@ -187,8 +187,7 @@ fun <T> ReorderColumn(
                     }
                 }
                 Box(
-                    Modifier
-                        .zIndex(if (dragging) 1f else 0f)
+                    Modifier.zIndex(if (dragging) 1f else 0f)
                         // Non-dragged items glide to their new slot; the dragged one is positioned
                         // manually via graphicsLayer below.
                         .then(if (dragging) Modifier else Modifier.animatePlacement { order })

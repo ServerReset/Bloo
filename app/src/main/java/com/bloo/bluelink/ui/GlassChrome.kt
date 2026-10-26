@@ -283,8 +283,7 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
     val drawBlur = androidx.compose.runtime.remember(blur) { androidx.compose.runtime.derivedStateOf { blur() > 0.01f } }
     if (haze != null && canBlurBackdrops()) {
         Box(
-            Modifier
-                .matchParentSize()
+            Modifier.matchParentSize()
                 // Faded, and not drawn at all at 0: while it is skipped Haze does no capture or blur work.
                 // The fade lives in the layer (a re-composite, not a redraw); only crossing the on/off
                 // threshold invalidates the draw. Reading blur() in drawWithContent made every card re-capture
@@ -310,8 +309,7 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
         )
     } else {
         Box(
-            Modifier
-                .matchParentSize()
+            Modifier.matchParentSize()
                 // 0.30 while lifted, not 0.6: a picked-up pebble has to stay clearly see-through.
                 .background(tint.copy(alpha = if (floating) 0.30f else 0.82f), shape)
                 .glassSheen(),

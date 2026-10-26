@@ -73,8 +73,7 @@ private fun SwatchDisc(color: Color, selected: Boolean, description: String, onC
     // The 58dp slot leaves room for the 1.12x pop. Exposed as a RadioButton so TalkBack announces
     // name and state.
     Box(
-        Modifier
-            .size(58.dp)
+        Modifier.size(58.dp)
             // The colour name was only ever rendered as a sibling Text below, outside this
             // clickable's own semantics -- TalkBack announced an unlabelled "double tap to
             // activate" with no colour name and no sense of which swatch is selected (the
@@ -88,8 +87,7 @@ private fun SwatchDisc(color: Color, selected: Boolean, description: String, onC
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            Modifier
-                .size(48.dp)
+            Modifier.size(48.dp)
                 // Read at draw time, not in composition.
                 .graphicsLayer { scaleX = scale; scaleY = scale }
                 .clip(CircleShape)
@@ -203,10 +201,7 @@ internal fun ColorPickerCanvas(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(GapRow)) {
         // Saturation × Value square
         Canvas(
-            Modifier
-                .fillMaxWidth()
-                .height(180.dp)
-                .clip(SmallShape)
+            Modifier.fillMaxWidth().height(180.dp).clip(SmallShape)
                 .semantics {
                     contentDescription = "Saturation and brightness. Or type a hex below."
                 }
@@ -239,10 +234,7 @@ internal fun ColorPickerCanvas(
 
         // Hue bar
         Canvas(
-            Modifier
-                .fillMaxWidth()
-                .height(34.dp)
-                .clip(CircleShape)
+            Modifier.fillMaxWidth().height(34.dp).clip(CircleShape)
                 .semantics {
                     contentDescription = "Hue picker. Use the hex field below for exact values."
                 }
@@ -271,10 +263,7 @@ internal fun ColorPickerCanvas(
 
         // Preview swatch
         Box(
-            Modifier
-                .fillMaxWidth()
-                .height(36.dp)
-                .clip(TinyShape)
+            Modifier.fillMaxWidth().height(36.dp).clip(TinyShape)
                 .background(picked)
         )
 

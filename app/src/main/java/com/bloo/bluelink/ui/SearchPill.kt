@@ -133,9 +133,7 @@ internal fun SearchPill(
             // GlassStyle carries the shape itself and Haze clips to it (GraphicsLayer.setClip), so that
             // clip was a second render layer drawn around an identical outline.
             Box(
-                Modifier
-                    .matchParentSize()
-                    .appGlassEffect(hazeState, pillShape),
+                Modifier.matchParentSize().appGlassEffect(hazeState, pillShape),
             )
         }
         Surface(
@@ -159,8 +157,7 @@ internal fun SearchPill(
                 ),
             ),
             interactionSource = interaction,
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
                 // The search pill gets neither shadow nor glass rim: on a 40dp circle they read as
                 // a smudge. glassEdge (GlassChrome.kt) is the dropShadow + glassRim pair with the
                 // theme-aware shadow weight, so a change there reaches this pill too. shadow =

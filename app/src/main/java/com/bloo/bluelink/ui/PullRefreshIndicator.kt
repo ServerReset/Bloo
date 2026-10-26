@@ -155,9 +155,7 @@ internal fun PullRefreshIndicatorHost(
     Box(modifier.fillMaxSize()) {
         GlassSurface(
             shape = androidx.compose.foundation.shape.CircleShape,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .size(IndicatorSize)
+            modifier = Modifier.align(Alignment.TopCenter).size(IndicatorSize)
                 .graphicsLayer {
                     // Drops from OFF the top edge as the pull grows and lands below the status bar.
                     //

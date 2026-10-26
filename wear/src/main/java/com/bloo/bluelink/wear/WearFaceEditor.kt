@@ -71,8 +71,7 @@ internal fun WearFaceEditor(
                                 size = face * 0.27f,
                                 description = "Done",
                                 color = scheme.background,
-                                modifier = Modifier
-                                    .align(Alignment.Center)
+                                modifier = Modifier.align(Alignment.Center)
                                     .offset { IntOffset((press.dx * face.roundToPx()).roundToInt(), (press.dy * face.roundToPx()).roundToInt()) },
                                 onClick = {
                                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)

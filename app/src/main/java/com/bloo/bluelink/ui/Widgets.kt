@@ -123,10 +123,7 @@ internal fun SettingsModeTab(
     // Sits below the status bar like the other floating header chrome, so it doesn't blur into the
     // system icons.
     Box(
-        Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(top = HeaderCornerGap, end = HeaderCornerGap),
+        Modifier.fillMaxWidth().statusBarsPadding().padding(top = HeaderCornerGap, end = HeaderCornerGap),
         contentAlignment = Alignment.TopEnd,
     ) {
         GlassSurface(

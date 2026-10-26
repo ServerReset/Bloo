@@ -74,8 +74,7 @@ internal fun HeroMorphReadout(
         // name's line -- so this copy must be invisible until that one has gone, or both are on
         // screen at once and the morph reads as a double image.
         Row(
-            Modifier
-                .padding(start = numbersStart)
+            Modifier.padding(start = numbersStart)
                 // fillMaxWidth so the anchor reports the readout's real span; the overlay lerps to
                 // that width (range at the right edge).
                 .fillMaxWidth()

@@ -179,9 +179,7 @@ internal fun ExpandableMapLayer(
         // actually sells "pop" -- with no `clipToBounds()`, so the whole sheet (its rounded-corner
         // shape included) moves as one rigid unit with nothing to hit a wall against.
         Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 // 85% of the screen, plus however far it has been pulled up: the sheet's top rises with the
                 // finger while its bottom stays pinned to the screen bottom, so the map simply gets
                 // taller instead of lifting off and leaving a gap. Read in the measure phase.
@@ -200,8 +198,7 @@ internal fun ExpandableMapLayer(
             // own bounds so the GROWING-from-pebble content never spills past the sheet's edges on
             // the way up -- independent of the outer sheet's own entrance bounce above.
             Box(
-                Modifier
-                    .fillMaxSize()
+                Modifier.fillMaxSize()
                     .onGloballyPositioned { sheetBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
                     .clipToBounds()
                     .graphicsLayer {
@@ -265,10 +262,7 @@ internal fun ExpandableMapLayer(
             // Bottom buttons, which appear once the map is expanded.
             if (isExpanded && chromeShown) {
                 Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
+                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
                         .imePadding()
                         .graphicsLayer {
                             val t = chrome.value.coerceIn(0f, 1f)

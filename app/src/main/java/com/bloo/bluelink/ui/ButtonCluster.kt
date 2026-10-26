@@ -122,8 +122,7 @@ internal fun ButtonCluster(
                     morphedCornerPercent = MorphedCornerPercent,
                     minHeight = 0.dp,
                     groupWeight = b.weight,
-                    modifier = Modifier
-                        .fillMaxHeight()
+                    modifier = Modifier.fillMaxHeight()
                         // Never narrower than the row is tall: a collapsed button is a circle.
                         .widthIn(min = rowHeight)
                         .then(b.modifier),

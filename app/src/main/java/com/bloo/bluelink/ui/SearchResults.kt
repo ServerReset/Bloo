@@ -235,9 +235,7 @@ internal fun ResultRow(
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     val haptics = LocalHaptics.current
     Row(
-        Modifier
-            .fillMaxWidth()
-            .then(
+        Modifier.fillMaxWidth().then(
                 if (onClick != null) {
                     Modifier.clip(StandardShape).clickable { haptics?.click(); onClick() }
                 } else {

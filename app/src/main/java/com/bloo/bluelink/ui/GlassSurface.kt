@@ -67,9 +67,7 @@ internal fun GlassSurface(
             .glassEdge(shape, shadow = shadow)
             .then(
                 if (onClick != null) {
-                    Modifier
-                        .clip(shape)
-                        .clickable(
+                    Modifier.clip(shape).clickable(
                             interactionSource = interaction,
                             indication = ripple(),
                             onClickLabel = contentDescription,
@@ -95,9 +93,7 @@ internal fun GlassSurface(
         // One node for blur+tint: both draw in the Box's own modifier chain (blur first, tint on
         // top).
         Box(
-            Modifier
-                .matchParentSize()
-                .clip(shape)
+            Modifier.matchParentSize().clip(shape)
                 // Floating glass refracts what is behind it; a nested panel or card keeps the flat
                 // blur.
                 .then(

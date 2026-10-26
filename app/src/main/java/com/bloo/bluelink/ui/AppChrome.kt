@@ -163,10 +163,7 @@ private fun DialogCard(
         Column(
             // weight(fill = false): wrap the body while it fits, take only the leftover (and scroll)
             // once the card has grown to its cap.
-            Modifier
-                .weight(1f, fill = false)
-                .verticalScroll(bodyScroll)
-                .dialogScrollbar(bodyScroll),
+            Modifier.weight(1f, fill = false).verticalScroll(bodyScroll).dialogScrollbar(bodyScroll),
             verticalArrangement = Arrangement.spacedBy(GapGroup),
             content = text,
         )

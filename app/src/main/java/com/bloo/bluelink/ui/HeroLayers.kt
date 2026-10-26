@@ -64,8 +64,7 @@ internal fun BoxScope.HeroBackground(
     // The card's own coordinate space; both anchors convert into it so the overlay lerps within one
     // space.
     Spacer(
-        Modifier
-            .matchParentSize()
+        Modifier.matchParentSize()
             .onGloballyPositioned { cardCoords.value = it },
     )
     // Captured here: the slide transitions' offset lambdas run outside composition.
@@ -102,9 +101,7 @@ internal fun BoxScope.HeroBackground(
     // The expanded readout at the BOTTOM of the card: a sibling of the photo, not a child, so it
     // does not inherit the photo's scale settle (text should not zoom).
     Box(
-        Modifier
-            .align(Alignment.BottomStart)
-            .fillMaxWidth()
+        Modifier.align(Alignment.BottomStart).fillMaxWidth()
             // The insets that place the readout against the card, derived from the header's own
             // geometry (its icon + gap + weighted text column) rather than tuned by eye: `start`
             // lines the collapsed readout up under the header's text column, `end` clears the

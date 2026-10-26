@@ -40,8 +40,7 @@ internal fun LockedControls(
             // Swallows taps (nothing underneath can be pressed) but not drags, so the page still
             // scrolls.
             Box(
-                Modifier
-                    .fillMaxSize()
+                Modifier.fillMaxSize()
                     // A tap swallower, not a button: as a clickable it told a screen reader there was something to activate.
                     .pointerInput(Unit) { detectTapGestures { } },
                 contentAlignment = Alignment.Center,

@@ -104,8 +104,7 @@ internal fun OnboardingSetupCard(
 ) {
     val scheme = MaterialTheme.colorScheme
     Column(
-        Modifier
-            .fillMaxWidth()
+        Modifier.fillMaxWidth()
             // GapSection, not 14.dp: this is the app's one inner-glass padding for a panel inside a
             // card (SettingsPrimitives names onboarding as a user of it), and a literal here meant
             // this card's inset did not match the alerts and seat panels beside it in the same deck.

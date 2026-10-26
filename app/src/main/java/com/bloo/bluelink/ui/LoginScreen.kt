@@ -255,16 +255,10 @@ internal fun LoginScreen(
         // Same gate as LoadingScreen.
         if (LocalAppearance.current.auroraBackground) AuroraBackground(Modifier.matchParentSize().hazeSource(hazeState))
         Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .imePadding(),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            val blockModifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 480.dp)
-                .padding(horizontal = GapSection)
+            val blockModifier = Modifier.fillMaxWidth().widthIn(max = 480.dp).padding(horizontal = GapSection)
             val enter = slideInVertically(tween(MotionLong, easing = LinearOutSlowInEasing)) { it / 4 } + fadeIn(tween(MotionLong))
 
             // The hero: the app tile with a soft glow behind it, the wordmark, and the brand line crossfading beneath.
@@ -272,10 +266,7 @@ internal fun LoginScreen(
                 LoginHero(
                     subtitle = brandSubtitle,
                     compact = shortScreen,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 480.dp)
-                        .statusBarsPadding()
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp).statusBarsPadding()
                         .padding(horizontal = GapBlock)
                         .padding(top = if (shortScreen) 16.dp else 40.dp, bottom = if (shortScreen) 14.dp else 22.dp),
                 )
@@ -481,8 +472,7 @@ private fun LoginHero(subtitle: String, compact: Boolean, modifier: Modifier = M
         Box(contentAlignment = Alignment.Center) {
             // The glow: a radial wash of the accent behind the tile, larger than it and breathing.
             Box(
-                Modifier
-                    .size(tileSize * 1.9f)
+                Modifier.size(tileSize * 1.9f)
                     .graphicsLayer { scaleX = breath; scaleY = breath }
                     .background(
                         Brush.radialGradient(listOf(scheme.primary.copy(alpha = 0.32f), Color.Transparent)),

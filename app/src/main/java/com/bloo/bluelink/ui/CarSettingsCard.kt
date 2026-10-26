@@ -86,10 +86,7 @@ internal fun CarSettingsCard(
                     model = rememberPhotoModel(storedImage),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .clip(StandardShape),
+                    modifier = Modifier.fillMaxWidth().height(120.dp).clip(StandardShape),
                 )
             }
             CarPhotoButtons(hasPhoto, onPick = onPickPhoto, onClear = { vm.setVehicleImage(v.vin, "") })

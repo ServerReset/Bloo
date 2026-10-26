@@ -65,10 +65,7 @@ fun SwitchTrack(
         contentAlignment = Alignment.CenterStart,
     ) {
         Box(
-            Modifier
-                .padding(start = thumbOffset)
-                .size(thumbSize)
-                .clip(CircleShape)
+            Modifier.padding(start = thumbOffset).size(thumbSize).clip(CircleShape)
                 .background(thumbColor),
         )
     }

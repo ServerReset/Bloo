@@ -233,8 +233,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     }
 
     Box(
-        Modifier
-            .fillMaxSize()
+        Modifier.fillMaxSize()
             // Opaque, and a pointer target of its own so touches never fall through to what the
             // deck sits over; it takes none of them, so the cards and buttons above get every one.
             .graphicsLayer {
@@ -276,10 +275,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                         contentAlignment = Alignment.TopCenter,
                     ) {
                     Column(
-                        Modifier
-                            .fillMaxSize()
-                            .widthIn(max = OnboardingCardMaxWidth)
-                            .verticalScroll(rememberScrollState())
+                        Modifier.fillMaxSize().widthIn(max = OnboardingCardMaxWidth).verticalScroll(rememberScrollState())
                             .pageTurn(
                                 offset = { pageOffsetFraction(deck.currentPage, idx, deck.currentPageOffsetFraction) },
                                 strength = 0.7f,

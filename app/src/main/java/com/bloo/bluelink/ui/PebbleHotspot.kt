@@ -158,9 +158,7 @@ internal fun HotspotSlot(
                 // column of pebbles -- not two cards jammed together.
                 Spacer(Modifier.height(GapGroup))
                 Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = PebbleHeaderHeight)
+                    Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight)
                         .onGloballyPositioned {
                             hotDrag?.let { d ->
                                 d.slotTopLeft = it.localToWindow(Offset.Zero)
@@ -283,8 +281,7 @@ internal fun PinnedPebble(
     LaunchedEffect(dragging, flying) { hotDrag?.pinnedActive = dragging || flying }
     DisposableEffect(hotDrag) { onDispose { hotDrag?.pinnedActive = false } }
     Box(
-        Modifier
-            .fillMaxWidth()
+        Modifier.fillMaxWidth()
             .graphicsLayer {
                 translationX = x
                 translationY = y
@@ -332,9 +329,7 @@ private fun EmptyDropZone(hovered: Boolean) {
     val dash = with(LocalDensity.current) { floatArrayOf(8.dp.toPx(), 6.dp.toPx()) }
     val stroke = with(LocalDensity.current) { (1f + glow).dp.toPx() }
     Box(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = PebbleHeaderHeight)
+        Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight)
             .graphicsLayer {
                 val s = 1f + 0.02f * glow
                 scaleX = s

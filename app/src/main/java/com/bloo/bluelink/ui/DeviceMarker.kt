@@ -49,8 +49,7 @@ internal fun BoxScope.DeviceMarker(
     if (markerOffBox(sx, sy, halfW, halfH, marginPx)) {
         val (ex, ey) = clampMarkerToEdge(sx, sy, halfW, halfH, marginPx)
         Box(
-            Modifier
-                .align(Alignment.Center)
+            Modifier.align(Alignment.Center)
                 .offset { IntOffset(ex.roundToInt(), ey.roundToInt()) }
                 .size(30.dp)
                 .background(color, CircleShape)
@@ -62,8 +61,7 @@ internal fun BoxScope.DeviceMarker(
         }
     } else {
         Box(
-            Modifier
-                .align(Alignment.Center)
+            Modifier.align(Alignment.Center)
                 .offset { IntOffset(sx.roundToInt(), sy.roundToInt()) }
                 .size(30.dp)
                 .semantics { contentDescription = "Your location" },
@@ -71,10 +69,7 @@ internal fun BoxScope.DeviceMarker(
         ) {
             Box(Modifier.size(30.dp).background(color.copy(alpha = 0.22f), CircleShape))
             Box(
-                Modifier
-                    .size(16.dp)
-                    .background(Color.White, CircleShape)
-                    .padding(3.dp)
+                Modifier.size(16.dp).background(Color.White, CircleShape).padding(3.dp)
                     .background(color, CircleShape),
             )
         }

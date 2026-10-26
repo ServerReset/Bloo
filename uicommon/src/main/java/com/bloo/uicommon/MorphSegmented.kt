@@ -200,8 +200,7 @@ fun MorphSegmented(
             // The chosen segment's fill is painted behind the labels at that segment's live size.
             indicatorColor = indicatorColor,
             segmentShape = segmentShape,
-            modifier = Modifier
-                .padding(4.dp)
+            modifier = Modifier.padding(4.dp)
                 .pointerInput(n) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
@@ -296,10 +295,7 @@ fun MorphSegmented(
                 label = "segFg",
             )
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(segmentShape)
-                    .pointerHoverIcon(PointerIcon.Hand)
+                modifier = Modifier.fillMaxSize().clip(segmentShape).pointerHoverIcon(PointerIcon.Hand)
                     .keyboardActivate(segmentShape, if (isSelected) selectedTextColor else unselectedTextColor) {
                         if (opt.key != currentSelectedKey) {
                             currentOnTick()

@@ -45,9 +45,7 @@ private fun DebugInfoItem(
     onCopy: ((String) -> Unit)? = null,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
+        modifier = Modifier.fillMaxWidth().then(
                 if (info.copyable && onCopy != null) {
                     Modifier.clip(TinyShape).hapticClickable { onCopy(info.value) }
                 } else {

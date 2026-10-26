@@ -106,8 +106,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
     // indicator/release behaviour to track the request it actually triggers.
     Refreshable(refreshing = loading, onRefresh = { vm.loadGarage() }) {
         Box(
-            Modifier
-                .fillMaxSize()
+            Modifier.fillMaxSize()
                 // Scrollable so the pull-to-refresh gesture reaches the Refreshable above: a
                 // PullToRefreshBox only sees the drag through a scrollable child's nested scroll, and
                 // a plain (non-scrolling) card swallowed it -- which is why "pull down to try again"
@@ -122,9 +121,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
             GlassSurface(
                 shape = ExtraLargeShape,
                 liquid = false,
-                modifier = Modifier
-                    .widthIn(max = 400.dp)
-                    .fillMaxWidth()
+                modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth()
                     .graphicsLayer {
                         alpha = contentAlpha.value
                         // .dp.toPx(): translationY is in pixels, not dp.

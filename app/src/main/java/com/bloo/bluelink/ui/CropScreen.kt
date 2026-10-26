@@ -104,8 +104,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                 val image = bmp
                 when {
                     image != null -> Box(
-                        Modifier
-                            .fillMaxWidth()
+                        Modifier.fillMaxWidth()
                             .aspectRatio(16f / 9f)
                             .clip(StandardShape)
                             .onSizeChanged { frame = it }

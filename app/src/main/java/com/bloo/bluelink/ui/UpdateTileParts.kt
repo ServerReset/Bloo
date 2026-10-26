@@ -110,8 +110,7 @@ internal fun UpdateReleaseNotes(
     // second shadow.
     NestedGlassPanel(hazeState) {
         Column(
-            Modifier
-                .padding(GapGroup)
+            Modifier.padding(GapGroup)
                 // Animate the card's own height when "Show more" expands the notes (and back when
                 // it collapses), so the box grows/shrinks smoothly instead of jumping to the new
                 // size on one frame. Same spring the rest of the update card uses.
