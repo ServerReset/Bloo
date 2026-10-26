@@ -91,13 +91,6 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
         // the first frame.
         Thread {
             runCatching {
-                StartupTrace.trace("class warm-up (stores)") {
-                    val app = applicationContext
-                    com.bloo.bluelink.data.SettingsStore(app)
-                    com.bloo.bluelink.data.SnapshotStore(app)
-                    com.bloo.bluelink.data.StatusCache(app)
-                    com.bloo.bluelink.data.SessionStore(app)
-                }
                 // Encrypted-prefs warm-up (MasterKey + EncryptedSharedPreferences + Tink). See
                 // CredentialStore.warmUp's own doc: this is the ~470ms the cold-start auto-login
                 // otherwise pays on the critical path, right ahead of the app-lock check and the
