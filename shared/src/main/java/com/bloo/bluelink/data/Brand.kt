@@ -100,6 +100,17 @@ enum class Brand(
         label = "Hyundai (Europe)",
     );
 
+    /** Where an owner resets a forgotten password (or, where the brand has no such page, its owners area). */
+    val forgotPasswordUrl: String get() = when (this) {
+        HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgot-password"
+        GENESIS -> "https://owners.genesis.com/us/en/forgot-password.html"
+        KIA -> "https://owners.kia.com/us/en/kia-owner-portal.html"
+        HYUNDAI_CA -> "https://www.hyundaicanada.com/en/owners-section"
+        GENESIS_CA -> "https://www.genesis.com/ca/en/support/contact-us.html"
+        KIA_CA -> "https://www.kia.ca/en/owners"
+        HYUNDAI_EU -> "https://www.hyundai.com/eu/en/owners.html"
+    }
+
     /**
      * False only for Kia US, whose commands aren't PIN-gated at all; every other brand (including
      * Canada, gated behind CanadaApi.pinAuth) needs the login form's PIN field filled in.

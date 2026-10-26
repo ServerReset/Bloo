@@ -409,18 +409,7 @@ internal fun LoginScreen(
                     ActionRow {
                         MorphTextButton(
                             text = "Forgot password?",
-                            onClick = {
-                                val forgotUrl = when (brand) {
-                                    Brand.HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgot-password"
-                                    Brand.GENESIS -> "https://owners.genesis.com/us/en/forgot-password.html"
-                                    Brand.KIA     -> "https://owners.kia.com/us/en/kia-owner-portal.html"
-                                    Brand.HYUNDAI_CA -> "https://www.hyundaicanada.com/en/owners-section"
-                                    Brand.GENESIS_CA -> "https://www.genesis.com/ca/en/support/contact-us.html"
-                                    Brand.KIA_CA -> "https://www.kia.ca/en/owners"
-                                    Brand.HYUNDAI_EU -> "https://www.hyundai.com/eu/en/owners.html"
-                                }
-                                openUrl(context, forgotUrl)
-                            },
+                            onClick = { openUrl(context, brand.forgotPasswordUrl) },
                         )
                         if (onCancel != null) MorphTextButton(text = "Cancel", onClick = onCancel)
                     }
