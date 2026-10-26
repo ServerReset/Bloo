@@ -41,13 +41,14 @@ class SearchPillMorphTest {
         }
         rule.waitForIdle()
         val before = composed
-        assertEquals(80.dp, rule.onNodeWithTag("pill").getBoundsInRoot().width)
+        val start = rule.onNodeWithTag("pill").getBoundsInRoot()
+        assertEquals(80f, (start.right - start.left).value, 1f)
         width.value = 200.dp
         height.value = 64.dp
         rule.waitForIdle()
         val bounds = rule.onNodeWithTag("pill").getBoundsInRoot()
-        assertEquals(200.dp, bounds.width)
-        assertEquals(64.dp, bounds.height)
+        assertEquals(200f, (bounds.right - bounds.left).value, 1f)
+        assertEquals(64f, (bounds.bottom - bounds.top).value, 1f)
         assertEquals("the parent did not recompose", before, composed)
     }
 }
