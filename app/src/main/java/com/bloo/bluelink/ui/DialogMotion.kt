@@ -1,5 +1,14 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.focusable
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -77,10 +86,17 @@ private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean
     BackHandler(enabled = isTop && !entry.leaving) { entry.onDismiss() }
 
     val scheme = MaterialTheme.colorScheme
+    // Keyboard focus moves into the dialog as it opens, so Tab and Enter work on it and not on the page behind.
+    val cardFocus = remember { FocusRequester() }
+    // Only with a physical keyboard attached: on a touch-only phone it would take focus from a field that is about to autofocus.
+    val hasKeyboard = LocalContext.current.resources.configuration.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS
+    LaunchedEffect(entry) { if (hasKeyboard) runCatching { cardFocus.requestFocus() } }
     val screenHeightPx = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp().toPx() }
     Box(
         Modifier
             .fillMaxSize()
+            // A screen reader reads the dialog first, ahead of the page it covers.
+            .semantics { isTraversalGroup = true; traversalIndex = -1f }
             // A leaving dialog swallows touches, so a second tap cannot land on what it covers.
             .then(
                 if (entry.leaving) {
@@ -97,7 +113,12 @@ private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean
             Modifier
                 .fillMaxSize()
                 .drawBehind { drawRect(Color.Black, alpha = DialogScrimAlpha * progress.value.coerceIn(0f, 1f)) }
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClickLabel = "Close dialog",
+                    role = Role.Button,
+                ) {
                     if (!entry.leaving) entry.onDismiss()
                 },
         )
@@ -112,6 +133,8 @@ private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean
                     .padding(horizontal = GapBlock)
                     .widthIn(max = 560.dp)
                     .fillMaxWidth()
+                    .focusRequester(cardFocus)
+                    .focusable()
                     // Rises from below the screen.
                     .popGraphics({ progress.value }, fromY = { screenHeightPx })
                     // Swallows taps on the card so they do not fall through to the scrim.
