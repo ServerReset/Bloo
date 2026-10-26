@@ -29,6 +29,15 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.border
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
@@ -175,10 +184,34 @@ fun AnimatedSlider(
         }
     }
 
+    // Keyboard: the slider takes focus (Tab), shows a ring while it has it, and moves one step per arrow key (Home and End go to the
+    // ends, PageUp and PageDown by a tenth of the range), through the same settle a tap uses.
+    val focusSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val focused by focusSource.collectIsFocusedAsState()
+    fun nudge(by: Int) {
+        val oneStep = (valueRange.endInclusive - valueRange.start) / (steps + 1)
+        val moved = (value + oneStep * by).coerceIn(valueRange.start, valueRange.endInclusive)
+        settleTo(snapToStep(moved, valueRange, steps))
+    }
     Box(
         modifier
             .fillMaxWidth()
             .height(thumbH)
+            .then(if (focused) Modifier.border(2.dp, accent, RoundedCornerShape(thumbH / 2)) else Modifier)
+            .focusable(enabled, focusSource)
+            .onKeyEvent { event ->
+                if (!enabled || event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (event.key) {
+                    Key.DirectionRight, Key.DirectionUp -> nudge(1)
+                    Key.DirectionLeft, Key.DirectionDown -> nudge(-1)
+                    Key.PageUp -> nudge(((steps + 1) / 10).coerceAtLeast(1))
+                    Key.PageDown -> nudge(-((steps + 1) / 10).coerceAtLeast(1))
+                    Key.MoveHome -> settleTo(snapToStep(valueRange.start, valueRange, steps))
+                    Key.MoveEnd -> settleTo(snapToStep(valueRange.endInclusive, valueRange, steps))
+                    else -> return@onKeyEvent false
+                }
+                true
+            }
             // No motion blur: a blurred render target reads as the slider going low-resolution.
             .onSizeChanged { widthPx = it.width.toFloat() }
             // Same tap-vs-drag disambiguation as MorphSegmented's gesture handler: `claimed` starts

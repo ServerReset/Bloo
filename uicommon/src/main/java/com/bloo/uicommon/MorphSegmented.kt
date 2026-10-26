@@ -297,6 +297,12 @@ fun MorphSegmented(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(segmentShape)
+                    .keyboardActivate(segmentShape, if (isSelected) selectedTextColor else unselectedTextColor) {
+                        if (opt.key != currentSelectedKey) {
+                            currentOnTick()
+                            currentOnSelect(opt.key)
+                        }
+                    }
                     .semantics {
                         contentDescription = opt.label
                         role = Role.Tab
