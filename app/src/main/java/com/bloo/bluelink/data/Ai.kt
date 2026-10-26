@@ -23,7 +23,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  * isolated here; the model is downloaded on demand the first time.
  */
 class Ai(context: Context) {
-
     private val app = context.applicationContext
     // A same-thread "executor" used only to bridge Google's ListenableFuture callback API into a
     // coroutine below; it just runs the callback inline on whichever thread completes the future;

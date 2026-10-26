@@ -13,7 +13,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * fallbacks below that.
  */
 class Haptics(context: Context) {
-
     // API 31 (S) moved vibrator access behind VibratorManager; below that the vibrator is fetched
     // directly from the Context (deprecated but still the only path pre-S). Deferring them to first
     // use keeps the first frame free of them.
@@ -268,7 +267,6 @@ class Haptics(context: Context) {
             c.addPrimitive(primitive, scale, delayMs)
         }
     }
-
 }
 
 /** Lets any composable reach the haptics engine. Defaults to a no-op (disabled). */

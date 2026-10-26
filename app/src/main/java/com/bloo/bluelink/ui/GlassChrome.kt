@@ -184,7 +184,6 @@ internal fun glintStrength(tiltX: Float, tiltY: Float): Float = (kotlin.math.hyp
  * changes the base colour.
  */
 
-
 /**
  * Resolves [GlassSurface]'s own fill color -- also called directly by places that can't host
  * [GlassSurface] itself because they don't own their own layout, just a `Color` parameter on a

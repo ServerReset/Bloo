@@ -15,7 +15,6 @@ private val Context.updateDataStore by safePreferencesDataStore("bloo_update")
  * needs to survive past that, hence [snoozeUntil].
  */
 class UpdateStore(private val context: Context) {
-
     private val keyLastCheckedAt = longPreferencesKey("last_checked_at")
     private val keySnoozeUntil = longPreferencesKey("snooze_until")
     private val keyLastNotifiedRun = intPreferencesKey("last_notified_run")

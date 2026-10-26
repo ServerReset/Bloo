@@ -38,7 +38,6 @@ import com.bloo.bluelink.data.VehicleStatus
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd off
  */
 internal object DebugSampleGarage {
-
     private const val PREFS = "bloo_debug_fixtures"
     private const val KEY_GARAGE = "sample_garage"
     private const val KEY_LOCK = "sample_lock"

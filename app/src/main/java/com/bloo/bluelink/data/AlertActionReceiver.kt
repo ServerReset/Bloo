@@ -16,7 +16,6 @@ import kotlinx.coroutines.launch
  * refuses to lock.
  */
 class AlertActionReceiver : BroadcastReceiver() {
-
     /**
      * Entry point invoked when the user taps an action button on a Bloo alert
      * notification. Runs in order:

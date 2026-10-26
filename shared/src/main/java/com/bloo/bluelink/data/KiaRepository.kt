@@ -10,7 +10,6 @@ class KiaRepository(
     private val store: SessionStore,
     private val credentialStore: CredentialStore,
 ) : VehicleRepository {
-
     /** Session-specific vinkeys + EV flags, keyed by vehicle id (our [Vehicle.vin]). */
     private val summaries = java.util.concurrent.ConcurrentHashMap<String, KiaVehicleSummary>()
 

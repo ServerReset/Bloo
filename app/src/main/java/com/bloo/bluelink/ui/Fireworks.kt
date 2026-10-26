@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.Color
  * synthesized.
  */
 object Fireworks {
-
     fun playSound(context: Context) {
         val ctx = context.applicationContext
         runCatching {

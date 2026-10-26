@@ -10,7 +10,6 @@ import kotlin.math.tan
  * details, in one place.
  */
 object MapTiles {
-
     /** Edge of one OSM tile in pixels. */
     const val TILE_PX = 256
 

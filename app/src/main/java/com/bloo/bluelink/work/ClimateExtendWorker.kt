@@ -31,7 +31,6 @@ import java.util.concurrent.TimeUnit
  * this worker's situation too.
  */
 class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : BlooWorker(ctx, params) {
-
     override suspend fun run(): Result {
         val vin = inputData.getString(KEY_VIN) ?: return Result.failure()
         val remainingMinutes = inputData.getInt(KEY_REMAINING_MIN, 0)

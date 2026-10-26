@@ -30,7 +30,6 @@ import com.bloo.bluelink.data.WatchLockTiming
  * itself out of its accounts.
  */
 class WatchPinStore(private val context: Context) {
-
     private val vault = SecureVault.of(context)
 
     init { importOldPrefs() }

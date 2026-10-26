@@ -24,7 +24,6 @@ import kotlinx.coroutines.withContext
  * Kept lean: one check on open, one download+install on tap.
  */
 object WearUpdateChecker {
-
     private val _available = MutableStateFlow<WorkflowRun?>(null)
     /** The newer watch build, if any. */
     val available: StateFlow<WorkflowRun?> = _available

@@ -48,7 +48,6 @@ import com.bloo.bluelink.update.shizukuInstall
  * shortcut intents into the ViewModel.
  */
 class MainActivity : FragmentActivity() {
-
     companion object {
         /**
          * The most recently created MainActivity, for system-level integrations that have no view

@@ -82,7 +82,6 @@ class BlueLinkRepository(
     private val store: SessionStore,
     private val brand: Brand,
 ) : VehicleRepository {
-
     /**
      * In-memory copy of the last [SessionStore.Session] loaded for this brand, alongside
      * [withSession]'s own timing showing store.load() itself taking 1-3 SECONDS -- not the usual

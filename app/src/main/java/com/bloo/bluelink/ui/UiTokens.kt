@@ -112,8 +112,6 @@ internal val ExtraLargeShape = RoundedCornerShape(28.dp) // Modal dialogs
 //
 // Shared Haze backdrop-blur gate and progressive-blur instances used by every blur site.
 
-
-
 /**
  * The shape every full-height scrim's blur uses: strong at its edge, tapering to none by the far
  * edge.
@@ -124,7 +122,6 @@ internal val StandardBlurProgressive
         startIntensity = 1f,
         endIntensity = 0f
     )
-
 
 // ---- Motion durations (ms) -------------------------------------------------------
 //

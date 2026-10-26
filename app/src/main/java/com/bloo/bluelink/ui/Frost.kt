@@ -16,7 +16,6 @@ import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection
 
-
 /**
  * The pill that says why something is frozen: a snowflake-cool lock and the reason, in the app's
  * standard [GlassSurface] chrome.

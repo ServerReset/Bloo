@@ -9,7 +9,6 @@ package com.bloo.bluelink.autolock
  * Activity Recognition) is always required before the grace countdown starts.
  */
 class LockStateMachine {
-
     private var walkingConfirmed = false
 
     fun next(current: DetectionState, event: DetectionEvent): DetectionState = when (event) {

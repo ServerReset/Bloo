@@ -409,7 +409,6 @@ fun BlooApp(vm: AppViewModel) {
     DialogLayer(dialogHost)
     }
     }
-
 }
 
 // Owns the lock-blur animation in its own small recompose scope so animating it doesn't invalidate

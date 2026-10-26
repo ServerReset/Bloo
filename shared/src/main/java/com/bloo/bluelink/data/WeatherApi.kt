@@ -144,7 +144,6 @@ enum class WeatherCode(val label: String) {
  * location and for the live position of each car.
  */
 object WeatherApi {
-
     // ignoreUnknownKeys so Open-Meteo adding new response fields later doesn't break parsing;
     // isLenient to tolerate minor JSON quirks from the API.
     private val json = BlooLenientJson

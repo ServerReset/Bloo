@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit
  * again just resets the 1-day timer rather than stacking multiple reminders.
  */
 class UpdateReminderWorker(context: Context, params: WorkerParameters) : BlooWorker(context, params) {
-
     override suspend fun run(): Result {
         val ctx = applicationContext
         // Clear the snooze first so the check below (and every later check) can surface the

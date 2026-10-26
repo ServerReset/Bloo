@@ -24,7 +24,6 @@ import com.bloo.bluelink.data.updatedLabel
  * car, exactly as the Tile does.
  */
 class BlooComplicationService : SuspendingComplicationDataSourceService() {
-
     override fun getPreviewData(type: ComplicationType): ComplicationData? = when (type) {
         ComplicationType.RANGED_VALUE -> rangedData(80f, "80%", "Battery", null, tap())
         ComplicationType.SHORT_TEXT -> shortTextData("80%", "Battery", bolt(), tap())
@@ -73,7 +72,6 @@ abstract class BlooTextComplication(
     private val requestCode: Int,
     private val tapKey: String?,
 ) : SuspendingComplicationDataSourceService() {
-
     /** The text and its spoken form for [car], or null for no data. */
     protected abstract fun text(car: VehicleSnapshot): Pair<String, String>?
 

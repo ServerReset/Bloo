@@ -10,7 +10,6 @@ import javax.crypto.spec.PBEKeySpec
  * security policy is unit-testable alongside everything else in :shared.
  */
 object PinCrypto {
-
     /** Default work factor. */
     const val PIN_DEFAULT_ITERATIONS = 150_000
     const val PIN_MIN_ITERATIONS = 50_000

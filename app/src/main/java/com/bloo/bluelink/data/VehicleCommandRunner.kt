@@ -8,7 +8,6 @@ import kotlinx.coroutines.sync.withLock
  * [SnapshotStore] so snapshot-fed surfaces reflect the new state immediately.
  */
 object VehicleCommandRunner {
-
     /**
      * Marks a climate target that carries an explicit temperature, e.g. "temp:64". See
      * [runClimateStart].

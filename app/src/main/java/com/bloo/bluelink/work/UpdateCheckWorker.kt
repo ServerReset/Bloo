@@ -19,7 +19,6 @@ import java.util.concurrent.TimeUnit
  * a while," posting a notification instead of a tile nobody's there to see.
  */
 class UpdateCheckWorker(context: Context, params: WorkerParameters) : BlooWorker(context, params) {
-
     /**
      * WorkManager's entry point, invoked on each ~12-hour periodic tick.
      *

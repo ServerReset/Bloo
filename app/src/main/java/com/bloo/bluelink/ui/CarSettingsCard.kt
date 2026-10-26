@@ -74,7 +74,6 @@ internal fun CarSettingsCard(
     ) {
         val advanced = state.settingsMode == "advanced"
       Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-
         // Order is the order you would set a car up in: how it looks, what it is, what it can do,
         // what it does by itself, and -- advanced only -- the paperwork.
         SettingsGroup("Photo") {

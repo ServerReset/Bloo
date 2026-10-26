@@ -39,7 +39,6 @@ import kotlinx.coroutines.tasks.await
  * within a second or two of both sides being connected.
  */
 object WearDataLayerSync {
-
     private val scope = ioScope()
     private val json = BlooJson
 

@@ -25,7 +25,6 @@ import kotlinx.coroutines.sync.withLock
  * service-due / door-open notifications even when the app is closed.
  */
 class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(context, params) {
-
     /**
      * WorkManager's entry point, invoked on each ~30-minute periodic tick.
      *

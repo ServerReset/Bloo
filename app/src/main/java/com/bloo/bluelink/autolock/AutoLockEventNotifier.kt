@@ -26,7 +26,6 @@ import com.bloo.bluelink.data.postBuilt
  * locked itself" never rides the same channel as "your door is open".
  */
 object AutoLockEventNotifier {
-
     /**
      * Versioned: a notification channel's sound and importance are fixed when the channel is
      * first created -- Android silently ignores any later change to an existing channel -- so

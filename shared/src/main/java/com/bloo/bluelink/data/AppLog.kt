@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
  * commands, errors). Capped to a ring buffer.
  */
 object AppLog {
-
     private const val MAX_LINES = 500
     // Single shared formatter reused across all log() calls; SimpleDateFormat is not thread-safe,
     // so all access to it happens inside the `synchronized(this)` block below to avoid concurrent

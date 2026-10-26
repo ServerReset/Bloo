@@ -50,7 +50,6 @@ import kotlinx.serialization.json.Json
  * own snapshot writes to keep the watch live while it is open.
  */
 class PhoneWatchSyncService : WearableListenerService() {
-
     private val scope = ioScope()
     private val json = BlooJson
 

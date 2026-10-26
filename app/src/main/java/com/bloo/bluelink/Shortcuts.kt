@@ -13,7 +13,6 @@ import com.bloo.bluelink.data.links
 
 /** App-icon long-press shortcuts: per-car quick actions and navigation. */
 object Shortcuts {
-
     const val ACTION = "com.bloo.bluelink.action.SHORTCUT"
     const val EXTRA_VIN = "vin"
     const val EXTRA_CMD = "cmd"

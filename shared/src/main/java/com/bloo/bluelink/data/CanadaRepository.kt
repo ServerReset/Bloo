@@ -9,7 +9,6 @@ class CanadaRepository(
     private val brand: Brand,
     private val credentialStore: CredentialStore,
 ) : VehicleRepository {
-
     private val summaries = SummaryCache<CanadaVehicleSummary>()
     private val pAuths = java.util.concurrent.ConcurrentHashMap<String, String>()
 

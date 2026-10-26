@@ -16,7 +16,6 @@ data class Credentials(
  * remembered and re-authenticated after a token expires.
  */
 class CredentialStore(context: Context) {
-
     private val appContext: Context = context.applicationContext
 
     private val vault: SecureVault get() = vaultFor(appContext)

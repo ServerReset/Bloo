@@ -8,7 +8,6 @@ import androidx.core.content.edit
  * IDs so the search can suggest recently used commands at the top of results.
  */
 internal class RecentCommandsTracker(private val context: Context) {
-
     companion object {
         private const val PREF_NAME = "recent_commands"
         private const val RECENT_COMMANDS_KEY = "recent_ids"

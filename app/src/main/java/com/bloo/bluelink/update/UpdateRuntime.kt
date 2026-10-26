@@ -87,5 +87,4 @@ internal object UpdateRuntime {
      * up offering GitHub downloads to Play copies after the phone app had been fixed.
      */
     fun usesGitHub(context: Context): Boolean = canSelfInstall && !fromPlayStore(context)
-
 }

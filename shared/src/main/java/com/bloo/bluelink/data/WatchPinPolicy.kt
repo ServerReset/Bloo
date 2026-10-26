@@ -20,7 +20,6 @@ enum class WatchLockTiming(val wireKey: String, val label: String) {
  * fact; this object only answers the two questions the UI asks of it.
  */
 object WatchPinPolicy {
-
     fun locksOnOpen(timing: WatchLockTiming): Boolean =
         timing == WatchLockTiming.OPEN || timing == WatchLockTiming.BOTH
 

@@ -16,7 +16,6 @@ private val Context.dataStore by safePreferencesDataStore("bloo_session")
  * stored locally on-device only, in the encrypted [SecureVault] with the credentials.
  */
 class SessionStore(private val context: Context) {
-
     data class Session(
         val accessToken: String,
         val refreshToken: String?,

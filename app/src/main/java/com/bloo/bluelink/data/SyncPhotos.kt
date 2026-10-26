@@ -17,7 +17,6 @@ import kotlinx.serialization.json.contentOrNull
  * JPEGs on the way out, write them back to `filesDir/cars/` on the way in.
  */
 internal object SyncPhotos {
-
     /**
      * Longest edge a synced photo is downscaled to before base64-embedding -- small enough that
      * even several cars' photos keep the whole settings backup a reasonable size for repeated

@@ -27,7 +27,6 @@ import java.util.Locale
  * alone would hide it.
  */
 object StartupFrameMonitor {
-
     /** A frame longer than this is logged individually (2x a 60Hz frame). */
     private const val HITCH_MS = 32.0
 

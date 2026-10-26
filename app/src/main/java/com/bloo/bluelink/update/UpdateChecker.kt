@@ -44,7 +44,6 @@ sealed class UpdateCheckResult {
  * into BuildConfig.BUILD_RUN_NUMBER at CI build time.
  */
 object UpdateChecker {
-
     /**
      * Check for an update. Returns the result - available, up-to-date, or failed.
      *

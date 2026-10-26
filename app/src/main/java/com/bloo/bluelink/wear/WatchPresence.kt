@@ -24,7 +24,6 @@ import kotlinx.coroutines.launch
  * The push is a cheap no-op when no watch is paired, and the Data Layer coalesces/queues it.
  */
 object WatchPresence {
-
     /** The watch currently connected to THIS phone over the Data Layer. */
     data class ConnectedWatch(val id: String, val name: String)
 

@@ -19,7 +19,6 @@ class EuRepository(
     private val brand: Brand,
     private val credentialStore: CredentialStore,
 ) : VehicleRepository {
-
     private val summaries = SummaryCache<EuVehicleSummary>()
     private val controlTokens = java.util.concurrent.ConcurrentHashMap<String, String>()
 

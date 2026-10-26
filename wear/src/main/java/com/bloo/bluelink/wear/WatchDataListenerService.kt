@@ -17,7 +17,6 @@ import kotlinx.coroutines.tasks.await
  * endpoint the Data Layer delivers to.
  */
 class WatchDataListenerService : WearableListenerService() {
-
     private val scope = ioScope()
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {

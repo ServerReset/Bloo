@@ -213,7 +213,6 @@ internal fun NotificationsCardContent(
                 }
             }
         }
-
       }
     }
 }

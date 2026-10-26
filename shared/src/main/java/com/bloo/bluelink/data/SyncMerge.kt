@@ -27,7 +27,6 @@ import kotlinx.serialization.json.JsonObjectBuilder
  * [BACKUP_VERSION] stays 1; without `_hash` callers fall back to the timestamp gate.
  */
 object SyncMerge {
-
     /**
      * The settings-backup format version. The format is a flat key-value bag, so an older client
      * reading a newer backup is normally fine (unknown keys are ignored); bump this only if a

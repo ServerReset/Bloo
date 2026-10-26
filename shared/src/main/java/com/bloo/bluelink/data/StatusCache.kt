@@ -32,7 +32,6 @@ private data class CachePayload(
  * cold start, until a command is sent or the user refreshes.
  */
 class StatusCache(private val context: Context) {
-
     // ignoreUnknownKeys lets old cache files survive future field additions without
     // crashing decode; encodeDefaults ensures every field is always written so a
     // reader on an older app version (or after a rollback) still finds all keys present.

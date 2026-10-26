@@ -27,7 +27,6 @@ import com.bloo.bluelink.data.VehicleSnapshot
  * case (locking an already-parked car); a missed one is just the phone's AutoLock's job instead.
  */
 object WearAutoLock {
-
     /** It is a beta: the watch UI labels the toggle, and it defaults off. */
     const val BETA = true
 

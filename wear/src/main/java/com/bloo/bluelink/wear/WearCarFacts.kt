@@ -13,7 +13,6 @@ import java.util.Locale
  * watch, and so the page grows with what the car actually tells us rather than with a fixed template.
  */
 internal object WearCarFacts {
-
     fun status(v: VehicleSnapshot): List<Pair<String, String>> = buildList {
         if (v.hasBattery) v.percent?.let { add("Battery" to "$it%") }
         v.rangeMi?.let { add("Range" to "$it mi") }

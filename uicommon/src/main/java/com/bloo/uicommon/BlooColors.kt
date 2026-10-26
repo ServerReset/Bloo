@@ -29,5 +29,4 @@ object BlooColors {
         return if (dark) lerp(surface, onSurface, 0.18f)
         else lerp(surface, onSurface, 0.20f)
     }
-
 }

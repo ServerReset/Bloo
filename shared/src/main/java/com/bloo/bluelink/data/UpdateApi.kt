@@ -55,7 +55,6 @@ fun buildLabel(runNumber: Int, branch: String = ""): String {
  * which one is currently installed.
  */
 object UpdateApi {
-
     private const val OWNER = "ServerReset"
     private const val REPO = "Bloo"
     private const val PHONE_ASSET_NAME = "Bloo.apk"

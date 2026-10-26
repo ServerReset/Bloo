@@ -21,7 +21,6 @@ import kotlinx.serialization.builtins.serializer
  * bag.
  */
 class SettingsStore(internal val context: Context) {
-
     /**
      * Per-car keys are instead built ad hoc with string interpolation (see e.g. [seatConfig]) since
      * Preferences DataStore has no notion of a keyed sub-namespace - this object only holds the

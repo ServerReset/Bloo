@@ -126,27 +126,23 @@ internal fun SettingsScreen(
             }
             // Gates the item itself: an empty item still holds a slot and spacing.
             if (state.aiSupported) item {
-
             // Only when the device supports Gemini Nano; always shown, not advanced-only.
             run {
                 AiCardContent(state, vm)
             }
             }
             if (advTransition0.targetState || !advTransition0.isIdle) item {
-
             // App-icon shortcuts (long-press the launcher icon)
             AnimatedVisibility(visibleState = advTransition0, enter = expandEnterSized(), exit = expandExitSized()) {
                 AppShortcutsCardContent(state, vm)
             }
             }
             item {
-
             // Backup / Sync
             BackupSyncCardContent(state, vm, context, advanced)
             }
             // Gates the item: with no cars yet it would still hold a slot and gap.
             if (state.vehicles.isNotEmpty()) item {
-
             // Cars: drag to reorder, tap to expand setup + photo. Shown in Simple and Advanced;
             // power-user groups gate themselves.
             CarsCardContent(
@@ -156,7 +152,6 @@ internal fun SettingsScreen(
             )
             }
             if (advTransition1.targetState || !advTransition1.isIdle) item {
-
             // Debug -- device info and the activity log together, for support troubleshooting. A
             // power-user card, so it only exists in Advanced mode.
             AnimatedVisibility(visibleState = advTransition1, enter = expandEnterSized(), exit = expandExitSized()) {
@@ -164,12 +159,10 @@ internal fun SettingsScreen(
             }
             }
             item {
-
             // Visuals: theme, colour, font, units, size
             VisualsCardContent(appearance, advanced, vm)
             }
             item {
-
             // Location -- was titled "Weather" and talked only about weather, even though choosing
             // "My location" here does more than that: it sets Appearance.weatherFollowsDevice, and
             // AppViewModel.refreshDeviceLocation() (the same place that keeps the map's own "you
@@ -179,17 +172,14 @@ internal fun SettingsScreen(
             LocationCardContent(appearance, vm)
             }
             item {
-
             // Notifications
             NotificationsCardContent(notif, state, advanced, vm)
             }
             item {
-
             // Security
             SecurityCardContent(state, vm, canBio, context, appearance)
             }
             item {
-
             // Sounds & vibration One switch, rendered as a single row (SettingsCard inlineSetting).
             SoundsVibrationCardContent(appearance, vm)
             }

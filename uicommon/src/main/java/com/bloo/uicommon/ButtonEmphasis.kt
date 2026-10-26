@@ -28,7 +28,6 @@ fun confirmTone(): ActionTone =
 fun denyTone(): ActionTone =
     if (LocalIsDarkTheme.current) ActionTone(Color(0xFFFF8A80), Color(0xFF4A0507)) else ActionTone(Color(0xFFC62828), Color.White)
 
-
 /**
  * How a button speaks, resolved to colours in one place. [Tonal]: the standard button. [Confirm]: go ahead
  * (green). [Deny]: remove, sign out, stop (red).

@@ -25,7 +25,6 @@ import com.bloo.bluelink.data.AppLog
  * that can go stale.
  */
 internal object AutoLockTrigger {
-
     /** A car's Bluetooth just disconnected: start an evaluation. */
     fun onCarDisconnected(context: Context, vin: String, log: Boolean = true) {
         val ctx = context.applicationContext

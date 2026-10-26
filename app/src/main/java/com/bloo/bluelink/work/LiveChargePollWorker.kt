@@ -33,7 +33,6 @@ import kotlinx.coroutines.sync.withLock
  * not there's anything to report.
  */
 class LiveChargePollWorker(context: Context, params: WorkerParameters) : BlooWorker(context, params) {
-
     /**
      * One tick: re-poll every signed-in brand's vehicles (cached status,
      * `refresh = false` -- this is a frequent background poll, not a

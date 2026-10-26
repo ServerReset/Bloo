@@ -30,7 +30,6 @@ import android.util.Log
  * deliberately NOT hooked to anything that runs per-frame or per-keystroke.
  */
 object StartupTrace {
-
     const val TAG = "BlooStartup"
 
     /** Uptime at which THIS PROCESS was created -- the only honest zero for a cold

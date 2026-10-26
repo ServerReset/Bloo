@@ -8,7 +8,6 @@ import kotlinx.coroutines.sync.withLock
  * into the on-disk [SnapshotStore].
  */
 object CarCommandRunner {
-
     /**
      * Any thrown exception during dispatch is caught by the outer `runCatching`/`getOrElse` and
      * turned into a failed [CarCommandResult] with the exception's message, rather than

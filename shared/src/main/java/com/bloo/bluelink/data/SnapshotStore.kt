@@ -184,7 +184,6 @@ internal fun mergeVehicleUpdates(existing: List<VehicleSnapshot>, updates: List<
  * DataStore's transactional [edit], so concurrent writers do not stomp on each other.
  */
 class SnapshotStore(private val context: Context) {
-
     private val json = BlooJson
 
     private object Keys {

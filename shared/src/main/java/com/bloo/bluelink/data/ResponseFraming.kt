@@ -7,7 +7,6 @@ import okhttp3.Request
  * `readHexadecimalUnsignedLong`, which OkHttp uses to read a CHUNK SIZE -- 0x7b is `{`.
  */
 object ResponseFraming {
-
     fun isFramingFailure(t: Throwable): Boolean {
         var current: Throwable? = t
         var depth = 0

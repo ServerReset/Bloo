@@ -21,7 +21,6 @@ import java.util.concurrent.TimeUnit
  * WorkManager-level constraint only needs "any network."
  */
 class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : BlooWorker(ctx, params) {
-
     /**
      * WorkManager's entry point, invoked on each periodic tick (see [schedule]).
      *

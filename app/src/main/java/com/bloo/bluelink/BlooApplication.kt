@@ -28,7 +28,6 @@ import com.bloo.uicommon.content
  * Also starts [DeviceStatus]'s single process-wide listeners (battery saver, thermal, lock state).
  */
 class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderFactory {
-
     /**
      * Earliest hook the process gets -- runs before [onCreate] and before any ContentProvider
      * (WorkManager's initializer among them, were it still installed). Instrumented because
