@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.segmentsOf
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -39,7 +40,6 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.SegmentOption
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
@@ -180,12 +180,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             if (isSelf && (live != null || registered.isNotEmpty())) {
                 SettingsSegmentedRow(
                     label = "Get the PIN from your watch",
-                    options = listOf(
-                        SegmentOption(WatchLockTiming.OFF.wireKey, "Off", null),
-                        SegmentOption(WatchLockTiming.OPEN.wireKey, "Opening", null),
-                        SegmentOption(WatchLockTiming.COMMANDS.wireKey, "Commands", null),
-                        SegmentOption(WatchLockTiming.BOTH.wireKey, "Both", null),
-                    ),
+                    options = segmentsOf(WatchLockTiming.OFF.wireKey to "Off", WatchLockTiming.OPEN.wireKey to "Opening", WatchLockTiming.COMMANDS.wireKey to "Commands", WatchLockTiming.BOTH.wireKey to "Both"),
                     selectedKey = state.watchLockTiming.wireKey,
                     description = "Uses your app PIN.",
                     onSelect = { vm.setWatchLockTiming(WatchLockTiming.fromWire(it)) },

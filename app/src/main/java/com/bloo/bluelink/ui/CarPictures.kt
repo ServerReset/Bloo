@@ -29,6 +29,8 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.MorphTextButton
 
+private val NonAlnum = Regex("[^a-z0-9]+")
+
 /** One bundled car picture: which model it is, which colour, and the asset it is read from. */
 internal data class CarPicture(val group: String, val colour: String, val url: String)
 
@@ -83,7 +85,7 @@ internal object CarPictures {
  */
 internal fun matchCarPicture(model: String, name: String, colour: String?, pictures: List<CarPicture>): CarPicture? {
     fun squash(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
-    fun words(s: String) = s.lowercase().split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() && it != "matte" }.toSet()
+    fun words(s: String) = s.lowercase().split(NonAlnum).filter { it.isNotEmpty() && it != "matte" }.toSet()
     val wanted = colour?.let(::squash)?.takeIf { it.isNotEmpty() } ?: return null
     val wantedWords = words(colour)
     val said = squash("$model $name")

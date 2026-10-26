@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.segmentsOf
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -283,11 +284,7 @@ internal fun LoginScreen(
                     Column(Modifier.fillMaxWidth().padding(GapPage), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
                         LoginSectionLabel(Icons.Filled.Public, "Where is your account?")
                         MorphSegmented(
-                            options = listOf(
-                                SegmentOption("US", "United States", null),
-                                SegmentOption("CA", "Canada", null),
-                                SegmentOption("EU", "Europe", null),
-                            ),
+                            options = segmentsOf("US" to "United States", "CA" to "Canada", "EU" to "Europe"),
                             selectedKey = region,
                             onSelect = { key ->
                                 region = key

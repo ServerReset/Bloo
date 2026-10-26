@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.segmentsOf
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -38,7 +39,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.uicommon.SegmentOption
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.ButtonTargetHeight
 import com.bloo.uicommon.ButtonLabelStyle
@@ -124,7 +124,7 @@ internal fun SettingsModeTab(settingsMode: String, onSettingsModeChange: (String
     ) {
         GlassSurface(shape = StandardShape, modifier = Modifier.width(172.dp), hazeState = hazeState) {
             com.bloo.uicommon.MorphSegmented(
-                options = listOf(SegmentOption("simple", "Simple", null), SegmentOption("advanced", "Advanced", null)),
+                options = segmentsOf("simple" to "Simple", "advanced" to "Advanced"),
                 selectedKey = settingsMode,
                 onSelect = onSettingsModeChange,
                 containerColor = Color.Transparent,

@@ -69,6 +69,9 @@ import kotlinx.coroutines.launch
 /** One option in a [MorphSegmented] control. [icon] is optional. */
 data class SegmentOption(val key: String, val label: String, val icon: ImageVector? = null)
 
+/** Icon-less segments from (key to label) pairs: `segmentsOf("imperial" to "Imperial", "metric" to "Metric")`. */
+fun segmentsOf(vararg choices: Pair<String, String>): List<SegmentOption> = choices.map { SegmentOption(it.first, it.second, null) }
+
 /**
  * Bloo's full-width segmented selector: a pick-one control where the chosen segment STRETCHES and
  * the rest SQUASH to make room, all riding one bouncy spring, so the choice reads as the control

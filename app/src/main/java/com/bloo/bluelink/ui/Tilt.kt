@@ -35,7 +35,7 @@ private const val TiltEase = 0.12f
 /** The held-angle reading: m/s^2 of gravity that counts as fully leaned, the easing per sample, and the smallest write. */
 private const val HoldRange = 3f
 private const val HoldEase = 0.2f
-private const val HoldStep = 0.01f
+private const val HoldStep = 0.03f
 
 /** A write only when it has moved by more than the eye can see: each write redraws every reader. */
 private const val TiltStep = 0.004f

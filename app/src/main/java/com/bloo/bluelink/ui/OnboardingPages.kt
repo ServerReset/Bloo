@@ -52,7 +52,6 @@ import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
-import com.bloo.uicommon.SegmentOption
 import com.bloo.uicommon.content
 
 /**
@@ -250,12 +249,7 @@ internal fun OnboardingRestorePage(vm: AppViewModel) {
 @Composable
 internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     ThemeModeSegmentedRow(appearance) { vm.setThemeMode(it) }
-    SettingsSegmentedRow(
-        label = "Units",
-        options = listOf(SegmentOption("imperial", "Imperial", null), SegmentOption("metric", "Metric", null)),
-        selectedKey = appearance.unitSystem,
-        onSelect = { vm.setUnitSystem(it) },
-    )
+    UnitSystemRow(appearance, vm)
     MutedText("Both live in Settings as well.")
 }
 

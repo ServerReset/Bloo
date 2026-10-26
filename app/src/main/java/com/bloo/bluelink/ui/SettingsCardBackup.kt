@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.segmentsOf
 import androidx.compose.foundation.layout.PaddingValues
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,7 +39,6 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.SegmentOption
 
 /**
  * The "Backup & sync" card. Two ways to keep a setup safe: automatic Drive sync across devices (the
@@ -99,7 +99,7 @@ internal fun BackupSyncCardContent(state: UiState, vm: AppViewModel, context: Co
                 SettingsGroup("Drive file") {
                     SettingsSegmentedRow(
                         label = "Sync over",
-                        options = listOf(SegmentOption("wifi", "Wi-Fi only", null), SegmentOption("any", "Any network", null)),
+                        options = segmentsOf("wifi" to "Wi-Fi only", "any" to "Any network"),
                         selectedKey = if (state.syncWifiOnly) "wifi" else "any",
                         onSelect = { vm.setSyncWifiOnly(it == "wifi") },
                     )

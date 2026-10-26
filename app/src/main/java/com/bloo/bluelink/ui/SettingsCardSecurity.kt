@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.segmentsOf
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,7 +23,6 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
-import com.bloo.uicommon.SegmentOption
 
 /** The "Security" card: the app lock and the PIN that backs it up. */
 @Composable
@@ -100,11 +100,7 @@ internal fun AppLockRow(state: UiState, appearance: SettingsStore.Appearance, vm
     val lockOn = appearance.biometricLock
     SettingsSegmentedRow(
         label = "Ask for biometrics",
-        options = listOf(
-            SegmentOption("off", LockTiming.OFF.label, null),
-            SegmentOption("screen_off", LockTiming.SCREEN_OFF.label, null),
-            SegmentOption("immediate", LockTiming.IMMEDIATE.label, null),
-        ),
+        options = segmentsOf("off" to LockTiming.OFF.label, "screen_off" to LockTiming.SCREEN_OFF.label, "immediate" to LockTiming.IMMEDIATE.label),
         selectedKey = when {
             !lockOn -> "off"
             appearance.lockTiming == LockTiming.IMMEDIATE -> "immediate"

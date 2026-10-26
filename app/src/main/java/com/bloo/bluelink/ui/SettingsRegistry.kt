@@ -1,12 +1,12 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.segmentsOf
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import com.bloo.bluelink.data.SettingsCatalog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.uicommon.GapRow
-import com.bloo.uicommon.SegmentOption
 import com.bloo.uicommon.content
 
 /**
@@ -88,7 +88,7 @@ internal val ChoiceSettings: List<SettingSpec> = listOf(
     ) { _, _, s, vm ->
         SettingsSegmentedRow(
             label = "Settings",
-            options = listOf(SegmentOption("simple", "Simple", null), SegmentOption("advanced", "Advanced", null)),
+            options = segmentsOf("simple" to "Simple", "advanced" to "Advanced"),
             selectedKey = s.settingsMode,
             onSelect = { vm.setSettingsMode(it) },
         )
