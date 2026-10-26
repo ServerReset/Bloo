@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
-import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapPage
@@ -142,11 +141,7 @@ internal fun OnboardingStepCard(spec: OnboardingCardSpec, content: @Composable (
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
         contentGap = GapGroup,
     ) {
-        RevealText(
-            spec.summary,
-            style = SecondaryTextStyle(),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        RevealMutedText(spec.summary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         content()
     }
 }

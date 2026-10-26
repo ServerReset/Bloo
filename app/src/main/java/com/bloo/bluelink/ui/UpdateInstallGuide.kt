@@ -37,21 +37,9 @@ internal fun UpdateInstallGuideDialog(
                     "Android will hand off to its installer. Two things to expect:",
                     style = SecondaryTextStyle(),
                 )
-                RevealText(
-                    "1. Tap \"Install\" on the system sheet.",
-                    style = SecondaryTextStyle(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                RevealText(
-                    "2. If it says \"Blocked by Play Protect\" (this copy was installed from a file, not from Google Play), tap \"More details\", then \"Install anyway\".",
-                    style = SecondaryTextStyle(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                RevealText(
-                    "3. Confirm with your PIN, password or biometrics.",
-                    style = SecondaryTextStyle(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                RevealMutedText("1. Tap \"Install\" on the system sheet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                RevealMutedText("2. If it says \"Blocked by Play Protect\" (this copy was installed from a file, not from Google Play), tap \"More details\", then \"Install anyway\".", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                RevealMutedText("3. Confirm with your PIN, password or biometrics.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         buttons = {

@@ -149,11 +149,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
                     StatusRow("Next service due", "${formatDistance(it, metric)}$note")
                 }
                 if (lastSvc == null || interval == null) {
-                    RevealText(
-                        "Set last-service mileage and interval in Settings to track service.",
-                        style = SecondaryTextStyle(),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    RevealMutedText("Set last-service mileage and interval in Settings to track service.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 

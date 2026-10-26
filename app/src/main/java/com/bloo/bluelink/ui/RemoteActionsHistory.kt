@@ -80,11 +80,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
             Spacer(Modifier.weight(1f))
         }
         Spacer(Modifier.width(GapRow))
-        RevealText(
-            text = shortTime(action.timestamp, use24Hour),
-            style = SecondaryTextStyle(),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        RevealMutedText(text = shortTime(action.timestamp, use24Hour), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

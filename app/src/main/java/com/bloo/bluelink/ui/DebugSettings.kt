@@ -155,11 +155,7 @@ fun DebugSettingsPanel(
     // No self-styled card: it renders inside SettingsCard("Debug", ...), whose title row already
     // says so.
     Column(modifier.fillMaxWidth()) {
-        RevealText(
-            "Tap a copyable value to copy it to the clipboard.",
-            style = SecondaryTextStyle(),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        RevealMutedText("Tap a copyable value to copy it to the clipboard.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(GapRow))
 
         // heightIn is required: the Settings LazyColumn item measures with unbounded max height,

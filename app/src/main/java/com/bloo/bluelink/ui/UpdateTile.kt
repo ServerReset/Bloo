@@ -151,11 +151,7 @@ internal fun UpdateAvailableTile(
                             // anyway". Spell that out up front rather than only after someone
                             // reports it as broken.
                             if (!state.shizukuAvailable || !LocalAppearance.current.seamlessInstallShizuku) {
-                                RevealText(
-                                    "Shizuku is off, so Android asks you to confirm each update. On the next screen tap \"More details\" to expand it, then \"Install anyway\".",
-                                    style = SecondaryTextStyle(),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                RevealMutedText("Shizuku is off, so Android asks you to confirm each update. On the next screen tap \"More details\" to expand it, then \"Install anyway\".", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             RevealText(
                                 if (hasDirectDownload) "1. Tap \"Update\", then \"Install\" once it downloads" else "1. Download the APK, then open it",

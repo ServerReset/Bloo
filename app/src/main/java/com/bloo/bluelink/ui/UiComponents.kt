@@ -88,8 +88,8 @@ internal fun ButtonIcon(icon: ImageVector, description: String? = null, tint: Co
 
 /** [MutedText] that reveals as it appears (the pebbles' captions and hints). */
 @Composable
-internal fun RevealMutedText(text: String, modifier: Modifier = Modifier) {
-    RevealText(text, modifier, style = SecondaryTextStyle(), color = mutedContentColor())
+internal fun RevealMutedText(text: String, modifier: Modifier = Modifier, color: Color = mutedContentColor()) {
+    RevealText(text, modifier, style = SecondaryTextStyle(), color = color)
 }
 
 /** The SECONDARY role as text: what a line is about. Same as [BodySmallText]. */

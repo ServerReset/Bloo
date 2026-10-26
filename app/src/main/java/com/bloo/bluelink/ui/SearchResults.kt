@@ -106,11 +106,7 @@ internal fun SettingsSearchResults(
         Column(Modifier.fillMaxWidth().padding(vertical = GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             RevealText("No matches for \"$query\"", style = PrimaryTextStyle())
             // Not a dead end: point at the three kinds of thing the bar understands.
-            RevealText(
-                "Try a car name, a setting, or a command like \"lock my car\".",
-                style = SecondaryTextStyle(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            RevealMutedText("Try a car name, a setting, or a command like \"lock my car\".", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {
         // Split the single best match out on top, then group the rest. One obvious answer should say
