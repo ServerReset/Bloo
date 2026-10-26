@@ -1,5 +1,7 @@
 package com.bloo.uicommon
 
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -297,6 +299,7 @@ fun MorphSegmented(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(segmentShape)
+                    .pointerHoverIcon(PointerIcon.Hand)
                     .keyboardActivate(segmentShape, if (isSelected) selectedTextColor else unselectedTextColor) {
                         if (opt.key != currentSelectedKey) {
                             currentOnTick()

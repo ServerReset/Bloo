@@ -1,5 +1,7 @@
 package com.bloo.uicommon
 
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -86,7 +88,13 @@ fun MorphButtonCore(
     // (growing to full width, or zero height in unbounded parents).
     // One node for a screen reader: the label (the content) and the click (the chrome beneath it) are siblings, so left apart
     // it would meet an unlabelled clickable and, separately, a bit of text that does nothing.
-    Box(modifier = modifier.semantics(mergeDescendants = true) {}, contentAlignment = Alignment.Center) {
+    // A mouse shows the pointing hand over an enabled button.
+    Box(
+        modifier = modifier
+            .semantics(mergeDescendants = true) {}
+            .then(if (enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
         MorphChrome(
             pressed = pressed,
             active = active,

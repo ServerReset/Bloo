@@ -1,5 +1,7 @@
 package com.bloo.uicommon
 
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -198,6 +200,7 @@ fun AnimatedSlider(
             .fillMaxWidth()
             .height(thumbH)
             .then(if (focused) Modifier.border(2.dp, accent, RoundedCornerShape(thumbH / 2)) else Modifier)
+            .then(if (enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
             .focusable(enabled, focusSource)
             .onKeyEvent { event ->
                 if (!enabled || event.type != KeyEventType.KeyDown) return@onKeyEvent false
