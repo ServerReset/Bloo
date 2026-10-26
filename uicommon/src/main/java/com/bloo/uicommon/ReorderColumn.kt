@@ -245,7 +245,7 @@ fun <T> ReorderColumn(
                     val gapPx = spacing.toPx()
                     // Springs the item back into its slot from wherever it was let go (sideways included), then clears the
                     // drag; [landed] runs once it is home.
-                    val settleHome: (() -> Unit)? -> Unit = { landed ->
+                    val settleHome: ((() -> Unit)?) -> Unit = { landed ->
                         settlingKey = k
                         settleJob = scope.launch {
                             val ax = Animatable(offsetX)
