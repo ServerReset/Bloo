@@ -99,18 +99,22 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
         // Many status payloads carry no location, so `status.isDriving` alone reads 0 while the car
         // is genuinely moving, and the parked-car alerts (unlocked, door open, running too long)
         // then fire mid-drive. A missing/empty snapshot just falls back to the status itself.
-        val snapshotDriving = runCatching {
-            SnapshotStore(applicationContext).current().vehicles.associate { it.vin to it.isDriving }
-        }.getOrDefault(emptyMap())
+        val snapshots = runCatching { SnapshotStore(applicationContext).current().vehicles }.getOrDefault(emptyList())
+        val snapshotDriving = snapshots.associate { it.vin to it.isDriving }
+        // Vehicle IDENTITY comes from that snapshot too, as in LiveChargePollWorker: re-fetching the fleet list is a
+        // network round trip per brand every tick for cars this worker already knows. A car added elsewhere is picked
+        // up by the next foreground refresh; with no snapshot at all (a fresh install) the list is fetched as before.
+        val snapshotsByBrand = snapshots.groupBy { Brand.fromIndicator(it.toVehicle().brandIndicator) }
 
         val credentials = CredentialStore(applicationContext)
         for (brand in store.loggedInBrands()) {
             val repo = runCatching { repositoryFor(brand, store, credentials) }.getOrNull() ?: continue
             // Share the app-wide status gate so a foregrounded app and this worker
             // never issue overlapping requests (Blue Link 502s otherwise).
-            AppLog.log("AlertWorker: requesting statusMutex for ${brand.label} vehicles()")
-            val vehicles = runCatching { BlueLinkGate.statusMutex.withLock { repo.vehicles() } }
-                .getOrElse { emptyList() }
+            val vehicles = snapshotsByBrand[brand]?.map { it.toVehicle() }.orEmpty().ifEmpty {
+                AppLog.log("AlertWorker: requesting statusMutex for ${brand.label} vehicles()")
+                runCatching { BlueLinkGate.statusMutex.withLock { repo.vehicles() } }.getOrElse { emptyList() }
+            }
             for (v in vehicles) {
                 AppLog.log("AlertWorker: requesting statusMutex for ${v.name}")
                 val status = runCatching {
