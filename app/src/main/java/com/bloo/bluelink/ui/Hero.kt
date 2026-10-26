@@ -167,11 +167,7 @@ internal fun HeroHeader(
             // per placement and costs car-swipe frames.
             titleTrailing = if (trailingGone && !hoisted) null else {
                 {
-                    HeroCollapsedNumbers(
-                        readout, heroTState.value,
-                        onPositioned = report(collapsedNumbers),
-                        hoisted = hoisted,
-                    )
+                    HeroCollapsedNumbers(readout, heroTState.value, onPositioned = report(collapsedNumbers), hoisted = hoisted)
                 }
             },
             summary = null,

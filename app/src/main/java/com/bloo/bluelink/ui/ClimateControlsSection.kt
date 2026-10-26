@@ -211,11 +211,7 @@ internal fun ClimateControlsSection(
             // RollingNumber, not StepRow's built-in roll: StepRow's AnimatedContent always slides
             // the same direction regardless of which way the value moved, which reads oddly on a
             // slider you're actively dragging both ways.
-            RollingNumber(
-                text = "$duration min",
-                style = SecondaryTextStyle(),
-                fontWeight = FontWeight.Medium,
-            )
+            RollingNumber(text = "$duration min", style = SecondaryTextStyle(), fontWeight = FontWeight.Medium)
         }
         AnimatedSlider(
             value = duration.toFloat(),

@@ -85,11 +85,7 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
             RevealText(weather.condition.label, fontWeight = FontWeight.SemiBold, style = PrimaryTextStyle())
             MutedText(caption)
         }
-        RollingNumber(
-            text = weather.tempLabel(fahrenheit),
-            style = PrimaryTextStyle(),
-            fontWeight = FontWeight.Bold,
-        )
+        RollingNumber(text = weather.tempLabel(fahrenheit), style = PrimaryTextStyle(), fontWeight = FontWeight.Bold)
     }
 }
 
@@ -272,13 +268,7 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
                     maxLines = 1,
                 )
                 WeatherGlyph(day.condition, true, 20.dp)
-                DayRangeBar(
-                    low = lo,
-                    high = hi,
-                    weekLow = weekLow,
-                    weekHigh = weekHigh,
-                    modifier = Modifier.weight(1f),
-                )
+                DayRangeBar(low = lo, high = hi, weekLow = weekLow, weekHigh = weekHigh, modifier = Modifier.weight(1f))
                 RevealText(
                     buildString {
                         if (hi != null) append("$hi°")
@@ -377,17 +367,9 @@ internal fun WeatherLocations(
             )
             WeatherBlock(car, fahrenheit, metric, title = "Here & at the car", merged = true)
         } else {
-            WeatherBlock(
-                car, fahrenheit, metric,
-                title = "At the car",
-                subtitle = place ?: "Car location",
-            )
+            WeatherBlock(car, fahrenheit, metric, title = "At the car", subtitle = place ?: "Car location")
             if (phone != null) {
-                WeatherBlock(
-                    phone, fahrenheit, metric,
-                    title = "Your location",
-                    subtitle = devicePlace,
-                )
+                WeatherBlock(phone, fahrenheit, metric, title = "Your location", subtitle = devicePlace)
             }
         }
     }

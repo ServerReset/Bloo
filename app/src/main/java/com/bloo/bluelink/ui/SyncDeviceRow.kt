@@ -156,13 +156,7 @@ internal fun SyncDeviceRow(
 
 @Composable
 internal fun DeviceTag(text: String, color: Color) {
-    RevealText(
-        text,
-        style = SecondaryTextStyle(),
-        color = color,
-        maxLines = 1,
-        modifier = Modifier.padding(start = GapRow),
-    )
+    RevealText(text, style = SecondaryTextStyle(), color = color, maxLines = 1, modifier = Modifier.padding(start = GapRow))
 }
 
 /**

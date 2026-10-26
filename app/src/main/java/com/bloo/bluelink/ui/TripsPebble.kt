@@ -97,12 +97,7 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RevealText(
-                tripDate(trip.startdate),
-                style = PrimaryTextStyle(),
-                fontWeight = FontWeight.Bold,
-                color = primaryColor,
-            )
+            RevealText(tripDate(trip.startdate), style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, color = primaryColor)
             trip.distance?.let {
                 RevealText(
                     formatTripDistance(it, metric),
@@ -133,12 +128,7 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
 private fun TripStat(label: String, value: String, captionColor: Color) {
     Column {
         RevealText(label, style = SecondaryTextStyle(), color = captionColor, maxLines = 1)
-        RevealText(
-            value,
-            style = SecondaryTextStyle(),
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-        )
+        RevealText(value, style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 

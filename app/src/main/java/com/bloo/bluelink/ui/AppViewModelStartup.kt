@@ -100,11 +100,7 @@ internal fun AppViewModel.coldStartAutoLogin() {
             val appearance = settingsStore.appearance.first()
             val (lockMechanisms, appPinSet, lockout) = withContext(Dispatchers.IO) {
                 val pinSet = credentialStore.getPinRecord() != null
-                Triple(
-                    (appearance.biometricLock && canUseBiometrics()) || pinSet,
-                    pinSet,
-                    credentialStore.pinLockout(),
-                )
+                Triple((appearance.biometricLock && canUseBiometrics()) || pinSet, pinSet, credentialStore.pinLockout())
             }
             _state.update { it.copy(appPinSet = appPinSet, pinLockout = lockout) }
             // Straight after a reboot the device's own unlock is the one just passed (the app only starts once it is unlocked),

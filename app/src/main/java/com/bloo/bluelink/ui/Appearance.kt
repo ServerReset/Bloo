@@ -308,12 +308,7 @@ private fun snapStep(v: Float, step: Float): Float = Math.round(v / step) * step
  */
 @Composable
 private fun SelectedCheck() {
-    Icon(
-        AppIcons.Check,
-        contentDescription = null,
-        tint = Color.White,
-        modifier = Modifier.size(22.dp),
-    )
+    Icon(AppIcons.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
 }
 
 /** A swatch caption's colour: full-strength when chosen, muted otherwise. */

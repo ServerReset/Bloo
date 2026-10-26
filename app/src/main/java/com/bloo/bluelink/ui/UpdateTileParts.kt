@@ -178,12 +178,7 @@ internal fun UpdateDismissRow(
             enabled = !busy,
             emphasis = ButtonEmphasis.Confirm,
         )
-        MorphTextButton(
-            "Not now",
-            onClick = vm::dismissUpdate,
-            enabled = !busy,
-            emphasis = ButtonEmphasis.Deny,
-        )
+        MorphTextButton("Not now", onClick = vm::dismissUpdate, enabled = !busy, emphasis = ButtonEmphasis.Deny)
     }
 }
 

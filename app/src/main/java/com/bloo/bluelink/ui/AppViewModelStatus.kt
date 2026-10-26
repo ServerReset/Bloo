@@ -210,13 +210,7 @@ internal suspend fun AppViewModel.refreshLiveChargeBar(vehicles: List<Vehicle>) 
         val ev = status.evStatus
         if (ev?.batteryCharge == true) anyCharging = true
         runCatching {
-            LiveCharge.sync(
-                context = getApplication(),
-                settings = settingsStore,
-                vin = v.vin,
-                carName = v.name,
-                ev = ev,
-            )
+            LiveCharge.sync(context = getApplication(), settings = settingsStore, vin = v.vin, carName = v.name, ev = ev)
         }
     }
     if (anyCharging) com.bloo.bluelink.work.LiveChargePollWorker.kick(getApplication())

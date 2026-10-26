@@ -281,10 +281,7 @@ internal fun CarMap(
                             .offset {
                                 val originX = xTileF * tilePx - wPx / 2f
                                 val originY = yTileF * tilePx - hPx / 2f
-                                IntOffset(
-                                    (tx * tilePx - originX).roundToInt(),
-                                    (ty * tilePx - originY).roundToInt(),
-                                )
+                                IntOffset((tx * tilePx - originX).roundToInt(), (ty * tilePx - originY).roundToInt())
                             },
                     )
                 }

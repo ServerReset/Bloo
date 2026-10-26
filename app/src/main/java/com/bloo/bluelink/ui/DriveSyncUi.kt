@@ -232,10 +232,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             icon = Icons.Filled.Smartphone,
             title = "Rename this device",
             text = {
-                BodyMediumText(
-                    "Shown in the devices list on all your synced devices.",
-                    color = scheme.onSurfaceVariant,
-                )
+                BodyMediumText("Shown in the devices list on all your synced devices.", color = scheme.onSurfaceVariant)
                 // "Name this device" is an ordinary form field, and it was the only one of those
                 // wearing the credential look.
                 BlooTextField(

@@ -58,11 +58,7 @@ internal fun OnboardingPinForm(
             isError = attempted && confirm.isNotEmpty() && pin != confirm,
         )
         if (attempted && (pin.length < PinCrypto.PIN_MIN_DIGITS || pin != confirm)) {
-            RevealText(
-                "PINs must be 4-8 digits and match.",
-                style = SecondaryTextStyle(),
-                color = scheme.error,
-            )
+            RevealText("PINs must be 4-8 digits and match.", style = SecondaryTextStyle(), color = scheme.error)
         }
         val pinLabel: String = if (existing) "Replace PIN" else "Save PIN"
         MorphActionButton(

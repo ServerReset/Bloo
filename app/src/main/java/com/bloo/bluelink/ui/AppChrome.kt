@@ -153,12 +153,7 @@ private fun DialogCard(
             Spacer(Modifier.height(GapSection))
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            RevealText(
-                title,
-                style = PrimaryTextStyle(),
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-            )
+            RevealText(title, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             if (titleTrailing != null) {
                 Spacer(Modifier.width(GapRow))
                 titleTrailing()

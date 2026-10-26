@@ -138,9 +138,7 @@ internal fun chargeReadoutOf(
             else -> {
                 // Muted inherited content colour; tracks the active scheme and the hero's on-photo
                 // scrim.
-                LocalContentColor.current.copy(
-                    alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
-                )
+                LocalContentColor.current.copy(alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha)
             }
         },
         charging = charging,
@@ -271,12 +269,7 @@ internal fun HeroNumbers(
         Spacer(Modifier.width(lerp(8.dp, 14.dp, t)))
         Column(horizontalAlignment = Alignment.End) {
             // LocalContentColor so the range picks up the on-photo colour like the percentage.
-            RollingNumber(
-                data.rangeText ?: "--",
-                rangeStyle,
-                FontWeight.Bold,
-                color = LocalContentColor.current,
-            )
+            RollingNumber(data.rangeText ?: "--", rangeStyle, FontWeight.Bold, color = LocalContentColor.current)
             // The status line ("Parked", "Charging - 25 min - DC") travels under the range,
             // right-aligned.
             val statusSlot = with(LocalDensity.current) { type.labelLarge.lineHeight.toDp() }

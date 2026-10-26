@@ -144,12 +144,7 @@ internal object DebugSampleGarage {
             dte = Dte(value = 214.0, unit = 1),
             airTemp = TempValue(value = "21", unit = 0),
             battery = Battery12V(batSoc = 88, batState = 0),
-            evStatus = EvStatus(
-                batteryCharge = false,
-                batteryStatus = 72,
-                batteryPlugin = 0,
-            ),
-        )
+            evStatus = EvStatus(batteryCharge = false, batteryStatus = 72, batteryPlugin = 0, ))
         return state.copy(
             screen = Screen.Garage,
             vehicles = listOf(car),

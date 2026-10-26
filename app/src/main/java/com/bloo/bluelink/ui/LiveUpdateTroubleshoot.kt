@@ -79,11 +79,7 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            MorphTextButton(
-                "Close",
-                onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            MorphTextButton("Close", onDismiss, modifier = Modifier.fillMaxWidth())
         },
     )
 }

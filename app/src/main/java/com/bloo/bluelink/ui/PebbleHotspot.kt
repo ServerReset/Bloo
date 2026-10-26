@@ -347,21 +347,13 @@ private fun EmptyDropZone(hovered: Boolean) {
                 drawRoundRect(
                     color = outline,
                     cornerRadius = CornerRadius(r),
-                    style = Stroke(
-                        width = stroke,
-                        pathEffect = PathEffect.dashPathEffect(dash),
-                    ),
-                )
+                    style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(dash), ))
             }
             .padding(vertical = GapPage, horizontal = GapGroup),
         contentAlignment = Alignment.Center,
     ) {
         CompositionLocalProvider(LocalContentColor provides tone) {
-            MorphButtonLabel(
-                Icons.Filled.PushPin,
-                if (hovered) "Release to pin" else "Drag a pebble here",
-                pending = false,
-            )
+            MorphButtonLabel(Icons.Filled.PushPin, if (hovered) "Release to pin" else "Drag a pebble here", pending = false)
         }
     }
 }

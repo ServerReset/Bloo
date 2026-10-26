@@ -189,13 +189,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                 )
                 Spacer(Modifier.width(GapGroup))
                 Column(Modifier.weight(1f)) {
-                    RevealText(
-                        "Bloo",
-                        style = PrimaryTextStyle(),
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
+                    RevealText("Bloo", style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                     RevealMutedText(if (carCount == 0) "No vehicles yet" else "$carCount car${if (carCount == 1) "" else "s"}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 MorphExpandButton(

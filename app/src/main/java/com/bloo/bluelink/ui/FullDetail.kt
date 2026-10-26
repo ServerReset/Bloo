@@ -194,11 +194,7 @@ internal fun ExpandedCar(
                     },
                     trail = {
                         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-                            PebbleList(
-                                v, state, vm,
-                                exclude = setOf("summary"),
-                                pinHotspot = expanded,
-                            )
+                            PebbleList(v, state, vm, exclude = setOf("summary"), pinHotspot = expanded)
                         }
                     },
                 )

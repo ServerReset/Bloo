@@ -371,10 +371,7 @@ fun BlooApp(vm: AppViewModel) {
     StatusBarScrim(searchHazeState)
     // The app-wide pull-to-refresh disc, drawn above content; refracts searchHazeState. The lock overlay
     // and dialogs sit above it.
-    PullRefreshIndicatorHost(
-        state = refreshIndicator,
-        hazeState = searchHazeState,
-    )
+    PullRefreshIndicatorHost(state = refreshIndicator, hazeState = searchHazeState)
     }
     }
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.

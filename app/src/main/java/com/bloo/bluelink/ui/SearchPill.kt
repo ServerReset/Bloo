@@ -230,10 +230,7 @@ internal fun SearchPill(
                             )
                         }
                         MorphIconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) }) {
-                            Icon(
-                                AppIcons.Close,
-                                contentDescription = if (query.isNotEmpty()) "Clear" else "Close",
-                            )
+                            Icon(AppIcons.Close, contentDescription = if (query.isNotEmpty()) "Clear" else "Close")
                         }
                     }
                     // Closed PILL (Settings): the icon plus the word, centred.
@@ -282,11 +279,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
             if (state.vehicles.size > 1) add("Where is my car" to Icons.Filled.Place)
         }.take(if (compact) 2 else 4)
     }
-    RevealText(
-        "Ask for anything",
-        style = PrimaryTextStyle(),
-        color = scheme.onSurface,
-    )
+    RevealText("Ask for anything", style = PrimaryTextStyle(), color = scheme.onSurface)
     if (actions.isNotEmpty()) {
         ResultGroup("Actions") {
             actions.forEach { cmd ->

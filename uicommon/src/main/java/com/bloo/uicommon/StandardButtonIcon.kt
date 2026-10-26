@@ -119,12 +119,7 @@ private fun MorphButtonGlyph(
             animationSpec = tween(MotionShort),
             label = "buttonGlyph",
         ) { glyph ->
-            Icon(
-                glyph,
-                contentDescription = null,
-                tint = LocalContentColor.current,
-                modifier = Modifier.size(iconSize),
-            )
+            Icon(glyph, contentDescription = null, tint = LocalContentColor.current, modifier = Modifier.size(iconSize))
         }
     }
 }

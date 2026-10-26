@@ -181,11 +181,7 @@ internal fun MapTopBar(
             ) {
                 Icon(AppIcons.DirectionsCar, contentDescription = null, modifier = Modifier.size(24.dp))
                 Column {
-                    RollingNumber(
-                        vehicleName,
-                        style = PrimaryTextStyle(),
-                        fontWeight = FontWeight.Bold,
-                    )
+                    RollingNumber(vehicleName, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold)
                     if (statusLine != null) {
                         RollingNumber(
                             statusLine,

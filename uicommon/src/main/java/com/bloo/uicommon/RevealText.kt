@@ -316,9 +316,7 @@ private fun rolledNumbers(
                 val box = measurer.measure(m.value, style, maxLines = 1).size
                 content[id] = InlineTextContent(
                     with(density) {
-                        Placeholder(
-                            (box.width + 1).toSp(), box.height.toSp(), PlaceholderVerticalAlign.TextCenter,
-                        )
+                        Placeholder((box.width + 1).toSp(), box.height.toSp(), PlaceholderVerticalAlign.TextCenter)
                     },
                 ) { RollingRun(from, m.value, style) }
                 appendInlineContent(id, m.value)

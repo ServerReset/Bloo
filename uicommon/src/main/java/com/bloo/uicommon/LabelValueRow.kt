@@ -54,12 +54,7 @@ fun LabelValueRow(
                     fontFamily = if (valueMono) FontFamily.Monospace else baseStyle.fontFamily,
                 )
             }
-            AnimatedValue(
-                value = value,
-                style = valueStyle,
-                maxLines = 2,
-                reduceMotion = LocalReduceMotion.current,
-            )
+            AnimatedValue(value = value, style = valueStyle, maxLines = 2, reduceMotion = LocalReduceMotion.current)
         }
     }
 }

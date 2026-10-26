@@ -65,9 +65,7 @@ internal fun OnboardingFeaturesPage(state: UiState) {
             add(Triple(AppIcons.AutoAwesome, "On-device AI summaries", "Plain-language status summaries, generated on your phone"))
         }
     }
-    OnboardingTipListPage(
-        tips = tips,
-    )
+    OnboardingTipListPage(tips = tips)
 }
 
 /**

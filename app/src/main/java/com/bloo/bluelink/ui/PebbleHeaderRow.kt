@@ -173,11 +173,7 @@ internal fun PebbleHeaderRow(
                 )
             } else if (canToggle) {
                 // Gated on canToggle so a pebble with nothing to disclose draws no chevron.
-                MorphExpandButton(
-                    expanded = expanded,
-                    onToggle = onToggle,
-                    onPressChange = onChevronPressChange,
-                )
+                MorphExpandButton(expanded = expanded, onToggle = onToggle, onPressChange = onChevronPressChange)
             }
         }
         }

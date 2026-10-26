@@ -253,11 +253,7 @@ internal fun WearRingLabels(actions: List<WearQuickAction?>) {
                     // A preset's name is the phone's to choose: cut so it stays on its own quarter's arc.
                     action.label.let { if (it.length > 14) it.take(13) + "…" else it },
                     style = {
-                        CurvedTextStyle(
-                            fontSize = labelSize,
-                            fontWeight = FontWeight.SemiBold,
-                            color = color,
-                        )
+                        CurvedTextStyle(fontSize = labelSize, fontWeight = FontWeight.SemiBold, color = color)
                     },
                 )
             }

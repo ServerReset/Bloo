@@ -70,12 +70,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
                 Icon(icon, contentDescription = null, modifier = Modifier.size(12.dp))
                 Spacer(Modifier.width(GapHairline))
             }
-            RevealText(
-                text,
-                style = SecondaryTextStyle(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            RevealText(text, style = SecondaryTextStyle(), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

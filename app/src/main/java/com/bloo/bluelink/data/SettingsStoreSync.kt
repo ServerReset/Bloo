@@ -256,9 +256,7 @@ suspend fun SettingsStore.performMainToMainSync(
             // ONE set, used by both the hash and the body -- see portableContentHash's param doc for
             // why passing it to only one of them corrupts the change gate.
             val carriedTombstones = remoteJson?.let { SyncMerge.parseRemoved(it) } ?: emptySet()
-            val localHash = SyncMerge.portableContentHash(
-                prefsMap, uploadedDirtyKeys, photos, priorRemoved = carriedTombstones,
-            )
+            val localHash = SyncMerge.portableContentHash(prefsMap, uploadedDirtyKeys, photos, priorRemoved = carriedTombstones)
             val driveBody = SyncMerge.buildExportForMainToMain(
                 prefs = prefsMap,
                 dirtyKeys = uploadedDirtyKeys,

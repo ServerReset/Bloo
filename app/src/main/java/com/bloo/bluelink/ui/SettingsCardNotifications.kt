@@ -222,9 +222,5 @@ internal fun NotificationsCardContent(
 @Composable
 private fun AttentionRow(problem: String, action: String, onClick: () -> Unit) {
     SettingsCaption(problem, bottomGap = GapHairline)
-    MorphTextButton(
-        action,
-        onClick = onClick,
-        icon = AppIcons.Warning,
-    )
+    MorphTextButton(action, onClick = onClick, icon = AppIcons.Warning)
 }

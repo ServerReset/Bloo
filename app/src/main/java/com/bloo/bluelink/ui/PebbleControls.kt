@@ -163,10 +163,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 // Climate, ...), which only ever get Pebble's flat PebbleContentInset row padding.
                 // The 4.dp here lines the two icons up: 4 + this Box's own 12 ==
                 // PebbleContentInset.
-                PrimaryActions(
-                    v, state, vm,
-                    contentPadding = PaddingValues(start = PebbleContentInset - 12.dp, end = 8.dp),
-                )
+                PrimaryActions(v, state, vm, contentPadding = PaddingValues(start = PebbleContentInset - 12.dp, end = 8.dp))
             }
             // Gated on the toggle alone: RemoteActionsInline draws its own empty state, and a
             // silent no-op reads as a missing gesture.

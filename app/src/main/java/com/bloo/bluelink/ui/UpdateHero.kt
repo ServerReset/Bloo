@@ -29,12 +29,7 @@ internal fun UpdateDeltaHero(currentBuild: Int, newBuild: Int, modifier: Modifie
         horizontalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         if (currentBuild > 0) {
-            RollingNumber(
-                "$currentBuild",
-                style = PrimaryTextStyle(),
-                fontWeight = FontWeight.Normal,
-                color = scheme.onSurface,
-            )
+            RollingNumber("$currentBuild", style = PrimaryTextStyle(), fontWeight = FontWeight.Normal, color = scheme.onSurface)
             Icon(
                 AppIcons.ArrowForward,
                 contentDescription = "to",

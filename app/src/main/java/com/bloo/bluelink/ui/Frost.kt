@@ -34,11 +34,7 @@ internal fun FrostMessage(message: String, modifier: Modifier = Modifier) {
         ) {
             ButtonIcon(AppIcons.Lock, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(GapRow))
-            RevealText(
-                message,
-                style = PrimaryTextStyle(),
-                fontWeight = FontWeight.SemiBold,
-            )
+            RevealText(message, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold)
         }
     }
 }

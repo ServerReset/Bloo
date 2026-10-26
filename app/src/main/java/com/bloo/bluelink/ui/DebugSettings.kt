@@ -134,11 +134,7 @@ fun getDebugInfo(): List<DebugInfo> {
                 System.getProperty("java.vm.version")
             ).joinToString(" ").ifBlank { "Unknown" },
         ),
-        DebugInfo(
-            label = "Kotlin Runtime",
-            value = KotlinVersion.CURRENT.toString(),
-        ),
-    )
+        DebugInfo(label = "Kotlin Runtime", value = KotlinVersion.CURRENT.toString(), ))
 }
 
 /**

@@ -30,11 +30,7 @@ internal fun LockedControls(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Box(modifier) {
-        Column(
-            Modifier.inertButtonFrost(locked),
-            verticalArrangement = Arrangement.spacedBy(GapRow),
-            content = content,
-        )
+        Column(Modifier.inertButtonFrost(locked), verticalArrangement = Arrangement.spacedBy(GapRow), content = content)
         AnimatedVisibility(
             visible = locked,
             modifier = Modifier.matchParentSize(),

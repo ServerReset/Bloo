@@ -74,8 +74,4 @@ fun AppViewModel.useDeviceLocationForWeather() = weather.useDeviceLocationForWea
  * with the live-tracking collector so both agree on whether a fix has speed.
  */
 internal fun android.location.Location.toDeviceGeoLocation(): GeoLocation =
-    GeoLocation(
-        latitude,
-        longitude,
-        if (hasSpeed()) speed.toDouble() else null,
-    )
+    GeoLocation(latitude, longitude, if (hasSpeed()) speed.toDouble() else null)

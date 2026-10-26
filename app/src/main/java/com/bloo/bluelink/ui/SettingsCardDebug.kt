@@ -203,9 +203,7 @@ private fun CreditRow(entry: CreditEntry) {
         Column(Modifier.weight(1f)) {
             RevealText(entry.name, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(2.dp))
-            BodySmallText(
-                entry.description,
-            )
+            BodySmallText(entry.description)
             Spacer(Modifier.height(GapHairline))
             // The actual link, styled and tappable -- not a caption-coloured, inert copy of the
             // URL. clip+clickable (not the whole Row, which would make the icon/name/description

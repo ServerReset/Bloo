@@ -292,12 +292,7 @@ private fun ToastCard(
             IconBadge(icon = icon, tint = accent, size = 34.dp, iconSize = 19.dp)
             Spacer(Modifier.width(GapGroup))
             SelectionContainer(Modifier.weight(1f)) {
-                RevealText(
-                    toast.message,
-                    style = SecondaryTextStyle(),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                RevealText(toast.message, style = SecondaryTextStyle(), maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             CopyButton(toast, accent, onCopy)
             MorphIconButton(onClick = onDismiss) { Icon(AppIcons.Close, contentDescription = "Dismiss") }

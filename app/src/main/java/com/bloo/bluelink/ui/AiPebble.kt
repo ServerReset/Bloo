@@ -83,10 +83,7 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
                         if (bulleted) {
                             RevealMutedText("•")
                         }
-                        RevealText(
-                            if (bulleted) line.substring(2) else line,
-                            style = SecondaryTextStyle(),
-                        )
+                        RevealText(if (bulleted) line.substring(2) else line, style = SecondaryTextStyle())
                     }
                 }
             }

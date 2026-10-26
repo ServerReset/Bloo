@@ -209,9 +209,7 @@ private fun AutoLockSetup(
 ) {
     val permissionsOk = bluetoothOk && notificationsOk
     SettingsGroup("AutoLock") {
-        BodySmallText(
-            "Locks $carName when you walk away, using the car's Bluetooth to tell you've left.",
-        )
+        BodySmallText("Locks $carName when you walk away, using the car's Bluetooth to tell you've left.")
         BodySmallText(
             "Four things first. AutoLock does nothing at all until they are done, so none of its " +
                 "settings are here yet.",
@@ -236,11 +234,7 @@ private fun AutoLockSetup(
 
         StepRow("3. Background activity", if (backgroundOk) "Unrestricted" else "Restricted")
         BodySmallText("A battery-restricted app is asleep when you walk away, so it never sees the disconnect.")
-        MorphTextButton(
-            "Allow background activity",
-            enabled = !backgroundOk,
-            onClick = onAllowBackground,
-        )
+        MorphTextButton("Allow background activity", enabled = !backgroundOk, onClick = onAllowBackground)
 
         StepRow("4. Car Bluetooth device", deviceName ?: "Not set")
         BodySmallText("The one device Bloo watches. Pick the car's head unit, not your phone or earbuds.")

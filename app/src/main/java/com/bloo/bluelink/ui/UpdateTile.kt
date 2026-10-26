@@ -121,10 +121,7 @@ internal fun UpdateAvailableTile(
             // Column, not Box: UpdateStatusLine emits two top-level siblings that a Box would stack
             // on top of each other.
             Column(Modifier.padding(GapGroup)) {
-                UpdateStatusLine(
-                    deltaLabel, seamless, state, vm,
-                    showDelta = info.run.displayTitle?.isNotBlank() == true,
-                )
+                UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = info.run.displayTitle?.isNotBlank() == true)
             }
         }
             // Release notes ("What's new"), capped, with a "Full notes" link; shared block (see

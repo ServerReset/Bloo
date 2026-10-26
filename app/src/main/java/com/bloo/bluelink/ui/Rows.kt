@@ -99,13 +99,7 @@ internal fun SectionLabel(text: String) {
 internal fun StepRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         // bodySmall keeps slider labels compact.
-        RevealText(
-            label,
-            Modifier.weight(1f),
-            style = SecondaryTextStyle(),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        RevealText(label, Modifier.weight(1f), style = SecondaryTextStyle(), maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.width(GapRow))
         // Roll the value when it changes (e.g. dragging a slider).
         AnimatedContent(

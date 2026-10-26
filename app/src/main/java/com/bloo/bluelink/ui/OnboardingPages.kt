@@ -326,12 +326,7 @@ internal fun OnboardingPebbleDemo() {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconBadge(AppIcons.Bolt, tint = scheme.primary, size = 28.dp, iconSize = 15.dp)
                 Spacer(Modifier.width(GapRow))
-                RevealText(
-                    "Charge",
-                    style = PrimaryTextStyle(),
-                    fontWeight = FontWeight.Bold,
-                    color = scheme.onSurface,
-                )
+                RevealText("Charge", style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, color = scheme.onSurface)
                 Spacer(Modifier.weight(1f))
                 Icon(
                     if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,

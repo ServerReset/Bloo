@@ -250,12 +250,7 @@ object WeatherApi {
     private fun Daily.toPoints(): List<DayPoint> {
         val days = time ?: return emptyList()
         return days.mapIndexed { i, d ->
-            DayPoint(
-                date = d,
-                highC = max?.getOrNull(i),
-                lowC = min?.getOrNull(i),
-                code = weatherCode?.getOrNull(i) ?: -1,
-            )
+            DayPoint(date = d, highC = max?.getOrNull(i), lowC = min?.getOrNull(i), code = weatherCode?.getOrNull(i) ?: -1)
         }
     }
 }
