@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
+import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.CarAlerts
