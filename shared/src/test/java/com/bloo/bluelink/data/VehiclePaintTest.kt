@@ -34,6 +34,23 @@ class VehiclePaintTest {
         assertNull(paint("""{"interiorColor":"Black","inColor":"Grey"}""").colour)
     }
 
+    @Test fun hyundaiUsListsAGenericColourAndNoModelNameOnlyHints() {
+        val p = paint("""{"nickName":"Daisy","color":"BLUE","interiorColor":"BLACK","sapColorCode":"U4G","hmaModel":"IONIQ 5","series":"SEL","modelCode":"NE","trim":"SEL","modelYear":"2023"}""")
+        assertEquals("BLUE", p.colour)
+        assertEquals("SEL", p.trim)
+        assertEquals("IONIQ 5", p.model)
+    }
+
+    @Test fun aModelNameBeatsTheOtherHints() {
+        assertEquals("IONIQ 6", paint("""{"modelName":"IONIQ 6","hmaModel":"X","series":"Y"}""").model)
+    }
+
+    @Test fun aBareYearGetsTheHintAsItsModelAndAFullNameIsLeftAlone() {
+        assertEquals("2023 IONIQ 5", modelWithName("2023", "IONIQ 5"))
+        assertEquals("2023 IONIQ 5", modelWithName("2023 IONIQ 5", "SEL"))
+        assertEquals("2023", modelWithName("2023", null))
+    }
+
     @Test fun blankOrNonTextFieldsAreIgnored() {
         val p = paint("""{"exteriorColor":"  ","color":12,"trim":null}""")
         assertNull(p.colour)

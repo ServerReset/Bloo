@@ -35,6 +35,17 @@ class CarPictureMatchTest {
         assertEquals("Digital Teal", matchCarPicture("2024 IONIQ 5", "", "Digital Teal Metallic", set)?.colour)
     }
 
+    @Test fun aBareColourFamilyPicksTheOnlyPaintOfThatFamilyOnTheModel() {
+        val set = pictures + pic("IONIQ 5", "Lucid Blue") + pic("IONIQ 5 (original)", "Lucid Blue") + pic("IONIQ 5 N", "Performance Blue Matte")
+        assertEquals("Lucid Blue", matchCarPicture("2023 IONIQ 5", "Daisy", "BLUE", set)?.colour)
+        assertEquals("IONIQ 5", matchCarPicture("2023 IONIQ 5", "Daisy", "BLUE", set)?.group)
+    }
+
+    @Test fun aBareColourFamilyWithTwoPaintsOnTheModelChoosesNothing() {
+        val set = pictures + pic("IONIQ 6", "Biophilic Blue") + pic("IONIQ 6", "Transmission Blue")
+        assertNull(matchCarPicture("2023 IONIQ 6", "Daisy", "BLUE", set))
+    }
+
     @Test fun twoPaintsThatFitEquallyChooseNothing() {
         val set = pictures + pic("IONIQ 5", "Gravity Gold Matte") + pic("IONIQ 5", "Gravity Silver Metal")
         assertNull(matchCarPicture("2024 IONIQ 5", "", "Gravity Gold Silver", set))

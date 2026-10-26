@@ -107,8 +107,9 @@ internal fun matchCarPicture(model: String, name: String, colour: String?, pictu
         }
     val best = scored.maxOfOrNull { it.second } ?: return null
     val top = scored.filter { it.second == best }
-    // A loose match must be the only one: two different paints that fit equally means the account has not said which.
-    if (best < 3 && top.map { it.first.colour }.distinct().size > 1) return null
+    // A loose match must be the only one: two different paints that fit equally (a bare "BLUE" on a model with two blues) means
+    // the account has not said which.
+    if (best < 4 && top.map { it.first.colour }.distinct().size > 1) return null
     return top.maxWithOrNull(compareBy<Triple<CarPicture, Int, Int>> { it.third }.thenBy { if (wantsMatte == it.first.colour.endsWith("Matte")) 1 else 0 })?.first
 }
 

@@ -114,7 +114,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         val parsed = json.decodeFromString(EnrollmentResponse.serializer(), body)
         val paints = paintByVin(body)
         val vehicles = parsed.enrolledVehicleDetails.map { it.vehicleDetails.toVehicle(brand) }
-            .map { v -> paints[v.vin]?.let { v.copy(colour = it.colour, trim = it.trim) } ?: v }
+            .map { v -> paints[v.vin]?.let { v.copy(model = modelWithName(v.model, it.model), colour = it.colour, trim = it.trim) } ?: v }
         logVehicleFieldNames(body)
         val decodeMs = System.currentTimeMillis() - decodeStartedAt
         if (decodeMs > 200) {
@@ -415,7 +415,7 @@ private fun logVehicleFieldNames(body: String) {
     }.getOrNull() ?: return
     if (names.isNotEmpty()) AppLog.log("Account vehicle fields (names only): ${names.joinToString()}")
     // The colour and trim themselves are not private (no VIN with them), and say whether pictures can be matched on their own.
-    paintByVin(body).values.forEach { AppLog.log("Account vehicle paint: colour=${it.colour ?: "none"}, trim=${it.trim ?: "none"}") }
+    paintByVin(body).values.forEach { AppLog.log("Account vehicle paint: colour=${it.colour ?: "none"}, trim=${it.trim ?: "none"}, model=${it.model ?: "none"}") }
 }
 
 /** Each enrolled car's paint colour and trim by VIN, read straight off the raw enrolment body (the typed model does not carry them). */
