@@ -30,6 +30,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -88,10 +93,24 @@ fun MorphButtonCore(
     // (growing to full width, or zero height in unbounded parents).
     // One node for a screen reader: the label (the content) and the click (the chrome beneath it) are siblings, so left apart
     // it would meet an unlabelled clickable and, separately, a bit of text that does nothing.
+    // Named apart from the semantics receiver's own onClick/onLongClick, which share these names.
+    val activate = onClick
+    val hold = onLongClick
     // A mouse shows the pointing hand over an enabled button.
     Box(
         modifier = modifier
-            .semantics(mergeDescendants = true) {}
+            // The click lives on THIS node (the clickable chrome below is silenced), so the label, the Button role, the
+            // disabled state and the action are one item. A clickable child is its own merge boundary and would otherwise
+            // stay a separate, unlabelled one.
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                if (!enabled) {
+                    disabled()
+                } else {
+                    this.onClick { activate(); true }
+                    hold?.let { held -> this.onLongClick { held(); true } }
+                }
+            }
             .then(if (enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
@@ -187,6 +206,8 @@ private fun BoxScope.MorphChrome(
                 role = Role.Button,
                 onLongClick = onLongClick,
                 onClick = onClick,
-            ),
+            )
+            // Pointer and keyboard still reach this node; what a screen reader hears is the parent's.
+            .clearAndSetSemantics {},
     )
 }
