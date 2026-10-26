@@ -1,5 +1,6 @@
 package com.bloo.bluelink.widget
 
+import com.bloo.uicommon.segmentsOf
 import com.bloo.bluelink.ui.rememberPhotoModel
 import android.app.Activity
 import android.appwidget.AppWidgetManager
@@ -237,7 +238,7 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
                 var stripWidth by remember { mutableStateOf(330) }
                 SettingsSegmentedRow(
                     label = "Preview width",
-                    options = listOf(SegmentOption("250", "Narrow"), SegmentOption("330", "Medium"), SegmentOption("410", "Wide")),
+                    options = segmentsOf("250" to "Narrow", "330" to "Medium", "410" to "Wide"),
                     selectedKey = stripWidth.toString(),
                 ) { stripWidth = it.toInt() }
                 StripPreview(car, photoUrl, choice, stripControlCount(stripWidth.toFloat()))
