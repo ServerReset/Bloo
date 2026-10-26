@@ -158,10 +158,7 @@ fun SafeExpansiveButton(
     // Inside an [ExpressiveButtonRow]/[ExpressiveButtonGroup] this button joins the group, which
     // takes the extra width off its NEIGHBOURS so the row's own footprint never changes.
     if (LocalExpressiveGroup.current) {
-        Box(
-            modifier.then(ExpressiveGroupData(press, groupWeight)),
-            propagateMinConstraints = true,
-        ) {
+        Box(modifier.then(ExpressiveGroupData(press, groupWeight)), propagateMinConstraints = true) {
             // Providing FALSE inside makes joining a group idempotent. LocalExpressiveGrowth TRUE,
             // though (unlike the group flag) -- a member's own width is still being smoothly
             // driven, by the group's seam-reserve layout instead of this file's standalone one, so

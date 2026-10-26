@@ -103,11 +103,7 @@ internal fun ShareIntakeHost(vm: AppViewModel, stateHolder: State<UiState>) {
     }
 
     val crop = if (uri != null && chosen != null) chosen to uri else null
-    AnimatedVisibility(
-        visible = crop != null,
-        enter = fadeIn(tween(MotionMedium)),
-        exit = fadeOut(tween(MotionShort)),
-    ) {
+    AnimatedVisibility(visible = crop != null, enter = fadeIn(tween(MotionMedium)), exit = fadeOut(tween(MotionShort))) {
         if (crop != null) {
             CropScreen(
                 vin = crop.first,

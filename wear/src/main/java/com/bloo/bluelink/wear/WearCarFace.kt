@@ -55,10 +55,7 @@ fun WearCarFace(
 ) {
     // The aurora, at watch scale: a soft wash of the level's colour behind the tiles, as the phone's
     // background washes behind its cards. Drawn once, no animation.
-    BoxWithConstraints(
-        modifier.wearAuroraWash(tint),
-        contentAlignment = Alignment.Center,
-    ) {
+    BoxWithConstraints(modifier.wearAuroraWash(tint), contentAlignment = Alignment.Center) {
         val unit = minOf(maxWidth, maxHeight) / ReferenceFace
         val press = rememberQuadrantPress()
         CompositionLocalProvider(LocalFaceUnit provides unit) {

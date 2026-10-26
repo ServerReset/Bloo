@@ -169,11 +169,7 @@ internal fun PinDialogs(
                         // this group's policy it is not read at all, so it would have silently done
                         // nothing while the two halves went back to hugging their labels. See
                         // ExpressiveButtons.kt.
-                        ExpressiveButtonRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            spacing = GapRow,
-                            equalWidths = true,
-                        ) {
+                        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow, equalWidths = true) {
                             MorphTextButton("Keep PIN", onDismiss, emphasis = ButtonEmphasis.Confirm)
                             // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- same
                             // missing-style issue as "Continue" above.

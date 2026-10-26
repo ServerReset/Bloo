@@ -116,11 +116,7 @@ private fun PinGate(store: WatchPinStore, title: String, onUnlocked: () -> Unit)
 /** The phone is signing this watch in: the code to match, and the way out (the ✕ beside it) if the phone's end is gone. */
 @Composable
 private fun SignInCode(code: String) {
-    WearMessageScreen(
-        icon = AppIcons.Watch,
-        title = "Sign in from your phone",
-        detail = "Check this code matches the phone.",
-    ) {
+    WearMessageScreen(icon = AppIcons.Watch, title = "Sign in from your phone", detail = "Check this code matches the phone.") {
         RevealText(
             code,
             style = MaterialTheme.typography.displaySmall,

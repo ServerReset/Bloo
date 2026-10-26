@@ -270,10 +270,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                     // Centred and width-capped: on a wide screen (a tablet, a phone in landscape, a
                     // foldable's inner display) a full-bleed card stretched the whole way across and
                     // read as a wall of text. The garage caps its columns the same way.
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.TopCenter,
-                    ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                     Column(
                         Modifier.fillMaxSize().widthIn(max = OnboardingCardMaxWidth).verticalScroll(rememberScrollState())
                             .pageTurn(

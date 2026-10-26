@@ -113,10 +113,7 @@ internal fun GlassAlertDialog(
         return
     }
     // No layer to draw into (a preview, a secondary window): an ordinary platform dialog.
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
+    Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         GlassSurface(
             shape = ExtraLargeShape,
             modifier = Modifier.padding(horizontal = GapBlock).widthIn(max = 560.dp).fillMaxWidth(),

@@ -71,10 +71,7 @@ internal fun Modifier.innerGlassPanel(padding: Dp = GapSection): Modifier =
  */
 @Composable
 internal fun SettingsGroup(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().innerGlassPanel(GapSection),
-        verticalArrangement = Arrangement.spacedBy(GapRow),
-    ) {
+    Column(Modifier.fillMaxWidth().innerGlassPanel(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
         if (!title.isNullOrBlank()) {
             GroupHeading(title)
         }

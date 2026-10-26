@@ -186,10 +186,7 @@ private data class CreditEntry(
 @Composable
 private fun CreditRow(entry: CreditEntry) {
     val context = LocalContext.current
-    Row(
-        Modifier.fillMaxWidth().outlinedPanel(),
-        horizontalArrangement = Arrangement.spacedBy(GapSection),
-    ) {
+    Row(Modifier.fillMaxWidth().outlinedPanel(), horizontalArrangement = Arrangement.spacedBy(GapSection)) {
         IconBadge(
             entry.icon,
             tint = MaterialTheme.colorScheme.onSecondaryContainer,

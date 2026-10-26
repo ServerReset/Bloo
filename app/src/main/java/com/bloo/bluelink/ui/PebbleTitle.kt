@@ -113,11 +113,7 @@ internal fun PebbleTitleRow(
         // Only the hero flips atRestScale. The Crossfade hides the pop when the scaled and native
         // paths swap; CenterStart keeps their glyphs aligned despite differing box heights.
         Box(modifier = titleBaseModifier, contentAlignment = Alignment.CenterStart) {
-        Crossfade(
-            targetState = atRestScale,
-            animationSpec = tween(MotionFast),
-            label = "heroTitleRestSwap",
-        ) { atRest ->
+        Crossfade(targetState = atRestScale, animationSpec = tween(MotionFast), label = "heroTitleRestSwap") { atRest ->
             RevealText(
                 title,
                 modifier = if (atRest) {

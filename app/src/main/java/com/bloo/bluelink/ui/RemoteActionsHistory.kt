@@ -48,10 +48,7 @@ private fun statusColor(status: String) = when (status.lowercase()) {
  */
 @Composable
 private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = GapHairline),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = GapHairline), verticalAlignment = Alignment.CenterVertically) {
         Dot(statusColor(action.status), 6.dp)
         Spacer(Modifier.width(GapRow))
         RevealText(
@@ -107,9 +104,7 @@ private fun shortTime(iso: String, use24Hour: Boolean): String = runCatching {
 internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
     // The panel owns its insets: the pebble's content inset on the sides and real bottom clearance
     // for the corner radius.
-    Column(
-        Modifier.fillMaxWidth().padding(start = PebbleContentInset, end = PebbleContentInset, bottom = GapSection),
-    ) {
+    Column(Modifier.fillMaxWidth().padding(start = PebbleContentInset, end = PebbleContentInset, bottom = GapSection)) {
         // A hairline separating the controls from the history.
         SectionDivider(alpha = 0.35f, modifier = Modifier.padding(bottom = GapRow))
         if (actions.isEmpty()) {

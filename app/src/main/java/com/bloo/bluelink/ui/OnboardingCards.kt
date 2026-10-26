@@ -170,14 +170,8 @@ internal fun OnboardingBottomBar(
         hazeState = hazeState,
         modifier = Modifier.fillMaxWidth().padding(horizontal = GapPage, vertical = GapGroup),
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(GapGroup),
-            verticalArrangement = Arrangement.spacedBy(GapGroup),
-        ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
+        Column(Modifier.fillMaxWidth().padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 repeat(total.coerceAtLeast(1)) { i ->
                     Box(
                         Modifier.weight(1f).height(5.dp).clip(CircleShape)

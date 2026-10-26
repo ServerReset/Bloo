@@ -54,11 +54,7 @@ internal fun AiAnswer(
     val thinking = "search" in state.aiBusy
     val reply = state.aiSearchReply
     ExpandVisibility(thinking || reply != null, from = Alignment.Bottom) {
-        GlassSurface(
-            shape = StandardShape,
-            modifier = Modifier.fillMaxWidth(),
-            hazeState = hazeState,
-        ) {
+        GlassSurface(shape = StandardShape, modifier = Modifier.fillMaxWidth(), hazeState = hazeState) {
             ResultCardColumn(AppIcons.AutoAwesome, "AI answer") {
                 if (reply != null) {
                     RevealText(reply, style = SecondaryTextStyle())

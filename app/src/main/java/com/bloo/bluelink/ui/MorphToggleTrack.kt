@@ -45,10 +45,7 @@ internal fun SeatConfigRow(
     onHeat: (Boolean) -> Unit,
     onCool: (Boolean) -> Unit,
 ) {
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         RevealText(label, Modifier.weight(1f), style = SecondaryTextStyle(), maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.width(GapRow))
         ExpressiveButtonRow(spacing = GapRow) {

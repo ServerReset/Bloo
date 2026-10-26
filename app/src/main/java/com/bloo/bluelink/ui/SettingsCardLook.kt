@@ -41,12 +41,7 @@ import com.bloo.uicommon.MorphTextButton
  */
 @Composable
 internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
-    SettingsCard(
-        "Visuals",
-        Icons.Filled.Palette,
-        vm,
-        status = displayStatus(appearance),
-    ) {
+    SettingsCard("Visuals", Icons.Filled.Palette, vm, status = displayStatus(appearance)) {
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             ThemeGroups(appearance, advanced, vm)
             // SIMPLE, not advanced: Atkinson Hyperlegible is a typeface for low vision, and an

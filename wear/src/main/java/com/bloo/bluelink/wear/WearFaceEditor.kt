@@ -45,10 +45,7 @@ internal fun WearFaceEditor(
     val haptics = LocalHapticFeedback.current
     WearBackable(onDone) {
         ScreenScaffold(timeText = { TimeText() }) {
-            BoxWithConstraints(
-                Modifier.fillMaxSize().wearAuroraWash(scheme.primary),
-                contentAlignment = Alignment.Center,
-            ) {
+            BoxWithConstraints(Modifier.fillMaxSize().wearAuroraWash(scheme.primary), contentAlignment = Alignment.Center) {
                 // The face, at two thirds of the display; its fixed sizes scale with it as they do on the main screen.
                 val face = minOf(maxWidth, maxHeight) * 0.6f
                 val press = rememberQuadrantPress()

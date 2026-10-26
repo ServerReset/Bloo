@@ -23,15 +23,8 @@ import com.bloo.uicommon.GapSection
  */
 @Composable
 internal fun FrostMessage(message: String, modifier: Modifier = Modifier) {
-    GlassSurface(
-        shape = CircleShape,
-        modifier = modifier,
-        hazeState = LocalBackdropHaze.current,
-    ) {
-        Row(
-            Modifier.padding(horizontal = GapSection, vertical = GapRow),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    GlassSurface(shape = CircleShape, modifier = modifier, hazeState = LocalBackdropHaze.current) {
+        Row(Modifier.padding(horizontal = GapSection, vertical = GapRow), verticalAlignment = Alignment.CenterVertically) {
             ButtonIcon(AppIcons.Lock, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(GapRow))
             RevealText(message, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold)

@@ -110,9 +110,7 @@ internal fun SearchPill(
     val latestDrag = androidx.compose.runtime.rememberUpdatedState(onDrag)
     val latestDragStart = androidx.compose.runtime.rememberUpdatedState(onDragStart)
     val latestDragEnd = androidx.compose.runtime.rememberUpdatedState(onDragEnd)
-    Box(
-        modifier.size(width, height),
-    ) {
+    Box(modifier.size(width, height)) {
         // canBlur/pillShape are hoisted so the fill and the blur layer agree.
         val pillShape = CircleShape
         val canBlur = hazeState != null && canBlurBackdrops()

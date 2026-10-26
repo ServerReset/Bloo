@@ -339,9 +339,7 @@ private fun CarCard(car: VehicleSnapshot, photoUrl: String?, selected: Boolean, 
             .background(if (selected) scheme.secondaryContainer else scheme.surfaceContainerHighest)
             .clickable(onClick = onSelect),
     ) {
-        Box(
-            Modifier.fillMaxWidth().height(84.dp).background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary))),
-        ) {
+        Box(Modifier.fillMaxWidth().height(84.dp).background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary)))) {
             if (photoUrl != null) {
                 AsyncImage(
                     model = rememberPhotoModel(photoUrl),
@@ -376,9 +374,7 @@ private fun stripControlIcon(c: StripControl) = when (c) {
 private fun StripPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Choice, count: Int) {
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(choice.stripShape.squareDp?.dp ?: 50.dp)
-    Box(
-        Modifier.fillMaxWidth().height(64.dp).clip(shape).background(scheme.surfaceContainerHigh),
-    ) {
+    Box(Modifier.fillMaxWidth().height(64.dp).clip(shape).background(scheme.surfaceContainerHigh)) {
         if (choice.photo && photoUrl != null) {
             AsyncImage(
                 model = rememberPhotoModel(photoUrl),

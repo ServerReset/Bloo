@@ -96,11 +96,7 @@ internal fun MapFeatureRow(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.padding(horizontal = GapGroup, vertical = GapRow)) {
-        ExpressiveButtonRow(
-            modifier = Modifier.fillMaxWidth(),
-            spacing = GapRow,
-            lineSpacing = GapRow,
-        ) {
+        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow, lineSpacing = GapRow) {
             features.forEach { feature ->
                 MorphActionButton(
                     label = feature.label,

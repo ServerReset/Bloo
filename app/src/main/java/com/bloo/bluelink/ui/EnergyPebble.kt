@@ -156,10 +156,7 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         range != null -> "${formatDistance(range, metric)}"
         else -> "--"
     }
-    Pebble(
-        v, "fuel", "Fuel", Icons.Filled.LocalGasStation, state, vm, modifier,
-        summary = summary,
-    ) {
+    Pebble(v, "fuel", "Fuel", Icons.Filled.LocalGasStation, state, vm, modifier, summary = summary) {
         // The two StatusRows carry the detail; no hero repeating the summary.
         PebbleStatusGate(status, state.refreshing) { status ->
             fuelPct?.let { StatusRow("Fuel level", "$it%") }

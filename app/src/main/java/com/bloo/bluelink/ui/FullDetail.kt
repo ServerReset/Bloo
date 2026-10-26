@@ -246,10 +246,7 @@ internal fun CarHeaderRow(
 ) {
     val meta by remember(v) { derivedStateOf { "${v.model} · ${state.value.powertrainLabel(v)}" } }
     val fetchedAt by remember(v) { derivedStateOf { state.value.fetchedAt(v) } }
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(GapRow),

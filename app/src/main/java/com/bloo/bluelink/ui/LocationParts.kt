@@ -134,10 +134,7 @@ private fun WeatherLocationHeading(title: String, subtitle: String?, weather: We
  */
 @Composable
 private fun CurrentConditions(weather: Weather, fahrenheit: Boolean, tint: Color) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(GapSection),
-    ) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapSection)) {
         Icon(
             weatherIcon(weather.condition, weather.isDay),
             contentDescription = weather.condition.label,

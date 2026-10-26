@@ -164,10 +164,7 @@ fun DebugSettingsPanel(
 
             item {
                 Spacer(Modifier.height(GapRow))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(GapRow),
-                    verticalAlignment = Alignment.Top,
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(GapRow), verticalAlignment = Alignment.Top) {
                     Icon(
                         imageVector = Icons.Filled.Security,
                         contentDescription = null,

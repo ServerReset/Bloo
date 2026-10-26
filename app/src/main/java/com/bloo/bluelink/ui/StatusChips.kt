@@ -62,10 +62,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
         liquid = false,
         cheap = true,
     ) {
-        Row(
-            Modifier.padding(horizontal = GapRow, vertical = GapHairline),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Row(Modifier.padding(horizontal = GapRow, vertical = GapHairline), verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(12.dp))
                 Spacer(Modifier.width(GapHairline))

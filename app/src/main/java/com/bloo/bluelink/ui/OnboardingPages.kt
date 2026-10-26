@@ -275,10 +275,7 @@ internal fun OnboardingAlertsPage(notif: SettingsStore.NotificationPrefs, vm: Ap
     // innerGlassPanel(GapSection), not outlinedPanel(12.dp): this is the app's ONE inner-glass panel
     // for a group of things inside a card, and SettingsPrimitives names onboarding items among its
     // users. The literal 12.dp is why this panel's inset did not match the setup cards beside it.
-    Column(
-        Modifier.fillMaxWidth().innerGlassPanel(GapSection),
-        verticalArrangement = Arrangement.spacedBy(GapRow),
-    ) {
+    Column(Modifier.fillMaxWidth().innerGlassPanel(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
         ToggleRow("Live charging updates", notif.charging, description = "Progress and a Stop button while a car charges.") { vm.setNotifyCharging(it) }
         ToggleRow("Charge complete", notif.chargeComplete) { vm.setNotifyChargeComplete(it) }
         ToggleRow("Left unlocked", notif.unlocked) { vm.setNotifyUnlocked(it) }

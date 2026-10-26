@@ -316,10 +316,7 @@ fun MorphSegmented(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     opt.icon?.let { icon ->
                         Image(
                             painter = rememberVectorPainter(icon),

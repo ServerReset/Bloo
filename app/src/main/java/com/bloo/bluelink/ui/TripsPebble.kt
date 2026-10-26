@@ -88,10 +88,7 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
     }
     // Each trip is its own zone: an outlined panel with a header line (when + how far) and a neat
     // grid of stats underneath.
-    Column(
-        Modifier.fillMaxWidth().outlinedPanel(GapGroup),
-        verticalArrangement = Arrangement.spacedBy(GapRow),
-    ) {
+    Column(Modifier.fillMaxWidth().outlinedPanel(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

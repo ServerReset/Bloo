@@ -273,9 +273,7 @@ internal fun HeroNumbers(
             // The status line ("Parked", "Charging - 25 min - DC") travels under the range,
             // right-aligned.
             val statusSlot = with(LocalDensity.current) { type.labelLarge.lineHeight.toDp() }
-            Box(
-                Modifier.height(lerp(0.dp, statusSlot, t)).clipToBounds(),
-            ) {
+            Box(Modifier.height(lerp(0.dp, statusSlot, t)).clipToBounds()) {
                 if (t > 0.01f) {
                     val statusColor by androidx.compose.animation.animateColorAsState(
                         data.statusColor.takeOrElse { LocalContentColor.current }.legible(),

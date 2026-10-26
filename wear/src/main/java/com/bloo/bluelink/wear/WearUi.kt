@@ -147,10 +147,7 @@ fun WearPebble(
     body: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    Column(
-        modifier.fillMaxWidth().padding(horizontal = ListInset),
-        verticalArrangement = Arrangement.spacedBy(RowGap),
-    ) {
+    Column(modifier.fillMaxWidth().padding(horizontal = ListInset), verticalArrangement = Arrangement.spacedBy(RowGap)) {
         // The same heading as the phone's sections (:uicommon), centred for the round face and in the watch's own tint and size.
         SectionHeading(
             title, icon,
@@ -253,9 +250,7 @@ fun WearActionRow(
             label = { labelModifier ->
                 Row(labelModifier, verticalAlignment = Alignment.CenterVertically) {
                     if (glyph != null) {
-                        CompositionLocalProvider(
-                            LocalContentColor provides tint,
-                        ) {
+                        CompositionLocalProvider(LocalContentColor provides tint) {
                             MorphButtonLabel(icon = glyph, label = "", pending = pending, iconSize = 18.dp)
                         }
                         Spacer(Modifier.width(10.dp))

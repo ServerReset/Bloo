@@ -83,9 +83,7 @@ internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
     // The blur modifier is applied only while there IS one. Modifier.blur(0.dp) installs no
     // RenderEffect, but it still forces the whole app tree into its own graphicsLayer on every
     // frame -- for the entire life of the process, to serve a lock screen that is almost never up.
-    Box(
-        Modifier.fillMaxSize().then(if (lockBlur.value > 0f) Modifier.blur(lockBlur.value.dp) else Modifier),
-    ) {
+    Box(Modifier.fillMaxSize().then(if (lockBlur.value > 0f) Modifier.blur(lockBlur.value.dp) else Modifier)) {
         content()
     }
 }

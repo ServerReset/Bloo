@@ -214,11 +214,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                 Spacer(Modifier.width(GapGroup))
                 SecondaryText(label, modifier = Modifier.padding(bottom = GapRow))
             }
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandEnterSized(),
-                exit = expandExitSized(fade = false),
-            ) {
+            AnimatedVisibility(visible = expanded, enter = expandEnterSized(), exit = expandExitSized(fade = false)) {
                 Column {
                     Spacer(Modifier.height(GapGroup))
                     // Which update row this is depends on how the app was distributed, and nothing

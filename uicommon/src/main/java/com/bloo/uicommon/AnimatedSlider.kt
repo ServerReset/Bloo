@@ -287,9 +287,7 @@ fun AnimatedSlider(
         // itself -- all positioned from a single `frac` derived from anim.value, so reading
         // anim.value in this draw scope (rather than in a @Composable read further up) means
         // dragging/settling repaints without triggering a recomposition of this whole function.
-        Canvas(
-            Modifier.fillMaxWidth().height(thumbH),
-        ) {
+        Canvas(Modifier.fillMaxWidth().height(thumbH)) {
             // Thumb position as a 0..1 fraction of valueRange.
             val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
             val frac = (anim.value - valueRange.start) / span

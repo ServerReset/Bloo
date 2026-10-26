@@ -59,10 +59,7 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
 @Composable
 private fun AccountPanel(creds: Credentials, vm: AppViewModel, addAnother: Boolean) {
     val signOut = rememberConfirmArm()
-    Column(
-        Modifier.fillMaxWidth().outlinedPanel(14.dp),
-        verticalArrangement = Arrangement.spacedBy(GapRow),
-    ) {
+    Column(Modifier.fillMaxWidth().outlinedPanel(14.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
         IconLeadRow(
             Icons.Filled.Person,
             tint = MaterialTheme.colorScheme.primary,

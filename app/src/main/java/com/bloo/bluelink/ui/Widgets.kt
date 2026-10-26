@@ -126,11 +126,7 @@ internal fun SettingsModeTab(
         Modifier.fillMaxWidth().statusBarsPadding().padding(top = HeaderCornerGap, end = HeaderCornerGap),
         contentAlignment = Alignment.TopEnd,
     ) {
-        GlassSurface(
-            shape = StandardShape,
-            modifier = Modifier.width(172.dp),
-            hazeState = hazeState,
-        ) {
+        GlassSurface(shape = StandardShape, modifier = Modifier.width(172.dp), hazeState = hazeState) {
             com.bloo.uicommon.MorphSegmented(
                 options = listOf(
                     SegmentOption("simple", "Simple", null),
