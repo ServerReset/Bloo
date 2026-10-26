@@ -305,9 +305,7 @@ internal fun WearButton(
         pillCornerPercent = PillCorner,
         morphedCornerPercent = MorphedCorner,
         expressive = false,
-        onClickHaptic = {
-            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-        },
+        onClickHaptic = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
         content = content,
     )
 }

@@ -24,9 +24,7 @@ object ApiHttp {
         .addInterceptor(
             // BASIC logs the request/response LINE only (no bodies), so a password, PIN or token in
             // an auth body is never written to the log.
-            HttpLoggingInterceptor { line -> AppLog.log(line) }.apply {
-                level = HttpLoggingInterceptor.Level.BASIC
-            },
+            HttpLoggingInterceptor { line -> AppLog.log(line) }.apply { level = HttpLoggingInterceptor.Level.BASIC },
         )
         .build()
 

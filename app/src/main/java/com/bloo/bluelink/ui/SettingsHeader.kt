@@ -108,9 +108,7 @@ internal fun rememberAdvancedVisibility(advanced: Boolean, count: Int): List<Boo
 @Composable
 internal fun rememberGridItemVisibility(visible: Boolean): MutableTransitionState<Boolean> {
     val transition = remember { MutableTransitionState(visible) }
-    LaunchedEffect(visible) {
-        transition.targetState = visible
-    }
+    LaunchedEffect(visible) { transition.targetState = visible }
     return transition
 }
 

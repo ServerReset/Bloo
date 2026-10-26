@@ -42,9 +42,7 @@ internal fun PinDialogs(mode: String?, onDismiss: () -> Unit, vm: AppViewModel, 
     // current-PIN gate -> (new PIN entry | remove confirm) A fresh setup (no PIN installed yet) has
     // no "current PIN" to prove -- jump straight to choosing the new one. Change and Remove always
     // gate on knowing the existing PIN first.
-    var stage by remember(mode) {
-        mutableStateOf(if (mode == "set" && !state.appPinSet) "finish" else "current")
-    }
+    var stage by remember(mode) { mutableStateOf(if (mode == "set" && !state.appPinSet) "finish" else "current") }
     var currentPin by remember { mutableStateOf("") }
     var rejected by remember { mutableStateOf(false) }
     // Baselines, so the effects below react to CHANGES only -- the initial composition must not

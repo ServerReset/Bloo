@@ -71,9 +71,7 @@ internal class QuadrantPress(
 @Composable
 internal fun rememberQuadrantPress(): QuadrantPress {
     val policy = LocalPowerPolicy.current
-    val state = androidx.compose.runtime.remember {
-        QuadrantPress(Animatable(0f), Animatable(0f))
-    }
+    val state = androidx.compose.runtime.remember { QuadrantPress(Animatable(0f), Animatable(0f)) }
     val bouncy = androidx.compose.runtime.rememberUpdatedState(policy.bouncySprings)
     // `pressed` is read here, in a flow, and not in composition: a press then moves the cross (a layout) without recomposing
     // the face and its four tiles around it.

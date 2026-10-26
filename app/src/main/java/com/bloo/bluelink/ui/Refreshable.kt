@@ -42,9 +42,7 @@ internal fun Refreshable(
     // One stable key per Refreshable instance, so this page's own in-flight flag contributes to the
     // app-wide OR without clearing a DIFFERENT page's (neighbour car pages stay composed).
     val indicatorKey = remember { Any() }
-    LaunchedEffect(refreshing, indicator) {
-        indicator?.setRefreshing(indicatorKey, refreshing)
-    }
+    LaunchedEffect(refreshing, indicator) { indicator?.setRefreshing(indicatorKey, refreshing) }
     DisposableEffect(indicator, indicatorKey) {
         onDispose { indicator?.setRefreshing(indicatorKey, false) }
     }

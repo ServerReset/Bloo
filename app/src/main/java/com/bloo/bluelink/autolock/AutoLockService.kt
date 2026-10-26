@@ -167,9 +167,7 @@ class AutoLockService : Service() {
             return START_NOT_STICKY
         }
         scope.launch {
-            SnapshotStore(applicationContext).current().vehicles.firstOrNull { it.vin == vin }?.name?.let {
-                carNames[vin] = it
-            }
+            SnapshotStore(applicationContext).current().vehicles.firstOrNull { it.vin == vin }?.name?.let { carNames[vin] = it }
             startForegroundCompat(vin, DetectionState.CONFIRMING, 0)
         }
         // No onTriggerFired here any more: AutoLockTrigger already started the controller's

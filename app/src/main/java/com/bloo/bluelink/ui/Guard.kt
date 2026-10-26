@@ -77,9 +77,7 @@ import androidx.compose.animation.Crossfade
 internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
     // Both directions SNAP, neither animates the radius.
     val lockBlur = remember { Animatable(0f) }
-    LaunchedEffect(locked) {
-        lockBlur.snapTo(if (locked) LOCK_BLUR_DP else 0f)
-    }
+    LaunchedEffect(locked) { lockBlur.snapTo(if (locked) LOCK_BLUR_DP else 0f) }
     // The blur modifier is applied only while there IS one. Modifier.blur(0.dp) installs no
     // RenderEffect, but it still forces the whole app tree into its own graphicsLayer on every
     // frame -- for the entire life of the process, to serve a lock screen that is almost never up.

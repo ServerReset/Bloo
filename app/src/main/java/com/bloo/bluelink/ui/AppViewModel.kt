@@ -216,9 +216,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Write the current live status/location maps to disk (survives restart). */
     internal fun persistCache() {
         val s = _state.value
-        viewModelScope.launch {
-            statusCache.save(s.statuses, s.locations, s.placeNames, s.lastFetched)
-        }
+        viewModelScope.launch { statusCache.save(s.statuses, s.locations, s.placeNames, s.lastFetched) }
     }
 
     init {

@@ -108,12 +108,8 @@ internal fun KiaUsaApi.parseStatus(info: JsonObject): VehicleStatus {
             backLeft = window("backLeft", "windowRL"),
             backRight = window("backRight", "windowRR"),
         ),
-        tirePressureLamp = vs.path("tirePressure", "all").int()?.let {
-            TirePressureLamp(tirePressureLampAll = it)
-        },
-        airTemp = climate.path("airTemp", "value").str()?.let {
-            TempValue(it, climate.path("airTemp", "unit").int())
-        },
+        tirePressureLamp = vs.path("tirePressure", "all").int()?.let { TirePressureLamp(tirePressureLampAll = it) },
+        airTemp = climate.path("airTemp", "value").str()?.let { TempValue(it, climate.path("airTemp", "unit").int()) },
         battery = vs.path("batteryStatus", "stateOfCharge").int()?.let { Battery12V(batSoc = it) },
         steerWheelHeat = heat.path("steeringWheel").int(),
         sideBackWindowHeat = heat.path("rearWindow").int(),
@@ -128,9 +124,7 @@ internal fun KiaUsaApi.parseStatus(info: JsonObject): VehicleStatus {
         breakOilStatus = vs.path("breakOilStatus").flag(),
         smartKeyBatteryWarning = vs.path("smartKeyBatteryWarning").flag(),
         fuelLevel = vs.path("fuelLevel").int(),
-        dte = vs.path("distanceToEmpty", "value").dbl()?.let {
-            Dte(it, vs.path("distanceToEmpty", "unit").int())
-        },
+        dte = vs.path("distanceToEmpty", "value").dbl()?.let { Dte(it, vs.path("distanceToEmpty", "unit").int()) },
         dateTime = vs.path("syncDate", "utc").str(),
         evStatus = evStatus,
         vehicleLocation = if (lat != null && lon != null) {

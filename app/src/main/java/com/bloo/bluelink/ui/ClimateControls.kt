@@ -331,9 +331,7 @@ internal fun PresetPill(
             ),
             ClusterButton(
                 onClick = { haptics?.tick(); onEdit() },
-                content = {
-                    ButtonIcon(Icons.Filled.Edit, "Edit $name")
-                },
+                content = { ButtonIcon(Icons.Filled.Edit, "Edit $name") },
             ),
         ),
         modifier = modifier.fillMaxWidth(),

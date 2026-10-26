@@ -86,9 +86,7 @@ internal fun CriticalContent(
     val hasBattery by remember(v.vin) { derivedStateOf { stateSource.value.hasBattery(v) } }
     val hasFuel by remember(v.vin) { derivedStateOf { stateSource.value.hasFuel(v) } }
     val photoExpanded by remember(v.vin) {
-        derivedStateOf {
-            stateSource.value.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION)
-        }
+        derivedStateOf { stateSource.value.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION) }
     }
     val drivingLabel by remember(v.vin) { derivedStateOf { stateSource.value.drivingLabel(v) } }
     val metric = LocalAppearance.current.metricDistance

@@ -73,9 +73,7 @@ internal fun AiCommandProposal(
     var proposal by remember(submittedQuery) { mutableStateOf<Pair<String, String>?>(null) }
     var ran by remember(submittedQuery) { mutableStateOf<String?>(null) }
     var running by remember(submittedQuery) { mutableStateOf(false) }
-    LaunchedEffect(submittedQuery) {
-        proposal = vm.aiResolveCommand(submittedQuery)
-    }
+    LaunchedEffect(submittedQuery) { proposal = vm.aiResolveCommand(submittedQuery) }
     val p = proposal
     if (p != null) {
         val car = state.vehicles.firstOrNull { it.vin == p.second }
@@ -189,9 +187,7 @@ internal fun CommandActionResult(
     hazeState: dev.chrisbanes.haze.HazeState?,
 ) {
     val ctx = LocalContext.current
-    val targetVehicle = remember(submittedQuery, state.vehicles) {
-        resolveCommandTarget(submittedQuery, state.vehicles)
-    }
+    val targetVehicle = remember(submittedQuery, state.vehicles) { resolveCommandTarget(submittedQuery, state.vehicles) }
     var actionResult by rememberSaveable(submittedQuery) { mutableStateOf<String?>(null) }
     var actionRunning by remember(submittedQuery) { mutableStateOf(false) }
     // Saveable: the submitted query survives an activity recreation, so the 'already ran' flag must too, or

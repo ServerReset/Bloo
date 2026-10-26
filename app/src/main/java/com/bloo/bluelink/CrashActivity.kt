@@ -282,9 +282,7 @@ class CrashActivity : ComponentActivity() {
                 "Copy",
                 icon = Icons.Filled.ContentCopy,
                 onClick = {
-                    clipboardScope.launch {
-                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo crash log", report)))
-                    }
+                    clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo crash log", report))) }
                 },
             )
             SelectionContainer {
