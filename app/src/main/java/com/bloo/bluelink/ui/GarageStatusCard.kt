@@ -1,5 +1,8 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -143,17 +146,24 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                         size = 64.dp,
                         iconSize = 32.dp,
                     )
-                    RollingNumber(
-                        headline,
-                        style = MaterialTheme.typography.headlineSmall.copy(textAlign = TextAlign.Center),
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    RevealText(
-                        body,
-                        style = SecondaryTextStyle(),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
+                    // One spoken message (headline and body together), announced when it changes (loading, then failed).
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(GapSection),
+                        modifier = Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+                    ) {
+                        RollingNumber(
+                            headline,
+                            style = MaterialTheme.typography.headlineSmall.copy(textAlign = TextAlign.Center),
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        RevealText(
+                            body,
+                            style = SecondaryTextStyle(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                     // The body says "pull down to try again"; this makes the retry an actual, visible
                     // control rather than a gesture someone has to already know.
                     if (loadFailed) {

@@ -5,6 +5,8 @@ package com.bloo.bluelink.ui
  * and its supporting pieces: CarMap, weatherIcon/weatherTint and the openUrl/openApp/dial launchers.
  */
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -168,6 +170,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         .fillMaxWidth()
                         .height(if (glance) 130.dp else 220.dp)
                         .clip(StandardShape)
+                        .semantics { contentDescription = "Map showing where ${v.name} is" }
                         .then(
                             if (expandedMap == null) Modifier else Modifier
                                 .onGloballyPositioned {
