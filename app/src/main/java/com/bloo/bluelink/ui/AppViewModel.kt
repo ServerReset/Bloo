@@ -294,6 +294,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Per-VIN pending debounced climate save (see saveClimateDebounced). */
     internal val climateSaveJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
+    /** The watch-the-car-until-it-agrees job for each command key; a newer command for the same action replaces it. */
+    internal val commandConfirmJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
 
     internal var liveLocationJob: kotlinx.coroutines.Job? = null
 

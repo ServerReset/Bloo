@@ -36,6 +36,7 @@ suspend fun EuApi.vehicles(session: EuSession): List<EuVehicleSummary> = withCon
     list.mapNotNull { e ->
         val o = e.obj() ?: return@mapNotNull null
         val id = o["vehicleId"]?.str() ?: return@mapNotNull null
+        logAccountCar(o)
         val type = o["type"]?.str()?.uppercase(Locale.US)
         EuVehicleSummary(
             id = id,
@@ -44,6 +45,8 @@ suspend fun EuApi.vehicles(session: EuSession): List<EuVehicleSummary> = withCon
             vin = o["vin"]?.str() ?: id,
             isEv = type == "EV" || type == "PHEV" || type == "PE",
             ccs2 = o["ccuCCS2ProtocolSupport"]?.intLoose() ?: 0,
+            colour = paintOf(o).colour,
+            trim = paintOf(o).trim,
         )
     }
 }

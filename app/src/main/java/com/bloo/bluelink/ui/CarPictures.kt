@@ -76,6 +76,34 @@ internal object CarPictures {
     }
 }
 
+/**
+ * The bundled picture that is this car, or null when its model or its colour is not known well enough to say: the group is
+ * found as [CarPictures.groupFor] does it and the colour must match a picture's colour (whole name, or one inside the other, a
+ * plain colour preferred over its matte twin unless the car says matte). Wrong paint is worse than none, so no guess is made.
+ */
+internal fun matchCarPicture(model: String, name: String, colour: String?, pictures: List<CarPicture>): CarPicture? {
+    fun squash(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
+    val wanted = colour?.let(::squash)?.takeIf { it.isNotEmpty() } ?: return null
+    val said = squash("$model $name")
+    val wantsN = said.contains("ioniq5n")
+    val wantsMatte = wanted.contains("matte")
+    return pictures
+        .filter { said.contains(squash(it.group.substringBefore(" (").removeSuffix(" N"))) }
+        .filter { (it.group.contains(" N")) == wantsN }
+        .mapNotNull { p ->
+            val c = squash(p.colour)
+            val score = when {
+                c == wanted -> 3
+                c.removeSuffix("matte") == wanted.removeSuffix("matte") && (wantsMatte == c.endsWith("matte")) -> 3
+                c.contains(wanted) || wanted.contains(c) -> 2
+                else -> 0
+            }
+            if (score == 0) null else Triple(p, score, if ("(" in p.group) 0 else 1)
+        }
+        .maxWithOrNull(compareBy<Triple<CarPicture, Int, Int>>({ it.second }, { it.third }))
+        ?.first
+}
+
 /** A cut-out picture is drawn whole against the pebble (not cropped, not frosted): a PNG the user chose, or a bundled one. */
 internal fun isCutoutPhoto(url: String): Boolean =
     url.endsWith(".png", ignoreCase = true) || url.startsWith(CarPictures.URL_PREFIX)

@@ -154,8 +154,10 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location upda
 // Lock/unlock share the "doors" action key, so a lock command in flight blocks a rapid-fire unlock
 // (and vice versa) rather than letting them race each other through the API. Each optimistically
 // flips VehicleStatus.doorLock the instant the command is accepted.
-fun AppViewModel.lock(v: Vehicle) = runCommand(v.vin, "doors", "Locked", { it.copy(doorLock = true) }) { repoFor(v).lock(v) }
-fun AppViewModel.unlock(v: Vehicle) = runCommand(v.vin, "doors", "Unlocked", { it.copy(doorLock = false) }) { repoFor(v).unlock(v) }
+fun AppViewModel.lock(v: Vehicle) =
+    runCommand(v.vin, "doors", "Locked", { it.copy(doorLock = true) }, confirm = { it.doorLock == true }) { repoFor(v).lock(v) }
+fun AppViewModel.unlock(v: Vehicle) =
+    runCommand(v.vin, "doors", "Unlocked", { it.copy(doorLock = false) }, confirm = { it.doorLock == false }) { repoFor(v).unlock(v) }
 
 // Both share the "hornLights" action key (only one can run at a time) and have no boolean toggle to
 // optimistically flip -- these are momentary actions (the car doesn't have a persistent "lights are
@@ -169,7 +171,7 @@ fun AppViewModel.hornAndLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Ho
  * [ClimateExtendWorker] chain so a scheduled follow-up cannot turn climate back on.
  */
 fun AppViewModel.stopClimate(v: Vehicle) =
-    runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) {
+    runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }, confirm = { it.airCtrlOn == false }) {
         com.bloo.bluelink.work.ClimateExtendWorker.cancel(getApplication(), v.vin)
         repoFor(v).stopClimate(v)
     }
@@ -188,6 +190,7 @@ fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
             fahrenheit = appearance.value.useFahrenheit,
         )})",
         { it.copy(airCtrlOn = true) },
+        confirm = { it.airCtrlOn == true },
     ) {
         val chunks = com.bloo.bluelink.data.climateChunks(req.durationMinutes)
         // Unchanged behavior for every request already within the single- command cap: chunks is
@@ -221,13 +224,19 @@ fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
 
 /** Begin charging; optimistically sets [VehicleStatus.evStatus]'s batteryCharge to true. */
 fun AppViewModel.startCharge(v: Vehicle) =
-    runCommand(v.vin, "charge", "Charging", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = true)) }) {
+    runCommand(
+        v.vin, "charge", "Charging", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = true)) },
+        confirm = { it.evStatus?.batteryCharge == true },
+    ) {
         repoFor(v).startCharge(electric(v, _state.value))
     }
 
 /** Stop charging; optimistic mirror of [startCharge]. Shares the "charge" key. */
 fun AppViewModel.stopCharge(v: Vehicle) =
-    runCommand(v.vin, "charge", "Charging stopped", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = false)) }) {
+    runCommand(
+        v.vin, "charge", "Charging stopped", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = false)) },
+        confirm = { it.evStatus?.batteryCharge == false },
+    ) {
         repoFor(v).stopCharge(electric(v, _state.value))
     }
 
@@ -290,6 +299,9 @@ internal fun AppViewModel.runCommand(
     action: String,
     success: String,
     optimistic: ((VehicleStatus) -> VehicleStatus)?,
+    // What the car's own status says once it has really done it. Given, the app watches for that after the server accepts the
+    // command and says so (see [confirmWithCar]); without it the command is only ever "sent".
+    confirm: ((VehicleStatus) -> Boolean)? = null,
     block: suspend () -> Unit,
 ) {
     val key = "$vin:$action"
@@ -325,6 +337,7 @@ internal fun AppViewModel.runCommand(
                 st.copy(statuses = statuses)
             }
             persistSnapshots()
+            if (confirm != null) confirmWithCar(vin, key, success, confirm)
             // Auto-AI: a command changed the car's state, refresh the summary.
             _state.value.vehicles.firstOrNull { it.vin == vin }?.let { autoSummarize(it) }
         } catch (e: Exception) {
@@ -379,5 +392,42 @@ internal fun AppViewModel.recordRemoteAction(vin: String, action: String, status
             }
             .take(REMOTE_ACTION_HISTORY_MAX)
         st.copy(remoteActionHistory = st.remoteActionHistory + (vin to kept))
+    }
+}
+
+/** How often, and for how long, the app asks the car's cloud status whether a command has really happened. */
+private const val CONFIRM_INTERVAL_MS = 5_000L
+private const val CONFIRM_ATTEMPTS = 9
+
+/**
+ * After a command is accepted, the car still has to do it (a lock takes a few seconds to tens of seconds to reach it). This
+ * reads the car's own status every few seconds, without waking the car, until [confirm] holds, then says so in a toast
+ * ("Locked, confirmed by the car"); if the car has not agreed within about 45 s it says the command was sent but not yet
+ * confirmed, and brings the screen to the car's real state instead of the optimistic one. A newer command for the same action
+ * replaces the watch, so a quick lock then unlock never reports the first.
+ */
+private fun AppViewModel.confirmWithCar(vin: String, key: String, success: String, confirm: (VehicleStatus) -> Boolean) {
+    commandConfirmJobs[key]?.cancel()
+    commandConfirmJobs[key] = viewModelScope.launch {
+        val v = _state.value.vehicles.firstOrNull { it.vin == vin } ?: return@launch
+        repeat(CONFIRM_ATTEMPTS) {
+            kotlinx.coroutines.delay(CONFIRM_INTERVAL_MS)
+            val seen = try {
+                statusMutex.withLock { repoFor(v).status(v, refresh = false) }
+            } catch (e: Exception) {
+                rethrowIfCancellation(e)
+                null
+            }
+            if (seen != null && confirm(seen)) {
+                // Take the car's reading in (location, alerts and all), then say it is done.
+                loadStatus(v, refresh = false, errorMessage = "Refresh failed", surfaceErrors = false)
+                AppLog.log("$success: confirmed by the car")
+                _state.update { it.copy(message = "$success, confirmed by the car", messageType = ToastKind.SUCCESS) }
+                return@launch
+            }
+        }
+        AppLog.log("$success: sent, the car has not confirmed yet")
+        loadStatus(v, refresh = false, errorMessage = "Refresh failed", surfaceErrors = false)
+        _state.update { it.copy(message = "$success was sent. The car hasn't confirmed yet", messageType = ToastKind.INFO) }
     }
 }

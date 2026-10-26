@@ -112,7 +112,9 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         // one number, so it can't say which SIDE of that gap the rest is on.
         val decodeStartedAt = System.currentTimeMillis()
         val parsed = json.decodeFromString(EnrollmentResponse.serializer(), body)
+        val paints = paintByVin(body)
         val vehicles = parsed.enrolledVehicleDetails.map { it.vehicleDetails.toVehicle(brand) }
+            .map { v -> paints[v.vin]?.let { v.copy(colour = it.colour, trim = it.trim) } ?: v }
         logVehicleFieldNames(body)
         val decodeMs = System.currentTimeMillis() - decodeStartedAt
         if (decodeMs > 200) {
@@ -412,4 +414,14 @@ private fun logVehicleFieldNames(body: String) {
             .toSortedSet()
     }.getOrNull() ?: return
     if (names.isNotEmpty()) AppLog.log("Account vehicle fields (names only): ${names.joinToString()}")
+    // The colour and trim themselves are not private (no VIN with them), and say whether pictures can be matched on their own.
+    paintByVin(body).values.forEach { AppLog.log("Account vehicle paint: colour=${it.colour ?: "none"}, trim=${it.trim ?: "none"}") }
 }
+
+/** Each enrolled car's paint colour and trim by VIN, read straight off the raw enrolment body (the typed model does not carry them). */
+private fun paintByVin(body: String): Map<String, VehiclePaint> = runCatching {
+    val cars = BlooJson.parseToJsonElement(body).jsonObject["enrolledVehicleDetails"]?.jsonArray ?: return emptyMap()
+    cars.mapNotNull { (it as? kotlinx.serialization.json.JsonObject)?.get("vehicleDetails") as? kotlinx.serialization.json.JsonObject }
+        .mapNotNull { o -> o["vin"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }?.let { it to paintOf(o) } }
+        .toMap()
+}.getOrDefault(emptyMap())

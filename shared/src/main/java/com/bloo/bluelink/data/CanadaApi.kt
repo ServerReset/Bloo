@@ -41,6 +41,8 @@ data class CanadaVehicleSummary(
     override val vin: String,
     val year: Int?,
     override val isEv: Boolean,
+    override val colour: String? = null,
+    override val trim: String? = null,
 ) : AccountVehicle
 
 /**
@@ -209,6 +211,7 @@ class CanadaApi(private val brand: Brand) {
         list.mapNotNull { e ->
             val o = e.obj() ?: return@mapNotNull null
             val id = o["vehicleId"]?.str() ?: return@mapNotNull null
+            logAccountCar(o)
             CanadaVehicleSummary(
                 id = id,
                 name = vehicleDisplayName(o["nickName"]?.str(), o["modelName"]?.str(), id),
@@ -221,6 +224,8 @@ class CanadaApi(private val brand: Brand) {
                 isEv = o["fuelKindCode"].let { fk ->
                     fk?.int() == 4 || fk?.str()?.trim()?.uppercase() in setOf("E", "EV")
                 },
+                colour = paintOf(o).colour,
+                trim = paintOf(o).trim,
             )
         }
     }

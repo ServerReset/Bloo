@@ -115,6 +115,13 @@ suspend fun SettingsStore.setImageUrl(vin: String, url: String) {
     }
 }
 
+/** Whether this car has already been given a bundled picture automatically (so clearing it is not undone). */
+fun SettingsStore.autoPictureDone(vin: String, p: Preferences): Boolean = p[booleanPreferencesKey("auto_img_$vin")] == true
+
+suspend fun SettingsStore.setAutoPictureDone(vin: String) {
+    editTracked { it[booleanPreferencesKey("auto_img_$vin")] = true }
+}
+
 /**
  * Reads the per-seat heat/cool capability flags for [vin], each stored under
  * its own short-suffixed key (e.g. "seat_dh_$vin" for driver-heat).

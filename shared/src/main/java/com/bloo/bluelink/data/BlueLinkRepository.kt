@@ -219,6 +219,8 @@ interface AccountVehicle {
     val model: String
     val vin: String
     val isEv: Boolean
+    val colour: String? get() = null
+    val trim: String? get() = null
 }
 
 /** The app's [Vehicle] for this account car, under [brand]. Canada and EU cars are all modern head units, so no generation applies. */
@@ -230,6 +232,8 @@ internal fun AccountVehicle.toVehicle(brand: Brand) = Vehicle(
     generation = "",
     brandIndicator = brand.code,
     isEv = isEv,
+    colour = colour,
+    trim = trim,
 )
 
 /**

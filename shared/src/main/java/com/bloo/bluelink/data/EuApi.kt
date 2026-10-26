@@ -51,6 +51,8 @@ data class EuVehicleSummary(
     override val vin: String,
     override val isEv: Boolean,
     val ccs2: Int,
+    override val colour: String? = null,
+    override val trim: String? = null,
 ) : AccountVehicle
 
 /**

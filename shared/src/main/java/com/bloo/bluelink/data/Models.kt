@@ -64,6 +64,9 @@ data class Vehicle(
     val brandIndicator: String,
     val isEv: Boolean,
     val odometer: String? = null,
+    /** The paint colour and trim the account lists for this car, when it lists them (see [paintOf]). */
+    val colour: String? = null,
+    val trim: String? = null,
 )
 
 // --- Vehicle status -------------------------------------------------------

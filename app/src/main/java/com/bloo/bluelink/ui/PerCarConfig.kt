@@ -6,7 +6,11 @@ import com.bloo.bluelink.data.collapsedSections
 import com.bloo.bluelink.data.defaultClimatePreset
 import com.bloo.bluelink.data.enabledShortcuts
 import com.bloo.bluelink.data.hotspots
+import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.autoPictureDone
 import com.bloo.bluelink.data.imageUrl
+import com.bloo.bluelink.data.setAutoPictureDone
+import com.bloo.bluelink.data.setImageUrl
 import com.bloo.bluelink.data.lastServiceMiles
 import com.bloo.bluelink.data.licensePlate
 import com.bloo.bluelink.data.onboardingSeen
@@ -39,7 +43,11 @@ internal suspend fun AppViewModel.perCarConfig(
     val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin, prefs)?.let { v.vin to it } }.toMap()
     val platforms = vehicles.mapNotNull { v -> settingsStore.platform(v.vin, prefs)?.let { v.vin to it } }.toMap()
     val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin, prefs) }
-    val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin, prefs)?.let { v.vin to it } }.toMap()
+    val stored = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin, prefs)?.let { v.vin to it } }.toMap()
+    // A car with no picture of its own gets the bundled one for its model and paint, once, when the account tells us both. It is
+    // then an ordinary choice (kept, changeable, clearable), and a cleared one is not given back.
+    val auto = autoPictures(vehicles.filter { it.vin !in stored }, prefs)
+    val images = stored + auto
     val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin, prefs) }.filterValues { it.isNotBlank() }
     val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
     val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
@@ -104,4 +112,21 @@ internal suspend fun AppViewModel.seedDefaultClimatePresets() {
         v.vin to (settingsStore.defaultClimatePreset(v.vin, prefs) ?: "smart")
     }
     _state.update { it.copy(defaultClimatePresets = presets) }
+}
+
+/** The bundled picture for each of [vehicles] that has not been given one before and whose model and colour match one; saved as it is chosen. */
+private suspend fun AppViewModel.autoPictures(
+    vehicles: List<Vehicle>,
+    prefs: androidx.datastore.preferences.core.Preferences,
+): Map<String, String> {
+    val todo = vehicles.filter { it.colour != null && !settingsStore.autoPictureDone(it.vin, prefs) }
+    if (todo.isEmpty()) return emptyMap()
+    val pictures = CarPictures.all(getApplication())
+    val found = todo.mapNotNull { v -> matchCarPicture(v.model, v.name, v.colour, pictures)?.let { v.vin to it.url } }.toMap()
+    found.forEach { (vin, url) ->
+        AppLog.log("Picture chosen for a car from its model and colour: ${url.substringAfterLast('/')}")
+        settingsStore.setImageUrl(vin, url)
+        settingsStore.setAutoPictureDone(vin)
+    }
+    return found
 }
