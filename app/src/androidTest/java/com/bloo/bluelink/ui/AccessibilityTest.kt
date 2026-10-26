@@ -2,8 +2,16 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.width
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -49,6 +57,20 @@ class AccessibilityTest {
         rule.onRoot().performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.K) } }
         rule.waitForIdle()
         assertEquals(Shortcut.Search, heard.value)
+    }
+
+    @Test fun largeTextKeepsAButtonInsideItsWidthAndOnScreen() {
+        rule.setContent {
+            BlooTheme {
+                val base = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale = 2f)) {
+                    Box(Modifier.width(300.dp)) { MorphTextButton("Start the climate now", onClick = {}, modifier = Modifier.fillMaxWidth()) }
+                }
+            }
+        }
+        rule.onNodeWithText("Start the climate now").assertIsDisplayed()
+        val width = rule.onNodeWithText("Start the climate now").getBoundsInRoot().width
+        assertTrue("the button stays within 300dp at double text size (was $width)", width <= 300.dp)
     }
 
     @Test fun aDisabledShortcutHandlerHearsNothing() {
