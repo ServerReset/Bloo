@@ -322,9 +322,7 @@ fun BlooApp(vm: AppViewModel) {
                         }
                         // Cold-start lock: don't compose (and blur) the full garage behind a lock
                         // the user hasn't passed; it composes once `locked` flips.
-                        if (!(locked && !unlockedThisSession)) {
-                            GarageScreen(stateHolder, vm, hazeState = searchHazeState)
-                        }
+                        if (!(locked && !unlockedThisSession)) GarageScreen(stateHolder, vm, hazeState = searchHazeState)
                         }
                     }
                 }

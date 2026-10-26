@@ -359,9 +359,7 @@ internal fun WeatherLocations(
             WeatherBlock(car, fahrenheit, metric, title = "Here & at the car", merged = true)
         } else {
             WeatherBlock(car, fahrenheit, metric, title = "At the car", subtitle = place ?: "Car location")
-            if (phone != null) {
-                WeatherBlock(phone, fahrenheit, metric, title = "Your location", subtitle = devicePlace)
-            }
+            if (phone != null) WeatherBlock(phone, fahrenheit, metric, title = "Your location", subtitle = devicePlace)
         }
     }
 }

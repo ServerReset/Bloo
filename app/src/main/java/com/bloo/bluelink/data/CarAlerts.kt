@@ -252,9 +252,7 @@ object CarAlerts {
                     }
                 } else if (isCharging) {
                     // Charging: mark the session started.
-                    if (!settings.chargeCompleteNotificationSent(v.vin)) {
-                        settings.setChargeCompleteNotificationSent(v.vin, true)
-                    }
+                    if (!settings.chargeCompleteNotificationSent(v.vin)) settings.setChargeCompleteNotificationSent(v.vin, true)
                 }
             }
         }

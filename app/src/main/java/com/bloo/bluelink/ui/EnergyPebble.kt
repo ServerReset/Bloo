@@ -93,9 +93,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
             activeContent = denyTone().content,
         ),
     ) {
-        if (running) {
-            RevealMutedText("Unavailable while the car is running.")
-        }
+        if (running) RevealMutedText("Unavailable while the car is running.")
         // Charge limits are EDITABLE here (see the AC/DC pills below, which replaced an earlier
         // read-only ChargeFuelBar state). ChargeFuelBar itself only renders in a forced-open
         // context for a brand that cannot report limits at all (Canada) -- there would otherwise be

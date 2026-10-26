@@ -88,9 +88,7 @@ class WearMainActivity : ComponentActivity() {
         // for CAR data -- see WearDataLayerSync).
         WearDataLayerSync.start(this)
         // Notifications need a one-time grant on Android 13+.
-        if (!WearNotifier.canPost(this)) {
-            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 0)
-        }
+        if (!WearNotifier.canPost(this)) requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 0)
         // The watch checks for its OWN updates over its own internet, independent of the phone.
         // Lean: not unasked; the watch has its own power budget.
         if (com.bloo.bluelink.data.DeviceStatus.policy(this).pollIntervalMultiplier == 1) lifecycleScope.launch { WearUpdateChecker.check() }

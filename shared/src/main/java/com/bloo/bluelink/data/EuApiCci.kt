@@ -231,9 +231,7 @@ internal suspend fun EuApi.cciPost(
         .header("Accept-Language", "en")
         .header("User-Agent", "okhttp/3.12.0")
     if (nonCcsToken != null) builder.header("Authentication", nonCcsToken)
-    if (cciAccessToken != null) {
-        builder.header("authorization", "Bearer " + cciAccessToken.removePrefix("Bearer ").trim())
-    }
+    if (cciAccessToken != null) builder.header("authorization", "Bearer " + cciAccessToken.removePrefix("Bearer ").trim())
     if (exchangeableToken != null) {
         builder.header("exchangeable-token", exchangeableToken)
         builder.header("non-ccs-token", nonCcsToken ?: "")

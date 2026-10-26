@@ -76,9 +76,7 @@ internal class WeatherController(
      */
     fun refreshDeviceLocationForWeather(preloaded: android.location.Location? = null) = scope.launch {
         if (!settingsStore.appearance.first().weatherFollowsDevice) return@launch
-        if (withContext(Dispatchers.IO) { settingsStore.setWeatherFromDeviceLocation(preloaded) }) {
-            loadHomeWeather(force = true)
-        }
+        if (withContext(Dispatchers.IO) { settingsStore.setWeatherFromDeviceLocation(preloaded) }) loadHomeWeather(force = true)
     }
 
     /** Fetch weather for the configured home location. Skips if a recent reading exists. */

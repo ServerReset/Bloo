@@ -35,9 +35,7 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
     }
     SettingsCard("Accounts", Icons.Filled.Person, vm, status = status) {
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-            if (accounts.isEmpty()) {
-                BodyMediumText("Not signed in", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            if (accounts.isEmpty()) BodyMediumText("Not signed in", color = MaterialTheme.colorScheme.onSurfaceVariant)
             // "Add another account" rides in the LAST account's button row, next to its Sign out.
             accounts.forEachIndexed { i, creds -> AccountPanel(creds, vm, addAnother = i == accounts.lastIndex) }
             if (accounts.isEmpty()) {
@@ -48,9 +46,7 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                     emphasis = ButtonEmphasis.Confirm,
                 )
             }
-            if (accounts.any { it.brand.requiresPin }) {
-                BodySmallText("Wrong-PIN attempts lock it for a few minutes.")
-            }
+            if (accounts.any { it.brand.requiresPin }) BodySmallText("Wrong-PIN attempts lock it for a few minutes.")
         }
     }
 }

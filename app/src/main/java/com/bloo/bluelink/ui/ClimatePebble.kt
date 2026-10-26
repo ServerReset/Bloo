@@ -87,9 +87,7 @@ internal fun ClimatePebble(
     // start went out. Until the car reports what was sent (or a minute passes), the slider keeps what was sent.
     var lastSent by remember(v.vin) { mutableStateOf<Pair<ClimateRequest, Long>?>(null) }
     val startClimateWithEngineCheck: (ClimateRequest) -> Unit = { req ->
-        if (status?.engine == true) {
-            vm.reportInfo("Climate changes may be rejected while the car is running")
-        }
+        if (status?.engine == true) vm.reportInfo("Climate changes may be rejected while the car is running")
         lastSent = req to System.currentTimeMillis()
         vm.startClimate(v, req)
     }

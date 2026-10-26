@@ -81,9 +81,7 @@ object AutoLockNotification {
         if (state == DetectionState.GRACE) {
             builder.addAction(0, "Lock now", actionIntent(context, vin, AutoLockService.ACTION_LOCK_NOW))
         }
-        if (!state.isTerminal) {
-            builder.addAction(0, "Cancel", actionIntent(context, vin, AutoLockService.ACTION_CANCEL))
-        }
+        if (!state.isTerminal) builder.addAction(0, "Cancel", actionIntent(context, vin, AutoLockService.ACTION_CANCEL))
         return builder.build()
     }
 

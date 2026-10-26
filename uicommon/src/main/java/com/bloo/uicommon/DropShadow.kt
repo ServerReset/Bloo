@@ -44,9 +44,7 @@ fun Modifier.dropShadow(
     val paint = Paint().asFrameworkPaint().apply {
         this.color = color.toArgb()
         isAntiAlias = true
-        if (blurRadius > 0.dp) {
-            maskFilter = BlurMaskFilter(blurRadius.toPx(), BlurMaskFilter.Blur.NORMAL)
-        }
+        if (blurRadius > 0.dp) maskFilter = BlurMaskFilter(blurRadius.toPx(), BlurMaskFilter.Blur.NORMAL)
     }
     val outline = shape.createOutline(size, layoutDirection, this)
     // Prefer drawRoundRect/drawRect over drawPath wherever the outline allows it.

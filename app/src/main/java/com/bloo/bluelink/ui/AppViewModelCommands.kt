@@ -358,9 +358,7 @@ internal fun AppViewModel.runCommand(
             // Hold the lock for at least MIN_COMMAND_LOCK_MS so a double-tap cannot fire an
             // overlapping request.
             val elapsed = System.currentTimeMillis() - startedAt
-            if (elapsed < MIN_COMMAND_LOCK_MS) {
-                kotlinx.coroutines.delay(MIN_COMMAND_LOCK_MS - elapsed)
-            }
+            if (elapsed < MIN_COMMAND_LOCK_MS) kotlinx.coroutines.delay(MIN_COMMAND_LOCK_MS - elapsed)
             _state.update { it.copy(pending = it.pending - key) }
         }
     }

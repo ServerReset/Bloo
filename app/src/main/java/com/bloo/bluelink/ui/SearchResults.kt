@@ -171,9 +171,7 @@ internal fun SettingsSearchResults(
         LaunchedEffect(submittedQuery) {
             try {
                 val enhanced = vm.enhanceCommandParsing(submittedQuery, null)
-                if (enhanced != null) {
-                    command = enhanced
-                }
+                if (enhanced != null) command = enhanced
             } catch (e: Exception) {
                 rethrowIfCancellation(e)
                 // Graceful fallback if AI enhancement fails
@@ -181,9 +179,7 @@ internal fun SettingsSearchResults(
         }
     }
     val resolvedCommand = command
-    if (resolvedCommand != null) {
-        CommandActionResult(resolvedCommand, submittedQuery, state, vm, hazeState)
-    }
+    if (resolvedCommand != null) CommandActionResult(resolvedCommand, submittedQuery, state, vm, hazeState)
 
     // Free-form command via the AI when the deterministic parser did not recognise the phrasing.
     if (command == null && state.aiActive && submittedQuery.isNotBlank()) {
@@ -199,9 +195,7 @@ internal fun SettingsSearchResults(
     // On-device AI reply (when enabled): a plain-language answer, a complement to structured
     // matches. Gated on submittedQuery, not the live query: it fires a real AI request and must
     // wait for a deliberate submit.
-    if (state.aiActive) {
-        AiAnswer(state, vm, submittedQuery, hazeState)
-    }
+    if (state.aiActive) AiAnswer(state, vm, submittedQuery, hazeState)
 }
 
 /** A small heading over a run of result rows, with hairline dividers between the rows. */
@@ -248,9 +242,7 @@ internal fun ResultRow(
         IconBadge(icon, tint = tint, size = 32.dp, iconSize = 17.dp)
         Spacer(Modifier.width(GapGroup))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-            if (caption != null) {
-                MutedText(caption)
-            }
+            if (caption != null) MutedText(caption)
             content()
         }
         if (onClick != null) {

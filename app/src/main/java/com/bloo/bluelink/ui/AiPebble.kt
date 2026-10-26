@@ -80,9 +80,7 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
                 summary.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
                     val bulleted = line.startsWith("* ") || line.startsWith("- ")
                     Row(horizontalArrangement = Arrangement.spacedBy(GapRow)) {
-                        if (bulleted) {
-                            RevealMutedText("•")
-                        }
+                        if (bulleted) RevealMutedText("•")
                         RevealText(if (bulleted) line.substring(2) else line, style = SecondaryTextStyle())
                     }
                 }

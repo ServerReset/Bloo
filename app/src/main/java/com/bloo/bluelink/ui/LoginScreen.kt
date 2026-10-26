@@ -425,9 +425,7 @@ internal fun LoginScreen(
                                 openUrl(context, forgotUrl)
                             },
                         )
-                        if (onCancel != null) {
-                            MorphTextButton(text = "Cancel", onClick = onCancel)
-                        }
+                        if (onCancel != null) MorphTextButton(text = "Cancel", onClick = onCancel)
                     }
                     MorphTextButton(
                         text = when {

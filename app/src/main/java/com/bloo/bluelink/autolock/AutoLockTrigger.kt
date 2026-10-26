@@ -33,9 +33,7 @@ internal object AutoLockTrigger {
         AutoLockService.start(ctx, vin)
         // The evaluation itself, in-process and independent of the service.
         AutoLockController.onTriggerFired(ctx, vin)
-        if (log) {
-            AppLog.log("AutoLock: car Bluetooth disconnected for $vin - evaluating.")
-        }
+        if (log) AppLog.log("AutoLock: car Bluetooth disconnected for $vin - evaluating.")
     }
 
     /** The car reconnected (the user got back in): abort whatever is pending for it. */

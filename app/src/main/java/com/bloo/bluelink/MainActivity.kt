@@ -105,9 +105,7 @@ class MainActivity : FragmentActivity() {
             statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            window.isNavigationBarContrastEnforced = false
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
         // Seed com.bloo.bluelink.ui.inMultiWindowMode from the Activity's actual starting state --
         // onMultiWindowModeChanged (below) only fires on a TRANSITION, so a cold start directly
         // INTO split-screen/freeform would otherwise never set this at all and StatusBarScrim would
@@ -221,9 +219,7 @@ class MainActivity : FragmentActivity() {
      * signatures match, and that copy must stop updating itself the moment it does.
      */
     private fun refreshUpdates() {
-        if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(this)) {
-            com.bloo.bluelink.update.PlayUpdates.onForeground(this)
-        }
+        if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(this)) com.bloo.bluelink.update.PlayUpdates.onForeground(this)
     }
 
     override fun onResume() {

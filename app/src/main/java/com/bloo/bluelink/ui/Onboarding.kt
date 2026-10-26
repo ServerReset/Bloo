@@ -78,9 +78,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     val notifLifecycle = LocalLifecycleOwner.current
     DisposableEffect(notifLifecycle) {
         val obs = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                notifGranted = com.bloo.bluelink.data.Notifications.hasPermission(context)
-            }
+            if (event == Lifecycle.Event.ON_RESUME) notifGranted = com.bloo.bluelink.data.Notifications.hasPermission(context)
         }
         notifLifecycle.lifecycle.addObserver(obs)
         onDispose { notifLifecycle.lifecycle.removeObserver(obs) }

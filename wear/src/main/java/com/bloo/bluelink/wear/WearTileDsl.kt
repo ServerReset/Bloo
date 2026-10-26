@@ -128,9 +128,7 @@ internal fun tileModifiers(
         if (clickableId != null && onClick != null) {
             setClickable(ModifiersBuilders.Clickable.Builder().setId(clickableId).setOnClick(onClick).build())
         }
-        if (description != null) {
-            setSemantics(ModifiersBuilders.Semantics.Builder().setContentDescription(description).build())
-        }
+        if (description != null) setSemantics(ModifiersBuilders.Semantics.Builder().setContentDescription(description).build())
         if (padding != null) setPadding(ModifiersBuilders.Padding.Builder().setAll(dp(padding)).build())
     }.build()
 

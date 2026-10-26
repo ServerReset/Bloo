@@ -124,9 +124,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         ) else null,
     ) {
         // See diagSummary above.
-        if (rows.isEmpty()) {
-            SecondaryText("No diagnostics yet.")
-        }
+        if (rows.isEmpty()) SecondaryText("No diagnostics yet.")
         // Grouped by what the reading is about, in the order a person would check them; a group with nothing to say is left out.
         val grouped = remember(rows) { rows.groupBy { diagGroupOf(it.label) } }
         DiagGroup.entries.forEach { group ->
