@@ -30,6 +30,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
 
 /**
  * A pending Kia one-time-code challenge shown over the login form. [sentTo] is the destination the
@@ -213,10 +215,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val notifications: StateFlow<SettingsStore.NotificationPrefs> =
         settingsStore.notifications.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.NotificationPrefs())
 
-    /** Write the current live status/location maps to disk (survives restart). */
+    private val cacheWrite = Mutex()
+
+    /**
+     * Write the current live status/location maps to disk (survives restart). One write at a time, and the state is read
+     * once the write's turn comes: a save started earlier can no longer land after (and overwrite) a newer one.
+     */
     internal fun persistCache() {
-        val s = _state.value
-        viewModelScope.launch { statusCache.save(s.statuses, s.locations, s.placeNames, s.lastFetched) }
+        viewModelScope.launch {
+            cacheWrite.withLock {
+                val s = _state.value
+                statusCache.save(s.statuses, s.locations, s.placeNames, s.lastFetched)
+            }
+        }
     }
 
     init {
