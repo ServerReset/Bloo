@@ -1,7 +1,6 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
-import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
@@ -19,7 +18,7 @@ import java.util.concurrent.TimeUnit
  * covers the "app is already open" case; this covers "app hasn't been opened in
  * a while," posting a notification instead of a tile nobody's there to see.
  */
-class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+class UpdateCheckWorker(context: Context, params: WorkerParameters) : BlooWorker(context, params) {
 
     /**
      * WorkManager's entry point, invoked on each ~12-hour periodic tick.
@@ -54,9 +53,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
      *    here, because the fixed [NOTIF_ID] means a repeat replaces its own
      *    notification rather than adding one.
      */
-    override suspend fun doWork(): Result {
-        // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
-        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
+    override suspend fun run(): Result {
         if (skipWhenLean(applicationContext, "update", 12 * 60 * 60_000L)) return Result.success()
 
         val ctx = applicationContext

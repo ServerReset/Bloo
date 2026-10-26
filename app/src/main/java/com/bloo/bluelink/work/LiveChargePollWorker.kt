@@ -2,7 +2,6 @@ package com.bloo.bluelink.work
 
 import android.content.Context
 import androidx.work.BackoffPolicy
-import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
@@ -33,7 +32,7 @@ import kotlinx.coroutines.sync.withLock
  * ends, unlike a periodic request that would keep firing forever whether or
  * not there's anything to report.
  */
-class LiveChargePollWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+class LiveChargePollWorker(context: Context, params: WorkerParameters) : BlooWorker(context, params) {
 
     /**
      * One tick: re-poll every signed-in brand's vehicles (cached status,
@@ -45,10 +44,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
      * Reschedules itself only if at least one car is still charging by the
      * end of the pass.
      */
-    override suspend fun doWork(): Result {
-        // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
-        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
-
+    override suspend fun run(): Result {
         val store = SessionStore(applicationContext)
         val settings = SettingsStore(applicationContext)
         if (!settings.notificationPrefs().charging) return Result.success()

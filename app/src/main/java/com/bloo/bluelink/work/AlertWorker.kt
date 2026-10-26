@@ -1,7 +1,6 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
-import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
@@ -25,7 +24,7 @@ import kotlinx.coroutines.sync.withLock
  * Periodically refreshes each signed-in car's status in the background and posts
  * service-due / door-open notifications even when the app is closed.
  */
-class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(context, params) {
 
     /**
      * WorkManager's entry point, invoked on each ~30-minute periodic tick.
@@ -63,9 +62,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
      * fetch for one car/brand is silently absorbed per-item as described above,
      * and the whole thing just runs again on the next periodic tick regardless.
      */
-    override suspend fun doWork(): Result {
-        // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
-        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
+    override suspend fun run(): Result {
         if (skipWhenLean(applicationContext, "alerts", 30 * 60_000L)) return Result.success()
 
         val store = SessionStore(applicationContext)

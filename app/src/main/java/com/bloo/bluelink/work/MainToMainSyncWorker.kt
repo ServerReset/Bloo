@@ -1,7 +1,6 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
-import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
@@ -21,7 +20,7 @@ import java.util.concurrent.TimeUnit
  * performMainToMainSync] itself re-checks the Wi-Fi-only preference each run, so the
  * WorkManager-level constraint only needs "any network."
  */
-class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : BlooWorker(ctx, params) {
 
     /**
      * WorkManager's entry point, invoked on each periodic tick (see [schedule]).
@@ -44,9 +43,7 @@ class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
      * 4. Otherwise (no error, sync attempted and either succeeded or found
      *    nothing new to import) returns [Result.success].
      */
-    override suspend fun doWork(): Result {
-        // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
-        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
+    override suspend fun run(): Result {
         if (skipWhenLean(applicationContext, "sync", 2 * 60 * 60_000L)) return Result.success()
 
         val ctx = applicationContext

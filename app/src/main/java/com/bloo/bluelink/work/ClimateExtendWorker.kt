@@ -1,7 +1,6 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
-import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
@@ -31,12 +30,9 @@ import java.util.concurrent.TimeUnit
  * actions and AutoLock already run with no live ViewModel, which is exactly
  * this worker's situation too.
  */
-class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : BlooWorker(ctx, params) {
 
-    override suspend fun doWork(): Result {
-        // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
-        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
-
+    override suspend fun run(): Result {
         val vin = inputData.getString(KEY_VIN) ?: return Result.failure()
         val remainingMinutes = inputData.getInt(KEY_REMAINING_MIN, 0)
         // Nothing left to extend -- a schedule() call with 0 remaining is a

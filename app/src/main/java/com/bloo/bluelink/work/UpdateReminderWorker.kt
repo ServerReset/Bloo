@@ -1,7 +1,6 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
-import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
@@ -27,12 +26,9 @@ import java.util.concurrent.TimeUnit
  * recurring schedule. Enqueued as unique work with REPLACE so tapping "Remind me"
  * again just resets the 1-day timer rather than stacking multiple reminders.
  */
-class UpdateReminderWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+class UpdateReminderWorker(context: Context, params: WorkerParameters) : BlooWorker(context, params) {
 
-    override suspend fun doWork(): Result {
-        // Sealed after a phone restart until the user signs in (see BootGate): nothing runs, nothing posts.
-        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return Result.success()
-
+    override suspend fun run(): Result {
         val ctx = applicationContext
         // Clear the snooze first so the check below (and every later check) can surface the
         // tile again -- this is the "bring the update thing back" half, and an active snooze
