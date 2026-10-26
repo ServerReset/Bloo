@@ -102,6 +102,8 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize"
+            android:resizeableActivity="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|layoutDirection"
             android:theme="@style/Theme.Bloo">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

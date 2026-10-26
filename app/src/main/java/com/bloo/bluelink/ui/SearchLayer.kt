@@ -114,6 +114,10 @@ internal fun SearchLayer(
     val haptics = LocalHaptics.current
 
     BackHandler(enabled = open) { query = ""; focused = false }
+    // Ctrl+K / Ctrl+F: the keyboard's way into the search field.
+    LaunchedEffect(vm) {
+        vm.shortcutEvents.collect { if (it == Shortcut.Search) focused = true }
+    }
     // Report open-state so the aurora can pause (see AuroraBackground `paused`).
     SideEffect { onOpenChanged?.invoke(open) }
     // Leaving composition while open (lock engaged, map expanded) must not leave the toasts parked and the

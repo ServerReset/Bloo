@@ -27,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
@@ -82,7 +84,9 @@ fun MorphButtonCore(
     // The content Row wraps and the chrome uses matchParentSize(), so CONTENT decides the button's size
     // and `modifier` stretches it. fillMaxSize() children would leave the Box with no intrinsic size
     // (growing to full width, or zero height in unbounded parents).
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+    // One node for a screen reader: the label (the content) and the click (the chrome beneath it) are siblings, so left apart
+    // it would meet an unlabelled clickable and, separately, a bit of text that does nothing.
+    Box(modifier = modifier.semantics(mergeDescendants = true) {}, contentAlignment = Alignment.Center) {
         MorphChrome(
             pressed = pressed,
             active = active,
@@ -172,6 +176,7 @@ private fun BoxScope.MorphChrome(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 enabled = enabled,
+                role = Role.Button,
                 onLongClick = onLongClick,
                 onClick = onClick,
             ),

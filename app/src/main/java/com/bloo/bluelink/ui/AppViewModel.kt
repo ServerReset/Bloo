@@ -293,6 +293,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val currentBuildNumber: Int get() = com.bloo.bluelink.BuildConfig.BUILD_RUN_NUMBER
 
     /** Per-VIN pending debounced climate save (see saveClimateDebounced). */
+    /** Keyboard shortcuts for the screen that owns them (help, search, settings, back); see [onShortcut]. */
+    internal val shortcutEvents = kotlinx.coroutines.flow.MutableSharedFlow<Shortcut>(extraBufferCapacity = 8)
     internal val climateSaveJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
     /** The watch-the-car-until-it-agrees job for each command key; a newer command for the same action replaces it. */
     internal val commandConfirmJobs = mutableMapOf<String, kotlinx.coroutines.Job>()

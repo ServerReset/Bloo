@@ -156,6 +156,18 @@ fun BlooApp(vm: AppViewModel) {
     // and page spacers read it. See SearchAnchor.kt.
     val searchAnchor = remember { SearchAnchor() }
     val dialogHost = remember { DialogHost(searchHazeState) }
+    // Hardware-keyboard shortcuts (see KeyboardShortcuts.kt): the ones the root owns are heard here.
+    var showShortcuts by remember { mutableStateOf(false) }
+    val goBack = rememberBackAction()
+    LaunchedEffect(vm) {
+        vm.shortcutEvents.collect { event ->
+            when (event) {
+                Shortcut.Help -> showShortcuts = !showShortcuts
+                Shortcut.Back -> if (showShortcuts) showShortcuts = false else goBack()
+                else -> Unit
+            }
+        }
+    }
     CompositionLocalProvider(
         // Removes the default ripple app-wide (see NoTapHighlight). Material 3 components ignore
         // LocalIndication, so LocalRippleConfiguration = null turns off theirs.
@@ -176,7 +188,7 @@ fun BlooApp(vm: AppViewModel) {
     // Biometric lock overlay: blur the whole app behind it and fade the blur away once unlocked.
     // Hoisted into their own small composables below so only those tiny scopes recompose per frame;
     // everything else just gets redrawn under the blurred/faded layer.
-    Box(Modifier.fillMaxSize().observeUserActivity(ambientActivity)) {
+    Box(Modifier.fillMaxSize().observeUserActivity(ambientActivity).appShortcuts(enabled = !locked, onShortcut = vm::onShortcut)) {
     // "Content settled": the garage's first composition has finished. Gates two full-screen blurs
     // (lock blur, Aurora backdrop blur) that dominate cold-start frame cost.
     var contentSettled by remember { mutableStateOf(screen == Screen.Garage) }
@@ -395,6 +407,7 @@ fun BlooApp(vm: AppViewModel) {
     // build from this repo may be signed with the development key again. What reaches installs on
     // the old key now is the release text itself: see the title and changelog steps in
     // .github/workflows/android.yml.
+    if (showShortcuts) ShortcutsDialog(onDismiss = { showShortcuts = false })
     // Every open dialog, above everything else.
     DialogLayer(dialogHost)
     }

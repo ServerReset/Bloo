@@ -133,6 +133,10 @@ internal fun CollapsedGaragePager(
         // direction -- so an external change (a shortcut tap selecting a specific car while this
         // pager was already composed on a different one) updated currentIndex, but the pager itself
         // just sat there on whatever car it last settled on.
+        // Ctrl+, : travel to the Settings page at the end of the pager.
+        LaunchedEffect(wrap, vm, slots) {
+            vm.shortcutEvents.collect { if (it == Shortcut.Settings) wrap.animateToReal(slots) }
+        }
         suspend fun snapToIndex(idx: Int) {
             // A nearby car is travelled to (a full-screen button on the second column brings that car to the front while
             // the page widens); only a long way off, or a car count change, jumps.
