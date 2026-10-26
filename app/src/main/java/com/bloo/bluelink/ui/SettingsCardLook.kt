@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.Icon
@@ -69,6 +70,10 @@ internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: 
             SettingsGroup("Welcome cards") {
                 BodySmallText("The cards you swipe through on first open.")
                 MorphTextButton("Show welcome cards", onClick = { vm.showWelcomeCards() }, icon = Icons.Filled.Style)
+            }
+            SettingsGroup("Keyboard") {
+                BodySmallText("Shortcuts for a hardware keyboard: switch cars, refresh, lock, search and more. Press F1 anywhere.")
+                MorphTextButton("Show keyboard shortcuts", onClick = { vm.shortcutEvents.tryEmit(Shortcut.Help) }, icon = Icons.Filled.Keyboard)
             }
         }
     }
