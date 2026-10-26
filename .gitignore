@@ -10,7 +10,8 @@
 local.properties
 app/build/
 build/
-.claude/
+.claude/*
+!.claude/skills/
 __pycache__/
 
 # Throwaway refactor scripts written into the repo root during a session.
