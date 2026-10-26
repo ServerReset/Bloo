@@ -69,7 +69,8 @@ class AccessibilityTest {
             }
         }
         rule.onNodeWithText("Start the climate now").assertIsDisplayed()
-        val width = rule.onNodeWithText("Start the climate now").getBoundsInRoot().width
+        val bounds = rule.onNodeWithText("Start the climate now").getBoundsInRoot()
+        val width = bounds.right - bounds.left
         assertTrue("the button stays within 300dp at double text size (was $width)", width <= 300.dp)
     }
 
