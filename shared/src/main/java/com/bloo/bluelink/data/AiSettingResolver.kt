@@ -39,10 +39,7 @@ object AiSettingResolver {
     }
 
     /** [value] is already validated for the setting: "on"/"off", an option key, or a number as text. */
-    data class Resolution(val id: String, val value: String) {
-        val asBoolean: Boolean get() = value == "on"
-        val asNumber: Double? get() = value.toDoubleOrNull()
-    }
+    data class Resolution(val id: String, val value: String)
 
     /** The longest free-text value accepted (a place name is far shorter). */
     private const val MAX_TEXT = 80

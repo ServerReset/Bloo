@@ -23,7 +23,6 @@ class AiSettingResolverTest {
     fun aCleanSwitchAnswerResolves() {
         assertEquals(Resolution("t0", "off"), AiSettingResolver.parse("t0|off", list))
         assertEquals(Resolution("t1", "on"), AiSettingResolver.parse("T1 | ON", list))
-        assertTrue(AiSettingResolver.parse("t1|on", list)!!.asBoolean)
     }
 
     @Test
@@ -44,7 +43,6 @@ class AiSettingResolverTest {
     fun aRangeMustBeANumberInsideItsBounds() {
         assertEquals(Resolution("r0", "1.2"), AiSettingResolver.parse("r0|1.2", list))
         assertEquals(Resolution("r1", "30"), AiSettingResolver.parse("r1|30", list))
-        assertEquals(30.0, AiSettingResolver.parse("r1|30", list)!!.asNumber)
         assertNull(AiSettingResolver.parse("r0|5", list))
         assertNull(AiSettingResolver.parse("r1|0", list))
         assertNull(AiSettingResolver.parse("r1|lots", list))

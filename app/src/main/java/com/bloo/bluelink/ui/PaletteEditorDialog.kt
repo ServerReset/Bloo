@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.uicommon.ArmedDeleteButton
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth

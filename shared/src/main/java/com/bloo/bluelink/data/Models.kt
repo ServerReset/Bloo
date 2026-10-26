@@ -227,14 +227,6 @@ data class Battery12V(
             level!! >= 50 -> "Fair"
             else -> "Low"
         }
-
-    /**
-     * Whether this 12V reading is one the user should act on -- i.e. exactly the readings [health]
-     * already calls "Low" or "Needs attention". Defined in terms of [health] rather than repeating
-     * a number, because the number was the bug.
-     */
-    val needsAttention: Boolean
-        get() = health == "Low" || health == "Needs attention"
 }
 
 @Serializable

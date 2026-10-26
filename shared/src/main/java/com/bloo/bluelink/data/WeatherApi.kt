@@ -95,8 +95,6 @@ data class DayPoint(
     val code: Int,
 ) {
     val condition: WeatherCode get() = WeatherCode.from(code)
-    /** The "MM-DD" tail of [date], or the whole string if it has no dash. */
-    val shortDate: String get() = date.substringAfter('-').takeIf { it.isNotBlank() } ?: date
 }
 
 /**

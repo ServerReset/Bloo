@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -22,12 +21,6 @@ import androidx.compose.ui.graphics.luminance
 
 /** The brightness range behind the content being drawn; null where nothing describes it (text then keeps its own colour). */
 internal val LocalBackdropBand = compositionLocalOf<BandLuma?> { null }
-
-/** Describes [content]'s backdrop as [band]. */
-@Composable
-internal fun ProvideBackdrop(band: BandLuma?, content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalBackdropBand provides band, content = content)
-}
 
 /** A flat colour as a band of zero spread. */
 internal fun surfaceBand(color: Color): BandLuma = color.luminance().let { BandLuma(it, it, it) }

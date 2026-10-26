@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 /** The climate pebble's controls section: [ClimateControlsSection]. */
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer

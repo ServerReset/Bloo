@@ -42,19 +42,6 @@ class WeatherForecastTest {
 
     // ---- DayPoint: weekday label and condition ----
 
-    /** shortDate drops the year and month, keeping the "MM-DD" tail. */
-    @Test
-    fun shortDateKeepsTheMonthAndDay() {
-        assertEquals("06-01", DayPoint("2024-06-01", 25.0, 15.0, 0).shortDate)
-        assertEquals("12-31", DayPoint("2024-12-31", 5.0, -2.0, 71).shortDate)
-    }
-
-    /** A date with no dash falls back to itself rather than an empty string. */
-    @Test
-    fun shortDateFallsBackToTheRawDateWithoutADash() {
-        assertEquals("20240601", DayPoint("20240601", 25.0, 15.0, 0).shortDate)
-    }
-
     @Test
     fun dayConditionBucketsTheWmoCode() {
         assertEquals(WeatherCode.THUNDERSTORM, DayPoint("2024-06-01", 25.0, 15.0, 95).condition)
