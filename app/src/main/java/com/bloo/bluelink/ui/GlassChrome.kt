@@ -132,36 +132,41 @@ internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()):
             if (tilt != null) {
                 // The sheen follows the way the phone is held and swells while it moves; it is always there, so the edge is
                 // never a flat line.
-                val sheen = edgeSheen(tilt.holdX, tilt.holdY, glintStrength(tilt.x, tilt.y), if (dark) SheenPeakDark else SheenPeakLight)
-                drawOutline(outline, sheen, style = Stroke(line * 1.4f))
+                val swell = glintStrength(tilt.x, tilt.y)
+                // White on a dark pebble; on a pale one white would vanish, so the light is the theme's own colour there.
+                val light = if (dark) Color.White else scheme.primary
+                // A faint wash across the whole face, then the edge itself, wider and brighter than the resting rim.
+                drawOutline(outline, edgeSheen(tilt.holdX, tilt.holdY, swell, light, SheenWashPeak, SheenWashHalfWidth))
+                drawOutline(outline, edgeSheen(tilt.holdX, tilt.holdY, swell, light, SheenPeak, SheenHalfWidth), style = Stroke(line * 2f))
             }
         }
     }
 }
 
-/** How bright the sheen is at the middle of its band, held and at full motion: dark pebbles catch less, light ones more. */
-private const val SheenPeakDark = 0.6f
-private const val SheenPeakLight = 0.85f
+/** How bright the sheen is at the middle of its band on the edge, and of the faint wash over the face. */
+private const val SheenPeak = 0.9f
+private const val SheenWashPeak = 0.12f
 
-/** Half-width of the sheen along the rim's diagonal (fraction of it): a wide soft sweep, not a pinpoint. */
+/** Half-width of each along the rim's diagonal (fraction of it): a wide soft sweep, not a pinpoint. */
 private const val SheenHalfWidth = 0.3f
+private const val SheenWashHalfWidth = 0.45f
 
 /** Where along the rim's diagonal the sheen sits, 0 (top-left) to 1 (bottom-right): leaning right or forward slides it toward the bottom-right. */
 internal fun sheenCentre(holdX: Float, holdY: Float): Float =
-    (0.5f + (holdX + holdY) * 0.5f * 0.45f).coerceIn(SheenHalfWidth * 0.5f, 1f - SheenHalfWidth * 0.5f)
+    (0.5f + (holdX + holdY) * 0.5f * 0.9f).coerceIn(SheenHalfWidth * 0.5f, 1f - SheenHalfWidth * 0.5f)
 
 /** The sheen's strength: a steady base from the held angle, swelling with recent motion (0..1). */
 internal fun sheenStrength(motion: Float): Float = 0.55f + 0.45f * motion.coerceIn(0f, 1f)
 
 /** A soft band of light that slides along the rim as the phone is tilted, like light sweeping across a pane of glass. */
-private fun DrawScope.edgeSheen(holdX: Float, holdY: Float, motion: Float, peak: Float): Brush {
+private fun DrawScope.edgeSheen(holdX: Float, holdY: Float, motion: Float, light: Color, peak: Float, halfWidth: Float): Brush {
     val centre = sheenCentre(holdX, holdY)
-    val clear = Color.White.copy(alpha = 0f)
+    val clear = light.copy(alpha = 0f)
     return Brush.linearGradient(
         0f to clear,
-        (centre - SheenHalfWidth).coerceAtLeast(0.001f) to clear,
-        centre to Color.White.copy(alpha = peak * sheenStrength(motion)),
-        (centre + SheenHalfWidth).coerceAtMost(0.999f) to clear,
+        (centre - halfWidth).coerceAtLeast(0.001f) to clear,
+        centre to light.copy(alpha = peak * sheenStrength(motion)),
+        (centre + halfWidth).coerceAtMost(0.999f) to clear,
         1f to clear,
         start = Offset.Zero,
         end = Offset(size.width, size.height),

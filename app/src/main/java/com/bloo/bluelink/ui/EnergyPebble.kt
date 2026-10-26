@@ -24,7 +24,6 @@ import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.chargerLabel
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.isPluggedOrCharging
-import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.denyTone
 import com.bloo.uicommon.container
@@ -95,11 +94,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
         ),
     ) {
         if (running) {
-            RevealText(
-                "Unavailable while the car is running.",
-                style = SecondaryTextStyle(),
-                color = mutedContentColor(),
-            )
+            RevealMutedText("Unavailable while the car is running.")
         }
         // Charge limits are EDITABLE here (see the AC/DC pills below, which replaced an earlier
         // read-only ChargeFuelBar state). ChargeFuelBar itself only renders in a forced-open

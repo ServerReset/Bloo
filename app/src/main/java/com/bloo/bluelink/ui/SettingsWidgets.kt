@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
@@ -26,7 +25,6 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
@@ -57,7 +54,6 @@ import kotlin.math.max
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.ButtonTargetHeight
-import com.bloo.uicommon.ButtonIconSize
 import com.bloo.uicommon.ButtonLabelStyle
 import com.bloo.uicommon.ButtonIconGap
 import com.bloo.uicommon.GapRow
@@ -323,7 +319,7 @@ internal fun ListButton(
         groupWeight = GroupWeightProportional,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+            ButtonIcon(icon)
             Spacer(Modifier.width(ButtonIconGap))
         }
         // The shared name-and-detail column (:uicommon), in the button's own label style.
@@ -334,7 +330,7 @@ internal fun ListButton(
                 enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
                 exit = scaleOut() + fadeOut(),
             ) {
-                Icon(AppIcons.Check, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+                ButtonIcon(AppIcons.Check)
             }
         }
     }

@@ -33,7 +33,7 @@ internal const val TiltMax = 0.06f
 private const val TiltEase = 0.12f
 
 /** The held-angle reading: m/s^2 of gravity that counts as fully leaned, the easing per sample, and the smallest write. */
-private const val HoldRange = 6f
+private const val HoldRange = 3f
 private const val HoldEase = 0.2f
 private const val HoldStep = 0.01f
 
@@ -100,7 +100,7 @@ internal fun rememberTilt(active: Boolean, ambient: AmbientActivity?): TiltState
                 val ny = tilt.y + (targetY - tilt.y) * TiltEase
                 if (abs(nx - tilt.x) > TiltStep) tilt.x = nx
                 if (abs(ny - tilt.y) > TiltStep) tilt.y = ny
-                // The held angle: gravity's share on each axis (about 6 m/s^2 is a steep lean), eased over a second or so.
+                // The held angle: gravity's share on each axis (about 3 m/s^2, a lean of some 18 degrees, is all the way), eased over a second or so.
                 val hx = tilt.holdX + ((x / HoldRange).coerceIn(-1f, 1f) - tilt.holdX) * HoldEase
                 val hy = tilt.holdY + ((y / HoldRange).coerceIn(-1f, 1f) - tilt.holdY) * HoldEase
                 if (abs(hx - tilt.holdX) > HoldStep) tilt.holdX = hx

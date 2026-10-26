@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -253,7 +252,7 @@ internal fun ClimatePresetSection(
                     },
                     emphasis = ButtonEmphasis.Deny,
                 ) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete ${preset.name}", modifier = Modifier.size(ButtonIconSize))
+                    ButtonIcon(Icons.Filled.Delete, "Delete ${preset.name}")
                 }
             },
             text = {
@@ -327,7 +326,7 @@ internal fun PresetPill(
                 weight = 1f,
                 contentPadding = PaddingValues(horizontal = ChipPaddingH, vertical = GapGroup),
                 content = {
-                    Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+                    ButtonIcon(Icons.Filled.AcUnit)
                     Spacer(Modifier.width(ButtonIconGap))
                     TitleSubtitle(
                         title = name,
@@ -343,7 +342,7 @@ internal fun PresetPill(
             ClusterButton(
                 onClick = { haptics?.tick(); onEdit() },
                 content = {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit $name", modifier = Modifier.size(ButtonIconSize))
+                    ButtonIcon(Icons.Filled.Edit, "Edit $name")
                 },
             ),
         ),
@@ -387,7 +386,7 @@ internal fun ChargeLimitPill(
                     },
                 ) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+                        ButtonIcon(icon)
                         Spacer(Modifier.width(ButtonIconGap))
                         RevealText(label, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                         RollingNumber(text = "$limit%", style = PrimaryTextStyle(), fontWeight = FontWeight.Bold)

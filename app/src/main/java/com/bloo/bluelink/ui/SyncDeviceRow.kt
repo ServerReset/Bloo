@@ -146,7 +146,7 @@ internal fun SyncDeviceRow(
         }
         if (isSelf) {
             MorphIconButton(onClick = onRename) {
-                Icon(Icons.Filled.Edit, contentDescription = "Rename this device", modifier = Modifier.size(ButtonIconSize))
+                ButtonIcon(Icons.Filled.Edit, "Rename this device")
             }
         } else {
             RemoveDeviceButton(device.name, "this device", onRemove)

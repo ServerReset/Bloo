@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -77,6 +78,18 @@ internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: C
 @Composable
 internal fun MutedText(text: String, modifier: Modifier = Modifier) {
     BodySmallText(text, modifier, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/** An [Icon] at the standard in-button size ([com.bloo.uicommon.ButtonIconSize]); [description] null marks it decorative. */
+@Composable
+internal fun ButtonIcon(icon: ImageVector, description: String? = null, tint: Color = LocalContentColor.current) {
+    Icon(icon, contentDescription = description, modifier = Modifier.size(com.bloo.uicommon.ButtonIconSize), tint = tint)
+}
+
+/** [MutedText] that reveals as it appears (the pebbles' captions and hints). */
+@Composable
+internal fun RevealMutedText(text: String, modifier: Modifier = Modifier) {
+    RevealText(text, modifier, style = SecondaryTextStyle(), color = mutedContentColor())
 }
 
 /** The SECONDARY role as text: what a line is about. Same as [BodySmallText]. */

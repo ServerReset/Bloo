@@ -81,11 +81,7 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
                     val bulleted = line.startsWith("* ") || line.startsWith("- ")
                     Row(horizontalArrangement = Arrangement.spacedBy(GapRow)) {
                         if (bulleted) {
-                            RevealText(
-                                "•",
-                                style = SecondaryTextStyle(),
-                                color = mutedContentColor(),
-                            )
+                            RevealMutedText("•")
                         }
                         RevealText(
                             if (bulleted) line.substring(2) else line,
@@ -95,16 +91,8 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
                 }
             }
         } else {
-            RevealText(
-                "Summarizes this car's latest status, on your device.",
-                style = SecondaryTextStyle(),
-                color = mutedContentColor(),
-            )
+            RevealMutedText("Summarizes this car's latest status, on your device.")
         }
-        RevealText(
-            "Reflects the last refresh. Tap Summarize to update.",
-            style = SecondaryTextStyle(),
-            color = mutedContentColor(),
-        )
+        RevealMutedText("Reflects the last refresh. Tap Summarize to update.")
     }
 }

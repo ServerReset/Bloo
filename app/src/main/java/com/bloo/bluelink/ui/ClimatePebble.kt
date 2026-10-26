@@ -237,11 +237,7 @@ internal fun ClimatePebble(
         // No hero: the summary is the same expression and already renders as the tile headline.
         if (running) {
             if (climateOn) {
-                RevealText(
-                    "On at the car. Read-only while the car is running.",
-                    style = SecondaryTextStyle(),
-                    color = mutedContentColor(),
-                )
+                RevealMutedText("On at the car. Read-only while the car is running.")
                 status.airTemp?.let { t ->
                     t.value?.let { StatusRow("Set to", degLabel(it, fahrenheit, t.unit)) }
                 }
@@ -252,11 +248,7 @@ internal fun ClimatePebble(
                     s.frSeatHeatState?.takeIf { it != 0 }?.let { StatusRow("Passenger seat", onOff(it)) }
                 }
             } else {
-                RevealText(
-                    "Climate can't be started while the car is running.",
-                    style = SecondaryTextStyle(),
-                    color = mutedContentColor(),
-                )
+                RevealMutedText("Climate can't be started while the car is running.")
             }
             return@Pebble
         }
@@ -329,11 +321,7 @@ private fun SmartClimateSection(
             onClick = { if (ambientF != null) onStartAtTarget(smartClimateTargetF(ambientF)) else onStartUnread() },
             enabled = enabled,
         )
-        RevealText(
-            ambientF?.let { smartClimateTargetLine(it, fahrenheit) } ?: "Sets the temperature for the weather where your car is parked.",
-            style = SecondaryTextStyle(),
-            color = mutedContentColor(),
-        )
+        RevealMutedText(ambientF?.let { smartClimateTargetLine(it, fahrenheit) } ?: "Sets the temperature for the weather where your car is parked.")
     }
 }
 

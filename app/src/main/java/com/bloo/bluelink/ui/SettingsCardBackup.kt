@@ -15,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.lastSyncMs
 import com.bloo.bluelink.data.setSyncUri
@@ -36,7 +34,6 @@ import com.bloo.bluelink.data.syncUri
 import com.bloo.bluelink.data.syncWifiOnly
 import com.bloo.uicommon.rememberConfirmArm
 import kotlinx.coroutines.launch
-import com.bloo.uicommon.ButtonIconSize
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
@@ -143,7 +140,7 @@ private fun SyncErrorBanner(message: String) {
         ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(ButtonIconSize))
+        ButtonIcon(Icons.Filled.CloudOff, tint = MaterialTheme.colorScheme.error)
         Spacer(Modifier.width(GapGroup))
         BodySmallText(message, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
     }
