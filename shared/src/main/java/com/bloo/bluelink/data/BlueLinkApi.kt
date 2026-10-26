@@ -411,7 +411,7 @@ private fun logVehicleFieldNames(body: String) {
     }.getOrNull() ?: return
     if (names.isNotEmpty()) AppLog.log("Account vehicle fields (names only): ${names.joinToString()}")
     // The colour and trim themselves are not private (no VIN with them), and say whether pictures can be matched on their own.
-    paintByVin(body).values.forEach { AppLog.log("Account vehicle paint: colour=${it.colour ?: "none"}, trim=${it.trim ?: "none"}, model=${it.model ?: "none"}") }
+    paintByVin(body).values.forEach { AppLog.log("Account vehicle paint: colour=${it.colour ?: "none"}, code=${it.colourCode ?: "none"}, trim=${it.trim ?: "none"}, model=${it.model ?: "none"}") }
 }
 
 /** Each enrolled car's paint colour and trim by VIN, read straight off the raw enrolment body (the typed model does not carry them). */

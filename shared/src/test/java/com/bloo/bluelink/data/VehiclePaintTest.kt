@@ -51,6 +51,19 @@ class VehiclePaintTest {
         assertEquals("2023", modelWithName("2023", null))
     }
 
+    @Test fun aPlatformCodeBecomesTheModelsName() {
+        assertEquals("2025 IONIQ 5", modelWithName("2025", "NE1"))
+        assertEquals("2024 IONIQ 6", modelWithName("2024", "CE1"))
+        assertEquals("2025 EV9", modelWithName("2025", "MV"))
+        assertEquals("2025 KONA", modelWithName("2025", "KONA"))
+    }
+
+    @Test fun theSpecificPaintCodeIsKeptBesideTheGenericColour() {
+        val p = paint("""{"color":"BLUE","sapColorCode":"U4G"}""")
+        assertEquals("BLUE", p.colour)
+        assertEquals("U4G", p.colourCode)
+    }
+
     @Test fun blankOrNonTextFieldsAreIgnored() {
         val p = paint("""{"exteriorColor":"  ","color":12,"trim":null}""")
         assertNull(p.colour)

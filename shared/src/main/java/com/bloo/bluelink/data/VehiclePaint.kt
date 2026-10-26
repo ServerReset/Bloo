@@ -5,7 +5,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /** What an account lists about how a car looks: its paint colour and trim, either of which may be absent. */
-internal data class VehiclePaint(val colour: String?, val trim: String?, val model: String? = null)
+internal data class VehiclePaint(val colour: String?, val trim: String?, val model: String? = null, val colourCode: String? = null)
 
 /**
  * Reads the paint colour and trim off one account car, whatever the brand calls them: any text field whose key names a colour
@@ -21,16 +21,23 @@ internal fun paintOf(car: JsonObject): VehiclePaint {
     val trim = fields.firstOrNull { (k, _) -> k == "trim" || k.endsWith("trim") || k == "trimname" }?.second
     // Hyundai US names no model, only these: the first that is present says which car it is ("IONIQ 5").
     val model = listOf("modelname", "hmamodel", "series", "model", "modelcode").firstNotNullOfOrNull { want -> fields.firstOrNull { it.first == want }?.second }
-    return VehiclePaint(colour, trim, model)
+    val colourCode = colours.firstOrNull { (k, _) -> "code" in k }?.second
+    return VehiclePaint(colour, trim, model, colourCode)
 }
 
 /** Logs which fields an account car lists (names only) and its colour and trim (not private, and no VIN), so a picture can be matched. */
 internal fun logAccountCar(car: JsonObject) {
     val paint = paintOf(car)
     AppLog.log("Account vehicle fields (names only): ${car.keys.sorted().joinToString()}")
-    AppLog.log("Account vehicle paint: colour=${paint.colour ?: "none"}, trim=${paint.trim ?: "none"}, model=${paint.model ?: "none"}")
+    AppLog.log("Account vehicle paint: colour=${paint.colour ?: "none"}, code=${paint.colourCode ?: "none"}, trim=${paint.trim ?: "none"}, model=${paint.model ?: "none"}")
 }
 
 /** A car's model line: what the account called it, or, when that is only a year (Hyundai US lists no model name), the year and [hint]. */
 internal fun modelWithName(model: String, hint: String?): String =
-    if (hint.isNullOrBlank() || model.any(Char::isLetter)) model else "$model $hint".trim()
+    if (hint.isNullOrBlank() || model.any(Char::isLetter)) model else "$model ${friendlyModel(hint)}".trim()
+
+/** Hyundai's and Kia's internal platform codes, as the names owners know the cars by. */
+private val ModelCodes = mapOf("NE" to "IONIQ 5", "CE" to "IONIQ 6", "ME" to "IONIQ 9", "CV" to "EV6", "MV" to "EV9")
+
+/** A model code ("NE1") as the model's name ("IONIQ 5"); anything that is not a known code is returned as it came. */
+internal fun friendlyModel(hint: String): String = ModelCodes[hint.trim().uppercase().trimEnd { it.isDigit() }] ?: hint
