@@ -78,8 +78,9 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : BlooWor
         // same as it always was for anything this worker missed.
         val snapshotsByBrand = SnapshotStore(applicationContext).current().vehicles
             .groupBy { Brand.fromIndicator(it.toVehicle().brandIndicator) }
+        val credentials = CredentialStore(applicationContext)
         for (brand in store.loggedInBrands()) {
-            val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }
+            val repo = runCatching { repositoryFor(brand, store, credentials) }
                 .getOrNull() ?: continue
             val vehicles = snapshotsByBrand[brand]?.map { it.toVehicle() } ?: emptyList()
             for (v in vehicles) {

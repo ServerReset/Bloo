@@ -103,8 +103,9 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
             SnapshotStore(applicationContext).current().vehicles.associate { it.vin to it.isDriving }
         }.getOrDefault(emptyMap())
 
+        val credentials = CredentialStore(applicationContext)
         for (brand in store.loggedInBrands()) {
-            val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }.getOrNull() ?: continue
+            val repo = runCatching { repositoryFor(brand, store, credentials) }.getOrNull() ?: continue
             // Share the app-wide status gate so a foregrounded app and this worker
             // never issue overlapping requests (Blue Link 502s otherwise).
             AppLog.log("AlertWorker: requesting statusMutex for ${brand.label} vehicles()")

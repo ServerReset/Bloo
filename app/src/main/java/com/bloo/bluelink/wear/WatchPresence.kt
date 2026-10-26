@@ -8,6 +8,7 @@ import com.bloo.bluelink.ioScope
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 
 /**
@@ -73,6 +74,7 @@ object WatchPresence {
     private var started = false
     private val scope = ioScope()
 
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
     fun start(context: Context) {
         if (started) return
         started = true
@@ -84,7 +86,9 @@ object WatchPresence {
         // Observe the snapshot store and push on every change.
         scope.launch {
             runCatching {
-                SnapshotStore(app).payload.collect {
+                // Debounced like the widgets: one status refresh writes the snapshot several times in a row, and each
+                // push rebuilds and sends the whole payload.
+                SnapshotStore(app).payload.debounce(600).collect {
                     if (_hasWatch.value) PhoneWatchSyncService.pushNow(app)
                 }
             }

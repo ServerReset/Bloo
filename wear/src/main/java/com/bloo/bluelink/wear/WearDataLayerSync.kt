@@ -141,6 +141,8 @@ object WearDataLayerSync {
         // the app was closed would raise nothing (a first sighting never alerts).
         val before = _vehicles.value.ifEmpty { runCatching { SnapshotStore(app).current().vehicles }.getOrDefault(emptyList()) }
         WearNotifier.onVehicles(app, before, payload.vehicles)
+        // A push that carries the cars already held (the phone re-sends on every snapshot write) need not rewrite the store.
+        val carsUnchanged = payload.vehicles == _vehicles.value
         _vehicles.value = payload.vehicles
         _selectedVin.value = payload.selectedVin
         _connected.value = true
@@ -153,7 +155,7 @@ object WearDataLayerSync {
                 payload.watchUpdateApkUrl?.let { url -> UpdateAdvice(run, url, payload.watchUpdateNotes) }
             }
         // Mirror into the shared store so anything reading SnapshotStore sees the same data.
-        runCatching { SnapshotStore(app).saveVehicles(payload.vehicles) }
+        if (!carsUnchanged) runCatching { SnapshotStore(app).saveVehicles(payload.vehicles) }
         // The tile and the complication read that store: have them redraw from it now rather than at their next poll.
         WearSurfaces.refresh(app)
         // PIN + timing.
