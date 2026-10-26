@@ -70,4 +70,22 @@ class SearchFactsTest {
     @Test fun anEmptyQueryAsksForNothing() {
         assertTrue(rankFacts(emptyList(), carFacts(state(), appearance)).isEmpty())
     }
+
+    private fun pieces(query: String) = rankPieces(searchTokens(query), carFacts(state(), appearance))
+
+    @Test fun batteryLiftsTheChargePieceOfEveryCarAndTheTwelveVoltOne() {
+        val p = pieces("battery")
+        assertEquals(setOf("V1" to FactTopic.CHARGE, "V2" to FactTopic.CHARGE, "V1" to FactTopic.TWELVE_VOLT), p.map { it.vin to it.topic }.toSet())
+        assertEquals(p.size, p.map { it.vin to it.topic }.toSet().size, "each piece appears once")
+        assertEquals(FactTopic.CHARGE, p.first().topic)
+    }
+
+    @Test fun rangeAndBatteryAreOnePiecePerCarNotTwo() {
+        val p = pieces("battery range").filter { it.vin == "V1" && it.topic == FactTopic.CHARGE }
+        assertEquals(1, p.size)
+    }
+
+    @Test fun lockedLiftsTheDoorsPiece() {
+        assertTrue(pieces("locked").any { it.topic == FactTopic.DOORS })
+    }
 }

@@ -24,7 +24,12 @@ import com.bloo.uicommon.AppIcons
  * directly (the live readout, not a control, and not only what the AI says about it), so typing "battery" answers with the
  * battery of every car.
  */
+/** What a fact is about: each topic is drawn as ONE piece of the app's own UI lifted out into search (see SearchPieces.kt). */
+internal enum class FactTopic { CHARGE, TWELVE_VOLT, DOORS, CLIMATE, ENGINE, ODOMETER, LOCATION }
+
 internal class CarFact(
+    val vin: String,
+    val topic: FactTopic,
     val car: String,
     val label: String,
     val value: String,
@@ -47,8 +52,8 @@ internal fun carFacts(state: UiState, appearance: SettingsStore.Appearance): Lis
         val name = v.name
         val hasBattery = state.hasBattery(v)
         val ev = st.evStatus
-        fun fact(label: String, value: String, detail: String?, icon: ImageVector, keywords: String) =
-            add(CarFact(name, label, value, detail?.takeIf { it.isNotBlank() }, icon, keywords))
+        fun fact(topic: FactTopic, label: String, value: String, detail: String?, icon: ImageVector, keywords: String) =
+            add(CarFact(v.vin, topic, name, label, value, detail?.takeIf { it.isNotBlank() }, icon, keywords))
 
         st.percentFor(hasBattery)?.let { pct ->
             val detail = if (hasBattery) {
@@ -61,17 +66,17 @@ internal fun carFacts(state: UiState, appearance: SettingsStore.Appearance): Lis
                 null
             }
             if (hasBattery) {
-                fact("Battery", "$pct%", detail, AppIcons.BatteryFull, "battery charge charging soc percent level ev plug plugged limit")
+                fact(FactTopic.CHARGE, "Battery", "$pct%", detail, AppIcons.BatteryFull, "battery charge charging soc percent level ev plug plugged limit")
             } else {
-                fact("Fuel", "$pct%", null, AppIcons.Bolt, "fuel gas tank percent level petrol")
+                fact(FactTopic.CHARGE, "Fuel", "$pct%", null, AppIcons.Bolt, "fuel gas tank percent level petrol")
             }
         }
         if (hasBattery) {
-            st.fuelLevel?.let { fact("Fuel", "$it%", null, AppIcons.Bolt, "fuel gas tank percent level petrol") }
+            st.fuelLevel?.let { fact(FactTopic.CHARGE, "Fuel", "$it%", null, AppIcons.Bolt, "fuel gas tank percent level petrol") }
         }
-        st.rangeMiFor(hasBattery)?.let { fact("Range", formatDistance(it, appearance.metricDistance), null, Icons.Filled.Speed, "range distance dte empty left") }
-        st.battery?.level?.let { fact("12V battery", "$it%", st.battery?.health, AppIcons.BatteryAlert, "battery 12v 12 volt auxiliary accessory starter health") }
-        doorLockLabel(st.doorLock)?.let { fact("Doors", it, null, AppIcons.Lock, "door doors lock locked unlock unlocked secure") }
+        st.rangeMiFor(hasBattery)?.let { fact(FactTopic.CHARGE, "Range", formatDistance(it, appearance.metricDistance), null, Icons.Filled.Speed, "range distance dte empty left") }
+        st.battery?.level?.let { fact(FactTopic.TWELVE_VOLT, "12V battery", "$it%", st.battery?.health, AppIcons.BatteryAlert, "battery 12v 12 volt auxiliary accessory starter health") }
+        doorLockLabel(st.doorLock)?.let { fact(FactTopic.DOORS, "Doors", it, null, AppIcons.Lock, "door doors lock locked unlock unlocked secure") }
         val open = buildList {
             st.doorOpen?.openLabels()?.forEach { add("$it door") }
             st.windowOpen?.openLabels()?.forEach { add("$it window") }
@@ -79,15 +84,15 @@ internal fun carFacts(state: UiState, appearance: SettingsStore.Appearance): Lis
             if (st.hoodOpen == true) add("hood")
         }
         if (st.doorOpen != null || st.windowOpen != null) {
-            fact("Open", if (open.isEmpty()) "All closed" else open.joinToString(", "), null, AppIcons.DirectionsCar, "open door doors window windows trunk hood closed ajar")
+            fact(FactTopic.DOORS, "Open", if (open.isEmpty()) "All closed" else open.joinToString(", "), null, AppIcons.DirectionsCar, "open door doors window windows trunk hood closed ajar")
         }
         st.airCtrlOn?.let { on ->
             val setpoint = st.airTemp?.value?.let { degLabel(it, appearance.useFahrenheit, st.airTemp?.unit) }
-            fact("Climate", if (on) "On" else "Off", setpoint?.let { "set to $it" }, AppIcons.Climate, "climate ac heat heater cool air conditioning temperature defrost")
+            fact(FactTopic.CLIMATE, "Climate", if (on) "On" else "Off", setpoint?.let { "set to $it" }, AppIcons.Climate, "climate ac heat heater cool air conditioning temperature defrost")
         }
-        engineLabel(st.engine)?.let { fact("Engine", it, null, AppIcons.DirectionsCar, "engine running parked ignition on off") }
-        parseOdometerMiles(v.odometer)?.let { fact("Odometer", formatDistance(it, appearance.metricDistance), null, Icons.Filled.Speed, "odometer mileage miles km distance driven") }
-        (state.placeNames[v.vin] ?: state.locations[v.vin]?.coordString(4))?.let { fact("Location", it, null, Icons.Filled.Place, "location where parked place gps address map") }
+        engineLabel(st.engine)?.let { fact(FactTopic.ENGINE, "Engine", it, null, AppIcons.DirectionsCar, "engine running parked ignition on off") }
+        parseOdometerMiles(v.odometer)?.let { fact(FactTopic.ODOMETER, "Odometer", formatDistance(it, appearance.metricDistance), null, Icons.Filled.Speed, "odometer mileage miles km distance driven") }
+        (state.placeNames[v.vin] ?: state.locations[v.vin]?.coordString(4))?.let { fact(FactTopic.LOCATION, "Location", it, null, Icons.Filled.Place, "location where parked place gps address map") }
     }
 }
 
@@ -99,3 +104,10 @@ internal fun rankFacts(tokens: List<String>, facts: List<CarFact>): List<CarFact
     }
     return scored(fuzzy = false).ifEmpty { scored(fuzzy = true) }.sortedByDescending { it.second }.map { it.first }
 }
+
+/** One piece of UI to lift into the results: a car's [topic], found by the words that matched its facts. */
+internal class SearchPiece(val vin: String, val car: String, val topic: FactTopic)
+
+/** The pieces [tokens] ask for, best first: each (car, topic) once, in the order its best fact ranked. */
+internal fun rankPieces(tokens: List<String>, facts: List<CarFact>): List<SearchPiece> =
+    rankFacts(tokens, facts).distinctBy { it.vin to it.topic }.map { SearchPiece(it.vin, it.car, it.topic) }

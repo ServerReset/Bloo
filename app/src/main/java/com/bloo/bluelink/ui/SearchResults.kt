@@ -75,7 +75,7 @@ internal fun SettingsSearchResults(
         buildSettingsSearchEntries(state, appearance, notif, vm, canBio, prefs)
     }
     val facts = remember(state, appearance) { carFacts(state, appearance) }
-    val factHits = remember(facts, tokens) { rankFacts(tokens, facts) }
+    val pieces = remember(facts, tokens) { rankPieces(tokens, facts) }
     val settings = remember(entries, tokens, limit) {
         val strict = entries.mapNotNull { e -> searchScore(tokens, e, fuzzy = false)?.let { e to it } }
         val scored = strict.ifEmpty { entries.mapNotNull { e -> searchScore(tokens, e, fuzzy = true)?.let { e to it } } }
@@ -107,15 +107,16 @@ internal fun SettingsSearchResults(
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(GapRow)) {
         SearchPillList(Modifier.weight(1f, fill = false), listState) {
-            if (factHits.isEmpty() && settings.isEmpty() && suggestedCommands.isEmpty()) {
+            if (pieces.isEmpty() && settings.isEmpty() && suggestedCommands.isEmpty()) {
                 pillItem("none", listState) {
                     // Not a dead end: point at the kinds of thing the bar understands.
                     MessagePill("No matches for \"$query\"", "Try a car name, a setting, or a command like \"lock my car\".", hazeState)
                 }
             }
-            if (factHits.isNotEmpty()) {
-                pillItem("head:cars", listState) { SearchHeading(if (factHits.size > 1) "Your cars · ${factHits.size}" else "Your cars", hazeState) }
-                factHits.forEach { f -> pillItem("fact:${f.title}", listState) { FactPill(f, hazeState) } }
+            if (pieces.isNotEmpty()) {
+                pillItem("head:cars", listState) { SearchHeading(if (pieces.size > 1) "From your cars · ${pieces.size}" else "From your cars", hazeState) }
+                // Pieces of the car's own page, lifted out: the charge bar, the lock buttons, the climate switch, the map.
+                pieces.forEach { p -> pillItem("piece:${p.vin}:${p.topic}", listState) { SearchPieceView(p, state, vm, appearance, hazeState) } }
             }
             if (suggestedCommands.isNotEmpty()) {
                 pillItem("head:actions", listState) { SearchHeading("Actions", hazeState) }

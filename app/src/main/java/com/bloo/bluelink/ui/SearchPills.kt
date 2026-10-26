@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -85,18 +87,6 @@ private fun PillBody(
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline), content = content)
         trailing?.invoke()
-    }
-}
-
-/** What the app knows about a car, as an answer: the car and what, the value big, and a line of detail under it. */
-@Composable
-internal fun FactPill(fact: CarFact, hazeState: HazeState?) {
-    SearchGlassPill(hazeState, Modifier.semantics(mergeDescendants = true) {}) {
-        PillBody(fact.icon, MaterialTheme.colorScheme.primary) {
-            MutedText("${fact.label} · ${fact.car}")
-            RevealText(fact.value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            fact.detail?.let { MutedText(it) }
-        }
     }
 }
 
@@ -195,4 +185,53 @@ private fun Modifier.pillEdgeFocus(state: LazyListState, key: Any): Modifier = g
     scaleX = 1f - 0.08f * t
     scaleY = 1f - 0.2f * t
     transformOrigin = TransformOrigin(0.5f, if (intoTop >= intoBottom) 0f else 1f)
+}
+
+/**
+ * A piece of the app's own UI, lifted out and floating: a bigger, livelier glass than an ordinary result (the glass refracts), tagged
+ * with where it was lifted from, and set a little askew like a sheet pulled loose. It springs up into place when it arrives
+ * (peeling off the page), and a person who has asked for less motion gets it already in place.
+ */
+@Composable
+internal fun LiftedPiece(
+    origin: String,
+    icon: ImageVector,
+    key: Any,
+    hazeState: HazeState?,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val reduce = com.bloo.uicommon.LocalReduceMotion.current
+    val lift = remember(key) { androidx.compose.animation.core.Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(key) {
+        if (!reduce) lift.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = androidx.compose.animation.core.Spring.StiffnessLow))
+    }
+    // A faint, steady angle per piece (a fraction of a degree to a degree and a half), so a stack reads as loose sheets.
+    val tilt = ((key.hashCode() and 7) - 3) * 0.4f
+    val blurred = hazeState != null && canBlurBackdrops()
+    GlassSurface(
+        shape = RoundedCornerShape(26.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                val t = lift.value
+                val rest = 1f - t
+                translationY = rest * 36.dp.toPx()
+                scaleX = 0.92f + 0.08f * t
+                scaleY = 0.92f + 0.08f * t
+                rotationZ = tilt + rest * -4f
+                alpha = minOf(1f, t * 1.6f)
+            },
+        hazeState = hazeState,
+        tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = if (blurred) 0.6f else 0.96f),
+        contentAlignment = Alignment.TopStart,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(GapSection), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBadge(icon, tint = MaterialTheme.colorScheme.primary, size = 28.dp, iconSize = 16.dp)
+                Spacer(Modifier.width(GapRow))
+                MutedText(origin)
+            }
+            content()
+        }
+    }
 }
