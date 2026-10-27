@@ -1,5 +1,9 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.AnimatedSlider
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.AnimatedContent
@@ -108,6 +112,40 @@ internal fun StepRow(label: String, value: String, valueColor: Color = Color.Uns
             },
             label = "stepValue",
         ) { v -> RevealText(v, style = SecondaryTextStyle(), fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1) }
+    }
+}
+
+/**
+ * A labelled stepped slider that drags a local draft and commits once, when it settles: the label and a readout of the draft above, the
+ * slider below. [value] is the stored setting, and the draft starts over from it whenever [key] changes. [snap] rounds the settled value to
+ * a stop before it is shown and passed to [onCommit]; a write behind every frame of a drag would be a write per frame.
+ */
+@Composable
+internal fun DraftSlider(
+    label: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    readout: (Float) -> String,
+    onCommit: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    snap: (Float) -> Float = { it },
+    key: Any? = value,
+) {
+    var draft by remember(key) { mutableFloatStateOf(value) }
+    Column(modifier) {
+        StepRow(label, readout(draft))
+        AnimatedSlider(
+            value = draft,
+            onValueChange = { draft = it },
+            valueRange = valueRange,
+            steps = steps,
+            onValueSettled = {
+                val settled = snap(it)
+                draft = settled
+                onCommit(settled)
+            },
+        )
     }
 }
 

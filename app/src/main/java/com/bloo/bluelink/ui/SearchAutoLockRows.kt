@@ -11,7 +11,6 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.setAutoLockConfig
 import kotlin.math.roundToInt
-import com.bloo.uicommon.AnimatedSlider
 
 // --- AutoLock controls surfaced as search results ---
 
@@ -43,16 +42,17 @@ internal fun AutoLockGraceSearchRow(v: Vehicle, vm: AppViewModel) {
     var config by remember(v.vin) { mutableStateOf<AutoLockConfig?>(null) }
     LaunchedEffect(v.vin) { config = vm.autoLockConfig(v.vin) }
     val current = config ?: return
-    StepRow("Grace period", "${current.graceSeconds}s")
-    AnimatedSlider(
+    DraftSlider(
+        "Grace period",
         value = current.graceSeconds.toFloat(),
-        onValueChange = { config = current.copy(graceSeconds = it.roundToInt()) },
-        onValueSettled = {
+        valueRange = 10f..120f,
+        steps = 10,
+        readout = { "${it.roundToInt()}s" },
+        snap = { it.roundToInt().toFloat() },
+        onCommit = {
             val updated = current.copy(graceSeconds = it.roundToInt())
             config = updated
             vm.setAutoLockConfig(v.vin, updated)
         },
-        valueRange = 10f..120f,
-        steps = 10,
     )
 }

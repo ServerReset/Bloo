@@ -2,12 +2,10 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.bloo.bluelink.data.SettingsStore
 import kotlin.math.roundToInt
-import com.bloo.uicommon.AnimatedSlider
 
 /**
  * How clear the liquid glass is, from heavily frosted (an opaque, soft backing) to nearly clear
@@ -18,23 +16,22 @@ import com.bloo.uicommon.AnimatedSlider
 internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     // The last, Ultra, turns every glass effect up past maximum on EVERY surface; the rest set how
     // transparent the floating glass is.
-    var index by remember(appearance.glassClarity, appearance.ultraGlass) {
-        mutableFloatStateOf((if (appearance.ultraGlass) GlassStops.lastIndex else nearestGlassStop(appearance.glassClarity)).toFloat())
-    }
-    val stop = GlassStops[index.roundToInt().coerceIn(0, GlassStops.lastIndex)]
-    StepRow("Glass", if (stop.ultra) "Ultra · everything turned up past maximum" else "${stop.name} · ${(stop.transparency * 100).roundToInt()}% transparent")
-    AnimatedSlider(
-        value = index,
-        onValueChange = { index = it },
+    DraftSlider(
+        "Glass",
+        value = (if (appearance.ultraGlass) GlassStops.lastIndex else nearestGlassStop(appearance.glassClarity)).toFloat(),
         valueRange = 0f..GlassStops.lastIndex.toFloat(),
         steps = GlassStops.size - 2,
-        onValueSettled = {
-            val i = it.roundToInt().coerceIn(0, GlassStops.lastIndex)
-            index = i.toFloat()
-            val picked = GlassStops[i]
+        readout = {
+            val stop = GlassStops[it.roundToInt().coerceIn(0, GlassStops.lastIndex)]
+            if (stop.ultra) "Ultra · everything turned up past maximum" else "${stop.name} · ${(stop.transparency * 100).roundToInt()}% transparent"
+        },
+        snap = { it.roundToInt().coerceIn(0, GlassStops.lastIndex).toFloat() },
+        onCommit = {
+            val picked = GlassStops[it.roundToInt()]
             vm.setGlassClaritySoon(picked.transparency)
             vm.setUltraGlass(picked.ultra)
         },
+        key = appearance.glassClarity to appearance.ultraGlass,
     )
     BodySmallText("How see-through floating glass is, from solid to nothing but the bending edge. Ultra puts glass on every card and cranks the edge refraction, colour fringe and shine as far as they go. Heavy on older devices.")
 }

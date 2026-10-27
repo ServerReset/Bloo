@@ -8,7 +8,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -26,7 +25,6 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
-import com.bloo.uicommon.AnimatedSlider
 
 /** Dialog to create or edit a [CustomPaletteData]. */
 @Composable
@@ -123,31 +121,28 @@ internal fun vibrancyIndexFor(v: Float): Int =
  */
 @Composable
 internal fun VibrancySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
-    var indexDraft by remember(appearance.vibrancy) { mutableFloatStateOf(vibrancyIndexFor(appearance.vibrancy).toFloat()) }
-    StepRow("Vibrancy", VibrancyLabels[indexDraft.roundToInt().coerceIn(0, 2)])
-    AnimatedSlider(
-        value = indexDraft,
-        onValueChange = { indexDraft = it },
+    DraftSlider(
+        "Vibrancy",
+        value = vibrancyIndexFor(appearance.vibrancy).toFloat(),
         valueRange = 0f..2f,
         steps = 1,
-        onValueSettled = {
-            val idx = it.roundToInt().coerceIn(0, 2)
-            indexDraft = idx.toFloat()
-            vm.setVibrancySoon(VibrancySteps[idx])
-        },
+        readout = { VibrancyLabels[it.roundToInt().coerceIn(0, 2)] },
+        snap = { it.roundToInt().coerceIn(0, 2).toFloat() },
+        onCommit = { vm.setVibrancySoon(VibrancySteps[it.roundToInt()]) },
+        key = appearance.vibrancy,
     )
 }
 
 @Composable
 internal fun UiScaleSlider(appearance: SettingsStore.Appearance, vm: AppViewModel, label: String = "Text & layout scale") {
-    var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
-    StepRow(label, "${(uiScaleDraft * 100).roundToInt()}%")
-    AnimatedSlider(
-        value = uiScaleDraft,
-        onValueChange = { uiScaleDraft = it },
+    DraftSlider(
+        label,
+        value = appearance.uiScale,
         valueRange = 0.8f..1.3f,
         steps = 4,
-        onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
+        readout = { "${(it * 100).roundToInt()}%" },
+        snap = { (it * 10).roundToInt() / 10f },
+        onCommit = { vm.setUiScaleSoon(it) },
     )
 }
 
