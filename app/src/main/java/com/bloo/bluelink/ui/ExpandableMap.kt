@@ -139,6 +139,8 @@ internal fun ExpandableMapLayer(
     val openSpec: AnimationSpec<Float> = if (plainMotion) tween(160, easing = LinearEasing) else tween(MapOpenMs, easing = MapOpenEasing)
     val closeSpec: AnimationSpec<Float> = if (plainMotion) tween(160, easing = LinearEasing) else tween(MapCloseMs, easing = MapCloseEasing)
     // The bars' spring is read here, not inside the coroutine: spring() is composable, and so only callable during composition.
+    // The gap the top bar leaves above the screen's edge, read here: tokens are composable, so not inside the draw block below.
+    val barGapPx = with(density) { GapSection.toPx() * 2f }
     val chromeInSpec: AnimationSpec<Float> = if (plainMotion) tween(120) else spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow)
 
     val placed = rootPos != null
@@ -302,7 +304,7 @@ internal fun ExpandableMapLayer(
                         .graphicsLayer {
                             // 0 is off the top of the screen, 1 its place; the bounce takes it a little past 1 either way.
                             alpha = 1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)
-                            translationY = -(1f - chrome.value) * (windowSize.height * 0.15f + size.height + GapSection.toPx() * 2f)
+                            translationY = -(1f - chrome.value) * (windowSize.height * 0.15f + size.height + barGapPx)
                         },
                 )
             }
