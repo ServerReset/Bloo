@@ -5,7 +5,6 @@ package com.bloo.bluelink.ui
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.Role
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -131,11 +130,7 @@ internal fun PebbleHeaderRow(
                 titleTrailing = titleTrailing, titleTrailingAtEnd = titleTrailingAtEnd,
             )
             if (summary != null) {
-                AnimatedContent(
-                    targetState = summary,
-                    transitionSpec = { expandContentTransform() },
-                    label = "pebbleSummary",
-                ) { s -> RollingNumber(
+                AnimatedSwap(summary, label = "pebbleSummary") { s -> RollingNumber(
                     s,
                     style = SecondaryTextStyle(),
                     fontWeight = FontWeight.Medium,

@@ -144,11 +144,7 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
         Spacer(Modifier.width(GapGroup))
         Column {
             TitleSmallText(title)
-            AnimatedContent(
-                targetState = status,
-                transitionSpec = { expandContentTransform() },
-                label = "statusHeaderText",
-            ) { s ->
+            AnimatedSwap(status, label = "statusHeaderText") { s ->
                 RevealText(s, style = SecondaryTextStyle(), color = animTint, fontWeight = FontWeight.Medium)
             }
         }

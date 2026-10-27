@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -232,11 +231,7 @@ internal fun PrimaryActions(
                     modifier = Modifier.size(22.dp),
                 )
             }
-            AnimatedContent(
-                targetState = stateText,
-                transitionSpec = { expandContentTransform() },
-                label = "lockStateText",
-            ) { text ->
+            AnimatedSwap(stateText, label = "lockStateText") { text ->
                 RevealText(
                     text,
                     style = PrimaryTextStyle(),

@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.AnimatedContent
 import kotlinx.coroutines.delay
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.LocalReduceMotion
@@ -127,6 +129,26 @@ internal fun EnterOnce(
 /** Transition spec for [AnimatedContent] pairing [expandEnter] and [expandExit]. */
 internal fun expandContentTransform(): ContentTransform =
     expandEnter() togetherWith expandExit()
+
+/**
+ * A value that changes and swaps in place: the old one folds away and the new one opens into its space, with the app's one expand
+ * motion. Every text or small value that changes under the user's eye uses this rather than spelling the AnimatedContent out.
+ */
+@Composable
+internal fun <T> AnimatedSwap(
+    value: T,
+    label: String,
+    modifier: Modifier = Modifier,
+    content: @Composable AnimatedContentScope.(T) -> Unit,
+) {
+    AnimatedContent(
+        targetState = value,
+        transitionSpec = { expandContentTransform() },
+        label = label,
+        modifier = modifier,
+        content = content,
+    )
+}
 
 /** Independent pop-in/pop-out for ONE row-level element that appears while its pebble is open. */
 @Composable
