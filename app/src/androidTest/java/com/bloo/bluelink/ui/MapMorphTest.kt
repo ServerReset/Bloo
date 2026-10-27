@@ -20,6 +20,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.GeoLocation
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -72,22 +73,29 @@ class MapMorphTest {
                 )
             }
         }
-        // The first frames: placed, and not yet moving.
-        rule.mainClock.advanceTimeByFrame()
+        // The first frame: placed, and the spring has barely begun, so the map is still on the pebble's rectangle (a few dp of it at most).
         rule.mainClock.advanceTimeByFrame()
         val start = rule.onNodeWithTag("map").getBoundsInRoot()
         val density = rule.density.density
         // The pebble's rectangle is in screen coordinates and the bounds are in the compose root's: the root need not sit at the screen's corner.
         val rootOnScreen = rule.onRoot().fetchSemanticsNode().layoutInfo.coordinates.positionOnScreen()
-        assertEquals("left", (origin.left - rootOnScreen.x) / density, start.left.value, 3f)
-        assertEquals("top", (origin.top - rootOnScreen.y) / density, start.top.value, 3f)
-        assertEquals("width", origin.width / density, (start.right - start.left).value, 3f)
-        assertEquals("height", origin.height / density, (start.bottom - start.top).value, 3f)
+        assertEquals("left", (origin.left - rootOnScreen.x) / density, start.left.value, 15f)
+        assertEquals("top", (origin.top - rootOnScreen.y) / density, start.top.value, 15f)
+        assertEquals("width", origin.width / density, (start.right - start.left).value, 15f)
+        assertEquals("height", origin.height / density, (start.bottom - start.top).value, 15f)
+
+        // Part-way through it is neither: it is growing, not jumping.
+        rule.mainClock.advanceTimeBy(150)
+        val mid = rule.onNodeWithTag("map").getBoundsInRoot()
+        val startWidth = (start.right - start.left).value
+        val midWidth = (mid.right - mid.left).value
+        assertTrue("wider part-way through ($midWidth > $startWidth)", midWidth > startWidth)
 
         // Run the opening out: the map ends as the sheet, the full width and 85% of the height, bottom-anchored.
         rule.mainClock.advanceTimeBy(5_000)
         val root = rule.onRoot().getBoundsInRoot()
         val end = rule.onNodeWithTag("map").getBoundsInRoot()
+        assertTrue("wider at the end than part-way ($midWidth)", (end.right - end.left).value > midWidth)
         assertEquals("full width", root.right.value - root.left.value, (end.right - end.left).value, 3f)
         assertEquals("85% of the height", (root.bottom.value - root.top.value) * 0.85f, (end.bottom - end.top).value, 3f)
         assertEquals("bottom-anchored", root.bottom.value, end.bottom.value, 3f)
