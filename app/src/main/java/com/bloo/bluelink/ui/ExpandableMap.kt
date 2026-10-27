@@ -138,6 +138,8 @@ internal fun ExpandableMapLayer(
     val plainMotion = LocalReduceMotion.current || LocalPowerPolicy.current.lean
     val openSpec: AnimationSpec<Float> = if (plainMotion) tween(160, easing = LinearEasing) else tween(MapOpenMs, easing = MapOpenEasing)
     val closeSpec: AnimationSpec<Float> = if (plainMotion) tween(160, easing = LinearEasing) else tween(MapCloseMs, easing = MapCloseEasing)
+    // The bars' spring is read here, not inside the coroutine: spring() is composable, and so only callable during composition.
+    val chromeInSpec: AnimationSpec<Float> = if (plainMotion) tween(120) else spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow)
 
     val placed = rootPos != null
     LaunchedEffect(placed) {
@@ -157,7 +159,7 @@ internal fun ExpandableMapLayer(
         // chrome was already there while the map was still unfolding.
         expandFraction.animateTo(1f, animationSpec = openSpec)
         // The bars bounce in from off the screen's edge: a spring that overshoots its place and settles.
-        chrome.animateTo(1f, animationSpec = if (plainMotion) tween(120) else spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow))
+        chrome.animateTo(1f, animationSpec = chromeInSpec)
     }
 
     // How far the drag handle has actually been pulled down, in px -- the SAME real drag-to-dismiss
