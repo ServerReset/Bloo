@@ -39,6 +39,8 @@ internal fun BoxScope.DeviceMarker(
     tilePx: Float,
     panX: Float,
     panY: Float,
+    /** How much of the pan shows right now (0 to 1), as the map's own content is shifted by it. */
+    panWeight: () -> Float,
     scale: Float,
     box: State<IntSize>,
     marginPx: Float,
@@ -49,8 +51,9 @@ internal fun BoxScope.DeviceMarker(
     val halfW = box.value.width / 2f
     val halfH = box.value.height / 2f
     if (halfW <= 0f || halfH <= 0f) return
-    val sx = (((MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx).toFloat() + panX) * scale
-    val sy = (((MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx).toFloat() + panY) * scale
+    val weight = panWeight()
+    val sx = (((MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx).toFloat() + panX * weight) * scale
+    val sy = (((MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx).toFloat() + panY * weight) * scale
     if (markerOffBox(sx, sy, halfW, halfH, marginPx)) {
         val (ex, ey) = clampMarkerToEdge(sx, sy, halfW, halfH, marginPx)
         Box(

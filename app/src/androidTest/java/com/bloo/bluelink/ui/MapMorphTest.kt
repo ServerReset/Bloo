@@ -168,15 +168,13 @@ class MapMorphTest {
         assertEquals("the same map came back, nothing was rebuilt", 1, built)
     }
 
-    @Test fun theRealMapKeepsTheCarAtTheCentreOfItsBoxWhileItResizes() {
-        val origin = Rect(80f, 400f, 680f, 700f)
-        rule.mainClock.autoAdvance = false
+    /** The real map inside the real layer, with the pebble at [origin]; [state] is the map's pan and zoom, [dismissed] counts closes. */
+    private fun setRealMap(origin: Rect, state: CarMapState, onDismiss: () -> Unit) {
         rule.setContent {
             BlooTheme {
-                val state = remember { CarMapState() }
                 val movable = remember {
                     movableContentOf { modifier: Modifier, inputs: MapInputs ->
-                        CarMap(inputs.location, modifier.testTag("map"), state, inputs.deviceLocation, inputs.interactive, inputs.tileArea)
+                        CarMap(inputs.location, modifier.testTag("map"), state, inputs.deviceLocation, inputs.interactive, inputs.tileArea, inputs.panWeight)
                     }
                 }
                 ExpandableMapLayer(
@@ -189,25 +187,79 @@ class MapMorphTest {
                     map = { modifier, inputs -> movable(modifier, inputs) },
                     hazeState = null,
                     onRefreshLocation = {},
-                    onDismiss = {},
+                    onDismiss = onDismiss,
                 )
             }
         }
-        // Let the map start (it waits a few frames the first time) and the opening get under way, then sample it as it grows.
+    }
+
+    /** Where the car's pin tip is, in the compose root's dp. */
+    private fun pinTip(): Pair<Float, Float> {
+        val pin = rule.onNodeWithContentDescription("Car location").getBoundsInRoot()
+        return (pin.left.value + pin.right.value) / 2f to pin.bottom.value
+    }
+
+    @Test fun theCarStaysWhereItWasOnScreenWhileTheMapOpens() {
+        val origin = Rect(80f, 400f, 680f, 700f)
+        rule.mainClock.autoAdvance = false
+        setRealMap(origin, CarMapState()) {}
+        // Let the map start (it waits a few frames the first time) and the opening get under way.
         repeat(8) { rule.mainClock.advanceTimeByFrame() }
-        var lastWidth = 0f
+        val density = rule.density.density
+        val rootOnScreen = rule.onRoot().fetchSemanticsNode().layoutInfo.coordinates.positionOnScreen()
+        val wantX = (origin.center.x - rootOnScreen.x) / density
+        val wantY = (origin.center.y - rootOnScreen.y) / density
+        // The pin is where the pebble's pin was, at every point of the opening: the map just gets bigger around it.
         repeat(6) { step ->
             rule.mainClock.advanceTimeBy(60)
-            val box = rule.onNodeWithTag("map").getBoundsInRoot()
-            val pin = rule.onNodeWithContentDescription("Car location").getBoundsInRoot()
-            val boxCentreX = (box.left.value + box.right.value) / 2f
-            val boxCentreY = (box.top.value + box.bottom.value) / 2f
-            val width = box.right.value - box.left.value
-            // The pin's tip (the bottom of its icon) is the car: it stays dead centre however big the box is at that moment.
-            assertEquals("step $step: car x at the box centre (box ${width}dp wide)", boxCentreX, (pin.left.value + pin.right.value) / 2f, 2f)
-            assertEquals("step $step: car y at the box centre", boxCentreY, pin.bottom.value, 2f)
-            assertTrue("step $step: the box is growing ($width > $lastWidth)", width >= lastWidth)
-            lastWidth = width
+            val (x, y) = pinTip()
+            assertEquals("step $step: pin x", wantX, x, 3f)
+            assertEquals("step $step: pin y", wantY, y, 3f)
         }
+        rule.mainClock.advanceTimeBy(5_000)
+        val (x, y) = pinTip()
+        assertEquals("open: pin x", wantX, x, 3f)
+        assertEquals("open: pin y", wantY, y, 3f)
+        // And so the open map is off-centre about it, as the pebble was: the pin is nowhere near the middle of the sheet.
+        val box = rule.onNodeWithTag("map").getBoundsInRoot()
+        val boxCentreY = (box.top.value + box.bottom.value) / 2f
+        assertTrue("open: the map is off-centre about the pin", kotlin.math.abs(boxCentreY - y) > 40f)
+    }
+
+    @Test fun closingGlidesThePinToTheMiddleOfTheCollapsedMapInStepWithTheCollapse() {
+        val origin = Rect(80f, 400f, 680f, 700f)
+        val state = CarMapState()
+        var dismissed = 0
+        rule.mainClock.autoAdvance = false
+        setRealMap(origin, state) { dismissed++ }
+        repeat(8) { rule.mainClock.advanceTimeByFrame() }
+        rule.mainClock.advanceTimeBy(5_000)
+        val density = rule.density.density
+        val rootOnScreen = rule.onRoot().fetchSemanticsNode().layoutInfo.coordinates.positionOnScreen()
+        val wantX = (origin.center.x - rootOnScreen.x) / density
+        val wantY = (origin.center.y - rootOnScreen.y) / density
+
+        // Pan the open map: the pin is now away from where the pebble's was.
+        state.pan(100f, -150f)
+        rule.mainClock.advanceTimeByFrame()
+        val (px, py) = pinTip()
+        assertEquals("panned: pin x moved with the finger", wantX + 100f / density, px, 3f)
+        assertEquals("panned: pin y moved with the finger", wantY - 150f / density, py, 3f)
+
+        // Close it (a tap above the sheet) and watch the pin come in as the map collapses.
+        rule.onRoot().performTouchInput { click(Offset(width / 2f, 5f)) }
+        var last = Float.MAX_VALUE
+        repeat(14) { step ->
+            rule.mainClock.advanceTimeBy(40)
+            val (x, y) = pinTip()
+            val away = kotlin.math.hypot(x - wantX, y - wantY)
+            assertTrue("step $step: the pin only comes closer ($away <= $last)", away <= last + 2f)
+            last = away
+        }
+        rule.mainClock.advanceTimeBy(5_000)
+        val (x, y) = pinTip()
+        assertEquals("closed: pin x at the middle of the collapsed map", wantX, x, 3f)
+        assertEquals("closed: pin y at the middle of the collapsed map", wantY, y, 3f)
+        assertEquals("dismissed once", 1, dismissed)
     }
 }

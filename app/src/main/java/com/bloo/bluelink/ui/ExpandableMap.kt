@@ -1,5 +1,10 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.LocalPowerPolicy
+import com.bloo.uicommon.LocalReduceMotion
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.runtime.derivedStateOf
 import kotlin.math.roundToInt
 import androidx.compose.ui.layout.layout
@@ -71,6 +76,12 @@ internal data class MapFeature(
     val onClick: () -> Unit,
 )
 
+/** How long the map takes to open and to close, and the curves: a ramp up, a slowing down, and a few percent of overshoot before it settles (the close overshoots a little less). */
+private const val MapOpenMs = 520
+private const val MapCloseMs = 440
+private val MapOpenEasing = CubicBezierEasing(0.32f, 0f, 0.2f, 1.3f)
+private val MapCloseEasing = CubicBezierEasing(0.32f, 0f, 0.2f, 1.2f)
+
 /** The pebble map's corner radius (its clip, StandardShape) and the sheet's top corners, which the map's own corners ease between. */
 private val PebbleMapCorner = 16.dp
 private val SheetCorner = 28.dp
@@ -108,21 +119,38 @@ internal fun ExpandableMapLayer(
     }
     val showMe = rememberShowMyLocation(location, deviceLocation, mapState, deviceRequest)
 
+    // The overlay's own place on screen: the pebble's rect is in screen coordinates, and the map is placed in this box's.
+    var rootPos by remember { mutableStateOf<androidx.compose.ui.geometry.Offset?>(null) }
+    val windowSize = LocalWindowInfo.current.containerSize
+
     // Animate from pebble size to full screen.
     val expandFraction = remember { Animatable(0f) }
     // The chrome (top bar + bottom row) has its OWN track, so its arrival and departure can be
     // sequenced against the sheet's: it comes in AFTER the map has grown, and leaves BEFORE the map
     // shrinks -- the sheet morphing back into its pebble is the part the eye should follow out.
     val chrome = remember { Animatable(0f) }
-    // Read here, at composable scope, not inside the LaunchedEffect below -- lowPowerAwareSpring is
-    // itself @Composable, so it can't be called from a suspend lambda.
-    val openSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+    // Read here, at composable scope, not inside the LaunchedEffect below. A ramp up, a slowing down, and a few percent of
+    // overshoot before it settles; under reduce-motion or power saving, a short plain ease instead.
+    val plainMotion = LocalReduceMotion.current || LocalPowerPolicy.current.lean
+    val openSpec: AnimationSpec<Float> = if (plainMotion) tween(160, easing = LinearEasing) else tween(MapOpenMs, easing = MapOpenEasing)
+    val closeSpec: AnimationSpec<Float> = if (plainMotion) tween(160, easing = LinearEasing) else tween(MapCloseMs, easing = MapCloseEasing)
 
-    LaunchedEffect(Unit) {
+    val placed = rootPos != null
+    LaunchedEffect(placed) {
+        if (!placed) return@LaunchedEffect
+        // The pin stays where it was on screen: the map is panned by how far the pebble's middle is from the sheet's, and that pan ramps in
+        // with the opening (see MapInputs.panWeight), so the map opens off-centre and just gets bigger. Closing ramps it back out, which is
+        // what carries the pin to the middle of the collapsed map.
+        val root = rootPos ?: return@LaunchedEffect
+        val o = originBounds.translate(-root.x, -root.y)
+        val w = windowSize.width.toFloat()
+        val h = windowSize.height.toFloat()
+        val k = mapState.scale.coerceAtLeast(0.5f)
+        mapState.panTo((o.center.x - w / 2f) / k, (o.center.y - (h - h * 0.85f / 2f)) / k)
         // Open in two beats: the sheet grows from the pebble to full screen first, THEN the bars
         // arrive. Previously they faded in from the very first frame (expandFraction > 0.1), so the
         // chrome was already there while the map was still unfolding.
-        expandFraction.animateTo(1f, animationSpec = openSpring)
+        expandFraction.animateTo(1f, animationSpec = openSpec)
         chrome.animateTo(1f, animationSpec = tween(MotionMedium))
     }
 
@@ -142,12 +170,16 @@ internal fun ExpandableMapLayer(
     // lowPowerAwareSpring is itself @Composable (it reads battery-saver state), so it can't be
     // called from inside a suspend lambda.
     val dragSpring = lowPowerAwareSpring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium)
-    // Same reason as dragSpring above -- read here, not inside the scope.launch{} in close().
-    val closeSpring = lowPowerAwareSpring<Float>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
     // How far down the pull has gone, 0..1 over 40% of the screen. The sheet shrinks toward its
     // pebble as it is dragged, so letting go carries the SAME motion on, instead of the sheet snapping
     // back to full size and then shrinking.
     val closeDistPx = LocalWindowInfo.current.containerSize.height * 0.4f
+    // How far open the map is, 0 (the pebble) to 1 (the sheet), a little past either end while it overshoots. Part-way to the pebble already
+    // while dragged down; the rest on release.
+    fun progress(): Float {
+        val drag = (dragPx.value / closeDistPx).coerceIn(0f, 1f)
+        return expandFraction.value * (1f - 0.5f * drag)
+    }
     var closing by remember { mutableStateOf(false) }
     // The top bar and bottom buttons exist only once the chrome's own track has left zero. A derived
     // boolean, so the sheet recomposes when it FLIPS, not on every frame of the springs.
@@ -159,16 +191,14 @@ internal fun ExpandableMapLayer(
             // Chrome first (a quick retreat), then the sheet morphs back into its pebble, and the
             // drag offset eases away with it so a mid-drag dismiss doesn't visibly snap dragPx to 0.
             scope.launch { chrome.animateTo(0f, animationSpec = tween(MotionFast)) }.join()
-            val a = scope.launch { expandFraction.animateTo(0f, animationSpec = closeSpring) }
-            val b = scope.launch { dragPx.animateTo(0f, animationSpec = closeSpring) }
+            val a = scope.launch { expandFraction.animateTo(0f, animationSpec = closeSpec) }
+            val b = scope.launch { dragPx.animateTo(0f, animationSpec = closeSpec) }
             a.join(); b.join()
+            // The pin has arrived at the middle of the collapsed map; the pebble's map starts from there.
+            mapState.panTo(0f, 0f)
             onDismiss()
         }
     }
-
-    // The overlay's own place on screen: the pebble's rect is in screen coordinates, and the map is placed in this box's.
-    var rootPos by remember { mutableStateOf<androidx.compose.ui.geometry.Offset?>(null) }
-    val windowSize = LocalWindowInfo.current.containerSize
 
     // Back handler for closing
     BackHandler(enabled = isExpanded) { close() }
@@ -177,7 +207,7 @@ internal fun ExpandableMapLayer(
         // Scrim background (dims/blurs content behind) -- covers the WHOLE screen, not just the
         // sheet: this is what shows through the top 15% strip the sheet itself doesn't reach.
         if (isExpanded) {
-            ScrimBlur(hazeState = hazeState, progress = { expandFraction.value })
+            ScrimBlur(hazeState = hazeState, progress = { expandFraction.value.coerceIn(0f, 1f) })
             Box(Modifier.fillMaxSize().noRippleClickable { close() })
         }
 
@@ -186,7 +216,7 @@ internal fun ExpandableMapLayer(
         // of it. Closing runs the same rectangle back down to the pebble's, where the map is put back.
         val sheetCornerPx = with(density) { SheetCorner.toPx() }
         val pebbleCornerPx = with(density) { PebbleMapCorner.toPx() }
-        val mapInputs = MapInputs(location, deviceLocation, interactive = isExpanded, tileArea = windowSize)
+        val mapInputs = MapInputs(location, deviceLocation, interactive = isExpanded, tileArea = windowSize, panWeight = { progress().coerceIn(0f, 1f) })
         map(
             Modifier
                 .layout { measurable, constraints ->
@@ -196,10 +226,7 @@ internal fun ExpandableMapLayer(
                     val sheet = Rect(0f, h - sheetH + dragPx.value, w, h + dragPx.value)
                     val root = rootPos
                     val origin = if (root == null) sheet else originBounds.translate(-root.x, -root.y)
-                    // Part-way to the pebble already while dragged down; the rest on release.
-                    val drag = (dragPx.value / closeDistPx).coerceIn(0f, 1f)
-                    val t = (expandFraction.value * (1f - 0.5f * drag)).coerceIn(0f, 1f)
-                    val r = lerp(origin, sheet, t)
+                    val r = lerp(origin, sheet, progress())
                     val placeable = measurable.measure(
                         androidx.compose.ui.unit.Constraints.fixed(r.width.roundToInt().coerceAtLeast(1), r.height.roundToInt().coerceAtLeast(1)),
                     )
@@ -208,8 +235,7 @@ internal fun ExpandableMapLayer(
                 .graphicsLayer {
                     // Not drawn until it knows where the overlay is, rather than for a frame in the wrong place.
                     alpha = if (rootPos == null) 0f else 1f
-                    val drag = (dragPx.value / closeDistPx).coerceIn(0f, 1f)
-                    val t = (expandFraction.value * (1f - 0.5f * drag)).coerceIn(0f, 1f)
+                    val t = progress().coerceIn(0f, 1f)
                     val top = lerp(pebbleCornerPx, sheetCornerPx, t)
                     val bottom = lerp(pebbleCornerPx, 0f, t)
                     shape = RoundedCornerShape(

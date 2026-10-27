@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.layout.ParentDataModifier
@@ -75,6 +76,7 @@ internal fun CarMap(
     deviceLocation: GeoLocation? = null,
     interactive: Boolean = true,
     tileArea: IntSize = IntSize.Zero,
+    panWeight: () -> Float = { 1f },
 ) {
     var started by remember { mutableStateOf(MapStartGate.open) }
     if (!started) {
@@ -86,7 +88,7 @@ internal fun CarMap(
         Box(modifier)
         return
     }
-    CarMapBody(location, modifier, state, deviceLocation, interactive, tileArea)
+    CarMapBody(location, modifier, state, deviceLocation, interactive, tileArea, panWeight)
 }
 
 /**
@@ -116,8 +118,11 @@ private fun CarMapBody(
      * change on every frame of the resize. Zero means the box's own size.
      */
     tileArea: IntSize = IntSize.Zero,
+    /** How much of [state]'s pan shows right now (0 to 1); read in the draw phase, so ramping it recomposes nothing. */
+    panWeight: () -> Float = { 1f },
 ) {
     val context = LocalContext.current
+    val weight by rememberUpdatedState(panWeight)
     // Cold-start diagnostic; see HeroVisual's matching mark.
     com.bloo.bluelink.data.StartupTrace.once("carmap-composing", "CarMap composing (first one)")
 
@@ -222,8 +227,9 @@ private fun CarMapBody(
                 val fetchScaleCoverage = 1f / state.scale.coerceAtLeast(0.5f)
                 val fetchW = wPx * fetchScaleCoverage
                 val fetchH = hPx * fetchScaleCoverage
-                val fetchOriginX = xTileF * tilePx - fetchW / 2f - state.panX
-                val fetchOriginY = yTileF * tilePx - fetchH / 2f - state.panY
+                val w = weight().coerceIn(0f, 1f)
+                val fetchOriginX = xTileF * tilePx - fetchW / 2f - state.panX * w
+                val fetchOriginY = yTileF * tilePx - fetchH / 2f - state.panY * w
                 TileRange(
                     firstX = floor(fetchOriginX / tilePx).toInt(),
                     firstY = floor(fetchOriginY / tilePx).toInt(),
@@ -288,8 +294,9 @@ private fun CarMapBody(
                     // Pan is one layer translation; children are placed at pan-independent
                     // positions. Divide by `scale` to bring tile-space pan into parent space (keeps
                     // 1:1 finger tracking).
-                    translationX = state.panX * state.scale
-                    translationY = state.panY * state.scale
+                    val w = weight().coerceIn(0f, 1f)
+                    translationX = state.panX * state.scale * w
+                    translationY = state.panY * state.scale * w
                     scaleX = state.scale
                     scaleY = state.scale
                 },
@@ -389,6 +396,7 @@ private fun CarMapBody(
                 tilePx = tilePx,
                 panX = state.panX,
                 panY = state.panY,
+                panWeight = { weight().coerceIn(0f, 1f) },
                 scale = state.scale,
                 box = boxSize,
                 marginPx = with(density) { 22.dp.toPx() },

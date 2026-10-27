@@ -41,6 +41,16 @@ internal class CarMapState {
     private var userAdjusted = false
 
     /**
+     * Puts the map at exactly this pan (in the same pixels as [pan]): the car that far from the middle of the box. The full-screen map
+     * uses it to open with the car where it was in the pebble, and to hand the pan back to nothing when it closes.
+     */
+    fun panTo(x: Float, y: Float) {
+        userAdjusted = true
+        panX = x
+        panY = y
+    }
+
+    /**
      * A continuous drag in screen pixels: the map slides with the finger, so the offset accumulates
      * in the drag direction.
      */
@@ -150,7 +160,7 @@ internal class ExpandedMapState {
     fun mapFor(vin: String): @Composable (Modifier, MapInputs) -> Unit = perVinMap.getOrPut(vin) {
         val state = mapStateFor(vin)
         movableContentOf { modifier: Modifier, inputs: MapInputs ->
-            CarMap(inputs.location, modifier, state, inputs.deviceLocation, inputs.interactive, inputs.tileArea)
+            CarMap(inputs.location, modifier, state, inputs.deviceLocation, inputs.interactive, inputs.tileArea, inputs.panWeight)
         }
     }
 
@@ -184,4 +194,6 @@ internal data class MapInputs(
     val deviceLocation: GeoLocation?,
     val interactive: Boolean,
     val tileArea: IntSize = IntSize.Zero,
+    /** How much of the map's pan shows right now, 0 to 1: the full-screen map ramps it with its opening, so the car glides between the pebble's centre and where it was panned to. */
+    val panWeight: () -> Float = { 1f },
 )
