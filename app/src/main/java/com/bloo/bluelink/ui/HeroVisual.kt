@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.StartupTrace
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.animateColorAsState
@@ -267,7 +268,7 @@ internal fun HeroVisual(
     aspectRatio: Float? = null,
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("HeroVisual")
-    com.bloo.bluelink.data.StartupTrace.once("hero-visual-${v.vin}", "HeroVisual composing for ${v.name}")
+    StartupTrace.once("hero-visual-${v.vin}", "HeroVisual composing for ${v.name}")
     val density = LocalDensity.current
     val sizeModifier = when {
         // The photo fills the column at 16:9, but never grows past a height cap: on a wide column a
@@ -348,7 +349,7 @@ internal fun HeroVisual(
                         val sourceSize = (model as? java.io.File)?.let {
                             runCatching { it.length() }.getOrNull()
                         }
-                        com.bloo.bluelink.data.StartupTrace.once(
+                        StartupTrace.once(
                             "hero-photo-decoded-${v.vin}",
                             "hero photo decoded for ${v.name} (${state.result.dataSource}) in " +
                                 "${elapsedMs}ms, source=${sourceSize?.let { "${it / 1024}KB local file" } ?: "remote/unknown"}",

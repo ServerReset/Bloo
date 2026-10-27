@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.StartupTrace
 import android.content.ClipData
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterExitState
@@ -69,10 +70,10 @@ fun BlooApp(vm: AppViewModel) {
     // root, and the withFrameNanos below is the moment a frame is actually produced -- the pair
     // separates "compose is slow" from "the frame clock is late", which the frame monitor's own
     // numbers alone cannot distinguish.
-    com.bloo.bluelink.data.StartupTrace.once("compose-root", "BlooApp: first composition")
+    StartupTrace.once("compose-root", "BlooApp: first composition")
     LaunchedEffect(Unit) {
         withFrameNanos { }
-        com.bloo.bluelink.data.StartupTrace.once("compose-first-frame", "BlooApp: first frame callback")
+        StartupTrace.once("compose-first-frame", "BlooApp: first frame callback")
     }
     com.bloo.bluelink.perf.TrackRecompositions("BlooApp")
     val stateHolder = vm.state.collectAsStateWithLifecycle()
@@ -261,11 +262,11 @@ fun BlooApp(vm: AppViewModel) {
                 // Bootstrapping placeholder (see Screen.Loading): same aurora + wordmark as Login,
                 // nothing interactive.
                 Screen.Loading -> {
-                    com.bloo.bluelink.data.StartupTrace.once("screen-loading", "screen: Loading composed")
+                    StartupTrace.once("screen-loading", "screen: Loading composed")
                     LoadingScreen(Modifier.padding(padding))
                 }
                 Screen.Login -> Box(Modifier.padding(padding)) {
-                    com.bloo.bluelink.data.StartupTrace.once("screen-login", "screen: Login composed")
+                    StartupTrace.once("screen-login", "screen: Login composed")
                     val loginUpdateAvailable by remember { derivedStateOf { stateHolder.value.updateAvailable } }
                     val loginUpdateChecking by remember { derivedStateOf { stateHolder.value.updateChecking } }
                     val bootReauth by remember { derivedStateOf { stateHolder.value.bootReauth } }
@@ -287,7 +288,7 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Onboarding -> OnboardingScreen(vm)
                 is Screen.CarSetup -> OnboardingScreen(vm, OnboardingMode.NewCars(screen.vins))
                 Screen.Garage -> {
-                    com.bloo.bluelink.data.StartupTrace.once("screen-garage", "screen: Garage composed (first garage frame next)")
+                    StartupTrace.once("screen-garage", "screen: Garage composed (first garage frame next)")
                     // Reuses the outer `appearance`.
                     val auroraTouch = remember { AuroraTouch() }
                     val auroraReactions = remember { AuroraReactions() }

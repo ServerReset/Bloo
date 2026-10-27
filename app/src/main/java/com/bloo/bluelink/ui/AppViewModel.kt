@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.StartupTrace
 import android.app.Application
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.AndroidViewModel
@@ -78,24 +79,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         AppLog.log("$message (+${System.currentTimeMillis() - coldStartAt}ms)")
         // Same breadcrumb on the greppable startup trace, so one logcat filter shows the
         // ViewModel's phases interleaved with Application/Activity/frame marks.
-        com.bloo.bluelink.data.StartupTrace.markIfStarting(message)
+        StartupTrace.markIfStarting(message)
     }
 
     // Each store construction is timed individually: the ViewModel is constructed synchronously on
     // the main thread by MainActivity's `viewModels()` dereference, so anything a constructor does
     // (opening SharedPreferences, resolving DataStore files, building an ML Kit client) is on the
     // critical path to the first frame.
-    internal val store = com.bloo.bluelink.data.StartupTrace.trace("SessionStore()") { SessionStore(app) }
+    internal val store = StartupTrace.trace("SessionStore()") { SessionStore(app) }
 
-    internal val settingsStore = com.bloo.bluelink.data.StartupTrace.trace("SettingsStore()") { SettingsStore(app) }
+    internal val settingsStore = StartupTrace.trace("SettingsStore()") { SettingsStore(app) }
 
-    internal val credentialStore = com.bloo.bluelink.data.StartupTrace.trace("CredentialStore()") { CredentialStore(app) }
+    internal val credentialStore = StartupTrace.trace("CredentialStore()") { CredentialStore(app) }
 
-    internal val snapshotStore = com.bloo.bluelink.data.StartupTrace.trace("SnapshotStore()") { SnapshotStore(app) }
+    internal val snapshotStore = StartupTrace.trace("SnapshotStore()") { SnapshotStore(app) }
 
-    internal val statusCache = com.bloo.bluelink.data.StartupTrace.trace("StatusCache()") { StatusCache(app) }
+    internal val statusCache = StartupTrace.trace("StatusCache()") { StatusCache(app) }
 
-    internal val ai = com.bloo.bluelink.data.StartupTrace.trace("Ai()") { com.bloo.bluelink.data.Ai(app) }
+    internal val ai = StartupTrace.trace("Ai()") { com.bloo.bluelink.data.Ai(app) }
 
     // One repository per signed-in brand (any mix of brands can be active).
     internal val repos = mutableMapOf<Brand, VehicleRepository>()

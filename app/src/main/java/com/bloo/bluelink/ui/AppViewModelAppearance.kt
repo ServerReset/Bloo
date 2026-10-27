@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.StartupTrace
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.deleteCustomPalette
 import com.bloo.bluelink.data.saveCustomPalette
@@ -102,7 +103,7 @@ fun AppViewModel.setSeamlessInstallShizuku(value: Boolean) {
  * cold restart.
  */
 fun AppViewModel.refreshShizukuAvailable() {
-    com.bloo.bluelink.data.StartupTrace.markIfStarting("Shizuku probe: begin")
+    StartupTrace.markIfStarting("Shizuku probe: begin")
     viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
         val avail = com.bloo.bluelink.update.shizukuInstall().isAvailable()
         _state.update { it.copy(shizukuAvailable = avail) }

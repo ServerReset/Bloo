@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.StartupTrace
 import android.app.Application
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
@@ -94,12 +95,12 @@ suspend fun AppViewModel.loadGarageInner() {
     // Fire-and-forget, parallel to the vehicle fetch: refreshes the device's own location on app
     // open.
     refreshDeviceLocation()
-    com.bloo.bluelink.data.StartupTrace.markIfStarting(
+    StartupTrace.markIfStarting(
         "loadGarageInner: refreshDeviceLocation() dispatched (repos=${repos.size})",
     )
     // Started once per app open; no explicit stop, the subscription dies with the process.
     beginLiveDeviceLocation()
-    com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: live device location started")
+    StartupTrace.markIfStarting("loadGarageInner: live device location started")
     // That fetch is a network round trip and it was the gate on the garage being shown at all: the
     // UI sat on Screen.Loading for its whole duration (measured 2.1s on the API 34 emulator, and
     // that is before the garage's own first composition). The list is already on disk from the last
@@ -152,7 +153,7 @@ suspend fun AppViewModel.loadGarageInner() {
         // check + auto-sync collector run once this session -- bootstrapDriveSync is idempotent
         // (AtomicBoolean guard), so the non-empty path below calling it again is a no-op.
         bootstrapDriveSync()
-        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: publishing empty garage")
+        StartupTrace.markIfStarting("loadGarageInner: publishing empty garage")
         _state.update {
             it.copy(
                 // Keep whatever cars are already on screen (the cached garage) so the error banner
@@ -178,9 +179,9 @@ suspend fun AppViewModel.loadGarageInner() {
     }
     val vehicles = applyOrder(fetched, settingsStore.vehicleOrder(prefs))
     // The per-car/per-tile config fields, shared with refreshLocalCarConfig via perCarConfig.
-    com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: prefs snapshot + order applied, perCarConfig starting")
+    StartupTrace.markIfStarting("loadGarageInner: prefs snapshot + order applied, perCarConfig starting")
     val cfg = perCarConfig(vehicles, prefs)
-    com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: perCarConfig done")
+    StartupTrace.markIfStarting("loadGarageInner: perCarConfig done")
     // All three read the same prefs snapshot rather than re-fetching the DataStore per vehicle.
     val lastVin = settingsStore.lastVehicleVin(prefs)
     val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }

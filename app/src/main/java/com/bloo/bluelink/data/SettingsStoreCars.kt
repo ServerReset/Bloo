@@ -85,9 +85,9 @@ suspend fun SettingsStore.warmUp() {
  * prevent.
  */
 suspend fun SettingsStore.snapshot(): Preferences {
-    com.bloo.bluelink.data.StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() begin")
+    StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() begin")
     val prefs = context.settingsDataStore.data.first()
-    com.bloo.bluelink.data.StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() done")
+    StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() done")
     return prefs
 }
 
