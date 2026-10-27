@@ -85,6 +85,13 @@ internal fun DebugCardContent(
                 StatusRow("On-device AI (Gemini Nano)", aiAvailability?.describe() ?: "Checking…")
                 MorphTextButton("Check again", onClick = { vm.reprobeAi() })
             }
+            SettingsGroup("Performance") {
+                BodySmallText("The cost of every frame (composition, layout, draw, GPU), main-thread stalls with the code that was running, recompositions and garbage collection, filed under what you were doing. Reset, use the app for a minute, then copy this and send it.")
+                ActionRow {
+                    MorphTextButton("Copy report", onClick = { copy("bloo performance", com.bloo.bluelink.perf.PerfMonitor.report()) })
+                    MorphTextButton("Reset", onClick = { com.bloo.bluelink.perf.PerfMonitor.reset() }, emphasis = ButtonEmphasis.Deny)
+                }
+            }
             SettingsGroup("Activity log") {
                 BodySmallText("${logs.size} lines, newest first.")
                 ActionRow {

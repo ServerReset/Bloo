@@ -266,6 +266,7 @@ internal fun HeroVisual(
     /** When set, size by aspect ratio instead of [height] (16:9 on the phone hero). */
     aspectRatio: Float? = null,
 ) {
+    com.bloo.bluelink.perf.TrackRecompositions("HeroVisual")
     com.bloo.bluelink.data.StartupTrace.once("hero-visual-${v.vin}", "HeroVisual composing for ${v.name}")
     val density = LocalDensity.current
     val sizeModifier = when {

@@ -121,6 +121,7 @@ private fun CarMapBody(
     /** How much of [state]'s pan shows right now (0 to 1); read in the draw phase, so ramping it recomposes nothing. */
     panWeight: () -> Float = { 1f },
 ) {
+    com.bloo.bluelink.perf.TrackRecompositions("CarMapBody")
     val context = LocalContext.current
     val weight by rememberUpdatedState(panWeight)
     // Cold-start diagnostic; see HeroVisual's matching mark.

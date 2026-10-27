@@ -168,7 +168,14 @@ internal fun PebbleShell(
     contentGap: Dp = GapRow,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    com.bloo.bluelink.perf.TrackRecompositions("PebbleShell")
     val haptics = LocalHaptics.current
+    // Frames while a pebble opens or closes are filed under it ("Garage/pebble-Trips"), not under the screen alone; not the first composition.
+    var seenOnce by remember { mutableStateOf(false) }
+    LaunchedEffect(expanded) {
+        if (seenOnce) com.bloo.bluelink.perf.PerfMonitor.scope("pebble-$title", 900)
+        seenOnce = true
+    }
     // Collapsed = pill-soft corners; expanded = tighter rounded square. Direction picks the same
     // springs collapseEnter/collapseExit use for height so corners and height read as one card.
     var headerRowHeightPx by remember { mutableIntStateOf(0) }

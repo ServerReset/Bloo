@@ -74,12 +74,15 @@ fun BlooApp(vm: AppViewModel) {
         withFrameNanos { }
         com.bloo.bluelink.data.StartupTrace.once("compose-first-frame", "BlooApp: first frame callback")
     }
+    com.bloo.bluelink.perf.TrackRecompositions("BlooApp")
     val stateHolder = vm.state.collectAsStateWithLifecycle()
     val state by stateHolder
     val appearance by vm.appearance.collectAsStateWithLifecycle()
     val powerPolicy by com.bloo.bluelink.data.DeviceStatus.policy.collectAsStateWithLifecycle()
     // Narrow derived reads, so unrelated UiState emissions don't recompose the whole root.
     val screen by remember { derivedStateOf { state.screen } }
+    // Frames are filed under the screen that is showing, so a log says "Garage" or "Settings", not just "slow".
+    LaunchedEffect(screen) { com.bloo.bluelink.perf.PerfMonitor.screen(screen::class.simpleName ?: screen.toString()) }
     val locked by remember { derivedStateOf { state.locked } }
     // Latches once the app has been unlocked; only the cold-start lock defers composing the garage.
     var unlockedThisSession by remember { mutableStateOf(false) }

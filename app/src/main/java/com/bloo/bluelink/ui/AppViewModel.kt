@@ -232,6 +232,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         logStartup("AppViewModel constructed")
+        // How often the whole UI state changes is the first thing to know about a screen that feels busy: each emission can recompose
+        // everything reading it.
+        viewModelScope.launch { _state.collect { com.bloo.bluelink.perf.PerfMonitor.count("UiState emissions") } }
         bootstrapColdStart()
     }
 

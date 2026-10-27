@@ -105,6 +105,7 @@ internal fun ExpandableMapLayer(
     deviceRequest: DeviceLocationRequest? = null,
     onDismiss: () -> Unit,
 ) {
+    com.bloo.bluelink.perf.TrackRecompositions("ExpandableMapLayer")
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -147,6 +148,7 @@ internal fun ExpandableMapLayer(
         val h = windowSize.height.toFloat()
         val k = mapState.scale.coerceAtLeast(0.5f)
         mapState.panTo((o.center.x - w / 2f) / k, (o.center.y - (h - h * 0.85f / 2f)) / k)
+        com.bloo.bluelink.perf.PerfMonitor.scope("map-open", 1_000)
         // Open in two beats: the sheet grows from the pebble to full screen first, THEN the bars
         // arrive. Previously they faded in from the very first frame (expandFraction > 0.1), so the
         // chrome was already there while the map was still unfolding.
@@ -187,6 +189,7 @@ internal fun ExpandableMapLayer(
     fun close() {
         if (closing) return
         closing = true
+        com.bloo.bluelink.perf.PerfMonitor.scope("map-close", 1_000)
         scope.launch {
             // Chrome first (a quick retreat), then the sheet morphs back into its pebble, and the
             // drag offset eases away with it so a mid-drag dismiss doesn't visibly snap dragPx to 0.

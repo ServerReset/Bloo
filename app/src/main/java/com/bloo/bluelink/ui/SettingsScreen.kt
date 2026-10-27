@@ -57,6 +57,7 @@ internal fun SettingsScreen(
     /** Shared with GarageScreen's car pages so the floating search bar gets one blur source. */
     hazeState: HazeState = remember { HazeState() },
 ) {
+    com.bloo.bluelink.perf.TrackRecompositions("SettingsScreen")
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()

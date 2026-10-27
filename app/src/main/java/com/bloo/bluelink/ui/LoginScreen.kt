@@ -136,6 +136,7 @@ internal fun LoginScreen(
      */
     updateAvailableUrl: String? = null,
 ) {
+    com.bloo.bluelink.perf.TrackRecompositions("LoginScreen")
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }

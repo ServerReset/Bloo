@@ -106,6 +106,8 @@ class MainActivity : FragmentActivity() {
             navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
+        // Per-frame cost, main-thread stalls and the rest of the app's own performance numbers, for the activity log and the Debug card's report.
+        com.bloo.bluelink.perf.PerfMonitor.install(this)
         // Seed com.bloo.bluelink.ui.inMultiWindowMode from the Activity's actual starting state --
         // onMultiWindowModeChanged (below) only fires on a TRANSITION, so a cold start directly
         // INTO split-screen/freeform would otherwise never set this at all and StatusBarScrim would
@@ -182,6 +184,7 @@ class MainActivity : FragmentActivity() {
      */
     override fun onStop() {
         super.onStop()
+        com.bloo.bluelink.perf.PerfMonitor.foreground(false)
         backgroundedAt = System.currentTimeMillis()
         viewModel.appForeground.value = false
     }
@@ -189,6 +192,7 @@ class MainActivity : FragmentActivity() {
     override fun onStart() {
         StartupTrace.mark("MainActivity.onStart")
         super.onStart()
+        com.bloo.bluelink.perf.PerfMonitor.foreground(true)
         viewModel.appForeground.value = true
         viewModel.recheckAiOnForeground()
         viewModel.summarizeMissingOnForeground()
@@ -231,6 +235,7 @@ class MainActivity : FragmentActivity() {
     /** Remove the Shizuku listener so it doesn't leak past this Activity instance. */
     override fun onDestroy() {
         if (current === this) current = null
+        com.bloo.bluelink.perf.PerfMonitor.uninstall()
         runCatching { unregisterReceiver(screenOffReceiver) }
         runCatching { shizukuInstall().unregisterPermissionResultListener() }
         super.onDestroy()

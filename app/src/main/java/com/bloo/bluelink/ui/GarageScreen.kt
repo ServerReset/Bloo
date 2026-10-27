@@ -34,6 +34,7 @@ internal fun GarageScreen(
     /** Defaults to a fresh one for every existing caller's exact prior behavior. */
     hazeState: HazeState = remember { HazeState() },
 ) {
+    com.bloo.bluelink.perf.TrackRecompositions("GarageScreen")
     // DERIVED reads, not body reads of `state.value`.
     val vehicles by remember { derivedStateOf { state.value.vehicles } }
     val refreshing by remember { derivedStateOf { state.value.refreshing } }

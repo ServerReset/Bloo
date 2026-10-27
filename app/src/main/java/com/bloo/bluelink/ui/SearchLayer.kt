@@ -104,6 +104,7 @@ internal fun SearchLayer(
      */
     hazeState: HazeState? = null,
 ) {
+    com.bloo.bluelink.perf.TrackRecompositions("SearchLayer")
     var query by rememberSaveable { mutableStateOf("") }
     var submitted by rememberSaveable { mutableStateOf("") }
     var focused by rememberSaveable { mutableStateOf(false) }
@@ -131,6 +132,7 @@ internal fun SearchLayer(
     LaunchedEffect(open) {
         if (hapticArmed) {
             if (open) haptics?.click() else haptics?.tick()
+            com.bloo.bluelink.perf.PerfMonitor.scope(if (open) "search-open" else "search-close", 1_200)
         }
         hapticArmed = true
     }

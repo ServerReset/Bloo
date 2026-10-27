@@ -118,6 +118,7 @@ internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
 
 @Composable
 internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Modifier) {
+    com.bloo.bluelink.perf.TrackRecompositions("LocationPebble")
     val context = LocalContext.current
     val appearance = LocalAppearance.current
     val fahrenheit = appearance.useFahrenheit
