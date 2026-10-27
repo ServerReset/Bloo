@@ -199,11 +199,11 @@ class MapMorphTest {
         // past that: advance it until the pin is placed, and only then read it.
         var pin = rule.onNodeWithContentDescription("Car location").getBoundsInRoot()
         var waited = 0
-        while (pin.width <= 0f && waited++ < 60) {
+        while ((pin.right - pin.left).value <= 0f && waited++ < 60) {
             rule.mainClock.advanceTimeByFrame()
             pin = rule.onNodeWithContentDescription("Car location").getBoundsInRoot()
         }
-        check(pin.width > 0f && pin.height > 0f) { "the pin never got placed: $pin" }
+        check((pin.right - pin.left).value > 0f && (pin.bottom - pin.top).value > 0f) { "the pin never got placed: $pin" }
         return (pin.left.value + pin.right.value) / 2f to pin.bottom.value
     }
 
