@@ -1,5 +1,6 @@
 package com.bloo.bluelink
 
+import com.bloo.bluelink.ui.ProgressBar
 import com.bloo.bluelink.data.downloadLabel
 import android.content.ClipData
 import android.content.Intent
