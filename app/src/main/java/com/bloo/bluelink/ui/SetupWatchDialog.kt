@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Watch
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -194,13 +193,10 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                     } else if (busy) {
                         // The install itself streams several MB over ADB, which is the slow part; show
                         // a bar so it does not look hung.
-                        LinearProgressIndicator(
-                            progress = { if (installProgress in 0.01f..0.99f) installProgress else 1f },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        ProgressBar(if (installProgress in 0.01f..0.99f) installProgress else 1f)
                     } else if (apk == null) {
                         BodySmallText(downloadLabel(downloadProgress, "Fetching the watch app…"), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        LinearProgressIndicator(progress = { downloadProgress }, modifier = Modifier.fillMaxWidth())
+                        ProgressBar(downloadProgress)
                     }
                     BodySmallText(
                         "Keep the watch's Wireless debugging screen open the whole time (the port changes " +

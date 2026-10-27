@@ -27,7 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -256,7 +255,7 @@ class CrashActivity : ComponentActivity() {
             }
 
             if (downloading) {
-                LinearProgressIndicator(progress = { downloadProgress }, modifier = Modifier.fillMaxWidth())
+                ProgressBar(downloadProgress)
             }
 
             statusMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
