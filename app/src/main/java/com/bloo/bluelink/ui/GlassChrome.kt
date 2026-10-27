@@ -97,8 +97,8 @@ internal fun Modifier.pebbleCardEdge(shape: Shape): Modifier {
  * The liquid-glass edge: a thin line brightest where light would catch it (the top-left), fading through the
  * middle to a fainter catch at the bottom-right, plus a soft inner glow along the top lip. It is what makes a
  * frosted card read as a pane of glass lying OVER the page. The static part is drawn once per size; when the
- * phone is tilted a soft sheen slides along the edge (see [edgeSheen]) with the way the phone is held, swelling
- * while it moves; it costs one extra stroke and nothing at all under battery saver.
+ * phone is turned a slanted reflection (see [sheenBrush]) glides across the whole face and lights the edge it passes
+ * under, swelling while the phone moves; it costs three more gradient fills and nothing at all under battery saver.
  */
 @Composable
 internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()): Modifier {
@@ -130,46 +130,63 @@ internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()):
             drawOutline(outline, lip)
             drawOutline(outline, rim, style = Stroke(line))
             if (tilt != null) {
-                // The sheen follows the way the phone is held and swells while it moves; it is always there, so the edge is
-                // never a flat line.
-                val swell = glintStrength(tilt.x, tilt.y)
+                // A slanted reflection that slides across the whole face as the phone is turned, like light moving over a pane of glass:
+                // a broad soft wash, a brighter core inside it, and only a light response from the edge it passes under.
+                val centre = sheenCentre(tilt.holdX, tilt.holdY)
+                val strength = sheenStrength(glintStrength(tilt.x, tilt.y))
                 // White on a dark pebble; on a pale one white would vanish, so the light is the theme's own colour there.
                 val light = if (dark) Color.White else scheme.primary
-                // A faint wash across the whole face, then the edge itself, wider and brighter than the resting rim.
-                drawOutline(outline, edgeSheen(tilt.holdX, tilt.holdY, swell, light, SheenWashPeak, SheenWashHalfWidth))
-                drawOutline(outline, edgeSheen(tilt.holdX, tilt.holdY, swell, light, SheenPeak, SheenHalfWidth), style = Stroke(line * 2f))
+                val wash = if (dark) SheenWashPeak else SheenWashPeak * 0.75f
+                drawOutline(outline, sheenBrush(centre, SheenWashHalfWidth, wash * strength, light))
+                drawOutline(outline, sheenBrush(centre, SheenCoreHalfWidth, SheenCorePeak * strength, light))
+                drawOutline(outline, sheenBrush(centre, SheenEdgeHalfWidth, SheenEdgePeak * strength, light), style = Stroke(line * 1.5f))
             }
         }
     }
 }
 
-/** How bright the sheen is at the middle of its band on the edge, and of the faint wash over the face. */
-private const val SheenPeak = 0.9f
-private const val SheenWashPeak = 0.12f
+/** How bright the reflection is at its middle: across the face (a broad wash, and a brighter core in it) and along the edge it passes under. */
+private const val SheenWashPeak = 0.20f
+private const val SheenCorePeak = 0.16f
+private const val SheenEdgePeak = 0.45f
 
-/** Half-width of each along the rim's diagonal (fraction of it): a wide soft sweep, not a pinpoint. */
-private const val SheenHalfWidth = 0.3f
-private const val SheenWashHalfWidth = 0.45f
+/** Half-width of each band, as a fraction of the pebble's length along the sweep. */
+private const val SheenWashHalfWidth = 0.42f
+private const val SheenCoreHalfWidth = 0.12f
+private const val SheenEdgeHalfWidth = 0.30f
 
-/** Where along the rim's diagonal the sheen sits, 0 (top-left) to 1 (bottom-right): leaning right or forward slides it toward the bottom-right. */
+/** How far the band's stripes lean from upright (rise over run): a slanted reflection, not a vertical bar. */
+private const val SheenSlant = 0.45f
+
+/** How far past either end the band's middle may travel, so it can sweep right off the pebble and the whole face gets its turn. */
+private const val SheenReach = 0.15f
+
+/**
+ * Where along the sweep the band's middle sits, 0 (left end) to 1 (right end), and a little beyond either so it leaves the pebble:
+ * turning the phone about its long axis moves it most, tipping it forward or back a little. Level is the middle.
+ */
 internal fun sheenCentre(holdX: Float, holdY: Float): Float =
-    (0.5f + (holdX + holdY) * 0.5f * 0.9f).coerceIn(SheenHalfWidth * 0.5f, 1f - SheenHalfWidth * 0.5f)
+    (0.5f + (holdX * 0.8f + holdY * 0.35f) * 0.65f).coerceIn(-SheenReach, 1f + SheenReach)
 
 /** The sheen's strength: a steady base from the held angle, swelling with recent motion (0..1). */
 internal fun sheenStrength(motion: Float): Float = 0.55f + 0.45f * motion.coerceIn(0f, 1f)
 
-/** A soft band of light that slides along the rim as the phone is tilted, like light sweeping across a pane of glass. */
-private fun DrawScope.edgeSheen(holdX: Float, holdY: Float, motion: Float, light: Color, peak: Float, halfWidth: Float): Brush {
-    val centre = sheenCentre(holdX, holdY)
+/** A soft slanted band of light, [halfWidth] either side of [centre] along the sweep, for filling or stroking the pebble's outline. */
+private fun DrawScope.sheenBrush(centre: Float, halfWidth: Float, peak: Float, light: Color): Brush {
     val clear = light.copy(alpha = 0f)
+    // The sweep runs along a direction leaning SheenSlant, so the band's stripes slant; 0..1 spans the pebble corner to corner along it.
+    val norm = kotlin.math.sqrt(1f + SheenSlant * SheenSlant)
+    val ux = 1f / norm
+    val uy = SheenSlant / norm
+    val extent = size.width * ux + size.height * uy
     return Brush.linearGradient(
         0f to clear,
-        (centre - halfWidth).coerceAtLeast(0.001f) to clear,
-        centre to light.copy(alpha = peak * sheenStrength(motion)),
-        (centre + halfWidth).coerceAtMost(0.999f) to clear,
+        (centre - halfWidth).coerceIn(0f, 1f) to clear,
+        centre.coerceIn(0f, 1f) to light.copy(alpha = peak),
+        (centre + halfWidth).coerceIn(0f, 1f) to clear,
         1f to clear,
         start = Offset.Zero,
-        end = Offset(size.width, size.height),
+        end = Offset(ux * extent, uy * extent),
     )
 }
 

@@ -32,10 +32,13 @@ private const val TiltGain = 0.012f
 internal const val TiltMax = 0.06f
 private const val TiltEase = 0.12f
 
-/** The held-angle reading: m/s^2 of gravity that counts as fully leaned, the easing per sample, and the smallest write. */
+/**
+ * The held-angle reading: m/s^2 of turning, away from the grip the phone has settled into, that counts as fully leaned; the easing
+ * per sample (a sheen that glides, not one that snaps); and the smallest write.
+ */
 private const val HoldRange = 3f
-private const val HoldEase = 0.2f
-private const val HoldStep = 0.03f
+private const val HoldEase = 0.12f
+private const val HoldStep = 0.01f
 
 /** A write only when it has moved by more than the eye can see: each write redraws every reader. */
 private const val TiltStep = 0.004f
@@ -46,7 +49,7 @@ internal class TiltState {
     var x by mutableFloatStateOf(0f)
     var y by mutableFloatStateOf(0f)
 
-    /** How the phone is HELD, -1..1 per axis (lean right / lean forward): slow and not high-passed, so a pebble's sheen sits where the angle puts it. */
+    /** How far the phone is TURNED from the grip it has settled into, -1..1 per axis (lean right / lean forward): slow, so a pebble's sheen glides to where the turn puts it and drifts back to the middle as the grip settles. */
     var holdX by mutableFloatStateOf(0f)
     var holdY by mutableFloatStateOf(0f)
 
@@ -78,6 +81,7 @@ internal fun rememberTilt(active: Boolean, ambient: AmbientActivity?): TiltState
         // average; tilt is their difference, so it stays centred whatever the resting angle.
         var rawX = 0f; var rawY = 0f
         var baseX = 0f; var baseY = 0f
+        var seeded = false
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 // No writes while paused: samples stall instead of invalidating.
@@ -89,6 +93,9 @@ internal fun rememberTilt(active: Boolean, ambient: AmbientActivity?): TiltState
                 val slowAlpha = 0.01f
                 val x = -event.values[0]
                 val y = event.values[1]
+                // Start from where the phone is, not from zero: gravity is ~9.8 on an axis, and every reading measured against a zero baseline
+                // would read as a full lean until the slow average caught up.
+                if (!seeded) { rawX = x; rawY = y; baseX = x; baseY = y; seeded = true }
                 rawX = rawX * (1 - fastAlpha) + x * fastAlpha
                 rawY = rawY * (1 - fastAlpha) + y * fastAlpha
                 baseX = baseX * (1 - slowAlpha) + x * slowAlpha
@@ -100,9 +107,11 @@ internal fun rememberTilt(active: Boolean, ambient: AmbientActivity?): TiltState
                 val ny = tilt.y + (targetY - tilt.y) * TiltEase
                 if (abs(nx - tilt.x) > TiltStep) tilt.x = nx
                 if (abs(ny - tilt.y) > TiltStep) tilt.y = ny
-                // The held angle: gravity's share on each axis (about 3 m/s^2, a lean of some 18 degrees, is all the way), eased over a second or so.
-                val hx = tilt.holdX + ((x / HoldRange).coerceIn(-1f, 1f) - tilt.holdX) * HoldEase
-                val hy = tilt.holdY + ((y / HoldRange).coerceIn(-1f, 1f) - tilt.holdY) * HoldEase
+                // The turn from the settled grip: the smoothed reading less the slow average (about 3 m/s^2, a lean of some 18 degrees, is all
+                // the way), then eased again so the sheen takes a few seconds to follow. Gravity's own pull on the axis is in both terms, so a phone
+                // held upright reads as level, not as a full lean.
+                val hx = tilt.holdX + (((rawX - baseX) / HoldRange).coerceIn(-1f, 1f) - tilt.holdX) * HoldEase
+                val hy = tilt.holdY + (((rawY - baseY) / HoldRange).coerceIn(-1f, 1f) - tilt.holdY) * HoldEase
                 if (abs(hx - tilt.holdX) > HoldStep) tilt.holdX = hx
                 if (abs(hy - tilt.holdY) > HoldStep) tilt.holdY = hy
             }
