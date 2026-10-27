@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 class WearPinPadTest {
 
     /** Round Wear faces worth supporting, largest to smallest, in dp (454px @320dpi is 227dp). */
-    private val faces = listOf(280, 260, 240, 233, 227, 210, 195, 180)
+    private val faces = listOf(280, 260, 240, 233, 228, 227, 210, 204, 195, 180)
 
     private fun needed(maxHeight: Dp, sizing: PinPadSizing): Dp {
         val gaps = if (sizing.showCaption) 6 else 5

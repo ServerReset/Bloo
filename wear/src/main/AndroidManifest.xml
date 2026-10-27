@@ -12,7 +12,7 @@
     <!-- Seamless in-watch update: the phone pushes the watch APK and the watch hands it to the
          system installer (see WatchDataListenerService). -->
 
-    <uses-feature android:name="android.hardware.type.watch" />
+    <uses-feature android:name="android.hardware.type.watch" android:required="true" />
 
     <application
         android:allowBackup="false"
@@ -23,14 +23,17 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault">
-        <!-- False, and it used to say true. This app waits for a snapshot from the phone and shows
-             nothing useful without one, so declaring it standalone told the system (and Play) that it
-             works on its own, which is exactly how "Waiting for your phone" reads as a broken app
-             rather than as a companion that has not been paired yet. -->
+        <!-- True: once signed in via WearCredentialSync, the watch refreshes the session and runs
+             commands over its own Wi-Fi or LTE connection without the phone reachable, and renders
+             its tiles and complications on-device. Declaring standalone=true also lets Google Play
+             offer and install the watch app directly on Wear OS 5+ watches (such as Pixel Watch 3). -->
         <!-- (No double hyphen in an XML comment. That is what broke this file the first time.) -->
         <meta-data
             android:name="com.google.android.wearable.standalone"
-            android:value="false" />
+            android:value="true" />
+        <uses-library
+            android:name="com.google.android.wearable"
+            android:required="false" />
 
         <activity
             android:name=".WearMainActivity"

@@ -82,7 +82,34 @@ if [ "${PLAY_ROLLOUT:-false}" = "true" ]; then
   current="$(call GET "$api/edits/$edit_id/tracks/$track")"
   echo "$current" | jq -r '.releases[]? | "  found: status=\(.status) versionCodes=\((.versionCodes // [])|join(",")) name=\(.name // "")"'
   if ! echo "$current" | jq -e '.releases[]? | select(.status=="draft")' >/dev/null; then
-    echo "  nothing to promote: no draft release on '$track'"
+    echo "  nothing to promote: no draft release on '$track' (checking wear:$track if applicable)"
+    call DELETE "$api/edits/$edit_id" >/dev/null || true
+  else
+    promoted="$(echo "$current" | jq -c '{track: .track, releases: [ .releases[] | if .status=="draft" then (.status="completed") else . end ] }')"
+    echo "  sending: $promoted"
+    call PUT "$api/edits/$edit_id/tracks/$track" -d "$promoted"
+    call POST "$api/edits/$edit_id:commit"
+    echo "  PROMOTED. The release is no longer a draft."
+    call GET "$api/edits/$(call POST "$api/edits" | jq -r .id)/tracks/$track" 2>/dev/null | jq -r '.releases[]? | "  now: status=\(.status) versionCodes=\((.versionCodes // [])|join(","))"' || true
+  fi
+  if [[ "$track" != wear:* ]]; then
+    w_edit="$(call POST "$api/edits" | jq -r .id)"
+    if t_groups="$(call GET "$api/edits/$w_edit/testers/$track" 2>/dev/null)" && \
+       echo "$t_groups" | jq -e '(.googleGroups // []) | length > 0' >/dev/null 2>&1; then
+      call PUT "$api/edits/$w_edit/testers/wear:$track" -d "$(echo "$t_groups" | jq -c '{googleGroups: .googleGroups}')" >/dev/null 2>&1 || true
+    fi
+    if w_cur="$(call GET "$api/edits/$w_edit/tracks/wear:$track" 2>/dev/null)" && \
+       echo "$w_cur" | jq -e '.releases[]? | select(.status=="draft")' >/dev/null 2>&1; then
+      echo; echo "--- ROLLOUT: promoting the draft on 'wear:$track'"
+      w_prom="$(echo "$w_cur" | jq -c '{track: .track, releases: [ .releases[] | if .status=="draft" then (.status="completed") else . end ] }')"
+      call PUT "$api/edits/$w_edit/tracks/wear:$track" -d "$w_prom" && call POST "$api/edits/$w_edit:commit" && echo "  PROMOTED wear:$track." || true
+    else
+      call POST "$api/edits/$w_edit:commit" >/dev/null 2>&1 || call DELETE "$api/edits/$w_edit" >/dev/null 2>&1 || true
+    fi
+  fi
+  exit 0
+fi
+if false; then
     call DELETE "$api/edits/$edit_id" >/dev/null || true
     exit 0
   fi
@@ -110,10 +137,14 @@ if [ "${PLAY_INSPECT:-false}" = "true" ]; then
   # whatever comes back, verbatim, and carry on. A diagnostic must not fail the run it is diagnosing,
   # and it must not swallow the answer either: those are two different mistakes and this is neither.
   echo "  country availability (a release cannot roll out to nowhere):"
-  call GET "$api/edits/$edit_id/countryavailability" 2>&1 | head -c 400 || echo "    (unavailable via the API)"
+  for tr in internal alpha wear:internal wear:alpha; do
+    echo "    $tr: $(call GET "$api/edits/$edit_id/countryavailability/$tr" 2>/dev/null | jq -c . 2>/dev/null || echo '(unavailable)')"
+  done
   echo
   echo "  testers (Google Groups only; an email list shows as nothing here):"
-  call GET "$api/edits/$edit_id/testers" 2>&1 | head -c 300 || echo "    (unavailable via the API)"
+  for tr in internal alpha wear:internal wear:alpha; do
+    echo "    $tr: $(call GET "$api/edits/$edit_id/testers/$tr" 2>/dev/null | jq -c . 2>/dev/null || echo '(unavailable)')"
+  done
   echo
   echo "  app details (what Play considers setup):"
   call GET "$api/edits/$edit_id/details" | jq -r '

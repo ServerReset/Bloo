@@ -266,6 +266,15 @@ watch_edit="$(call POST "$api/edits" | jq -r .id)"
 watch_ok=1
 for track in "${phone_tracks[@]}"; do
   assign_to_edit "$watch_edit" "wear:$track" "${wear_codes[@]}" || { watch_ok=0; continue; }
+  # Mirror the phone track's tester Google Groups onto wear:$track so testers on alpha/internal
+  # are also opted into wear:alpha/wear:internal (without this, a newly created wear:$track has
+  # no testers and Play marks the tester's watch as incompatible because it only sees the phone track).
+  if t_groups="$(call GET "$api/edits/$watch_edit/testers/$track" 2>/dev/null)" && \
+     echo "$t_groups" | jq -e '(.googleGroups // []) | length > 0' >/dev/null 2>&1; then
+    t_payload="$(echo "$t_groups" | jq -c '{googleGroups: .googleGroups}')"
+    call PUT "$api/edits/$watch_edit/testers/wear:$track" -d "$t_payload" >/dev/null 2>&1 && \
+      echo "  synced testers from $track -> wear:$track: $t_payload" || true
+  fi
 done
 if [ "$watch_ok" = "1" ]; then
   echo; echo "--- committing the watch release"
@@ -293,20 +302,38 @@ if [ "$watch_ok" = "1" ]; then
     if printf '%s' "${wout:-}" | grep -qi "targeting no countries"; then
       echo "::warning::a track with no country availability cannot take a completed release. Publishing the watch as a DRAFT instead: roll it out from the console, or set that track's countries once (Test and release -> the track -> the Wear OS form factor -> Countries/regions) and it completes itself from then on."
       ASSIGN_STATUS=draft
-      draft_edit="$(call POST "$api/edits" | jq -r .id)"
+      draft_ok=1
       draft_ok=1
       for track in "${phone_tracks[@]}"; do
-        assign_to_edit "$draft_edit" "wear:$track" "${wear_codes[@]}" || { draft_ok=0; continue; }
+        # Commit each wear:$track in its own edit so a track with countries (e.g. wear:internal)
+        # still publishes as completed even when another (e.g. wear:alpha) must fall back to draft.
+        t_edit="$(call POST "$api/edits" | jq -r .id)"
+        if t_groups="$(call GET "$api/edits/$t_edit/testers/$track" 2>/dev/null)" && \
+           echo "$t_groups" | jq -e '(.googleGroups // []) | length > 0' >/dev/null 2>&1; then
+          t_payload="$(echo "$t_groups" | jq -c '{googleGroups: .googleGroups}')"
+          call PUT "$api/edits/$t_edit/testers/wear:$track" -d "$t_payload" >/dev/null 2>&1 || true
+        fi
+        ASSIGN_STATUS="$STATUS"
+        if assign_to_edit "$t_edit" "wear:$track" "${wear_codes[@]}" && call POST "$api/edits/$t_edit:commit" >/dev/null 2>&1; then
+          echo "  wear:$track committed as $STATUS"
+        else
+          call DELETE "$api/edits/$t_edit" >/dev/null 2>&1 || true
+          t_edit="$(call POST "$api/edits" | jq -r .id)"
+          [ -n "${t_payload:-}" ] && call PUT "$api/edits/$t_edit/testers/wear:$track" -d "$t_payload" >/dev/null 2>&1 || true
+          ASSIGN_STATUS=draft
+          assign_to_edit "$t_edit" "wear:$track" "${wear_codes[@]}" && call POST "$api/edits/$t_edit:commit" >/dev/null 2>&1 || draft_ok=0
+          call DELETE "$api/edits/$t_edit" >/dev/null 2>&1 || true
+        fi
       done
       ASSIGN_STATUS=
-      if [ "$draft_ok" = "1" ] && call POST "$api/edits/$draft_edit:commit" >/dev/null 2>&1; then
+      if [ "$draft_ok" = "1" ]; then
         echo "WATCH PUBLISHED AS A DRAFT: $PKG -> $(printf 'wear:%s,' "${phone_tracks[@]}" | sed 's/,$//') holds $(printf '%s,' "${wear_codes[@]}" | sed 's/,$//')"
         watch_ok=1
       else
         echo "::warning::the draft was refused too -- the phone is published, the watch is not"
         watch_ok=0
       fi
-      call DELETE "$api/edits/$draft_edit" >/dev/null 2>&1 || true
+      true
     else
       echo "::warning::the watch commit was refused -- the phone is published, the watch is not"
       watch_ok=0
