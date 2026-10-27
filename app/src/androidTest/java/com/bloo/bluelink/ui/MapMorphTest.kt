@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -76,8 +77,10 @@ class MapMorphTest {
         rule.mainClock.advanceTimeByFrame()
         val start = rule.onNodeWithTag("map").getBoundsInRoot()
         val density = rule.density.density
-        assertEquals("left", origin.left / density, start.left.value, 3f)
-        assertEquals("top", origin.top / density, start.top.value, 3f)
+        // The pebble's rectangle is in screen coordinates and the bounds are in the compose root's: the root need not sit at the screen's corner.
+        val rootOnScreen = rule.onRoot().fetchSemanticsNode().layoutInfo.coordinates.positionOnScreen()
+        assertEquals("left", (origin.left - rootOnScreen.x) / density, start.left.value, 3f)
+        assertEquals("top", (origin.top - rootOnScreen.y) / density, start.top.value, 3f)
         assertEquals("width", origin.width / density, (start.right - start.left).value, 3f)
         assertEquals("height", origin.height / density, (start.bottom - start.top).value, 3f)
 
