@@ -195,11 +195,16 @@ class MapMorphTest {
 
     /** Where the car's pin tip is, in the compose root's dp. */
     private fun pinTip(): Pair<Float, Float> {
-        // Wait until the pin is laid out: before its first placement it has no bounds to read.
-        val node = rule.onNodeWithContentDescription("Car location").fetchSemanticsNode()
-        val pin = node.boundsInRoot
-        check(pin.width > 0f && pin.height > 0f) { "the pin has not been placed yet: $pin" }
-        return (pin.left + pin.right) / 2f / rule.density.density to pin.bottom / rule.density.density
+        // The first map waits a few frames before it composes (MapStartFrames), so the pin is not there to read until the clock has run
+        // past that: advance it until the pin is placed, and only then read it.
+        var pin = rule.onNodeWithContentDescription("Car location").getBoundsInRoot()
+        var waited = 0
+        while (pin.width <= 0f && waited++ < 60) {
+            rule.mainClock.advanceTimeByFrame()
+            pin = rule.onNodeWithContentDescription("Car location").getBoundsInRoot()
+        }
+        check(pin.width > 0f && pin.height > 0f) { "the pin never got placed: $pin" }
+        return (pin.left.value + pin.right.value) / 2f to pin.bottom.value
     }
 
     @Test fun theCarStaysWhereItWasOnScreenWhileTheMapOpens() {
