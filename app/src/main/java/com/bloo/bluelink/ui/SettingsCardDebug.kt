@@ -85,15 +85,18 @@ internal fun DebugCardContent(
                 MorphTextButton("Check again", onClick = { vm.reprobeAi() })
             }
             SettingsGroup("Activity log") {
-                BodySmallText("${logs.size} lines, newest last.")
+                BodySmallText("${logs.size} lines, newest first.")
                 ActionRow {
                     MorphTextButton("Copy", onClick = { copy("bloo logs", logs.joinToString("\n")) })
                     MorphTextButton("Clear", onClick = { vm.clearLogs() }, emphasis = ButtonEmphasis.Deny)
                 }
                 val scroll = rememberScrollState()
+                // Newest at the top, so the latest line is the first thing seen and the view opens on it; Copy above still hands over the
+                // log in the order it happened, which is the order a support report is read in.
+                val newestFirst = remember(logs) { logs.asReversed().joinToString("\n") }
                 SelectionContainer {
                     RevealText(
-                        text = logs.joinToString("\n").ifBlank { "No activity yet." },
+                        text = newestFirst.ifBlank { "No activity yet." },
                         style = SecondaryTextStyle(),
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp).fadingEdges(scroll)
