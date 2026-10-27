@@ -30,7 +30,8 @@ class PopInTest {
     }
 
     @Test fun aSingleElementStartsAtOnce() {
-        assertEquals(1f, popProgress(popProgress(0.4f, 0, 1), 0, 1) .coerceAtLeast(1f), 0.0001f)
-        assertTrue(popProgress(0.2f, 0, 1) > 0f)
+        assertEquals(0f, popProgress(0f, 0, 1))
+        assertTrue(popProgress(0.2f, 0, 1) > 0f, "it is already on its way a fifth of the way through")
+        assertEquals(1f, popProgress(1f, 0, 1), 0.0001f)
     }
 }
