@@ -20,6 +20,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -48,13 +49,47 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import com.bloo.uicommon.LocalPowerPolicy
 
+/** How many frames the first map in a process waits before it composes, so it lands after the cards and photos the garage draws first. */
+private const val MapStartFrames = 6
+
+/** Open once any map has started: later maps (a second car's, the expanded one) compose at once. */
+private object MapStartGate {
+    @Volatile var open = false
+}
+
+/**
+ * The car map ([CarMapBody]), started a few frames after the first screen rather than in it. The map's first composition and its burst
+ * of tile requests landed in the same frames as the hero photos on a cold start (a 400 ms frame in a measured log); the box is there at
+ * once, so nothing moves when the map arrives.
+ */
+@Composable
+internal fun CarMap(
+    location: GeoLocation,
+    modifier: Modifier = Modifier,
+    state: CarMapState = rememberCarMapState(),
+    deviceLocation: GeoLocation? = null,
+    interactive: Boolean = true,
+) {
+    var started by remember { mutableStateOf(MapStartGate.open) }
+    if (!started) {
+        LaunchedEffect(Unit) {
+            repeat(MapStartFrames) { withFrameNanos { } }
+            MapStartGate.open = true
+            started = true
+        }
+        Box(modifier)
+        return
+    }
+    CarMapBody(location, modifier, state, deviceLocation, interactive)
+}
+
 /**
  * A small slippy map centred on the car, assembled from key-free OpenStreetMap raw tiles. We
  * compute the tiles needed to fill the box with the car at the centre, draw each at its pixel
  * offset, then drop a pin. This avoids the flaky static-map render services that painted blank.
  */
 @Composable
-internal fun CarMap(
+private fun CarMapBody(
     location: GeoLocation,
     modifier: Modifier = Modifier,
     state: CarMapState = rememberCarMapState(),

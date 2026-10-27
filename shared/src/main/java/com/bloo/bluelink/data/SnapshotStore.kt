@@ -290,10 +290,14 @@ class SnapshotStore(private val context: Context) {
 
     /** Parse the stored JSON into [SnapshotData]; null or corrupt input yields an empty payload rather than throwing. */
     private fun decode(raw: String?): SnapshotData {
+        // Several readers ask for the same unchanged blob in a burst (the cold start reads it five times in its first seconds, from the
+        // widget, the watch push and the garage); the last parse is kept and handed back while the stored text is the same.
+        val last = lastDecoded
+        if (raw != null && last != null && last.first == raw) return last.second
         val payload = raw?.let {
             runCatching { json.decodeFromString(SnapshotPayload.serializer(), it) }.getOrNull()
         } ?: SnapshotPayload()
-        return SnapshotData(payload.vehicles, payload.selectedVin)
+        return SnapshotData(payload.vehicles, payload.selectedVin).also { if (raw != null) lastDecoded = raw to it }
     }
 
     /** Decoded view of the store: every known vehicle plus the selected VIN. */
@@ -306,3 +310,6 @@ class SnapshotStore(private val context: Context) {
             get() = vehicles.firstOrNull { it.vin == selectedVin } ?: vehicles.firstOrNull()
     }
 }
+
+/** The most recent parse of the stored blob and the text it came from, shared by every [SnapshotStore] (they are cheap and made per use). */
+@Volatile private var lastDecoded: Pair<String, SnapshotStore.SnapshotData>? = null
