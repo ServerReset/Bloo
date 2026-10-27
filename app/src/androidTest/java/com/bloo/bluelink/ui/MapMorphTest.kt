@@ -11,6 +11,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.unit.toSize
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getBoundsInRoot
@@ -99,5 +105,65 @@ class MapMorphTest {
         assertEquals("full width", root.right.value - root.left.value, (end.right - end.left).value, 3f)
         assertEquals("85% of the height", (root.bottom.value - root.top.value) * 0.85f, (end.bottom - end.top).value, 3f)
         assertEquals("bottom-anchored", root.bottom.value, end.bottom.value, 3f)
+    }
+
+    @Test fun closingPutsTheSameMapBackInItsSlotOnTheSlotsRectangle() {
+        var open by mutableStateOf(false)
+        var built = 0
+        var slot by mutableStateOf<Rect?>(null)
+        var dismissed = 0
+        rule.setContent {
+            BlooTheme {
+                val movable = remember {
+                    movableContentOf { modifier: Modifier ->
+                        remember { built++ }
+                        Box(modifier.testTag("map"))
+                    }
+                }
+                Box(Modifier.fillMaxSize()) {
+                    // The pebble's slot: it keeps its size and place whether or not the map is in it.
+                    Box(
+                        Modifier.offset(40.dp, 200.dp).size(200.dp, 120.dp).testTag("slot")
+                            .onGloballyPositioned { slot = Rect(it.positionOnScreen(), it.size.toSize()) },
+                    ) { if (!open) movable(Modifier.fillMaxSize()) }
+                    val origin = slot
+                    if (open && origin != null) {
+                        ExpandableMapLayer(
+                            isExpanded = true,
+                            originBounds = origin,
+                            location = GeoLocation(37.0, -122.0),
+                            vehicleName = "Car",
+                            deviceLocation = null,
+                            mapState = remember { CarMapState() },
+                            map = { modifier, _ -> movable(modifier) },
+                            hazeState = null,
+                            onRefreshLocation = {},
+                            onDismiss = { dismissed++; open = false },
+                        )
+                    }
+                }
+            }
+        }
+        rule.waitForIdle()
+        val slotBounds = rule.onNodeWithTag("slot").getBoundsInRoot()
+        assertEquals("built once, in the slot", 1, built)
+
+        open = true
+        rule.waitForIdle()
+        val openBounds = rule.onNodeWithTag("map").getBoundsInRoot()
+        val root = rule.onRoot().getBoundsInRoot()
+        assertTrue("open: much bigger than the slot", (openBounds.right - openBounds.left).value > (slotBounds.right - slotBounds.left).value * 2)
+        assertEquals("open: bottom-anchored", root.bottom.value, openBounds.bottom.value, 3f)
+
+        // Tap the scrim above the sheet: that closes it.
+        rule.onRoot().performTouchInput { click(Offset(width / 2f, 5f)) }
+        rule.waitForIdle()
+        assertEquals("dismissed once", 1, dismissed)
+        val back = rule.onNodeWithTag("map").getBoundsInRoot()
+        assertEquals("back in the slot: left", slotBounds.left.value, back.left.value, 2f)
+        assertEquals("back in the slot: top", slotBounds.top.value, back.top.value, 2f)
+        assertEquals("back in the slot: width", (slotBounds.right - slotBounds.left).value, (back.right - back.left).value, 2f)
+        assertEquals("back in the slot: height", (slotBounds.bottom - slotBounds.top).value, (back.bottom - back.top).value, 2f)
+        assertEquals("the same map came back, nothing was rebuilt", 1, built)
     }
 }
