@@ -159,7 +159,8 @@ object PerfMonitor {
             commandMs = ms(FrameMetrics.COMMAND_ISSUE_DURATION),
             swapMs = ms(FrameMetrics.SWAP_BUFFERS_DURATION),
             gpuMs = gpu,
-            delayMs = ms(FrameMetrics.UNKNOWN_DELAY_DURATION) + ms(FrameMetrics.INTENDED_VS_ACTUAL_VSYNC_OFFSET),
+            // Late to start: the unexplained delay, and how long after its vsync the frame actually began.
+            delayMs = ms(FrameMetrics.UNKNOWN_DELAY_DURATION) + (m.getMetric(FrameMetrics.VSYNC_TIMESTAMP) - m.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP)) / 1_000_000f,
         )
         // The first frame after the window appears is always expensive and says nothing about the app.
         if (m.getMetric(FrameMetrics.FIRST_DRAW_FRAME) == 1L) return
