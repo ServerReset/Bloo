@@ -8,6 +8,15 @@ import android.media.AudioAttributes
 import android.net.Uri
 import androidx.core.app.NotificationCompat
 
+/** How long a notice about something that happened stays in the shade untouched before the system takes it down. */
+const val NOTICE_CLEAR_AFTER_MS = 30 * 60 * 1000L
+
+/**
+ * Has the system clear this notification on its own if the user has not swiped it away: a "your car locked" from this morning is
+ * not news by lunch, and left in the shade it reads as the most recent one. The system does it, so it happens with the app closed.
+ */
+fun NotificationCompat.Builder.clearsAfterAWhile(): NotificationCompat.Builder = setTimeoutAfter(NOTICE_CLEAR_AFTER_MS)
+
 /**
  * Creates a notification channel only when it is missing. Channels are API 26+ and the app's minSdk
  * IS 26, so there is no version guard to make.

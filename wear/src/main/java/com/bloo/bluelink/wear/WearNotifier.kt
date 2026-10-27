@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.clearsAfterAWhile
 import android.Manifest
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -161,6 +162,7 @@ object WearNotifier {
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setContentIntent(openApp(app))
+            .clearsAfterAWhile()
             .build()
 
     private fun openApp(app: Context): PendingIntent = PendingIntent.getActivity(

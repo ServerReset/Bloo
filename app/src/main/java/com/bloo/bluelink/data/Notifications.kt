@@ -167,6 +167,8 @@ object Notifications {
         channelId: String = CHANNEL_ALERTS,
         /** Don't bridge this to a paired watch (it raises its own version). */
         localOnly: Boolean = false,
+        /** Whether the system takes it down after [NOTICE_CLEAR_AFTER_MS] if it is left alone; false for what must wait to be dealt with. */
+        clears: Boolean = true,
     ): Boolean {
         if (!hasPermission(context)) return false
         ensureChannel(context, channelId)
@@ -181,7 +183,10 @@ object Notifications {
             .setLocalOnly(localOnly)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .apply { pi?.let { setContentIntent(it) } }
+            .apply {
+                pi?.let { setContentIntent(it) }
+                if (clears) clearsAfterAWhile()
+            }
 
         actions.forEachIndexed { i, a ->
             val actionIntent = Intent(context, AlertActionReceiver::class.java).apply {
@@ -249,4 +254,6 @@ internal fun postUpdateAvailable(context: Context, id: Int, run: WorkflowRun): B
     title = "Bloo update available",
     text = (run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${run.runNumber}") + ". Open Bloo to download and install.",
     channelId = Notifications.CHANNEL_UPDATES,
+    // An update stays on offer until it is taken or replaced.
+    clears = false,
 )

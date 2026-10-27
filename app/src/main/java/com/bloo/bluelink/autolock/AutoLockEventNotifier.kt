@@ -1,5 +1,6 @@
 package com.bloo.bluelink.autolock
 
+import com.bloo.bluelink.data.clearsAfterAWhile
 import android.app.NotificationManager
 import android.content.Context
 import android.net.Uri
@@ -97,6 +98,8 @@ object AutoLockEventNotifier {
             // local-only), so "my car locked itself" reaches the wrist. The watch's own AutoLock raises the same kind of
             // alert for itself (WearNotifier.autoLockResult), under the one "Auto lock" switch both devices share.
             .setLocalOnly(false)
+            // So an old "locked" is not mistaken for the latest one.
+            .clearsAfterAWhile()
         contentIntent?.let { builder.setContentIntent(it) }
 
         postBuilt(context, notificationId(vin), builder)

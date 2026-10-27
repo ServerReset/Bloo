@@ -373,6 +373,8 @@ object AutoLockController {
             id = AutoLockNotification.notificationId(vin) + 1,
             title = "$carName didn't lock",
             text = text,
+            // Stays until it is dealt with, as above; the others about AutoLock clear themselves.
+            clears = false,
         )
     }
 
