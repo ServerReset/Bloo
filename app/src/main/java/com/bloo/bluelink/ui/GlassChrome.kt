@@ -97,8 +97,8 @@ internal fun Modifier.pebbleCardEdge(shape: Shape): Modifier {
  * The liquid-glass edge: a thin line brightest where light would catch it (the top-left), fading through the
  * middle to a fainter catch at the bottom-right, plus a soft inner glow along the top lip. It is what makes a
  * frosted card read as a pane of glass lying OVER the page. The static part is drawn once per size; when the
- * phone is turned a slanted reflection (see [sheenBrush]) glides across the whole face and lights the edge it passes
- * under, swelling while the phone moves; it costs three more gradient fills and nothing at all under battery saver.
+ * phone is turned a shimmer (see [sheenBrush]) glides along the edge, over the whole pebble, and swells while the phone
+ * moves; it is the edge only, two more strokes, and nothing at all under battery saver.
  */
 @Composable
 internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()): Modifier {
@@ -130,30 +130,27 @@ internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()):
             drawOutline(outline, lip)
             drawOutline(outline, rim, style = Stroke(line))
             if (tilt != null) {
-                // A slanted reflection that slides across the whole face as the phone is turned, like light moving over a pane of glass:
-                // a broad soft wash, a brighter core inside it, and only a light response from the edge it passes under.
+                // A shimmer that lives on the edge: the rim catches the light as the phone is turned, a soft broad glow along it with a brighter core
+                // inside the glow, sliding over the whole pebble. Nothing is painted on the face; the card's own glass stays as it is.
                 val centre = sheenCentre(tilt.holdX, tilt.holdY)
                 val strength = sheenStrength(glintStrength(tilt.x, tilt.y))
                 // White on a dark pebble; on a pale one white would vanish, so the light is the theme's own colour there.
                 val light = if (dark) Color.White else scheme.primary
-                val wash = if (dark) SheenWashPeak else SheenWashPeak * 0.75f
-                drawOutline(outline, sheenBrush(centre, SheenWashHalfWidth, wash * strength, light))
-                drawOutline(outline, sheenBrush(centre, SheenCoreHalfWidth, SheenCorePeak * strength, light))
-                drawOutline(outline, sheenBrush(centre, SheenEdgeHalfWidth, SheenEdgePeak * strength, light), style = Stroke(line * 1.5f))
+                val soften = if (dark) 1f else 0.8f
+                drawOutline(outline, sheenBrush(centre, SheenGlowHalfWidth, SheenGlowPeak * soften * strength, light), style = Stroke(line * 3f))
+                drawOutline(outline, sheenBrush(centre, SheenCoreHalfWidth, SheenCorePeak * soften * strength, light), style = Stroke(line * 1.5f))
             }
         }
     }
 }
 
-/** How bright the reflection is at its middle: across the face (a broad wash, and a brighter core in it) and along the edge it passes under. */
-private const val SheenWashPeak = 0.20f
-private const val SheenCorePeak = 0.16f
-private const val SheenEdgePeak = 0.45f
+/** How bright the shimmer is at its middle along the edge: a broad soft glow, and a brighter core inside it. */
+private const val SheenGlowPeak = 0.40f
+private const val SheenCorePeak = 0.85f
 
 /** Half-width of each band, as a fraction of the pebble's length along the sweep. */
-private const val SheenWashHalfWidth = 0.42f
-private const val SheenCoreHalfWidth = 0.12f
-private const val SheenEdgeHalfWidth = 0.30f
+private const val SheenGlowHalfWidth = 0.40f
+private const val SheenCoreHalfWidth = 0.13f
 
 /** How far the band's stripes lean from upright (rise over run): a slanted reflection, not a vertical bar. */
 private const val SheenSlant = 0.45f
