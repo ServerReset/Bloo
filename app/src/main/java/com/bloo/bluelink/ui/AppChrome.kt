@@ -124,9 +124,20 @@ internal fun GlassAlertDialog(
     }
 }
 
-/** The dialog's usual two full-width buttons, stacked: the action (a Confirm button unless [confirmEmphasis] says otherwise) over its way out. */
+/** One full-width button in a dialog's button stack: every dialog's buttons are these, one under the next. */
 @Composable
-internal fun ColumnScope.ConfirmCancelButtons(
+internal fun DialogButton(
+    label: String,
+    onClick: () -> Unit,
+    emphasis: ButtonEmphasis = ButtonEmphasis.Tonal,
+    enabled: Boolean = true,
+) {
+    MorphTextButton(label, onClick = onClick, enabled = enabled, emphasis = emphasis, modifier = Modifier.fillMaxWidth())
+}
+
+/** The dialog's usual two buttons, stacked: the action (a Confirm button unless [confirmEmphasis] says otherwise) over its way out. */
+@Composable
+internal fun ConfirmCancelButtons(
     confirm: String,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
@@ -134,8 +145,8 @@ internal fun ColumnScope.ConfirmCancelButtons(
     confirmEmphasis: ButtonEmphasis = ButtonEmphasis.Confirm,
     cancel: String = "Cancel",
 ) {
-    MorphTextButton(confirm, onClick = onConfirm, enabled = enabled, emphasis = confirmEmphasis, modifier = Modifier.fillMaxWidth())
-    MorphTextButton(cancel, onClick = onCancel, modifier = Modifier.fillMaxWidth())
+    DialogButton(confirm, onConfirm, confirmEmphasis, enabled)
+    DialogButton(cancel, onCancel)
 }
 
 /** The inside of every dialog: optional icon badge, title row, scrolling body, then the buttons. */

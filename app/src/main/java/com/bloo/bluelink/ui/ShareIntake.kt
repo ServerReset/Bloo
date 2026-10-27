@@ -3,7 +3,6 @@ package com.bloo.bluelink.ui
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
@@ -20,7 +19,6 @@ import com.bloo.bluelink.data.settingsBackupProblem
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MotionShort
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -165,6 +163,6 @@ private fun SharedCarChooser(vehicles: List<Vehicle>, onPick: (Vehicle) -> Unit,
                 )
             }
         },
-        buttons = { MorphTextButton("Cancel", onClick = onDismiss, modifier = Modifier.fillMaxWidth()) },
+        buttons = { DialogButton("Cancel", onDismiss) },
     )
 }

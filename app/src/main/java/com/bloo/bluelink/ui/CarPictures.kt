@@ -143,7 +143,7 @@ private fun CarPictureDialog(v: Vehicle, current: String?, onPick: (String) -> U
             if (pictures.isEmpty()) BodyMediumText("No pictures are bundled with this build.")
             else CarPictureGrid(pictures, groups, group, current, { group = it }, onPick)
         },
-        buttons = { MorphTextButton("Close", onClick = onDismiss, modifier = Modifier.fillMaxWidth()) },
+        buttons = { DialogButton("Close", onDismiss) },
     )
 }
 

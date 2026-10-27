@@ -3,7 +3,6 @@ package com.bloo.bluelink.ui
 import android.os.Build
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -26,7 +25,6 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.MorphTextButton
 
 /**
  * Ordered troubleshooting steps covering the two different ways this bar can fail to show
@@ -66,20 +64,9 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
             }
         },
         buttons = {
-            MorphTextButton(
-                "Allow background activity",
-                onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
-                modifier = Modifier.fillMaxWidth(),
-                emphasis = ButtonEmphasis.Confirm,
-            )
-            if (isSamsung) {
-                MorphTextButton(
-                    "Open Developer options",
-                    onClick = { LiveCharge.openDeveloperOptions(context) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            MorphTextButton("Close", onDismiss, modifier = Modifier.fillMaxWidth())
+            DialogButton("Allow background activity", { LiveCharge.requestBackgroundUnrestricted(context) }, ButtonEmphasis.Confirm)
+            if (isSamsung) DialogButton("Open Developer options", { LiveCharge.openDeveloperOptions(context) })
+            DialogButton("Close", onDismiss)
         },
     )
 }

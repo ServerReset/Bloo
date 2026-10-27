@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -429,7 +428,7 @@ private fun BluetoothDevicePicker(vm: AppViewModel, onPick: (PairedDevice) -> Un
                 }
             }
         },
-        buttons = { MorphTextButton("Close", onClick = onDismiss, modifier = Modifier.fillMaxWidth()) },
+        buttons = { DialogButton("Close", onDismiss) },
     )
 }
 

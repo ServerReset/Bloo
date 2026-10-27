@@ -35,7 +35,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.GapRow
-import com.bloo.uicommon.MorphTextButton
 
 /** What a keyboard shortcut asks the app to do. Pure data: [shortcutFor] maps keys to these, [onShortcut] carries them out. */
 internal sealed interface Shortcut {
@@ -142,8 +141,6 @@ internal fun ShortcutsDialog(onDismiss: () -> Unit) {
                 }
             }
         },
-        buttons = {
-            MorphTextButton("Close", onClick = onDismiss, modifier = Modifier.fillMaxWidth(), emphasis = ButtonEmphasis.Confirm)
-        },
+        buttons = { DialogButton("Close", onDismiss, ButtonEmphasis.Confirm) },
     )
 }
