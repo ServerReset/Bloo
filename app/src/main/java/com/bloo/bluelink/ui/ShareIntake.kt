@@ -19,6 +19,7 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.settingsBackupProblem
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.MotionMedium
+import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MotionShort
 import kotlinx.coroutines.Dispatchers
@@ -129,15 +130,15 @@ internal fun ShareIntakeHost(vm: AppViewModel, stateHolder: State<UiState>) {
                 )
             },
             buttons = {
-                MorphTextButton(
+                ConfirmCancelButtons(
                     "Import",
-                    onClick = {
+                    onConfirm = {
                         vm.endSharedSettings()
                         vm.importSettings(context, Uri.parse(settings))
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    onCancel = { vm.endSharedSettings() },
+                    confirmEmphasis = ButtonEmphasis.Tonal,
                 )
-                MorphTextButton("Cancel", onClick = { vm.endSharedSettings() }, modifier = Modifier.fillMaxWidth())
             },
         )
     }

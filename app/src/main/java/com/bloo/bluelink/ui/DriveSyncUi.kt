@@ -201,13 +201,13 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                 )
             },
             buttons = {
-                MorphTextButton(
+                ConfirmCancelButtons(
                     "Remove",
-                    onClick = { vm.removeSyncedDevice(r.id); removal = null },
-                    emphasis = ButtonEmphasis.Deny,
-                    modifier = Modifier.fillMaxWidth(),
+                    onConfirm = { vm.removeSyncedDevice(r.id); removal = null },
+                    onCancel = { removal = null },
+                    confirmEmphasis = ButtonEmphasis.Deny,
+                    cancel = "Keep",
                 )
-                MorphTextButton("Keep", onClick = { removal = null }, modifier = Modifier.fillMaxWidth())
             },
         )
     }
@@ -241,20 +241,14 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                 )
             },
             buttons = {
-                MorphTextButton(
+                ConfirmCancelButtons(
                     "Save",
-                    onClick = {
+                    onConfirm = {
                         if (draft.isNotBlank()) vm.renameThisDevice(draft)
                         renaming = false
                     },
+                    onCancel = { renaming = false },
                     enabled = draft.isNotBlank(),
-                    emphasis = ButtonEmphasis.Confirm,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                MorphTextButton(
-                    "Cancel",
-                    onClick = { renaming = false },
-                    modifier = Modifier.fillMaxWidth()
                 )
             },
         )

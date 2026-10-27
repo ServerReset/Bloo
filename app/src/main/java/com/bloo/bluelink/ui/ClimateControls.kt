@@ -65,7 +65,6 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.TitleSubtitle
 import com.bloo.uicommon.MorphIconButton
-import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.ButtonLabelStyle
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -263,19 +262,17 @@ internal fun ClimatePresetSection(
                 }
             },
             buttons = {
-                MorphTextButton(
+                ConfirmCancelButtons(
                     "Save",
-                    onClick = {
+                    onConfirm = {
                         if (name.isNotBlank()) {
                             onUpdate(preset.id, name.trim(), form.toRequest())
                             editing = null
                         }
                     },
+                    onCancel = { editing = null },
                     enabled = name.isNotBlank(),
-                    emphasis = ButtonEmphasis.Confirm,
-                    modifier = Modifier.fillMaxWidth(),
                 )
-                MorphTextButton("Cancel", onClick = { editing = null }, modifier = Modifier.fillMaxWidth())
             },
         )
     }

@@ -4,7 +4,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Thermostat
@@ -38,8 +37,6 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.denyTone
-import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.container
 import com.bloo.uicommon.content
@@ -334,14 +331,7 @@ private fun SavePresetDialog(onSave: (String) -> Unit, onDismiss: () -> Unit) {
             LabeledField(name, { name = it }, "Name")
         },
         buttons = {
-            MorphTextButton(
-                "Save",
-                onClick = { if (name.isNotBlank()) onSave(name.trim()) },
-                enabled = name.isNotBlank(),
-                emphasis = ButtonEmphasis.Confirm,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            MorphTextButton("Cancel", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+            ConfirmCancelButtons("Save", onConfirm = { if (name.isNotBlank()) onSave(name.trim()) }, onCancel = onDismiss, enabled = name.isNotBlank())
         },
     )
 }

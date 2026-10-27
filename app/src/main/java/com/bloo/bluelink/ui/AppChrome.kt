@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.ButtonEmphasis
 import kotlin.math.sin
 import androidx.compose.foundation.ScrollState
 import androidx.compose.ui.draw.drawWithContent
@@ -120,6 +122,20 @@ internal fun GlassAlertDialog(
             tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.97f),
         ) { card() }
     }
+}
+
+/** The dialog's usual two full-width buttons, stacked: the action (a Confirm button unless [confirmEmphasis] says otherwise) over its way out. */
+@Composable
+internal fun ColumnScope.ConfirmCancelButtons(
+    confirm: String,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+    enabled: Boolean = true,
+    confirmEmphasis: ButtonEmphasis = ButtonEmphasis.Confirm,
+    cancel: String = "Cancel",
+) {
+    MorphTextButton(confirm, onClick = onConfirm, enabled = enabled, emphasis = confirmEmphasis, modifier = Modifier.fillMaxWidth())
+    MorphTextButton(cancel, onClick = onCancel, modifier = Modifier.fillMaxWidth())
 }
 
 /** The inside of every dialog: optional icon badge, title row, scrolling body, then the buttons. */
