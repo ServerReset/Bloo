@@ -37,14 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.lerp
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.ui.util.lerp
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -76,31 +71,9 @@ internal data class MapFeature(
     val onClick: () -> Unit,
 )
 
-/** The pebble map's corner radius (its clip, StandardShape) and the sheet's top corners, which the window eases between. */
+/** The pebble map's corner radius (its clip, StandardShape) and the sheet's top corners, which the map's own corners ease between. */
 private val PebbleMapCorner = 16.dp
 private val SheetCorner = 28.dp
-
-/** A rounded rectangle of the given size, centred in whatever it clips: the window the map is seen through as it opens and closes. */
-private class MapWindowShape(
-    private val width: Float,
-    private val height: Float,
-    private val topRadius: Float,
-    private val bottomRadius: Float,
-) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val left = (size.width - width) / 2f
-        val top = (size.height - height) / 2f
-        return Outline.Rounded(
-            RoundRect(
-                left, top, left + width, top + height,
-                topLeftCornerRadius = CornerRadius(topRadius),
-                topRightCornerRadius = CornerRadius(topRadius),
-                bottomRightCornerRadius = CornerRadius(bottomRadius),
-                bottomLeftCornerRadius = CornerRadius(bottomRadius),
-            ),
-        )
-    }
-}
 
 @Composable
 internal fun ExpandableMapLayer(
@@ -111,6 +84,8 @@ internal fun ExpandableMapLayer(
     statusLine: String? = null,
     deviceLocation: GeoLocation?,
     mapState: CarMapState,
+    /** The car's one map ([ExpandedMapState.mapFor]), moved here from its pebble. */
+    map: @Composable (Modifier, MapInputs) -> Unit,
     hazeState: HazeState?,
     onRefreshLocation: () -> Unit,
     /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
@@ -191,14 +166,14 @@ internal fun ExpandableMapLayer(
         }
     }
 
-    // Captured at the SHEET's own real layout -- 85% height, bottom-anchored, full width -- not the
-    // whole screen. This is the "full" target the morph below scales the pebble up to.
-    var sheetBounds by remember { mutableStateOf<Rect?>(null) }
+    // The overlay's own place on screen: the pebble's rect is in screen coordinates, and the map is placed in this box's.
+    var rootPos by remember { mutableStateOf<androidx.compose.ui.geometry.Offset?>(null) }
+    val windowSize = LocalWindowInfo.current.containerSize
 
     // Back handler for closing
     BackHandler(enabled = isExpanded) { close() }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().onGloballyPositioned { rootPos = it.positionOnScreen() }) {
         // Scrim background (dims/blurs content behind) -- covers the WHOLE screen, not just the
         // sheet: this is what shows through the top 15% strip the sheet itself doesn't reach.
         if (isExpanded) {
@@ -206,61 +181,60 @@ internal fun ExpandableMapLayer(
             Box(Modifier.fillMaxSize().noRippleClickable { close() })
         }
 
-        // This outer box is the sheet where it comes to rest: it does not slide in. The map grows out of the pebble's own picture
-        // (the window below), so a slide as well would be two motions pulling in different directions. It moves only with the pull-down.
+        // THE MAP. The very element that was in the pebble, moved here, and sized by hand every frame from the pebble's rectangle to
+        // the sheet's: its tiles stay at their own scale and the car stays at its centre, so what grows is the map's own box, not a picture
+        // of it. Closing runs the same rectangle back down to the pebble's, where the map is put back.
+        val sheetCornerPx = with(density) { SheetCorner.toPx() }
+        val pebbleCornerPx = with(density) { PebbleMapCorner.toPx() }
+        val mapInputs = MapInputs(location, deviceLocation, interactive = isExpanded, tileArea = windowSize)
+        map(
+            Modifier
+                .layout { measurable, constraints ->
+                    val w = constraints.maxWidth.toFloat()
+                    val h = constraints.maxHeight.toFloat()
+                    val sheetH = (h * 0.85f + pull.up.value).coerceIn(h * 0.85f, h)
+                    val sheet = Rect(0f, h - sheetH + dragPx.value, w, h + dragPx.value)
+                    val root = rootPos
+                    val origin = if (root == null) sheet else originBounds.translate(-root.x, -root.y)
+                    // Part-way to the pebble already while dragged down; the rest on release.
+                    val drag = (dragPx.value / closeDistPx).coerceIn(0f, 1f)
+                    val t = (expandFraction.value * (1f - 0.5f * drag)).coerceIn(0f, 1f)
+                    val r = lerp(origin, sheet, t)
+                    val placeable = measurable.measure(
+                        androidx.compose.ui.unit.Constraints.fixed(r.width.roundToInt().coerceAtLeast(1), r.height.roundToInt().coerceAtLeast(1)),
+                    )
+                    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(r.left.roundToInt(), r.top.roundToInt()) }
+                }
+                .graphicsLayer {
+                    // Not drawn until it knows where the overlay is, rather than for a frame in the wrong place.
+                    alpha = if (rootPos == null) 0f else 1f
+                    val drag = (dragPx.value / closeDistPx).coerceIn(0f, 1f)
+                    val t = (expandFraction.value * (1f - 0.5f * drag)).coerceIn(0f, 1f)
+                    val top = lerp(pebbleCornerPx, sheetCornerPx, t)
+                    val bottom = lerp(pebbleCornerPx, 0f, t)
+                    shape = RoundedCornerShape(
+                        topStart = CornerSize(top), topEnd = CornerSize(top), bottomEnd = CornerSize(bottom), bottomStart = CornerSize(bottom),
+                    )
+                    clip = true
+                }
+                .hazeSource(mapHazeState),
+            mapInputs,
+        )
+
+        // The bars. The sheet's own frame, where it comes to rest (85% of the screen, taller as it is pulled up): it holds only the
+        // bars now, and moves only with the pull-down.
         Box(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                // 85% of the screen, plus however far it has been pulled up: the sheet's top rises with the
-                // finger while its bottom stays pinned to the screen bottom, so the map simply gets
-                // taller instead of lifting off and leaving a gap. Read in the measure phase.
+                // 85% of the screen, plus however far it has been pulled up: the sheet's top rises with the finger while its bottom
+                // stays pinned to the screen bottom. Read in the measure phase.
                 .layout { measurable, constraints ->
                     val base = (constraints.maxHeight * 0.85f).roundToInt()
                     val h = (base + pull.up.value.roundToInt()).coerceIn(base, constraints.maxHeight)
                     val p = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
                     layout(p.width, p.height) { p.place(0, 0) }
                 }
-                .graphicsLayer { translationY = dragPx.value }
-                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
+                .graphicsLayer { translationY = dragPx.value },
         ) {
-            // The map itself, laid out at the sheet's full size and never scaled. What grows is a window onto it: it starts as the pebble
-            // map's own rectangle and ends as the sheet's, its corners easing from the pebble's to the sheet's. The map is shifted so the car
-            // sits where it does in the pebble at the start, and it shares the pebble map's zoom and pan, so the first frame is the same
-            // picture the pebble was showing; closing runs it backwards into that picture.
-            Box(
-                Modifier.fillMaxSize()
-                    .onGloballyPositioned { sheetBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
-                    .graphicsLayer {
-                        val full = sheetBounds
-                        if (full == null || full.width <= 0f || full.height <= 0f) {
-                            // Not placed yet: nothing to align to, so nothing is drawn rather than a full-size map for a frame.
-                            alpha = 0f
-                            return@graphicsLayer
-                        }
-                        // Part-way to the pebble already while dragged down; the rest on release.
-                        val drag = (dragPx.value / closeDistPx).coerceIn(0f, 1f)
-                        val t = (expandFraction.value * (1f - 0.5f * drag)).coerceIn(0f, 1f)
-                        translationX = (originBounds.center.x - full.center.x) * (1f - t)
-                        translationY = (originBounds.center.y - full.center.y) * (1f - t)
-                        // Centred on the layer, which the shift above keeps centred on the window's own centre.
-                        shape = MapWindowShape(
-                            width = lerp(originBounds.width, size.width, t),
-                            height = lerp(originBounds.height, size.height, t),
-                            topRadius = lerp(PebbleMapCorner.toPx(), SheetCorner.toPx(), t),
-                            bottomRadius = lerp(PebbleMapCorner.toPx(), 0f, t),
-                        )
-                        clip = true
-                    },
-            ) {
-                CarMap(
-                    location,
-                    Modifier.fillMaxSize().hazeSource(mapHazeState),
-                    state = mapState,
-                    deviceLocation = deviceLocation,
-                    // Only the full-screen map is draggable; the pebble-sized sheet stays put.
-                    interactive = isExpanded,
-                )
-            }
-
             // One consolidated top bar -- name, drag handle, and refresh, all inside one shared
             // floating pill background instead of three separate glass pieces (see MapTopBar's own
             // doc).

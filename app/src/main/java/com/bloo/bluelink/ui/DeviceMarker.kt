@@ -12,6 +12,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,12 +40,15 @@ internal fun BoxScope.DeviceMarker(
     panX: Float,
     panY: Float,
     scale: Float,
-    halfW: Float,
-    halfH: Float,
+    box: State<IntSize>,
     marginPx: Float,
     color: Color,
     onCenter: () -> Unit,
 ) {
+    // Read here, in this composable's own scope: a map being resized recomposes this marker alone, not the map around it.
+    val halfW = box.value.width / 2f
+    val halfH = box.value.height / 2f
+    if (halfW <= 0f || halfH <= 0f) return
     val sx = (((MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx).toFloat() + panX) * scale
     val sy = (((MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx).toFloat() + panY) * scale
     if (markerOffBox(sx, sy, halfW, halfH, marginPx)) {

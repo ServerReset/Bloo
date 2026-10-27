@@ -153,9 +153,8 @@ internal fun GarageScreen(
                 }
             },
         )
-        // THE SINGLE CarMap instance, positioned at the screen level. It animates from the pebble
-        // location (collapsed) to full-screen (expanded). Same instance, literally growing -- not
-        // two separate maps or morphing.
+        // THE SINGLE CarMap instance (ExpandedMapState.mapFor), moved here from the pebble's slot and sized from the pebble's rectangle
+        // to the screen's by ExpandableMapLayer, then moved back when it closes: the same composed map, not two.
         val expandedVin = expandedMap.vin
         val expandedVehicle = if (expandedVin != null) vehicles.firstOrNull { it.vin == expandedVin } else null
         val expandedLocation = expandedVehicle?.let { state.value.locations[it.vin] }
@@ -171,6 +170,7 @@ internal fun GarageScreen(
                 statusLine = mapStatusLine(state.value, expandedVehicle, appearance.metricDistance),
                 deviceLocation = deviceLocation,
                 mapState = expandedMap.mapStateFor(expandedVehicle.vin),
+                map = expandedMap.mapFor(expandedVehicle.vin),
                 hazeState = hazeState,
                 onRefreshLocation = locateExpandedVehicle,
                 deviceRequest = rememberDeviceLocationRequest(vm),

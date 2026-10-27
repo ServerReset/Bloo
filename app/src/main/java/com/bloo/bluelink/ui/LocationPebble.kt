@@ -5,6 +5,7 @@ package com.bloo.bluelink.ui
  * and its supporting pieces: CarMap, weatherIcon/weatherTint and the openUrl/openApp/dial launchers.
  */
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.animation.AnimatedVisibility
@@ -164,23 +165,24 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 val expandedMap = LocalExpandedMap.current
                 val isExpanded = expandedMap?.vin == v.vin
                 val ownMapState = remember { CarMapState() }
-                CarMap(
-                    loc,
-                    Modifier.fillMaxWidth().height(if (glance) 130.dp else 220.dp).clip(StandardShape)
-                        .semantics { contentDescription = "Map showing where ${v.name} is" }
-                        .then(
-                            if (expandedMap == null) Modifier else Modifier
-                                .onGloballyPositioned {
-                                    expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
-                                    expandedMap.locationFor(v.vin).value = loc
-                                }
-                                .graphicsLayer { alpha = if (isExpanded) 0f else 1f },
-                        ),
-                    state = expandedMap?.mapStateFor(v.vin) ?: ownMapState,
-                    deviceLocation = state.deviceLocation,
+                val slot = Modifier.fillMaxWidth().height(if (glance) 130.dp else 220.dp).clip(StandardShape)
+                    .semantics { contentDescription = "Map showing where ${v.name} is" }
+                    .then(
+                        if (expandedMap == null) Modifier else Modifier.onGloballyPositioned {
+                            expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
+                            expandedMap.locationFor(v.vin).value = loc
+                        },
+                    )
+                if (expandedMap == null) {
                     // Static in the garage: a horizontal swipe over it turns the car page.
-                    interactive = false,
-                )
+                    CarMap(loc, slot, state = ownMapState, deviceLocation = state.deviceLocation, interactive = false)
+                } else {
+                    // The slot keeps its size and its place whether or not the map is in it; while the map is open it is in the
+                    // full-screen layer instead (the same composed map, moved, not a copy), and comes back here when it closes.
+                    Box(slot) {
+                        if (!isExpanded) expandedMap.mapFor(v.vin)(Modifier.fillMaxSize(), MapInputs(loc, state.deviceLocation, interactive = false))
+                    }
+                }
                 MapFeatureRow(
                     features = listOfNotNull(
                         expandedMap?.let { host -> MapFeature(Icons.Filled.Fullscreen, "Expand") { host.vin = v.vin } },

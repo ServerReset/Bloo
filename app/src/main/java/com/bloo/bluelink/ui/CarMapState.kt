@@ -1,6 +1,9 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.Modifier
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -136,6 +139,21 @@ internal fun rememberCarMapState(): CarMapState = remember { CarMapState() }
  * expanded view starting over at a fresh state with a fresh tile fetch.
  */
 internal class ExpandedMapState {
+    private val perVinMap = mutableMapOf<String, @Composable (Modifier, MapInputs) -> Unit>()
+
+    /**
+     * The ONE map composable for this car, as movable content. Call it where the map should be drawn: the pebble's slot while the
+     * map is collapsed, the full-screen layer while it is open. Moving the call from one to the other moves the composed map itself
+     * (its state, its loaded tiles, its place in the pan and zoom), it does not build a second one, so the map that opens is the map
+     * that was in the pebble. Call it from one place at a time.
+     */
+    fun mapFor(vin: String): @Composable (Modifier, MapInputs) -> Unit = perVinMap.getOrPut(vin) {
+        val state = mapStateFor(vin)
+        movableContentOf { modifier: Modifier, inputs: MapInputs ->
+            CarMap(inputs.location, modifier, state, inputs.deviceLocation, inputs.interactive, inputs.tileArea)
+        }
+    }
+
     /** VIN of the car whose map is currently expanded, or null. */
     var vin by mutableStateOf<String?>(null)
     private val perVinMapState = mutableMapOf<String, CarMapState>()
@@ -159,3 +177,11 @@ internal class ExpandedMapState {
     /** The location for this VIN's map, kept live for the screen-level map layer. */
     fun locationFor(vin: String): MutableState<GeoLocation?> = perVinLocation.getOrPut(vin) { mutableStateOf(null) }
 }
+
+/** What the shared map is drawn from at the place it is hosted: where the car is, where the phone is, whether it takes touches, and the area to keep tiles for. */
+internal data class MapInputs(
+    val location: GeoLocation,
+    val deviceLocation: GeoLocation?,
+    val interactive: Boolean,
+    val tileArea: IntSize = IntSize.Zero,
+)

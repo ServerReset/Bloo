@@ -1,5 +1,10 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.ParentDataModifier
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
@@ -69,6 +74,7 @@ internal fun CarMap(
     state: CarMapState = rememberCarMapState(),
     deviceLocation: GeoLocation? = null,
     interactive: Boolean = true,
+    tileArea: IntSize = IntSize.Zero,
 ) {
     var started by remember { mutableStateOf(MapStartGate.open) }
     if (!started) {
@@ -80,7 +86,7 @@ internal fun CarMap(
         Box(modifier)
         return
     }
-    CarMapBody(location, modifier, state, deviceLocation, interactive)
+    CarMapBody(location, modifier, state, deviceLocation, interactive, tileArea)
 }
 
 /**
@@ -104,6 +110,12 @@ private fun CarMapBody(
      * swipe over it still turns the car page; only the full-screen map is draggable.
      */
     interactive: Boolean = true,
+    /**
+     * The area, in px, to keep tiles loaded for when it is larger than the box itself: a map that is about to be (or is being)
+     * resized, as it grows from the pebble to the full screen, asks for the largest size it will reach, so the grid does not
+     * change on every frame of the resize. Zero means the box's own size.
+     */
+    tileArea: IntSize = IntSize.Zero,
 ) {
     val context = LocalContext.current
     // Cold-start diagnostic; see HeroVisual's matching mark.
@@ -155,11 +167,12 @@ private fun CarMapBody(
 
     // Measured with onSizeChanged, not BoxWithConstraints (a SubcomposeLayout defers composition,
     // costly while `location` updates continuously). Zero for the first frame just draws no tiles.
-    var boxSizePx by remember { mutableStateOf(IntSize.Zero) }
+    val boxSize = remember { mutableStateOf(IntSize.Zero) }
     Box(
         modifier
             .background(mapBackground)
-            .onSizeChanged { boxSizePx = it }
+            .clipToBounds()
+            .onSizeChanged { boxSize.value = it }
             .then(
                 if (interactive) {
                     Modifier.pointerInput(state) {
@@ -178,8 +191,14 @@ private fun CarMapBody(
     ) {
         val density = LocalDensity.current
         val tilePx = MapTiles.TILE_PX.toFloat()
-        val wPx = boxSizePx.width.toFloat()
-        val hPx = boxSizePx.height.toFloat()
+        // The size tiles are kept for: the box, or [tileArea] when that is larger. A derived value, so a box that is being resized
+        // (the map opening out of its pebble) recomposes nothing while it stays inside the area, and the tiles are placed from the live
+        // layout size in [TileLayer], not from this.
+        val extent by remember(tileArea) {
+            derivedStateOf { IntSize(maxOf(boxSize.value.width, tileArea.width), maxOf(boxSize.value.height, tileArea.height)) }
+        }
+        val wPx = extent.width.toFloat()
+        val hPx = extent.height.toFloat()
         val zoom = state.zoom
         val span = MapTiles.span(zoom)
         val xTileF = MapTiles.tileX(location.longitude, zoom)
@@ -275,6 +294,7 @@ private fun CarMapBody(
                     scaleY = state.scale
                 },
         ) {
+        TileLayer(xTileF, yTileF) {
         for (tx in range.firstX..range.lastX) {
             for (ty in range.firstY..range.lastY) {
                 if (ty < 0 || ty >= span) continue
@@ -298,9 +318,9 @@ private fun CarMapBody(
                             .data(MapTiles.tileUrl(zoom, wrappedX, ty))
                             // OSM blocks clients whose User-Agent does not identify the app.
                             .setHeader("User-Agent", MapTiles.userAgent("Android"))
-                            // No crossfade: Coil skips it only for memory hits, and the pebble map
-                            // and full-screen sheet are separate CarMaps requesting the same URLs,
-                            // so fading would look like a refresh.
+                            // No crossfade: Coil skips it only for memory hits, and a fade on a tile that was
+                            // already shown (the map moving between the pebble and the full screen) would look
+                            // like a refresh.
                             .crossfade(false)
                             .build()
                     }
@@ -308,17 +328,12 @@ private fun CarMapBody(
                         model = request,
                         contentDescription = null,
                         colorFilter = darkMapFilter,
-                        modifier = Modifier.size(tileDp)
-                            // Layout-phase placement: no recomposition per pan frame.
-                            // Pan-independent placement; the container's graphicsLayer applies pan.
-                            .offset {
-                                val originX = xTileF * tilePx - wPx / 2f
-                                val originY = yTileF * tilePx - hPx / 2f
-                                IntOffset((tx * tilePx - originX).roundToInt(), (ty * tilePx - originY).roundToInt())
-                            },
+                        // Sized and placed by TileLayer, from the layout size of the moment.
+                        modifier = Modifier.tileSlot(tx, ty),
                     )
                 }
             }
+        }
         }
         // On-screen distance between car pin and device dot in tile pixels (pan cancels out);
         // decides whether to merge them, accounting for zoom.
@@ -365,7 +380,7 @@ private fun CarMapBody(
         // shows. OUTSIDE the scaled layer, so it stays a constant size (a marker should not grow when
         // you pinch). Its screen offset is its tile delta from the car plus the pan, all times scale.
         val dev = deviceLocation
-        if (dev != null && wPx > 0f && hPx > 0f) {
+        if (dev != null) {
             DeviceMarker(
                 dev = dev,
                 zoom = zoom,
@@ -375,13 +390,40 @@ private fun CarMapBody(
                 panX = state.panX,
                 panY = state.panY,
                 scale = state.scale,
-                halfW = wPx / 2f,
-                halfH = hPx / 2f,
+                box = boxSize,
                 marginPx = with(density) { 22.dp.toPx() },
                 color = deviceLocationColor,
                 onCenter = { state.showDevice(location.latitude, location.longitude, dev.latitude, dev.longitude) },
             )
         }
         // Expand/Open-in-Maps render as a MapFeatureRow in the caller, not over the map.
+    }
+}
+
+/** A tile's own coordinates, read by [TileLayer] to place it. */
+private class TileSlot(val tx: Int, val ty: Int) : ParentDataModifier {
+    override fun Density.modifyParentData(parentData: Any?): Any = this@TileSlot
+}
+
+private fun Modifier.tileSlot(tx: Int, ty: Int): Modifier = this.then(TileSlot(tx, ty))
+
+/**
+ * The map's tiles, each one tile square, placed from the car's tile position so the car sits dead centre of whatever size the layer
+ * is at the moment. The size is read here, in layout, so a map being resized (opening out of its pebble) keeps every tile on its
+ * place frame by frame instead of lagging a frame behind a size held in state.
+ */
+@Composable
+private fun TileLayer(xTileF: Double, yTileF: Double, content: @Composable () -> Unit) {
+    val tile = MapTiles.TILE_PX
+    Layout(content = content, modifier = Modifier.fillMaxSize()) { measurables, constraints ->
+        val w = constraints.maxWidth
+        val h = constraints.maxHeight
+        val fixed = Constraints.fixed(tile, tile)
+        val originX = xTileF * tile - w / 2.0
+        val originY = yTileF * tile - h / 2.0
+        val placed = measurables.map { it.measure(fixed) to (it.parentData as TileSlot) }
+        layout(w, h) {
+            for ((p, slot) in placed) p.place((slot.tx * tile - originX).roundToInt(), (slot.ty * tile - originY).roundToInt())
+        }
     }
 }
