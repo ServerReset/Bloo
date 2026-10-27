@@ -24,6 +24,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.GeoLocation
 import org.junit.Assert.assertEquals
@@ -204,7 +205,10 @@ class MapMorphTest {
             rule.mainClock.advanceTimeByFrame()
             box = pin()
         }
-        check((box.right - box.left).value > 0f) { "the pin never got placed: $box" }
+        check((box.right - box.left).value > 0f) {
+            // Print the unmerged tree at the pin, so the next failure shows what the node really is.
+            "the pin never got placed: $box; tree:\n" + rule.onRoot(useUnmergedTree = true).printToString(maxDepth = 60)
+        }
         return (box.left.value + box.right.value) / 2f to box.bottom.value
     }
 
