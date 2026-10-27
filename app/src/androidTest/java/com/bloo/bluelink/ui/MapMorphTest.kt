@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.GeoLocation
@@ -165,5 +166,48 @@ class MapMorphTest {
         assertEquals("back in the slot: width", (slotBounds.right - slotBounds.left).value, (back.right - back.left).value, 2f)
         assertEquals("back in the slot: height", (slotBounds.bottom - slotBounds.top).value, (back.bottom - back.top).value, 2f)
         assertEquals("the same map came back, nothing was rebuilt", 1, built)
+    }
+
+    @Test fun theRealMapKeepsTheCarAtTheCentreOfItsBoxWhileItResizes() {
+        val origin = Rect(80f, 400f, 680f, 700f)
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            BlooTheme {
+                val state = remember { CarMapState() }
+                val movable = remember {
+                    movableContentOf { modifier: Modifier, inputs: MapInputs ->
+                        CarMap(inputs.location, modifier.testTag("map"), state, inputs.deviceLocation, inputs.interactive, inputs.tileArea)
+                    }
+                }
+                ExpandableMapLayer(
+                    isExpanded = true,
+                    originBounds = origin,
+                    location = GeoLocation(37.0, -122.0),
+                    vehicleName = "Car",
+                    deviceLocation = null,
+                    mapState = state,
+                    map = { modifier, inputs -> movable(modifier, inputs) },
+                    hazeState = null,
+                    onRefreshLocation = {},
+                    onDismiss = {},
+                )
+            }
+        }
+        // Let the map start (it waits a few frames the first time) and the opening get under way, then sample it as it grows.
+        repeat(8) { rule.mainClock.advanceTimeByFrame() }
+        var lastWidth = 0f
+        repeat(6) { step ->
+            rule.mainClock.advanceTimeBy(60)
+            val box = rule.onNodeWithTag("map").getBoundsInRoot()
+            val pin = rule.onNodeWithContentDescription("Car location").getBoundsInRoot()
+            val boxCentreX = (box.left.value + box.right.value) / 2f
+            val boxCentreY = (box.top.value + box.bottom.value) / 2f
+            val width = box.right.value - box.left.value
+            // The pin's tip (the bottom of its icon) is the car: it stays dead centre however big the box is at that moment.
+            assertEquals("step $step: car x at the box centre (box ${width}dp wide)", boxCentreX, (pin.left.value + pin.right.value) / 2f, 2f)
+            assertEquals("step $step: car y at the box centre", boxCentreY, pin.bottom.value, 2f)
+            assertTrue("step $step: the box is growing ($width > $lastWidth)", width >= lastWidth)
+            lastWidth = width
+        }
     }
 }
