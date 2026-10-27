@@ -268,9 +268,9 @@ class BlooTileService : TileService() {
         )
     }
 
-    /** The ring's colour from the level, shared with the watch face ([levelColorArgb]). */
+    /** The ring's colour from the level, the shared [BlooColors.levelColor] rule, as the watch face uses. */
     private fun tint(car: VehicleSnapshot): Int =
-        levelColorArgb(car.percent, car.charging == true, WHITE)
+        com.bloo.bluelink.data.BlooColors.levelColor(car.percent, car.charging == true, WHITE)
 
     /**
      * The car's charge as a ring round the display's edge, split as the phone's charge bar is: the fill (green, blue once it has

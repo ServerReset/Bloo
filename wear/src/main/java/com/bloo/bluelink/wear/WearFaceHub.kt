@@ -133,13 +133,6 @@ private fun HubLine(text: String, color: Color, hubSize: Dp, maxLines: Int = 1) 
 /** A moment's line in the hub, in place of the car's name: what just happened, or why to doubt the reading. */
 data class FaceStatus(val text: String, val error: Boolean = false)
 
-/**
- * The ring's colour, from the level: red when low, amber when getting there, green otherwise, and the
- * charging blue while it charges. A car with no level reads in [fallback].
- */
+/** The ring's colour from the level: the shared [com.bloo.bluelink.data.BlooColors.levelColor] rule, as a Compose colour. */
 fun faceTint(percent: Int?, charging: Boolean, fallback: Color): Color =
-    Color(levelColorArgb(percent, charging, fallback.toArgb()))
-
-/** [faceTint] as a plain ARGB int, so the Tile (which draws without Compose) colours its ring the same way. */
-fun levelColorArgb(percent: Int?, charging: Boolean, fallback: Int): Int =
-    com.bloo.bluelink.data.BlooColors.levelColor(percent, charging, fallback)
+    Color(com.bloo.bluelink.data.BlooColors.levelColor(percent, charging, fallback.toArgb()))
