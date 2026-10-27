@@ -167,8 +167,9 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                     appendLine()
                     appendLine("--- Stack trace ---")
                     appendLine(trace)
-                    val logLines = AppLog.snapshot()
-                    appendLine("--- App log (most recent ${logLines.size} lines) ---")
+                    // Newest first, as the app's own log view is.
+                    val logLines = AppLog.snapshot().asReversed()
+                    appendLine("--- App log (most recent ${logLines.size} lines, newest first) ---")
                     if (logLines.isEmpty()) {
                         append("(empty: crashed before anything logged, or log() was never reached)")
                     } else {

@@ -2,6 +2,9 @@ package com.bloo.bluelink.ui
 
 /** Trips/drive-history pebbles: TripsPebble, TripRow and climateChunksLabel. */
 
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.runtime.State
+import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,7 +29,6 @@ import com.bloo.bluelink.data.formatSpeedMph
 import com.bloo.bluelink.data.formatTripDistance
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.tripDate
-import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
@@ -65,19 +67,20 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
         when {
             trips == null -> SecondaryText(if (loading) "Fetching trip history…" else "No trip data yet.")
             trips.isEmpty() -> SecondaryText("No recent trips reported by this car.")
-            else -> Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+            else -> {
                 val tMetric = LocalAppearance.current.metricDistance
                 // In a forced-open/glance context (LocalForceExpanded) only the 3 most recent trips
                 // show so the tile fits without scrolling; the full pebble keeps up to 8.
                 val glance = LocalForceExpanded.current
-                trips.take(if (glance) 3 else 8).forEach { TripRow(it, metric = tMetric) }
+                // Each trip is a row of the pebble's own cascade (not one row holding them all), and pops in on its own.
+                trips.take(if (glance) 3 else 8).forEachIndexed { i, trip -> TripRow(trip, metric = tMetric, index = i) }
             }
         }
     }
 }
 
 @Composable
-internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
+internal fun TripRow(trip: EvTrip, metric: Boolean = false, index: Int = 0) {
     val primaryColor = MaterialTheme.colorScheme.onSurface
     // Same color-role swap as DiagnosticsPebble's indented rows: onSurfaceVariant is full alpha, so
     // dimness is the role. Boosted in a glance context, which has no other contrast handling.
@@ -86,18 +89,40 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    // The trips pop in one after another, and within a trip the panel pops first and then every text in it, one at a time.
+    val clock = rememberPopClock(delayMs = index * TripStaggerMs)
+    val stats = listOfNotNull(
+        trip.driveMinutes?.let { "Time" to fmtMinutes(it) },
+        trip.idleMinutes?.takeIf { it > 0 }?.let { "Idle" to fmtMinutes(it) },
+        // formatSpeedMph, not formatSpeed: these values are mph and formatSpeed takes km/h.
+        trip.avgspeed?.value?.let { "Avg" to formatSpeedMph(it, metric) },
+        trip.maxspeed?.value?.let { "Max" to formatSpeedMph(it, metric) },
+        trip.usedKwh?.let { "Used" to "$it kWh" },
+        trip.regenKwh?.takeIf { it > 0 }?.let { "Regen" to "$it kWh" },
+    )
+    // Slots: the panel, the date, the distance, then a label and a value for each stat.
+    val slots = 3 + 2 * stats.size
+    val textPivot = TransformOrigin(0f, 0.5f)
     // Each trip is its own zone: an outlined panel with a header line (when + how far) and a neat
     // grid of stats underneath.
-    Column(Modifier.fillMaxWidth().outlinedPanel(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+    Column(
+        Modifier.fillMaxWidth().popIn(clock, slot = 0, slots = slots, from = 0.9f).outlinedPanel(GapGroup),
+        verticalArrangement = Arrangement.spacedBy(GapRow),
+    ) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RevealText(tripDate(trip.startdate), style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, color = primaryColor)
+            Text(
+                tripDate(trip.startdate),
+                modifier = Modifier.popIn(clock, 1, slots, pivot = textPivot),
+                style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, color = primaryColor,
+            )
             trip.distance?.let {
-                RevealText(
+                Text(
                     formatTripDistance(it, metric),
+                    modifier = Modifier.popIn(clock, 2, slots, pivot = textPivot),
                     style = PrimaryTextStyle(),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -109,23 +134,21 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
             horizontalArrangement = Arrangement.spacedBy(GapGroup),
             verticalArrangement = Arrangement.spacedBy(GapHairline),
         ) {
-            trip.driveMinutes?.let { TripStat("Time", fmtMinutes(it), captionColor) }
-            trip.idleMinutes?.takeIf { it > 0 }?.let { TripStat("Idle", fmtMinutes(it), captionColor) }
-            // formatSpeedMph, not formatSpeed: these values are mph and formatSpeed takes km/h.
-            trip.avgspeed?.value?.let { TripStat("Avg", formatSpeedMph(it, metric), captionColor) }
-            trip.maxspeed?.value?.let { TripStat("Max", formatSpeedMph(it, metric), captionColor) }
-            trip.usedKwh?.let { TripStat("Used", "$it kWh", captionColor) }
-            trip.regenKwh?.takeIf { it > 0 }?.let { TripStat("Regen", "$it kWh", captionColor) }
+            stats.forEachIndexed { i, (label, value) -> TripStat(label, value, captionColor, clock, 3 + 2 * i, slots) }
         }
     }
 }
 
-/** One label-over-value stat in a trip's zone. */
+/** How long after the one before it each trip starts to pop in. */
+private const val TripStaggerMs = 90
+
+/** One label-over-value stat in a trip's zone; the label and the value each pop in on their own turn ([slot] and the one after it). */
 @Composable
-private fun TripStat(label: String, value: String, captionColor: Color) {
+private fun TripStat(label: String, value: String, captionColor: Color, clock: State<Float>, slot: Int, slots: Int) {
+    val pivot = TransformOrigin(0f, 0.5f)
     Column {
-        RevealText(label, style = SecondaryTextStyle(), color = captionColor, maxLines = 1)
-        RevealText(value, style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(label, modifier = Modifier.popIn(clock, slot, slots, pivot = pivot), style = SecondaryTextStyle(), color = captionColor, maxLines = 1)
+        Text(value, modifier = Modifier.popIn(clock, slot + 1, slots, pivot = pivot), style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 

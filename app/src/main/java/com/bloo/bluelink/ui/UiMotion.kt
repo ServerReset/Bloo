@@ -1,5 +1,15 @@
 package com.bloo.bluelink.ui
 
+import kotlinx.coroutines.delay
+import com.bloo.uicommon.LocalPowerPolicy
+import com.bloo.uicommon.LocalReduceMotion
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.runtime.asState
+import androidx.compose.runtime.State
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -181,4 +191,50 @@ internal fun ExpandVisibility(
     content: @Composable AnimatedVisibilityScope.() -> Unit,
 ) {
     AnimatedVisibility(visible, modifier, enter = expandEnterSized(from), exit = expandExitSized(from), content = content)
+}
+
+/**
+ * A clock for a group of elements that pop in one after another: 0 to 1 over [durationMs], starting [delayMs] after it is first composed
+ * (already 1 where motion is off). Hand it to [popIn] on each element; it is read in the draw phase, so it recomposes nothing.
+ */
+@Composable
+internal fun rememberPopClock(delayMs: Int = 0, durationMs: Int = 900): State<Float> {
+    val allowed = !LocalReduceMotion.current && !LocalPowerPolicy.current.lean
+    val clock = remember { Animatable(if (allowed) 0f else 1f) }
+    LaunchedEffect(Unit) {
+        if (allowed) {
+            delay(delayMs.toLong())
+            clock.animateTo(1f, tween(durationMs, easing = LinearEasing))
+        }
+    }
+    return clock.asState()
+}
+
+/** The share of a [rememberPopClock] over which the elements' starts are spread; each then takes the rest of it to pop. */
+private const val PopSpread = 0.6f
+
+/** How far along its own pop (0 to 1) the element in [slot] of [slots] is when the group's clock reads [clock]: later slots start later and all finish with the clock. */
+internal fun popProgress(clock: Float, slot: Int, slots: Int): Float {
+    val start = if (slots <= 1) 0f else slot.toFloat() / slots * PopSpread
+    return ((clock - start) / (1f - PopSpread)).coerceIn(0f, 1f)
+}
+
+/**
+ * Pops this element in on its turn of [clock]: it fades up and grows from [from] with the pebble rows' small overshoot. [slot] (0 until
+ * [slots]) is its place in the order, so a group is a ripple, one element after the next. [pivot] is where it grows from: the middle
+ * for a panel, the start edge for a line of text.
+ */
+internal fun Modifier.popIn(
+    clock: State<Float>,
+    slot: Int,
+    slots: Int,
+    from: Float = 0.8f,
+    pivot: TransformOrigin = TransformOrigin.Center,
+): Modifier = graphicsLayer {
+    val t = popProgress(clock.value, slot, slots)
+    val scale = from + (1f - from) * pebbleRowOvershoot(t)
+    alpha = t
+    scaleX = scale
+    scaleY = scale
+    transformOrigin = pivot
 }

@@ -71,7 +71,8 @@ internal fun DebugCardContent(
     // The log is read here, only while this card is composed: collecting it in the Settings root re-copied up to
     // 500 lines on every log line even with the card hidden.
     val logsVersion by vm.logsVersion.collectAsStateWithLifecycle()
-    val logs = remember(logsVersion) { vm.logSnapshot() }
+    // Newest first, here and in what Copy hands over: the latest line is the first thing seen, and the view opens on it.
+    val logs = remember(logsVersion) { vm.logSnapshot().asReversed() }
     fun copy(label: String, text: String) {
         clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, text))) }
     }
@@ -91,12 +92,9 @@ internal fun DebugCardContent(
                     MorphTextButton("Clear", onClick = { vm.clearLogs() }, emphasis = ButtonEmphasis.Deny)
                 }
                 val scroll = rememberScrollState()
-                // Newest at the top, so the latest line is the first thing seen and the view opens on it; Copy above still hands over the
-                // log in the order it happened, which is the order a support report is read in.
-                val newestFirst = remember(logs) { logs.asReversed().joinToString("\n") }
                 SelectionContainer {
                     RevealText(
-                        text = newestFirst.ifBlank { "No activity yet." },
+                        text = logs.joinToString("\n").ifBlank { "No activity yet." },
                         style = SecondaryTextStyle(),
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp).fadingEdges(scroll)
