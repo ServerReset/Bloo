@@ -24,6 +24,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.GeoLocation
 import org.junit.Assert.assertEquals
@@ -203,7 +204,10 @@ class MapMorphTest {
             rule.mainClock.advanceTimeByFrame()
             pin = rule.onNodeWithContentDescription("Car location").getBoundsInRoot()
         }
-        check((pin.right - pin.left).value > 0f && (pin.bottom - pin.top).value > 0f) { "the pin never got placed: $pin" }
+        check((pin.right - pin.left).value > 0f && (pin.bottom - pin.top).value > 0f) {
+            // Print the whole tree so the next failure says where the pin really is, not just that it has no size.
+            "the pin never got placed: $pin; tree:\n" + rule.onRoot().printToString(maxDepth = 40)
+        }
         return (pin.left.value + pin.right.value) / 2f to pin.bottom.value
     }
 
