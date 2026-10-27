@@ -24,7 +24,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.printToString
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.GeoLocation
 import org.junit.Assert.assertEquals
@@ -196,19 +195,17 @@ class MapMorphTest {
 
     /** Where the car's pin tip is, in the compose root's dp. */
     private fun pinTip(): Pair<Float, Float> {
-        // The first map waits a few frames before it composes (MapStartFrames), so the pin is not there to read until the clock has run
-        // past that: advance it until the pin is placed, and only then read it.
-        var pin = rule.onNodeWithContentDescription("Car location").getBoundsInRoot()
+        // The first map waits a few frames before it composes (MapStartFrames), so advance the clock until the pin is placed. The pin is
+        // read from the UNMERGED tree: the merged one reports the parent's bounds for an icon, which is the zero box the test saw.
+        fun pin() = rule.onNodeWithContentDescription("Car location", useUnmergedTree = true).getBoundsInRoot()
+        var box = pin()
         var waited = 0
-        while ((pin.right - pin.left).value <= 0f && waited++ < 60) {
+        while ((box.right - box.left).value <= 0f && waited++ < 60) {
             rule.mainClock.advanceTimeByFrame()
-            pin = rule.onNodeWithContentDescription("Car location").getBoundsInRoot()
+            box = pin()
         }
-        check((pin.right - pin.left).value > 0f && (pin.bottom - pin.top).value > 0f) {
-            // Print the whole tree so the next failure says where the pin really is, not just that it has no size.
-            "the pin never got placed: $pin; tree:\n" + rule.onRoot().printToString(maxDepth = 40)
-        }
-        return (pin.left.value + pin.right.value) / 2f to pin.bottom.value
+        check((box.right - box.left).value > 0f) { "the pin never got placed: $box" }
+        return (box.left.value + box.right.value) / 2f to box.bottom.value
     }
 
     @Test fun theCarStaysWhereItWasOnScreenWhileTheMapOpens() {
