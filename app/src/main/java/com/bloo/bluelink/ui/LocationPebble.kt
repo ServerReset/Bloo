@@ -218,7 +218,8 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                     val cw = carWeather
                     if (cw != null) {
                         if (glance) {
-                            WeatherStripe(cw, fahrenheit, place ?: "At the car")
+                            // The header already says where the car is; the caption is only for when it has no address to say.
+                            WeatherStripe(cw, fahrenheit, if (place == null) "At the car" else null)
                         } else {
                             WeatherLocations(
                                 car = cw,

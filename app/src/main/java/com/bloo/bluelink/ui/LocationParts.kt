@@ -67,12 +67,12 @@ internal fun weatherTint(code: WeatherCode, isDay: Boolean): Color =
     com.bloo.uicommon.weatherTint(code.toCode(), isDay, MaterialTheme.colorScheme.onSurfaceVariant)
 
 /**
- * A compact one-line weather readout: icon, temperature and condition, with a small caption (place
- * name) underneath. Used inside the Location pebble when it renders collapsed in a glance context,
+ * A compact one-line weather readout: icon, temperature and condition, with a small [caption] underneath
+ * (none when the pebble's own header already says where the car is). Used inside the Location pebble when it renders collapsed in a glance context,
  * where the full [WeatherBlock] has no room.
  */
 @Composable
-internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: String) {
+internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: String?) {
     Row(
         Modifier.fillMaxWidth().outlinedPanel(14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -81,7 +81,7 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
         WeatherGlyph(weather.condition, weather.isDay, 30.dp, describe = false)
         Column(Modifier.weight(1f)) {
             RevealText(weather.condition.label, fontWeight = FontWeight.SemiBold, style = PrimaryTextStyle())
-            MutedText(caption)
+            caption?.let { MutedText(it) }
         }
         RollingNumber(text = weather.tempLabel(fahrenheit), style = PrimaryTextStyle(), fontWeight = FontWeight.Bold)
     }
@@ -350,15 +350,13 @@ internal fun WeatherLocations(
         if (merged) {
             WeatherLocationHeading(
                 title = "Here & at the car",
-                subtitle = when {
-                    place != null && devicePlace != null && place != devicePlace -> "$place · $devicePlace"
-                    else -> place ?: devicePlace
-                },
+                // The car's address is the pebble's own header; say only where the phone is, when that is somewhere else.
+                subtitle = if (place == null) devicePlace else devicePlace?.takeIf { it != place },
                 weather = car,
             )
             WeatherBlock(car, fahrenheit, metric, title = "Here & at the car", merged = true)
         } else {
-            WeatherBlock(car, fahrenheit, metric, title = "At the car", subtitle = place ?: "Car location")
+            WeatherBlock(car, fahrenheit, metric, title = "At the car", subtitle = if (place == null) "Car location" else null)
             if (phone != null) WeatherBlock(phone, fahrenheit, metric, title = "Your location", subtitle = devicePlace)
         }
     }
