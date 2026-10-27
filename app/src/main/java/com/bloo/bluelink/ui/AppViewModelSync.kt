@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.readUriText
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SyncMerge
@@ -66,7 +67,7 @@ fun AppViewModel.exportSettings(context: android.content.Context) = viewModelSco
 /** Restore a full settings backup from a user-picked JSON file. */
 fun AppViewModel.importSettings(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
     val json = withContext(Dispatchers.IO) {
-        runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.getOrNull()
+        context.readUriText(uri)
     }
     if (json == null) {
         _state.update { it.copy(message = "Couldn't read that file.") }
@@ -141,7 +142,7 @@ fun AppViewModel.importSettingsAndSync(context: android.content.Context, uri: an
 internal suspend fun AppViewModel.importSettingsAndSyncSuspend(context: android.content.Context, uri: android.net.Uri): Boolean {
     // Read once only to confirm the file is reachable; do NOT import it here.
     val readable = withContext(Dispatchers.IO) {
-        runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.isSuccess
+        context.readUriText(uri) != null
     }
     if (!readable) AppLog.log("⚠ Drive sync: couldn't read the picked file (will still try to enable sync)")
     if (!persistSyncUriOrReport(uri)) return false

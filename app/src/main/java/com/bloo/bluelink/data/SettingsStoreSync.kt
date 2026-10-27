@@ -68,7 +68,7 @@ suspend fun SettingsStore.syncFileChangedRemotely(): Boolean {
         kotlinx.coroutines.withContext(Dispatchers.IO) {
             runCatching {
                 kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                    context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
+                    context.readUriText(parsed)
                 }
             }.getOrNull()
         }?.substringAfter('\n', "")?.takeIf { it.isNotBlank() }?.let { SyncMerge.parseMeta(it)?.hash }
@@ -118,7 +118,7 @@ suspend fun SettingsStore.performMainToMainSync(
                 // .use{} closes the InputStream (and its ParcelFileDescriptor); readText() alone
                 // does NOT close, leaking an FD to the Drive SAF provider on every sync pass. Still
                 // evaluates to String?.
-                context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
+                context.readUriText(parsed)
             }
         }
     }.onFailure {
@@ -272,7 +272,7 @@ suspend fun SettingsStore.performMainToMainSync(
             val body = "$now\n$driveBody"
             // Re-read the file just before writing. If it changed since this pass read it, another phone wrote a newer copy:
             // overwriting it would drop that phone's update, so this pass waits and merges the newer copy on the next one.
-            val fileChangedMidPass = context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() } != remoteContent
+            val fileChangedMidPass = context.readUriText(parsed) != remoteContent
             if (fileChangedMidPass) {
                 AppLog.log("Drive sync: the file changed during this pass; not overwriting it, the next pass merges the newer copy")
                 uploadError = "The Drive file changed during sync; it will retry."
@@ -288,7 +288,7 @@ suspend fun SettingsStore.performMainToMainSync(
                             out.flush()
                             pfd.fileDescriptor.sync()
                         } ?: error("Couldn't open the Drive file for writing")
-                        val verify = context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
+                        val verify = context.readUriText(parsed)
                         if (verify != body) error("Upload didn't verify: the Drive file doesn't match what was written")
                     }
                 }
@@ -357,7 +357,7 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
         val current = runCatching {
             withDriveRetry {
                 kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                    context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
+                    context.readUriText(parsed)
                 }
             }
         }.getOrElse { e ->
@@ -373,7 +373,7 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
                 kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
                     context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(payload.toByteArray()) }
                         ?: error("couldn't open for writing")
-                    val readBack = context.contentResolver.openInputStream(parsed)?.use { it.bufferedReader().readText() }
+                    val readBack = context.readUriText(parsed)
                     readBack == payload
                 }
             }

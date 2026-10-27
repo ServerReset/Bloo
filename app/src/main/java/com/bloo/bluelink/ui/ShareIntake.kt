@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.readUriText
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -40,8 +41,7 @@ fun AppViewModel.offerSharedFile(uri: Uri, mime: String?) {
         type in JsonTypes -> viewModelScope.launch {
             // Checked now, not at import: a file that is not a Bloo backup is said so at once, and never offered for import.
             val json = withContext(Dispatchers.IO) {
-                runCatching { getApplication<android.app.Application>().contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }
-                    .getOrNull()
+                getApplication<android.app.Application>().readUriText(uri)
             }
             val problem = if (json == null) "Couldn't read that file." else settingsStore.settingsBackupProblem(json)
             if (problem != null) {
