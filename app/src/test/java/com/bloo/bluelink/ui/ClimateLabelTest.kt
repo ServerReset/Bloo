@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.climatePresetDetail
+import com.bloo.bluelink.data.climatePresetTemp
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatLevel
@@ -62,6 +63,13 @@ class ClimateLabelTest {
         assertEquals("70°", climatePresetDetail(req(70), fahrenheit = true))
         // Fahrenheit input converted per the shared degValue rule: 68°F -> 20°C.
         assertEquals("20°", climatePresetDetail(req(68), fahrenheit = false))
+    }
+
+    @Test
+    fun climatePresetTemp_isJustTheTemperatureNeverTheOptions() {
+        // The preset row shows the name and this, right-aligned: defrost and seat heat are in the editor, not on the row.
+        assertEquals("80°", climatePresetTemp(req(80, defrost = true, heat = true), fahrenheit = true))
+        assertEquals("20°", climatePresetTemp(req(68), fahrenheit = false))
     }
 
     @Test

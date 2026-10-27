@@ -69,10 +69,13 @@ fun smartClimateTargetLine(ambientF: Int, fahrenheit: Boolean): String {
     return "It's $ambient by your car. Smart climate targets $target."
 }
 
+/** Just the temperature a saved climate preset sets, as "79°" (the unit is established by context). */
+fun climatePresetTemp(req: ClimateRequest, fahrenheit: Boolean): String = "${degValue(req.tempF.toDouble(), fahrenheit)}°"
+
 /** A compact "79° · Defrost · Heat" summary of what a saved climate preset will set; the phone and the watch word it alike. */
 fun climatePresetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
     // Bare "°" rather than degLabel's "°F"/"°C": the unit is established by context.
-    val parts = mutableListOf("${degValue(req.tempF.toDouble(), fahrenheit)}°")
+    val parts = mutableListOf(climatePresetTemp(req, fahrenheit))
     if (req.defrost) parts += "Defrost"
     val seats = listOf(req.seatFrontLeft, req.seatFrontRight, req.seatRearLeft, req.seatRearRight)
     if (seats.any { it.isHeat }) parts += "Heat"

@@ -1,5 +1,8 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.LocalReduceMotion
 import androidx.compose.animation.core.LinearEasing
@@ -76,11 +79,11 @@ internal data class MapFeature(
     val onClick: () -> Unit,
 )
 
-/** How long the map takes to open and to close, and the curves: a ramp up, a slowing down, and a few percent of overshoot before it settles (the close overshoots a little less). */
+/** How long the map takes to open and to close, and the curve: a ramp up and a slowing down, with no overshoot: the map does not bounce. */
 private const val MapOpenMs = 520
 private const val MapCloseMs = 440
-private val MapOpenEasing = CubicBezierEasing(0.32f, 0f, 0.2f, 1.3f)
-private val MapCloseEasing = CubicBezierEasing(0.32f, 0f, 0.2f, 1.2f)
+private val MapOpenEasing = CubicBezierEasing(0.32f, 0f, 0.2f, 1f)
+private val MapCloseEasing = CubicBezierEasing(0.32f, 0f, 0.2f, 1f)
 
 /** The pebble map's corner radius (its clip, StandardShape) and the sheet's top corners, which the map's own corners ease between. */
 private val PebbleMapCorner = 16.dp
@@ -153,7 +156,8 @@ internal fun ExpandableMapLayer(
         // arrive. Previously they faded in from the very first frame (expandFraction > 0.1), so the
         // chrome was already there while the map was still unfolding.
         expandFraction.animateTo(1f, animationSpec = openSpec)
-        chrome.animateTo(1f, animationSpec = tween(MotionMedium))
+        // The bars bounce in from off the screen's edge: a spring that overshoots its place and settles.
+        chrome.animateTo(1f, animationSpec = if (plainMotion) tween(120) else spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow))
     }
 
     // How far the drag handle has actually been pulled down, in px -- the SAME real drag-to-dismiss
@@ -193,7 +197,15 @@ internal fun ExpandableMapLayer(
         scope.launch {
             // Chrome first (a quick retreat), then the sheet morphs back into its pebble, and the
             // drag offset eases away with it so a mid-drag dismiss doesn't visibly snap dragPx to 0.
-            scope.launch { chrome.animateTo(0f, animationSpec = tween(MotionFast)) }.join()
+            scope.launch {
+                if (plainMotion) {
+                    chrome.animateTo(0f, tween(120))
+                } else {
+                    // Bounce out: a small step further in first, then off the edge it came from.
+                    chrome.animateTo(1.07f, tween(90, easing = FastOutSlowInEasing))
+                    chrome.animateTo(0f, tween(240, easing = FastOutLinearInEasing))
+                }
+            }.join()
             val a = scope.launch { expandFraction.animateTo(0f, animationSpec = closeSpec) }
             val b = scope.launch { dragPx.animateTo(0f, animationSpec = closeSpec) }
             a.join(); b.join()
@@ -286,10 +298,9 @@ internal fun ExpandableMapLayer(
                         .align(Alignment.TopCenter)
                         .padding(start = GapSection, end = GapSection, top = GapSection)
                         .graphicsLayer {
-                            val t = chrome.value.coerceIn(0f, 1f)
-                            alpha = t * (1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f))
-                            // Slides down into place as it arrives, back up as it leaves.
-                            translationY = (1f - t) * -12.dp.toPx()
+                            // 0 is off the top of the screen, 1 its place; the bounce takes it a little past 1 either way.
+                            alpha = 1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)
+                            translationY = -(1f - chrome.value) * (windowSize.height * 0.15f + size.height + GapSection.toPx() * 2f)
                         },
                 )
             }
@@ -300,10 +311,9 @@ internal fun ExpandableMapLayer(
                     modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
                         .imePadding()
                         .graphicsLayer {
-                            val t = chrome.value.coerceIn(0f, 1f)
-                            alpha = t * (1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f))
-                            // Rises into place as it arrives, back down as it leaves.
-                            translationY = (1f - t) * 12.dp.toPx()
+                            // 0 is off the bottom of the screen, 1 its place; the bounce takes it a little past 1 either way.
+                            alpha = 1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)
+                            translationY = (1f - chrome.value) * (size.height + 120.dp.toPx())
                         },
                 ) {
                     MapFeatureRow(

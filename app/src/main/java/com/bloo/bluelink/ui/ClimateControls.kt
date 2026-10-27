@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
@@ -59,11 +60,10 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WheelHeatLevel
-import com.bloo.bluelink.data.climatePresetDetail
+import com.bloo.bluelink.data.climatePresetTemp
 import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.GapGroup
-import com.bloo.uicommon.TitleSubtitle
 import com.bloo.uicommon.MorphIconButton
 import com.bloo.uicommon.ButtonLabelStyle
 import kotlin.math.roundToInt
@@ -218,7 +218,7 @@ internal fun ClimatePresetSection(
                 ) {
                     PresetPill(
                         name = preset.name,
-                        detail = climatePresetDetail(preset.request, fahrenheit),
+                        temp = climatePresetTemp(preset.request, fahrenheit),
                         active = preset.id == activeId,
                         onStart = { onStart(preset) },
                         onEdit = { editing = preset },
@@ -279,21 +279,20 @@ internal fun ClimatePresetSection(
 }
 
 /**
- * One saved climate preset as a cluster of two buttons: the preset's name, with what it sets underneath and the primary fill
- * while it is the one running, and a pencil beside it that opens the preset's editor. The row is the drag handle, so holding
- * it re-ranks the presets.
+ * One saved climate preset as a cluster of two buttons, each the height of the lock and unlock buttons: the preset's name at the start
+ * (cut short with an ellipsis when it is long) and the temperature it sets at the end, with the primary fill while it is the one
+ * running, and a pencil beside it that opens the preset's editor. The row is the drag handle, so holding it re-ranks the presets.
  */
 @Composable
 internal fun PresetPill(
     name: String,
-    detail: String,
+    temp: String,
     active: Boolean,
     onStart: () -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHaptics.current
-    val scheme = MaterialTheme.colorScheme
     ButtonCluster(
         listOf(
             ClusterButton(
@@ -301,19 +300,21 @@ internal fun PresetPill(
                 onClickHaptic = { haptics?.click() },
                 active = active,
                 weight = 1f,
-                contentPadding = PaddingValues(horizontal = ChipPaddingH, vertical = GapGroup),
+                // No vertical padding of its own: the button's standard height is the whole of it.
+                contentPadding = PaddingValues(horizontal = ChipPaddingH),
                 content = {
                     ButtonIcon(Icons.Filled.AcUnit)
                     Spacer(Modifier.width(ButtonIconGap))
-                    TitleSubtitle(
-                        title = name,
-                        subtitle = detail.ifBlank { null },
+                    RevealText(
+                        name,
+                        style = ButtonLabelStyle,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
-                        titleStyle = ButtonLabelStyle,
-                        titleWeight = FontWeight.SemiBold,
-                        subtitleColor = if (active) scheme.onPrimary.copy(alpha = 0.8f) else mutedContentColor(),
-                        maxLines = 2,
                     )
+                    Spacer(Modifier.width(GapRow))
+                    RevealText(temp, style = ButtonLabelStyle, fontWeight = FontWeight.Bold, maxLines = 1)
                 },
             ),
             ClusterButton(
