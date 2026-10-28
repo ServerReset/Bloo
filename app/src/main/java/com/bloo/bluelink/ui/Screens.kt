@@ -104,6 +104,8 @@ fun BlooApp(vm: AppViewModel) {
     val message by remember { derivedStateOf { state.message } }
     val messageType by remember { derivedStateOf { state.messageType } }
     val addingAccount by remember { derivedStateOf { state.addingAccount } }
+    // Adding an account shows the login form even while signed in. Above the Scaffold so the map overlay, drawn outside it, can read it too.
+    val target = if (addingAccount) Screen.Login else screen
     val accounts by remember { derivedStateOf { state.accounts } }
     val kiaOtp by remember { derivedStateOf { state.kiaOtp } }
     val canadaOtp by remember { derivedStateOf { state.canadaOtp } }
@@ -237,8 +239,6 @@ fun BlooApp(vm: AppViewModel) {
         // Toasts render in ToastHost below, above search, not in the Scaffold's snackbar.
         snackbarHost = {},
     ) { padding ->
-        // Adding an account shows the login form even while signed in.
-        val target = if (addingAccount) Screen.Login else screen
         // Hoisted above the screen switch: the aurora pauses while search is open.
         var searchOpen by remember { mutableStateOf(false) }
         // The search panel's IME animation freezes the tilt, sparing the redraws it would cause under the blur.
@@ -390,11 +390,11 @@ fun BlooApp(vm: AppViewModel) {
             }
         }
     }
-    // The status bar's own strip: a blur of what is behind it, strongest at the top and nearly gone
-    // by the bottom of the strip. It is the ONLY edge treatment in the app.
     // The expanded car's map sits over the app and under the status bar's blur, so the part of it that goes behind the status bar is
     // blurred rather than cut off at the content's edge. The map is drawn here, at screen level, for that reason.
     if (target == Screen.Garage && !(locked && !unlockedThisSession)) GarageMapOverlay(stateHolder, vm, expandedMap)
+    // The status bar's own strip: a blur of what is behind it, strongest at the top and nearly gone
+    // by the bottom of the strip. It is the ONLY edge treatment in the app.
     StatusBarScrim(searchHazeState)
     // The app-wide pull-to-refresh disc, drawn above content; refracts searchHazeState. The lock overlay
     // and dialogs sit above it.
