@@ -65,7 +65,7 @@ fun WearEdgeRing(
         lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
             while (true) {
                 sheenPhase.snapTo(0f)
-                sheenPhase.animateTo(1f, tween(1800, easing = LinearEasing))
+                sheenPhase.animateTo(1f, tween(1000, easing = LinearEasing))
             }
         }
     }

@@ -105,7 +105,7 @@ internal fun ChargeSegmentBar(
     // wide, slow sweep, so 20 steps a second is smooth and it is a third of the redraws of a 60Hz
     // one -- a real drain on a phone that sits on the charge screen for an hour.
     val shimmer: State<Float>? = if (plugged && LocalPowerPolicy.current.ambientMotion) {
-        rememberSlowShimmer(periodMs = 2600L)
+        rememberSlowShimmer(periodMs = 1400L)
     } else {
         null
     }
@@ -190,8 +190,8 @@ internal fun ChargeSegmentBar(
     }
 }
 
-/** How often the charging shimmer advances, in nanos: ~20fps. See [rememberSlowShimmer]. */
-private const val ShimmerStepNanos = 50_000_000L
+/** How often the charging shimmer advances, in nanos: ~30fps, smooth enough to read as motion. See [rememberSlowShimmer]. */
+private const val ShimmerStepNanos = 33_000_000L
 
 /**
  * A 0..1 sawtooth that advances at ~20fps rather than the display's refresh rate. It still rides the
