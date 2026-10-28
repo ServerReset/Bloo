@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -190,10 +191,16 @@ internal fun MapTopBar(
                         .background(LocalContentColor.current.copy(alpha = 0.55f), RoundedCornerShape(2.dp)),
                 )
             }
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+            // The charge and the range on one line at the end, so the car's figures read as a pair.
+            Row(
+                Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
+            ) {
                 if (chargePercent != null) {
                     RollingNumber(chargePercent, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, maxLines = 1)
                 }
+                if (chargePercent != null && chargeRange != null) Spacer(Modifier.width(GapGroup))
                 if (chargeRange != null) {
                     RollingNumber(
                         chargeRange,

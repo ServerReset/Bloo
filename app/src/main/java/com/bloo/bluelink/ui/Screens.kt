@@ -96,17 +96,6 @@ fun BlooApp(vm: AppViewModel) {
     // a successful (re)composition instead. Latching the instant a non-locked frame is composed is
     // what lets the garage start building on that very frame.
     SideEffect { if (!locked) unlockedThisSession = true }
-    // The search bar floats up from below the bottom edge when the app unlocks ("you're in"), overshoots its rest a
-    // little, and settles. It is composed the whole time, parked off screen while locked, so the first unlock frame
-    // does not pay for composing it, and the rise runs on frames that are already drawn.
-    val searchRise = remember { Animatable(if (locked) 1f else 0f) }
-    // The spring is built here, in composition: lowPowerAwareSpring is @Composable, so it cannot be read inside the coroutine below.
-    val searchRiseSpec = lowPowerAwareSpring<Float>(dampingRatio = SearchRiseDamping, stiffness = Spring.StiffnessLow)
-    LaunchedEffect(locked) {
-        if (locked) searchRise.snapTo(1f)
-        else searchRise.animateTo(0f, searchRiseSpec)
-    }
-    val screenHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
     val loading by remember { derivedStateOf { state.loading } }
     val refreshing by remember { derivedStateOf { state.refreshing } }
     val message by remember { derivedStateOf { state.message } }
@@ -117,6 +106,18 @@ fun BlooApp(vm: AppViewModel) {
     val canadaOtp by remember { derivedStateOf { state.canadaOtp } }
     val onSettingsPageSlot by vm.onSettingsPageSlot.collectAsStateWithLifecycle()
     val mapExpanded by remember { derivedStateOf { state.mapExpanded } }
+    // The search bar comes up from below the bottom edge, as it does when the app opens, whenever nothing hides it, and drops out
+    // the same way when the lock or the full-screen map takes it away. It stays composed, parked off screen while hidden, so the rise
+    // never pays for composing it.
+    val searchHidden = locked || mapExpanded
+    val searchRise = remember { Animatable(if (searchHidden) 1f else 0f) }
+    // Built here, in composition: lowPowerAwareSpring is @Composable, so it cannot be read inside the coroutine below.
+    val searchRiseSpec = lowPowerAwareSpring<Float>(dampingRatio = SearchRiseDamping, stiffness = Spring.StiffnessLow)
+    LaunchedEffect(searchHidden) {
+        // A lock hides the bar at once, under the blur. Everything else animates it.
+        if (locked) searchRise.snapTo(1f) else searchRise.animateTo(if (searchHidden) 1f else 0f, searchRiseSpec)
+    }
+    val screenHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
     // Derived too, so only a photo pick / welcome-card / install-guide change recomposes the root:
     // reading `state.x` directly here subscribed BlooApp to EVERY UiState emission.
     val photoPickRequest by remember { derivedStateOf { state.photoPickRequest } }
@@ -367,7 +368,7 @@ fun BlooApp(vm: AppViewModel) {
         // onSettingsPageSlot tracks it.
         val effectivelyInSettings = onSettingsPageSlot
         // Hidden while the map overlay is expanded: its bottom action row occupies the same corner.
-        if (searchable && !mapExpanded) {
+        if (searchable) {
             // No `.padding(padding)`: SearchLayer reads WindowInsets itself, and padding here would
             // subtract the nav bar twice.
             Box(Modifier.fillMaxSize().graphicsLayer { translationY = searchRise.value * screenHeightPx }) {

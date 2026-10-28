@@ -74,9 +74,12 @@ internal val HeroLightText = Color(0xFFF7F7FA)
 private val DarkTextLuma = relativeLuminance(0x1A, 0x1B, 0x20)
 private val LightTextLuma = relativeLuminance(0xF7, 0xF7, 0xFA)
 
-/** Dark or light text for [band], whichever reads better against the band's average brightness. */
+/**
+ * Dark or light text for [band]: whichever has the better contrast against the worst part of the pixels behind it (their 10th and
+ * 90th percentile brightness), so text on a photo with both light and dark areas takes the side that stays readable on most of it.
+ */
 internal fun overlayFor(band: BandLuma): BandOverlay =
-    BandOverlay(darkText = contrastRatio(DarkTextLuma, band.mean) >= contrastRatio(LightTextLuma, band.mean), behind = band)
+    BandOverlay(darkText = worstContrast(DarkTextLuma, band) >= worstContrast(LightTextLuma, band), behind = band)
 
 /** The decision for the two bands the hero's text sits in; a null band means "not measured", and the theme's own tone applies. */
 @Immutable
