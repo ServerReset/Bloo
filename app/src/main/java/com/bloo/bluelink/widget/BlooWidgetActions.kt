@@ -11,43 +11,44 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.CarCommand
+import com.bloo.bluelink.data.PrefKeys
 import com.bloo.bluelink.data.SnapshotStore
 import kotlinx.coroutines.delay
 
 internal object WidgetKeys {
     /** The car this widget shows (unset: the first car). */
-    val VIN = stringPreferencesKey("vin")
+    val VIN = stringPreferencesKey(PrefKeys.VIN)
     /** "vin:action" while that command is in flight. */
-    val PENDING = stringPreferencesKey("pending")
+    val PENDING = stringPreferencesKey(PrefKeys.PENDING)
     /** "vin|millis": an Unlock waiting for its confirming second tap. */
-    val ARMED = stringPreferencesKey("armed")
+    val ARMED = stringPreferencesKey(PrefKeys.ARMED)
     /** "text|millis": a short result line (a failure) shown for a few seconds. */
-    val NOTE = stringPreferencesKey("note")
+    val NOTE = stringPreferencesKey(PrefKeys.NOTE)
 
     // Per-widget options, chosen in the configuration screen.
-    val SHOW_CLIMATE = booleanPreferencesKey("show_climate")
-    val SHOW_CHARGE = booleanPreferencesKey("show_charge")
-    val SHOW_FLASH = booleanPreferencesKey("show_flash")
-    val SHOW_REFRESH = booleanPreferencesKey("show_refresh")
+    val SHOW_CLIMATE = booleanPreferencesKey(PrefKeys.SHOW_CLIMATE)
+    val SHOW_CHARGE = booleanPreferencesKey(PrefKeys.SHOW_CHARGE)
+    val SHOW_FLASH = booleanPreferencesKey(PrefKeys.SHOW_FLASH)
+    val SHOW_REFRESH = booleanPreferencesKey(PrefKeys.SHOW_REFRESH)
     /** Tighter padding and no detail rows, for a smaller widget. */
-    val COMPACT = booleanPreferencesKey("compact")
+    val COMPACT = booleanPreferencesKey(PrefKeys.COMPACT)
     /** The car's photo, blurred, as the widget's background (on by default; nothing shows without a photo). */
-    val SHOW_PHOTO = booleanPreferencesKey("show_photo")
+    val SHOW_PHOTO = booleanPreferencesKey(PrefKeys.SHOW_PHOTO)
     /** How soft that photo is: [WidgetPhoto.BLUR_LIGHT], MEDIUM or STRONG. */
-    val PHOTO_BLUR = androidx.datastore.preferences.core.intPreferencesKey("photo_blur")
+    val PHOTO_BLUR = androidx.datastore.preferences.core.intPreferencesKey(PrefKeys.PHOTO_BLUR)
     /** The widget's corner roundness: [WidgetCorner] index (medium by default). */
-    val CORNER = androidx.datastore.preferences.core.intPreferencesKey("corner")
+    val CORNER = androidx.datastore.preferences.core.intPreferencesKey(PrefKeys.CORNER)
     /** The widget's text size: [WidgetTextSize] index (normal by default). */
-    val TEXT_SIZE = androidx.datastore.preferences.core.intPreferencesKey("text_size")
+    val TEXT_SIZE = androidx.datastore.preferences.core.intPreferencesKey(PrefKeys.TEXT_SIZE)
     /** Colour the value and the charge bar by level (red low, amber, green, blue charging); off follows the theme. */
-    val LEVEL_TINT = booleanPreferencesKey("level_tint")
+    val LEVEL_TINT = booleanPreferencesKey(PrefKeys.LEVEL_TINT)
     /** Show the charge bar and status chips when there is room (on by default). */
-    val SHOW_EXTRAS = booleanPreferencesKey("show_extras")
+    val SHOW_EXTRAS = booleanPreferencesKey(PrefKeys.SHOW_EXTRAS)
 
     /** The strip's shape: [StripShape] index (pill by default). */
-    val STRIP_SHAPE = androidx.datastore.preferences.core.intPreferencesKey("strip_shape")
+    val STRIP_SHAPE = androidx.datastore.preferences.core.intPreferencesKey(PrefKeys.STRIP_SHAPE)
     /** The strip's controls in priority order, comma separated [StripControl] keys; unset follows the older per-control switches. */
-    val STRIP_CONTROLS = stringPreferencesKey("strip_controls")
+    val STRIP_CONTROLS = stringPreferencesKey(PrefKeys.STRIP_CONTROLS)
 
     val PARAM_VIN = ActionParameters.Key<String>("vin")
     val PARAM_ACTION = ActionParameters.Key<String>("action")

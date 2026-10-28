@@ -154,10 +154,10 @@ suspend fun SettingsStore.setSeatFlag(vin: String, field: String, value: Boolean
 
 suspend fun SettingsStore.onboardingSeen(): Boolean = onboardingSeen(context.settingsDataStore.data.first())
 
-fun SettingsStore.onboardingSeen(p: Preferences): Boolean = p[booleanPreferencesKey("onboarding_seen")] ?: false
+fun SettingsStore.onboardingSeen(p: Preferences): Boolean = p[booleanPreferencesKey(PrefKeys.ONBOARDING_SEEN)] ?: false
 
 suspend fun SettingsStore.setOnboardingSeen() {
-    editTracked { it[booleanPreferencesKey("onboarding_seen")] = true }
+    editTracked { it[booleanPreferencesKey(PrefKeys.ONBOARDING_SEEN)] = true }
 }
 
 /** True once a car has been through the feature-setup wizard. */
@@ -258,18 +258,18 @@ suspend fun SettingsStore.setSectionCollapsed(vin: String, section: String, coll
  * here or on another device, has a stored value that wins.
  */
 suspend fun SettingsStore.aiEnabled(): Boolean =
-    context.settingsDataStore.data.first()[booleanPreferencesKey("ai_enabled")] ?: true
+    context.settingsDataStore.data.first()[booleanPreferencesKey(PrefKeys.AI_ENABLED)] ?: true
 
 suspend fun SettingsStore.setAiEnabled(value: Boolean) {
-    editTracked { it[booleanPreferencesKey("ai_enabled")] = value }
+    editTracked { it[booleanPreferencesKey(PrefKeys.AI_ENABLED)] = value }
 }
 
 /** Whether to summarize each car automatically when the app opens or refreshes. Off until chosen. */
 suspend fun SettingsStore.aiAutoSummarize(): Boolean =
-    context.settingsDataStore.data.first()[booleanPreferencesKey("ai_auto_summarize")] ?: false
+    context.settingsDataStore.data.first()[booleanPreferencesKey(PrefKeys.AI_AUTO_SUMMARIZE)] ?: false
 
 suspend fun SettingsStore.setAiAutoSummarize(value: Boolean) {
-    editTracked { it[booleanPreferencesKey("ai_auto_summarize")] = value }
+    editTracked { it[booleanPreferencesKey(PrefKeys.AI_AUTO_SUMMARIZE)] = value }
 }
 
 /** The single pebble pinned to the hotspot's secondary slot for [vin], or null if none

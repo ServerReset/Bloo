@@ -10,7 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
  * every launch.
  */
 suspend fun SettingsStore.migrateSchema() {
-    val versionKey = intPreferencesKey("settings_schema")
+    val versionKey = intPreferencesKey(PrefKeys.SETTINGS_SCHEMA)
     context.settingsDataStore.edit { prefs ->
         prefs.asMap().keys.filter { SyncSchema.isDeprecated(it.name) }.forEach { prefs.remove(it) }
         if (prefs[versionKey] != SyncSchema.VERSION) prefs[versionKey] = SyncSchema.VERSION

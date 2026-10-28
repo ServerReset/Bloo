@@ -14,19 +14,19 @@ import com.bloo.uicommon.content
 suspend fun SettingsStore.enabledShortcuts(): Set<String>? = enabledShortcuts(context.settingsDataStore.data.first())
 
 fun SettingsStore.enabledShortcuts(p: Preferences): Set<String>? {
-    val raw = p[stringPreferencesKey("enabled_shortcuts")] ?: return null
+    val raw = p[stringPreferencesKey(PrefKeys.ENABLED_SHORTCUTS)] ?: return null
     return raw.split(",").filter { it.isNotBlank() }.toSet()
 }
 
 suspend fun SettingsStore.setEnabledShortcuts(ids: Set<String>) {
-    editTracked { it[stringPreferencesKey("enabled_shortcuts")] = ids.joinToString(",") }
+    editTracked { it[stringPreferencesKey(PrefKeys.ENABLED_SHORTCUTS)] = ids.joinToString(",") }
 }
 
 /** Drive URI for auto-backup; null when not configured. */
 suspend fun SettingsStore.syncUri(): String? = syncUri(context.settingsDataStore.data.first())
 
 fun SettingsStore.syncUri(p: Preferences): String? =
-    p[stringPreferencesKey("sync_uri")]?.takeIf { it.isNotBlank() }
+    p[stringPreferencesKey(PrefKeys.SYNC_URI)]?.takeIf { it.isNotBlank() }
 
 /** A short, stable biometric of the ACTUAL Drive file this device is synced
  *  to, derived from the persisted document URI's unique id. Shown in Settings
@@ -45,7 +45,7 @@ fun SettingsStore.syncFileFingerprint(p: Preferences): String? {
     // Drive file had different URIs (and different hashes) on two phones - the
     // exact "I picked the same file but the codes differ" bug. Null until the
     // first successful sync has read/minted the id.
-    val id = p[stringPreferencesKey("sync_file_id")] ?: return null
+    val id = p[stringPreferencesKey(PrefKeys.SYNC_FILE_ID)] ?: return null
     // Short, human-comparable tag (first 6 hex of a SHA-256 of the full id) so
     // we never surface the raw UUID but two devices still match at a glance.
     val hash = java.security.MessageDigest.getInstance("SHA-256").digest(id.toByteArray())
@@ -56,15 +56,15 @@ fun SettingsStore.syncFileFingerprint(p: Preferences): String? {
  *  Used by [performMainToMainSync] to decide whether to preserve the remote file's
  *  id or mint a new one. */
 internal suspend fun SettingsStore.syncFileId(): String? =
-    context.settingsDataStore.data.first()[stringPreferencesKey("sync_file_id")]?.takeIf { it.isNotBlank() }
+    context.settingsDataStore.data.first()[stringPreferencesKey(PrefKeys.SYNC_FILE_ID)]?.takeIf { it.isNotBlank() }
 
 internal suspend fun SettingsStore.setSyncFileId(id: String) {
-    context.settingsDataStore.edit { it[stringPreferencesKey("sync_file_id")] = id }
+    context.settingsDataStore.edit { it[stringPreferencesKey(PrefKeys.SYNC_FILE_ID)] = id }
 }
 
 suspend fun SettingsStore.setSyncUri(uri: String?) {
     editTracked {
-        val key = stringPreferencesKey("sync_uri")
+        val key = stringPreferencesKey(PrefKeys.SYNC_URI)
         it.putNonBlank(key, uri)
     }
 }
@@ -73,10 +73,10 @@ suspend fun SettingsStore.setSyncUri(uri: String?) {
 suspend fun SettingsStore.lastSyncMs(): Long = lastSyncMs(context.settingsDataStore.data.first())
 
 fun SettingsStore.lastSyncMs(p: Preferences): Long =
-    p[stringPreferencesKey("sync_last_ms")]?.toLongOrNull() ?: 0L
+    p[stringPreferencesKey(PrefKeys.SYNC_LAST_MS)]?.toLongOrNull() ?: 0L
 
 suspend fun SettingsStore.setLastSyncMs(ms: Long) {
-    editTracked { it[stringPreferencesKey("sync_last_ms")] = ms.toString() }
+    editTracked { it[stringPreferencesKey(PrefKeys.SYNC_LAST_MS)] = ms.toString() }
 }
 
 /** Persisted so a failure from the background periodic worker (no live
@@ -85,20 +85,20 @@ suspend fun SettingsStore.setLastSyncMs(ms: Long) {
  *  foreground sync happens to fail while the app is open. */
 suspend fun SettingsStore.lastSyncError(): String? = lastSyncError(context.settingsDataStore.data.first())
 
-fun SettingsStore.lastSyncError(p: Preferences): String? = p[stringPreferencesKey("sync_last_error")]
+fun SettingsStore.lastSyncError(p: Preferences): String? = p[stringPreferencesKey(PrefKeys.SYNC_LAST_ERROR)]
 
 suspend fun SettingsStore.setLastSyncError(error: String?) {
-    editTracked { if (error == null) it.remove(stringPreferencesKey("sync_last_error")) else it[stringPreferencesKey("sync_last_error")] = error }
+    editTracked { if (error == null) it.remove(stringPreferencesKey(PrefKeys.SYNC_LAST_ERROR)) else it[stringPreferencesKey(PrefKeys.SYNC_LAST_ERROR)] = error }
 }
 
 /** Wi-Fi only sync (true) or any network (false). */
 suspend fun SettingsStore.syncWifiOnly(): Boolean = syncWifiOnly(context.settingsDataStore.data.first())
 
 fun SettingsStore.syncWifiOnly(p: Preferences): Boolean =
-    p.flag(stringPreferencesKey("sync_wifi"), true)
+    p.flag(stringPreferencesKey(PrefKeys.SYNC_WIFI), true)
 
 suspend fun SettingsStore.setSyncWifiOnly(value: Boolean) {
-    editTracked { it[stringPreferencesKey("sync_wifi")] = value.toString() }
+    editTracked { it[stringPreferencesKey(PrefKeys.SYNC_WIFI)] = value.toString() }
 }
 
 /**
@@ -109,11 +109,11 @@ suspend fun SettingsStore.setSyncWifiOnly(value: Boolean) {
  */
 suspend fun SettingsStore.watchLockTiming(): com.bloo.bluelink.data.WatchLockTiming =
     com.bloo.bluelink.data.WatchLockTiming.fromWire(
-        context.settingsDataStore.data.first()[stringPreferencesKey("watch_lock_timing")],
+        context.settingsDataStore.data.first()[stringPreferencesKey(PrefKeys.WATCH_LOCK_TIMING)],
     )
 
 suspend fun SettingsStore.setWatchLockTiming(value: com.bloo.bluelink.data.WatchLockTiming) {
-    context.settingsDataStore.edit { it[stringPreferencesKey("watch_lock_timing")] = value.wireKey }
+    context.settingsDataStore.edit { it[stringPreferencesKey(PrefKeys.WATCH_LOCK_TIMING)] = value.wireKey }
 }
 
 /** A stable per-install id for this device in the sync registry, created once
@@ -121,10 +121,10 @@ suspend fun SettingsStore.setWatchLockTiming(value: com.bloo.bluelink.data.Watch
  *  survive a factory-reset-style reinstall as a NEW device, which a random UUID
  *  gives us for free). */
 suspend fun SettingsStore.syncDeviceId(): String {
-    val existing = context.settingsDataStore.data.first()[stringPreferencesKey("sync_device_id")]
+    val existing = context.settingsDataStore.data.first()[stringPreferencesKey(PrefKeys.SYNC_DEVICE_ID)]
     if (!existing.isNullOrBlank()) return existing
     val fresh = java.util.UUID.randomUUID().toString()
-    context.settingsDataStore.edit { it[stringPreferencesKey("sync_device_id")] = fresh }
+    context.settingsDataStore.edit { it[stringPreferencesKey(PrefKeys.SYNC_DEVICE_ID)] = fresh }
     return fresh
 }
 
@@ -134,18 +134,18 @@ suspend fun SettingsStore.syncDeviceId(): String {
  *  is there right now" (e.g. seeding UiState) should prefer this over the
  *  suspend overload; it costs no DataStore round trip against a snapshot they
  *  already hold. */
-fun SettingsStore.syncDeviceId(p: Preferences): String? = p[stringPreferencesKey("sync_device_id")]?.takeIf { it.isNotBlank() }
+fun SettingsStore.syncDeviceId(p: Preferences): String? = p[stringPreferencesKey(PrefKeys.SYNC_DEVICE_ID)]?.takeIf { it.isNotBlank() }
 
 /** Friendly name shown in the "your devices" list. Defaults to the hardware
  *  model until the user renames it. */
 suspend fun SettingsStore.syncDeviceName(): String = syncDeviceName(context.settingsDataStore.data.first())
 
 fun SettingsStore.syncDeviceName(p: Preferences): String =
-    p[stringPreferencesKey("sync_device_name")]?.takeIf { it.isNotBlank() } ?: Build.MODEL ?: "This device"
+    p[stringPreferencesKey(PrefKeys.SYNC_DEVICE_NAME)]?.takeIf { it.isNotBlank() } ?: Build.MODEL ?: "This device"
 
 suspend fun SettingsStore.setSyncDeviceName(name: String) {
     context.settingsDataStore.edit {
-        val k = stringPreferencesKey("sync_device_name")
+        val k = stringPreferencesKey(PrefKeys.SYNC_DEVICE_NAME)
         if (name.isBlank()) it.remove(k) else it[k] = name.trim()
     }
 }
@@ -153,11 +153,11 @@ suspend fun SettingsStore.setSyncDeviceName(name: String) {
 /** Hash of the portable content this device last saw or wrote (the change gate). */
 suspend fun SettingsStore.syncLastHash(): String? = syncLastHash(context.settingsDataStore.data.first())
 
-fun SettingsStore.syncLastHash(p: Preferences): String? = p[stringPreferencesKey("sync_last_hash")]?.takeIf { it.isNotBlank() }
+fun SettingsStore.syncLastHash(p: Preferences): String? = p[stringPreferencesKey(PrefKeys.SYNC_LAST_HASH)]?.takeIf { it.isNotBlank() }
 
 suspend fun SettingsStore.setSyncLastHash(hash: String?) {
     context.settingsDataStore.edit {
-        val k = stringPreferencesKey("sync_last_hash")
+        val k = stringPreferencesKey(PrefKeys.SYNC_LAST_HASH)
         it.putNonBlank(k, hash)
     }
 }
@@ -165,24 +165,24 @@ suspend fun SettingsStore.setSyncLastHash(hash: String?) {
 /** Whether this device has ever completed a sync of the CURRENT file. False →
  *  the next pass full-adopts (join-adopt). Reset to false on a file switch. */
 suspend fun SettingsStore.syncSyncedEver(): Boolean =
-    context.settingsDataStore.data.first()[booleanPreferencesKey("sync_synced_ever")] ?: false
+    context.settingsDataStore.data.first()[booleanPreferencesKey(PrefKeys.SYNC_SYNCED_EVER)] ?: false
 
 suspend fun SettingsStore.setSyncSyncedEver(value: Boolean) {
     context.settingsDataStore.edit {
-        if (value) it[booleanPreferencesKey("sync_synced_ever")] = true
-        else it.remove(booleanPreferencesKey("sync_synced_ever"))
+        if (value) it[booleanPreferencesKey(PrefKeys.SYNC_SYNCED_EVER)] = true
+        else it.remove(booleanPreferencesKey(PrefKeys.SYNC_SYNCED_EVER))
     }
 }
 
 /** One-shot flag: the next sync pass force-adopts the file (used by
  *  "Pull from primary now"). Cleared by the pass that consumes it. */
 suspend fun SettingsStore.syncPullPrimary(): Boolean =
-    context.settingsDataStore.data.first()[booleanPreferencesKey("sync_pull_primary")] ?: false
+    context.settingsDataStore.data.first()[booleanPreferencesKey(PrefKeys.SYNC_PULL_PRIMARY)] ?: false
 
 suspend fun SettingsStore.setSyncPullPrimary(value: Boolean) {
     context.settingsDataStore.edit {
-        if (value) it[booleanPreferencesKey("sync_pull_primary")] = true
-        else it.remove(booleanPreferencesKey("sync_pull_primary"))
+        if (value) it[booleanPreferencesKey(PrefKeys.SYNC_PULL_PRIMARY)] = true
+        else it.remove(booleanPreferencesKey(PrefKeys.SYNC_PULL_PRIMARY))
     }
 }
 
@@ -191,13 +191,13 @@ suspend fun SettingsStore.setSyncPullPrimary(value: Boolean) {
 suspend fun SettingsStore.syncedDevices(): List<SyncMerge.SyncDevice> = syncedDevices(context.settingsDataStore.data.first())
 
 fun SettingsStore.syncedDevices(p: Preferences): List<SyncMerge.SyncDevice> {
-    val raw = p[stringPreferencesKey("sync_devices_cache")] ?: return emptyList()
+    val raw = p[stringPreferencesKey(PrefKeys.SYNC_DEVICES_CACHE)] ?: return emptyList()
     return runCatching { devicesJson.decodeFromString(deviceListSerializer, raw) }.getOrElse { emptyList() }
 }
 
 internal suspend fun SettingsStore.setSyncedDevicesCache(devices: List<SyncMerge.SyncDevice>) {
     context.settingsDataStore.edit {
-        it[stringPreferencesKey("sync_devices_cache")] = devicesJson.encodeToString(deviceListSerializer, devices)
+        it[stringPreferencesKey(PrefKeys.SYNC_DEVICES_CACHE)] = devicesJson.encodeToString(deviceListSerializer, devices)
     }
 }
 
@@ -206,11 +206,11 @@ internal suspend fun SettingsStore.setSyncedDevicesCache(devices: List<SyncMerge
 suspend fun SettingsStore.syncPrimaryDeviceId(): String? = syncPrimaryDeviceId(context.settingsDataStore.data.first())
 
 fun SettingsStore.syncPrimaryDeviceId(p: Preferences): String? =
-    p[stringPreferencesKey("sync_primary_cache")]?.takeIf { it.isNotBlank() }
+    p[stringPreferencesKey(PrefKeys.SYNC_PRIMARY_CACHE)]?.takeIf { it.isNotBlank() }
 
 internal suspend fun SettingsStore.setSyncPrimaryCache(id: String?) {
     context.settingsDataStore.edit {
-        val k = stringPreferencesKey("sync_primary_cache")
+        val k = stringPreferencesKey(PrefKeys.SYNC_PRIMARY_CACHE)
         it.putNonBlank(k, id)
     }
 }
@@ -222,11 +222,11 @@ internal suspend fun SettingsStore.setSyncPrimaryCache(id: String?) {
  *  Settings display) and "what I want the file to say". Reading the cache as a write
  *  intent is what stopped the primary from ever changing -- see [performMainToMainSync]. */
 internal suspend fun SettingsStore.syncPrimaryPending(): String? =
-    context.settingsDataStore.data.first()[stringPreferencesKey("sync_primary_pending")]?.takeIf { it.isNotBlank() }
+    context.settingsDataStore.data.first()[stringPreferencesKey(PrefKeys.SYNC_PRIMARY_PENDING)]?.takeIf { it.isNotBlank() }
 
 internal suspend fun SettingsStore.setSyncPrimaryPending(id: String?) {
     context.settingsDataStore.edit {
-        val k = stringPreferencesKey("sync_primary_pending")
+        val k = stringPreferencesKey(PrefKeys.SYNC_PRIMARY_PENDING)
         it.putNonBlank(k, id)
     }
 }
@@ -253,13 +253,13 @@ suspend fun SettingsStore.requestPullFromPrimary() {
  *  [setPrimaryDevice] this is a SET, not a single value: several devices could be
  *  kicked before the next sync runs. */
 suspend fun SettingsStore.syncPendingRemovedDeviceIds(): Set<String> {
-    val raw = context.settingsDataStore.data.first()[stringPreferencesKey("sync_pending_removed_device_ids")]
+    val raw = context.settingsDataStore.data.first()[stringPreferencesKey(PrefKeys.SYNC_PENDING_REMOVED_DEVICE_IDS)]
     return raw?.split(',')?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 }
 
 internal suspend fun SettingsStore.setSyncPendingRemovedDeviceIds(ids: Set<String>) {
     context.settingsDataStore.edit {
-        val k = stringPreferencesKey("sync_pending_removed_device_ids")
+        val k = stringPreferencesKey(PrefKeys.SYNC_PENDING_REMOVED_DEVICE_IDS)
         if (ids.isEmpty()) it.remove(k) else it[k] = ids.joinToString(",")
     }
 }

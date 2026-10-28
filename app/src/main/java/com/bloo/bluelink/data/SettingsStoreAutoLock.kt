@@ -76,7 +76,7 @@ suspend fun SettingsStore.setAutoLockConfig(vin: String, config: AutoLockConfig)
     // enumerate every car to check instead of needing one BroadcastReceiver registration
     // per car.
     editTracked {
-        val key = stringPreferencesKey("autolock_vins")
+        val key = stringPreferencesKey(PrefKeys.AUTOLOCK_VINS)
         val current = (it[key] ?: "").split(',').filter { s -> s.isNotBlank() }.toMutableSet()
         if (config.enabled) current += vin else current -= vin
         it[key] = current.joinToString(",")
@@ -92,7 +92,7 @@ suspend fun SettingsStore.autoLockConfiguredVins(): List<String> =
 
 fun SettingsStore.autoLockConfiguredVins(p: Preferences): List<String> =
 
-    (p[stringPreferencesKey("autolock_vins")] ?: "").split(',').filter { it.isNotBlank() }
+    (p[stringPreferencesKey(PrefKeys.AUTOLOCK_VINS)] ?: "").split(',').filter { it.isNotBlank() }
 
 /** Forgets AutoLock entirely for every currently-registered car -- called on a full
  *  sign-out (see [com.bloo.bluelink.ui.AppViewModel.logout]) alongside the other
@@ -104,7 +104,7 @@ suspend fun SettingsStore.clearAllAutoLockConfigs() {
     val vins = autoLockConfiguredVins()
     if (vins.isEmpty()) return
     editTracked {
-        it.remove(stringPreferencesKey("autolock_vins"))
+        it.remove(stringPreferencesKey(PrefKeys.AUTOLOCK_VINS))
         // MutablePreferences.remove is generic on the key's own value type
         // (fun <T> remove(key: Preferences.Key<T>): T) and autoLockKeys' mixed
         // Boolean/String keys collapse to Preferences.Key<*> in the list -- Kotlin can't

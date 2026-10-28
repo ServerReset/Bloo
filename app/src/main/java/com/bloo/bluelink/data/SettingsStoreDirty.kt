@@ -39,7 +39,7 @@ internal suspend fun SettingsStore.editTracked(mutate: (androidx.datastore.prefe
         // stop).
         touched.removeAll { com.bloo.bluelink.data.SyncMerge.isDeviceLocal(it) }
         if (touched.isNotEmpty()) {
-            val dirtyKey = stringPreferencesKey("sync_dirty_keys")
+            val dirtyKey = stringPreferencesKey(PrefKeys.SYNC_DIRTY_KEYS)
             val existing = prefs.dirtyKeySet()
             prefs[dirtyKey] = (existing + touched).joinToString(",")
         }
@@ -51,7 +51,7 @@ internal suspend fun SettingsStore.editTracked(mutate: (androidx.datastore.prefe
  * value → empty set).
  */
 internal fun Preferences.dirtyKeySet(): Set<String> =
-    this[stringPreferencesKey("sync_dirty_keys")]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+    this[stringPreferencesKey(PrefKeys.SYNC_DIRTY_KEYS)]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
 internal suspend fun SettingsStore.dirtyKeys(): Set<String> =
     context.settingsDataStore.data.first().dirtyKeySet()
@@ -84,7 +84,7 @@ val SettingsStore.dirtyKeysFlow: Flow<Set<String>> get() = context.settingsDataS
  */
 internal suspend fun SettingsStore.clearDirtyKeys(keys: Set<String>) {
     context.settingsDataStore.edit { prefs ->
-        val dirtyKey = stringPreferencesKey("sync_dirty_keys")
+        val dirtyKey = stringPreferencesKey(PrefKeys.SYNC_DIRTY_KEYS)
         val remaining = prefs.dirtyKeySet() - keys
         if (remaining.isEmpty()) prefs.remove(dirtyKey) else prefs[dirtyKey] = remaining.joinToString(",")
     }

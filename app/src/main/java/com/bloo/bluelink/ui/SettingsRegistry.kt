@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.AlertKeys
+import com.bloo.bluelink.data.PrefKeys
 import com.bloo.uicommon.segmentsOf
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,15 +31,15 @@ internal enum class SettingKind { Range, Choice }
 
 internal val RangeSettings: List<SettingSpec> = listOf(
     SettingSpec(
-        key = "ui_scale", kind = SettingKind.Range,
+        key = PrefKeys.UI_SCALE, kind = SettingKind.Range,
         phrases = "make the text bigger make everything smaller text is too small can't read",
     ) { a, _, _, vm -> UiScaleSlider(a, vm, label = "Scale") },
     SettingSpec(
-        key = "glass_clarity", kind = SettingKind.Range,
+        key = PrefKeys.GLASS_CLARITY, kind = SettingKind.Range,
         phrases = "make it see through make the glass clearer more transparent less blurry stronger glass edge",
     ) { a, _, _, vm -> GlassClaritySlider(a, vm) },
     SettingSpec(
-        key = "vibrancy", kind = SettingKind.Range,
+        key = PrefKeys.VIBRANCY, kind = SettingKind.Range,
         phrases = "make the colors brighter less colorful more vivid washed out",
     ) { a, _, _, vm -> VibrancySlider(a, vm) },
     SettingSpec(
@@ -58,23 +59,23 @@ internal val RangeSettings: List<SettingSpec> = listOf(
 /** Every app-wide picker: one choice out of a few. */
 internal val ChoiceSettings: List<SettingSpec> = listOf(
     SettingSpec(
-        key = "theme_mode", kind = SettingKind.Choice,
+        key = PrefKeys.THEME_MODE, kind = SettingKind.Choice,
         phrases = "turn on dark mode switch to light mode black background follow the phone",
     ) { a, _, _, vm -> ThemeModeSegmentedRow(a) { vm.setThemeMode(it) } },
     SettingSpec(
-        key = "unit_system", kind = SettingKind.Choice,
+        key = PrefKeys.UNIT_SYSTEM, kind = SettingKind.Choice,
         phrases = "use kilometres use miles celsius or fahrenheit",
     ) { a, _, _, vm -> UnitSystemRow(a, vm) },
     SettingSpec(
-        key = "temp_unit", kind = SettingKind.Choice,
+        key = PrefKeys.TEMP_UNIT, kind = SettingKind.Choice,
         phrases = "show temperatures in celsius show fahrenheit",
     ) { a, _, _, vm -> TempUnitRow(a, vm) },
     SettingSpec(
-        key = "distance_unit", kind = SettingKind.Choice,
+        key = PrefKeys.DISTANCE_UNIT, kind = SettingKind.Choice,
         phrases = "show distances in miles show kilometres",
     ) { a, _, _, vm -> DistanceUnitRow(a, vm) },
     SettingSpec(
-        key = "watch_lock_timing", kind = SettingKind.Choice,
+        key = PrefKeys.WATCH_LOCK_TIMING, kind = SettingKind.Choice,
         phrases = "make my watch ask for the pin when i send a command",
     ) { _, _, s, vm ->
         Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -84,7 +85,7 @@ internal val ChoiceSettings: List<SettingSpec> = listOf(
         }
     },
     SettingSpec(
-        key = "settings_mode", kind = SettingKind.Choice,
+        key = PrefKeys.SETTINGS_MODE, kind = SettingKind.Choice,
         phrases = "show me more settings hide the advanced options keep it simple",
     ) { _, _, s, vm ->
         SettingsSegmentedRow(
@@ -95,7 +96,7 @@ internal val ChoiceSettings: List<SettingSpec> = listOf(
         )
     },
     SettingSpec(
-        key = "color_palette", kind = SettingKind.Choice,
+        key = PrefKeys.COLOR_PALETTE, kind = SettingKind.Choice,
         phrases = "change the accent colour make the app green use a different color",
     ) { a, _, _, vm ->
         Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -105,7 +106,7 @@ internal val ChoiceSettings: List<SettingSpec> = listOf(
         }
     },
     SettingSpec(
-        key = "font_choice", kind = SettingKind.Choice,
+        key = PrefKeys.FONT_CHOICE, kind = SettingKind.Choice,
         phrases = "change the font easier to read dyslexia friendly",
     ) { a, _, _, vm ->
         Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {

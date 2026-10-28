@@ -161,7 +161,7 @@ internal suspend fun SettingsStore.adoptSettingsJson(json: String): Boolean {
         // Clear the dirty set in the SAME transaction: the adopted values are the file's, not
         // pending local changes, so they must not be re-uploaded as edits (and must not protect
         // themselves on the next merge).
-        mut.remove(stringPreferencesKey("sync_dirty_keys"))
+        mut.remove(stringPreferencesKey(PrefKeys.SYNC_DIRTY_KEYS))
     }
     return true
 }

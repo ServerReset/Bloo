@@ -10,9 +10,9 @@ import kotlinx.coroutines.flow.first
 // keys (see SettingsCatalog), so they ride the same Drive backup and merge as every other setting, and a new watch (or
 // a reinstalled one) gets them back from the phone's next push.
 
-private val SLOTS = stringPreferencesKey("watch_face_slots")
-private val REDUCE_EFFECTS = booleanPreferencesKey("watch_reduce_effects")
-private val AUTOLOCK = booleanPreferencesKey("watch_autolock")
+private val SLOTS = stringPreferencesKey(PrefKeys.WATCH_FACE_SLOTS)
+private val REDUCE_EFFECTS = booleanPreferencesKey(PrefKeys.WATCH_REDUCE_EFFECTS)
+private val AUTOLOCK = booleanPreferencesKey(PrefKeys.WATCH_AUTOLOCK)
 
 /** The watch's stored settings, or null while nothing has ever been stored (the watch then offers its own). */
 suspend fun SettingsStore.watchLook(): WatchLookPrefs? {

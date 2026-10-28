@@ -16,17 +16,17 @@ import kotlinx.coroutines.TimeoutCancellationException
 
 suspend fun SettingsStore.resetSyncStateForNewFile() {
     context.settingsDataStore.edit {
-        it.remove(stringPreferencesKey("sync_last_hash"))
-        it.remove(booleanPreferencesKey("sync_synced_ever"))
-        it.remove(stringPreferencesKey("sync_last_ms"))
-        it.remove(stringPreferencesKey("sync_dirty_keys"))
-        it.remove(booleanPreferencesKey("sync_pull_primary"))
-        it.remove(stringPreferencesKey("sync_devices_cache"))
-        it.remove(stringPreferencesKey("sync_primary_cache"))
-        it.remove(stringPreferencesKey("sync_primary_pending"))
-        it.remove(stringPreferencesKey("sync_pending_removed_device_ids"))
+        it.remove(stringPreferencesKey(PrefKeys.SYNC_LAST_HASH))
+        it.remove(booleanPreferencesKey(PrefKeys.SYNC_SYNCED_EVER))
+        it.remove(stringPreferencesKey(PrefKeys.SYNC_LAST_MS))
+        it.remove(stringPreferencesKey(PrefKeys.SYNC_DIRTY_KEYS))
+        it.remove(booleanPreferencesKey(PrefKeys.SYNC_PULL_PRIMARY))
+        it.remove(stringPreferencesKey(PrefKeys.SYNC_DEVICES_CACHE))
+        it.remove(stringPreferencesKey(PrefKeys.SYNC_PRIMARY_CACHE))
+        it.remove(stringPreferencesKey(PrefKeys.SYNC_PRIMARY_PENDING))
+        it.remove(stringPreferencesKey(PrefKeys.SYNC_PENDING_REMOVED_DEVICE_IDS))
         // Drop the cached file id too - the new file has its own (or will mint one).
-        it.remove(stringPreferencesKey("sync_file_id"))
+        it.remove(stringPreferencesKey(PrefKeys.SYNC_FILE_ID))
     }
 }
 

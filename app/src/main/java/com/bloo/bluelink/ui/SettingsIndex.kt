@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.runtime.Composable
 import com.bloo.bluelink.data.AlertKeys
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
+import com.bloo.bluelink.data.PrefKeys
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SettingsCatalog
 import com.bloo.bluelink.data.SettingsStore
@@ -60,7 +61,7 @@ internal class ToggleSpec(
  */
 internal val ToggleSettings = listOf(
     ToggleSpec(
-        key = "haptics_enabled",
+        key = PrefKeys.HAPTICS_ENABLED,
         checked = { a, _, _ -> a.hapticsEnabled }, onToggle = { vm, v -> vm.setHapticsEnabled(v) },
     ),
     ToggleSpec(
@@ -104,15 +105,15 @@ internal val ToggleSettings = listOf(
         checked = { _, n, _ -> n.unlocked }, onToggle = { vm, v -> vm.setNotifyUnlocked(v) },
     ),
     ToggleSpec(
-        key = "aurora_background",
+        key = PrefKeys.AURORA_BACKGROUND,
         checked = { a, _, _ -> a.auroraBackground }, onToggle = { vm, v -> vm.setAuroraBackground(v) },
     ),
     ToggleSpec(
-        key = "dynamic_color", label = "Dynamic colour (Material You)",
+        key = PrefKeys.DYNAMIC_COLOR, label = "Dynamic colour (Material You)",
         checked = { a, _, _ -> a.dynamicColor }, onToggle = { vm, v -> vm.setDynamicColor(v) },
     ),
     ToggleSpec(
-        key = "columns_flipped",
+        key = PrefKeys.COLUMNS_FLIPPED,
         phrases = "put the controls on the other side swap the two columns",
         checked = { a, _, _ -> a.columnsFlipped }, onToggle = { vm, v -> vm.setColumnsFlipped(v) },
     ),
@@ -120,17 +121,17 @@ internal val ToggleSettings = listOf(
     // Gemini Nano actually supports, same reason the card is hidden entirely rather than shown
     // disabled.
     ToggleSpec(
-        key = "ai_enabled", label = "On-device AI (Gemini Nano)",
+        key = PrefKeys.AI_ENABLED, label = "On-device AI (Gemini Nano)",
         visible = { it.aiSupported }, checked = { _, _, s -> s.aiEnabled }, onToggle = { vm, v -> vm.setAiEnabled(v) },
     ),
     ToggleSpec(
-        key = "ai_auto_summarize",
+        key = PrefKeys.AI_AUTO_SUMMARIZE,
         phrases = "summarize my car automatically every time i open the app",
         visible = { it.aiActive }, checked = { _, _, s -> s.aiAutoSummarize }, onToggle = { vm, v -> vm.setAiAutoSummarize(v) },
     ),
     // Gated like the Backup & sync row: needs Shizuku installed and running.
     ToggleSpec(
-        key = "seamless_install_shizuku", label = "Install updates seamlessly (Shizuku)",
+        key = PrefKeys.SEAMLESS_INSTALL_SHIZUKU, label = "Install updates seamlessly (Shizuku)",
         visible = { it.shizukuAvailable }, checked = { a, _, _ -> a.seamlessInstallShizuku }, onToggle = { vm, v -> vm.setSeamlessInstallShizuku(v) },
     ),
 )

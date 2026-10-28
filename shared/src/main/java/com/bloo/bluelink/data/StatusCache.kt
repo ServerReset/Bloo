@@ -36,7 +36,7 @@ class StatusCache(private val context: Context) {
     // crashing decode; encodeDefaults ensures every field is always written so a
     // reader on an older app version (or after a rollback) still finds all keys present.
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-    private val key = stringPreferencesKey("payload")
+    private val key = stringPreferencesKey(PrefKeys.PAYLOAD)
 
     data class Cached(
         val statuses: Map<String, VehicleStatus>,

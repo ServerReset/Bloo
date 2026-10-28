@@ -187,7 +187,7 @@ class SnapshotStore(private val context: Context) {
     private val json = BlooJson
 
     private object Keys {
-        val PAYLOAD = stringPreferencesKey("payload")
+        val PAYLOAD = stringPreferencesKey(PrefKeys.PAYLOAD)
     }
 
     /** Live stream of the snapshot data; re-emits when the DataStore file changes, even from another process. */
