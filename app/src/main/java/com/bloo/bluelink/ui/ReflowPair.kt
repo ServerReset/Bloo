@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Dp
@@ -61,4 +62,26 @@ internal fun ReflowPair(
             trailPlaceable.place(x, y)
         }
     }
+}
+
+/** How wide, in dp, the band is over which a car's columns turn into two: the reflow eases across it rather than switching at its edge. */
+private const val TwoColumnRampDp = 12f
+
+/**
+ * How far a car has reflowed into two columns, 0 (one) to 1 (two), derived from how wide one of its columns is right now. The column
+ * count ([columns]) is an animated value, so as it eases (a car widening to full screen) the page widens and the reflow follows it
+ * through the same frames: there is no separate switch that could fall out of step with the column change.
+ *
+ * It is a [State] whose value is read only inside the measure and draw lambdas, so driving it never recomposes the car.
+ */
+internal class ColumnReflow(
+    private val columns: State<Float>,
+    private val widthDp: () -> Float,
+) : State<Float> {
+    override val value: Float
+        get() {
+            val column = widthDp() / columns.value.coerceAtLeast(1f)
+            val low = TWO_COLUMN_MIN_DP - TwoColumnRampDp
+            return ((column - low) / (2f * TwoColumnRampDp)).coerceIn(0f, 1f)
+        }
 }

@@ -107,25 +107,22 @@ internal fun GarageScreen(
     var fullScreen by remember { mutableStateOf(false) }
     LaunchedEffect(multiColumn) { if (!multiColumn) fullScreen = false }
     val perPage = if (fullScreen && multiColumn) 1 else naturalColumns
-    // THE single experience, scaling to the device: a car reflows to two columns (hero beside its
-    // pebbles, hot seat and all) when its own page is at least TWO_COLUMN_MIN_DP wide, and stays one
-    // column on a narrow window. No manual expand state, no second screen, nothing to open or close --
-    // except the full-screen button above, which only widens a car's PAGE, never swaps screens.
-    val twoColumn = (widthDp / perPage.toFloat()) >= TWO_COLUMN_MIN_DP.dp
-    // The two springs below are the SAME spring (a critically damped one is linear in its progress), so they move as one:
-    // how many cars share the width eases between the grid and one car, and the car's own reflow between one column and
-    // two eases with it. Before, the page snapped to full width at once and only the reflow animated -- the jump.
+    // THE single experience, scaling to the device: a car reflows to two columns (hero beside its pebbles, hot seat and all) when its
+    // own page is wide enough, and stays one column on a narrow window. No second screen, nothing to open or close, except the
+    // full-screen button, which only widens a car's PAGE.
+    //
+    // ONE motion drives all of it. The number of cars sharing the width (perPageAnim) springs, and everything else is derived from
+    // that value on every frame: the page width, the block width and the reflow (expandedT, below). Nothing is a separate boolean
+    // that flips on its own track, so the column change, the block growth and the two-column reflow move as one, the way the map's
+    // own open does.
+    val perPageTarget = if (fullScreen && multiColumn) 1 else naturalColumns
     val carSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
-    val expandedT = androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (twoColumn) 1f else 0f,
-        animationSpec = carSpring,
-        label = "expandT",
-    )
-    val perPageT = androidx.compose.animation.core.animateFloatAsState(
-        targetValue = perPage.toFloat(),
-        animationSpec = carSpring,
-        label = "perPageT",
-    )
+    val perPageAnim = remember { androidx.compose.animation.core.Animatable(perPageTarget.toFloat()) }
+    LaunchedEffect(perPageTarget) { perPageAnim.animateTo(perPageTarget.toFloat(), carSpring) }
+    val density = LocalDensity.current
+    val expandedT = remember(density) {
+        ColumnReflow(perPageAnim.asState(), widthDp = { windowInfo.containerSize.width / density.density })
+    }
 
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
     BackdropHost {
@@ -133,7 +130,7 @@ internal fun GarageScreen(
         // expand or collapse to reconcile -- the pebbles slide from under the hero to beside it purely
         // as the page grows wide enough.
         CollapsedGaragePager(
-            vehicles, count, slots, perPage, naturalColumns, perPageT, vm.currentIndex,
+            vehicles, count, slots, perPage, naturalColumns, perPageAnim, vm.currentIndex,
             windowInfo.containerSize.width, state, vm, hazeState,
             expandedT = expandedT,
             multiColumn = multiColumn,
