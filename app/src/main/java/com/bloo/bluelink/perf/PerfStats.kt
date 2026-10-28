@@ -42,6 +42,14 @@ internal class ScopeStats {
     var worstMs = 0f
         private set
     private val histogram = IntArray(HistogramMs + 1)
+    private val buckets = IntArray(BucketLabels.size)
+
+    /** The slowest frame seen under this scope, with what it spent its time on. */
+    var worstCost: FrameCost? = null
+        private set
+
+    /** Total frame time seen, in ms: frames at their full cost, so busy = this over the window. */
+    val totalMs: Double get() = sumTotal
     private var sumTotal = 0.0
     private var sumInput = 0.0
     private var sumAnimation = 0.0
@@ -56,6 +64,8 @@ internal class ScopeStats {
     /** [budgetMs] is the display's frame time: a frame that takes longer than it missed its deadline. */
     fun add(cost: FrameCost, budgetMs: Float) {
         frames++
+        buckets[bucketOf(cost.totalMs)]++
+        if (cost.totalMs > worstMs || worstCost == null) worstCost = cost
         if (cost.totalMs > budgetMs) missed++
         if (cost.totalMs > 32f) over32++
         if (cost.totalMs > 100f) over100++
@@ -93,11 +103,26 @@ internal class ScopeStats {
         return "input ${a(sumInput)} anim ${a(sumAnimation)} layout ${a(sumLayout)} draw ${a(sumDraw)} sync ${a(sumSync)} cmd ${a(sumCommand)} swap ${a(sumSwap)} gpu ${a(sumGpu)} delay ${a(sumDelay)}"
     }
 
+    /** How the frames fell across the budget bands, as "<8.3 12%  8.3-16.7 80%  ...". */
+    fun distribution(): String {
+        if (frames == 0) return ""
+        return BucketLabels.indices.joinToString("  ") { i -> "${BucketLabels[i]} ${(buckets[i] * 100f / frames).toInt()}%" }
+    }
+
     fun missedPercent(): Int = if (frames == 0) 0 else (missed * 100f / frames).toInt()
 
     companion object {
         /** Frame times past this land in the last bucket. */
         const val HistogramMs = 400
+
+        /** Bands a frame's time falls in: under a 120 Hz budget, a 60 Hz one, two frames of 60 Hz, and the slow ones. */
+        private val BucketEdgesMs = floatArrayOf(8.3f, 16.7f, 33.3f, 66.7f, 100f)
+        val BucketLabels = arrayOf("<8.3", "8.3-16.7", "16.7-33", "33-67", "67-100", ">100")
+
+        private fun bucketOf(ms: Float): Int {
+            for (i in BucketEdgesMs.indices) if (ms <= BucketEdgesMs[i]) return i
+            return BucketEdgesMs.size
+        }
     }
 }
 

@@ -187,18 +187,23 @@ object PerfMonitor {
         if (heapMb > peakHeapMb) peakHeapMb = heapMb
         val recomp = delta(recompositions, lastRecomp)
         val events = delta(counters, lastCount)
-        // Quiet when nothing was wrong: a log full of healthy windows hides the bad ones.
-        if (frames > 0 && (snapshot.missed > 0 || windowStalls > 0 || gcDelta.blocking > 0)) {
+        val seconds = WINDOW_MS / 1000.0
+        val busyPct = if (frames > 0) snapshot.totalMs / WINDOW_MS * 100.0 else 0.0
+        val allocMbPerSec = gcDelta.allocatedMb / seconds
+        val pssMb = memoryPssMb()
+        if (frames > 0) {
             val label = clock.labelAt(System.nanoTime())
             AppLog.log(
                 "perf ${WINDOW_MS / 1000}s [$label]: $frames frames, ${snapshot.missed} missed (${snapshot.missedPercent()}%), " +
-                    "p50 ${fmt(snapshot.percentile(0.5))} p95 ${fmt(snapshot.percentile(0.95))} worst ${fmt(snapshot.worstMs)} ms" +
+                    "busy ${"%.0f".format(busyPct)}%, p50 ${fmt(snapshot.percentile(0.5))} p95 ${fmt(snapshot.percentile(0.95))} " +
+                    "p99 ${fmt(snapshot.percentile(0.99))} worst ${fmt(snapshot.worstMs)} ms" +
                     (if (windowDropped > 0) ", $windowDropped dropped" else "") +
                     " | avg ms: ${snapshot.avgPhases()}" +
-                    " | gc ${gcDelta.count} (blocking ${gcDelta.blocking}, ${gcDelta.timeMs} ms) heap ${heapMb} MB threads ${threadCount()}" +
+                    " | gc ${gcDelta.count} (blocking ${gcDelta.blocking}, ${gcDelta.timeMs} ms), alloc ${"%.1f".format(allocMbPerSec)} MB/s" +
+                    ", heap $heapMb MB, pss $pssMb MB, threads ${threadCount()}" +
                     (if (windowStalls > 0) " | stalls $windowStalls (${windowStallMs} ms)" else "") +
-                    (if (recomp.isNotEmpty()) " | recomposed: ${top(recomp)}" else "") +
-                    (if (events.isNotEmpty()) " | events: ${top(events)}" else ""),
+                    (if (recomp.isNotEmpty()) " | recomposed/s: ${top(recomp, seconds)}" else "") +
+                    (if (events.isNotEmpty()) " | events/s: ${top(events, seconds)}" else ""),
             )
         }
         resetWindow()
@@ -222,7 +227,15 @@ object PerfMonitor {
         return out
     }
 
-    private fun top(m: Map<String, Long>, n: Int = 6): String = m.entries.sortedByDescending { it.value }.take(n).joinToString(" ") { "${it.key}×${it.value}" }
+    private fun top(m: Map<String, Long>, seconds: Double, n: Int = 6): String =
+        m.entries.sortedByDescending { it.value }.take(n).joinToString(" ") { "${it.key}×${"%.1f".format(it.value / seconds)}" }
+
+    /** Resident memory the app holds (proportional set size), in MB: what the system charges the app for, not just the Java heap. */
+    private fun memoryPssMb(): Long = runCatching {
+        val info = android.os.Debug.MemoryInfo()
+        android.os.Debug.getMemoryInfo(info)
+        info.totalPss / 1024L
+    }.getOrDefault(0L)
 
     // --- Stalls ---------------------------------------------------------------------------------------------
 
@@ -282,11 +295,14 @@ object PerfMonitor {
         appendLine("Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), ${Build.MANUFACTURER} ${Build.MODEL}, ${"%.0f".format(1000f / budgetMs)} Hz (budget ${fmt(budgetMs)} ms)")
         appendLine("Watching for ${(SystemClock.uptimeMillis() - startedAt) / 1000} s. Heap now ${(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024)} MB, peak seen $peakHeapMb MB, threads ${threadCount()}.")
         appendLine("GC since process start: ${gc.count} runs, ${gc.blocking} blocking, ${gc.timeMs} ms, ${gc.allocatedMb} MB allocated.")
+        appendLine("Memory: pss ${memoryPssMb()} MB now.")
         appendLine()
         appendLine("-- Frames by what was happening (frames, missed %, >32 ms, >100 ms, p50 / p95 / worst ms; average ms per phase) --")
         stats.entries.sortedByDescending { it.value.frames }.forEach { (label, s) ->
             appendLine("$label: ${s.frames} frames, ${s.missedPercent()}% missed, ${s.over32} over 32, ${s.over100} over 100, p50 ${fmt(s.percentile(0.5))} p95 ${fmt(s.percentile(0.95))} worst ${fmt(s.worstMs)}")
             appendLine("    avg ${fmt(s.avgTotal())} ms = ${s.avgPhases()}")
+            appendLine("    distribution: ${s.distribution()}")
+            s.worstCost?.let { appendLine("    worst ${fmt(it.totalMs)} ms, mostly ${it.worstPhase()}: ${it.phases()}") }
         }
         appendLine()
         appendLine("-- Slowest frames (over ${SLOW_FRAME_LOG_MS.toInt()} ms) --")

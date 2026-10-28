@@ -60,4 +60,20 @@ class PerfStatsTest {
         assertTrue("SearchFacts.carFacts(SearchFacts.kt:42) x2" in text, text)
         assertTrue("via SearchFacts.carFacts < Recomposer.run" in text, text)
     }
+
+    @Test fun theDistributionPutsEachFrameInItsBand() {
+        val s = ScopeStats()
+        for (ms in listOf(4f, 12f, 25f, 50f, 80f, 150f)) s.add(frame(ms), budgetMs = 16.7f)
+        // One frame in each of the six bands.
+        assertEquals("<8.3 16%  8.3-16.7 16%  16.7-33 16%  33-67 16%  67-100 16%  >100 16%", s.distribution())
+    }
+
+    @Test fun theWorstFrameKeepsItsPhases() {
+        val s = ScopeStats()
+        s.add(frame(10f, layout = 2f), 16f)
+        s.add(frame(90f, layout = 70f), 16f)
+        s.add(frame(40f), 16f)
+        assertEquals(90f, s.worstCost?.totalMs)
+        assertEquals("layout", s.worstCost?.worstPhase())
+    }
 }
