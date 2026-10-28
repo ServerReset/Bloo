@@ -21,8 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -35,18 +33,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.uicommon.PrimaryTextStyle
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.AppIcons
-import com.bloo.uicommon.rememberSpinAngle
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapPage
@@ -106,11 +106,9 @@ internal fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modi
 }
 
 /**
- * The one-bar header over an expanded map sheet: name (and status) at start, drag handle centred,
- * refresh at end, positioned independently in one [Box] so the handle stays centred whatever the
- * name length. [onRefreshLocation] null omits the refresh side. [dragModifier] carries the
- * drag-to-dismiss gesture, built by the caller because each call site closes over its own drag
- * state.
+ * The one-bar header over an expanded map sheet: the car (its photo and name) at the start, the drag handle centred, and its charge and
+ * range at the end. [dragModifier] carries the drag-to-dismiss gesture, built by the caller because each call site closes over its own
+ * drag state.
  */
 @Composable
 internal fun MapTopBar(
@@ -118,14 +116,11 @@ internal fun MapTopBar(
     mapHazeState: HazeState,
     modifier: Modifier = Modifier,
     dragModifier: Modifier,
-    /** "88% · 415 km": the car's charge and range, under its name. Null leaves the name alone. */
-    statusLine: String? = null,
-    onRefreshLocation: (() -> Unit)? = null,
-    /**
-     * True while the refresh from [onRefreshLocation] is in flight (the real command-pending flag);
-     * drives the icon spin.
-     */
-    refreshing: Boolean = false,
+    /** The car's photo at the bar's start, or null for the car glyph. */
+    photo: String? = null,
+    /** The car's charge, and its range, at the bar's end. Null leaves that line out. */
+    chargePercent: String? = null,
+    chargeRange: String? = null,
 ) {
     // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without
     // consuming, so dragModifier and the refresh click still receive the touch.
@@ -153,37 +148,39 @@ internal fun MapTopBar(
         // so a forced white glyph vanishes on a light map. GlassSurface's onSurface default tracks
         // the theme and custom palettes.
     ) {
-        Box(
-            Modifier.fillMaxWidth().then(dragModifier).heightIn(min = 60.dp)
-                .padding(horizontal = GapPage),
+        // Three parts: the car at the start, the drag handle in the middle, and its charge and range at the end. Equal weights either
+        // side keep the handle centred, whatever the name or the figures are.
+        Row(
+            Modifier.fillMaxWidth().then(dragModifier).heightIn(min = 60.dp).padding(horizontal = GapPage),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Reserves room on the end for the refresh icon (never under it) regardless of
-            // alignment, since both float independently in this Box rather than sharing a Row's own
-            // space-distribution. The car icon, its name, and under it the charge and range: the
-            // pill says which car this map is and how it is doing, not just what it is called.
             Row(
-                Modifier.align(Alignment.CenterStart).padding(end = if (onRefreshLocation != null) 48.dp else 0.dp),
+                Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(GapGroup),
             ) {
-                Icon(AppIcons.DirectionsCar, contentDescription = null, modifier = Modifier.size(24.dp))
-                Column {
-                    RollingNumber(vehicleName, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold)
-                    if (statusLine != null) {
-                        RollingNumber(
-                            statusLine,
-                            style = PrimaryTextStyle(),
-                            fontWeight = FontWeight.Medium,
-                            color = mutedContentColor(),
-                        )
-                    }
+                if (photo != null) {
+                    AsyncImage(
+                        model = rememberPhotoModel(photo),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(40.dp).clip(CircleShape),
+                    )
+                } else {
+                    Icon(AppIcons.DirectionsCar, contentDescription = null, modifier = Modifier.size(24.dp))
                 }
+                RollingNumber(
+                    vehicleName,
+                    style = PrimaryTextStyle(),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
             }
-            // Frosted drag handle, centre-aligned. Purely visual: the pop and drag belong to the
-            // whole bar (`dragModifier`).
+            // Frosted drag handle, centred. Purely visual: the pop and drag belong to the whole bar.
             GlassSurface(
                 shape = CircleShape,
-                modifier = Modifier.align(Alignment.Center).size(width = 44.dp, height = 18.dp),
+                modifier = Modifier.size(width = 44.dp, height = 18.dp),
                 hazeState = mapHazeState,
                 shadow = false,
             ) {
@@ -193,29 +190,17 @@ internal fun MapTopBar(
                         .background(LocalContentColor.current.copy(alpha = 0.55f), RoundedCornerShape(2.dp)),
                 )
             }
-            if (onRefreshLocation != null) {
-                // Icon-only: a refresh indicator that spins while it is actually working (the real
-                // pending flag), in the same ramp-up/steady-spin language as every in-progress
-                // icon.
-                val angle = rememberSpinAngle(refreshing)
-                // 40dp circle, centred in the bar like the handle and name; end padding keeps it
-                // off the edge.
-                GlassSurface(
-                    shape = CircleShape,
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = GapGroup).size(40.dp),
-                    hazeState = mapHazeState,
-                    onClick = onRefreshLocation,
-                    contentDescription = "Refresh location",
-                    // Over the same theme-following map, so it inherits GlassSurface's onSurface
-                    // default. Nested in the bar's elevated GlassSurface, so it skips the second
-                    // shadow (see glassEdge, GlassChrome.kt).
-                    shadow = false,
-                ) {
-                    Icon(
-                        Icons.Filled.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp)
-                            .graphicsLayer { rotationZ = angle.value },
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                if (chargePercent != null) {
+                    RollingNumber(chargePercent, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, maxLines = 1)
+                }
+                if (chargeRange != null) {
+                    RollingNumber(
+                        chargeRange,
+                        style = PrimaryTextStyle(),
+                        fontWeight = FontWeight.Medium,
+                        color = mutedContentColor(),
+                        maxLines = 1,
                     )
                 }
             }
@@ -287,13 +272,10 @@ internal fun Modifier.pullToRefreshOrDismiss(
     )
 }
 
-/** "88% · 415 km": a car's charge and range for the map pill, or null when it has neither yet. */
-// chargeReadoutOf is @Composable (it reads MaterialTheme/LocalContentColor for the state-colour
-// pair it derives), so this wrapper must be too -- not for composition itself, but because a plain
-// function cannot resolve those locals.
+/** The car's charge and its range for the map bar's end, each as its own line; null where it has none yet. */
+// chargeReadoutOf is @Composable, so this is too.
 @Composable
-internal fun mapStatusLine(state: UiState, v: com.bloo.bluelink.data.Vehicle, metric: Boolean): String? {
+internal fun mapChargeStats(state: UiState, v: com.bloo.bluelink.data.Vehicle, metric: Boolean): Pair<String?, String?> {
     val r = chargeReadoutOf(state.statusFor(v), state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric)
-    return listOfNotNull(r.pctText.takeIf { it.isNotBlank() }, r.rangeText?.takeIf { it.isNotBlank() })
-        .joinToString(" · ").ifBlank { null }
+    return r.pctText.takeIf { it.isNotBlank() } to r.rangeText?.takeIf { it.isNotBlank() }
 }

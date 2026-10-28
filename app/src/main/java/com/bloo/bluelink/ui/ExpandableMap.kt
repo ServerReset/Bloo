@@ -95,12 +95,15 @@ internal fun ExpandableMapLayer(
     originBounds: Rect,
     location: GeoLocation,
     vehicleName: String,
-    statusLine: String? = null,
+    /** The car's charge and range for the bar's end (see [mapChargeStats]). */
+    chargePercent: String? = null,
+    chargeRange: String? = null,
+    /** The car's stored photo, at the bar's start in place of the car glyph. */
+    photo: String? = null,
     deviceLocation: GeoLocation?,
     mapState: CarMapState,
     /** The car's one map ([ExpandedMapState.mapFor]), moved here from its pebble. */
     map: @Composable (Modifier, MapInputs) -> Unit,
-    hazeState: HazeState?,
     onRefreshLocation: () -> Unit,
     /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
     refreshing: Boolean = false,
@@ -141,6 +144,8 @@ internal fun ExpandableMapLayer(
     // The bars' spring is read here, not inside the coroutine: spring() is composable, and so only callable during composition.
     // The gap the top bar leaves above the screen's edge, read here: tokens are composable, so not inside the draw block below.
     val barGapPx = with(density) { GapSection.toPx() * 2f }
+    // The bar's gutter, from the screen's edges and from the top, read here for the same reason.
+    val barInsetPx = with(density) { GapSection.toPx() }
     val chromeInSpec: AnimationSpec<Float> = if (plainMotion) tween(120) else spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow)
 
     val placed = rootPos != null
@@ -156,12 +161,10 @@ internal fun ExpandableMapLayer(
         val k = mapState.scale.coerceAtLeast(0.5f)
         mapState.panTo((o.center.x - w / 2f) / k, (o.center.y - (h - h * 0.85f / 2f)) / k)
         com.bloo.bluelink.perf.PerfMonitor.scope("map-open", 1_000)
-        // Open in two beats: the sheet grows from the pebble to full screen first, THEN the bars
-        // arrive. Previously they faded in from the very first frame (expandFraction > 0.1), so the
-        // chrome was already there while the map was still unfolding.
-        expandFraction.animateTo(1f, animationSpec = openSpec)
-        // The bars bounce in from off the screen's edge: a spring that overshoots its place and settles.
-        chrome.animateTo(1f, animationSpec = chromeInSpec)
+        // The sheet grows and the bar flies in together: the bar comes down from above the screen, under the status bar, and
+        // overshoots its place a little before it settles.
+        launch { expandFraction.animateTo(1f, animationSpec = openSpec) }
+        launch { chrome.animateTo(1f, animationSpec = chromeInSpec) }
     }
 
     // How far the drag handle has actually been pulled down, in px -- the SAME real drag-to-dismiss
@@ -199,20 +202,19 @@ internal fun ExpandableMapLayer(
         closing = true
         com.bloo.bluelink.perf.PerfMonitor.scope("map-close", 1_000)
         scope.launch {
-            // Chrome first (a quick retreat), then the sheet morphs back into its pebble, and the
-            // drag offset eases away with it so a mid-drag dismiss doesn't visibly snap dragPx to 0.
-            scope.launch {
+            // One motion: the bar retreats up while the sheet shrinks, and the bar's width follows the sheet from the first frame.
+            val retreat = launch {
                 if (plainMotion) {
                     chrome.animateTo(0f, tween(120))
                 } else {
-                    // Bounce out: a small step further in first, then off the edge it came from.
+                    // A small bounce out, then off the top it came from.
                     chrome.animateTo(1.07f, tween(90, easing = FastOutSlowInEasing))
-                    chrome.animateTo(0f, tween(240, easing = FastOutLinearInEasing))
+                    chrome.animateTo(0f, tween(MapCloseMs - 90, easing = FastOutLinearInEasing))
                 }
-            }.join()
-            val a = scope.launch { expandFraction.animateTo(0f, animationSpec = closeSpec) }
-            val b = scope.launch { dragPx.animateTo(0f, animationSpec = closeSpec) }
-            a.join(); b.join()
+            }
+            val shrink = launch { expandFraction.animateTo(0f, animationSpec = closeSpec) }
+            val drag = launch { dragPx.animateTo(0f, animationSpec = closeSpec) }
+            retreat.join(); shrink.join(); drag.join()
             // The pin has arrived at the middle of the collapsed map; the pebble's map starts from there.
             mapState.panTo(0f, 0f)
             onDismiss()
@@ -223,10 +225,9 @@ internal fun ExpandableMapLayer(
     BackHandler(enabled = isExpanded) { close() }
 
     Box(Modifier.fillMaxSize().onGloballyPositioned { rootPos = it.positionOnScreen() }) {
-        // Scrim background (dims/blurs content behind) -- covers the WHOLE screen, not just the
-        // sheet: this is what shows through the top 15% strip the sheet itself doesn't reach.
+        // Clear, not blurred: the app behind the map is not dimmed or blurred. This covers the whole screen, so a tap in the strip
+        // above the sheet closes it too.
         if (isExpanded) {
-            ScrimBlur(hazeState = hazeState, progress = { expandFraction.value.coerceIn(0f, 1f) })
             Box(Modifier.fillMaxSize().noRippleClickable { close() })
         }
 
@@ -286,7 +287,9 @@ internal fun ExpandableMapLayer(
             if (isExpanded && chromeShown) {
                 MapTopBar(
                     vehicleName = vehicleName,
-                    statusLine = statusLine,
+                    photo = photo,
+                    chargePercent = chargePercent,
+                    chargeRange = chargeRange,
                     mapHazeState = mapHazeState,
                     // No refresh button: pull the bar up to full tension and let go instead.
                     dragModifier = Modifier.pullToRefreshOrDismiss(
@@ -299,8 +302,21 @@ internal fun ExpandableMapLayer(
                         },
                     ),
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(start = GapSection, end = GapSection, top = GapSection)
+                        .align(Alignment.TopStart)
+                        // The bar's width follows the sheet's: as wide as the pebble at the start, the sheet's side gutters when open,
+                        // and back again on close, from the first frame of either.
+                        .layout { measurable, constraints ->
+                            val p = progress().coerceIn(0f, 1f)
+                            val root = rootPos ?: androidx.compose.ui.geometry.Offset.Zero
+                            val o = originBounds.translate(-root.x, -root.y)
+                            val left = lerp(o.left, barInsetPx, p)
+                            val right = lerp(o.right, constraints.maxWidth - barInsetPx, p)
+                            val w = (right - left).roundToInt().coerceAtLeast(1)
+                            val bar = measurable.measure(constraints.copy(minWidth = w, maxWidth = w))
+                            layout(constraints.maxWidth, bar.height + barInsetPx.roundToInt()) {
+                                bar.place(left.roundToInt(), barInsetPx.roundToInt())
+                            }
+                        }
                         .graphicsLayer {
                             // 0 is off the top of the screen, 1 its place; the bounce takes it a little past 1 either way.
                             alpha = 1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)

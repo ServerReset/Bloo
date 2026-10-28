@@ -160,16 +160,18 @@ internal fun GarageScreen(
 
         if (expandedVehicle != null && expandedLocation != null && originBounds != null) {
             val locateExpandedVehicle = rememberLocateAction(vm, expandedVehicle)
+            val (chargePercent, chargeRange) = mapChargeStats(state.value, expandedVehicle, appearance.metricDistance)
             ExpandableMapLayer(
                 isExpanded = true,
                 originBounds = originBounds,
                 location = expandedLocation,
                 vehicleName = expandedVehicle.name,
-                statusLine = mapStatusLine(state.value, expandedVehicle, appearance.metricDistance),
+                chargePercent = chargePercent,
+                chargeRange = chargeRange,
+                photo = state.value.imageUrls[expandedVehicle.vin],
                 deviceLocation = deviceLocation,
                 mapState = expandedMap.mapStateFor(expandedVehicle.vin),
                 map = expandedMap.mapFor(expandedVehicle.vin),
-                hazeState = hazeState,
                 onRefreshLocation = locateExpandedVehicle,
                 deviceRequest = rememberDeviceLocationRequest(vm),
                 // The real command-pending flag, not a guessed timer -- see MapTopBar's own doc --

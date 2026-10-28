@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.Dp
 
 /**
  * Unified glass system: every floating surface takes its tint, blur, rim and shadow from here.
- * [GlassSurface] is the floating panel, [ScrimBlur] the full-screen dim, [pebbleCardEdge] the
+ * [GlassSurface] is the floating panel, [pebbleCardEdge] the
  * opaque card edge.
  */
 
