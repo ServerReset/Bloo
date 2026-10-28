@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
@@ -53,8 +52,6 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.SecondaryTextStyle
-import com.bloo.uicommon.lowPowerAwareSpring
-import com.bloo.uicommon.SoftDamping
 import com.bloo.uicommon.content
 
 /**
@@ -75,7 +72,6 @@ internal fun NestedGlassPanel(hazeState: dev.chrisbanes.haze.HazeState?, content
 internal fun UpdateReleaseNotes(info: UpdateInfo, hazeState: dev.chrisbanes.haze.HazeState? = null) {
     val notes = info.run.releaseNotes?.trim().orEmpty()
     if (notes.isBlank()) return
-    val context = LocalContext.current
     // Glass surface with unified blur styling. shadow = false -- shared by the pebble body AND
     // SettingsHeroCard's expanded body (this composable's own doc), both of which already nest this
     // inside another elevated card/group; see glassEdge's own doc for why a nested panel skips the
