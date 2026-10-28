@@ -75,6 +75,7 @@ import com.bloo.bluelink.data.cToF
 import com.bloo.bluelink.data.climatePresetTemp
 import com.bloo.bluelink.data.fToC
 import com.bloo.uicommon.BlooSlider
+import com.bloo.uicommon.ButtonIcon
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.ButtonEmphasis

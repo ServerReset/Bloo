@@ -50,6 +50,7 @@ import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.collapsedSections
+import com.bloo.uicommon.ButtonIcon
 import com.bloo.uicommon.SecondaryTextStyle
 import kotlin.math.max
 import com.bloo.uicommon.RevealText
