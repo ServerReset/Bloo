@@ -102,7 +102,7 @@ fun WearApp(
                 title = if (connected) "No cars yet" else "Waiting for your phone",
                 detail = if (connected) "Add a car in Bloo on your phone." else "Open Bloo on your phone and keep it near the watch.",
             )
-            else -> Cars(repo, vehicles, send, tileRequest, onTileRequestHandled)
+            else -> Cars(repo, vehicles, CarPageActions(send, tileRequest, onTileRequestHandled))
         }
     }
 }
@@ -134,10 +134,11 @@ private fun SignInCode(code: String) {
 private fun Cars(
     repo: WearSnapshotRepository,
     vehicles: List<com.bloo.bluelink.data.VehicleSnapshot>,
-    send: (() -> Unit) -> Unit,
-    tileRequest: WearMainActivity.TileRequest?,
-    onTileRequestHandled: () -> Unit,
+    actions: CarPageActions,
 ) {
+    val send = actions.send
+    val tileRequest = actions.tileRequest
+    val onTileRequestHandled = actions.onTileRequestHandled
     val context = LocalContext.current
     val startPage = remember {
         WearTileCar.saved(context)?.let { vin -> vehicles.indexOfFirst { it.vin == vin } }?.coerceAtLeast(0) ?: 0
@@ -155,11 +156,13 @@ private fun Cars(
                 WearCarPage(
                     repo = repo,
                     car = car,
-                    send = send,
                     // A tile action belongs to the car the tile showed, so only the page on screen takes it: the pager
                     // composes its neighbours, and they would run it too.
-                    tileRequest = tileRequest?.takeIf { page == pagerState.currentPage },
-                    onTileRequestHandled = onTileRequestHandled,
+                    actions = CarPageActions(
+                        send = send,
+                        tileRequest = tileRequest?.takeIf { page == pagerState.currentPage },
+                        onTileRequestHandled = onTileRequestHandled,
+                    ),
                 )
             }
         }

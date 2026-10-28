@@ -65,14 +65,25 @@ internal class WearCarUi(
  * One car: its face and, a swipe up, its details; over them, in turn, the face editor and the control list it opens. A
  * command that opens the car (Unlock) asks once more first. Back or a swipe right peels one layer off.
  */
+/**
+ * What the app hands a car page: the gate its commands go through, and a request from the watch's Tile to act on, and the call that
+ * says the request was handled. Passed as one value, since every page takes all three.
+ */
+internal class CarPageActions(
+    val send: (() -> Unit) -> Unit,
+    val tileRequest: WearMainActivity.TileRequest?,
+    val onTileRequestHandled: () -> Unit,
+)
+
 @Composable
 internal fun WearCarPage(
     repo: WearSnapshotRepository,
     car: VehicleSnapshot,
-    send: (() -> Unit) -> Unit,
-    tileRequest: WearMainActivity.TileRequest?,
-    onTileRequestHandled: () -> Unit,
+    actions: CarPageActions,
 ) {
+    val send = actions.send
+    val tileRequest = actions.tileRequest
+    val onTileRequestHandled = actions.onTileRequestHandled
     val context = LocalContext.current
     val signedIn by WearCredentialSync.signedIn.collectAsStateWithLifecycle()
     val pending by WearCommands.pending.collectAsStateWithLifecycle()
