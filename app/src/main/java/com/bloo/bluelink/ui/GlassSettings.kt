@@ -30,7 +30,6 @@ internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppVie
             vm.setGlassClaritySoon(picked.transparency)
             vm.setUltraGlass(picked.ultra)
         },
-        key = appearance.glassClarity to appearance.ultraGlass,
     )
     BodySmallText("How see-through floating glass is, from solid to nothing but the bending edge. Ultra puts glass on every card and cranks the edge refraction, colour fringe and shine as far as they go. Heavy on older devices.")
 }

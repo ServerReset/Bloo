@@ -32,6 +32,7 @@ import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.degLabel
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.GapRow
