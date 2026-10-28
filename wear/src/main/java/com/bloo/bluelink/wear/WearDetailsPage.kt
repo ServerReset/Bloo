@@ -1,5 +1,10 @@
 package com.bloo.bluelink.wear
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.ui.Modifier
 import com.bloo.bluelink.data.downloadLabel
 import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +44,7 @@ internal fun rememberWearUpdateState(): WearUpdateState {
  * The car's details page, one swipe up from the face: a failed command's reason, its readings, its climate, its care and
  * freshness, any watch update, then the watch's own settings. A scrolling [WearListScreen].
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState) {
     val scope = rememberCoroutineScope()
@@ -68,6 +74,10 @@ internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState) {
                 WearPebble(title = "Update available", icon = AppIcons.SystemUpdate) {
                     if (update.downloading) {
                         WearCenteredText(downloadLabel(update.progress), style = MaterialTheme.typography.bodyMedium)
+                        LinearWavyProgressIndicator(
+                            progress = { update.progress },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                        )
                     } else {
                         WearActionRow("Update now", AppIcons.Download) {
                             scope.launch { WearUpdateChecker.downloadAndInstall(context) }

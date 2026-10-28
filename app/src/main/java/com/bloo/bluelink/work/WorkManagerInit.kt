@@ -45,19 +45,21 @@ internal fun connectedConstraints(): androidx.work.Constraints =
         .build()
 
 /**
- * Schedules the periodic worker [W] under [name], on the connected-network constraint every periodic worker here asks for. A schedule
- * already under [name] is replaced by this one. [configure] adds anything a worker needs on top (backoff, say).
+ * Schedules the periodic worker [W] under [name], on the connected-network constraint every periodic worker here asks for. [policy]
+ * decides what an existing schedule under [name] does: UPDATE replaces it with this one, KEEP leaves it running. [configure] adds anything
+ * a worker needs on top (backoff, say).
  */
 internal inline fun <reified W : androidx.work.ListenableWorker> enqueuePeriodic(
     context: Context,
     name: String,
     interval: Long,
     unit: TimeUnit,
+    policy: ExistingPeriodicWorkPolicy = ExistingPeriodicWorkPolicy.UPDATE,
     configure: PeriodicWorkRequest.Builder.() -> Unit = {},
 ) {
     val request = PeriodicWorkRequestBuilder<W>(interval, unit)
         .setConstraints(connectedConstraints())
         .apply(configure)
         .build()
-    WorkManagerInit.of(context).enqueueUniquePeriodicWork(name, ExistingPeriodicWorkPolicy.UPDATE, request)
+    WorkManagerInit.of(context).enqueueUniquePeriodicWork(name, policy, request)
 }

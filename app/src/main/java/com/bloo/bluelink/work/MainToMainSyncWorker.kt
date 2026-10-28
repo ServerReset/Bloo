@@ -1,6 +1,7 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
@@ -99,7 +100,9 @@ class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : BlooWorker(
         /** Every 2 hours is frequent enough that changes propagate within a normal
          *  day of use, without the battery/data cost of anything tighter for a
          *  low-urgency settings-sync convenience feature. */
-        fun schedule(context: Context) = enqueuePeriodic<MainToMainSyncWorker>(context, NAME, 2, TimeUnit.HOURS) {
+        // KEEP: a schedule already running under this name is left alone, so calling schedule() on every app launch does not reset
+        // the timer or cancel a run in flight. (This used to say KEEP but pass UPDATE, which reset the timer on every launch.)
+        fun schedule(context: Context) = enqueuePeriodic<MainToMainSyncWorker>(context, NAME, 2, TimeUnit.HOURS, ExistingPeriodicWorkPolicy.KEEP) {
             // Requires any usable network connection (not Wi-Fi-only at the WorkManager level): the Wi-Fi-only preference is re-checked
             // inside performMainToMainSync() on every run, so the schedule itself stays as loose as possible.
             // Explicit (rather than the platform default) so a transient failure is retried within a minute, not the default's much
