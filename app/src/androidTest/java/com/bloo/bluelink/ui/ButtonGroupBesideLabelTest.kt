@@ -9,6 +9,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.ExpressiveButtonGroup
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test

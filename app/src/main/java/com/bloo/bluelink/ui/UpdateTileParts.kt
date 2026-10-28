@@ -46,6 +46,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.update.UpdateInfo
 import com.bloo.uicommon.IconBadgeContainer
+import com.bloo.uicommon.ProgressBar
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapRow

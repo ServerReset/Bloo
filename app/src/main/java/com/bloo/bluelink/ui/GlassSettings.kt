@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.uicommon.BlooSlider
 import kotlin.math.roundToInt
 
 /**

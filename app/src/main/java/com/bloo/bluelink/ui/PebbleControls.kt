@@ -121,7 +121,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
         animationSpec = if (expanded) {
             lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
         } else {
-            lowPowerAwareSpring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness)
+            lowPowerAwareSpring(dampingRatio = PebbleCloseDamping, stiffness = Spring.StiffnessLow)
         },
         label = "controlsPebbleCorner",
     )

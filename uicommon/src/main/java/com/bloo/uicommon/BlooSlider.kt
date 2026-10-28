@@ -1,4 +1,4 @@
-package com.bloo.bluelink.ui
+package com.bloo.uicommon
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,11 +16,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.bloo.uicommon.GapRow
-import com.bloo.uicommon.LocalHaptics
-import com.bloo.uicommon.LocalReduceMotion
-import com.bloo.uicommon.MorphIconButton
-import com.bloo.uicommon.inertButtonFrost
 
 /**
  * The app's one slider, used everywhere a value is picked: a track with a round −/+ at either end, and optionally a label and a readout
@@ -32,7 +27,7 @@ import com.bloo.uicommon.inertButtonFrost
  * −/+ press moves to, by default one part.
  */
 @Composable
-internal fun BlooSlider(
+fun BlooSlider(
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,

@@ -62,7 +62,7 @@ internal fun PebbleTitleRow(
         animationSpec = if (expandingTitle) {
             lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
         } else {
-            lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = PebbleBounceStiffness)
+            lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow)
         },
         label = "pebbleHeaderGrow",
     )

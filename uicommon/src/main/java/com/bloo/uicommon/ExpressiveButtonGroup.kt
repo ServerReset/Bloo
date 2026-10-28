@@ -1,4 +1,4 @@
-package com.bloo.bluelink.ui
+package com.bloo.uicommon
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -11,13 +11,6 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
-import com.bloo.uicommon.NaturalWidths
-import com.bloo.uicommon.ExpressiveGroupData
-import com.bloo.uicommon.MaxSingleButtonWidth
-import com.bloo.uicommon.ExpressiveButtonGroupScope
-import com.bloo.uicommon.LocalExpressiveGroup
-import com.bloo.uicommon.balancedLineBreaks
-import com.bloo.uicommon.content
 
 /**
  * How much EXTRA room a collapsed line must find before its labels come back. This is the margin

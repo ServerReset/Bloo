@@ -283,7 +283,7 @@ private fun BoxScope.SearchElement(
     // The four springs are read in layout and draw (lambdas below), never here, so a morph or a drag moves the pill
     // without recomposing it every frame.
     // Two springs: SIZE overshoots a little, POSITION is bouncier still so the edge-snap reads as
-    // landing. Numbers are the shared PebbleBounce tokens.
+    // landing. Numbers are the shared BounceDamping and its stiffness.
     val sizeSpec = lowPowerAwareSpring<Dp>(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
     val w = animateDpAsState(targetW, sizeSpec, label = "searchW")
     val h = animateDpAsState(targetH, sizeSpec, label = "searchH")

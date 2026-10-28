@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -8,8 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -63,11 +60,6 @@ internal fun MutedText(text: String, modifier: Modifier = Modifier) {
     BodySmallText(text, modifier, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-/** An [Icon] at the standard in-button size ([com.bloo.uicommon.ButtonIconSize]); [description] null marks it decorative. */
-@Composable
-internal fun ButtonIcon(icon: ImageVector, description: String? = null, tint: Color = LocalContentColor.current) {
-    Icon(icon, contentDescription = description, modifier = Modifier.size(com.bloo.uicommon.ButtonIconSize), tint = tint)
-}
 
 /** [MutedText] that reveals as it appears (the pebbles' captions and hints). */
 @Composable
@@ -166,16 +158,3 @@ internal fun Modifier.hapticClickable(onClickLabel: String? = null, onClick: () 
     return clickable(interactionSource = source, indication = null, onClickLabel = onClickLabel) { haptics?.click(); onClick() }
 }
 
-/**
- * The app's one progress bar: the expressive wavy indicator, the same as every other progress in the app. Indeterminate (running, with no
- * end in sight) when [progress] is null.
- */
-@Composable
-internal fun ProgressBar(progress: Float?, modifier: Modifier = Modifier) {
-    val track = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-    if (progress != null) {
-        LinearWavyProgressIndicator(progress = { progress }, modifier = modifier.fillMaxWidth(), trackColor = track)
-    } else {
-        LinearWavyProgressIndicator(modifier = modifier.fillMaxWidth(), trackColor = track)
-    }
-}

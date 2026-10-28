@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.uicommon.BlooSlider
 import com.bloo.uicommon.PrimaryTextStyle
 import java.util.UUID
 import kotlin.math.abs

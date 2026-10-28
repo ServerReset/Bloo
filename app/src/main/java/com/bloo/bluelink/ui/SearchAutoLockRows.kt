@@ -10,6 +10,7 @@ import com.bloo.bluelink.autolock.AutoLockConfig
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.setAutoLockConfig
+import com.bloo.uicommon.BlooSlider
 import kotlin.math.roundToInt
 
 // --- AutoLock controls surfaced as search results ---

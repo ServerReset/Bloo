@@ -211,7 +211,7 @@ internal fun PebbleShell(
     val cornerSpec = if (expanded || chevronPressed) {
         lowPowerAwareSpring<Dp>(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
     } else {
-        lowPowerAwareSpring<Dp>(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness)
+        lowPowerAwareSpring<Dp>(dampingRatio = PebbleCloseDamping, stiffness = Spring.StiffnessLow)
     }
     // Animated only when the USER changed something (open, close, hold). A target that moves because the card
     // was measured -- every pebble as it first fills in after a swipe -- snaps: springing it rebuilt the whole

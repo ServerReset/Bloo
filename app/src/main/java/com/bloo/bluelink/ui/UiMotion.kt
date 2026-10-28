@@ -71,16 +71,10 @@ internal val MorphedCornerPercent get() = com.bloo.uicommon.MorphedCornerPercent
 // internal: PebbleShell's corner-radius morph shares these springs so height and corners move as
 // one.
 /** The springs the app settles things with, named so the same feel is one value everywhere. */
-internal const val SettleDamping = com.bloo.uicommon.BounceDamping
 internal const val GentleDamping = 0.9f
-internal const val PopDamping = com.bloo.uicommon.BounceDamping
-
-internal val PebbleBounceDamping = com.bloo.uicommon.BounceDamping
 
 // Slightly underdamped (0.95) for a smoother close that isn't stiff.
 internal val PebbleCloseDamping = 0.95f
-
-internal val PebbleBounceStiffness = Spring.StiffnessLow
 
 /**
  * Standard enter animation for expanding surfaces: a fade-in. Nothing slides: the surface grows
