@@ -308,7 +308,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                 // Shared dismissal row, giving the same undo window as the app
                                 // tile.
                                 UpdateDismissRow(state, vm)
-                                UpdateReleaseNotes(updateInfo, collapsedLines = 3)
+                                UpdateReleaseNotes(updateInfo)
                             }
                         }
                     }

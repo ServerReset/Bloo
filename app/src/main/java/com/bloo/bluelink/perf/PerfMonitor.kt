@@ -84,6 +84,8 @@ object PerfMonitor {
     private var windowStalls = 0
     private var windowStallMs = 0L
     private var lastGc = GcSample.read()
+    private var lastCpuMs = 0L
+    private var lastCpuAt = 0L
     private var peakHeapMb = 0L
     private var thread: HandlerThread? = null
     private var handler: Handler? = null
@@ -324,6 +326,13 @@ object PerfMonitor {
         val busyPct = if (frames > 0) snapshot.totalMs / WINDOW_MS * 100.0 else 0.0
         val allocMbPerSec = gcDelta.allocatedMb / seconds
         val pssMb = memoryPssMb()
+        // Process CPU over this window, as a share of wall time (a core is 100%), and the native heap the Java counts miss.
+        val now = SystemClock.uptimeMillis()
+        val cpuMs = android.os.Process.getElapsedCpuTime()
+        val cpuPct = if (lastCpuAt > 0L) (cpuMs - lastCpuMs) * 100.0 / (now - lastCpuAt).coerceAtLeast(1L) else 0.0
+        lastCpuMs = cpuMs
+        lastCpuAt = now
+        val nativeMb = Debug.getNativeHeapAllocatedSize() / (1024 * 1024)
         val label = clock.labelAt(System.nanoTime())
         val line = buildString {
             append("WINDOW ${WINDOW_MS / 1000}s [$label] $frames frames, ${snapshot.missed} missed (${snapshot.missedPercent()}%), ")
@@ -332,7 +341,7 @@ object PerfMonitor {
             if (windowDropped > 0) append(", $windowDropped dropped")
             if (frames > 0) append(" | avg ms: ${snapshot.avgPhases()} | distribution ${snapshot.distribution()}")
             append(" | gc ${gcDelta.count} (blocking ${gcDelta.blocking}, ${gcDelta.timeMs} ms), alloc ${"%.1f".format(allocMbPerSec)} MB/s")
-            append(", heap $heapMb MB, pss $pssMb MB, threads ${threadCount()}")
+            append(", heap $heapMb MB, native $nativeMb MB, pss $pssMb MB, threads ${threadCount()}, cpu ${"%.0f".format(cpuPct)}%")
             append(" | main-post ${mainPost.line()} | pool-default ${defaultPool.line()} | pool-io ${ioPool.line()}")
             if (windowStalls > 0) append(" | stalls $windowStalls (${windowStallMs} ms)")
             if (recomp.isNotEmpty()) append(" | recomposed/s: ${top(recomp, seconds)}")
@@ -427,6 +436,14 @@ object PerfMonitor {
     }.getOrNull() ?: 0
 
     /** Everything seen since the monitor started (or since [reset]), as text for the Debug card's Copy button. */
+    /** The report, then every timeline line still kept on the device: what Save writes out. */
+    fun saveableReport(): String = buildString {
+        append(report())
+        appendLine()
+        appendLine("-- Timeline: every line still kept, oldest first --")
+        append(PerfFile.readAll())
+    }
+
     fun report(): String = buildString {
         val gc = GcSample.read()
         appendLine("== Bloo performance report ==")
@@ -435,7 +452,10 @@ object PerfMonitor {
         appendLine("Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), ${Build.MANUFACTURER} ${Build.MODEL}, ${"%.0f".format(1000f / budgetMs)} Hz (budget ${fmt(budgetMs)} ms)")
         appendLine("Watching for ${(SystemClock.uptimeMillis() - startedAt) / 1000} s. Heap now ${(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024)} MB, peak seen $peakHeapMb MB, threads ${threadCount()}.")
         appendLine("GC since process start: ${gc.count} runs, ${gc.blocking} blocking, ${gc.timeMs} ms, ${gc.allocatedMb} MB allocated.")
-        appendLine("Memory: pss ${memoryPssMb()} MB now.")
+        appendLine("Memory: pss ${memoryPssMb()} MB now, native heap ${Debug.getNativeHeapAllocatedSize() / (1024 * 1024)} MB.")
+        val cpuSinceStart = android.os.Process.getElapsedCpuTime()
+        val wallSinceStart = (SystemClock.uptimeMillis() - startedAt).coerceAtLeast(1L)
+        appendLine("CPU: ${cpuSinceStart} ms of process CPU since process start (${"%.0f".format(cpuSinceStart * 100.0 / wallSinceStart)}% of wall time, a core is 100%).")
         appendLine()
         appendLine("-- Frames by what was happening (frames, missed %, >32 ms, >100 ms, p50 / p95 / worst ms; average ms per phase) --")
         stats.entries.sortedByDescending { it.value.frames }.forEach { (label, s) ->

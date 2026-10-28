@@ -34,12 +34,21 @@ object AppLog {
      * value instances to notify collectors.
      */
     fun log(message: String) {
-        synchronized(this) {
-            buffer.addLast("${timestamp.format(Date())}  $message")
+        val line = synchronized(this) {
+            val stamped = "${timestamp.format(Date())}  $message"
+            buffer.addLast(stamped)
             while (buffer.size > MAX_LINES) buffer.removeFirst()
             _version.value += 1
+            stamped
         }
+        sink?.invoke(line)
     }
+
+    /**
+     * Where each line also goes, outside the lock: the app sets this to a file, so every line is kept rather than only the newest
+     * [MAX_LINES] the panel shows.
+     */
+    @Volatile var sink: ((String) -> Unit)? = null
 
     /** Resets the log to empty, e.g. when the user taps "clear" in Settings. */
     fun clear() {

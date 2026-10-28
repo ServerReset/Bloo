@@ -80,6 +80,9 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
     override fun onCreate() {
         StartupTrace.mark(StartupLabels.APPLICATION_ON_CREATE_BEGIN)
         super.onCreate()
+        // The activity log is kept in a file as well as in the panel's buffer, so a long session can be saved in full.
+        com.bloo.bluelink.data.ActivityLogFile.init(this)
+        com.bloo.bluelink.data.AppLog.sink = { com.bloo.bluelink.data.ActivityLogFile.append(it) }
         installStartupStrictMode()
         StartupTrace.mark(StartupLabels.APPLICATION_SUPER_ON_CREATE_DONE)
         DeviceStatus.ensureInitialized(this)

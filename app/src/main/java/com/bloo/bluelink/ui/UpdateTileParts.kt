@@ -8,7 +8,6 @@ package com.bloo.bluelink.ui
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,11 +20,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Bolt
@@ -37,8 +33,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +41,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -77,55 +70,19 @@ internal fun NestedGlassPanel(hazeState: dev.chrisbanes.haze.HazeState?, content
     )
 }
 
-/** The release notes block: "What's new", an excerpt, and a link to the full notes. */
+/** The release notes block: "What's new", in full, and a link to the formatted notes. */
 @Composable
-internal fun UpdateReleaseNotes(
-    info: UpdateInfo,
-    /**
-     * Lines shown while COLLAPSED. 5 in the pebble, which has the room; 3 in the Settings card,
-     * which does not.
-     */
-    collapsedLines: Int = 5,
-    hazeState: dev.chrisbanes.haze.HazeState? = null,
-) {
+internal fun UpdateReleaseNotes(info: UpdateInfo, hazeState: dev.chrisbanes.haze.HazeState? = null) {
     val notes = info.run.releaseNotes?.trim().orEmpty()
     if (notes.isBlank()) return
     val context = LocalContext.current
-    // Expanded in place: held across the card's own recompositions (keyed on the build), so a long
-    // note can be read fully without leaving the app. "GitHub" stays as the escape hatch to the
-    // formatted release page.
-    var expanded by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
     // Glass surface with unified blur styling. shadow = false -- shared by the pebble body AND
     // SettingsHeroCard's expanded body (this composable's own doc), both of which already nest this
     // inside another elevated card/group; see glassEdge's own doc for why a nested panel skips the
     // second shadow.
     NestedGlassPanel(hazeState) {
-        Column(
-            Modifier.padding(GapGroup)
-                // Animate the card's own height when "Show more" expands the notes (and back when
-                // it collapses), so the box grows/shrinks smoothly instead of jumping to the new
-                // size on one frame. Same spring the rest of the update card uses.
-                .animateContentSize(
-                    lowPowerAwareSpring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow,
-                    ),
-                ),
-            verticalArrangement = Arrangement.spacedBy(GapRow),
-        ) {
-            // The framework drops a label to its glyph only when a half is genuinely too narrow for
-            // it.
-            val looksLong =
-                notes.count { it == '\n' } >= collapsedLines || notes.length > collapsedLines * 48
-            val showToggle = looksLong || expanded
+        Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             ActionRow {
-                if (showToggle) {
-                    MorphTextButton(
-                        if (expanded) "Show less" else "Show more",
-                        onClick = { expanded = !expanded },
-                        fillOnPress = false,
-                    )
-                }
                 MorphTextButton(
                     "GitHub",
                     onClick = { context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())) },
@@ -137,18 +94,7 @@ internal fun UpdateReleaseNotes(
                 notes,
                 style = SecondaryTextStyle(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = if (expanded) {
-                    // Expanded: the whole changelog inline, but BOUNDED and scrollable so a very
-                    // long release note can't grow the card to several screens tall and push the
-                    // buttons off the bottom. The height is generous but finite.
-                    Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState())
-                } else {
-                    Modifier.fillMaxWidth()
-                },
-                // Collapsed: capped at [collapsedLines], ellipsized. Expanded: no line cap (the
-                // scroll bound above is what limits it), so the changelog reads fully.
-                maxLines = if (expanded) Int.MAX_VALUE else collapsedLines,
-                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

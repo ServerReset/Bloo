@@ -128,7 +128,7 @@ internal fun UpdateAvailableTile(
             // Release notes ("What's new"), capped, with a "Full notes" link; shared block (see
             // UpdateReleaseNotes).
             PopVisible(visible = info.run.releaseNotes != null) {
-                UpdateReleaseNotes(info, collapsedLines = 5, hazeState = hazeState)
+                UpdateReleaseNotes(info, hazeState = hazeState)
             }
             // Progressive install help: only in the tap-through (non-seamless) path, and only as an
             // opt-in disclosure - the Play-Protect steps are scaffolding, not something to shout

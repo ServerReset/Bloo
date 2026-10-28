@@ -80,6 +80,22 @@ internal fun DebugCardContent(
     fun copy(label: String, text: String) {
         clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, text))) }
     }
+    // Save writes the whole log to a file the user picks (Downloads, Drive), ready to upload. The text is made off the main thread.
+    val saveScope = androidx.compose.runtime.rememberCoroutineScope()
+    val savePerformance = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri ->
+        if (uri != null) saveScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            writeLogTo(context, uri, "performance") { com.bloo.bluelink.perf.PerfMonitor.saveableReport() }
+        }
+    }
+    val saveActivity = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri ->
+        if (uri != null) saveScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            writeLogTo(context, uri, "activity") { com.bloo.bluelink.data.ActivityLogFile.readAll() }
+        }
+    }
     SettingsCard("Debug", Icons.Filled.BugReport, vm, status = "${logs.size} log lines") {
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             SettingsGroup("Device info") {
@@ -90,8 +106,13 @@ internal fun DebugCardContent(
                 MorphTextButton("Check again", onClick = { vm.reprobeAi() })
             }
             SettingsGroup("Performance") {
-                BodySmallText("The cost of every frame (composition, layout, draw, GPU), main-thread stalls with the code that was running, recompositions and garbage collection, filed under what you were doing. Reset, use the app for a minute, then copy this and send it.")
+                BodySmallText("The cost of every frame (composition, layout, draw, GPU), main-thread stalls with the code that was running, recompositions, garbage collection, CPU and memory, filed under what you were doing. Reset, use the app for a minute, then save the file and upload it. The whole timeline is in the file, not only the summary.")
                 ActionRow {
+                    MorphTextButton(
+                        "Save file",
+                        onClick = { savePerformance.launch("bloo-performance-${fileStamp()}.txt") },
+                        emphasis = ButtonEmphasis.Confirm,
+                    )
                     MorphTextButton("Copy report", onClick = { copy("bloo performance", com.bloo.bluelink.perf.PerfMonitor.report()) })
                     MorphTextButton("Share log file", onClick = {
                         com.bloo.bluelink.perf.PerfFile.shareIntent(context)?.let { context.startActivity(android.content.Intent.createChooser(it, "Send the performance log")) }
@@ -100,8 +121,13 @@ internal fun DebugCardContent(
                 }
             }
             SettingsGroup("Activity log") {
-                BodySmallText("${logs.size} lines, newest first.")
+                BodySmallText("The newest ${logs.size} lines are shown here. Save file writes every line kept since install, to upload.")
                 ActionRow {
+                    MorphTextButton(
+                        "Save file",
+                        onClick = { saveActivity.launch("bloo-activity-${fileStamp()}.txt") },
+                        emphasis = ButtonEmphasis.Confirm,
+                    )
                     MorphTextButton("Copy", onClick = { copy("bloo logs", logs.joinToString("\n")) })
                     MorphTextButton("Clear", onClick = { vm.clearLogs() }, emphasis = ButtonEmphasis.Deny)
                 }
@@ -241,4 +267,16 @@ private fun CreditRow(entry: CreditEntry) {
             }
         }
     }
+}
+
+/** A stamp for a saved file's name: sortable, and different each time. */
+private fun fileStamp(): String = java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US).format(java.util.Date())
+
+/** Writes [text] to the file the user picked. The text is made here, on the caller's (background) thread, and the outcome is logged. */
+private fun writeLogTo(context: android.content.Context, uri: android.net.Uri, what: String, text: () -> String) {
+    val saved = runCatching {
+        val body = text()
+        context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(body) } ?: error("no output stream")
+    }.isSuccess
+    com.bloo.bluelink.data.AppLog.log(if (saved) "Saved the $what log to the file you chose" else "Could not save the $what log")
 }
