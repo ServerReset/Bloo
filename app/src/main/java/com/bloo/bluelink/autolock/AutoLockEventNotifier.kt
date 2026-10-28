@@ -1,5 +1,6 @@
 package com.bloo.bluelink.autolock
 
+import com.bloo.bluelink.data.ChannelOnce
 import com.bloo.bluelink.data.clearsAfterAWhile
 import android.app.NotificationManager
 import android.content.Context
@@ -35,14 +36,13 @@ object AutoLockEventNotifier {
      */
     private const val CHANNEL_ID = "bloo_autolock_events_v1"
 
-    @Volatile private var channelEnsured = false
+    private val channel = ChannelOnce()
 
     /** The bundled car-door-lock clip as a notification-sound URI. */
     fun carLockSound(context: Context): Uri =
         "android.resource://${context.packageName}/${R.raw.car_door_lock}".toUri()
 
-    private fun ensureChannel(context: Context) {
-        if (channelEnsured) return
+    private fun ensureChannel(context: Context) = channel.ensure {
         ensureNotificationChannel(
             context,
             id = CHANNEL_ID,
@@ -52,7 +52,6 @@ object AutoLockEventNotifier {
             showBadge = true,
             sound = carLockSound(context),
         )
-        channelEnsured = true
     }
 
     /** A notification id per car, in a range of its own (0x42...) so it can never collide

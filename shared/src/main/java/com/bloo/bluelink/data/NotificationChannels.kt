@@ -92,3 +92,21 @@ fun postSealedNotice(
 fun cancelNotice(context: Context, id: Int) {
     runCatching { context.getSystemService(NotificationManager::class.java)?.cancel(id) }
 }
+
+/**
+ * A notification channel created at most once per process. Channels persist across runs, so after the first call there is nothing left to
+ * do: [ensure] runs its [create] the first time, and returns straight away every time after that.
+ */
+class ChannelOnce {
+    @Volatile private var done = false
+
+    fun ensure(create: () -> Unit) {
+        if (done) return
+        synchronized(this) {
+            if (!done) {
+                create()
+                done = true
+            }
+        }
+    }
+}

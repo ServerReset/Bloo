@@ -40,7 +40,7 @@ internal fun SeatConfigRow(label: String, heat: Boolean, cool: Boolean, onHeat: 
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         RevealText(label, Modifier.weight(1f), style = SecondaryTextStyle(), maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.width(GapRow))
-        ExpressiveButtonRow(spacing = GapRow) {
+        ExpressiveButtonGroup(spacing = GapRow) {
             MorphChip(selected = heat, onClick = { onHeat(!heat) }, label = "Heat")
             MorphChip(selected = cool, onClick = { onCool(!cool) }, label = "Cool")
         }

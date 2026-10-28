@@ -155,7 +155,7 @@ fun SafeExpansiveButton(
 ) {
     val rawPress by expressivePressFraction(interactionSource, enabled)
     val press = { rawPress }
-    // Inside an [ExpressiveButtonRow]/[ExpressiveButtonGroup] this button joins the group, which
+    // Inside an [ExpressiveButtonGroup] this button joins the group, which
     // takes the extra width off its NEIGHBOURS so the row's own footprint never changes.
     if (LocalExpressiveGroup.current) {
         Box(modifier.then(ExpressiveGroupData(press, groupWeight)), propagateMinConstraints = true) {

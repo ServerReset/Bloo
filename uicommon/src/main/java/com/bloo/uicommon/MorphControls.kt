@@ -55,7 +55,7 @@ fun MorphChip(selected: Boolean, onClick: () -> Unit, label: String, modifier: M
     val haptics = LocalHaptics.current
     val chipSelected = selected
     // Wrapped like every other button so a chip presses the same way (takes width from neighbours
-    // in an ExpressiveButtonRow, grows on its own).
+    // in an ExpressiveButtonGroup, grows on its own).
     val chipSource = remember { MutableInteractionSource() }
     SafeExpansiveButton(interactionSource = chipSource, enabled = true) {
     // The same MorphButton as everywhere: pill when idle, primary fill + rounded box when selected,

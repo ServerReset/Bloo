@@ -28,7 +28,7 @@ class ButtonGroupBesideLabelTest {
             BlooTheme {
                 Row(Modifier.width(380.dp)) {
                     Text("Activity log, 125 lines", Modifier.weight(1f).testTag("label"))
-                    ExpressiveButtonRow(spacing = 8.dp) {
+                    ExpressiveButtonGroup(spacing = 8.dp) {
                         MorphTextButton("Copy", onClick = {}, modifier = Modifier.testTag("copy"))
                         MorphTextButton("Clear", onClick = {}, modifier = Modifier.testTag("clear"))
                     }

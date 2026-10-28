@@ -42,7 +42,7 @@ class ButtonGroupLayoutTest {
         rule.setContent {
             BlooTheme {
                 Box(Modifier.width(rowWidth)) {
-                    ExpressiveButtonRow(Modifier.fillMaxWidth(), spacing = 8.dp) {
+                    ExpressiveButtonGroup(Modifier.fillMaxWidth(), spacing = 8.dp) {
                         labels.forEachIndexed { i, label ->
                             MorphTextButton(label, onClick = {}, modifier = Modifier.testTag("b$i"), showIcon = false)
                         }
@@ -70,7 +70,7 @@ class ButtonGroupLayoutTest {
         rule.setContent {
             BlooTheme {
                 Box(Modifier.width(rowWidth)) {
-                    ExpressiveButtonRow(Modifier.fillMaxWidth(), spacing = 8.dp) {
+                    ExpressiveButtonGroup(Modifier.fillMaxWidth(), spacing = 8.dp) {
                         MorphTextButton("Sync now", onClick = {}, modifier = Modifier.testTag("lone"), showIcon = false)
                     }
                 }
@@ -97,7 +97,7 @@ class ButtonGroupLayoutTest {
             BlooTheme {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     Box(Modifier.width(rowWidth)) {
-                        ExpressiveButtonRow(Modifier.fillMaxWidth(), spacing = 8.dp) {
+                        ExpressiveButtonGroup(Modifier.fillMaxWidth(), spacing = 8.dp) {
                             MorphTextButton("Sync now", onClick = {}, modifier = Modifier.testTag("lone"), showIcon = false)
                         }
                     }

@@ -142,7 +142,7 @@ private fun CollapsedPebblesControl(v: Vehicle, state: UiState, vm: AppViewModel
     val open = sections.count { state.isPebbleExpanded(v.vin, it) }
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         StatusRow("Open pebbles", "$open of ${sections.size}")
-        ExpressiveButtonRow(spacing = GapRow) {
+        ExpressiveButtonGroup(spacing = GapRow) {
             MorphTextButton("Collapse all", onClick = {
                 sections.filter { state.isPebbleExpanded(v.vin, it) }.forEach { vm.togglePebble(v, it) }
             })
@@ -167,7 +167,7 @@ private fun CarPhotoControl(v: Vehicle, state: UiState, vm: AppViewModel) {
 @Composable
 internal fun CarPhotoButtons(hasPhoto: Boolean, onPick: () -> Unit, onClear: () -> Unit) {
     // A group, not a plain Row: the buttons share the row's width and press against each other.
-    ExpressiveButtonRow(spacing = GapRow) {
+    ExpressiveButtonGroup(spacing = GapRow) {
         MorphTextButton(if (hasPhoto) "Change photo" else "Choose photo", onClick = onPick)
         if (hasPhoto) MorphTextButton("Clear", onClick = onClear, emphasis = ButtonEmphasis.Deny)
     }

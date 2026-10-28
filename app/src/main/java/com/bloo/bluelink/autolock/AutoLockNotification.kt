@@ -1,5 +1,6 @@
 package com.bloo.bluelink.autolock
 
+import com.bloo.bluelink.data.ChannelOnce
 import com.bloo.bluelink.data.clearsAfterAWhile
 import android.app.Notification
 import android.app.NotificationManager
@@ -19,19 +20,9 @@ object AutoLockNotification {
      *  user can hide its shade entry while keeping AutoLock's background watcher alive. */
     internal const val CHANNEL_ID = "bloo_autolock"
 
-    // build() is called on every state transition of a live evaluation -- once a second for
-    // however long the grace countdown runs, up to the configured max of 120. Without this
-    // flag, ensureNotificationChannel's own existence check is a Binder IPC call to
-    // NotificationManagerService, repeated every single one of those ticks, to re-confirm a
-    // channel that (after the very first call in this process's life) is certain to already
-    // exist -- channels persist across app runs, not just within one. @Volatile: build() can
-    // be called from AutoLockService's Main-dispatcher coroutine and, via a "Simulate
-    // leaving" test, potentially interleaved calls -- a plain var risked two threads both
-    // observing false and both paying for the (harmless but pointless) double IPC once.
-    @Volatile private var channelEnsured = false
+    private val channel = ChannelOnce()
 
-    private fun ensureChannel(context: Context) {
-        if (channelEnsured) return
+    private fun ensureChannel(context: Context) = channel.ensure {
         ensureNotificationChannel(
             context,
             id = CHANNEL_ID,
@@ -40,7 +31,6 @@ object AutoLockNotification {
             description = "Shows while AutoLock is deciding whether to lock your car",
             showBadge = false,
         )
-        channelEnsured = true
     }
 
     fun notificationId(vin: String): Int = 0x41_0000 or (vin.hashCode() and 0xFFFF)

@@ -88,13 +88,13 @@ internal fun rememberShowMyLocation(
 
 /**
  * The buttons under a map: one action button per [MapFeature], in the same row the car info pebble
- * uses ([ExpressiveButtonRow] of [MorphActionButton]s) -- the app's standard labelled-button row.
+ * uses ([ExpressiveButtonGroup] of [MorphActionButton]s) -- the app's standard labelled-button row.
  */
 @Composable
 internal fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modifier) {
     Box(modifier.padding(horizontal = GapGroup, vertical = GapRow)) {
         // Never wraps onto a second line: when the labels do not fit, the buttons drop to their icons.
-        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow, wrap = false) {
+        ExpressiveButtonGroup(modifier = Modifier.fillMaxWidth(), spacing = GapRow, wrap = false) {
             features.forEach { feature ->
                 MorphActionButton(
                     label = feature.label, icon = feature.icon, onClick = feature.onClick, enabled = feature.enabled,
