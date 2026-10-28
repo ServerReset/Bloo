@@ -3,6 +3,7 @@ package com.bloo.bluelink.work
 import android.content.Context
 import androidx.core.content.edit
 import com.bloo.bluelink.data.DeviceStatus
+import com.bloo.bluelink.data.privatePrefs
 
 /**
  * The periodic workers are scheduled once at a fixed interval, so the device's lean mode (see
@@ -12,7 +13,7 @@ import com.bloo.bluelink.data.DeviceStatus
  */
 internal fun skipWhenLean(context: Context, name: String, baseIntervalMs: Long): Boolean {
     val scale = DeviceStatus.policy(context).pollIntervalMultiplier
-    val prefs = context.applicationContext.getSharedPreferences("bloo_lean_runs", Context.MODE_PRIVATE)
+    val prefs = context.privatePrefs("bloo_lean_runs")
     val now = System.currentTimeMillis()
     val last = prefs.getLong(name, 0L)
     // A few minutes of slack: WorkManager runs periodic work flexibly, not on the dot.

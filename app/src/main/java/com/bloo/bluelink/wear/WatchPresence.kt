@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.content.edit
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WatchSyncProtocol
+import com.bloo.bluelink.data.privatePrefs
 import com.bloo.bluelink.ioScope
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +43,7 @@ object WatchPresence {
     /** Last known answer, readable from a fresh process (a worker posting a notification) before
      *  the first [refresh] has come back. */
     fun appInstalled(context: Context): Boolean =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_APP, false)
+        context.privatePrefs(PREFS).getBoolean(KEY_APP, false)
 
     private const val PREFS = "bloo_watch_presence"
     private const val KEY_APP = "app_installed"
@@ -57,7 +58,7 @@ object WatchPresence {
                 .addOnSuccessListener { info ->
                     val present = info.nodes.isNotEmpty()
                     _hasApp.value = present
-                    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+                    app.privatePrefs(PREFS).edit {
                         putBoolean(KEY_APP, present)
                     }
                 }

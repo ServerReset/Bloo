@@ -19,8 +19,7 @@ object BootGate {
     private const val KEY_ENABLED = "enabled"
     private const val KEY_OPEN_BOOT = "open_boot"
 
-    private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = context.privatePrefs(PREFS)
 
     /** The system's reboot counter, or -1 when this device does not report one. */
     private fun bootCount(context: Context): Int =

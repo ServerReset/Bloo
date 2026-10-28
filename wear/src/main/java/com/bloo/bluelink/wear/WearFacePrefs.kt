@@ -2,6 +2,7 @@ package com.bloo.bluelink.wear
 
 import android.content.Context
 import androidx.core.content.edit
+import com.bloo.bluelink.data.privatePrefs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -14,7 +15,7 @@ object WearFacePrefs {
     val positions = listOf("Top left", "Top right", "Bottom left", "Bottom right")
 
     private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences("bloo_watch_face", Context.MODE_PRIVATE)
+        context.privatePrefs("bloo_watch_face")
 
     fun load(context: Context): List<String> = parse(prefs(context).getString("slots", null))
 

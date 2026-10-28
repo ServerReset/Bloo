@@ -2,6 +2,7 @@ package com.bloo.bluelink.ui
 
 import android.content.Context
 import androidx.core.content.edit
+import com.bloo.bluelink.data.privatePrefs
 
 /**
  * Tracks recently used commands for quick access in the search interface. Stores a list of command
@@ -15,7 +16,7 @@ internal class RecentCommandsTracker(private val context: Context) {
     }
 
     private val prefs by lazy {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        context.privatePrefs(PREF_NAME)
     }
 
     /** Get recently used commands as a list of command IDs, most recent first. */

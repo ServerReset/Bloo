@@ -4,6 +4,7 @@ import android.content.Context
 import com.bloo.bluelink.BuildConfig
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.privatePrefs
 import com.bloo.bluelink.data.setThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,8 +61,7 @@ internal object DebugSampleGarage {
         }.apply()
     }
 
-    private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = context.privatePrefs(PREFS)
 
     /**
      * Make sure a PIN record exists, so the lock screen has a keypad to draw.

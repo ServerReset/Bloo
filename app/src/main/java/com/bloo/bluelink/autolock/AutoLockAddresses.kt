@@ -2,6 +2,7 @@ package com.bloo.bluelink.autolock
 
 import android.content.Context
 import androidx.core.content.edit
+import com.bloo.bluelink.data.privatePrefs
 
 /**
  * A synchronous answer to "is this Bluetooth address one of our cars, and which one?".
@@ -26,8 +27,7 @@ import androidx.core.content.edit
 object AutoLockAddresses {
     private const val PREFS = "bloo_autolock_addresses"
 
-    private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = context.privatePrefs(PREFS)
 
     /**
      * Replace the mirror. Addresses are the keys, VINs the values; an empty map clears it. Called with

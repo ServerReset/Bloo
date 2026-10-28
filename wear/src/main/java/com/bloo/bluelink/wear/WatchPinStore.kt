@@ -3,6 +3,7 @@ package com.bloo.bluelink.wear
 import android.content.Context
 import android.os.SystemClock
 import androidx.core.content.edit
+import com.bloo.bluelink.data.privatePrefs
 import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.CredentialStore
@@ -36,7 +37,7 @@ class WatchPinStore(private val context: Context) {
 
     /** One-time move of the old plain SharedPreferences into the encrypted vault, then wiped. */
     private fun importOldPrefs() {
-        val old = context.applicationContext.getSharedPreferences("bloo_watch_pin", Context.MODE_PRIVATE)
+        val old = context.privatePrefs("bloo_watch_pin")
         if (old.all.isEmpty()) return
         vault.edit {
             old.getString(KEY_TIMING, null)?.let { put(K_TIMING, it) }

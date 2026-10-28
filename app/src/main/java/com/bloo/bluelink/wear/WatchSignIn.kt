@@ -8,6 +8,7 @@ import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.WatchCredentialBundle
 import com.bloo.bluelink.data.WatchCredentialTransfer
 import com.bloo.bluelink.data.WatchSyncProtocol
+import com.bloo.bluelink.data.privatePrefs
 import com.bloo.bluelink.ioScope
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.delay
@@ -47,11 +48,11 @@ object WatchSignIn {
 
     /** Whether the watch with [nodeId] has acknowledged a sign-in from this phone (kept across launches). */
     fun isSignedIn(context: Context, nodeId: String): Boolean =
-        context.applicationContext.getSharedPreferences(SIGNED_IN_PREFS, Context.MODE_PRIVATE)
+        context.privatePrefs(SIGNED_IN_PREFS)
             .getStringSet(KEY_SIGNED_IN, emptySet()).orEmpty().contains(nodeId)
 
     private fun rememberSignedIn(context: Context, nodeId: String) {
-        val prefs = context.applicationContext.getSharedPreferences(SIGNED_IN_PREFS, Context.MODE_PRIVATE)
+        val prefs = context.privatePrefs(SIGNED_IN_PREFS)
         val nodes = prefs.getStringSet(KEY_SIGNED_IN, emptySet()).orEmpty()
         prefs.edit().putStringSet(KEY_SIGNED_IN, HashSet(nodes) + nodeId).apply()
     }

@@ -5,6 +5,7 @@ import androidx.core.content.edit
 import com.bloo.bluelink.data.DeviceStatus
 import com.bloo.bluelink.data.WatchLookPrefs
 import com.bloo.bluelink.data.WatchSyncProtocol
+import com.bloo.bluelink.data.privatePrefs
 import com.bloo.bluelink.ioScope
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.launch
@@ -19,7 +20,7 @@ import kotlinx.serialization.json.Json
  */
 internal object WearLook {
     private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences("bloo_watch_look", Context.MODE_PRIVATE)
+        context.privatePrefs("bloo_watch_look")
 
     /** The wearer's own "reduce effects" switch (blur, motion and animation off, as under Battery Saver). */
     fun reduceEffects(context: Context): Boolean = prefs(context).getBoolean("reduce_effects", false)

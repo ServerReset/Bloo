@@ -20,6 +20,7 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.chargeLeftLabel
 import com.bloo.bluelink.data.isStale
+import com.bloo.bluelink.data.privatePrefs
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.ioScope
 import com.google.common.util.concurrent.ListenableFuture
@@ -85,7 +86,7 @@ class BlooTileService : TileService() {
             .build()
     }
 
-    private fun tilePrefs() = applicationContext.getSharedPreferences("bloo_watch_tile", MODE_PRIVATE)
+    private fun tilePrefs() = applicationContext.privatePrefs("bloo_watch_tile")
 
     /**
      * Starts the refresh the hub asked for, without waiting for it: the tile answers at once showing "Updating..." (the flag

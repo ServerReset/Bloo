@@ -15,6 +15,7 @@ import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WatchPinPolicy
 import com.bloo.bluelink.data.ensureNotificationChannel
+import com.bloo.bluelink.data.privatePrefs
 import com.bloo.bluelink.ioScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -22,7 +23,7 @@ import kotlinx.serialization.json.Json
 
 /** Which watch notifications the user wants. Plain prefs: nothing here is secret. */
 class WearNotificationPrefs(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences("bloo_watch_notifications", Context.MODE_PRIVATE)
+    private val prefs = context.privatePrefs("bloo_watch_notifications")
 
     /** Take the phone's choices (it is the source of truth; see [WatchNotifyPrefs]). */
     fun apply(p: com.bloo.bluelink.data.WatchNotifyPrefs) {

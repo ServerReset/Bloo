@@ -3,6 +3,7 @@ package com.bloo.bluelink.wear
 import android.content.Context
 import androidx.core.content.edit
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.privatePrefs
 
 /**
  * Which car the tile shows: the one the app was last showing, so the tile and the face agree about the car and
@@ -13,7 +14,7 @@ internal object WearTileCar {
     private const val KEY = "vin"
 
     private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences("bloo_watch_tile", Context.MODE_PRIVATE)
+        context.privatePrefs("bloo_watch_tile")
 
     /** Remembers [vin]; true when that changed the choice (so the tile needs redrawing). */
     fun save(context: Context, vin: String): Boolean {

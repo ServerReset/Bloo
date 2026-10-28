@@ -5,6 +5,7 @@ import androidx.core.content.edit
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.climatePresetDetail
+import com.bloo.bluelink.data.privatePrefs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.builtins.ListSerializer
@@ -30,7 +31,7 @@ internal object WearPresets {
     @Volatile private var loaded = false
 
     private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences("bloo_watch_presets", Context.MODE_PRIVATE)
+        context.privatePrefs("bloo_watch_presets")
 
     /** Reads what was last stored, once per process (the tile runs without the app having opened). */
     fun ensureLoaded(context: Context) {

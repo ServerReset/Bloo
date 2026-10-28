@@ -11,6 +11,7 @@ import android.hardware.TriggerEventListener
 import android.os.SystemClock
 import androidx.core.content.edit
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.privatePrefs
 
 /**
  * The watch's own AutoLock -- **beta**.
@@ -36,8 +37,7 @@ object WearAutoLock {
     private const val PREFS = "bloo_wear_autolock"
     private const val KEY_ENABLED = "enabled"
 
-    private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = context.privatePrefs(PREFS)
 
     fun isEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
 
