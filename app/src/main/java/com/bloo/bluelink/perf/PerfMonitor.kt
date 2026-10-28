@@ -73,6 +73,8 @@ object PerfMonitor {
     private var probeJob: Job? = null
     private var device: Context? = null
     private var thermalListener: PowerManager.OnThermalStatusChangedListener? = null
+    /** The manager the listener was added to: removal has to go back to the same one. */
+    private var thermalPower: PowerManager? = null
     private var powerReceiver: BroadcastReceiver? = null
     private var lastBatteryBucket = -2
     private var lastCharging: Boolean? = null
@@ -137,6 +139,7 @@ object PerfMonitor {
                 event("thermal", "now ${PerfDevice.thermalName(power)} (status $status)")
             }
             thermalListener = l
+            thermalPower = power
             power.addThermalStatusListener(Executor { h.post(it) }, l)
         }
         val receiver = object : BroadcastReceiver() {
@@ -215,8 +218,10 @@ object PerfMonitor {
         windowTick?.let { handler?.removeCallbacks(it) }
         probeJob?.cancel()
         probeJob = null
-        thermalListener?.let { l -> (device?.getSystemService(PowerManager::class.java))?.removeThermalStatusListener(l) }
+        // Best effort: a listener the system no longer holds must not take the activity down with it.
+        thermalListener?.let { l -> runCatching { thermalPower?.removeThermalStatusListener(l) } }
         thermalListener = null
+        thermalPower = null
         powerReceiver?.let { r -> runCatching { device?.unregisterReceiver(r) } }
         powerReceiver = null
         event("uninstall")
