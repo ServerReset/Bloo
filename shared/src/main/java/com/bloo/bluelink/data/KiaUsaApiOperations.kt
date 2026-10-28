@@ -29,13 +29,7 @@ suspend fun KiaUsaApi.verifyOtpAndComplete(
     }
     // Exchange for the final session id.
     val finishReq = Request.Builder().url(API + "prof/authUser")
-        .post(
-            buildJsonObject {
-                put("deviceKey", deviceId)
-                put("deviceType", 2)
-                put("userCredential", buildJsonObject { put("userId", username); put("password", password) })
-            }.toString().toRequestBody(jsonMedia),
-        )
+        .post(KiaUsaApi.authUserBody(deviceId, username, password, withTnc = false))
         .apiHeaders(deviceId).header("sid", interimSid).header("rmtoken", rmtoken)
         .build()
     // The finish exchange can itself rotate the rmtoken; prefer a freshly-

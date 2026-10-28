@@ -56,6 +56,18 @@ class KiaUsaApi {
 
     internal val jsonMedia = "application/json;charset=utf-8".toMediaType()
 
+        /**
+         * The body of the authUser call: the device and the account's credentials. The first sign-in also says the terms were accepted, which
+         * the second, finishing call does not repeat.
+         */
+        internal fun authUserBody(deviceId: String, username: String, password: String, withTnc: Boolean): okhttp3.RequestBody =
+            buildJsonObject {
+                put("deviceKey", deviceId)
+                put("deviceType", 2)
+                put("userCredential", buildJsonObject { put("userId", username); put("password", password) })
+                if (withTnc) put("tncFlag", 1)
+            }.toString().toRequestBody(jsonMedia)
+
     internal val client: OkHttpClient get() = ApiHttp.client
 
     // --- Headers ---------------------------------------------------------
@@ -105,12 +117,7 @@ class KiaUsaApi {
     suspend fun authUser(
         username: String, password: String, deviceId: String, rmtoken: String?, pin: String?,
     ): KiaAuth = withContext(Dispatchers.IO) {
-        val body = buildJsonObject {
-            put("deviceKey", deviceId)
-            put("deviceType", 2)
-            put("userCredential", buildJsonObject { put("userId", username); put("password", password) })
-            put("tncFlag", 1)
-        }.toString().toRequestBody(jsonMedia)
+        val body = authUserBody(deviceId, username, password, withTnc = true)
         val req = Request.Builder().url(API + "prof/authUser").post(body).apiHeaders(deviceId)
             .apply { rmtoken?.let { header("rmtoken", it) } }
             .build()
