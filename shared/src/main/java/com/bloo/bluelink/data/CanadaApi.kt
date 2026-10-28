@@ -25,8 +25,8 @@ data class CanadaSession(
     val accessToken: String,
     val refreshToken: String?,
     val deviceId: String,
-    val pin: String?,
-)
+    override val pin: String?,
+) : PinnedSession
 
 /**
  * A Canada-account vehicle summary. [id] is the API's own `vehicleId`, sent back as the `vehicleId`

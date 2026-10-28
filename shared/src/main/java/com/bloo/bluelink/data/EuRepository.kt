@@ -3,30 +3,21 @@ package com.bloo.bluelink.data
 import com.bloo.bluelink.rethrowIfCancellation
 
 /**
- * [VehicleRepository] for Hyundai Bluelink Europe (CCAPI / CCS2), served by
- * [EuApi]. Structurally identical to [CanadaRepository]:
- *  - Vehicle summaries are cached by VIN and refreshed on demand.
- *  - Every command needs a PIN-derived control token ([EuApi.controlToken]),
- *    cached here per VIN and re-fetched on a 401 (the EU analogue of Canada's
- *    `pAuth`).
- *  - A dead session (401/403) is re-authenticated silently: first with the
- *    stored refresh token, then, if that fails, by replaying the password login
- *    (Europe has no OTP step, so this is a clean single call).
+ * [VehicleRepository] for Hyundai Bluelink Europe (CCAPI / CCS2), served by [EuApi]. The shared account, control-token and session plumbing is
+ * in [ControlledAccountRepository]. A dead session is first refreshed with the stored refresh token and, failing that, renewed by replaying
+ * the password login (Europe has no OTP step, so this is a clean single call).
  */
 class EuRepository(
     private val api: EuApi,
-    private val store: SessionStore,
-    private val brand: Brand,
+    store: SessionStore,
+    brand: Brand,
     private val credentialStore: CredentialStore,
-) : VehicleRepository {
-    private val summaries = SummaryCache<EuVehicleSummary>()
-    private val controlTokens = java.util.concurrent.ConcurrentHashMap<String, String>()
+) : ControlledAccountRepository<EuSession, EuVehicleSummary>(store, brand) {
 
     // --- Sign-in -------------------------------------------------------------
 
     /**
-     * Europe sign-in: register the device (once, to obtain the stable
-     * ccsp-device-id all authenticated calls carry), then OAuth2 with the
+     * Europe sign-in: register the device (once, to obtain the stable ccsp-device-id all authenticated calls carry), then OAuth2 with the
      * account email + password, and persist the session + credentials. No OTP.
      */
     suspend fun login(username: String, password: String, pin: String) {
@@ -47,15 +38,7 @@ class EuRepository(
         )
     }
 
-    override suspend fun logout() {
-        summaries.clear()
-        controlTokens.clear()
-        store.clear(brand)
-    }
-
     // --- Vehicles / status ---------------------------------------------------
-
-    override suspend fun vehicles(): List<Vehicle> = withSession { s -> fetchSummaries(s).map { it.toVehicle(brand) } }
 
     override suspend fun status(v: Vehicle, refresh: Boolean): VehicleStatus? = withSession { s ->
         api.status(s, summaryFor(s, v), refresh)
@@ -77,8 +60,8 @@ class EuRepository(
     override suspend fun stopClimate(v: Vehicle) =
         withCommandAuth(v) { s, summary, token -> api.stopClimate(s, summary, token) }
 
-    // Charge targets authenticate with the access token (not the PIN control
-    // token), so this goes through withSession rather than withCommandAuth.
+    // Charge targets authenticate with the access token (not the PIN control token), so this goes through withSession rather than
+    // withCommandAuth.
     override suspend fun setChargeTargets(v: Vehicle, acPercent: Int, dcPercent: Int) = withSession { s ->
         api.setChargeTargets(s, summaryFor(s, v), acPercent, dcPercent)
     }
@@ -89,13 +72,9 @@ class EuRepository(
     override suspend fun stopCharge(v: Vehicle) =
         withCommandAuth(v) { s, summary, token -> api.stopCharge(s, summary, token) }
 
-    // --- Plumbing ------------------------------------------------------------
+    // --- Brand plumbing ------------------------------------------------------
 
-    private suspend fun fetchSummaries(s: EuSession): List<EuVehicleSummary> = summaries.refresh { api.vehicles(s) }
-
-    private suspend fun summaryFor(s: EuSession, v: Vehicle): EuVehicleSummary = summaries.require(v.vin) { api.vehicles(s) }
-
-    private fun SessionStore.Session.toEu() =
+    override fun SessionStore.Session.toSession() =
         EuSession(
             accessToken, refreshToken, deviceId ?: EuApi.newDeviceId(), pin,
             // The OneApp/CCI token set a refresh needs. It used to be dropped here (and never saved below), so every
@@ -108,49 +87,26 @@ class EuRepository(
             idToken = idToken,
         )
 
-    /** Runs [block] with a fresh control token for [v], fetching it via
-     *  [EuApi.controlToken] if not cached, and retrying once with a freshly
-     *  minted token if the command itself 401s (an expired control token,
-     *  distinct from an expired session - [withSession] handles that below). */
-    private suspend fun <T> withCommandAuth(
-        v: Vehicle, block: suspend (EuSession, EuVehicleSummary, String) -> T,
-    ): T = withSession { s ->
-        val summary = summaryFor(s, v)
-        val pin = s.pin.orEmpty()
-        controlTokenAuth(controlTokens, v.vin, mint = { api.controlToken(s, pin) }) { token ->
-            block(s, summary, token)
-        }
-    }
+    override suspend fun fetchVehicles(s: EuSession): List<EuVehicleSummary> = api.vehicles(s)
+
+    override suspend fun mintControlToken(s: EuSession, summary: EuVehicleSummary, pin: String): String =
+        api.controlToken(s, pin)
 
     /**
-     * Runs [block] with the saved Europe session. On a 401/403, refreshes the
-     * access token via the stored refresh token (a cheap, password-free exchange
-     * the CCAPI supports - unlike Canada) and retries once. If the refresh itself
-     * fails, falls back to replaying the stored-credentials password login before
-     * giving up with "sign in again". Control tokens are dropped on reauth since
-     * they were bound to the now-dead session.
+     * Only a genuine token or device expiry (EuApi maps those to 401) triggers a silent refresh. A bare 403 or a business error like
+     * "Duplicate request" is terminal here - retrying it would just refresh or duplicate the command.
      */
-    private suspend fun <T> withSession(block: suspend (EuSession) -> T): T {
-        val stored = store.load(brand) ?: throw BlueLinkException("Not logged in")
-        return withReauthOnce(
-            stored.toEu(),
-            // Only a genuine token/device expiry (EuApi maps those to 401) triggers a silent refresh. A bare 403 or a business error
-            // like "Duplicate request" is terminal here - retrying it would just refresh/duplicate.
-            isAuthFailure = { it.code == 401 },
-            reauthenticate = { e -> renewSession(stored, e) },
-            block = block,
-        )
-    }
+    override fun isSessionFailure(e: BlueLinkException): Boolean = e.code == 401
 
     /** Refreshes the token, falling back to a full re-login, and saves the result in place of the expired session. */
-    private suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): EuSession {
+    override suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): EuSession {
         AppLog.log("${brand.label} session expired; refreshing")
-        val refreshed = runCatching { api.refresh(stored.toEu()) }.onFailure { rethrowIfCancellation(it) }.getOrNull()
+        val refreshed = runCatching { api.refresh(stored.toSession()) }.onFailure { rethrowIfCancellation(it) }.getOrNull()
         val session = refreshed ?: reLogin() ?: throw BlueLinkException(
             "Session expired - please sign out and sign in again", code = e.code,
         )
         save(session, stored.username, stored.pin)
-        controlTokens.clear()
+        clearControlTokens()
         return session
     }
 

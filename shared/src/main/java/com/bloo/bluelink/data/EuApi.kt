@@ -29,7 +29,7 @@ data class EuSession(
     val accessToken: String,
     val refreshToken: String?,
     val deviceId: String,
-    val pin: String?,
+    override val pin: String?,
     // --- OneApp/CCI token set (Hyundai EU) ---
     // Hyundai's WAF now blocks the legacy IDPConnect authorize/signin by client_id, so
     // sign-in goes through the OneApp client_id + cci-api-eu.hyundai.com, which mint a
@@ -42,7 +42,7 @@ data class EuSession(
     val nonCcsToken: String? = null,
     val nonCcsRefreshToken: String? = null,
     val idToken: String? = null,
-)
+) : PinnedSession
 
 data class EuVehicleSummary(
     override val id: String,

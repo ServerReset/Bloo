@@ -2,16 +2,13 @@ package com.bloo.bluelink.data
 
 import com.bloo.bluelink.rethrowIfCancellation
 
-/** [VehicleRepository] for Hyundai/Genesis/Kia Canada. */
+/** [VehicleRepository] for Hyundai/Genesis/Kia Canada. The shared account, control-token and session plumbing is in [ControlledAccountRepository]. */
 class CanadaRepository(
     private val api: CanadaApi,
-    private val store: SessionStore,
-    private val brand: Brand,
+    store: SessionStore,
+    brand: Brand,
     private val credentialStore: CredentialStore,
-) : VehicleRepository {
-    private val summaries = SummaryCache<CanadaVehicleSummary>()
-    private val pAuths = java.util.concurrent.ConcurrentHashMap<String, String>()
-
+) : ControlledAccountRepository<CanadaSession, CanadaVehicleSummary>(store, brand) {
     /**
      * Device id + pending OTP state carried between the password step and the OTP steps (mirrors
      * KiaRepository's pendingDeviceId).
@@ -51,15 +48,7 @@ class CanadaRepository(
         store.saveLogin(session.accessToken, session.refreshToken, session.deviceId, username, pin, brand)
     }
 
-    override suspend fun logout() {
-        summaries.clear()
-        pAuths.clear()
-        store.clear(brand)
-    }
-
     // --- Vehicles / status ---------------------------------------------------
-
-    override suspend fun vehicles(): List<Vehicle> = withSession { s -> fetchSummaries(s).map { it.toVehicle(brand) } }
 
     override suspend fun status(v: Vehicle, refresh: Boolean): VehicleStatus? = withSession { s ->
         api.status(s, summaryFor(s, v), refresh)
@@ -90,44 +79,24 @@ class CanadaRepository(
     override suspend fun stopCharge(v: Vehicle) =
         withCommandAuth(v) { s, summary, pAuth -> api.stopCharge(s, summary, pAuth) }
 
-    // --- Plumbing --------------------------------------------------------
+    // --- Brand plumbing ------------------------------------------------------
 
-    private suspend fun fetchSummaries(s: CanadaSession): List<CanadaVehicleSummary> = summaries.refresh { api.vehicles(s) }
-
-    private suspend fun summaryFor(s: CanadaSession, v: Vehicle): CanadaVehicleSummary = summaries.require(v.vin) { api.vehicles(s) }
-
-    private fun SessionStore.Session.toCanada() =
+    override fun SessionStore.Session.toSession() =
         CanadaSession(accessToken, refreshToken, deviceId ?: CanadaApi.newDeviceId(), pin)
 
+    override suspend fun fetchVehicles(s: CanadaSession): List<CanadaVehicleSummary> = api.vehicles(s)
+
+    override suspend fun mintControlToken(s: CanadaSession, summary: CanadaVehicleSummary, pin: String): String =
+        api.pinAuth(s, summary.id, pin)
+
+    /** A 401 or 403 means the Canada session has expired. */
+    override fun isSessionFailure(e: BlueLinkException): Boolean = e.isUnauthorized()
+
     /**
-     * Runs [block] with a fresh PIN-derived `pAuth` for [v], fetching it via [CanadaApi.pinAuth] if
-     * not already cached, and retrying once with a freshly-fetched pAuth if the command itself 401s
-     * (an expired/rotated pAuth, distinct from an expired session -- [withSession] handles that
-     * case one layer down).
+     * A fresh session from the stored credentials, saved in place of the expired one. The control tokens were minted for the dead session,
+     * so they go too.
      */
-    private suspend fun <T> withCommandAuth(
-        v: Vehicle, block: suspend (CanadaSession, CanadaVehicleSummary, String) -> T,
-    ): T = withSession { s ->
-        val summary = summaryFor(s, v)
-        val pin = s.pin.orEmpty()
-        controlTokenAuth(pAuths, v.vin, mint = { api.pinAuth(s, summary.id, pin) }) { pAuth ->
-            block(s, summary, pAuth)
-        }
-    }
-
-    /** Runs [block] with the saved Canada session, re-logging in once with the stored credentials if it has expired. */
-    private suspend fun <T> withSession(block: suspend (CanadaSession) -> T): T {
-        val stored = store.load(brand) ?: throw BlueLinkException("Not logged in")
-        return withReauthOnce(
-            stored.toCanada(),
-            isAuthFailure = { it.isUnauthorized() },
-            reauthenticate = { e -> renewSession(stored, e) },
-            block = block,
-        )
-    }
-
-    /** A fresh session from the stored credentials, saved in place of the expired one. */
-    private suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): CanadaSession {
+    override suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): CanadaSession {
         val creds = credentialStore.load(brand)
             ?: throw BlueLinkException("Session expired - please sign in again", code = e.code)
         AppLog.log("${brand.label} session expired; re-authenticating silently")
@@ -139,7 +108,7 @@ class CanadaRepository(
         }
         save(auth.session, creds.email, stored.pin)
         val fresh = store.load(brand) ?: throw e
-        pAuths.clear()
-        return fresh.toCanada()
+        clearControlTokens()
+        return fresh.toSession()
     }
 }
