@@ -115,8 +115,8 @@ class AlertActionReceiver : BroadcastReceiver() {
 
         /** Fired by the live charging bar's own deleteIntent when the user dismisses it. */
         const val ACTION_LIVE_CHARGE_DISMISSED = "com.bloo.bluelink.LIVE_CHARGE_DISMISSED"
-        const val EXTRA_VIN = "vin"
-        const val EXTRA_ACTION = "action"
+        const val EXTRA_VIN = IntentExtras.VIN
+        const val EXTRA_ACTION = IntentExtras.ACTION
         const val EXTRA_NOTIF_ID = "notif_id"
 
         /** Optional: id for the "sent"/"failed" confirmation, when it must NOT reuse

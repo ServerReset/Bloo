@@ -1,5 +1,9 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.wear.TilePalette.WHITE
+import com.bloo.bluelink.wear.TilePalette.MUTED
+import com.bloo.bluelink.wear.TilePalette.RIM
+import com.bloo.bluelink.wear.TilePalette.BUTTON
 import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.wear.protolayout.LayoutElementBuilders.LayoutElement
 import androidx.wear.protolayout.ResourceBuilders
@@ -135,10 +139,6 @@ class BlooClimateTileService : TileService() {
         const val ROW_HEIGHT = 46f
         const val ROW_GAP = 6f
         const val ROW_WIDTH_FRACTION = 0.64f
-        const val WHITE = 0xFFFFFFFF.toInt()
-        const val MUTED = 0xFFB8B8C4.toInt()
-        const val RIM = 0x33FFFFFF
-        const val BUTTON = 0xFF2A2A33.toInt()
         /** The colour of what is on: the phone's accent once it has sent one, else the brand's (as the main tile). */
         val ACTIVE: Int get() = WearAccent.accent.value?.primary ?: BlooColors.brandAccent
     }

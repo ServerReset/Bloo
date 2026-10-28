@@ -210,7 +210,7 @@ class WearActionReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val EXTRA_VIN = "vin"
-        const val EXTRA_ACTION = "action"
+        const val EXTRA_VIN = com.bloo.bluelink.data.IntentExtras.VIN
+        const val EXTRA_ACTION = com.bloo.bluelink.data.IntentExtras.ACTION
     }
 }

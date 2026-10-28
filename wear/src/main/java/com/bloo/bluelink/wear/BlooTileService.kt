@@ -1,5 +1,9 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.wear.TilePalette.WHITE
+import com.bloo.bluelink.wear.TilePalette.MUTED
+import com.bloo.bluelink.wear.TilePalette.RIM
+import com.bloo.bluelink.wear.TilePalette.BUTTON
 import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
@@ -337,11 +341,7 @@ class BlooTileService : TileService() {
             "bolt" to R.drawable.tile_bolt, "flash" to R.drawable.tile_flash, "refresh" to R.drawable.tile_refresh,
             "close" to R.drawable.tile_close, "horn" to R.drawable.tile_horn,
         )
-        const val WHITE = 0xFFFFFFFF.toInt()
-        const val MUTED = 0xFFB8B8C4.toInt()
-        const val RIM = 0x33FFFFFF
         const val BLACK = 0xFF000000.toInt()
-        const val BUTTON = 0xFF2A2A33.toInt()
         /** The ring's inset from the display's edge, and the gaps between quarters, matching the face (dp at 227dp). */
         const val RING_INSET = 13f
         /** The gap between two segments of the ring, in degrees (the round caps stand out past it, so it reads as a small space). */

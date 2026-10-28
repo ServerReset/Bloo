@@ -321,7 +321,7 @@ class AutoLockService : Service() {
         const val ACTION_LOCK_NOW = "com.bloo.bluelink.AUTOLOCK_LOCK_NOW"
         const val ACTION_START_WATCH = "com.bloo.bluelink.AUTOLOCK_START_WATCH"
         const val ACTION_STOP_WATCH = "com.bloo.bluelink.AUTOLOCK_STOP_WATCH"
-        const val EXTRA_VIN = "vin"
+        const val EXTRA_VIN = com.bloo.bluelink.data.IntentExtras.VIN
 
         /** Starts the notification wrapper for [vin] (Bluetooth disconnect / a manual
          *  "Simulate leaving" test from Settings). Best-effort: returns false when the OS
