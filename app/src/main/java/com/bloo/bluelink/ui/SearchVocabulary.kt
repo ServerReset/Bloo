@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarCommandIds
 import com.bloo.bluelink.data.CarLabels
 
 // --- Search vocabulary: stopwords, the synonym table and the token expander ---
@@ -44,15 +45,15 @@ internal val SearchSynonyms: Map<String, List<String>> = mapOf(
     "heater" to listOf("climate"),
     "cool" to listOf("climate"),
     "aircon" to listOf("climate"),
-    "defrost" to listOf("climate", "defog"),
+    CarCommandIds.DEFROST to listOf("climate", "defog"),
     "warm" to listOf("climate"),
     "preheat" to listOf("climate"),
     "seats" to listOf("seat"),
-    "doors" to listOf("lock", "door"),
-    "alarm" to listOf("horn"),
-    "beep" to listOf("horn"),
-    "flash" to listOf("lights"),
-    "headlights" to listOf("lights"),
+    "doors" to listOf(CarCommandIds.LOCK, "door"),
+    "alarm" to listOf(CarCommandIds.HORN),
+    "beep" to listOf(CarCommandIds.HORN),
+    "flash" to listOf(CarCommandIds.LIGHTS),
+    "headlights" to listOf(CarCommandIds.LIGHTS),
     "backup" to listOf("sync", "drive", "google"),
     "cloud" to listOf("sync", "drive"),
     "notify" to listOf("notification", "alert"),
@@ -108,8 +109,8 @@ internal val SearchSynonyms: Map<String, List<String>> = mapOf(
     "temperature" to listOf("climate", "unit"),
     "kilometers" to listOf("odometer", "kilometres"),
     "bluetooth" to listOf("autolock"),
-    "grace" to listOf("autolock", "lock"),
-    "delay" to listOf("autolock", "lock", "minutes"),
+    "grace" to listOf("autolock", CarCommandIds.LOCK),
+    "delay" to listOf("autolock", CarCommandIds.LOCK, "minutes"),
     "minutes" to listOf("alert", "notification"),
     "watch" to listOf("wear", "notification"),
     "smartwatch" to listOf("watch"),
@@ -127,13 +128,13 @@ internal fun expandToken(t: String): List<String> {
 
 /** A runner command id as a sentence fragment, for the confirm card. */
 internal fun aiCommandLabel(cmd: String): String = when (cmd) {
-    "lock" -> "Lock"
-    "unlock" -> "Unlock"
-    "charge_on" -> CarLabels.START_CHARGING
-    "charge_off" -> CarLabels.STOP_CHARGING
-    "lights" -> "Flash the lights on"
-    "horn" -> "Sound the horn on"
-    "climate_on" -> "Start climate on"
-    "climate_off" -> "Stop climate on"
+    CarCommandIds.LOCK -> "Lock"
+    CarCommandIds.UNLOCK -> "Unlock"
+    CarCommandIds.CHARGE_ON -> CarLabels.START_CHARGING
+    CarCommandIds.CHARGE_OFF -> CarLabels.STOP_CHARGING
+    CarCommandIds.LIGHTS -> "Flash the lights on"
+    CarCommandIds.HORN -> "Sound the horn on"
+    CarCommandIds.CLIMATE_ON -> "Start climate on"
+    CarCommandIds.CLIMATE_OFF -> "Stop climate on"
     else -> "Run on"
 }

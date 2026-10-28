@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarCommandIds
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.Vehicle
@@ -31,37 +32,37 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
             ParsedVehicleCommand("open_app", label = "Opening the app for")
         // Unlock before lock: "unlock" contains "lock".
         RxUnlock.containsMatchIn(q) ->
-            ParsedVehicleCommand("unlock", label = "Unlocking")
+            ParsedVehicleCommand(CarCommandIds.UNLOCK, label = "Unlocking")
         RxLock.containsMatchIn(q) ->
-            ParsedVehicleCommand("lock", label = "Locking")
+            ParsedVehicleCommand(CarCommandIds.LOCK, label = "Locking")
         RxSmartClimate.containsMatchIn(q) ->
-            ParsedVehicleCommand("climate_on", "smart", "Starting smart climate for")
+            ParsedVehicleCommand(CarCommandIds.CLIMATE_ON, "smart", "Starting smart climate for")
         // Defrost is a start-climate request, matched before the generic stop/start patterns.
         wantsDefrost && !RxNegation.containsMatchIn(q) -> {
             val f = temp ?: CLIMATE_TEMP_RANGE_F.last
             ParsedVehicleCommand(
-                "climate_on",
+                CarCommandIds.CLIMATE_ON,
                 VehicleCommandRunner.TEMP_PREFIX + f + VehicleCommandRunner.DEFROST_SUFFIX,
                 "Defrosting",
             )
         }
         RxClimateOff
-            .containsMatchIn(q) -> ParsedVehicleCommand("climate_off", label = "Stopping climate for")
+            .containsMatchIn(q) -> ParsedVehicleCommand(CarCommandIds.CLIMATE_OFF, label = "Stopping climate for")
         RxClimateStart.containsMatchIn(q) ->
             if (temp != null) {
                 ParsedVehicleCommand(
-                    "climate_on",
+                    CarCommandIds.CLIMATE_ON,
                     VehicleCommandRunner.TEMP_PREFIX + temp,
                     "Starting climate at $tempLabel for",
                 )
             } else {
-                ParsedVehicleCommand("climate_on", "default", "Starting climate for")
+                ParsedVehicleCommand(CarCommandIds.CLIMATE_ON, "default", "Starting climate for")
             }
         // Bare "heat <car> to 80" / "cool <car> to 65" / "warm <car> to 70" -- no start/turn-on
         // prefix, no "up" -- the pattern above requires one of those, so a query that's just the
         // verb plus a target temperature fell through to "not a command" entirely.
         temp != null && RxHeatCoolVerb.containsMatchIn(q) ->
-            ParsedVehicleCommand("climate_on", VehicleCommandRunner.TEMP_PREFIX + temp, "Starting climate at $tempLabel for")
+            ParsedVehicleCommand(CarCommandIds.CLIMATE_ON, VehicleCommandRunner.TEMP_PREFIX + temp, "Starting climate at $tempLabel for")
         // Charge limit before charge start/stop: "set the charge limit to 80" contains "charg".
         RxChargeLimit
             .containsMatchIn(q) -> {
@@ -73,13 +74,13 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
             }
         }
         RxFlashLights.containsMatchIn(q) ->
-            ParsedVehicleCommand("lights", label = "Flashing lights on")
+            ParsedVehicleCommand(CarCommandIds.LIGHTS, label = "Flashing lights on")
         RxHorn.containsMatchIn(q) ->
-            ParsedVehicleCommand("horn", label = "Sounding horn on")
+            ParsedVehicleCommand(CarCommandIds.HORN, label = "Sounding horn on")
         RxChargeStop.containsMatchIn(q) ->
-            ParsedVehicleCommand("charge_off", label = "Stopping charge for")
+            ParsedVehicleCommand(CarCommandIds.CHARGE_OFF, label = "Stopping charge for")
         RxChargeStart
-            .containsMatchIn(q) -> ParsedVehicleCommand("charge_on", label = "Starting charge for")
+            .containsMatchIn(q) -> ParsedVehicleCommand(CarCommandIds.CHARGE_ON, label = "Starting charge for")
         else -> null
     }
 }

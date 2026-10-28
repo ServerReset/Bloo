@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarCommandIds
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AcUnit
@@ -43,24 +44,24 @@ internal data class CommandMetadata(
 internal val CommandCatalog = listOf(
     // LOCK COMMANDS
     CommandMetadata(
-        id = "lock", title = "Lock", description = "Lock the car doors", category = CommandCategory.LOCK,
+        id = CarCommandIds.LOCK, title = "Lock", description = "Lock the car doors", category = CommandCategory.LOCK,
         icon = AppIcons.Lock, keywords = "lock secure close",
         aliases = listOf("lock up", "lock the car", "secure the car"),
     ),
     CommandMetadata(
-        id = "unlock", title = "Unlock", description = "Unlock the car doors", category = CommandCategory.LOCK,
+        id = CarCommandIds.UNLOCK, title = "Unlock", description = "Unlock the car doors", category = CommandCategory.LOCK,
         icon = AppIcons.Lock, keywords = "unlock open let in",
         aliases = listOf("unlock the car", "open the car", "let me in"),
     ),
 
     // CHARGING COMMANDS
     CommandMetadata(
-        id = "charge_on", title = CarLabels.START_CHARGING, description = "Begin charging the battery",
+        id = CarCommandIds.CHARGE_ON, title = CarLabels.START_CHARGING, description = "Begin charging the battery",
         category = CommandCategory.CHARGING, icon = AppIcons.Bolt, keywords = "start charging begin charge on",
         aliases = listOf("start charge", "charge the car", "plug in"),
     ),
     CommandMetadata(
-        id = "charge_off", title = CarLabels.STOP_CHARGING, description = "Stop the battery charging",
+        id = CarCommandIds.CHARGE_OFF, title = CarLabels.STOP_CHARGING, description = "Stop the battery charging",
         category = CommandCategory.CHARGING, icon = AppIcons.Bolt, keywords = "stop charging end unplug halt",
         aliases = listOf("stop charge", "unplug the car", "cancel charging"),
     ),
@@ -72,7 +73,7 @@ internal val CommandCatalog = listOf(
 
     // CLIMATE COMMANDS
     CommandMetadata(
-        id = "climate_on",
+        id = CarCommandIds.CLIMATE_ON,
         title = CarLabels.START_CLIMATE,
         description = "Start the climate control system",
         category = CommandCategory.CLIMATE,
@@ -84,17 +85,17 @@ internal val CommandCatalog = listOf(
         ),
     ),
     CommandMetadata(
-        id = "climate_off", title = CarLabels.STOP_CLIMATE, description = "Stop the climate control",
+        id = CarCommandIds.CLIMATE_OFF, title = CarLabels.STOP_CLIMATE, description = "Stop the climate control",
         category = CommandCategory.CLIMATE, icon = Icons.Filled.AcUnit, keywords = "stop climate ac heat cool off",
         aliases = listOf("stop ac", "turn off climate", "turn off heat"),
     ),
     CommandMetadata(
-        id = "climate_smart", title = CarLabels.SMART_CLIMATE, description = "Start climate based on current weather",
+        id = CarCommandIds.CLIMATE_SMART, title = CarLabels.SMART_CLIMATE, description = "Start climate based on current weather",
         category = CommandCategory.CLIMATE, icon = Icons.Filled.AcUnit, keywords = "smart climate smart ac",
         aliases = listOf("start smart climate", "smart climate on"),
     ),
     CommandMetadata(
-        id = "defrost", title = "Defrost", description = "Clear windows and defrost the windscreen",
+        id = CarCommandIds.DEFROST, title = "Defrost", description = "Clear windows and defrost the windscreen",
         category = CommandCategory.CLIMATE, icon = Icons.Filled.AcUnit,
         keywords = "defrost demist clear windscreen deice",
         aliases = listOf("defog windows", "clear ice", "defog the car"),
@@ -102,14 +103,14 @@ internal val CommandCatalog = listOf(
 
     // LIGHTS COMMANDS
     CommandMetadata(
-        id = "lights", title = CarLabels.FLASH_LIGHTS, description = "Flash the headlights",
+        id = CarCommandIds.LIGHTS, title = CarLabels.FLASH_LIGHTS, description = "Flash the headlights",
         category = CommandCategory.LIGHTS, icon = Icons.AutoMirrored.Filled.VolumeUp,
         keywords = "flash lights blink headlights", aliases = listOf("flash headlights", "blink lights", "lights on"),
     ),
 
     // HORN COMMANDS
     CommandMetadata(
-        id = "horn", title = "Sound horn", description = "Sound the car horn and flash lights",
+        id = CarCommandIds.HORN, title = "Sound horn", description = "Sound the car horn and flash lights",
         category = CommandCategory.HORN, icon = Icons.AutoMirrored.Filled.VolumeUp, keywords = "horn honk beep sound",
         aliases = listOf("honk", "beep", "find my car"),
     ),

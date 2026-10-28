@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarCommandIds
 import android.app.Application
 import androidx.core.net.toUri
 import androidx.lifecycle.viewModelScope
@@ -53,9 +54,9 @@ internal fun AppViewModel.tryRunPendingShortcut() {
                 startClimate(v, ClimateRequest(tempF = DEFAULT_CLIMATE_TEMP_F, defrost = false, durationMinutes = DEFAULT_CLIMATE_DURATION_MIN))
             }
         }
-        "lock" -> lock(v)
-        "unlock" -> unlock(v)
-        "locate" -> locate(v)
+        CarCommandIds.LOCK -> lock(v)
+        CarCommandIds.UNLOCK -> unlock(v)
+        CarCommandIds.LOCATE -> locate(v)
         "bluelink" -> openOemApp(v)
         // "open" just selects the car (done above).
     }

@@ -5,6 +5,7 @@ package com.bloo.bluelink.ui
  * and its supporting pieces: CarMap, weatherIcon/weatherTint and the openUrl/openApp/dial launchers.
  */
 
+import com.bloo.bluelink.data.CarCommandIds
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.semantics.semantics
@@ -133,7 +134,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     } else {
         state.placeNames[v.vin]
     }
-    val locating = state.isPending(v.vin, "locate")
+    val locating = state.isPending(v.vin, CarCommandIds.LOCATE)
     // Show the place name (or a hint) in the header so it's visible even collapsed.
     val summary = place ?: if (location != null) "Located" else "Not located yet"
     Pebble(

@@ -21,14 +21,14 @@ object CarLabels {
  */
 object CarAction {
     const val TOGGLE_LOCK = "toggle_lock"
-    const val LOCK = "lock"
-    const val UNLOCK = "unlock"
+    const val LOCK = CarCommandIds.LOCK
+    const val UNLOCK = CarCommandIds.UNLOCK
     const val TOGGLE_CLIMATE = "toggle_climate"
-    const val CLIMATE_ON = "climate_on"
-    const val CLIMATE_OFF = "climate_off"
+    const val CLIMATE_ON = CarCommandIds.CLIMATE_ON
+    const val CLIMATE_OFF = CarCommandIds.CLIMATE_OFF
     const val TOGGLE_CHARGE = "toggle_charge"
-    const val CHARGE_ON = "charge_on"
-    const val CHARGE_OFF = "charge_off"
+    const val CHARGE_ON = CarCommandIds.CHARGE_ON
+    const val CHARGE_OFF = CarCommandIds.CHARGE_OFF
 
     /**
      * Flash the hazard lights, or flash + sound the horn. Hyundai/Genesis only (see
@@ -41,7 +41,7 @@ object CarAction {
      * Start climate at the temperature the weather at the car calls for (see [smartClimateTargetF]); a second press while
      * it is running stops it. Needs the car's location and a weather reading, so it fails plainly without them.
      */
-    const val CLIMATE_SMART = "climate_smart"
+    const val CLIMATE_SMART = CarCommandIds.CLIMATE_SMART
 
     /** Apply the AC/DC charge-limit targets in [CarCommand.acLimit]/[CarCommand.dcLimit]. */
     const val SET_CHARGE_LIMITS = "set_charge_limits"

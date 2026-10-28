@@ -93,9 +93,9 @@ internal fun KiaUsaApi.parseStatus(info: JsonObject): VehicleStatus {
         doorLock = vs.path("doorLock").flag(),
         airCtrlOn = climate.path("airCtrl").flag(),
         engine = vs.path("engine").flag(),
-        defrost = climate.path("defrost").flag(),
+        defrost = climate.path(CarCommandIds.DEFROST).flag(),
         hoodOpen = doors.path("hood").flag(),
-        trunkOpen = doors.path("trunk").flag(),
+        trunkOpen = doors.path(CarCommandIds.TRUNK).flag(),
         doorOpen = DoorOpen(
             frontLeft = doors.path("frontLeft").int(), frontRight = doors.path("frontRight").int(),
             backLeft = doors.path("backLeft").int(), backRight = doors.path("backRight").int(),
@@ -149,7 +149,7 @@ suspend fun KiaUsaApi.startClimate(session: KiaSession, v: KiaVehicleSummary, re
         put("remoteClimate", buildJsonObject {
             put("airTemp", buildJsonObject { put("unit", 1); put("value", tempValue) })
             put("airCtrl", true)
-            put("defrost", req.defrost)
+            put(CarCommandIds.DEFROST, req.defrost)
             put("heatingAccessory", buildJsonObject {
                 put("rearWindow", if (req.defrost) 1 else 0)
                 put("sideMirror", if (req.defrost) 1 else 0)

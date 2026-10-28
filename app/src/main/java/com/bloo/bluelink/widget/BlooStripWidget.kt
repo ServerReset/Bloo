@@ -1,5 +1,6 @@
 package com.bloo.bluelink.widget
 
+import com.bloo.bluelink.data.CarCommandIds
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.setValue
@@ -42,7 +43,7 @@ import com.bloo.bluelink.data.stateLineOrParked
 
 /** A button the strip can carry, in the order the settings chose; the narrower the strip, the fewer from the front it keeps. */
 internal enum class StripControl(val key: String, val label: String, val action: String) {
-    LOCK("lock", "Lock", CarAction.TOGGLE_LOCK),
+    LOCK(CarCommandIds.LOCK, "Lock", CarAction.TOGGLE_LOCK),
     CLIMATE("climate", "Climate", CarAction.TOGGLE_CLIMATE),
     CHARGE("charge", "Charge", CarAction.TOGGLE_CHARGE),
     FLASH("flash", "Flash", CarAction.FLASH_LIGHTS);

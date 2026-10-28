@@ -50,21 +50,21 @@ object VehicleCommandRunner {
                     "doors" ->
                         if (snap.locked == true) { repo.unlock(v); "Unlocking ${v.name}" }
                         else { repo.lock(v); "Locking ${v.name}" }
-                    "lock" -> { repo.lock(v); "Locking ${v.name}" }
-                    "unlock" -> { repo.unlock(v); "Unlocking ${v.name}" }
+                    CarCommandIds.LOCK -> { repo.lock(v); "Locking ${v.name}" }
+                    CarCommandIds.UNLOCK -> { repo.unlock(v); "Unlocking ${v.name}" }
                     "charge" ->
                         if (snap.charging == true) { repo.stopCharge(v); "Stopping charge" }
                         else { repo.startCharge(v); "Starting charge" }
-                    "charge_on" -> { repo.startCharge(v); "Starting charge" }
-                    "charge_off" -> { repo.stopCharge(v); "Stopping charge" }
+                    CarCommandIds.CHARGE_ON -> { repo.startCharge(v); "Starting charge" }
+                    CarCommandIds.CHARGE_OFF -> { repo.stopCharge(v); "Stopping charge" }
                     "climate" -> runClimate(ctx, repo, v, snap, climateTarget, smart)
-                    "climate_on" -> runClimateStart(ctx, repo, v, snap, climateTarget, smart)
-                    "climate_off" -> stopClimate(repo, v)
+                    CarCommandIds.CLIMATE_ON -> runClimateStart(ctx, repo, v, snap, climateTarget, smart)
+                    CarCommandIds.CLIMATE_OFF -> stopClimate(repo, v)
                     // No arguments, no state to predict: these two make the car do something
                     // audible/visible and change nothing that any surface displays, which is why
                     // they need no optimistic write below.
-                    "lights" -> { repo.flashLights(v); "Flashing lights on ${v.name}" }
-                    "horn" -> { repo.hornAndLights(v); "Sounding horn on ${v.name}" }
+                    CarCommandIds.LIGHTS -> { repo.flashLights(v); "Flashing lights on ${v.name}" }
+                    CarCommandIds.HORN -> { repo.hornAndLights(v); "Sounding horn on ${v.name}" }
                     // The percentage rides in on the same string parameter the climate target uses
                     // -- it is the command's argument slot, and giving it a second one for the sake
                     // of naming would change every call site for one command's benefit.
@@ -132,7 +132,7 @@ object VehicleCommandRunner {
      */
     private suspend fun prepareSmartClimate(ctx: Context, vin: String, cmd: String, target: String): ClimateRequest? {
         if (target != "smart") return null
-        if (cmd != "climate" && cmd != "climate_on") return null
+        if (cmd != "climate" && cmd != CarCommandIds.CLIMATE_ON) return null
         val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin } ?: return null
         if (cmd == "climate" && snap.climateOn == true) return null
         val lat = snap.lat ?: return null
@@ -201,14 +201,14 @@ object VehicleCommandRunner {
     fun optimistic(snap: VehicleSnapshot, cmd: String): VehicleSnapshot {
         val action = when (cmd) {
             "doors" -> CarAction.TOGGLE_LOCK
-            "lock" -> CarAction.LOCK
-            "unlock" -> CarAction.UNLOCK
+            CarCommandIds.LOCK -> CarAction.LOCK
+            CarCommandIds.UNLOCK -> CarAction.UNLOCK
             "charge" -> CarAction.TOGGLE_CHARGE
-            "charge_on" -> CarAction.CHARGE_ON
-            "charge_off" -> CarAction.CHARGE_OFF
+            CarCommandIds.CHARGE_ON -> CarAction.CHARGE_ON
+            CarCommandIds.CHARGE_OFF -> CarAction.CHARGE_OFF
             "climate" -> CarAction.TOGGLE_CLIMATE
-            "climate_on" -> CarAction.CLIMATE_ON
-            "climate_off" -> CarAction.CLIMATE_OFF
+            CarCommandIds.CLIMATE_ON -> CarAction.CLIMATE_ON
+            CarCommandIds.CLIMATE_OFF -> CarAction.CLIMATE_OFF
             else -> return snap
         }
         return CarCommandRunner.optimistic(snap, action)

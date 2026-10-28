@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarCommandIds
 import kotlinx.coroutines.flow.collectLatest
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
@@ -98,7 +99,7 @@ fun AppViewModel.ensureLiveDeviceLocation() {
     beginLiveDeviceLocation(restart = true)
 }
 
-fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
+fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, CarCommandIds.LOCATE, "Location updated", optimistic = null) {
     // "Locate" is the one button whose entire job is refreshing a position -- the car's, below --
     // so it refreshes the DEVICE's own right alongside it. Fire-and- forget: a slow/missing device
     // fix must not delay or fail the car locate this command exists for.

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarCommandIds
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Vehicle
@@ -18,8 +19,8 @@ import kotlinx.coroutines.launch
  * cannot execute it, the model must not be able to name it.
  */
 private val AI_COMMANDS = setOf(
-    "lock", "unlock", "charge_on", "charge_off", "climate_on", "climate_off",
-    "lights", "horn",
+    CarCommandIds.LOCK, CarCommandIds.UNLOCK, CarCommandIds.CHARGE_ON, CarCommandIds.CHARGE_OFF, CarCommandIds.CLIMATE_ON, CarCommandIds.CLIMATE_OFF,
+    CarCommandIds.LIGHTS, CarCommandIds.HORN,
 )
 // charge_limit is deliberately absent: it carries a number a model could get wrong undetectably, so
 // the deterministic parser reads it from the query instead.

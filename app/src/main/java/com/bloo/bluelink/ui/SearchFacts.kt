@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarCommandIds
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Speed
@@ -80,7 +81,7 @@ internal fun carFacts(state: UiState, appearance: SettingsStore.Appearance): Lis
         val open = buildList {
             st.doorOpen?.openLabels()?.forEach { add("$it door") }
             st.windowOpen?.openLabels()?.forEach { add("$it window") }
-            if (st.trunkOpen == true) add("trunk")
+            if (st.trunkOpen == true) add(CarCommandIds.TRUNK)
             if (st.hoodOpen == true) add("hood")
         }
         if (st.doorOpen != null || st.windowOpen != null) {

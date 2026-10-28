@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarCommandIds
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -106,7 +107,7 @@ private fun DoorsPiece(v: Vehicle, status: VehicleStatus, state: UiState, vm: Ap
     val open = buildList {
         status.doorOpen?.openLabels()?.forEach { add("$it door") }
         status.windowOpen?.openLabels()?.forEach { add("$it window") }
-        if (status.trunkOpen == true) add("trunk")
+        if (status.trunkOpen == true) add(CarCommandIds.TRUNK)
         if (status.hoodOpen == true) add("hood")
     }
     if (status.doorOpen != null || status.windowOpen != null) StatusRow("Open", if (open.isEmpty()) "All closed" else open.joinToString(", "))

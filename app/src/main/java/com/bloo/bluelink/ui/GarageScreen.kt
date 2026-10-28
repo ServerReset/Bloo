@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarCommandIds
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.size
@@ -188,7 +189,7 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
             deviceRequest = rememberDeviceLocationRequest(vm),
             // The real command-pending flag, not a guessed timer -- see MapTopBar's own doc -- so the refresh icon's spin genuinely
             // tracks the in-flight fetch this same button just kicked off.
-            refreshing = state.value.isPending(expandedVehicle.vin, "locate"),
+            refreshing = state.value.isPending(expandedVehicle.vin, CarCommandIds.LOCATE),
             onDismiss = { expandedMap.vin = null },
         )
     }

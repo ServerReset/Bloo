@@ -36,7 +36,7 @@ suspend fun BlueLinkApi.startClimate(
                     put("value", JsonPrimitive(req.tempF.toString()))
                     put("unit", JsonPrimitive(1))
                 })
-                put("defrost", JsonPrimitive(req.defrost))
+                put(CarCommandIds.DEFROST, JsonPrimitive(req.defrost))
                 // heating1 is a bundle-selector, not a plain boolean: the real values are 0 (all
                 // off), 2 (rear window + mirrors only), 3 (steering wheel only) and 4 (steering
                 // wheel + rear window + mirrors) -- confirmed across multiple independent
@@ -55,7 +55,7 @@ suspend fun BlueLinkApi.startClimate(
                     put("unit", JsonPrimitive(1))
                     put("value", JsonPrimitive(req.tempF.toString()))
                 })
-                put("defrost", JsonPrimitive(req.defrost))
+                put(CarCommandIds.DEFROST, JsonPrimitive(req.defrost))
                 // heating1 is a bundle-selector, not a plain boolean: the real values are 0 (all
                 // off), 2 (rear window + mirrors only), 3 (steering wheel only) and 4 (steering
                 // wheel + rear window + mirrors) -- confirmed across multiple independent

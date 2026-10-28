@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarCommandIds
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
@@ -355,7 +356,7 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
         "location" -> {
             val locationState = stateSlice(state, v) { s ->
                 listOf(
-                    s.locations[v.vin], s.placeNames[v.vin], s.isPending(v.vin, "locate"),
+                    s.locations[v.vin], s.placeNames[v.vin], s.isPending(v.vin, CarCommandIds.LOCATE),
                     s.carWeather[v.vin], s.deviceLocation, s.isPebbleExpanded(v.vin, "location"),
                 )
             }

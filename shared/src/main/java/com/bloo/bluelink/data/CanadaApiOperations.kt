@@ -72,7 +72,7 @@ internal fun CanadaApi.parseStatus(vs: JsonObject, modelYear: Int?): VehicleStat
         acc = vs["acc"].flag(),
         trunkOpen = vs["trunkOpen"].flag(),
         hoodOpen = vs["hoodOpen"].flag(),
-        defrost = vs["defrost"].flag(),
+        defrost = vs[CarCommandIds.DEFROST].flag(),
         doorOpen = (vs["doorOpen"] as? JsonObject)?.let {
             DoorOpen(it["frontLeft"].int(), it["frontRight"].int(), it["backLeft"].int(), it["backRight"].int())
         },
@@ -141,7 +141,7 @@ suspend fun CanadaApi.startClimate(
         .any { it != SeatLevel.OFF }
     fun climateFields() = buildJsonObject {
         put("airCtrl", 1)
-        put("defrost", req.defrost)
+        put(CarCommandIds.DEFROST, req.defrost)
         // heating1 is a bundle-selector, not a plain boolean -- see BlueLinkApi's own
         // (US/Genesis) copy of this same field for the sourced values (0/2/3/4, not a
         // 0/1 toggle) and the real-world report that motivated the fix.
