@@ -23,13 +23,13 @@ const val BounceDamping = 0.6f
  * The stiffness for things that pop up and float: pop-ups, toasts and the badge on a card. Lower than the rest of the bounces (Spring's
  * StiffnessVeryLow), so the rise is gentler and the settle takes long enough to read as a bounce rather than a snap. Same [BounceDamping].
  */
-const val FloatingStiffness = 50f
+const val FloatingStiffness = 200f
 
 /**
  * The damping for pop-ups, toasts and badges. A little more than [BounceDamping], so the rebound at the end of a rise is softer: the bounce
  * stays, without the snap back.
  */
-const val FloatingDamping = 0.7f
+const val FloatingDamping = 0.35f
 
 /**
  * The morph button's two corner states, as a percentage of the shorter side: a true pill at rest, a

@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.layout.VerticalAlignmentLine
 import com.bloo.uicommon.MotionShort
-import com.bloo.uicommon.motionBlurWhenMoving
 import com.bloo.uicommon.MorphedCornerPercent
 import com.bloo.uicommon.PillCornerPercent
 import com.bloo.uicommon.SoftDamping
@@ -156,7 +155,7 @@ internal fun PopVisible(
 ) {
     AnimatedVisibility(
         visible = visible,
-        modifier = modifier.motionBlurWhenMoving(),
+        modifier = modifier,
         enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
             scaleIn(
                 lowPowerFloating(),
@@ -206,7 +205,7 @@ internal fun ExpandVisibility(
     from: Alignment.Vertical = Alignment.Top,
     content: @Composable AnimatedVisibilityScope.() -> Unit,
 ) {
-    AnimatedVisibility(visible, modifier.motionBlurWhenMoving(), enter = expandEnterSized(from), exit = expandExitSized(from), content = content)
+    AnimatedVisibility(visible, modifier, enter = expandEnterSized(from), exit = expandExitSized(from), content = content)
 }
 
 /**

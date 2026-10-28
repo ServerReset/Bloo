@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.uicommon.calmSpring
-import com.bloo.uicommon.motionBlurWhenMoving
 import com.bloo.uicommon.floatingSpring
 import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.MorphIconButton
@@ -158,7 +157,7 @@ internal fun BoxScope.ToastSlot(
     val toggle by androidx.compose.runtime.rememberUpdatedState(onSetExpanded)
     var vDrag by remember(toast.id) { androidx.compose.runtime.mutableFloatStateOf(0f) }
     Box(
-        Modifier.align(Alignment.BottomStart).motionBlurWhenMoving()
+        Modifier.align(Alignment.BottomStart)
             // A leaving toast goes behind every other one (and so behind the search bar, which is drawn after the stack).
             .zIndex(if (toast.leaving) -1f else 0f)
             .fillMaxWidth()

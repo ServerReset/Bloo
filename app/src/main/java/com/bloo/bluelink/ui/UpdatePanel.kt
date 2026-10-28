@@ -82,16 +82,18 @@ internal fun UpdatePanel(
     vm: AppViewModel,
     hazeState: HazeState? = null,
     primaryInBody: Boolean = true,
+    /** The version jump at the top of the body. The tile shows it here; Settings already shows it in its own header. */
+    showHeadline: Boolean = false,
 ) {
     if (UpdateRuntime.usesGitHub(LocalContext.current)) {
-        GitHubUpdateBody(state, vm, hazeState, primaryInBody)
+        GitHubUpdateBody(state, vm, hazeState, primaryInBody, showHeadline)
     } else {
         PlayUpdateBody(hazeState, primaryInBody)
     }
 }
 
 @Composable
-private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeState?, primaryInBody: Boolean) {
+private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeState?, primaryInBody: Boolean, showHeadline: Boolean) {
     val context = LocalContext.current
     val seamless = LocalAppearance.current.seamlessInstallShizuku && state.shizukuAvailable
     val info = state.updateAvailable?.takeIf { !state.updateTileDismissed }
@@ -103,10 +105,11 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
         val newLabel = buildLabel(info.run.runNumber)
         // Build delta ("build 812 → build 828") when the installed build is known, else just the target.
         val deltaLabel = if (current > 0) "${buildLabel(current)} → $newLabel" else newLabel
-        UpdateDeltaHero(current, info.run.runNumber)
+        if (showHeadline) UpdateDeltaHero(current, info.run.runNumber)
         NestedGlassPanel(hazeState) {
             Column(Modifier.padding(GapGroup)) {
-                UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = info.run.displayTitle?.isNotBlank() == true)
+                // The version is already above (headline or header), so the status line says what is happening, not the version again.
+                UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = false)
             }
         }
         if (primaryInBody) {

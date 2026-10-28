@@ -69,7 +69,7 @@ internal fun UpdateAvailableTile(
                 headerAction = headerAction,
             ) {
                 // The header carries the primary action, so the body does not repeat it.
-                UpdatePanel(state, vm, hazeState, primaryInBody = false)
+                UpdatePanel(state, vm, hazeState, primaryInBody = false, showHeadline = true)
             }
         }
     }
