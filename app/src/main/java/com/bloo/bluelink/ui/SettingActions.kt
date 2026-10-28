@@ -6,8 +6,12 @@ import com.bloo.bluelink.data.AlertKeys
 import com.bloo.bluelink.data.SettingsCatalog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.setDistanceUnit
+import com.bloo.bluelink.data.setDoorOpenMinutes
+import com.bloo.bluelink.data.setFontChoice
+import com.bloo.bluelink.data.setRunningMinutes
 import com.bloo.bluelink.data.setTempUnit
 import com.bloo.bluelink.data.setUnitSystem
+import com.bloo.bluelink.data.setUnlockedMinutes
 
 /** Everything a setting's current value is read from: the same three sources search draws its controls from. */
 internal class SettingContext(
@@ -130,7 +134,7 @@ internal val SettingActions: List<SettingAction> = buildList {
             "c_font", "font_choice", "atkinson hyperlegible google sans dyslexia",
             FontChoice.entries.map { Option(it.name.lowercase(), it.label) },
             { it.appearance.fontChoice.name.lowercase() },
-            { vm, v -> vm.setFontChoice(FontChoice.valueOf(v.uppercase())) },
+            { vm, v -> vm.persist { setFontChoice(FontChoice.valueOf(v.uppercase())) } },
         ),
     )
     add(
@@ -184,19 +188,19 @@ internal val SettingActions: List<SettingAction> = buildList {
     add(
         range(
             "r_unlocked", AlertKeys.UNLOCKED_MINUTES, "", 1.0, 120.0,
-            { it.notif.unlockedMinutes.toString() }, { vm, v -> vm.setUnlockedMinutes(v.toDouble().toInt()) },
+            { it.notif.unlockedMinutes.toString() }, { vm, v -> vm.persist { setUnlockedMinutes(v.toDouble().toInt()) } },
         ),
     )
     add(
         range(
             "r_door", AlertKeys.DOOR_MINUTES, "", 1.0, 120.0,
-            { it.notif.doorOpenMinutes.toString() }, { vm, v -> vm.setDoorOpenMinutes(v.toDouble().toInt()) },
+            { it.notif.doorOpenMinutes.toString() }, { vm, v -> vm.persist { setDoorOpenMinutes(v.toDouble().toInt()) } },
         ),
     )
     add(
         range(
             "r_running", AlertKeys.RUNNING_MINUTES, "", 1.0, 120.0,
-            { it.notif.runningMinutes.toString() }, { vm, v -> vm.setRunningMinutes(v.toDouble().toInt()) },
+            { it.notif.runningMinutes.toString() }, { vm, v -> vm.persist { setRunningMinutes(v.toDouble().toInt()) } },
         ),
     )
 }
