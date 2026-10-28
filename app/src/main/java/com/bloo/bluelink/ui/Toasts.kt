@@ -33,13 +33,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.FloatingStiffness
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.GapRow
-import com.bloo.uicommon.lowPowerAwareSpring
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner

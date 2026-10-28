@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,11 +46,9 @@ import com.bloo.bluelink.data.isPluggedOrCharging
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.uicommon.lowPowerBounce
-import com.bloo.uicommon.BounceDamping
 import kotlin.math.roundToInt
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.GapRow
-import com.bloo.uicommon.lowPowerAwareSpring
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Constraints
 

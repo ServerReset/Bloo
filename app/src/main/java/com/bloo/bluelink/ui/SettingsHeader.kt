@@ -5,11 +5,9 @@ package com.bloo.bluelink.ui
  * SettingsHeaderRow title row.
  */
 
-import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,9 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,10 +38,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.collapsedSections
-import com.bloo.bluelink.data.setSeamlessInstallShizuku
 import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.IconBadgeContainer
 import com.bloo.uicommon.PrimaryTextStyle
@@ -54,18 +47,10 @@ import com.bloo.uicommon.SecondaryTextStyle
 import kotlinx.coroutines.delay
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
-import com.bloo.uicommon.MorphButtonLabel
-import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.GapPage
-import com.bloo.uicommon.confirmTone
-import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.container
-import com.bloo.uicommon.content
-import com.bloo.uicommon.MorphButton
 
 /**
  * Delays an advanced-only card's own entrance by `index * STAGGER_STEP_MS` once [advanced] flips

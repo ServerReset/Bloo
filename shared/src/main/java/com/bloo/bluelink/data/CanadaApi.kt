@@ -1,6 +1,5 @@
 package com.bloo.bluelink.data
 
-import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
@@ -76,7 +75,6 @@ class CanadaApi(private val brand: Brand) {
             "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/130.0.0.0 Mobile Safari/537.36"
         private const val MFA_API_CODE = "0107"
-
 
         // The one shared OkHttp/Json stack -- see [ApiHttp]. This class is constructed per call on
         // hot command paths, so a per-call client would cost a fresh TCP + TLS handshake every

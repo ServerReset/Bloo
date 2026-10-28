@@ -11,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.FloatingStiffness
 

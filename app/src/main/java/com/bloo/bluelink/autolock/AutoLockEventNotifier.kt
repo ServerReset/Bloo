@@ -7,7 +7,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.net.toUri
 import com.bloo.bluelink.R
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.Notifications

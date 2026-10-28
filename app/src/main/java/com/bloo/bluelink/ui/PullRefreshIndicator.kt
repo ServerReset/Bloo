@@ -27,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.bounceSpring
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay

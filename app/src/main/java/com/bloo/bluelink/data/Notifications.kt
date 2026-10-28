@@ -9,7 +9,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.net.toUri
 import com.bloo.bluelink.R
 import com.bloo.bluelink.ui.hasPermission
 import com.bloo.uicommon.content

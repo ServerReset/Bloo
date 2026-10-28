@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.motionBlurWhenMoving
 import com.bloo.uicommon.FloatingStiffness

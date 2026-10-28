@@ -48,7 +48,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.bounceSpring
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.MorphButtonLabel

@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.settingsMode
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.motionBlurWhenMoving
 import com.bloo.uicommon.GapHairline

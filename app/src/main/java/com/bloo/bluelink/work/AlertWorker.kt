@@ -1,7 +1,6 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
-import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.AppLog

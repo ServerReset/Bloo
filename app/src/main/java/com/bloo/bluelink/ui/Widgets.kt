@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.segmentsOf
 import androidx.compose.animation.core.Spring
@@ -46,7 +45,6 @@ import com.bloo.uicommon.ButtonTargetHeight
 import com.bloo.uicommon.ButtonLabelStyle
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.LocalHaptics
-import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.glassTint
 import com.bloo.uicommon.MorphSegmented
 import com.bloo.uicommon.ambientRing

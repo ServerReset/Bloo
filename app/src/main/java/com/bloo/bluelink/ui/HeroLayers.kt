@@ -44,7 +44,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.bounceSpring
 import kotlin.math.roundToInt
 import com.bloo.uicommon.GapRow

@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.FloatingStiffness
 import androidx.compose.animation.AnimatedContentScope
@@ -44,7 +43,6 @@ import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.layout.VerticalAlignmentLine
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.motionBlurWhenMoving
-import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.MorphedCornerPercent
 import com.bloo.uicommon.PillCornerPercent
 import com.bloo.uicommon.SoftDamping

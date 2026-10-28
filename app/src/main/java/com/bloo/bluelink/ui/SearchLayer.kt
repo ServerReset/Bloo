@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -48,14 +47,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.lowPowerBounce
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.LocalHaptics
-import com.bloo.uicommon.lowPowerAwareSpring
 
 /** Which shape the search control is in: a bubble, a pill, or the full bar. */
 internal enum class SearchForm { BUBBLE, PILL, BAR }

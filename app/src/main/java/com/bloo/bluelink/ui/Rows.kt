@@ -2,15 +2,11 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -88,7 +84,6 @@ internal fun SectionLabel(text: String) {
     // The shared sub-heading (:uicommon's GroupHeading): a heading to screen readers, muted a little under its section's title.
     GroupHeading(text, modifier = Modifier.padding(top = 2.dp), color = LocalContentColor.current.copy(alpha = 0.85f))
 }
-
 
 /**
  * The app's one toggle control for boolean settings: a custom pill track+thumb (spring-timed like

@@ -26,7 +26,6 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.content
 import com.bloo.uicommon.secondaryTextColor
-import com.bloo.uicommon.secondaryTextStyle
 
 /**
  * Small shared composables built on UiTokens: text styles, icon badges, dividers, and
@@ -59,7 +58,6 @@ internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: C
 internal fun MutedText(text: String, modifier: Modifier = Modifier) {
     BodySmallText(text, modifier, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
-
 
 /** [MutedText] that reveals as it appears (the pebbles' captions and hints). */
 @Composable

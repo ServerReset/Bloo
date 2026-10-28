@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.lowPowerBounce
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -65,7 +64,6 @@ import com.bloo.uicommon.FieldShape
 import com.bloo.uicommon.Haptics
 import com.bloo.uicommon.SoftDamping
 import androidx.compose.animation.AnimatedVisibility
-import com.bloo.uicommon.lowPowerAwareSpring
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 

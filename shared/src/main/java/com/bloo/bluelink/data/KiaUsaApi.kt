@@ -4,7 +4,6 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
-import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
@@ -36,7 +35,6 @@ class KiaUsaApi {
         // Mimics an actual iOS Kia Connect client build, since the API appears
         // to key some behavior off a recognized User-Agent string.
         private const val USER_AGENT = "KIAPrimo_iOS/37 CFNetwork/1335.0.3.4 Darwin/21.6.0"
-
 
         // The one shared OkHttp/Json stack -- see [ApiHttp]. This class is
         // constructed per call on the hot command paths (notification actions,

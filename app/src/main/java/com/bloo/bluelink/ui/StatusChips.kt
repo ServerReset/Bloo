@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -29,7 +28,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.FloatingStiffness
 import com.bloo.uicommon.SecondaryTextStyle
@@ -39,7 +37,6 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
-import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.content
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material3.LocalTextStyle

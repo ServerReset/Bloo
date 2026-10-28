@@ -53,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.doorLockLabel
 import com.bloo.bluelink.data.supportsHornLights
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText

@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.MorphIconButton
 import androidx.compose.animation.core.Spring

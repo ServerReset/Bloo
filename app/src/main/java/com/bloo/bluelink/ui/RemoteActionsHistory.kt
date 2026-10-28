@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.uicommon.Dot
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer

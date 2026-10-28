@@ -31,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.bounceSpring
-import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.ButtonIcon
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapHairline
