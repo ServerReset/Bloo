@@ -7,40 +7,27 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** The hero's text colour follows the photo behind it: light photo, dark text; dark photo, light text; a gradient is judged by its worst part. */
+/** The hero's text colour follows the photo behind it: light photo, dark text; dark photo, light text. The photo itself is never changed. */
 class PhotoContrastTest {
     private fun band(mean: Float, spread: Float = 0f) = BandLuma(mean, (mean - spread / 2).coerceAtLeast(0f), (mean + spread / 2).coerceAtMost(1f))
 
-    @Test fun aLightPhotoGetsDarkTextAndNoScrim() {
+    @Test fun aLightPhotoGetsDarkText() {
         val o = overlayFor(band(0.85f))
         assertTrue(o.darkText)
-        assertEquals(0f, o.scrimAlpha)
     }
 
-    @Test fun aDarkPhotoGetsLightTextAndNoScrim() {
+    @Test fun aDarkPhotoGetsLightText() {
         val o = overlayFor(band(0.03f))
         assertFalse(o.darkText)
-        assertEquals(0f, o.scrimAlpha)
     }
 
-    @Test fun aMidTonePhotoGetsTextAndAScrimInTheOppositeTone() {
-        val o = overlayFor(band(0.20f))
-        assertTrue(o.scrimAlpha > 0f, "mid-grey needs help")
-        assertEquals(if (o.darkText) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black, o.scrimTone)
-    }
 
-    @Test fun aGradientIsJudgedByItsWorstPartNotItsAverage() {
-        // Dark on one side, light on the other: the average is mid-grey, but neither text clears both ends unaided.
-        val o = overlayFor(BandLuma(mean = 0.45f, low = 0.02f, high = 0.90f))
-        assertTrue(o.scrimAlpha > 0.2f, "a wide spread needs a real scrim, got ${o.scrimAlpha}")
-        // Whatever it chose, the scrimmed worst part now clears AA against the chosen text.
-        val worst = if (o.darkText) 0.02f + (1f - 0.02f) * o.scrimAlpha else 0.90f * (1f - o.scrimAlpha)
-        val text = if (o.darkText) relativeLuminance(0x1A, 0x1B, 0x20) else relativeLuminance(0xF7, 0xF7, 0xFA)
-        assertTrue(contrastRatio(text, worst) >= 4.5f, "contrast ${contrastRatio(text, worst)}")
-    }
 
-    @Test fun theScrimNeverExceedsItsCap() {
-        assertTrue(overlayFor(BandLuma(0.5f, 0f, 1f)).scrimAlpha <= 0.8f)
+
+    @Test fun aMidGreyPhotoGetsWhicheverTextContrastsMore() {
+        // No scrim: the photo is left alone, and the text is the one with the higher contrast against its brightness.
+        assertTrue(overlayFor(band(0.20f)).darkText)
+        assertFalse(overlayFor(band(0.15f)).darkText)
     }
 
     @Test fun luminanceMatchesTheKnownEndpoints() {
@@ -106,19 +93,7 @@ class PhotoContrastTest {
         assertEquals(1f, worstContrast(0.5f, BandLuma(0.5f, 0.3f, 0.7f)))
     }
 
-    @Test fun aScrimMovesTheBandItSitsOver() {
-        val under = BandLuma(0.2f, 0.1f, 0.3f).under(scrimLight = true, alpha = 0.5f)
-        assertEquals(0.6f, under.mean, 0.0001f)
-        val sunk = BandLuma(0.8f, 0.7f, 0.9f).under(scrimLight = false, alpha = 0.5f)
-        assertEquals(0.4f, sunk.mean, 0.0001f)
-    }
 
-    @Test fun theOverlayRemembersWhatIsBehindItsText() {
-        val o = overlayFor(BandLuma(0.45f, 0.02f, 0.90f))
-        // Behind the (scrimmed) text, the worst part now clears AA for the text it chose.
-        val text = if (o.darkText) relativeLuminance(0x1A, 0x1B, 0x20) else relativeLuminance(0xF7, 0xF7, 0xFA)
-        assertTrue(worstContrast(text, o.behind) >= 4.5f, "worst ${worstContrast(text, o.behind)}")
-    }
 
     @Test fun aMorphBlendsBetweenTwoBackdrops() {
         val mid = lerpBand(BandLuma(1f, 1f, 1f), BandLuma(0f, 0f, 0f), 0.25f)
