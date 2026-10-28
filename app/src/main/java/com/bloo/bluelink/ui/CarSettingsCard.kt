@@ -16,10 +16,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.climatePresets
@@ -79,13 +77,7 @@ internal fun CarSettingsCard(
             val storedImage = state.imageUrls[v.vin]
             val hasPhoto = !storedImage.isNullOrBlank()
             // A live preview, so the effect of a change is visible without leaving Settings.
-            if (hasPhoto) {
-                AsyncImage(
-                    model = rememberPhotoModel(storedImage), contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().height(120.dp).clip(StandardShape),
-                )
-            }
+            if (hasPhoto) HeroPhotoPreview(state, v, storedImage, LocalAppearance.current.metricDistance)
             CarPhotoButtons(hasPhoto, onPick = onPickPhoto, onClear = { vm.setVehicleImage(v.vin, "") })
             CarPictureButton(v, storedImage, vm)
         }

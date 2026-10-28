@@ -1,5 +1,9 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -32,6 +36,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -168,6 +173,42 @@ internal fun HeroForeground(
                     statusAlpha = statusAlpha,
                 )
             }
+        }
+    }
+}
+
+/**
+ * The hero as it will look with [imageUrl], for the settings preview: the photo at the hero's own shape and height, the car's name over
+ * it, and the charge readout over the photo's bottom, each in the colour the hero gives it on this photo.
+ */
+@Composable
+internal fun HeroPhotoPreview(state: UiState, v: Vehicle, imageUrl: String?, metric: Boolean) {
+    val readout = chargeReadoutOf(state.statusFor(v), state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric)
+    val tone by rememberHeroPhotoTone(imageUrl, MaterialTheme.colorScheme.background)
+    val cardCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
+    CompositionLocalProvider(LocalHeroTone provides tone) {
+        Box(Modifier.fillMaxWidth()) {
+            // The photo takes its own 16:9 height here, so the height passed is not used.
+            HeroBackground(
+                cardCoords = cardCoords,
+                v = v,
+                imageUrl = imageUrl,
+                photoExpanded = true,
+                height = 0.dp,
+                heroT = 1f,
+                hasExpandAction = false,
+                readout = readout,
+                hoisted = false,
+                statusAlpha = 1f,
+                reportNumbers = {},
+            )
+            Text(
+                v.name,
+                modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = heroTitleOnPhoto(tone),
+            )
         }
     }
 }

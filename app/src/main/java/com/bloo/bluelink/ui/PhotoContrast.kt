@@ -17,6 +17,7 @@ import coil.size.Precision
 import coil.size.Scale
 import com.bloo.uicommon.MotionMedium
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -41,6 +42,18 @@ internal fun contrastRatio(a: Float, b: Float): Float {
     val lo = minOf(a, b)
     return (hi + 0.05f) / (lo + 0.05f)
 }
+
+/**
+ * The brightness of a colour, for judging text over a cut-out photo that shows the page through it.
+ */
+internal fun backdropLumaOf(c: Color): Float =
+    relativeLuminance((c.red * 255).roundToInt(), (c.green * 255).roundToInt(), (c.blue * 255).roundToInt())
+
+/**
+ * The page brightness a photo's transparent pixels are judged against: the page colour for a cut-out (it shows the page through),
+ * and none for a photo that fills its frame.
+ */
+internal fun toneBackdropFor(url: String, page: Color): Float? = if (isCutoutPhoto(url)) backdropLumaOf(page) else null
 
 /** How bright a horizontal band of the photo is: its mean and its 10th and 90th percentile luminance (0..1). */
 @Immutable
@@ -75,13 +88,16 @@ internal data class HeroPhotoTone(val top: BandOverlay?, val bottom: BandOverlay
  * Luminance of the rows [fromRow, toRow) of a [width]-wide pixel grid, ignoring transparent pixels. Null when the band is mostly
  * transparent (a cut-out has no photo behind the text to measure).
  */
-internal fun bandLuma(pixels: IntArray, width: Int, fromRow: Int, toRow: Int): BandLuma? {
+internal fun bandLuma(pixels: IntArray, width: Int, fromRow: Int, toRow: Int, backdrop: Float? = null): BandLuma? {
     val values = FloatArray((toRow - fromRow) * width)
     var n = 0
     for (y in fromRow until toRow) for (x in 0 until width) {
         val p = pixels[y * width + x]
-        if ((p ushr 24) < 128) continue
-        values[n++] = relativeLuminance((p shr 16) and 0xFF, (p shr 8) and 0xFF, p and 0xFF)
+        val a = (p ushr 24) / 255f
+        // Transparent pixels are skipped on a photo that fills its frame; on a cut-out they are the page, so they count as it.
+        if (backdrop == null && a < 0.5f) continue
+        val lum = relativeLuminance((p shr 16) and 0xFF, (p shr 8) and 0xFF, p and 0xFF)
+        values[n++] = if (backdrop == null) lum else a * lum + (1f - a) * backdrop
     }
     if (n < values.size / 2 || n == 0) return null
     values.sort(0, n)
@@ -89,9 +105,9 @@ internal fun bandLuma(pixels: IntArray, width: Int, fromRow: Int, toRow: Int): B
 }
 
 /** The bands of a photo shown with Crop: the title sits in the top 30%, the readout in the bottom 38%. */
-internal fun heroToneOf(pixels: IntArray, width: Int, height: Int): HeroPhotoTone {
-    val top = bandLuma(pixels, width, 0, (height * 0.30f).toInt().coerceAtLeast(1))
-    val bottom = bandLuma(pixels, width, (height * 0.62f).toInt().coerceAtMost(height - 1), height)
+internal fun heroToneOf(pixels: IntArray, width: Int, height: Int, backdrop: Float? = null): HeroPhotoTone {
+    val top = bandLuma(pixels, width, 0, (height * 0.30f).toInt().coerceAtLeast(1), backdrop)
+    val bottom = bandLuma(pixels, width, (height * 0.62f).toInt().coerceAtMost(height - 1), height, backdrop)
     return HeroPhotoTone(top?.let(::overlayFor), bottom?.let(::overlayFor))
 }
 
@@ -102,13 +118,16 @@ private const val SampleH = 90
 private val toneCache = java.util.concurrent.ConcurrentHashMap<String, HeroPhotoTone>()
 
 /** [measureHeroTone], remembered for the session so a page swiped to later has its text colours on the first frame. */
-internal suspend fun measureHeroToneCached(context: Context, model: Any): HeroPhotoTone? {
-    val key = model.toString()
+internal suspend fun measureHeroToneCached(context: Context, model: Any, backdrop: Float?): HeroPhotoTone? {
+    val key = toneCacheKey(model, backdrop)
     toneCache[key]?.let { return it }
-    return measureHeroTone(context, model)?.also { toneCache[key] = it }
+    return measureHeroTone(context, model, backdrop)?.also { toneCache[key] = it }
 }
 
-private suspend fun measureHeroTone(context: Context, model: Any): HeroPhotoTone? = withContext(Dispatchers.Default) {
+/** A cut-out is remembered per page brightness it was judged against, so a theme change measures it again. */
+private fun toneCacheKey(model: Any, backdrop: Float?): String = "$model|${backdrop?.let { (it * 20f).roundToInt() } ?: -1}"
+
+private suspend fun measureHeroTone(context: Context, model: Any, backdrop: Float?): HeroPhotoTone? = withContext(Dispatchers.Default) {
     runCatching {
         val request = ImageRequest.Builder(context)
             .data(model)
@@ -119,17 +138,21 @@ private suspend fun measureHeroTone(context: Context, model: Any): HeroPhotoTone
             .build()
         val bitmap = context.imageLoader.execute(request).drawable?.toBitmap(SampleW, SampleH) ?: return@runCatching null
         val pixels = IntArray(SampleW * SampleH).also { bitmap.getPixels(it, 0, SampleW, 0, 0, SampleW, SampleH) }
-        heroToneOf(pixels, SampleW, SampleH)
+        heroToneOf(pixels, SampleW, SampleH, backdrop)
     }.getOrNull()
 }
 
-/** The tone of the hero's photo, measured off the main thread once per photo; [HeroPhotoTone.None] until then, and for no photo or a cut-out. */
+/**
+ * The tone of the hero's photo, measured off the main thread once per photo and page brightness; [HeroPhotoTone.None] until then, and
+ * for no photo. [page] is the colour a cut-out's transparent parts show.
+ */
 @Composable
-internal fun rememberHeroPhotoTone(imageUrl: String?): State<HeroPhotoTone> {
+internal fun rememberHeroPhotoTone(imageUrl: String?, page: Color): State<HeroPhotoTone> {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val model = if (imageUrl.isNullOrBlank() || isCutoutPhoto(imageUrl)) null else rememberPhotoModel(imageUrl)
-    return produceState(model?.let { toneCache[it.toString()] } ?: HeroPhotoTone.None, model) {
-        value = model?.let { measureHeroToneCached(context, it) } ?: HeroPhotoTone.None
+    val model = if (imageUrl.isNullOrBlank()) null else rememberPhotoModel(imageUrl)
+    val backdrop = imageUrl?.let { toneBackdropFor(it, page) }
+    return produceState(model?.let { toneCache[toneCacheKey(it, backdrop)] } ?: HeroPhotoTone.None, model, backdrop) {
+        value = model?.let { measureHeroToneCached(context, it, backdrop) } ?: HeroPhotoTone.None
     }
 }
 

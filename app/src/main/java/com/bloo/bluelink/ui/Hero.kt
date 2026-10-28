@@ -121,7 +121,9 @@ internal fun HeroHeader(
     val titleStep by remember { androidx.compose.runtime.derivedStateOf { (heroTState.value * 8f).roundToInt() / 8f } }
     // What the photo looks like behind the title and the readout decides their colours (dark text on a light photo, light on a dark
     // one), and a gradient or a photo that changes behind the text is covered by judging each band's worst part.
-    val photoTone by rememberHeroPhotoTone(imageUrl)
+    val photoTone by rememberHeroPhotoTone(imageUrl, MaterialTheme.colorScheme.background)
+    // A cut-out car photo floats on the page: no rim and no glass behind it, whatever the edge setting says.
+    val cutout = imageUrl != null && isCutoutPhoto(imageUrl)
     // A screen reader's actions menu on the readout: the three things most wanted of a car, without hunting for the buttons.
     val doorLocked = status?.doorLock
     val spokenActions = remember(v.vin, v.name, doorLocked) {
@@ -137,7 +139,8 @@ internal fun HeroHeader(
     CompositionLocalProvider(LocalHeroTone provides photoTone) {
         PebbleShell(
             expanded = heroShown,
-            edge = LocalAppearance.current.heroEdge,
+            edge = LocalAppearance.current.heroEdge && !cutout,
+            glass = !cutout,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
             icon = AppIcons.DirectionsCar,
             title = v.name,

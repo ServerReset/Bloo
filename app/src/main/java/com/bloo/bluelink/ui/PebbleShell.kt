@@ -134,6 +134,8 @@ internal fun PebbleShell(
     titleColor: Color = Color.Unspecified,
     /** Whether the card draws its rim and shadow. The hero turns it off for a floating photo. */
     edge: Boolean = true,
+    /** Whether the card draws its glass backdrop. A cut-out car photo turns it off, so the page shows through the photo. */
+    glass: Boolean = true,
     /**
      * Extra header content under the title and [summary] (the hero's collapsed charge readout).
      * Renders inside the header's text column. Null for other pebbles.
@@ -247,7 +249,7 @@ internal fun PebbleShell(
         ) {
             // Box, so `background` can draw behind the header and body.
             Box(Modifier.fillMaxWidth()) {
-                GlassCardBackdrop(pebbleShape, containerColor)
+                if (glass) GlassCardBackdrop(pebbleShape, containerColor)
                 background?.invoke(this)
                 // No animateContentSize: the body's AnimatedVisibility already animates the height,
                 // and a second spring compounds and rubber-bands.

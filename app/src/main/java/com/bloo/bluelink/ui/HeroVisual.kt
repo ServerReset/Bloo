@@ -124,7 +124,9 @@ internal fun PrefetchHeroPhotos(imageUrls: androidx.compose.runtime.State<Map<St
     val context = LocalContext.current
     // Read here, in this small scope, so a change to the photo list recomposes this and not the screen that hosts it.
     val urls = remember(imageUrls.value) { imageUrls.value.values.filter { it.isNotBlank() }.distinct().sorted() }
-    LaunchedEffect(urls) {
+    // Read in composition: a theme change re-measures the cut-outs against the new page colour.
+    val page = MaterialTheme.colorScheme.background
+    LaunchedEffect(urls, page) {
         val loader = context.imageLoader
         for (url in urls) {
             val model = photoModelOf(url)
@@ -133,7 +135,7 @@ internal fun PrefetchHeroPhotos(imageUrls: androidx.compose.runtime.State<Map<St
                 val result = loader.execute(heroImageRequest(context, model))
                 if (result is coil.request.SuccessResult) HeroPhotoReady.add(key)
             }
-            if (!isCutoutPhoto(url)) measureHeroToneCached(context, model)
+            measureHeroToneCached(context, model, toneBackdropFor(url, page))
         }
     }
 }
