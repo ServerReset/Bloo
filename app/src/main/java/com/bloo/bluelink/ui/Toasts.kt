@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.BounceDamping
+import com.bloo.uicommon.FloatingStiffness
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.GapRow
@@ -250,7 +251,7 @@ internal fun ToastHost(state: ToastState, hazeState: HazeState, onCopy: (String)
 
     // Animate the placement, so moving the search between the centre and a side SLIDES the stack
     // rather than snapping it.
-    val placeSpec = lowPowerAwareSpring<Float>(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
+    val placeSpec = lowPowerAwareSpring<Float>(dampingRatio = BounceDamping, stiffness = FloatingStiffness)
     val startInset by animateFloatAsState(clearance.startInsetPx, placeSpec, label = "toastStartInset")
     val endInset by animateFloatAsState(clearance.endInsetPx, placeSpec, label = "toastEndInset")
     val lift by animateFloatAsState(clearance.bottomLiftPx, placeSpec, label = "toastLift")

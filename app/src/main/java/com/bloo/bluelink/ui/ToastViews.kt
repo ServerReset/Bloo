@@ -1,6 +1,8 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.uicommon.BounceDamping
+import com.bloo.uicommon.motionBlurWhenMoving
+import com.bloo.uicommon.FloatingStiffness
 import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.MorphIconButton
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -69,7 +71,7 @@ import androidx.compose.ui.graphics.TransformOrigin
  * a quick no-bounce slide back off the screen, and the toasts around it glide on a damped reflow when the slots change.
  * It never comes from, or goes into, the search bar: the bar is just something the toast passes in front of or behind.
  */
-private val EnterSpring = spring<Float>(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
+private val EnterSpring = spring<Float>(dampingRatio = BounceDamping, stiffness = FloatingStiffness)
 private val ExitSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
 private val ReflowSpring = spring<Float>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
 
@@ -156,7 +158,7 @@ internal fun BoxScope.ToastSlot(
     val toggle by androidx.compose.runtime.rememberUpdatedState(onSetExpanded)
     var vDrag by remember(toast.id) { androidx.compose.runtime.mutableFloatStateOf(0f) }
     Box(
-        Modifier.align(Alignment.BottomStart)
+        Modifier.align(Alignment.BottomStart).motionBlurWhenMoving()
             // A leaving toast goes behind every other one (and so behind the search bar, which is drawn after the stack).
             .zIndex(if (toast.leaving) -1f else 0f)
             .fillMaxWidth()

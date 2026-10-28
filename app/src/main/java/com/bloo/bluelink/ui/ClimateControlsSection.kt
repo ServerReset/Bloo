@@ -206,20 +206,20 @@ internal fun ClimateControlsSection(
 
         if (hasSeats) {
             ExpandVisibility(seatsOpen, from = Alignment.Top) {
-                Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                    if (seats.driverHeat || seats.driverCool) {
-                        SeatCard("Driver", driver, seats.driverHeat, seats.driverCool) { onDriver(it) }
-                    }
-                    if (seats.passHeat || seats.passCool) {
-                        SeatCard("Passenger", passenger, seats.passHeat, seats.passCool) { onPassenger(it) }
-                    }
+                // Each seat is a quadrant of the car, with its own slider. A seat the car does not have is not drawn.
+                val front = buildList {
+                    if (seats.driverHeat || seats.driverCool) add(SeatQuadrant("Driver", driver, seats.driverHeat, seats.driverCool, onDriver))
+                    if (seats.passHeat || seats.passCool) add(SeatQuadrant("Passenger", passenger, seats.passHeat, seats.passCool, onPassenger))
+                }
+                val rear = buildList {
                     if (seats.rearLeftHeat || seats.rearLeftCool) {
-                        SeatCard("Rear left", rearLeft, seats.rearLeftHeat, seats.rearLeftCool) { onRearLeft(it) }
+                        add(SeatQuadrant("Rear left", rearLeft, seats.rearLeftHeat, seats.rearLeftCool, onRearLeft))
                     }
                     if (seats.rearRightHeat || seats.rearRightCool) {
-                        SeatCard("Rear right", rearRight, seats.rearRightHeat, seats.rearRightCool) { onRearRight(it) }
+                        add(SeatQuadrant("Rear right", rearRight, seats.rearRightHeat, seats.rearRightCool, onRearRight))
                     }
                 }
+                SeatQuadrants(front = front, rear = rear)
             }
         }
 

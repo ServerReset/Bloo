@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.uicommon.BounceDamping
+import com.bloo.uicommon.motionBlurWhenMoving
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection
@@ -229,7 +230,7 @@ internal fun PebbleShell(
     }
     // Read when drawn, so the open/close spring reshapes the card without recomposing it every frame.
     val pebbleShape = remember { AnimatedCornerShape(cornerAnim.asState()) }
-    Box(Modifier.fillMaxWidth()) {
+    Box(Modifier.fillMaxWidth().motionBlurWhenMoving()) {
         Card(
             Modifier.fillMaxWidth()
                 // The card's bounding box is glass (GlassCardBackdrop, its first child below, so the blur

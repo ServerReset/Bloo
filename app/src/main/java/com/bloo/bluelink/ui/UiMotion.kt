@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.uicommon.BounceDamping
+import com.bloo.uicommon.FloatingStiffness
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContent
 import kotlinx.coroutines.delay
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.layout.VerticalAlignmentLine
 import com.bloo.uicommon.MotionShort
+import com.bloo.uicommon.motionBlurWhenMoving
 import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.MorphedCornerPercent
 import com.bloo.uicommon.PillCornerPercent
@@ -156,16 +158,16 @@ internal fun PopVisible(
 ) {
     AnimatedVisibility(
         visible = visible,
-        modifier = modifier,
+        modifier = modifier.motionBlurWhenMoving(),
         enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
             scaleIn(
-                lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow),
+                lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = FloatingStiffness),
                 initialScale = 0.8f,
             ) +
-            (if (sizeAnimated) expandVertically(lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)) else EnterTransition.None),
+            (if (sizeAnimated) expandVertically(lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = FloatingStiffness)) else EnterTransition.None),
         exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
             scaleOut(MaterialTheme.motionScheme.defaultSpatialSpec<Float>(), targetScale = 0.8f) +
-            (if (sizeAnimated) shrinkVertically(lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)) else ExitTransition.None),
+            (if (sizeAnimated) shrinkVertically(lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = FloatingStiffness)) else ExitTransition.None),
         content = content,
     )
 }
@@ -206,7 +208,7 @@ internal fun ExpandVisibility(
     from: Alignment.Vertical = Alignment.Top,
     content: @Composable AnimatedVisibilityScope.() -> Unit,
 ) {
-    AnimatedVisibility(visible, modifier, enter = expandEnterSized(from), exit = expandExitSized(from), content = content)
+    AnimatedVisibility(visible, modifier.motionBlurWhenMoving(), enter = expandEnterSized(from), exit = expandExitSized(from), content = content)
 }
 
 /**
