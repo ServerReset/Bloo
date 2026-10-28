@@ -1,5 +1,6 @@
 package com.bloo.bluelink.work
 
+import com.bloo.bluelink.data.lastKnownStatus
 import androidx.work.ExistingPeriodicWorkPolicy
 import android.content.Context
 import androidx.work.WorkerParameters
@@ -117,9 +118,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
             }
             for (v in vehicles) {
                 AppLog.log("AlertWorker: requesting statusMutex for ${v.name}")
-                val status = runCatching {
-                    BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) }
-                }.getOrNull()
+                val status = repo.lastKnownStatus(v)
                 // Keep what we just paid a network round trip for. Only for a car we
                 // actually heard back about: a failed fetch has nothing to contribute,
                 // and this is the exact shape that once deleted the live charging bar

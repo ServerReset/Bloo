@@ -1,5 +1,6 @@
 package com.bloo.bluelink.work
 
+import com.bloo.bluelink.data.lastKnownStatus
 import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.ExistingWorkPolicy
@@ -84,9 +85,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : BlooWor
                 .getOrNull() ?: continue
             val vehicles = snapshotsByBrand[brand]?.map { it.toVehicle() } ?: emptyList()
             for (v in vehicles) {
-                val status = runCatching {
-                    BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) }
-                }.getOrNull()
+                val status = repo.lastKnownStatus(v)
                 if (status != null) learnedSomething = true
                 val ev = status?.evStatus
                 val charging = ev?.batteryCharge == true
