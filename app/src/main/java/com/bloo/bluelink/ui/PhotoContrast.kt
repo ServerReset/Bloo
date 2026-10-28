@@ -21,11 +21,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /*
- * Text that stays readable on ANY photo. The hero's text used to be one fixed colour per theme with a scrim built for it, which
- * fails on a photo of the wrong brightness. The photo is now sampled once where the text sits -- the title band at the top and
- * the readout band at the bottom -- and each band picks dark or light text from what is actually behind it. A band is judged by
- * the spread of its brightness, not only its average, so a gradient or a photo that changes behind the text is covered: the text
- * must hold up against the worst part of the band, and a scrim in the opposite tone is added only as far as that takes.
+ * The hero's text colour follows the photo. The photo is sampled once where the text sits -- the title band at the top and the
+ * readout band at the bottom -- and each band takes whichever of dark or light text contrasts more with what is behind it. The
+ * photo is never washed or scrimmed to make the text work.
  */
 
 /** Relative luminance (WCAG) of one sRGB colour, 0 (black) to 1 (white). */
@@ -48,13 +46,13 @@ internal fun contrastRatio(a: Float, b: Float): Float {
 @Immutable
 internal data class BandLuma(val mean: Float, val low: Float, val high: Float)
 
-/** What a band wants: dark or light text, and the opposite-tone scrim (0..1) that makes that text legible against the band's worst part. */
+/**
+ * The text a band of the photo wears: whichever of dark or light text contrasts more with the band's average brightness. There is no
+ * scrim: the photo is shown as it is, and the text is the colour that reads best on it.
+ */
 @Immutable
-internal data class BandOverlay(val darkText: Boolean, val scrimAlpha: Float, val behind: BandLuma) {
+internal data class BandOverlay(val darkText: Boolean, val behind: BandLuma) {
     val textColor: Color get() = if (darkText) HeroDarkText else HeroLightText
-
-    /** The scrim is the opposite tone of the text: a white wash behind dark text, a black one behind light text. */
-    val scrimTone: Color get() = if (darkText) Color.White else Color.Black
 }
 
 /** The hero's two text colours, matching the dark and light tones the card has always used. */
@@ -63,42 +61,9 @@ internal val HeroLightText = Color(0xFFF7F7FA)
 private val DarkTextLuma = relativeLuminance(0x1A, 0x1B, 0x20)
 private val LightTextLuma = relativeLuminance(0xF7, 0xF7, 0xFA)
 
-/** The contrast the text must keep against the worst part of its band (WCAG AA for normal text), with a margin for the blend maths. */
-private const val TargetContrast = 4.5f
-private const val ContrastMargin = 1.15f
-private const val MaxScrim = 0.8f
-
-/**
- * Dark or light text for [band], and how much opposite-tone scrim it needs. Dark text is judged against the DARKEST part of the
- * band and light text against the LIGHTEST, so a band that is light on one side and dark on the other chooses whichever text
- * can be rescued with less scrim, and gets that scrim.
- */
-internal fun overlayFor(band: BandLuma): BandOverlay {
-    val darkOnWorst = contrastRatio(DarkTextLuma, band.low)
-    val lightOnWorst = contrastRatio(LightTextLuma, band.high)
-    val darkText = darkOnWorst >= lightOnWorst
-    val need = TargetContrast * ContrastMargin
-    val alpha = if (darkText) {
-        if (darkOnWorst >= need) 0f else {
-            // Lift the darkest part until dark text clears the target: a white scrim at alpha a gives low + (1 - low) * a.
-            val required = need * (DarkTextLuma + 0.05f) - 0.05f
-            ((required - band.low) / (1f - band.low)).coerceIn(0f, MaxScrim)
-        }
-    } else {
-        if (lightOnWorst >= need) 0f else {
-            // Sink the lightest part until light text clears it: a black scrim at alpha a gives high * (1 - a).
-            val required = (LightTextLuma + 0.05f) / need - 0.05f
-            (1f - required / band.high.coerceAtLeast(0.0001f)).coerceIn(0f, MaxScrim)
-        }
-    }
-    return BandOverlay(darkText, alpha, band.under(scrimLight = darkText, alpha = alpha))
-}
-
-/** What the band's brightness becomes once a scrim of [alpha] is laid over it: white ([scrimLight]) lifts it, black sinks it. */
-internal fun BandLuma.under(scrimLight: Boolean, alpha: Float): BandLuma {
-    fun f(v: Float) = if (scrimLight) v + (1f - v) * alpha else v * (1f - alpha)
-    return BandLuma(f(mean), f(low), f(high))
-}
+/** Dark or light text for [band], whichever reads better against the band's average brightness. */
+internal fun overlayFor(band: BandLuma): BandOverlay =
+    BandOverlay(darkText = contrastRatio(DarkTextLuma, band.mean) >= contrastRatio(LightTextLuma, band.mean), behind = band)
 
 /** The decision for the two bands the hero's text sits in; a null band means "not measured", and the theme's own tone applies. */
 @Immutable

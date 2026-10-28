@@ -156,6 +156,10 @@ suspend fun SettingsStore.setUltraGlass(value: Boolean) {
     editTracked { it[SettingsStore.Keys.ULTRA_GLASS] = value.toString() }
 }
 
+suspend fun SettingsStore.setHeroEdge(value: Boolean) {
+    editTracked { it[SettingsStore.Keys.HERO_EDGE] = value.toString() }
+}
+
 suspend fun SettingsStore.setVibrancy(value: Float) {
     editTracked { it[SettingsStore.Keys.VIBRANCY] = value.toString() }
 }

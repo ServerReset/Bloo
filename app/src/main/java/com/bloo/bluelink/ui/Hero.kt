@@ -137,6 +137,7 @@ internal fun HeroHeader(
     CompositionLocalProvider(LocalHeroTone provides photoTone) {
         PebbleShell(
             expanded = heroShown,
+            edge = LocalAppearance.current.heroEdge,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
             icon = AppIcons.DirectionsCar,
             title = v.name,

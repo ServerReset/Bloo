@@ -3,12 +3,8 @@ package com.bloo.bluelink.ui
 import com.bloo.bluelink.data.StartupTrace
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,19 +14,13 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import coil.imageLoader
-import com.bloo.uicommon.MotionMedium
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -126,8 +116,7 @@ internal fun heroImageRequest(context: android.content.Context, model: Any): Ima
         .build()
 
 /**
- * Warms every car's hero photo before its page is swiped to: decodes it into Coil's memory cache (the sizes the hero and its frost
- * layer ask for) and measures the tone its text is chosen from. A page then draws its photo and its text colours on the first
+ * Warms every car's hero photo before its page is swiped to: decodes it into Coil's memory cache and measures the tone its text is chosen from. A page then draws its photo and its text colours on the first
  * frame. The decodes run one after another off the main thread, so a multi-car account never decodes them in one frame.
  */
 @Composable
@@ -144,27 +133,16 @@ internal fun PrefetchHeroPhotos(imageUrls: androidx.compose.runtime.State<Map<St
                 val result = loader.execute(heroImageRequest(context, model))
                 if (result is coil.request.SuccessResult) HeroPhotoReady.add(key)
             }
-            if (!isCutoutPhoto(url)) {
-                loader.enqueue(frostImageRequest(context, model))
-                measureHeroToneCached(context, model)
-            }
+            if (!isCutoutPhoto(url)) measureHeroToneCached(context, model)
         }
     }
 }
 
-/** The blurred copy behind the hero's text asks for this one. */
-internal fun frostImageRequest(context: android.content.Context, model: Any): ImageRequest =
-    ImageRequest.Builder(context).data(model).size(540, 540).crossfade(true).build()
-
 // collapseEnter / collapseExit (the app's one collapse spec) live in UiTokens.kt.
 
-/** The faintest tint kept on a measured photo, so its edges still sit together when no scrim is needed. */
-private const val MinPhotoScrim = 0.08f
-
 /**
- * The car photo plus a contrast scrim so overlaid text (title, chevron, charge readout) stays
- * legible on any photo. The gradient covers the FULL height and never reaches transparent; heaviest
- * at top and bottom, where content sits.
+ * The car photo, shown as it is. Overlaid text (title, chevron, charge readout) takes the colour that reads best on the photo behind it
+ * (see PhotoContrast); nothing is laid over the photo to make that work.
  */
 @Composable
 internal fun HeroPhotoBackdrop(
@@ -176,59 +154,6 @@ internal fun HeroPhotoBackdrop(
 ) {
     Box(Modifier.fillMaxWidth()) {
         HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio)
-        // Frost behind the text, not a wash over the whole photo: a blurred copy of the same photo, shown only in the top and
-        // bottom bands where the title, the numbers and the charge bar sit, fading out so the car in the middle stays sharp.
-        // It is a GPU blur on the photo's own layer, so it follows the content with no extra recomposition. (On a phone
-        // that cannot blur, the tint below is all there is.) A transparent cut-out PNG has no backdrop to frost.
-        val frostable = !imageUrl.isNullOrBlank() && !isCutoutPhoto(imageUrl)
-        if (frostable) {
-            val context = androidx.compose.ui.platform.LocalContext.current
-            val photoModel = rememberPhotoModel(imageUrl)
-            val frostRequest = remember(photoModel) { frostImageRequest(context, photoModel) }
-            val frostMask = remember {
-                Brush.verticalGradient(
-                    0f to Color.Black, 0.30f to Color.Transparent, 0.55f to Color.Transparent, 1f to Color.Black,
-                )
-            }
-            AsyncImage(
-                model = frostRequest,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize()
-                    .clip(RoundedCornerShape(corner))
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(frostMask, blendMode = BlendMode.DstIn)
-                    }
-                    .blur(16.dp, BlurredEdgeTreatment.Unbounded),
-            )
-        }
-        // A tint at the top and bottom edges in the OPPOSITE tone of the text there, as strong as that band's worst-case contrast needs
-        // (see overlayFor): a light photo gets almost none under dark text, a busy or mid-tone one gets enough to hold the text
-        // up. The two bands are judged apart, so a photo that is light at the top and dark at the bottom gets dark text above
-        // and light text below. Until the photo is measured (and for no photo or a cut-out) the theme's own tone is the fallback.
-        val tone = LocalHeroTone.current
-        val dark = appIsDarkTheme()
-        val gentle = imageUrl.isNullOrBlank()
-        val themeTone = if (dark) Color.White else Color.Black
-        val (themeTop, themeBottom) = when {
-            gentle -> 0.10f to 0.16f
-            dark -> 0.34f to 0.40f
-            else -> 0.30f to 0.40f
-        }
-        val topTone by animateColorAsState(tone.top?.scrimTone ?: themeTone, tween(MotionMedium), label = "scrimTopTone")
-        val bottomTone by animateColorAsState(tone.bottom?.scrimTone ?: themeTone, tween(MotionMedium), label = "scrimBottomTone")
-        val topAlpha by animateFloatAsState(tone.top?.scrimAlpha?.coerceAtLeast(MinPhotoScrim) ?: themeTop, tween(MotionMedium), label = "scrimTopAlpha")
-        val bottomAlpha by animateFloatAsState(tone.bottom?.scrimAlpha?.coerceAtLeast(MinPhotoScrim) ?: themeBottom, tween(MotionMedium), label = "scrimBottomAlpha")
-        val midAlpha = if (gentle) 0.02f else 0f
-        val scrim = Brush.verticalGradient(
-            0f to topTone.copy(alpha = topAlpha),
-            0.30f to topTone.copy(alpha = midAlpha),
-            0.62f to bottomTone.copy(alpha = midAlpha),
-            1f to bottomTone.copy(alpha = bottomAlpha),
-        )
-        Spacer(Modifier.matchParentSize().background(scrim))
     }
 }
 

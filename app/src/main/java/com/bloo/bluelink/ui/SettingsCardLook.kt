@@ -135,6 +135,11 @@ private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean,
                         VibrancySlider(appearance, vm)
                     }
                     SettingsGroup("Style") {
+                        ToggleRow(
+                            "Hero card edge",
+                            appearance.heroEdge,
+                            description = "the rim and shadow around the car card. Off, the photo floats on the page with no edge.",
+                        ) { vm.setHeroEdge(it) }
                         GlassClaritySlider(appearance, vm)
                     }
                 }

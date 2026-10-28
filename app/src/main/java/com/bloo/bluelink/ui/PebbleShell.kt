@@ -132,6 +132,8 @@ internal fun PebbleShell(
      * [Color.Unspecified] inherits; the hero sets it to stay legible over its photo.
      */
     titleColor: Color = Color.Unspecified,
+    /** Whether the card draws its rim and shadow. The hero turns it off for a floating photo. */
+    edge: Boolean = true,
     /**
      * Extra header content under the title and [summary] (the hero's collapsed charge readout).
      * Renders inside the header's text column. Null for other pebbles.
@@ -229,7 +231,7 @@ internal fun PebbleShell(
             Modifier.fillMaxWidth()
                 // The card's bounding box is glass (GlassCardBackdrop, its first child below, so the blur
                 // can be skipped while the pager moves); its own panels stay solid.
-                .pebbleCardEdge(pebbleShape),
+                .then(if (edge) Modifier.pebbleCardEdge(pebbleShape) else Modifier),
             shape = pebbleShape,
             // No shadow elevation: the whole card is scaled by ReorderColumn's drag lift and the
             // cold-start intro (a graphicsLayer on the pebble's own Box above), and the default 1dp
