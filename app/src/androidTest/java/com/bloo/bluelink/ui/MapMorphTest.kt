@@ -76,7 +76,6 @@ class MapMorphTest {
                     deviceLocation = null,
                     mapState = remember { CarMapState() },
                     map = { modifier, _ -> Box(modifier.testTag("map")) },
-                    hazeState = null,
                     onRefreshLocation = {},
                     onDismiss = {},
                 )
@@ -139,7 +138,6 @@ class MapMorphTest {
                             deviceLocation = null,
                             mapState = remember { CarMapState() },
                             map = { modifier, _ -> movable(modifier) },
-                            hazeState = null,
                             onRefreshLocation = {},
                             onDismiss = { dismissed++; open = false },
                         )
@@ -187,7 +185,6 @@ class MapMorphTest {
                     deviceLocation = null,
                     mapState = state,
                     map = { modifier, inputs -> movable(modifier, inputs) },
-                    hazeState = null,
                     onRefreshLocation = {},
                     onDismiss = onDismiss,
                 )
