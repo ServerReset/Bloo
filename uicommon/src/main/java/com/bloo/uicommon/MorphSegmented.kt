@@ -208,47 +208,34 @@ fun MorphSegmented(
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val slop = viewConfiguration.touchSlop
-                        var claimed = false
+                        var claimedHere = false
                         var crossed = false
                         var startFrac = 0f
                         var last = -1
                         val stepPx = widths.sum() / n + gapPx
-                        // The first few dp of a drag are held back (it resists), then it lets go
-                        // and catches up to the finger.
+                        // The first few dp of a drag are held back (it resists), then it lets go and catches up to the finger.
                         val resistPx = 18.dp.toPx()
                         try {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!change.pressed) {
-                                    if (!claimed) {
-                                        change.consume()
-                                        val idx = indexAt(down.position.x)
-                                        val key = currentOptions[idx].key
-                                        if (key != currentSelectedKey) {
-                                            currentOnTick()
-                                            currentOnSelect(key)
-                                        }
+                            awaitTapOrHorizontalDrag(
+                                down = down,
+                                slop = slop,
+                                onTap = {
+                                    val idx = indexAt(it.position.x)
+                                    val key = currentOptions[idx].key
+                                    if (key != currentSelectedKey) {
+                                        currentOnTick()
+                                        currentOnSelect(key)
                                     }
-                                    break
-                                }
-                                val dxPx = change.position.x - down.position.x
-                                if (!claimed) {
-                                    val dy = abs(change.position.y - down.position.y)
-                                    when {
-                                        abs(dxPx) > slop && abs(dxPx) >= dy -> {
-                                            claimed = true
-                                            change.consume()
-                                            startFrac = pos.value
-                                            dragFrac = startFrac
-                                            scope.launch { lag.snapTo(0f); stretch.animateTo(0f, spring(stiffness = Spring.StiffnessHigh)) }
-                                            currentOnTick()
-                                        }
-                                        dy > slop -> break
-                                    }
-                                }
-                                if (claimed && change.positionChanged()) {
-                                    change.consume()
+                                },
+                                onDragStart = {
+                                    claimedHere = true
+                                    startFrac = pos.value
+                                    dragFrac = startFrac
+                                    scope.launch { lag.snapTo(0f); stretch.animateTo(0f, spring(stiffness = Spring.StiffnessHigh)) }
+                                    currentOnTick()
+                                },
+                                onDrag = { change ->
+                                    val dxPx = change.position.x - down.position.x
                                     val target = startFrac + dxPx / stepPx
                                     if (!crossed && abs(dxPx) < resistPx) {
                                         dragFrac = startFrac + dxPx * 0.3f / stepPx
@@ -263,19 +250,19 @@ fun MorphSegmented(
                                     val idx = Math.round(posNow()).coerceIn(0, n - 1)
                                     dragIndex = idx
                                     if (idx != last) { last = idx; currentOnTick() }
-                                }
-                            }
-                            if (claimed) {
-                                val idx = Math.round(posNow()).coerceIn(0, n - 1)
-                                pendingIndex = idx
-                                val key = currentOptions[idx].key
-                                if (key != currentSelectedKey) currentOnSelect(key)
-                            }
+                                },
+                                onDragEnd = {
+                                    val idx = Math.round(posNow()).coerceIn(0, n - 1)
+                                    pendingIndex = idx
+                                    val key = currentOptions[idx].key
+                                    if (key != currentSelectedKey) currentOnSelect(key)
+                                },
+                            )
                         } finally {
                             val from = posNow()
                             val land = Math.round(from).coerceIn(0, n - 1)
                             dragIndex = null
-                            if (claimed) {
+                            if (claimedHere) {
                                 // Hand the highlight back to its own spring from exactly where the
                                 // finger left it, and let it snap to the option it is over.
                                 scope.launch {

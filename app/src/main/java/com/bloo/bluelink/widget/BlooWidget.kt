@@ -60,9 +60,6 @@ import com.bloo.bluelink.data.updatedLabel
 import com.bloo.uicommon.container
 import com.bloo.uicommon.content
 
-/** What the widget draws from: the saved cars, and whether the app is sealed after a restart. */
-private data class WidgetData(val sealed: Boolean, val cars: List<VehicleSnapshot>)
-
 /**
  * The widget's per-instance options, chosen on the configuration screen and stored in the widget's
  * own Glance state. Everything defaults to on/shown, so a widget placed without configuring still
@@ -104,18 +101,9 @@ internal data class WidgetOptions(
  * to the span rather than overflowing it -- see [AdaptiveBody]), per-widget options, and a sealed
  * state that shows no car data until the app is signed in after a restart.
  */
-class BlooWidget : GlanceAppWidget() {
-    // EXACT, not Responsive: Responsive renders the largest of a fixed set of nominal sizes that fits, and the
-    // nominal cell sizes are far smaller than a modern launcher's real cells, so the content was laid out for a
-    // smaller box than it got -- the empty space around everything. Exact hands the layout the real size, which
-    // the text and controls then scale to fill.
-    override val sizeMode = SizeMode.Exact
-    override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
-
+class BlooWidget : BlooGlanceWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val sealed = BootGate.isLocked(context)
-        val cars = if (sealed) emptyList() else runCatching { SnapshotStore(context).current().vehicles }.getOrDefault(emptyList())
-        val data = WidgetData(sealed, cars)
+        val data = loadWidgetCars(context)
         provideContent {
             GlanceTheme { WidgetContent(data) }
         }
@@ -123,7 +111,7 @@ class BlooWidget : GlanceAppWidget() {
 }
 
 @Composable
-private fun WidgetContent(data: WidgetData) {
+private fun WidgetContent(data: WidgetCars) {
     val prefs = currentState<Preferences>()
     val context = androidx.glance.LocalContext.current
     val opts = WidgetOptions.of(prefs)

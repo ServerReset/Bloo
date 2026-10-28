@@ -223,43 +223,16 @@ fun AnimatedSlider(
                 if (!enabled) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    val slop = viewConfiguration.touchSlop
-                    var claimed = false
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) {
-                            // Released before claiming: a tap, settle at the release point.
-                            if (!claimed) {
-                                change.consume()
-                                settleTo(snapToStep(rawForX(down.position.x), valueRange, steps))
-                            }
-                            break
-                        }
-                        if (!claimed) {
-                            val dx = abs(change.position.x - down.position.x)
-                            val dy = abs(change.position.y - down.position.y)
-                            when {
-                                dx > slop && dx >= dy -> {
-                                    claimed = true
-                                    dragging = true
-                                    change.consume()
-                                    trackTo(change.position.x)
-                                }
-                                dy > slop -> break
-                            }
-                        } else if (change.positionChanged()) {
-                            // Already dragging: keep the thumb tracking the finger every frame via
-                            // trackTo's free-flow + overshoot logic.
-                            trackTo(change.position.x)
-                            change.consume()
-                        }
-                    }
-                    // Drag ended: settle at the step the final anim.value quantizes to.
-                    if (claimed) {
-                        dragging = false
-                        settleTo(snapToStep(anim.value, valueRange, steps))
-                    }
+                    awaitTapOrHorizontalDrag(
+                        down = down,
+                        slop = viewConfiguration.touchSlop,
+                        // A tap settles at the step the press began on.
+                        onTap = { settleTo(snapToStep(rawForX(it.position.x), valueRange, steps)) },
+                        onDragStart = { dragging = true; trackTo(it.position.x) },
+                        onDrag = { trackTo(it.position.x) },
+                        // Drag ended: settle at the step the final anim.value quantizes to.
+                        onDragEnd = { dragging = false; settleTo(snapToStep(anim.value, valueRange, steps)) },
+                    )
                 }
             }
             // The LOGICAL value, not anim.value: reading the Animatable here invalidated

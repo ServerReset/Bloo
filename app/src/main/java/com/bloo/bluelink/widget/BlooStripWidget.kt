@@ -75,14 +75,11 @@ internal fun stripControlCount(widthDp: Float, buttonDp: Float = 38f): Int =
  * ([CarActionCallback] runs them, Unlock asks for its second tap) and follows the first car; the full widget is the
  * one with a car picker and options.
  */
-class BlooStripWidget : GlanceAppWidget() {
+class BlooStripWidget : BlooGlanceWidget() {
     // Exact: the strip lays itself out from its real size (a roomier one gains a state line and a charge bar).
-    override val sizeMode = SizeMode.Exact
-    override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val sealed = BootGate.isLocked(context)
-        val cars = if (sealed) emptyList() else runCatching { SnapshotStore(context).current().vehicles }.getOrDefault(emptyList())
+        val (sealed, cars) = loadWidgetCars(context)
         provideContent { GlanceTheme { StripContent(cars) } }
     }
 }
