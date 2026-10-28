@@ -58,6 +58,15 @@ fun parseJsonOrThrow(json: Json, text: String, code: Int, message: String): Json
         .getOrElse { throw BlueLinkException(message, code = code) }
 
 /**
+ * The message a failed response carries: [pick] reads it from the brand's own JSON error body, and the brand's fallback names the failure
+ * when the body has none. Shared by the brands that report failures as JSON; which field each brand reads stays in its own [pick].
+ */
+internal fun friendlyFailure(json: Json, body: String, brand: String, code: Int, pick: (JsonObject) -> String?): String {
+    val msg = runCatching { json.parseToJsonElement(body).obj()?.let(pick) }.getOrNull()
+    return msg?.takeIf { it.isNotBlank() } ?: "$brand request failed (HTTP $code)"
+}
+
+/**
  * The shared request skeleton of the brand clients that report failures in-band (Canada, Kia US): runs [request],
  * retrying once on a fresh connection when a GET's body cannot be framed (see [ResponseFraming]), turns any non-2xx
  * into a [BlueLinkException] carrying [friendly]'s message, parses the body (blank = empty object), and hands the

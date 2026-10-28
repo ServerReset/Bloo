@@ -352,13 +352,10 @@ class KiaUsaApi {
 
     internal fun raw(request: Request): Response = client.newCall(request).execute()
 
-    internal fun friendly(code: Int, body: String): String {
-        val msg = runCatching {
-            json.parseToJsonElement(body).obj()?.path("status", "errorMessage")?.str()
-                ?: json.parseToJsonElement(body).obj()?.get("errorMessage")?.str()
-        }.getOrNull()
-        return msg?.takeIf { it.isNotBlank() } ?: "Kia request failed (HTTP $code)"
-    }
+    internal fun friendly(code: Int, body: String): String =
+        friendlyFailure(json, body, "Kia", code) { obj ->
+            (obj.path("status", "errorMessage") ?: obj["errorMessage"])?.str()
+        }
 
     /**
      * Parse a response body to JSON, converting a malformed/empty/non-JSON body

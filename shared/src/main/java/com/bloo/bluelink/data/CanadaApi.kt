@@ -332,12 +332,8 @@ class CanadaApi(private val brand: Brand) {
         }
     }
 
-    internal fun friendly(code: Int, body: String): String {
-        val msg = runCatching {
-            json.parseToJsonElement(body).obj()?.let {
-                it.path("error", "errorDesc") ?: it["responseDesc"] ?: it.path("status", "errorMessage")
-            }?.str()
-        }.getOrNull()
-        return msg?.takeIf { it.isNotBlank() } ?: "Canada request failed (HTTP $code)"
-    }
+    internal fun friendly(code: Int, body: String): String =
+        friendlyFailure(json, body, "Canada", code) { obj ->
+            (obj.path("error", "errorDesc") ?: obj["responseDesc"] ?: obj.path("status", "errorMessage"))?.str()
+        }
 }

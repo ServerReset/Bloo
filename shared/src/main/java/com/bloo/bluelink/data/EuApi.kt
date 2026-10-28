@@ -362,12 +362,10 @@ class EuApi(private val brand: Brand) {
             root
         }
 
-    internal fun friendly(code: Int, body: String): String {
-        val msg = runCatching {
-            json.parseToJsonElement(body).obj()?.let { it["resMsg"] ?: it.path("error", "message") }?.str()
-        }.getOrNull()
-        return msg?.takeIf { it.isNotBlank() } ?: "Europe request failed (HTTP $code)"
-    }
+    internal fun friendly(code: Int, body: String): String =
+        friendlyFailure(json, body, "Europe", code) { obj ->
+            (obj["resMsg"] ?: obj.path("error", "message"))?.str()
+        }
 
     /**
      * Filters the 12V auxiliary battery reading the way the reference project's own
