@@ -84,13 +84,7 @@ object AutoLockEventNotifier {
 
         val contentIntent = com.bloo.bluelink.Shortcuts.openCardPendingIntent(context, vin, requestCode = notificationId(vin))
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_bloo)
-            .setColor(BlooColors.brandAccent)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setAutoCancel(true)
+        val builder = com.bloo.bluelink.data.Notifications.baseBuilder(context, CHANNEL_ID, title, text)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             // Said outright: shown on a paired watch as well as the phone (Wear OS bridges every notification that is not

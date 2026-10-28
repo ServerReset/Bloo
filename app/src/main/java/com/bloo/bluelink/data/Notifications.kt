@@ -16,6 +16,19 @@ import com.bloo.uicommon.content
 
 /** Posts Bloo's local alerts (service due, door left open, car left running). */
 object Notifications {
+    /**
+     * The base every car notification starts from: the app's small icon and accent, the title, and the text in a big-text style so a long
+     * line is not cut. Callers add their own category, priority, intent and visibility.
+     */
+    fun baseBuilder(context: Context, channelId: String, title: String, text: String): NotificationCompat.Builder =
+        NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.ic_stat_bloo)
+            .setColor(ACCENT)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+
     // One channel per KIND of notification, so the user can tune (or silence) each independently in
     // system settings -- a car that keeps nagging about a door is a very different thing from "your
     // car was started", and Android gives no way to split them once they share a channel. Every
@@ -173,13 +186,7 @@ object Notifications {
         if (!hasPermission(context)) return false
         ensureChannel(context, channelId)
         val pi = com.bloo.bluelink.Shortcuts.openCardPendingIntent(context, vin = null)
-        val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_stat_bloo)
-            .setColor(ACCENT)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setAutoCancel(true)
+        val builder = baseBuilder(context, channelId, title, text)
             .setLocalOnly(localOnly)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
