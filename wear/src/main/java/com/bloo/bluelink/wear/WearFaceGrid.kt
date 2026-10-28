@@ -40,7 +40,6 @@ import com.bloo.uicommon.standardButtonIcon
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.DisposableEffect
@@ -157,18 +156,12 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
     // A tile that is on breathes, but only its CONTENT: breathing the whole layer re-blurred the glass behind it on every frame, and
     // only while the watch is in front of the wearer (a stopped activity keeps its composition).
     val breathe = androidx.compose.runtime.remember { Animatable(1f) }
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    LaunchedEffect(action.active, policy.ambientMotion, lifecycleOwner) {
-        if (!(action.active && policy.ambientMotion)) {
-            breathe.snapTo(1f)
-            return@LaunchedEffect
-        }
-        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
-            while (true) {
-                breathe.animateTo(0.86f, androidx.compose.animation.core.tween(1500, easing = FastOutSlowInEasing))
-                breathe.animateTo(1f, androidx.compose.animation.core.tween(1500, easing = FastOutSlowInEasing))
-            }
-        }
+    LoopWhileInFront(
+        active = action.active && policy.ambientMotion,
+        onRest = { breathe.snapTo(1f) },
+    ) {
+        breathe.animateTo(0.86f, androidx.compose.animation.core.tween(1500, easing = FastOutSlowInEasing))
+        breathe.animateTo(1f, androidx.compose.animation.core.tween(1500, easing = FastOutSlowInEasing))
     }
     // The glyph bounces when the tile's meaning changes (Lock becomes Unlock, Climate turns on).
     val glyphBump = androidx.compose.runtime.remember { Animatable(1f) }

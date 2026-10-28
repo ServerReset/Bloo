@@ -3,7 +3,6 @@ package com.bloo.bluelink.wear
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.LinearEasing
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -54,20 +53,11 @@ fun WearEdgeRing(
     // A slight sheen over the charged part while the car charges, and the same for a refresh.
     val sheenOn = (charging || refreshing) && policy.ambientMotion && progress != null
     val sheenPhase = remember { Animatable(0f) }
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     // Only while the watch is in front of the wearer: a charging car leaves the face composed all night, and a sheen that outlived
     // the screen would redraw the whole ring 60 times a second for nobody.
-    LaunchedEffect(sheenOn, lifecycleOwner) {
-        if (!sheenOn) {
-            sheenPhase.snapTo(0f)
-            return@LaunchedEffect
-        }
-        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
-            while (true) {
-                sheenPhase.snapTo(0f)
-                sheenPhase.animateTo(1f, tween(1000, easing = LinearEasing))
-            }
-        }
+    LoopWhileInFront(active = sheenOn, onRest = { sheenPhase.snapTo(0f) }) {
+        sheenPhase.snapTo(0f)
+        sheenPhase.animateTo(1f, tween(1000, easing = LinearEasing))
     }
     val sheen = if (sheenOn) sheenPhase.asState() else null
     // The level lands with a bounce (it overshoots the new charge and settles), as the phone's bar does.
