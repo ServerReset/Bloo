@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.Json
 
 /**
  * The phone's saved climate presets, as the watch holds them: pushed with every sync, kept in plain prefs (nothing
@@ -19,7 +18,7 @@ import kotlinx.serialization.json.Json
  * exactly as on the phone. [fahrenheit] is the phone's own unit choice, so a preset reads the same on both.
  */
 internal object WearPresets {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = com.bloo.bluelink.data.BlooJson
     private val serializer = MapSerializer(String.serializer(), ListSerializer(ClimatePreset.serializer()))
 
     private val _presets = MutableStateFlow<Map<String, List<ClimatePreset>>>(emptyMap())
