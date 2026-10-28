@@ -94,17 +94,17 @@ internal suspend fun <T> controlTokenAuth(
 }
 
 /**
- * Coordinates one brand's API client with its persisted session, retrying once on an auth failure
- * by refreshing the access token. All data is live.
+ * Coordinates one brand's API client with its persisted session, retrying once on an auth failure by refreshing the access token. All data
+ * is live. The shared session handling is in [SessionRepository]; this keeps the session in memory and renews it by refresh token.
  */
 class BlueLinkRepository(
     private val api: BlueLinkApi,
-    private val store: SessionStore,
-    private val brand: Brand,
-) : VehicleRepository {
+    store: SessionStore,
+    brand: Brand,
+) : SessionRepository<SessionStore.Session>(store, brand) {
     /**
      * In-memory copy of the last [SessionStore.Session] loaded for this brand, alongside
-     * [withSession]'s own timing showing store.load() itself taking 1-3 SECONDS -- not the usual
+     * [loadSession]'s own timing showing store.load() itself taking 1-3 SECONDS -- not the usual
      * "instant, already-warm DataStore read" this class's own comments assumed -- and a single
      * cold-start burst calling it three separate times back to back (once each for the current
      * car's status, another car's status, and trips), paying that cost fully every time for data
@@ -129,9 +129,33 @@ class BlueLinkRepository(
         cachedSession = session
     }
 
-    override suspend fun logout() {
-        store.clear(brand)
+    override fun clearCaches() {
         cachedSession = null
+    }
+
+    override suspend fun loadSession(): SessionStore.Session {
+        cachedSession?.let { return it }
+        val loadStartedAt = System.currentTimeMillis()
+        val loaded = store.load(brand) ?: throw BlueLinkException("Not logged in")
+        val loadMs = System.currentTimeMillis() - loadStartedAt
+        if (loadMs > 500) {
+            AppLog.log("BlueLinkRepository: store.load(${brand.label}) took ${loadMs}ms")
+        }
+        return loaded.also { cachedSession = it }
+    }
+
+    override fun SessionStore.Session.toSession(): SessionStore.Session = this
+
+    /** Only with a refresh token to trade in: without one there is nothing to refresh, so the failure stands. */
+    override fun isSessionFailure(e: BlueLinkException, session: SessionStore.Session): Boolean =
+        e.isUnauthorized() && session.refreshToken != null
+
+    override suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): SessionStore.Session {
+        val refreshed = api.refresh(stored.refreshToken ?: throw e)
+        store.updateAccessToken(brand, refreshed.accessToken, refreshed.refreshToken)
+        val updated = store.load(brand) ?: throw e
+        cachedSession = updated
+        return updated
     }
 
     // Stamps each vehicle returned by the API with this repository's brand code, since the raw API
@@ -191,34 +215,6 @@ class BlueLinkRepository(
         withSession { s -> api.stopCharge(s.accessToken, s.username, s.pin, v) }
     }
 
-    /**
-     * Runs [block] with this brand's session, refreshing the token once on 401/403. The session is read from the cache first (see
-     * [cachedSession] for why), and a store read happens only when it is not cached.
-     */
-    private suspend fun <T> withSession(block: suspend (SessionStore.Session) -> T): T {
-        val session = cachedSession ?: run {
-            val loadStartedAt = System.currentTimeMillis()
-            val loaded = store.load(brand) ?: throw BlueLinkException("Not logged in")
-            val loadMs = System.currentTimeMillis() - loadStartedAt
-            if (loadMs > 500) {
-                AppLog.log("BlueLinkRepository: store.load(${brand.label}) took ${loadMs}ms")
-            }
-            loaded.also { cachedSession = it }
-        }
-        return withReauthOnce(
-            session,
-            // Only with a refresh token to trade in: without one there is nothing to refresh, so the failure stands.
-            isAuthFailure = { it.isUnauthorized() && session.refreshToken != null },
-            reauthenticate = { e ->
-                val refreshed = api.refresh(session.refreshToken ?: throw e)
-                store.updateAccessToken(brand, refreshed.accessToken, refreshed.refreshToken)
-                val updated = store.load(brand) ?: throw e
-                cachedSession = updated
-                updated
-            },
-            block = block,
-        )
-    }
 }
 
 /** What a Canada or EU account lists for each of its cars: enough to identify one and to build a [Vehicle] from. */

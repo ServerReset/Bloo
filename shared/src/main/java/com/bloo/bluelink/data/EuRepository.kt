@@ -96,7 +96,7 @@ class EuRepository(
      * Only a genuine token or device expiry (EuApi maps those to 401) triggers a silent refresh. A bare 403 or a business error like
      * "Duplicate request" is terminal here - retrying it would just refresh or duplicate the command.
      */
-    override fun isSessionFailure(e: BlueLinkException): Boolean = e.code == 401
+    override fun isSessionFailure(e: BlueLinkException, session: SessionStore.Session): Boolean = e.code == 401
 
     /** Refreshes the token, falling back to a full re-login, and saves the result in place of the expired session. */
     override suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): EuSession {

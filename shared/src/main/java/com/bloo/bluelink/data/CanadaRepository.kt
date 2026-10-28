@@ -90,7 +90,7 @@ class CanadaRepository(
         api.pinAuth(s, summary.id, pin)
 
     /** A 401 or 403 means the Canada session has expired. */
-    override fun isSessionFailure(e: BlueLinkException): Boolean = e.isUnauthorized()
+    override fun isSessionFailure(e: BlueLinkException, session: SessionStore.Session): Boolean = e.isUnauthorized()
 
     /**
      * A fresh session from the stored credentials, saved in place of the expired one. The control tokens were minted for the dead session,

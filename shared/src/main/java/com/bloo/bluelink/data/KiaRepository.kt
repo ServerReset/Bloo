@@ -120,7 +120,7 @@ class KiaRepository(
     override suspend fun fetchVehicles(s: KiaSession): List<KiaVehicleSummary> = api.vehicles(s)
 
     /** A 401 or 403 means the Kia session has expired. */
-    override fun isSessionFailure(e: BlueLinkException): Boolean = e.isUnauthorized()
+    override fun isSessionFailure(e: BlueLinkException, session: SessionStore.Session): Boolean = e.isUnauthorized()
 
     /** Re-authenticates with the stored rmtoken, silently (no OTP), and refreshes the session-bound vinkeys before the retry. */
     override suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): KiaSession {
