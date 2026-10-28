@@ -33,10 +33,8 @@ suspend fun EuApi.login(username: String, password: String, deviceId: String, pi
 suspend fun EuApi.vehicles(session: EuSession): List<EuVehicleSummary> = withContext(Dispatchers.IO) {
     val req = Request.Builder().url(spa + "vehicles").get().authHeaders(session, 0).build()
     val list = call(req).path("resMsg", "vehicles") as? JsonArray ?: JsonArray(emptyList())
-    list.mapNotNull { e ->
-        val o = e.obj() ?: return@mapNotNull null
-        val id = o["vehicleId"]?.str() ?: return@mapNotNull null
-        logAccountCar(o)
+    list.mapNotNull { entry ->
+        val (o, id) = accountCar(entry) ?: return@mapNotNull null
         val type = o["type"]?.str()?.uppercase(Locale.US)
         EuVehicleSummary(
             id = id, name = o["nickname"]?.str() ?: o["vehicleName"]?.str() ?: id.takeLast(6),

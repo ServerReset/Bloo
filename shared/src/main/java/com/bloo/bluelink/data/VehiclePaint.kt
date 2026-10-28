@@ -1,5 +1,6 @@
 package com.bloo.bluelink.data
 
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -26,6 +27,17 @@ internal fun paintOf(car: JsonObject): VehiclePaint {
 }
 
 /** Logs which fields an account car lists (names only) and its colour and trim (not private, and no VIN), so a picture can be matched. */
+/**
+ * One entry of an account's vehicle list: its car object and its vehicle id, logged for the account's own diagnostics. Null when the entry
+ * is not a car or has no vehicle id. Canada and Europe read their lists this way.
+ */
+internal fun accountCar(entry: JsonElement): Pair<JsonObject, String>? {
+    val o = entry.obj() ?: return null
+    val id = o["vehicleId"]?.str() ?: return null
+    logAccountCar(o)
+    return o to id
+}
+
 internal fun logAccountCar(car: JsonObject) {
     val paint = paintOf(car)
     AppLog.log("Account vehicle fields (names only): ${car.keys.sorted().joinToString()}")

@@ -180,10 +180,8 @@ class CanadaApi(private val brand: Brand) {
         val req = Request.Builder().url(apiUrl + "vhcllst")
             .post(ByteArray(0).toRequestBody(null)).authHeaders(session).build()
         val list = call(req).path("result", "vehicles") as? JsonArray ?: JsonArray(emptyList())
-        list.mapNotNull { e ->
-            val o = e.obj() ?: return@mapNotNull null
-            val id = o["vehicleId"]?.str() ?: return@mapNotNull null
-            logAccountCar(o)
+        list.mapNotNull { entry ->
+            val (o, id) = accountCar(entry) ?: return@mapNotNull null
             CanadaVehicleSummary(
                 id = id,
                 name = vehicleDisplayName(o["nickName"]?.str(), o["modelName"]?.str(), id),
