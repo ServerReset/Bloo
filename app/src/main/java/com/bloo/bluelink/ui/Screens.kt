@@ -100,9 +100,11 @@ fun BlooApp(vm: AppViewModel) {
     // fully off screen while locked, and springs to rest on unlock with a little overshoot. Held here because
     // SearchLayer is not composed while locked.
     val searchRise = remember { Animatable(if (locked) 1f else 0f) }
+    // The spring is built here, in composition: lowPowerAwareSpring is @Composable, so it cannot be read inside the coroutine below.
+    val searchRiseSpec = lowPowerAwareSpring<Float>(dampingRatio = SearchRiseDamping, stiffness = Spring.StiffnessMediumLow)
     LaunchedEffect(locked) {
         if (locked) searchRise.snapTo(1f)
-        else searchRise.animateTo(0f, lowPowerAwareSpring(dampingRatio = SearchRiseDamping, stiffness = Spring.StiffnessMediumLow))
+        else searchRise.animateTo(0f, searchRiseSpec)
     }
     val screenHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
     val loading by remember { derivedStateOf { state.loading } }
