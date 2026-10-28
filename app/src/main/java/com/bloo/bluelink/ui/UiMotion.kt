@@ -159,7 +159,7 @@ internal fun PopVisible(
         enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
             scaleIn(
                 lowPowerFloating(),
-                initialScale = 0.8f,
+                initialScale = 0.9f,
             ) +
             (if (sizeAnimated) expandVertically(lowPowerFloating()) else EnterTransition.None),
         exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +

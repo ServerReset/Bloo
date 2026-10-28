@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.UpdateApi
+import com.bloo.bluelink.update.UpdateInfo
 import com.bloo.bluelink.data.buildLabel
 import com.bloo.bluelink.update.PlayUpdates
 import com.bloo.bluelink.update.UpdateRuntime
@@ -98,9 +99,12 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
     val seamless = LocalAppearance.current.seamlessInstallShizuku && state.shizukuAvailable
     val info = state.updateAvailable?.takeIf { !state.updateTileDismissed }
     val current = vm.currentBuildNumber
-    // Opened only when there is an update to explain, keyed on its build so a new one starts closed.
-    var showHelp by rememberSaveable(info?.run?.runNumber) { mutableStateOf(false) }
+    // Keyed on the build, so a new one opens with its details closed.
+    var showDetails by rememberSaveable(info?.run?.runNumber) { mutableStateOf(false) }
 
+    // 1. The version jump, when this surface needs it (the tile does; Settings shows it in its header).
+    // 2. What is happening now, in one line with its progress.
+    // 3. The one thing to do, and the way out of it.
     if (info != null) {
         val newLabel = buildLabel(info.run.runNumber)
         // Build delta ("build 812 → build 828") when the installed build is known, else just the target.
@@ -108,13 +112,12 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
         if (showHeadline) UpdateDeltaHero(current, info.run.runNumber)
         NestedGlassPanel(hazeState) {
             Column(Modifier.padding(GapGroup)) {
-                // The version is already above (headline or header), so the status line says what is happening, not the version again.
+                // The version is already above, so the status line says what is happening, not the version again.
                 UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = false)
             }
         }
         if (primaryInBody) {
             val act = updateAction(state, info, seamless)
-            // Full width, like the rest of the card: side by side the download button collapsed to an icon.
             MorphButton(
                 onClick = { runUpdateAction(state, vm, info, context) },
                 modifier = Modifier.fillMaxWidth(),
@@ -127,51 +130,33 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
                 MorphButtonLabel(act.icon, act.label, pending = false)
             }
         }
-        // Progressive install help: only in the tap-through path, and only as an opt-in disclosure -- the Play Protect steps are scaffolding,
-        // not something to shout before the user has tapped Update.
-        if (!seamless) {
-            MorphTextButton(
-                if (showHelp) "Hide install help" else "Trouble installing?",
-                onClick = { showHelp = !showHelp },
-            )
-            PopVisible(visible = showHelp) {
-                NestedGlassPanel(hazeState) {
-                    Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-                        // Without Shizuku the OS installer gets in the way EVERY time, and the Play Protect sheet is folded shut by default, so an
-                        // update looks like it failed when the real answer is "expand it, then tap Install anyway". Spell that out up front.
-                        if (!state.shizukuAvailable || !LocalAppearance.current.seamlessInstallShizuku) {
-                            RevealMutedText(
-                                "Shizuku is off, so Android asks you to confirm each update. On the next screen tap \"More details\" to expand it, then \"Install anyway\".",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        RevealText(
-                            if (info.run.phoneApkUrl != null) "1. Tap \"Update\", then \"Install\" once it downloads" else "1. Download the APK, then open it",
-                            style = SecondaryTextStyle(),
-                        )
-                        RevealText(
-                            "2. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"",
-                            style = SecondaryTextStyle(),
-                        )
-                    }
-                }
-            }
-        }
-        // Dismiss, snooze and undo in one shared row, so this and the pebble cannot drift.
         UpdateDismissRow(state, vm)
-        UpdateReleaseNotes(info, hazeState = hazeState)
     } else {
-        // Nothing waiting: the installed build is the headline, and the check below is how to look again.
         Row(verticalAlignment = Alignment.Bottom) {
             RollingNumber(
                 text = if (current > 0) "$current" else "dev",
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.height(GapGroup))
         }
     }
 
+    // 4. Everything secondary sits behind one disclosure: what is new, how to install, and Shizuku.
+    MorphTextButton(
+        if (showDetails) "Hide details" else "Details",
+        onClick = { showDetails = !showDetails },
+    )
+    PopVisible(visible = showDetails, sizeAnimated = true) {
+        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+            if (info != null) {
+                UpdateReleaseNotes(info, hazeState = hazeState)
+                if (!seamless) InstallHelp(state, info, hazeState)
+            }
+            ShizukuSetting(state, vm)
+        }
+    }
+
+    // 5. The two ways to look for this yourself, always at the foot.
     ActionRow {
         MorphTextButton(
             "Check",
@@ -188,11 +173,37 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
             fillOnPress = false,
         )
     }
-    // Seamless install is a Shizuku feature: a toggle when Shizuku is present, otherwise the way to get it.
-    if (state.shizukuAvailable) {
-        ToggleRow("Install seamlessly (Shizuku)", LocalAppearance.current.seamlessInstallShizuku) {
-            vm.setSeamlessInstallShizuku(it)
+}
+
+/**
+ * How to get past Android's installer, for the tap-through path only. Without Shizuku the OS installer asks every time, and Play Protect's
+ * sheet is folded shut by default, so an update looks like it failed when the real answer is "expand it, then tap Install anyway".
+ */
+@Composable
+private fun InstallHelp(state: UiState, info: UpdateInfo, hazeState: HazeState?) {
+    NestedGlassPanel(hazeState) {
+        Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
+            if (!state.shizukuAvailable || !LocalAppearance.current.seamlessInstallShizuku) {
+                RevealMutedText(
+                    "Shizuku is off, so Android asks you to confirm each update. On the next screen tap \"More details\" to expand it, then \"Install anyway\".",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            RevealText(
+                if (info.run.phoneApkUrl != null) "1. Tap \"Update\", then \"Install\" once it downloads" else "1. Download the APK, then open it",
+                style = SecondaryTextStyle(),
+            )
+            RevealText("2. If you see \"Blocked by Play Protect\", tap \"More details\" → \"Install anyway\"", style = SecondaryTextStyle())
         }
+    }
+}
+
+/** Seamless install is a Shizuku feature: a switch when Shizuku is present, otherwise how to get it. */
+@Composable
+private fun ShizukuSetting(state: UiState, vm: AppViewModel) {
+    val context = LocalContext.current
+    if (state.shizukuAvailable) {
+        ToggleRow("Install seamlessly (Shizuku)", LocalAppearance.current.seamlessInstallShizuku) { vm.setSeamlessInstallShizuku(it) }
     } else {
         BodySmallText("Update without tapping through Android's installer. No root needed.")
         MorphTextButton(

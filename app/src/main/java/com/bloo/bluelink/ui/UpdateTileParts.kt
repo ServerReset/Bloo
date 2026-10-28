@@ -70,7 +70,7 @@ internal fun NestedGlassPanel(hazeState: dev.chrisbanes.haze.HazeState?, content
     )
 }
 
-/** The release notes block: "What's new", in full, and a link to the formatted notes. */
+/** The release notes, in full, under a "What's new" heading. */
 @Composable
 internal fun UpdateReleaseNotes(info: UpdateInfo, hazeState: dev.chrisbanes.haze.HazeState? = null) {
     val notes = info.run.releaseNotes?.trim().orEmpty()
@@ -82,14 +82,8 @@ internal fun UpdateReleaseNotes(info: UpdateInfo, hazeState: dev.chrisbanes.haze
     // second shadow.
     NestedGlassPanel(hazeState) {
         Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            ActionRow {
-                MorphTextButton(
-                    "GitHub",
-                    onClick = { context.openExternalUrl(info.run.htmlUrl) },
-                    icon = Icons.AutoMirrored.Filled.OpenInNew,
-                    fillOnPress = false,
-                )
-            }
+            // The footer's Releases link is the way out to GitHub, so the notes carry no link of their own.
+            RevealText("What's new", style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold)
             RevealText(
                 notes,
                 style = SecondaryTextStyle(),
