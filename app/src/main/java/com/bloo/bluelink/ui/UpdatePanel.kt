@@ -3,7 +3,6 @@ package com.bloo.bluelink.ui
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -35,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.UpdateApi
 import com.bloo.bluelink.data.buildLabel
@@ -182,7 +180,7 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
         )
         MorphTextButton(
             "Releases",
-            onClick = { context.tryStart(Intent(Intent.ACTION_VIEW, UpdateApi.RELEASES_URL.toUri())) },
+            onClick = { context.openExternalUrl(UpdateApi.RELEASES_URL) },
             icon = Icons.AutoMirrored.Filled.OpenInNew,
             fillOnPress = false,
         )

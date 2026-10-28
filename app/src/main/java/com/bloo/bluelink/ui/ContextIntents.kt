@@ -79,10 +79,13 @@ internal fun shareLocation(context: Context, location: GeoLocation, label: Strin
     )
 }
 
+/** Opens [url] in the device's own browser app. Returns false when there is none to open it, so a caller can say so. */
+internal fun Context.openExternalUrl(url: String): Boolean = tryStart(Intent(Intent.ACTION_VIEW, url.toUri()))
+
 internal fun openUrl(context: Context, url: String) {
     val uri = url.toUri()
     runCatching { CustomTabsIntent.Builder().build().launchUrl(context, uri) }
-        .onFailure { context.tryStart(Intent(Intent.ACTION_VIEW, uri)) }
+        .onFailure { context.openExternalUrl(url) }
 }
 
 internal fun openApp(context: Context, packages: List<String>, fallbackUrl: String) {

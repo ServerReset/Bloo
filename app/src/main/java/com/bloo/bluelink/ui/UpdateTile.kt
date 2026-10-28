@@ -6,7 +6,6 @@ package com.bloo.bluelink.ui
  */
 
 import android.content.Context
-import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
@@ -21,7 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.update.PlayUpdates
 import com.bloo.bluelink.update.UpdateInfo
@@ -150,7 +148,7 @@ internal fun runUpdateAction(state: UiState, vm: AppViewModel, info: UpdateInfo,
         else -> {
             // Dismiss ONLY if the page really opened. Swallowing an ActivityNotFoundException and dismissing anyway meant a tap did visibly
             // nothing AND cost the user the tile.
-            val opened = context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri()))
+            val opened = context.openExternalUrl(info.run.htmlUrl)
             if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
         }
     }

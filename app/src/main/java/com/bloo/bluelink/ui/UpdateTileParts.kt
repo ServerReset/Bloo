@@ -6,7 +6,6 @@ package com.bloo.bluelink.ui
  * [SettingsHeroCard]'s expanded body.
  */
 
-import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.fadeIn
@@ -42,7 +41,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.update.UpdateInfo
 import com.bloo.uicommon.IconBadgeContainer
@@ -86,7 +84,7 @@ internal fun UpdateReleaseNotes(info: UpdateInfo, hazeState: dev.chrisbanes.haze
             ActionRow {
                 MorphTextButton(
                     "GitHub",
-                    onClick = { context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())) },
+                    onClick = { context.openExternalUrl(info.run.htmlUrl) },
                     icon = Icons.AutoMirrored.Filled.OpenInNew,
                     fillOnPress = false,
                 )

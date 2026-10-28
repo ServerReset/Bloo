@@ -1,5 +1,6 @@
 package com.bloo.bluelink
 
+import com.bloo.bluelink.ui.openExternalUrl
 import com.bloo.uicommon.ProgressBar
 import com.bloo.bluelink.data.downloadLabel
 import android.content.ClipData
@@ -45,7 +46,6 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import com.bloo.bluelink.data.UpdateApi
 import com.bloo.bluelink.data.installDownloadedApk
 import com.bloo.bluelink.ui.SettingsGroup
@@ -266,8 +266,7 @@ class CrashActivity : ComponentActivity() {
                 "Open GitHub instead",
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    val browserIntent = Intent(Intent.ACTION_VIEW, UpdateApi.RELEASES_URL.toUri())
-                    runCatching { context.startActivity(browserIntent) }
+                    context.openExternalUrl(UpdateApi.RELEASES_URL)
                 },
             )
         }
