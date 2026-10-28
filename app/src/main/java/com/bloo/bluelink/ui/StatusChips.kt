@@ -28,6 +28,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.SecondaryTextStyle
+import com.bloo.uicommon.rememberRelativeTime
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapHairline

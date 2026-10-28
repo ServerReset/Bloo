@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.links
+import com.bloo.uicommon.SecondaryTextStyle
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons

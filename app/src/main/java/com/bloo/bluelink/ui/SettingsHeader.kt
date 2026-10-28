@@ -47,6 +47,10 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.collapsedSections
 import com.bloo.bluelink.data.setSeamlessInstallShizuku
+import com.bloo.uicommon.IconBadge
+import com.bloo.uicommon.IconBadgeContainer
+import com.bloo.uicommon.PrimaryTextStyle
+import com.bloo.uicommon.SecondaryTextStyle
 import kotlinx.coroutines.delay
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons

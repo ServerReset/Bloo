@@ -22,6 +22,7 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.SecondaryTextStyle
 
 // --- App PIN dialogs ------------------------------------------------------
 

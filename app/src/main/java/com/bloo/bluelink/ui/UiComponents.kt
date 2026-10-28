@@ -27,11 +27,16 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.IconBadge
+import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.TitleSubtitle
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.content
+import com.bloo.uicommon.secondaryTextColor
+import com.bloo.uicommon.secondaryTextStyle
 
 /**
  * Small shared composables built on UiTokens: text styles, icon badges, dividers, and
@@ -52,26 +57,6 @@ internal fun <T : Any> PebbleStatusGate(status: T?, refreshing: Boolean, content
         else -> SecondaryText("No status yet.")
     }
 }
-
-/** The style of secondary text, from the shared roles in :uicommon (see TextRoles.kt). */
-@Composable
-internal fun secondaryTextStyle(): TextStyle = com.bloo.uicommon.SecondaryTextStyle()
-
-/** The primary role's style, from :uicommon. */
-@Composable
-internal fun PrimaryTextStyle(): TextStyle = com.bloo.uicommon.PrimaryTextStyle()
-
-/** The secondary role's style, from :uicommon. */
-@Composable
-internal fun SecondaryTextStyle(): TextStyle = com.bloo.uicommon.SecondaryTextStyle()
-
-/** Secondary text's colour, from :uicommon. */
-@Composable
-internal fun secondaryTextColor(): Color = com.bloo.uicommon.secondaryTextColor()
-
-/** The halo behind secondary text, from :uicommon. */
-@Composable
-internal fun secondaryTextShadow(): Shadow = com.bloo.uicommon.secondaryTextShadow()
 
 /** The app's ONE muted secondary text: [secondaryTextStyle] (bodyMedium, semi-bold, with a soft halo) in the muted colour. */
 @Composable
@@ -117,29 +102,6 @@ internal fun TitleSmallText(
 ) {
     RevealText(text, style = PrimaryTextStyle(), modifier = modifier, color = color, fontWeight = fontWeight)
 }
-
-/** The circular tinted container [IconBadge] draws into (from :uicommon). */
-@Composable
-internal fun IconBadgeContainer(
-    modifier: Modifier = Modifier,
-    containerColor: Color,
-    size: Dp = 40.dp,
-    content: @Composable BoxScope.() -> Unit,
-) = com.bloo.uicommon.IconBadgeContainer(modifier, containerColor, size, content)
-
-/**
- * [IconBadgeContainer] with a single centered [Icon]. [containerColor] defaults to a 14%-alpha tint
- * of [tint]; pass a *Container role for the solid tonal look.
- */
-@Composable
-internal fun IconBadge(
-    icon: ImageVector,
-    tint: Color,
-    modifier: Modifier = Modifier,
-    containerColor: Color = tint.copy(alpha = 0.14f),
-    size: Dp = 40.dp,
-    iconSize: Dp = size * 0.5f,
-) = com.bloo.uicommon.IconBadge(icon, tint, modifier, containerColor, size, iconSize)
 
 /**
  * An [IconBadge] leading a title + optional muted subtitle, text column filling the row. [trailing]

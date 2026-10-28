@@ -32,6 +32,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.FieldShape
 import com.bloo.uicommon.content
+import com.bloo.uicommon.rememberRelativeTime
 
 /**
  * Every searchable setting as a [SearchEntry]: its title, the words that find it, and the control

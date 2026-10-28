@@ -35,6 +35,8 @@ import com.bloo.uicommon.GapGroup
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import com.bloo.uicommon.PrimaryTextStyle
+import com.bloo.uicommon.SecondaryTextStyle
 
 /**
  * Recent drives from the Hyundai/Genesis US trip-details feed: distance, time, speeds and (EVs) the

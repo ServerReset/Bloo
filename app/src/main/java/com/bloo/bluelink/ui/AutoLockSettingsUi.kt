@@ -34,6 +34,7 @@ import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.isBackgroundUnrestricted
 import com.bloo.bluelink.data.requestBackgroundUnrestricted
 import com.bloo.bluelink.data.setAutoLockConfig
+import com.bloo.uicommon.SecondaryTextStyle
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.MorphTextButton

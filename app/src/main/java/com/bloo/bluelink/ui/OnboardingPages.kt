@@ -43,6 +43,9 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.setBiometricLock
 import com.bloo.bluelink.data.setSyncUri
 import com.bloo.bluelink.data.syncUri
+import com.bloo.uicommon.IconBadge
+import com.bloo.uicommon.PrimaryTextStyle
+import com.bloo.uicommon.SecondaryTextStyle
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons

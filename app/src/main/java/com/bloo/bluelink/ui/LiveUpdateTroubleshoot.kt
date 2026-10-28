@@ -25,6 +25,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.SecondaryTextStyle
 
 /**
  * Ordered troubleshooting steps covering the two different ways this bar can fail to show

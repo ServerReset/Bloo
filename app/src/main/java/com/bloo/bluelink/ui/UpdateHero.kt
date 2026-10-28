@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.ButtonIconSize
 import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.PrimaryTextStyle
 
 /**
  * The version jump at a glance, shared by the update pebble and the Settings update card: the build

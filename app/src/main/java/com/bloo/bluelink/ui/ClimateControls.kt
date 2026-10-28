@@ -75,11 +75,13 @@ import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.climatePresetTemp
+import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.MorphIconButton
 import com.bloo.uicommon.ButtonLabelStyle
+import com.bloo.uicommon.SecondaryTextStyle
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first

@@ -23,6 +23,7 @@ import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.LocalIsDarkTheme
+import com.bloo.uicommon.SecondaryTextStyle
 
 /** Optional on-device Gemini Nano summary of the car's last-refreshed status. */
 @Composable

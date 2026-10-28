@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.IconBadge
+import com.bloo.uicommon.SecondaryTextStyle
 import dev.chrisbanes.haze.HazeState
 import kotlin.math.max
 import kotlinx.coroutines.launch

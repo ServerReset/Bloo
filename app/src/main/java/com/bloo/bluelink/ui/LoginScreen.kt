@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.PrimaryTextStyle
+import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.segmentsOf
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent

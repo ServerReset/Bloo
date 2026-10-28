@@ -13,6 +13,7 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
+import com.bloo.uicommon.SecondaryTextStyle
 
 /**
  * Shown before the system installer runs when Shizuku (seamless install) is off.

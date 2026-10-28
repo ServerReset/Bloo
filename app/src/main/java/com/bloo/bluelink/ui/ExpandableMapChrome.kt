@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.GeoLocation
+import com.bloo.uicommon.PrimaryTextStyle
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.AppIcons

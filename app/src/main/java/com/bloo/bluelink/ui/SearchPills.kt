@@ -35,7 +35,9 @@ import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.IconBadge
+import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.canBlurBackdrops
 import dev.chrisbanes.haze.HazeState
 

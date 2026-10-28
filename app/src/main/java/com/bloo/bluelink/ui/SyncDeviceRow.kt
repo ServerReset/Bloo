@@ -24,11 +24,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SyncMerge
+import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.ButtonIconSize
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
+import com.bloo.uicommon.SecondaryTextStyle
 
 private const val ACTIVE_DEVICE_MS = 10L * 60 * 1000
 

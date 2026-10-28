@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.PrimaryText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,7 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.SecondaryTextStyle
 
 /**
  * The watch, as one card under the phone it belongs to: its glyph, its name and status (PRIMARY and SECONDARY text), a remove

@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.SwitchTrack
 import com.bloo.uicommon.GapRow
 

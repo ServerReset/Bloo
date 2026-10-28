@@ -22,6 +22,7 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.MorphActionButton
+import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.content
 
 // --- The reusable onboarding setup cards (used by the setup deck and Settings) ---

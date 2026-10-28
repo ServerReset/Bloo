@@ -51,12 +51,14 @@ import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.serviceDue
 import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.targetForCurrentPlug
+import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.content
 import androidx.compose.ui.text.font.FontWeight
+import com.bloo.uicommon.rememberRelativeTime
 
 // --- Car info (status + service + links combined) -------------------------
 

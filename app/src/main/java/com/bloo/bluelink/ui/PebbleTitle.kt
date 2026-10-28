@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.bloo.uicommon.PrimaryTextStyle
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.MotionShort

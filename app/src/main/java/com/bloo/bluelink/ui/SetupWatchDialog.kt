@@ -28,6 +28,7 @@ import com.bloo.bluelink.wear.PhoneWatchSyncService
 import com.bloo.bluelink.wear.WatchInstall
 import com.bloo.bluelink.wear.newWatchInstaller
 import com.bloo.bluelink.wear.WatchPresence
+import com.bloo.uicommon.SecondaryTextStyle
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import kotlinx.coroutines.Dispatchers

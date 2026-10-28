@@ -20,6 +20,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection
+import com.bloo.uicommon.SecondaryTextStyle
 
 /**
  * Represents a single remote action taken on a vehicle. Used for displaying action history in

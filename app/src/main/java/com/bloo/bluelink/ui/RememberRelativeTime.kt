@@ -25,10 +25,6 @@ import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.AnimatedSlider
 import com.bloo.uicommon.content
 
-/** "5 min ago" for [millis], kept current without a clock in the caller (from :uicommon, shared with the watch). */
-@Composable
-internal fun rememberRelativeTime(millis: Long?): String? = com.bloo.uicommon.rememberRelativeTime(millis)
-
 /**
  * A clean, fully custom slider: a rounded track with an accent fill, subtle step ticks, and a
  * circular thumb that springs to the nearest step.

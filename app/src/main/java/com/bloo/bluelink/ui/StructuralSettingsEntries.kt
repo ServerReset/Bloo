@@ -20,6 +20,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.content
 
 /**

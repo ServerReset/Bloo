@@ -34,6 +34,8 @@ import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.WeatherCode
 import com.bloo.bluelink.data.formatSpeed
 import com.bloo.bluelink.data.weatherTemp
+import com.bloo.uicommon.PrimaryTextStyle
+import com.bloo.uicommon.SecondaryTextStyle
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapHairline

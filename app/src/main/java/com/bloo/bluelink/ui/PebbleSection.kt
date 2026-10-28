@@ -19,7 +19,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.SectionHeading
 import androidx.compose.ui.graphics.Color
 

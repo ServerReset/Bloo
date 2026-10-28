@@ -43,7 +43,10 @@ import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.SettingRow
+import com.bloo.uicommon.secondaryTextColor
+import com.bloo.uicommon.secondaryTextStyle
 
 // --- Settings -------------------------------------------------------------
 // (The settings screen lives in SettingsScreen.kt's family.)

@@ -59,6 +59,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.PrimaryTextStyle
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons

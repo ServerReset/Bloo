@@ -39,6 +39,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bloo.uicommon.SecondaryTextStyle
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.RevealText

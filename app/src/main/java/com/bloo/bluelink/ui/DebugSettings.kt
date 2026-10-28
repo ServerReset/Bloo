@@ -29,6 +29,7 @@ import com.bloo.bluelink.BuildConfig
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.SecondaryTextStyle
 
 /** A debug information item shown in DebugSettingsPanel; [copyable] lets a tap copy the value. */
 data class DebugInfo(

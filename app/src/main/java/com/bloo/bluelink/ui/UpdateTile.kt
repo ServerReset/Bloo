@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.update.UpdateInfo
+import com.bloo.uicommon.SecondaryTextStyle
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons

@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.SecondaryTextStyle
 import kotlin.math.max
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.ButtonIconGap

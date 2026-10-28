@@ -1,5 +1,6 @@
 package com.bloo.bluelink.widget
 
+import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.segmentsOf
 import com.bloo.bluelink.ui.rememberPhotoModel
 import android.app.Activity
@@ -77,7 +78,6 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import coil.compose.AsyncImage
 import com.bloo.bluelink.ui.ActionRow
 import com.bloo.bluelink.ui.BlooTheme
-import com.bloo.bluelink.ui.IconBadge
 import com.bloo.bluelink.ui.ScreenGutter
 import com.bloo.bluelink.ui.SettingsCaption
 import com.bloo.bluelink.ui.SettingsGroup
