@@ -8,6 +8,7 @@ package com.bloo.bluelink.ui
 import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -114,7 +115,7 @@ private fun playHeaderAction(): PebbleHeaderAction {
         active = true,
         activeContainer = confirmTone().container,
         activeContent = confirmTone().content,
-        onClick = { context.findActivity()?.let { PlayUpdates.start(it) } },
+        onClick = { context.hostActivity()?.let { PlayUpdates.start(it) } },
     )
 }
 

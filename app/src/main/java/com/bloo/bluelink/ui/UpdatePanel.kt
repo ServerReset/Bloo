@@ -60,9 +60,9 @@ import dev.chrisbanes.haze.HazeState
 /**
  * The Activity around this context, so a Play flow can be started from a composable. Null for anything that is not one.
  */
-internal tailrec fun Context.findActivity(): Activity? = when (this) {
+internal tailrec fun Context.hostActivity(): Activity? = when (this) {
     is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
+    is ContextWrapper -> baseContext.hostActivity()
     else -> null
 }
 
@@ -240,7 +240,7 @@ private fun PlayUpdateBody(hazeState: HazeState?, primaryInBody: Boolean) {
     if (available && primaryInBody) {
         // Play's own flow does the download and the install; this only opens it.
         MorphButton(
-            onClick = { context.findActivity()?.let { PlayUpdates.start(it) } },
+            onClick = { context.hostActivity()?.let { PlayUpdates.start(it) } },
             modifier = Modifier.fillMaxWidth(),
             active = true,
             activeContainerColor = confirmTone().container,
