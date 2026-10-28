@@ -2,6 +2,8 @@ package com.bloo.bluelink.data
 
 import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 
@@ -44,7 +46,7 @@ object ApiHttp {
  * a gateway 5xx, a truncated response) into a [BlueLinkException] - which the repository layer
  * already catches - instead of letting a raw SerializationException/IOException crash the app.
  */
-fun parseJsonOrThrow(json: Json, text: String, code: Int, message: String): kotlinx.serialization.json.JsonElement =
+fun parseJsonOrThrow(json: Json, text: String, code: Int, message: String): JsonElement =
     runCatching { json.parseToJsonElement(text) }
         .getOrElse { throw BlueLinkException(message, code = code) }
 
@@ -59,8 +61,8 @@ internal fun executeJson(
     json: Json,
     request: okhttp3.Request,
     friendly: (code: Int, body: String) -> String,
-    checkInBand: (root: kotlinx.serialization.json.JsonElement, request: okhttp3.Request, httpCode: Int) -> Unit,
-): kotlinx.serialization.json.JsonElement =
+    checkInBand: (root: JsonElement, request: okhttp3.Request, httpCode: Int) -> Unit,
+): JsonElement =
     ResponseFraming.retryOnceOnFreshConnection(request) { req ->
         client.newCall(req).execute().use { resp ->
             val text = resp.bodyWithSlowReadLog()
@@ -69,7 +71,7 @@ internal fun executeJson(
                 AppLog.log("ERROR ${resp.code} ${req.method} ${req.url.encodedPath}: $msg")
                 throw BlueLinkException(msg, code = resp.code)
             }
-            val root = if (text.isBlank()) kotlinx.serialization.json.JsonObject(emptyMap())
+            val root = if (text.isBlank()) JsonObject(emptyMap())
             else parseJsonOrThrow(json, text, resp.code, friendly(resp.code, text))
             checkInBand(root, req, resp.code)
             root

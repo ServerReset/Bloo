@@ -1,5 +1,9 @@
 package com.bloo.bluelink.data
 
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
@@ -14,54 +18,54 @@ suspend fun BlueLinkApi.startClimate(
     // Body shapes mirror the community hyundai_kia_connect_api exactly. For EVs the accepted body
     // is minimal; seat-heat + duration are only honoured on generation-3 cars, and Ims/username/vin
     // are ICE-only fields.
-    fun seatInfo() = kotlinx.serialization.json.buildJsonObject {
-        put("drvSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontLeft.apiValue))
-        put("astSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontRight.apiValue))
-        put("rlSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatRearLeft.apiValue))
-        put("rrSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatRearRight.apiValue))
+    fun seatInfo() = buildJsonObject {
+        put("drvSeatHeatState", JsonPrimitive(req.seatFrontLeft.apiValue))
+        put("astSeatHeatState", JsonPrimitive(req.seatFrontRight.apiValue))
+        put("rlSeatHeatState", JsonPrimitive(req.seatRearLeft.apiValue))
+        put("rrSeatHeatState", JsonPrimitive(req.seatRearRight.apiValue))
     }
     val isEv = v.isEv
     val gen3 = v.generation.trim() == "3"
     val path = if (isEv) "/ac/v2/evc/fatc/start" else "/ac/v2/rcs/rsc/start"
     val payload = json.encodeToString(
-        kotlinx.serialization.json.JsonObject.serializer(),
-        kotlinx.serialization.json.buildJsonObject {
+        JsonObject.serializer(),
+        buildJsonObject {
             if (isEv) {
-                put("airCtrl", kotlinx.serialization.json.JsonPrimitive(1))
-                put("airTemp", kotlinx.serialization.json.buildJsonObject {
-                    put("value", kotlinx.serialization.json.JsonPrimitive(req.tempF.toString()))
-                    put("unit", kotlinx.serialization.json.JsonPrimitive(1))
+                put("airCtrl", JsonPrimitive(1))
+                put("airTemp", buildJsonObject {
+                    put("value", JsonPrimitive(req.tempF.toString()))
+                    put("unit", JsonPrimitive(1))
                 })
-                put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
+                put("defrost", JsonPrimitive(req.defrost))
                 // heating1 is a bundle-selector, not a plain boolean: the real values are 0 (all
                 // off), 2 (rear window + mirrors only), 3 (steering wheel only) and 4 (steering
                 // wheel + rear window + mirrors) -- confirmed across multiple independent
                 // reverse-engineering efforts (bluelinky issues #139/#230,
                 // hyundai_kia_connect_api's own documented heating1 fix).
-                put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat.isOn) 3 else 0))
+                put("heating1", JsonPrimitive(if (req.steeringWheelHeat.isOn) 3 else 0))
                 // Older (gen-3) EVs additionally accept duration + seat heat.
                 if (gen3) {
-                    put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
+                    put("igniOnDuration", JsonPrimitive(req.durationMinutes))
                     put("seatHeaterVentInfo", seatInfo())
                 }
             } else {
-                put("Ims", kotlinx.serialization.json.JsonPrimitive(0))
-                put("airCtrl", kotlinx.serialization.json.JsonPrimitive(1))
-                put("airTemp", kotlinx.serialization.json.buildJsonObject {
-                    put("unit", kotlinx.serialization.json.JsonPrimitive(1))
-                    put("value", kotlinx.serialization.json.JsonPrimitive(req.tempF.toString()))
+                put("Ims", JsonPrimitive(0))
+                put("airCtrl", JsonPrimitive(1))
+                put("airTemp", buildJsonObject {
+                    put("unit", JsonPrimitive(1))
+                    put("value", JsonPrimitive(req.tempF.toString()))
                 })
-                put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
+                put("defrost", JsonPrimitive(req.defrost))
                 // heating1 is a bundle-selector, not a plain boolean: the real values are 0 (all
                 // off), 2 (rear window + mirrors only), 3 (steering wheel only) and 4 (steering
                 // wheel + rear window + mirrors) -- confirmed across multiple independent
                 // reverse-engineering efforts (bluelinky issues #139/#230,
                 // hyundai_kia_connect_api's own documented heating1 fix).
-                put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat.isOn) 3 else 0))
-                put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
+                put("heating1", JsonPrimitive(if (req.steeringWheelHeat.isOn) 3 else 0))
+                put("igniOnDuration", JsonPrimitive(req.durationMinutes))
                 put("seatHeaterVentInfo", seatInfo())
-                put("username", kotlinx.serialization.json.JsonPrimitive(username))
-                put("vin", kotlinx.serialization.json.JsonPrimitive(v.vin))
+                put("username", JsonPrimitive(username))
+                put("vin", JsonPrimitive(v.vin))
             }
         }
     ).toRequestBody(jsonMedia)
@@ -83,16 +87,16 @@ suspend fun BlueLinkApi.setChargeTargets(
     token: String, username: String, pin: String, v: Vehicle, acPercent: Int, dcPercent: Int,
 ): String = execute {
     val payload = json.encodeToString(
-        kotlinx.serialization.json.JsonObject.serializer(),
-        kotlinx.serialization.json.buildJsonObject {
-            put("targetSOClist", kotlinx.serialization.json.buildJsonArray {
-                add(kotlinx.serialization.json.buildJsonObject {
-                    put("plugType", kotlinx.serialization.json.JsonPrimitive(0))
-                    put("targetSOClevel", kotlinx.serialization.json.JsonPrimitive(dcPercent))
+        JsonObject.serializer(),
+        buildJsonObject {
+            put("targetSOClist", buildJsonArray {
+                add(buildJsonObject {
+                    put("plugType", JsonPrimitive(0))
+                    put("targetSOClevel", JsonPrimitive(dcPercent))
                 })
-                add(kotlinx.serialization.json.buildJsonObject {
-                    put("plugType", kotlinx.serialization.json.JsonPrimitive(1))
-                    put("targetSOClevel", kotlinx.serialization.json.JsonPrimitive(acPercent))
+                add(buildJsonObject {
+                    put("plugType", JsonPrimitive(1))
+                    put("targetSOClevel", JsonPrimitive(acPercent))
                 })
             })
         }

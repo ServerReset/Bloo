@@ -1,5 +1,8 @@
 package com.bloo.bluelink.data
 
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
 import com.bloo.bluelink.rethrowIfCancellation
@@ -56,10 +59,10 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     /** Exchange a username/password for a fresh access+refresh token pair. */
     suspend fun login(username: String, password: String): TokenResponse = execute {
         val body = json.encodeToString(
-            kotlinx.serialization.json.JsonObject.serializer(),
-            kotlinx.serialization.json.buildJsonObject {
-                put("username", kotlinx.serialization.json.JsonPrimitive(username))
-                put("password", kotlinx.serialization.json.JsonPrimitive(password))
+            JsonObject.serializer(),
+            buildJsonObject {
+                put("username", JsonPrimitive(username))
+                put("password", JsonPrimitive(password))
             }
         ).toRequestBody(jsonMedia)
         json.decodeFromString(TokenResponse.serializer(), call(tokenRequest("/v2/ac/oauth/token", body)))
@@ -72,9 +75,9 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      */
     suspend fun refresh(refreshToken: String): TokenResponse = execute {
         val body = json.encodeToString(
-            kotlinx.serialization.json.JsonObject.serializer(),
-            kotlinx.serialization.json.buildJsonObject {
-                put("refresh_token", kotlinx.serialization.json.JsonPrimitive(refreshToken))
+            JsonObject.serializer(),
+            buildJsonObject {
+                put("refresh_token", JsonPrimitive(refreshToken))
             }
         ).toRequestBody(jsonMedia)
         json.decodeFromString(TokenResponse.serializer(), call(tokenRequest("/v2/ac/oauth/token/refresh", body)))
@@ -235,10 +238,10 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      */
     internal suspend fun jsonCommand(path: String, token: String, username: String, pin: String, v: Vehicle): String = execute {
         val body = json.encodeToString(
-            kotlinx.serialization.json.JsonObject.serializer(),
-            kotlinx.serialization.json.buildJsonObject {
-                put("userName", kotlinx.serialization.json.JsonPrimitive(username))
-                put("vin", kotlinx.serialization.json.JsonPrimitive(v.vin))
+            JsonObject.serializer(),
+            buildJsonObject {
+                put("userName", JsonPrimitive(username))
+                put("vin", JsonPrimitive(v.vin))
             },
         ).toRequestBody(jsonMedia)
         val request = baseRequest(path, token, username, pin, v)
@@ -332,12 +335,12 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     internal fun friendlyError(code: Int, body: String): String {
         val message = runCatching {
             json.parseToJsonElement(body).let { el ->
-                (el as? kotlinx.serialization.json.JsonObject)?.let { obj ->
+                (el as? JsonObject)?.let { obj ->
                     // contentOrNull + the "null" sentinel guard, per key, BEFORE the `?:`.
                     // Normalising each key to a real String? first fixes both: the "null" literal
                     // is dropped and the fallback actually reaches errorSubMessage.
                     fun field(key: String): String? =
-                        (obj[key] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull?.takeIf { it != "null" }
+                        (obj[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it != "null" }
                     field("errorMessage") ?: field("errorSubMessage")
                 }
             }
@@ -405,7 +408,7 @@ private fun VehicleDetails.toVehicle(brand: Brand): Vehicle = Vehicle(
 private fun logVehicleFieldNames(body: String) {
     val names = runCatching {
         val cars = BlooJson.parseToJsonElement(body).jsonObject["enrolledVehicleDetails"]?.jsonArray ?: return
-        cars.mapNotNull { (it as? kotlinx.serialization.json.JsonObject)?.get("vehicleDetails") as? kotlinx.serialization.json.JsonObject }
+        cars.mapNotNull { (it as? JsonObject)?.get("vehicleDetails") as? JsonObject }
             .flatMap { it.keys }
             .toSortedSet()
     }.getOrNull() ?: return
@@ -417,7 +420,7 @@ private fun logVehicleFieldNames(body: String) {
 /** Each enrolled car's paint colour and trim by VIN, read straight off the raw enrolment body (the typed model does not carry them). */
 private fun paintByVin(body: String): Map<String, VehiclePaint> = runCatching {
     val cars = BlooJson.parseToJsonElement(body).jsonObject["enrolledVehicleDetails"]?.jsonArray ?: return emptyMap()
-    cars.mapNotNull { (it as? kotlinx.serialization.json.JsonObject)?.get("vehicleDetails") as? kotlinx.serialization.json.JsonObject }
-        .mapNotNull { o -> o["vin"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }?.let { it to paintOf(o) } }
+    cars.mapNotNull { (it as? JsonObject)?.get("vehicleDetails") as? JsonObject }
+        .mapNotNull { o -> o["vin"]?.let { (it as? JsonPrimitive)?.content }?.let { it to paintOf(o) } }
         .toMap()
 }.getOrDefault(emptyMap())

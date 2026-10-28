@@ -18,6 +18,7 @@ import com.bloo.bluelink.data.ensureNotificationChannel
 import com.bloo.bluelink.ioScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.serialization.json.Json
 
 /** Which watch notifications the user wants. Plain prefs: nothing here is secret. */
 class WearNotificationPrefs(context: Context) {
@@ -35,7 +36,7 @@ class WearNotificationPrefs(context: Context) {
 
     /** Tell the phone about a change made here, so both sides stay the same. */
     fun sendToPhone(context: Context) {
-        val bytes = kotlinx.serialization.json.Json.encodeToString(com.bloo.bluelink.data.WatchNotifyPrefs.serializer(), current()).encodeToByteArray()
+        val bytes = Json.encodeToString(com.bloo.bluelink.data.WatchNotifyPrefs.serializer(), current()).encodeToByteArray()
         val app = context.applicationContext
         ioScope().launch {
             runCatching {
