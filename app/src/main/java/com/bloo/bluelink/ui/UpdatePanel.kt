@@ -84,10 +84,13 @@ internal fun UpdatePanel(
     /** The version jump at the top of the body. The tile shows it here; Settings already shows it in its own header. */
     showHeadline: Boolean = false,
 ) {
-    if (UpdateRuntime.usesGitHub(LocalContext.current)) {
-        GitHubUpdateBody(state, vm, hazeState, primaryInBody, showHeadline)
-    } else {
-        PlayUpdateBody(hazeState, primaryInBody)
+    // One column for the whole body, so the sections are spaced the same way whichever track is shown.
+    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        if (UpdateRuntime.usesGitHub(LocalContext.current)) {
+            GitHubUpdateBody(state, vm, hazeState, primaryInBody, showHeadline)
+        } else {
+            PlayUpdateBody(hazeState, primaryInBody)
+        }
     }
 }
 
@@ -129,14 +132,6 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
             }
         }
         UpdateDismissRow(state, vm)
-    } else {
-        Row(verticalAlignment = Alignment.Bottom) {
-            RollingNumber(
-                text = if (current > 0) "$current" else "dev",
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-            )
-        }
     }
 
     // 4. Everything secondary sits behind one disclosure: what is new, how to install, and Shizuku.

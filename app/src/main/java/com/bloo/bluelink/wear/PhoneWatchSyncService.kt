@@ -49,6 +49,15 @@ import kotlinx.serialization.json.Json
  * foreground (a command from the watch wakes this). [pushNow] is called from the phone app's
  * own snapshot writes to keep the watch live while it is open.
  */
+/**
+ * One urgent data item at [path]: the fields [fill] writes, plus a timestamp, so the watch sees a change even when the payload is the same.
+ */
+private fun dataItem(path: String, fill: com.google.android.gms.wearable.DataMap.() -> Unit) =
+    PutDataMapRequest.create(path).apply {
+        dataMap.fill()
+        dataMap.putLong("_ts", System.currentTimeMillis())
+    }.asPutDataRequest().setUrgent()
+
 class PhoneWatchSyncService : WearableListenerService() {
     private val scope = ioScope()
     private val json = BlooJson
@@ -127,15 +136,6 @@ class PhoneWatchSyncService : WearableListenerService() {
         )
         pushBytes(WatchSyncProtocol.PATH_COMMAND_RESULT, json.encodeToString(WatchCommandResult.serializer(), out))
     }
-
-    /**
-     * One urgent data item at [path]: the fields [fill] writes, plus a timestamp, so the watch sees a change even when the payload is the same.
-     */
-    private fun dataItem(path: String, fill: com.google.android.gms.wearable.DataMap.() -> Unit) =
-        PutDataMapRequest.create(path).apply {
-            dataMap.fill()
-            dataMap.putLong("_ts", System.currentTimeMillis())
-        }.asPutDataRequest().setUrgent()
 
     private fun pushBytes(path: String, jsonString: String) {
         val req = dataItem(path) { putByteArray(KEY_PAYLOAD, jsonString.encodeToByteArray()) }
