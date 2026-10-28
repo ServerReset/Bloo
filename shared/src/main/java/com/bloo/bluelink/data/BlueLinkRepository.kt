@@ -49,6 +49,26 @@ fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStor
     return repo
 }
 
+/** The API's "this session or token is no longer valid" answers: 401, and 403 where a brand reports expiry that way. */
+internal fun BlueLinkException.isUnauthorized(): Boolean = code == 401 || code == 403
+
+/**
+ * Runs [block] with [session]. If it fails with an error [isAuthFailure] accepts, [reauthenticate] renews the session (or throws), and
+ * [block] runs once more with the renewed one. This is the retry-once shape every brand's session handling shares; the brands differ
+ * only in which failures count and in how they renew.
+ */
+internal suspend fun <S, T> withReauthOnce(
+    session: S,
+    isAuthFailure: (BlueLinkException) -> Boolean,
+    reauthenticate: suspend (BlueLinkException) -> S,
+    block: suspend (S) -> T,
+): T = try {
+    block(session)
+} catch (e: BlueLinkException) {
+    if (!isAuthFailure(e)) throw e
+    block(reauthenticate(e))
+}
+
 /**
  * Runs [block] with a cached PIN-derived control token for [vin], minting it via [mint] if absent
  * and re-minting once if the command itself 401s (an expired control token, distinct from an expired
@@ -172,14 +192,10 @@ class BlueLinkRepository(
     }
 
     /**
-     * Runs [block] with this brand's session, refreshing the token once on 401/403. Mechanism:
-     * loads the persisted [SessionStore.Session] for this brand (throwing if there is none, i.e.
-     * not logged in) and invokes [block] with it.
+     * Runs [block] with this brand's session, refreshing the token once on 401/403. The session is read from the cache first (see
+     * [cachedSession] for why), and a store read happens only when it is not cached.
      */
     private suspend fun <T> withSession(block: suspend (SessionStore.Session) -> T): T {
-        // cachedSession first -- see that property's own doc for why (three of these paid the full
-        // store.load() cost back to back in one cold-start burst, for data that hadn't changed
-        // between them).
         val session = cachedSession ?: run {
             val loadStartedAt = System.currentTimeMillis()
             val loaded = store.load(brand) ?: throw BlueLinkException("Not logged in")
@@ -189,21 +205,19 @@ class BlueLinkRepository(
             }
             loaded.also { cachedSession = it }
         }
-        return try {
-            block(session)
-        } catch (e: BlueLinkException) {
-            val refreshToken = session.refreshToken
-            val isAuth = e.code == 401 || e.code == 403
-            if (isAuth && refreshToken != null) {
-                val refreshed = api.refresh(refreshToken)
+        return withReauthOnce(
+            session,
+            // Only with a refresh token to trade in: without one there is nothing to refresh, so the failure stands.
+            isAuthFailure = { it.isUnauthorized() && session.refreshToken != null },
+            reauthenticate = { e ->
+                val refreshed = api.refresh(session.refreshToken ?: throw e)
                 store.updateAccessToken(brand, refreshed.accessToken, refreshed.refreshToken)
                 val updated = store.load(brand) ?: throw e
                 cachedSession = updated
-                block(updated)
-            } else {
-                throw e
-            }
-        }
+                updated
+            },
+            block = block,
+        )
     }
 }
 

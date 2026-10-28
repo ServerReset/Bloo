@@ -115,26 +115,31 @@ class CanadaRepository(
         }
     }
 
-    /** Runs [block] with the saved Canada session. */
+    /** Runs [block] with the saved Canada session, re-logging in once with the stored credentials if it has expired. */
     private suspend fun <T> withSession(block: suspend (CanadaSession) -> T): T {
         val stored = store.load(brand) ?: throw BlueLinkException("Not logged in")
-        return try {
-            block(stored.toCanada())
-        } catch (e: BlueLinkException) {
-            if (e.code != 401 && e.code != 403) throw e
-            val creds = credentialStore.load(brand)
-                ?: throw BlueLinkException("Session expired - please sign in again", code = e.code)
-            AppLog.log("${brand.label} session expired; re-authenticating silently")
-            val auth = runCatching {
-                api.authUser(creds.email, creds.password, stored.deviceId ?: CanadaApi.newDeviceId(), stored.pin)
-            }.onFailure { rethrowIfCancellation(it) }.getOrNull()
-            if (auth !is CanadaAuth.LoggedIn) {
-                throw BlueLinkException("Session expired - please sign out and sign in again", code = e.code)
-            }
-            save(auth.session, creds.email, stored.pin)
-            val fresh = store.load(brand) ?: throw e
-            pAuths.clear()
-            block(fresh.toCanada())
+        return withReauthOnce(
+            stored.toCanada(),
+            isAuthFailure = { it.isUnauthorized() },
+            reauthenticate = { e -> renewSession(stored, e) },
+            block = block,
+        )
+    }
+
+    /** A fresh session from the stored credentials, saved in place of the expired one. */
+    private suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): CanadaSession {
+        val creds = credentialStore.load(brand)
+            ?: throw BlueLinkException("Session expired - please sign in again", code = e.code)
+        AppLog.log("${brand.label} session expired; re-authenticating silently")
+        val auth = runCatching {
+            api.authUser(creds.email, creds.password, stored.deviceId ?: CanadaApi.newDeviceId(), stored.pin)
+        }.onFailure { rethrowIfCancellation(it) }.getOrNull()
+        if (auth !is CanadaAuth.LoggedIn) {
+            throw BlueLinkException("Session expired - please sign out and sign in again", code = e.code)
         }
+        save(auth.session, creds.email, stored.pin)
+        val fresh = store.load(brand) ?: throw e
+        pAuths.clear()
+        return fresh.toCanada()
     }
 }

@@ -132,22 +132,26 @@ class EuRepository(
      */
     private suspend fun <T> withSession(block: suspend (EuSession) -> T): T {
         val stored = store.load(brand) ?: throw BlueLinkException("Not logged in")
-        return try {
-            block(stored.toEu())
-        } catch (e: BlueLinkException) {
-            // Only a genuine token/device expiry (EuApi maps those to 401) triggers
-            // a silent refresh. A bare 403 or a business error like "Duplicate
-            // request" is terminal here - retrying it would just refresh/duplicate.
-            if (e.code != 401) throw e
-            AppLog.log("${brand.label} session expired; refreshing")
-            val refreshed = runCatching { api.refresh(stored.toEu()) }.onFailure { rethrowIfCancellation(it) }.getOrNull()
-            val session = refreshed ?: reLogin() ?: throw BlueLinkException(
-                "Session expired - please sign out and sign in again", code = e.code,
-            )
-            save(session, stored.username, stored.pin)
-            controlTokens.clear()
-            block(session)
-        }
+        return withReauthOnce(
+            stored.toEu(),
+            // Only a genuine token/device expiry (EuApi maps those to 401) triggers a silent refresh. A bare 403 or a business error
+            // like "Duplicate request" is terminal here - retrying it would just refresh/duplicate.
+            isAuthFailure = { it.code == 401 },
+            reauthenticate = { e -> renewSession(stored, e) },
+            block = block,
+        )
+    }
+
+    /** Refreshes the token, falling back to a full re-login, and saves the result in place of the expired session. */
+    private suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): EuSession {
+        AppLog.log("${brand.label} session expired; refreshing")
+        val refreshed = runCatching { api.refresh(stored.toEu()) }.onFailure { rethrowIfCancellation(it) }.getOrNull()
+        val session = refreshed ?: reLogin() ?: throw BlueLinkException(
+            "Session expired - please sign out and sign in again", code = e.code,
+        )
+        save(session, stored.username, stored.pin)
+        controlTokens.clear()
+        return session
     }
 
     /** Last-resort silent re-auth: replay the stored-credentials password login. */

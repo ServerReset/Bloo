@@ -151,32 +151,36 @@ class KiaRepository(
         KiaSession(sid = accessToken, rmtoken = refreshToken, deviceId = deviceId ?: KiaUsaApi.newDeviceId(), pin = pin)
 
     /**
-     * Runs [block] with the saved Kia session. On an expired session (401/403), re-authenticates
-     * once with the stored rmtoken - silently, no OTP - then refreshes the session-specific vinkeys
-     * and retries.
+     * Runs [block] with the saved Kia session. On an expired session (401/403), re-authenticates once with the stored rmtoken -
+     * silently, no OTP - and retries.
      */
     private suspend fun <T> withSession(block: suspend (KiaSession) -> T): T {
         val stored = store.load(Brand.KIA) ?: throw BlueLinkException("Not logged in")
-        return try {
-            block(stored.toKia())
-        } catch (e: BlueLinkException) {
-            if (e.code != 401 && e.code != 403) throw e
-            val creds = credentialStore.load(Brand.KIA)
-                ?: throw BlueLinkException("Kia session expired - please sign in again")
-            AppLog.log("Kia session expired; re-authenticating with stored rmtoken")
-            val auth = api.authUser(
-                creds.email, creds.password, stored.deviceId ?: KiaUsaApi.newDeviceId(),
-                stored.refreshToken, stored.pin.ifBlank { null },
-            )
-            if (auth !is KiaAuth.LoggedIn) {
-                // The rmtoken itself expired; a fresh OTP round-trip is needed.
-                throw BlueLinkException("Kia session expired - please sign out and sign in again")
-            }
-            save(auth.session, creds.email, stored.pin)
-            val fresh = store.load(Brand.KIA) ?: throw e
-            // vinkeys are bound to the session, so refresh them before retrying.
-            fetchSummaries(fresh.toKia())
-            block(fresh.toKia())
+        return withReauthOnce(
+            stored.toKia(),
+            isAuthFailure = { it.isUnauthorized() },
+            reauthenticate = { e -> renewSession(stored, e) },
+            block = block,
+        )
+    }
+
+    /** A fresh session from the stored rmtoken, and the session-bound vinkeys refetched for it, in place of the expired one. */
+    private suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): KiaSession {
+        val creds = credentialStore.load(Brand.KIA)
+            ?: throw BlueLinkException("Kia session expired - please sign in again")
+        AppLog.log("Kia session expired; re-authenticating with stored rmtoken")
+        val auth = api.authUser(
+            creds.email, creds.password, stored.deviceId ?: KiaUsaApi.newDeviceId(),
+            stored.refreshToken, stored.pin.ifBlank { null },
+        )
+        if (auth !is KiaAuth.LoggedIn) {
+            // The rmtoken itself expired; a fresh OTP round-trip is needed.
+            throw BlueLinkException("Kia session expired - please sign out and sign in again")
         }
+        save(auth.session, creds.email, stored.pin)
+        val fresh = store.load(Brand.KIA) ?: throw e
+        // vinkeys are bound to the session, so refresh them before retrying.
+        fetchSummaries(fresh.toKia())
+        return fresh.toKia()
     }
 }
