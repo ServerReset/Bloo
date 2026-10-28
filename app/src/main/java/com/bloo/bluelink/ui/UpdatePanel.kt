@@ -88,7 +88,7 @@ internal fun UpdatePanel(
     if (UpdateRuntime.usesGitHub(LocalContext.current)) {
         GitHubUpdateBody(state, vm, hazeState, primaryInBody)
     } else {
-        PlayUpdateBody(vm, hazeState, primaryInBody)
+        PlayUpdateBody(hazeState, primaryInBody)
     }
 }
 
@@ -203,7 +203,7 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
 }
 
 @Composable
-private fun PlayUpdateBody(vm: AppViewModel, hazeState: HazeState?, primaryInBody: Boolean) {
+private fun PlayUpdateBody(hazeState: HazeState?, primaryInBody: Boolean) {
     val context = LocalContext.current
     val available by PlayUpdates.available.collectAsStateWithLifecycle()
     val scheme = MaterialTheme.colorScheme
