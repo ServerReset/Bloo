@@ -27,6 +27,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 
+/** The value [read] finds for each vehicle that has one, keyed by VIN. */
+private inline fun <T : Any> List<Vehicle>.perCar(read: (vin: String) -> T?): Map<String, T> =
+    mapNotNull { v -> read(v.vin)?.let { v.vin to it } }.toMap()
+
+/** The value [read] finds for every vehicle, keyed by VIN. */
+private inline fun <T> List<Vehicle>.perCarAll(read: (vin: String) -> T): Map<String, T> = associate { it.vin to read(it.vin) }
+
 /**
  * Reads this device's per-car / per-tile config for [vehicles] from one [prefs] snapshot and
  * returns a UiState transform folding them in, plus the resolved shortcut set (needed outside the
@@ -41,24 +48,24 @@ internal suspend fun AppViewModel.perCarConfig(
     vehicles: List<Vehicle>,
     prefs: androidx.datastore.preferences.core.Preferences,
 ): PerCarConfig = withContext(Dispatchers.Default) {
-    val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin, prefs) }
-    val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin, prefs)?.let { v.vin to it } }.toMap()
-    val platforms = vehicles.mapNotNull { v -> settingsStore.platform(v.vin, prefs)?.let { v.vin to it } }.toMap()
-    val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin, prefs) }
-    val stored = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin, prefs)?.let { v.vin to it } }.toMap()
+    val seatConfigs = vehicles.perCarAll { settingsStore.seatConfig(it, prefs) }
+    val powertrains = vehicles.perCar { settingsStore.powertrain(it, prefs) }
+    val platforms = vehicles.perCar { settingsStore.platform(it, prefs) }
+    val sectionOrders = vehicles.perCarAll { settingsStore.sectionOrder(it, prefs) }
+    val stored = vehicles.perCar { settingsStore.imageUrl(it, prefs) }
     // A car with no picture of its own gets the bundled one for its model and paint, once, when the account tells us both. It is
     // then an ordinary choice (kept, changeable, clearable), and a cleared one is not given back.
     val auto = autoPictures(vehicles.filter { it.vin !in stored }, prefs)
     val images = stored + auto
-    val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin, prefs) }.filterValues { it.isNotBlank() }
-    val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
-    val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
-    val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin, prefs) }
+    val plates = vehicles.perCarAll { settingsStore.licensePlate(it, prefs) }.filterValues { it.isNotBlank() }
+    val lastSvc = vehicles.perCar { settingsStore.lastServiceMiles(it, prefs) }
+    val svcInterval = vehicles.perCar { settingsStore.serviceIntervalMiles(it, prefs) }
+    val climatePresets = vehicles.perCarAll { settingsStore.climatePresets(it, prefs) }
     val firstRun = !settingsStore.onboardingSeen(prefs)
     // First open: all pebbles start expanded regardless of stored state.
     val collapsed = if (firstRun) emptySet()
     else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
-    val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspots(v.vin, prefs)?.let { v.vin to it } }.toMap()
+    val hotspots = vehicles.perCar { settingsStore.hotspots(it, prefs) }
     val shortcutSet = settingsStore.enabledShortcuts(prefs)
     PerCarConfig(
         apply = {
