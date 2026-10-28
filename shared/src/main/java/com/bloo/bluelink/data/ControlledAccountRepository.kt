@@ -22,6 +22,28 @@ typealias CanadaSession = ControlSession
 typealias KiaSession = ControlSession
 
 /**
+ * A car on a controlled account. Every brand has these fields. The one number or key a brand needs to command its car is here too, and the
+ * others leave it at its default: [year] for Canada (it picks the temperature table), [ccs2] for Europe (its protocol version) and [key] for
+ * Kia US (the vinkey its commands are keyed by). [vin] defaults to [id] for brands that key cars by their id.
+ */
+data class ControlVehicle(
+    override val id: String,
+    override val name: String,
+    override val model: String,
+    override val vin: String = id,
+    override val isEv: Boolean,
+    override val colour: String? = null,
+    override val trim: String? = null,
+    val year: Int? = null,
+    val ccs2: Int = 0,
+    val key: String = "",
+) : AccountVehicle
+
+typealias CanadaVehicleSummary = ControlVehicle
+typealias EuVehicleSummary = ControlVehicle
+typealias KiaVehicleSummary = ControlVehicle
+
+/**
  * The plumbing the Canada, EU and Kia repositories share, on top of [SessionRepository]. The account's vehicle list is cached by VIN. A
  * car may have a PIN-derived control token, cached per VIN and minted again once if a command 401s ([controlTokenAuth]). A brand supplies
  * its own session type, API calls, how a control token is minted, and how a session is renewed; everything else is here, once.

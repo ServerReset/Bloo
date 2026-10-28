@@ -44,16 +44,6 @@ data class EuSession(
     val idToken: String? = null,
 ) : PinnedSession
 
-data class EuVehicleSummary(
-    override val id: String,
-    override val name: String,
-    override val model: String,
-    override val vin: String,
-    override val isEv: Boolean,
-    val ccs2: Int,
-    override val colour: String? = null,
-    override val trim: String? = null,
-) : AccountVehicle
 
 /**
  * Client for Hyundai Bluelink Europe on the CCAPI platform ("CCS2" - E-GMP / 2023+ cars). One

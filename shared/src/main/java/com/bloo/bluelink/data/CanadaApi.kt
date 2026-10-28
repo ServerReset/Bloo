@@ -19,22 +19,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * obtain [CanadaApi.pinAuth] before any command); [deviceId] must stay stable across logins - the
  * 90-day "remembered device" (mfaYn) is bound to it, and re-sending a fresh one forces a new OTP.
  */
-/**
- * A Canada-account vehicle summary. [id] is the API's own `vehicleId`, sent back as the `vehicleId`
- * header on every vehicle-scoped call - unlike Kia US there is no separate session-scoped "vinkey"
- * to refresh. [year] drives which of the two temperature lookup tables [CanadaApi] hex-encodes
- * against (see [CanadaApi.tempToHex]).
- */
-data class CanadaVehicleSummary(
-    override val id: String,
-    override val name: String,
-    override val model: String,
-    override val vin: String,
-    val year: Int?,
-    override val isEv: Boolean,
-    override val colour: String? = null,
-    override val trim: String? = null,
-) : AccountVehicle
 
 /**
  * Outcome of step 1 of Canada sign-in: a ready session (device already remembered from a prior
