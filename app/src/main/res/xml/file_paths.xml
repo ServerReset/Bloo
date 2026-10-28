@@ -4,5 +4,6 @@
      downloaded update APK handed to the system package installer. -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="exports" path="exports/" />
+    <files-path name="perf" path="perf/" />
     <cache-path name="apk" path="apk/" />
 </paths>

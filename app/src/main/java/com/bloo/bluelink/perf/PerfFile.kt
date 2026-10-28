@@ -1,6 +1,8 @@
 package com.bloo.bluelink.perf
 
 import android.content.Context
+import android.content.Intent
+import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileWriter
 
@@ -33,6 +35,21 @@ internal object PerfFile {
                 f.renameTo(old)
             }
             FileWriter(f, true).use { it.append(stamp()).append(' ').append(line).append('\n') }
+        }
+    }
+
+    /**
+     * A share sheet that sends the log file itself (mail, Drive, a message), so it can be read off the phone without a computer. Null
+     * before the log has started. The file goes through the app's own FileProvider, which grants the receiver read access to that one file.
+     */
+    fun shareIntent(context: Context): Intent? {
+        val f = file?.takeIf { it.exists() } ?: return null
+        val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", f)
+        return Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Bloo performance log")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }
 

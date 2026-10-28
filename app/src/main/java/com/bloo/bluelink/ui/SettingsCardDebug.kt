@@ -73,6 +73,7 @@ internal fun DebugCardContent(
     val logsVersion by vm.logsVersion.collectAsStateWithLifecycle()
     // Newest first, here and in what Copy hands over: the latest line is the first thing seen, and the view opens on it.
     val logs = remember(logsVersion) { vm.logSnapshot().asReversed() }
+    val context = androidx.compose.ui.platform.LocalContext.current
     fun copy(label: String, text: String) {
         clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, text))) }
     }
@@ -89,6 +90,9 @@ internal fun DebugCardContent(
                 BodySmallText("The cost of every frame (composition, layout, draw, GPU), main-thread stalls with the code that was running, recompositions and garbage collection, filed under what you were doing. Reset, use the app for a minute, then copy this and send it.")
                 ActionRow {
                     MorphTextButton("Copy report", onClick = { copy("bloo performance", com.bloo.bluelink.perf.PerfMonitor.report()) })
+                    MorphTextButton("Share log file", onClick = {
+                        com.bloo.bluelink.perf.PerfFile.shareIntent(context)?.let { context.startActivity(android.content.Intent.createChooser(it, "Send the performance log")) }
+                    })
                     MorphTextButton("Reset", onClick = { com.bloo.bluelink.perf.PerfMonitor.reset() }, emphasis = ButtonEmphasis.Deny)
                 }
             }
