@@ -5,6 +5,7 @@ package com.bloo.bluelink.ui
  * section and [ChargeLimitPill].
  */
 
+import androidx.compose.foundation.layout.padding
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
