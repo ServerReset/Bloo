@@ -147,8 +147,8 @@ internal fun OnboardingSetupPage(
                     context.findFragmentActivity()?.let { activity ->
                         showBiometricPrompt(
                             activity = activity,
-                            title = "Enable biometric lock",
-                            subtitle = "Confirm to require it when opening Bloo",
+                            title = BiometricLockWording.ENABLE_TITLE,
+                            subtitle = BiometricLockWording.ENABLE_SUBTITLE,
                             onSuccess = { vm.setBiometricLock(true) },
                             onError = {},
                         )

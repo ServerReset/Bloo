@@ -133,8 +133,8 @@ internal fun AppLockRow(state: UiState, appearance: SettingsStore.Appearance, vm
                 } else {
                     showBiometricPrompt(
                         activity = activity,
-                        title = "Enable biometric lock",
-                        subtitle = "Confirm to require it when opening Bloo",
+                        title = BiometricLockWording.ENABLE_TITLE,
+                        subtitle = BiometricLockWording.ENABLE_SUBTITLE,
                         onSuccess = {
                             vm.setBiometricLock(true)
                             vm.setLockTiming(timing)
@@ -145,4 +145,10 @@ internal fun AppLockRow(state: UiState, appearance: SettingsStore.Appearance, vm
             }
         },
     )
+}
+
+/** The words of the app-lock prompt that turns biometrics on, said the same way in onboarding and in Settings. */
+internal object BiometricLockWording {
+    const val ENABLE_TITLE = "Enable biometric lock"
+    const val ENABLE_SUBTITLE = "Confirm to require it when opening Bloo"
 }
