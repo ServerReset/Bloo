@@ -36,18 +36,12 @@ sealed interface CanadaAuth {
  * completely different backend from both the US Hyundai/Genesis "HATA" API ([BlueLinkApi]) and
  * Kia's separate US backend ([KiaUsaApi]).
  */
-class CanadaApi(private val brand: Brand) {
+class CanadaApi(override val brand: Brand) : BrandEndpoints {
     init {
         require(brand.isCanada) { "CanadaApi requires a Canada brand, got $brand" }
     }
 
     internal val apiUrl get() = "${brand.baseUrl}/"
-    internal val host get() = brand.host
-
-    internal val clientId get() = brand.clientId
-
-    internal val clientSecret get() = brand.clientSecret
-
     companion object {
         private const val USER_AGENT =
             "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) " +

@@ -19,19 +19,23 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * Thin client over the real Hyundai Blue Link US telematics API. Base URL, credentials, paths and
  * headers come from the reverse-engineered community projects referenced in [Models].
  */
-class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
+/**
+ * The endpoint and client values a brand's API reads from its [Brand]. The Hyundai and Genesis client and the Canada client both take them
+ * from here, so the four reads are written once.
+ */
+interface BrandEndpoints {
+    val brand: Brand
+    val baseUrl: String get() = brand.baseUrl
+    val host: String get() = brand.host
+    val clientId: String get() = brand.clientId
+    val clientSecret: String get() = brand.clientSecret
+}
+
+class BlueLinkApi(override val brand: Brand = Brand.HYUNDAI) : BrandEndpoints {
     // These four all delegate straight to the [brand] passed at construction time, so one
     // BlueLinkApi instance can be pointed at either Hyundai or Genesis (both share this same API
     // shape, just different base URLs and OAuth credentials) just by constructing it with a
     // different Brand.
-    internal val baseUrl get() = brand.baseUrl
-
-    internal val host get() = brand.host
-
-    internal val clientId get() = brand.clientId
-
-    internal val clientSecret get() = brand.clientSecret
-
     companion object {
         // Two different User-Agent strings the real endpoints expect depending on which call is
         // being made: plain okhttp's default-looking UA for most authenticated calls, and Postman's
