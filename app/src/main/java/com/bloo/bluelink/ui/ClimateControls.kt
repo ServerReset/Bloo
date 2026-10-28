@@ -5,6 +5,19 @@ package com.bloo.bluelink.ui
  * section and [ChargeLimitPill].
  */
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
+import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -90,62 +103,6 @@ import com.bloo.uicommon.content
  * Reusable climate-control pieces: seat/wheel heat controls, preset pills and the charge-limit pill
  * (also used by EnergyPebble).
  */
-
-@Composable
-internal fun SeatControl(label: String, level: SeatLevel, canCool: Boolean, canHeat: Boolean, onChange: (SeatLevel) -> Unit) {
-    val range = SeatLevel.rangeFor(canCool, canHeat)
-    if (range.size <= 1) return
-    val index = range.indexOf(level).let { if (it < 0) range.indexOf(SeatLevel.OFF) else it }
-    val current = range.getOrNull(index) ?: range.firstOrNull() ?: return
-    // Deeper colour the stronger the setting; cross-fades through neutral between cooling (blues) and heating (reds).
-    TintedLevelControl(label, current.label, seatTint(current), "seatTint", range, index, onChange)
-}
-
-/**
- * Steering wheel heat as a Low/High level control (see [WheelHeatLevel]; most brands only get a
- * boolean at the network layer). Same slider/tint shape as [SeatControl], minus the cool half.
- */
-@Composable
-internal fun WheelHeatControl(level: WheelHeatLevel, onChange: (WheelHeatLevel) -> Unit) {
-    val range = WheelHeatLevel.entries.toList()
-    TintedLevelControl("Steering wheel heat", level.label, wheelHeatTint(level), "wheelHeatTint", range, range.indexOf(level).coerceAtLeast(0), onChange)
-}
-
-/**
- * Steering wheel heat tint by intensity -- the same light->dark red ramp [seatTint] uses for a
- * seat's own heat half, both derived from the canonical heat red so the two never drift onto
- * different pastels.
- */
-@Composable
-private fun <T> TintedLevelControl(
-    label: String,
-    valueLabel: String,
-    targetTint: Color,
-    tintLabel: String,
-    range: List<T>,
-    index: Int,
-    onChange: (T) -> Unit,
-) {
-    val tint by androidx.compose.animation.animateColorAsState(
-        targetValue = targetTint,
-        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
-        label = tintLabel,
-    )
-    Column {
-        StepRow(label, valueLabel, valueColor = tint)
-        LevelSlider(index, range, tint, onChange)
-    }
-}
-
-/**
- * Steering wheel heat tint by intensity: the same light-to-dark red ramp as [seatTint]'s heat half.
- */
-@Composable
-internal fun wheelHeatTint(level: WheelHeatLevel): Color = when (level) {
-    WheelHeatLevel.OFF -> MaterialTheme.colorScheme.onSurfaceVariant
-    WheelHeatLevel.LOW -> androidx.compose.ui.graphics.lerp(Heat, MaterialTheme.colorScheme.surface, 0.45f)
-    WheelHeatLevel.HIGH -> Heat
-}
 
 /**
  * Seat colour by intensity: light-to-dark blue for cool, red for heat, on the canonical
@@ -396,17 +353,163 @@ internal fun ChargeLimitPill(
     }
 }
 
+// --- The climate layout's pieces ---------------------------------------------
+
+/** One step of a temperature in the unit the car is shown in, kept inside the car's range and never off a whole degree. */
+internal fun stepTempF(tempF: Int, step: Int, fahrenheit: Boolean): Int {
+    if (fahrenheit) return (tempF + step).coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last)
+    val c = ((tempF - 32) * 5 / 9f).roundToInt() + step
+    return (c * 9 / 5f + 32).roundToInt().coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last)
+}
+
+/** A value with a round −/+ either side: the temperature (big) or the run time. The value rolls when it changes. */
+@Composable
+internal fun ClimateStepper(
+    value: String,
+    caption: String,
+    big: Boolean,
+    canDecrease: Boolean,
+    canIncrease: Boolean,
+    tint: Color,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit,
+) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        MorphIconButton(onClick = onDecrease, enabled = canDecrease) { ButtonIcon(Icons.Filled.Remove, "Lower $caption") }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            RollingNumber(
+                text = value,
+                style = if (big) MaterialTheme.typography.displaySmall else SecondaryTextStyle(),
+                fontWeight = FontWeight.Bold,
+                color = tint,
+            )
+            BodySmallText(caption, color = mutedContentColor())
+        }
+        MorphIconButton(onClick = onIncrease, enabled = canIncrease) { ButtonIcon(Icons.Filled.Add, "Raise $caption") }
+    }
+}
+
+/** A feature in the tile grid: what it is, whether it is on, and a line of detail under its name. */
+internal class ClimateTile(val label: String, val icon: ImageVector, val active: Boolean, val detail: String?, val onTap: () -> Unit)
+
+/** The feature tiles, two to a row, each the same height; an odd one out takes the row's full width. */
+@Composable
+internal fun ClimateTileGrid(tiles: List<ClimateTile>) {
+    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        tiles.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(GapRow)) {
+                row.forEach { tile -> ClimateTileCell(tile, Modifier.weight(1f)) }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClimateTileCell(tile: ClimateTile, modifier: Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val fill by animateColorAsState(
+        targetValue = if (tile.active) scheme.primaryContainer else scheme.surfaceVariant.copy(alpha = 0.5f),
+        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "climateTileFill",
+    )
+    val ink = if (tile.active) scheme.onPrimaryContainer else scheme.onSurfaceVariant
+    Column(
+        modifier
+            .heightIn(min = 76.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(fill)
+            .clickable(role = Role.Button, onClickLabel = tile.label, onClick = tile.onTap)
+            .padding(GapGroup),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(tile.icon, contentDescription = null, tint = ink, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.height(GapHairline))
+        RevealText(tile.label, style = SecondaryTextStyle(), color = ink, textAlign = TextAlign.Center, maxLines = 2)
+        tile.detail?.let { BodySmallText(it, color = ink) }
+    }
+}
+
+/** Which way a seat is set: warming or cooling. A seat that is off has no mode. */
+private enum class SeatMode { HEAT, COOL }
+
 /**
- * The stepped level slider both [SeatControl] and [WheelHeatControl] drive: a discrete [range], the
- * current [index] into it, and the tint the level (and its label) wears.
+ * One seat: Heat or Cool, then how strong, as three bars. Tapping the mode that is already on turns the seat off; tapping a bar sets
+ * that strength. Modes the car does not offer are not drawn.
  */
 @Composable
-private fun <T> LevelSlider(index: Int, range: List<T>, tint: Color, onChange: (T) -> Unit) {
-    AnimatedSlider(
-        value = index.toFloat(),
-        onValueChange = { onChange(range[it.roundToInt().coerceIn(0, range.lastIndex)]) },
-        valueRange = 0f..range.lastIndex.toFloat(),
-        steps = (range.size - 2).coerceAtLeast(0),
-        accent = tint,
+internal fun SeatCard(label: String, level: SeatLevel, canHeat: Boolean, canCool: Boolean, onChange: (SeatLevel) -> Unit) {
+    val heats = listOf(SeatLevel.LOW_HEAT, SeatLevel.MED_HEAT, SeatLevel.HIGH_HEAT)
+    val cools = listOf(SeatLevel.LOW_COOL, SeatLevel.MED_COOL, SeatLevel.HIGH_COOL)
+    val mode = when {
+        level.isHeat -> SeatMode.HEAT
+        level.isCool -> SeatMode.COOL
+        else -> null
+    }
+    val strengths = if (mode == SeatMode.COOL) cools else heats
+    val index = strengths.indexOf(level)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(GapGroup),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            RevealText(label, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(GapHairline)) {
+                if (canHeat) {
+                    ModePill("Heat", selected = mode == SeatMode.HEAT, tint = Heat) {
+                        onChange(if (mode == SeatMode.HEAT) SeatLevel.OFF else heats[0])
+                    }
+                }
+                if (canCool) {
+                    ModePill("Cool", selected = mode == SeatMode.COOL, tint = Cool) {
+                        onChange(if (mode == SeatMode.COOL) SeatLevel.OFF else cools[0])
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(GapRow))
+        Row(horizontalArrangement = Arrangement.spacedBy(GapHairline)) {
+            strengths.forEachIndexed { i, step ->
+                val on = mode != null && index >= 0 && i <= index
+                val bar by animateColorAsState(
+                    targetValue = if (on) seatTint(step) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                    animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+                    label = "seatBar",
+                )
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(bar)
+                        .clickable(enabled = mode != null, role = Role.Button, onClickLabel = "$label, ${step.label}") { onChange(step) },
+                )
+            }
+        }
+    }
+}
+
+/** A Heat or Cool switch in a seat's header: the selected one fills with its colour. */
+@Composable
+private fun ModePill(text: String, selected: Boolean, tint: Color, onTap: () -> Unit) {
+    val fill by animateColorAsState(
+        targetValue = if (selected) tint else Color.Transparent,
+        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "modePill",
     )
+    val ink = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+    Box(
+        Modifier
+            .clip(CircleShape)
+            .background(fill)
+            .clickable(role = Role.Button, onClickLabel = text, onClick = onTap)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        RevealText(text, style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold, color = ink)
+    }
 }
