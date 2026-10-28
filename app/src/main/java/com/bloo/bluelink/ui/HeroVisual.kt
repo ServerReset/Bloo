@@ -154,10 +154,13 @@ internal fun HeroPhotoBackdrop(
     height: Dp,
     aspectRatio: Float? = null,
     corner: Dp = PebbleCornerExpanded,
-    /** The name and charge sit clear of the photo: it is inset, so the header and the readout land in the space above and below it. */
-    clearOfText: Boolean = false,
+    /**
+     * How far the name and charge have moved off the photo, 0 (on it) to 1 (clear of it). The photo is inset by that share of the gap, so
+     * the header and the readout land in the space above and below it. The caller animates it; this only lays it out.
+     */
+    clearT: Float = 0f,
 ) {
-    Box(Modifier.fillMaxWidth().then(if (clearOfText) Modifier.padding(top = HeroTextClearTop, bottom = HeroTextClearBottom) else Modifier)) {
+    Box(Modifier.fillMaxWidth().padding(top = HeroTextClearTop * clearT, bottom = HeroTextClearBottom * clearT)) {
         HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio)
     }
 }

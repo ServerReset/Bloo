@@ -10,6 +10,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -74,6 +75,13 @@ internal fun BoxScope.HeroBackground(
         Modifier.matchParentSize()
             .onGloballyPositioned { cardCoords.value = it },
     )
+    // The clear-text layout eases in and out rather than jumping: the photo's inset follows this, so the card and the settings preview both
+    // grow or shrink to it. Critically damped, like the other size springs on the card.
+    val clearT = animateFloatAsState(
+        targetValue = if (clearOfText) 1f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "heroClear",
+    )
     // Captured here: the slide transitions' offset lambdas run outside composition.
     val heroPhotoDensity = LocalDensity.current
     AnimatedVisibility(
@@ -95,7 +103,7 @@ internal fun BoxScope.HeroBackground(
                 animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
             ) { with(heroPhotoDensity) { -HeroPhotoSlideDistance.roundToPx() } } +
             scaleOut(targetScale = 0.9f, animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec())) {
-        HeroPhotoBackdrop(v, imageUrl, height, aspectRatio = 16f / 9f, clearOfText = clearOfText)
+        HeroPhotoBackdrop(v, imageUrl, height, aspectRatio = 16f / 9f, clearT = clearT.value)
     }
     // The expanded readout at the BOTTOM of the card: a sibling of the photo, not a child, so it
     // does not inherit the photo's scale settle (text should not zoom).

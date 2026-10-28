@@ -72,19 +72,19 @@ internal fun CarSettingsCard(
         SettingsGroup("Photo") {
             val storedImage = state.imageUrls[v.vin]
             val hasPhoto = !storedImage.isNullOrBlank()
-            // Clear of the photo by default for a cut-out, which is where the text would otherwise cover the car.
+            // Clear of the photo by default for a cut-out, which is where the text would otherwise cover the car. Any other picture, or
+            // the brand gradient, can be switched on the same way.
             val textClear = state.textClearPhotos[v.vin] ?: (storedImage != null && isCutoutPhoto(storedImage))
-            // A live preview, so the effect of a change is visible without leaving Settings.
-            if (hasPhoto) HeroPhotoPreview(state, v, storedImage, LocalAppearance.current.metricDistance, clearOfText = textClear)
+            // A live preview, so the effect of a change is visible without leaving Settings. It is the hero as the car will show it, so it
+            // is there for the gradient too.
+            HeroPhotoPreview(state, v, storedImage, LocalAppearance.current.metricDistance, clearOfText = textClear)
             CarPhotoButtons(hasPhoto, onPick = onPickPhoto, onClear = { vm.setVehicleImage(v.vin, "") })
             CarPictureButton(v, storedImage, vm)
-            if (hasPhoto) {
-                ToggleRow(
-                    "Text clear of the car",
-                    textClear,
-                    description = "The name and charge sit above and below the photo, so nothing covers the car. The card gets taller.",
-                ) { vm.setTextClearPhoto(v, it) }
-            }
+            ToggleRow(
+                "Text clear of the photo",
+                textClear,
+                description = "The name and charge sit above and below the photo, so nothing covers it. The card grows to fit.",
+            ) { vm.setTextClearPhoto(v, it) }
         }
 
         SettingsGroup("Vehicle") {
