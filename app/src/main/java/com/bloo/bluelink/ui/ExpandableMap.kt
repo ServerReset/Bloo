@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -241,7 +242,8 @@ internal fun ExpandableMapLayer(
                 .layout { measurable, constraints ->
                     val w = constraints.maxWidth.toFloat()
                     val h = constraints.maxHeight.toFloat()
-                    val sheetH = (h * 0.85f + pull.up.value).coerceIn(h * 0.85f, h)
+                    // The sheet is the whole screen: its top runs behind the status bar, under the blur, and its bar sits just below it.
+                    val sheetH = h
                     val sheet = Rect(0f, h - sheetH + dragPx.value, w, h + dragPx.value)
                     val root = rootPos
                     val origin = if (root == null) sheet else originBounds.translate(-root.x, -root.y)
@@ -273,8 +275,7 @@ internal fun ExpandableMapLayer(
                 // 85% of the screen, plus however far it has been pulled up: the sheet's top rises with the finger while its bottom
                 // stays pinned to the screen bottom. Read in the measure phase.
                 .layout { measurable, constraints ->
-                    val base = (constraints.maxHeight * 0.85f).roundToInt()
-                    val h = (base + pull.up.value.roundToInt()).coerceIn(base, constraints.maxHeight)
+                    val h = constraints.maxHeight
                     val p = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
                     layout(p.width, p.height) { p.place(0, 0) }
                 }
@@ -285,6 +286,8 @@ internal fun ExpandableMapLayer(
             // doc).
             if (isExpanded && chromeShown) {
                 MapTopBar(
+                    // Below the status bar: the sheet runs behind it, and the bar must not sit under the clock.
+                    modifier = Modifier.statusBarsPadding(),
                     vehicleName = vehicleName,
                     photo = photo,
                     chargePercent = chargePercent,

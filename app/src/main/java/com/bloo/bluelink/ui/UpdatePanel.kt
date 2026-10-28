@@ -138,6 +138,7 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
     MorphTextButton(
         if (showDetails) "Hide details" else "Details",
         onClick = { showDetails = !showDetails },
+        modifier = Modifier.fillMaxWidth(),
     )
     PopVisible(visible = showDetails, sizeAnimated = true) {
         Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -145,7 +146,9 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
                 UpdateReleaseNotes(info, hazeState = hazeState)
                 if (!seamless) InstallHelp(state, info, hazeState)
             }
-            ShizukuSetting(state, vm)
+            NestedGlassPanel(hazeState) {
+                Column(Modifier.padding(GapGroup)) { ShizukuSetting(state, vm) }
+            }
         }
     }
 

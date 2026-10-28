@@ -150,7 +150,6 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
 @Composable
 internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
     val number = vm.currentBuildNumber
-    val label = com.bloo.bluelink.data.buildLabel(number, com.bloo.bluelink.BuildConfig.BUILD_BRANCH)
     val carCount = state.vehicles.size
     // Same collapse store every SettingsCard persists through, under the "Updates" key.
     val collapsed by vm.collapsedSections.collectAsStateWithLifecycle()
@@ -198,7 +197,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.width(GapGroup))
-                SecondaryText(label, modifier = Modifier.padding(bottom = GapRow))
+                SecondaryText(com.bloo.bluelink.BuildConfig.BUILD_BRANCH.takeIf { it.isNotBlank() } ?: "this build", modifier = Modifier.padding(bottom = GapRow))
             }
             AnimatedVisibility(visible = expanded, enter = expandEnterSized(), exit = expandExitSized(fade = false)) {
                 Column {
