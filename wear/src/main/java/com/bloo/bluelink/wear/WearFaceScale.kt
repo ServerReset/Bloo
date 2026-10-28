@@ -26,10 +26,10 @@ internal val RingStroke = 8.dp
 internal val RingGap = 5.dp
 
 /** The gap between the four quarter tiles (the cross through the middle of the face). */
-internal val TileGap = 6.dp
+internal val TileGap = 3.dp
 
 /** The hub's share of the inner circle's diameter. */
-internal const val HubFraction = 0.44f
+internal const val HubFraction = 0.34f
 
 /** The display the face's fixed sizes (ring, gaps, glyphs) were drawn for; every size scales by (real display / this). */
 internal val ReferenceFace = 227.dp
