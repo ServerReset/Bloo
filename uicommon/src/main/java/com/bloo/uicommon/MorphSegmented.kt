@@ -1,6 +1,7 @@
 package com.bloo.uicommon
 
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -83,9 +84,9 @@ fun MorphSegmented(
     selectedKey: String,
     onSelect: (String) -> Unit,
     containerColor: Color,
-    indicatorColor: Color,
-    selectedTextColor: Color,
-    unselectedTextColor: Color,
+    indicatorColor: Color = MaterialTheme.colorScheme.primary,
+    selectedTextColor: Color = MaterialTheme.colorScheme.onPrimary,
+    unselectedTextColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     textStyle: TextStyle,
     onTick: () -> Unit,
     modifier: Modifier = Modifier,

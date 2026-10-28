@@ -93,9 +93,6 @@ fun MorphSegmented(
         selectedKey = selectedKey,
         onSelect = onSelect,
         containerColor = containerColor ?: buttonContainer(),
-        indicatorColor = scheme.primary,
-        selectedTextColor = scheme.onPrimary,
-        unselectedTextColor = scheme.onSurfaceVariant,
         // The one button label style, so a picker matches the buttons beside it.
         textStyle = ButtonLabelStyle,
         onTick = { haptics?.tick() },

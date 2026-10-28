@@ -114,7 +114,6 @@ internal fun StatusBarScrim(haze: HazeState? = LocalBackdropHaze.current) {
 @Composable
 internal fun SettingsModeTab(settingsMode: String, onSettingsModeChange: (String) -> Unit, hazeState: HazeState? = null) {
     val haptics = LocalHaptics.current
-    val scheme = MaterialTheme.colorScheme
 
     // Sits below the status bar like the other floating header chrome, so it doesn't blur into the
     // system icons.
@@ -128,9 +127,6 @@ internal fun SettingsModeTab(settingsMode: String, onSettingsModeChange: (String
                 selectedKey = settingsMode,
                 onSelect = onSettingsModeChange,
                 containerColor = Color.Transparent,
-                indicatorColor = scheme.primary,
-                selectedTextColor = scheme.onPrimary,
-                unselectedTextColor = scheme.onSurfaceVariant,
                 textStyle = ButtonLabelStyle,
                 onTick = { haptics?.tick() },
                 trackHeight = HeaderButtonSize,

@@ -128,11 +128,17 @@ class PhoneWatchSyncService : WearableListenerService() {
         pushBytes(WatchSyncProtocol.PATH_COMMAND_RESULT, json.encodeToString(WatchCommandResult.serializer(), out))
     }
 
-    private fun pushBytes(path: String, jsonString: String) {
-        val req = PutDataMapRequest.create(path).apply {
-            dataMap.putByteArray(KEY_PAYLOAD, jsonString.encodeToByteArray())
+    /**
+     * One urgent data item at [path]: the fields [fill] writes, plus a timestamp, so the watch sees a change even when the payload is the same.
+     */
+    private fun dataItem(path: String, fill: com.google.android.gms.wearable.DataMap.() -> Unit) =
+        PutDataMapRequest.create(path).apply {
+            dataMap.fill()
             dataMap.putLong("_ts", System.currentTimeMillis())
         }.asPutDataRequest().setUrgent()
+
+    private fun pushBytes(path: String, jsonString: String) {
+        val req = dataItem(path) { putByteArray(KEY_PAYLOAD, jsonString.encodeToByteArray()) }
         runCatching { Wearable.getDataClient(applicationContext).putDataItem(req) }
     }
 
@@ -171,10 +177,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                         resp.body.bytes()
                     }
                     val asset = com.google.android.gms.wearable.Asset.createFromBytes(bytes)
-                    val req = PutDataMapRequest.create(WatchSyncProtocol.PATH_WATCH_APK).apply {
-                        dataMap.putAsset("apk", asset)
-                        dataMap.putLong("_ts", System.currentTimeMillis())
-                    }.asPutDataRequest().setUrgent()
+                    val req = dataItem(WatchSyncProtocol.PATH_WATCH_APK) { putAsset("apk", asset) }
                     Wearable.getDataClient(app).putDataItem(req).await()
                     AppLog.log("WatchSync: pushed watch APK (${bytes.size} bytes)")
                 }.onFailure { AppLog.log("WatchSync: watch APK push failed (${it.javaClass.simpleName})") }
@@ -224,10 +227,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                     accent = watchAccentOf(app, appearance),
                 )
                 val jsonString = Json.encodeToString(WatchSyncPayload.serializer(), payload)
-                val req = PutDataMapRequest.create(WatchSyncProtocol.PATH_SNAPSHOT).apply {
-                    dataMap.putByteArray(KEY_PAYLOAD, jsonString.encodeToByteArray())
-                    dataMap.putLong("_ts", System.currentTimeMillis())
-                }.asPutDataRequest().setUrgent()
+                val req = dataItem(WatchSyncProtocol.PATH_SNAPSHOT) { putByteArray(KEY_PAYLOAD, jsonString.encodeToByteArray()) }
                 runCatching { Wearable.getDataClient(app).putDataItem(req) }
                     .onFailure { AppLog.log("WatchSync: push failed (${it.javaClass.simpleName})") }
             }
