@@ -19,30 +19,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
-/**
- * A signed-in Hyundai Bluelink Europe (CCAPI / "CCS2") session. [deviceId] is the `ccsp-device-id`
- * from device registration and must stay stable across refreshes; [pin] is the account service PIN,
- * required to mint the short-lived control token every command needs (the EU analogue of Canada's
- * `pAuth`). [accessToken] is the bare token - headers prepend "Bearer ".
- */
-data class EuSession(
-    val accessToken: String,
-    val refreshToken: String?,
-    val deviceId: String,
-    override val pin: String?,
-    // --- OneApp/CCI token set (Hyundai EU) ---
-    // Hyundai's WAF now blocks the legacy IDPConnect authorize/signin by client_id, so
-    // sign-in goes through the OneApp client_id + cci-api-eu.hyundai.com, which mint a
-    // CCS-usable access token AND a set of CCI tokens. The CCI set is what a token
-    // REFRESH needs (the CCS token can't be refreshed on its own), so it has to be
-    // carried here and persisted. Null for any non-CCI path.
-    val cciAccessToken: String? = null,
-    val exchangeableToken: String? = null,
-    val exchangeableRefreshToken: String? = null,
-    val nonCcsToken: String? = null,
-    val nonCcsRefreshToken: String? = null,
-    val idToken: String? = null,
-) : PinnedSession
 
 
 /**
@@ -136,7 +112,7 @@ class EuApi(private val brand: Brand) {
             // Strip any prefix a stored session may still carry from the old CCI bug, so an existing
             // login is corrected on its first call instead of needing a re-login ("Bearer Bearer ..."
             // is rejected with a 403).
-            .header("Authorization", "Bearer " + session.accessToken.removePrefix("Bearer ").trim())
+            .header("Authorization", "Bearer " + session.token.removePrefix("Bearer ").trim())
             .header("ccsp-device-id", session.deviceId)
             .header("Ccuccs2protocolsupport", ccs2.toString())
 
@@ -174,7 +150,7 @@ class EuApi(private val brand: Brand) {
         // A OneApp/CCI session refreshes through the CCI token set, not the legacy OAuth
         // refresh_token grant (the CCS token can't be refreshed on its own). See [refreshCci].
         if (session.cciAccessToken != null || session.nonCcsToken != null) return@withContext refreshCci(session)
-        val refresh = session.refreshToken
+        val refresh = session.refresh
             ?: throw BlueLinkException("Session expired - please sign in again", code = 401)
         val form = FormBody.Builder()
             .add("grant_type", "refresh_token")
@@ -208,7 +184,7 @@ class EuApi(private val brand: Brand) {
             // Strip any prefix a stored session may still carry from the old CCI bug, so an existing
             // login is corrected on its first call instead of needing a re-login ("Bearer Bearer ..."
             // is rejected with a 403).
-            .header("Authorization", "Bearer " + session.accessToken.removePrefix("Bearer ").trim())
+            .header("Authorization", "Bearer " + session.token.removePrefix("Bearer ").trim())
             .header("Host", host)
             .header("Accept-Encoding", "gzip")
             .header("User-Agent", USER_AGENT_OKHTTP)

@@ -16,10 +16,18 @@ data class ControlSession(
     val refresh: String?,
     val deviceId: String,
     override val pin: String?,
+    // Europe's OneApp/CCI token set: a token refresh needs the CCI set, so it is carried and persisted. Null for every other brand.
+    val cciAccessToken: String? = null,
+    val exchangeableToken: String? = null,
+    val exchangeableRefreshToken: String? = null,
+    val nonCcsToken: String? = null,
+    val nonCcsRefreshToken: String? = null,
+    val idToken: String? = null,
 ) : PinnedSession
 
 typealias CanadaSession = ControlSession
 typealias KiaSession = ControlSession
+typealias EuSession = ControlSession
 
 /**
  * A car on a controlled account. Every brand has these fields. The one number or key a brand needs to command its car is here too, and the

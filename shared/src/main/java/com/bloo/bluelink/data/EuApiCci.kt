@@ -115,8 +115,8 @@ internal suspend fun EuApi.loginCci(username: String, password: String, deviceId
         // Bare token: EuApi.authHeaders / controlToken prepend "Bearer " themselves. Storing
         // "Bearer $ccs" here made every authenticated header "Bearer Bearer ...", which the EU API
         // rejects with a 403 (the vehicle list was the first call to hit it).
-        accessToken = ccs.removePrefix("Bearer ").trim(),
-        refreshToken = cci.path("refreshToken").str(),
+        token = ccs.removePrefix("Bearer ").trim(),
+        refresh = cci.path("refreshToken").str(),
         deviceId = deviceId,
         pin = pin,
         cciAccessToken = cciAccess,
@@ -162,7 +162,7 @@ internal suspend fun EuApi.refreshCci(session: EuSession): EuSession {
     val body = buildString {
         append("{")
         append("\"accessToken\":\"").append(session.cciAccessToken.orEmpty().removePrefix("Bearer ").trim()).append("\",")
-        append("\"refreshToken\":\"").append(session.refreshToken.orEmpty()).append("\",")
+        append("\"refreshToken\":\"").append(session.refresh.orEmpty()).append("\",")
         append("\"exchangeableAccessToken\":\"").append(session.exchangeableToken.orEmpty()).append("\",")
         append("\"exchangeableRefreshToken\":\"").append(session.exchangeableRefreshToken.orEmpty()).append("\",")
         append("\"nonCcsToken\":\"").append(session.nonCcsToken.orEmpty()).append("\",")
@@ -188,8 +188,8 @@ internal suspend fun EuApi.refreshCci(session: EuSession): EuSession {
         // Bare token: EuApi.authHeaders / controlToken prepend "Bearer " themselves. Storing
         // "Bearer $ccs" here made every authenticated header "Bearer Bearer ...", which the EU API
         // rejects with a 403 (the vehicle list was the first call to hit it).
-        accessToken = ccs.removePrefix("Bearer ").trim(),
-        refreshToken = data.path("refreshToken").str() ?: session.refreshToken,
+        token = ccs.removePrefix("Bearer ").trim(),
+        refresh = data.path("refreshToken").str() ?: session.refresh,
         cciAccessToken = cciAccess,
         exchangeableToken = exchangeable,
         exchangeableRefreshToken = data.path("exchangeableRefreshToken").str() ?: session.exchangeableRefreshToken,
