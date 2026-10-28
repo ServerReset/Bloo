@@ -165,7 +165,7 @@ internal fun MapTopBar(
                         model = rememberPhotoModel(photo),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(40.dp).clip(CircleShape),
+                        modifier = Modifier.size(width = 48.dp, height = 36.dp).clip(RoundedCornerShape(10.dp)),
                     )
                 } else {
                     Icon(AppIcons.DirectionsCar, contentDescription = null, modifier = Modifier.size(24.dp))

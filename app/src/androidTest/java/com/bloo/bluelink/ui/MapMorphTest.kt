@@ -63,7 +63,7 @@ class MapMorphTest {
         assertEquals("moved back to the pebble, not rebuilt", 1, built)
     }
 
-    @Test fun theMapStartsAScreenAboveThePebbleAndEndsOnTheSheet() {
+    @Test fun theMapStartsOnThePebbleRectangleAndEndsOnTheSheet() {
         val origin = Rect(80f, 400f, 680f, 700f)
         rule.mainClock.autoAdvance = false
         rule.setContent {
@@ -81,16 +81,14 @@ class MapMorphTest {
                 )
             }
         }
-        // The first frame: placed, and the entrance has barely begun. The map comes in from above the screen, so it starts a window's
-        // height up from the pebble's rectangle.
+        // The first frame: placed, and the spring has barely begun, so the map is still on the pebble's rectangle (a few dp of it at most).
         rule.mainClock.advanceTimeByFrame()
         val start = rule.onNodeWithTag("map").getBoundsInRoot()
         val density = rule.density.density
         // The pebble's rectangle is in screen coordinates and the bounds are in the compose root's: the root need not sit at the screen's corner.
         val rootOnScreen = rule.onRoot().fetchSemanticsNode().layoutInfo.coordinates.positionOnScreen()
         assertEquals("left", (origin.left - rootOnScreen.x) / density, start.left.value, 15f)
-        val windowHeightDp = rule.onRoot().getBoundsInRoot().let { (it.bottom - it.top).value }
-        assertEquals("top", (origin.top - rootOnScreen.y) / density - windowHeightDp, start.top.value, 15f)
+        assertEquals("top", (origin.top - rootOnScreen.y) / density, start.top.value, 15f)
         assertEquals("width", origin.width / density, (start.right - start.left).value, 15f)
         assertEquals("height", origin.height / density, (start.bottom - start.top).value, 15f)
 
