@@ -179,7 +179,9 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        ExpressiveButtonGroup(modifier = Modifier.fillMaxWidth(), spacing = GapRow, lineSpacing = GapRow, content = content)
+        ExpressiveButtonGroup(modifier = Modifier.fillMaxWidth(), spacing = GapRow, lineSpacing = GapRow) {
+            content()
+        }
     }
 
     val isSamsung = remember { Build.MANUFACTURER.lowercase() == "samsung" }
