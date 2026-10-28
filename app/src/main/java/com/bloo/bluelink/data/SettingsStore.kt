@@ -175,9 +175,9 @@ class SettingsStore(internal val context: Context) {
             // Clamp on read: a corrupt/hand-edited/foreign backup with e.g. ui_scale="10" would
             // otherwise scale the whole UI 10x and lock the user out of Settings, so a bad stored
             // value can never take effect.
-            uiScale = (prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f).coerceIn(0.85f, 1.3f),
-            vibrancy = (prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f).coerceIn(0.5f, 1.6f),
-            glassClarity = (prefs[Keys.GLASS_CLARITY]?.toFloatOrNull() ?: 0.8f).coerceIn(0f, 1f),
+            uiScale = (prefs.floatOr(Keys.UI_SCALE, 1f)).coerceIn(0.85f, 1.3f),
+            vibrancy = (prefs.floatOr(Keys.VIBRANCY, 1f)).coerceIn(0.5f, 1.6f),
+            glassClarity = (prefs.floatOr(Keys.GLASS_CLARITY, 0.8f)).coerceIn(0f, 1f),
             ultraGlass = prefs.flag(Keys.ULTRA_GLASS, false),
             heroEdge = prefs.flag(Keys.HERO_EDGE, true),
             hapticsEnabled = prefs.flag(Keys.HAPTICS, true),
@@ -321,6 +321,12 @@ class SettingsStore(internal val context: Context) {
  * The store as `name -> value`: the ONE view of the preferences that both Drive sync's export and
  * search's live index are built from, so what syncs and what can be found cannot drift apart.
  */
+/** A stored whole number, or [default] when it was never written or does not parse. */
+internal fun Preferences.intOr(key: Preferences.Key<String>, default: Int): Int = this[key]?.toIntOrNull() ?: default
+
+/** A stored decimal, or [default] when it was never written or does not parse. */
+internal fun Preferences.floatOr(key: Preferences.Key<String>, default: Float): Float = this[key]?.toFloatOrNull() ?: default
+
 /** Saves a true/false setting as its text, the form [flag] reads back. */
 internal suspend fun SettingsStore.putFlag(key: Preferences.Key<String>, value: Boolean) =
     editTracked { it[key] = value.toString() }
