@@ -88,6 +88,8 @@ data class UiState(
     val platforms: Map<String, VehiclePlatform> = emptyMap(),
     val sectionOrders: Map<String, List<String>> = emptyMap(),
     val imageUrls: Map<String, String> = emptyMap(),
+    /** Per car: whether its name and charge sit clear of its photo. Absent until the user chooses (see [textClearPhoto]). */
+    val textClearPhotos: Map<String, Boolean> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
     /**
      * Compact form of [placeNames] (street + ZIP) for space-constrained glance layouts. In-memory

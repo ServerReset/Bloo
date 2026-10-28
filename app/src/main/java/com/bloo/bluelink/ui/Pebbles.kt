@@ -293,13 +293,14 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
             val heroState = stateSlice(state, v) { s ->
                 listOf(
                     s.statuses[v.vin], s.imageUrls[v.vin], s.hasBattery(v), s.hasFuel(v),
-                    s.locations[v.vin], s.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
+                    s.locations[v.vin], s.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION), s.textClearPhotos[v.vin],
                 )
             }
             HeroHeader(
                 v, status, heroState.imageUrls[v.vin], heroState.hasBattery(v), heroState.hasFuel(v), vm,
                 modifier = modifier,
                 drivingLabel = heroState.drivingLabel(v), metric = metric,
+                textClear = heroState.textClearPhotos[v.vin],
                 photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
             )
         }

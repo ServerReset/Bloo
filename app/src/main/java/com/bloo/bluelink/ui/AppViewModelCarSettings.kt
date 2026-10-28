@@ -16,6 +16,7 @@ import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setSectionOrder
 import com.bloo.bluelink.data.setServiceIntervalMiles
+import com.bloo.bluelink.data.setTextClearPhoto
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -110,4 +111,10 @@ fun AppViewModel.setHotspot(v: Vehicle, section: String) {
 fun AppViewModel.setSectionOrder(v: Vehicle, order: List<String>) {
     _state.update { it.copy(sectionOrders = it.sectionOrders.withCar(v.vin, order)) }
     persist { setSectionOrder(v.vin, order) }
+}
+
+/** Whether this car's name and charge sit clear of its photo, rather than over it. */
+fun AppViewModel.setTextClearPhoto(v: Vehicle, value: Boolean) {
+    _state.update { it.copy(textClearPhotos = it.textClearPhotos.withCar(v.vin, value)) }
+    persist { setTextClearPhoto(v.vin, value) }
 }

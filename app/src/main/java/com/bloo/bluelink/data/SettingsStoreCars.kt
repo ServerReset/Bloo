@@ -328,3 +328,11 @@ suspend fun SettingsStore.setFontChoice(choice: FontChoice) {
 suspend fun SettingsStore.setDynamicColor(enabled: Boolean) {
     putFlag(SettingsStore.Keys.DYNAMIC, enabled)
 }
+
+/** Whether a car's name and charge sit clear of its photo rather than over it. Null until the user chooses, so a cut-out defaults to clear. */
+fun SettingsStore.textClearPhoto(vin: String, p: Preferences): Boolean? =
+    p[stringPreferencesKey("text_clear_$vin")]?.toBooleanStrictOrNull()
+
+suspend fun SettingsStore.setTextClearPhoto(vin: String, value: Boolean) {
+    editTracked { it[stringPreferencesKey("text_clear_$vin")] = value.toString() }
+}

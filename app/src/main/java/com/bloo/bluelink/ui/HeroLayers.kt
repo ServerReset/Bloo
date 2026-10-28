@@ -65,6 +65,7 @@ internal fun BoxScope.HeroBackground(
     hoisted: Boolean,
     statusAlpha: Float,
     reportNumbers: (LayoutCoordinates) -> Unit,
+    clearOfText: Boolean = false,
 ) {
     // The card's own coordinate space; both anchors convert into it so the overlay lerps within one
     // space.
@@ -94,7 +95,7 @@ internal fun BoxScope.HeroBackground(
                 animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
             ) { with(heroPhotoDensity) { -HeroPhotoSlideDistance.roundToPx() } } +
             scaleOut(targetScale = 0.9f, animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec())) {
-        HeroPhotoBackdrop(v, imageUrl, height, aspectRatio = 16f / 9f)
+        HeroPhotoBackdrop(v, imageUrl, height, aspectRatio = 16f / 9f, clearOfText = clearOfText)
     }
     // The expanded readout at the BOTTOM of the card: a sibling of the photo, not a child, so it
     // does not inherit the photo's scale settle (text should not zoom).
@@ -182,11 +183,13 @@ internal fun HeroForeground(
  * it, and the charge readout over the photo's bottom, each in the colour the hero gives it on this photo.
  */
 @Composable
-internal fun HeroPhotoPreview(state: UiState, v: Vehicle, imageUrl: String?, metric: Boolean) {
+internal fun HeroPhotoPreview(state: UiState, v: Vehicle, imageUrl: String?, metric: Boolean, clearOfText: Boolean = false) {
     val readout = chargeReadoutOf(state.statusFor(v), state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric)
     val tone by rememberHeroPhotoTone(imageUrl, MaterialTheme.colorScheme.background)
     val cardCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
-    CompositionLocalProvider(LocalHeroTone provides tone) {
+    // Clear of the photo, the text sits on the page, so it takes the page's own colour rather than the photo's.
+    val textTone = if (clearOfText) HeroPhotoTone.None else tone
+    CompositionLocalProvider(LocalHeroTone provides textTone) {
         Box(Modifier.fillMaxWidth()) {
             // The photo takes its own 16:9 height here, so the height passed is not used.
             HeroBackground(
@@ -201,13 +204,14 @@ internal fun HeroPhotoPreview(state: UiState, v: Vehicle, imageUrl: String?, met
                 hoisted = false,
                 statusAlpha = 1f,
                 reportNumbers = {},
+                clearOfText = clearOfText,
             )
             Text(
                 v.name,
                 modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = heroTitleOnPhoto(tone),
+                color = heroTitleOnPhoto(textTone),
             )
         }
     }

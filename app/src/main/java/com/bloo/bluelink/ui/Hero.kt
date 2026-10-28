@@ -51,6 +51,8 @@ internal fun HeroHeader(
     drivingLabel: String? = null,
     height: Dp = 150.dp,
     metric: Boolean = false,
+    /** The stored choice for [text clear of the photo][setTextClearPhoto]; null leaves it to the photo (a cut-out is clear by default). */
+    textClear: Boolean? = null,
     /**
      * Whether the photo box is showing. Passed in (not collected here) so the hero doesn't
      * recompose on unrelated state changes.
@@ -125,6 +127,9 @@ internal fun HeroHeader(
     val photoTone by rememberHeroPhotoTone(imageUrl, MaterialTheme.colorScheme.background)
     // A cut-out car photo floats on the page: no rim and no glass behind it, whatever the edge setting says.
     val cutout = imageUrl != null && isCutoutPhoto(imageUrl)
+    val clearOfText = textClear ?: cutout
+    // An open cut-out floats on the page: no rim and no glass behind it. Collapsed, it is a card again, with both.
+    val floatingPhoto = cutout && heroShown
     // A screen reader's actions menu on the readout: the three things most wanted of a car, without hunting for the buttons.
     val doorLocked = status?.doorLock
     val spokenActions = remember(v.vin, v.name, doorLocked) {
@@ -136,12 +141,14 @@ internal fun HeroHeader(
             },
         )
     }
-    val heroTitleColorNow = heroTitleColor(photoTone, titleStep)
-    CompositionLocalProvider(LocalHeroTone provides photoTone) {
+    // Clear of the photo, the title and readout sit on the page, so they take the page's colour, not the photo's.
+    val tone = if (clearOfText) HeroPhotoTone.None else photoTone
+    val heroTitleColorNow = heroTitleColor(tone, titleStep)
+    CompositionLocalProvider(LocalHeroTone provides tone) {
         PebbleShell(
             expanded = heroShown,
-            edge = LocalAppearance.current.heroEdge && !cutout,
-            glass = !cutout,
+            edge = LocalAppearance.current.heroEdge && !floatingPhoto,
+            glass = !floatingPhoto,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
             icon = AppIcons.DirectionsCar,
             title = v.name,
@@ -159,7 +166,7 @@ internal fun HeroHeader(
             // the header row, with the title and chevron overlaid.
             background = {
                 val t = heroTState.value
-                HeroBackground(cardCoords, v, imageUrl, heroShown, height, t, false, readout, hoisted, statusAlpha(t), report(expandedNumbers))
+                HeroBackground(cardCoords, v, imageUrl, heroShown, height, t, false, readout, hoisted, statusAlpha(t), report(expandedNumbers), clearOfText)
             },
             // The travelling numbers: a plain lerp between the two anchors in this Box's space.
             // Rendered as `foreground` so they cross the header row above its buttons, not under.

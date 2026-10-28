@@ -153,11 +153,17 @@ internal fun HeroPhotoBackdrop(
     height: Dp,
     aspectRatio: Float? = null,
     corner: Dp = PebbleCornerExpanded,
+    /** The name and charge sit clear of the photo: it is inset, so the header and the readout land in the space above and below it. */
+    clearOfText: Boolean = false,
 ) {
-    Box(Modifier.fillMaxWidth()) {
+    Box(Modifier.fillMaxWidth().then(if (clearOfText) Modifier.padding(top = HeroTextClearTop, bottom = HeroTextClearBottom) else Modifier)) {
         HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio)
     }
 }
+
+/** The space above the photo for the header, and below it for the charge readout, when the text sits clear of the car. Tuned by eye. */
+private val HeroTextClearTop = 72.dp
+private val HeroTextClearBottom = 120.dp
 
 /**
  * Spaces out hero photo loads that start close together so a multi-car account doesn't decode and

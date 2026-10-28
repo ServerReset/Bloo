@@ -22,6 +22,7 @@ import com.bloo.bluelink.data.seatConfig
 import com.bloo.bluelink.data.sectionOrder
 import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.snapshot
+import com.bloo.bluelink.data.textClearPhoto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -57,6 +58,7 @@ internal suspend fun AppViewModel.perCarConfig(
     // then an ordinary choice (kept, changeable, clearable), and a cleared one is not given back.
     val auto = autoPictures(vehicles.filter { it.vin !in stored }, prefs)
     val images = stored + auto
+    val textClear = vehicles.perCar { settingsStore.textClearPhoto(it, prefs) }
     val plates = vehicles.perCarAll { settingsStore.licensePlate(it, prefs) }.filterValues { it.isNotBlank() }
     val lastSvc = vehicles.perCar { settingsStore.lastServiceMiles(it, prefs) }
     val svcInterval = vehicles.perCar { settingsStore.serviceIntervalMiles(it, prefs) }
@@ -75,6 +77,7 @@ internal suspend fun AppViewModel.perCarConfig(
                 platforms = platforms,
                 sectionOrders = sectionOrders,
                 imageUrls = images,
+                textClearPhotos = textClear,
                 licensePlates = plates,
                 lastServiceMiles = lastSvc,
                 serviceIntervalMiles = svcInterval,
