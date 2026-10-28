@@ -211,7 +211,6 @@ private fun CarMapBody(
         val span = MapTiles.span(zoom)
         val xTileF = MapTiles.tileX(location.longitude, zoom)
         val yTileF = MapTiles.tileY(location.latitude, zoom)
-        val tileDp = with(density) { tilePx.toDp() }
 
         // Zooms out (never in) to bring the device into view the first time both fixes are known
         // and the map is at rest; see CarMapState.fitBothLocations.

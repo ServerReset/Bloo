@@ -334,13 +334,6 @@ enum class SeatLevel(val apiValue: Int, val label: String) {
     val isHeat: Boolean get() = apiValue in 6..8
 
     companion object {
-        /** Build the slider range for a seat given what it supports. */
-        fun rangeFor(canCool: Boolean, canHeat: Boolean): List<SeatLevel> = buildList {
-            if (canCool) addAll(listOf(HIGH_COOL, MED_COOL, LOW_COOL))
-            add(OFF)
-            if (canHeat) addAll(listOf(LOW_HEAT, MED_HEAT, HIGH_HEAT))
-        }
-
         fun fromApi(value: Int?): SeatLevel = entries.firstOrNull { it.apiValue == value } ?: OFF
     }
 }

@@ -350,10 +350,3 @@ internal fun Modifier.themedDropShadow(shape: Shape, blurRadius: Dp = 14.dp, off
     blurRadius = blurRadius,
     offsetY = offsetY,
 )
-
-/**
- * [appHazeEffect] when there is a backdrop to blur AND the device can do it; unchanged otherwise.
- */
-@Composable
-internal fun Modifier.hazeWhenAble(state: HazeState?, progressive: Boolean = false): Modifier =
-    if (state != null && canBlurBackdrops()) appHazeEffect(state, progressive) else this
