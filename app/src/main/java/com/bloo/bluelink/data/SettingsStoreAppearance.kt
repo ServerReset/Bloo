@@ -3,15 +3,15 @@ package com.bloo.bluelink.data
 // --- Appearance and display preference setters (extracted from SettingsStore) --
 
 suspend fun SettingsStore.setHapticsEnabled(value: Boolean) {
-    editTracked { it[SettingsStore.Keys.HAPTICS] = value.toString() }
+    putFlag(SettingsStore.Keys.HAPTICS, value)
 }
 
 suspend fun SettingsStore.setSeamlessInstallShizuku(value: Boolean) {
-    editTracked { it[SettingsStore.Keys.SEAMLESS_INSTALL_SHIZUKU] = value.toString() }
+    putFlag(SettingsStore.Keys.SEAMLESS_INSTALL_SHIZUKU, value)
 }
 
 suspend fun SettingsStore.setBiometricLock(enabled: Boolean) {
-    editTracked { it[SettingsStore.Keys.BIOMETRIC] = enabled.toString() }
+    putFlag(SettingsStore.Keys.BIOMETRIC, enabled)
 }
 
 /** Stores the enum's name() as a string; read back with LockTiming.valueOf(),
@@ -22,5 +22,5 @@ suspend fun SettingsStore.setLockTiming(value: LockTiming) {
 }
 
 suspend fun SettingsStore.setColumnsFlipped(flipped: Boolean) {
-    editTracked { it[SettingsStore.Keys.FLIPPED] = flipped.toString() }
+    putFlag(SettingsStore.Keys.FLIPPED, flipped)
 }

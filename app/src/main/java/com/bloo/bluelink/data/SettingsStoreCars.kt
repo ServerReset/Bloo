@@ -326,5 +326,5 @@ suspend fun SettingsStore.setFontChoice(choice: FontChoice) {
 }
 
 suspend fun SettingsStore.setDynamicColor(enabled: Boolean) {
-    editTracked { it[SettingsStore.Keys.DYNAMIC] = enabled.toString() }
+    putFlag(SettingsStore.Keys.DYNAMIC, enabled)
 }

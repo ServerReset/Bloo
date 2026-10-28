@@ -321,6 +321,10 @@ class SettingsStore(internal val context: Context) {
  * The store as `name -> value`: the ONE view of the preferences that both Drive sync's export and
  * search's live index are built from, so what syncs and what can be found cannot drift apart.
  */
+/** Saves a true/false setting as its text, the form [flag] reads back. */
+internal suspend fun SettingsStore.putFlag(key: Preferences.Key<String>, value: Boolean) =
+    editTracked { it[key] = value.toString() }
+
 /** A stored true/false preference, or [default] when it has never been written or is not a boolean. */
 internal fun Preferences.flag(key: Preferences.Key<String>, default: Boolean): Boolean =
     this[key]?.toBooleanStrictOrNull() ?: default

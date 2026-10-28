@@ -153,11 +153,11 @@ suspend fun SettingsStore.setGlassClarity(value: Float) {
 }
 
 suspend fun SettingsStore.setUltraGlass(value: Boolean) {
-    editTracked { it[SettingsStore.Keys.ULTRA_GLASS] = value.toString() }
+    putFlag(SettingsStore.Keys.ULTRA_GLASS, value)
 }
 
 suspend fun SettingsStore.setHeroEdge(value: Boolean) {
-    editTracked { it[SettingsStore.Keys.HERO_EDGE] = value.toString() }
+    putFlag(SettingsStore.Keys.HERO_EDGE, value)
 }
 
 suspend fun SettingsStore.setVibrancy(value: Float) {
@@ -165,7 +165,7 @@ suspend fun SettingsStore.setVibrancy(value: Float) {
 }
 
 suspend fun SettingsStore.setAuroraBackground(value: Boolean) {
-    editTracked { it[SettingsStore.Keys.AURORA] = value.toString() }
+    putFlag(SettingsStore.Keys.AURORA, value)
 }
 
 // The setters below validate the incoming string against the fixed set of legal values and silently
