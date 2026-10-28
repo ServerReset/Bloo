@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.bloo.uicommon.lowPowerCalm
 import com.bloo.uicommon.rememberChargeFillColors
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -85,7 +86,7 @@ internal fun ChargeSegmentBar(
     var limitSeen by remember { mutableStateOf(false) }
     // Read here, at composable scope, not inline inside the LaunchedEffect below --
     // lowPowerAwareSpring is itself @Composable, so it can't be called from a suspend lambda.
-    val limitSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+    val limitSpring = lowPowerCalm<Float>(Spring.StiffnessMediumLow)
     LaunchedEffect(limit) {
         val target = (limit ?: return@LaunchedEffect) / 100f
         if (limitSeen) {

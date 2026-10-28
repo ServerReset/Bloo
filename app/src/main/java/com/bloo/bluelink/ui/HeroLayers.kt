@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.calmSpring
 import com.bloo.uicommon.bounceSpring
 import kotlin.math.roundToInt
 import com.bloo.uicommon.GapRow
@@ -79,7 +80,7 @@ internal fun BoxScope.HeroBackground(
     // grow or shrink to it. Critically damped, like the other size springs on the card.
     val clearT = animateFloatAsState(
         targetValue = if (clearOfText) 1f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = calmSpring(Spring.StiffnessMediumLow),
         label = "heroClear",
     )
     // Captured here: the slide transitions' offset lambdas run outside composition.

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.calmSpring
 import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.motionBlurWhenMoving
 import com.bloo.uicommon.FloatingStiffness
@@ -72,7 +73,7 @@ import androidx.compose.ui.graphics.TransformOrigin
  * It never comes from, or goes into, the search bar: the bar is just something the toast passes in front of or behind.
  */
 private val EnterSpring = bounceSpring<Float>(stiffness = FloatingStiffness)
-private val ExitSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
+private val ExitSpring = calmSpring<Float>(Spring.StiffnessMedium)
 private val ReflowSpring = spring<Float>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
 
 /** How much of each older toast peeks out above the newest while the pile is folded. */
@@ -228,7 +229,7 @@ internal fun BoxScope.ToastSlot(
         // search it takes the whole gap. The width BLENDS between the two (driven by the same spring as the
         // insets), so moving the search never snaps a toast to full width before it animates.
         val beside = startInsetPx > 1f || endInsetPx > 1f
-        val besideFrac = animateFloatAsState(if (beside) 1f else 0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow), label = "toastBeside")
+        val besideFrac = animateFloatAsState(if (beside) 1f else 0f, calmSpring(Spring.StiffnessMediumLow), label = "toastBeside")
         Box(
             Modifier.layout { measurable, constraints ->
                 val avail = constraints.maxWidth

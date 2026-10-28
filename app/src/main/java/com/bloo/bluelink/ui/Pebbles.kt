@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.calmSpring
 import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.LocalHaptics
 
@@ -214,12 +215,12 @@ internal fun PebbleList(
                 // a fade-out here would draw a second copy behind the flight.
                 enter = fadeIn(tween(MotionFast / 2)) + expandVertically(
                     expandFrom = Alignment.Top,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+                    animationSpec = calmSpring(Spring.StiffnessMedium),
                 ),
                 exit = if (hotDrag?.pendingPin == section) {
                     ExitTransition.None
                 } else {
-                    shrinkVertically(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(MotionFast))
+                    shrinkVertically(calmSpring(Spring.StiffnessMedium)) + fadeOut(tween(MotionFast))
                 },
             ) {
                 val ready by remember(section) {

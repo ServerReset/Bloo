@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.lowPowerCalm
 import com.bloo.uicommon.lowPowerBounce
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.MorphButtonLabel
@@ -81,7 +82,7 @@ internal fun SplitExpandButton(
     // The location button's icon bounces when it is tapped.
     val bounceY = remember { Animatable(0f) }
     val bounceScope = rememberCoroutineScope()
-    val bounceUpSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh)
+    val bounceUpSpring = lowPowerCalm<Float>(Spring.StiffnessHigh)
     val bounceDownSpring = lowPowerBounce<Float>(stiffness = Spring.StiffnessLow)
     var bouncing by remember { mutableStateOf(false) }
 

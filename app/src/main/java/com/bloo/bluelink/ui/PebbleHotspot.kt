@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.calmSpring
 import com.bloo.uicommon.bounceSpring
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.MorphButtonLabel
@@ -66,7 +67,7 @@ private val UnpinTravel = 88.dp
  * The spring an unpinned pebble flies back into its stack slot on. Mirrors the ReorderColumn's own
  * drop-flight spec, so pinning and unpinning are the same motion in opposite directions.
  */
-private val UnpinFlightProgressSpec = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+private val UnpinFlightProgressSpec = calmSpring<Float>(Spring.StiffnessMediumLow)
 
 /**
  * The car-info column's "hot seat": the controls pebble pinned under the hero, plus the empty slot a

@@ -72,6 +72,7 @@ import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.cToF
 import com.bloo.bluelink.data.climatePresetTemp
 import com.bloo.bluelink.data.fToC
+import com.bloo.uicommon.lowPowerCalm
 import com.bloo.uicommon.BlooSlider
 import com.bloo.uicommon.ButtonIcon
 import com.bloo.uicommon.PrimaryTextStyle
@@ -422,7 +423,7 @@ private fun ClimateTileCell(tile: ClimateTile, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
     val fill by animateColorAsState(
         targetValue = if (tile.active) scheme.primaryContainer else scheme.surfaceVariant.copy(alpha = 0.5f),
-        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = lowPowerCalm(Spring.StiffnessMediumLow),
         label = "climateTileFill",
     )
     val ink = if (tile.active) scheme.onPrimaryContainer else scheme.onSurfaceVariant

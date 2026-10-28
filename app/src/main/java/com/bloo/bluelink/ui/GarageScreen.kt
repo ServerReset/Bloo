@@ -20,6 +20,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
+import com.bloo.uicommon.calmSpring
 import com.bloo.uicommon.LocalHaptics
 
 /**
@@ -116,7 +117,7 @@ internal fun GarageScreen(
     // that flips on its own track, so the column change, the block growth and the two-column reflow move as one, the way the map's
     // own open does.
     val perPageTarget = if (fullScreen && multiColumn) 1 else naturalColumns
-    val carSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+    val carSpring = calmSpring<Float>(Spring.StiffnessMediumLow)
     val perPageAnim = remember { androidx.compose.animation.core.Animatable(perPageTarget.toFloat()) }
     LaunchedEffect(perPageTarget) { perPageAnim.animateTo(perPageTarget.toFloat(), carSpring) }
     val density = LocalDensity.current

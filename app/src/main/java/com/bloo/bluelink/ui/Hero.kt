@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.uicommon.calmSpring
 import com.bloo.uicommon.AppIcons
 
 /**
@@ -75,7 +76,7 @@ internal fun HeroHeader(
     val heroShown = photoExpanded
     val heroTState = animateFloatAsState(
         targetValue = if (heroShown) 1f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = calmSpring(Spring.StiffnessMediumLow),
         label = "heroMorph",
     )
     // NOT read in this body: every per-frame use reads heroTState inside its own slot (background,

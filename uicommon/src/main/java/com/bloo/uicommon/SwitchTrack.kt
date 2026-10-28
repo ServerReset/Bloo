@@ -39,7 +39,7 @@ fun SwitchTrack(
     thumbOff: Color,
     modifier: Modifier = Modifier,
 ) {
-    val spec = lowPowerAwareSpring<Color>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+    val spec = lowPowerCalm<Color>(Spring.StiffnessMediumLow)
     val trackColor by animateColorAsState(if (checked) trackOn else trackOff, animationSpec = spec, label = "toggleTrackBg")
     val thumbColor by animateColorAsState(if (checked) thumbOn else thumbOff, animationSpec = spec, label = "toggleThumbFg")
     val trackWidth = 44.dp

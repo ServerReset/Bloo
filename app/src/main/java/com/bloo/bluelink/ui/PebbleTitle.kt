@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.bloo.uicommon.lowPowerCalm
 import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.PrimaryTextStyle
 import kotlin.math.roundToInt
@@ -62,7 +63,7 @@ internal fun PebbleTitleRow(
         animationSpec = if (expandingTitle) {
             lowPowerBounce(stiffness = Spring.StiffnessLow)
         } else {
-            lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow)
+            lowPowerCalm(Spring.StiffnessLow)
         },
         label = "pebbleHeaderGrow",
     )

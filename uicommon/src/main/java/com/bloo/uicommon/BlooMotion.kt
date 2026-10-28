@@ -41,3 +41,13 @@ fun <T> bounceSpring(stiffness: Float = Spring.StiffnessLow): SpringSpec<T> = sp
 /** The same bounce, leaning to a plain tween under battery saver (see [lowPowerAwareSpring]). For composables. */
 @Composable
 fun <T> lowPowerBounce(stiffness: Float = Spring.StiffnessLow) = lowPowerAwareSpring<T>(dampingRatio = BounceDamping, stiffness = stiffness)
+
+/**
+ * A spring that settles without overshoot: the fades, sizes and drags that must not bounce. [stiffness] is one of Spring's own constants.
+ * For coroutines and top-level values.
+ */
+fun <T> calmSpring(stiffness: Float): SpringSpec<T> = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = stiffness)
+
+/** The same calm spring, leaning to a plain tween under battery saver (see [lowPowerAwareSpring]). For composables. */
+@Composable
+fun <T> lowPowerCalm(stiffness: Float) = lowPowerAwareSpring<T>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = stiffness)
