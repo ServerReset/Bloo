@@ -5,6 +5,7 @@ import com.bloo.bluelink.data.StartupTrace
 import android.content.ClipData
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,6 +60,7 @@ import com.bloo.uicommon.FieldShape
 import com.bloo.uicommon.Haptics
 import com.bloo.uicommon.SoftDamping
 import androidx.compose.animation.AnimatedVisibility
+import com.bloo.uicommon.lowPowerAwareSpring
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
@@ -93,6 +96,15 @@ fun BlooApp(vm: AppViewModel) {
     // a successful (re)composition instead. Latching the instant a non-locked frame is composed is
     // what lets the garage start building on that very frame.
     SideEffect { if (!locked) unlockedThisSession = true }
+    // The search bar rises from below the bottom edge when the app opens after a lock ("you're in"). It starts
+    // fully off screen while locked, and springs to rest on unlock with a little overshoot. Held here because
+    // SearchLayer is not composed while locked.
+    val searchRise = remember { Animatable(if (locked) 1f else 0f) }
+    LaunchedEffect(locked) {
+        if (locked) searchRise.snapTo(1f)
+        else searchRise.animateTo(0f, lowPowerAwareSpring(dampingRatio = SearchRiseDamping, stiffness = Spring.StiffnessMediumLow))
+    }
+    val screenHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
     val loading by remember { derivedStateOf { state.loading } }
     val refreshing by remember { derivedStateOf { state.refreshing } }
     val message by remember { derivedStateOf { state.message } }
@@ -356,7 +368,7 @@ fun BlooApp(vm: AppViewModel) {
         if (searchable && !locked && !mapExpanded) {
             // No `.padding(padding)`: SearchLayer reads WindowInsets itself, and padding here would
             // subtract the nav bar twice.
-            Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().graphicsLayer { translationY = searchRise.value * screenHeightPx }) {
                 SearchLayer(
                     vm = vm,
                     state = stateHolder,
@@ -442,6 +454,9 @@ internal const val FOUR_COLUMN_MIN_DP = 1500
  * (An earlier take collapsed this to `width / 600`, which showed one wide car instead of the grid --
  * wrong: a large screen wants MORE columns, not fewer.)
  */
+/** Low damping so the search bar overshoots a little as it rises into place on unlock. */
+private const val SearchRiseDamping = 0.45f
+
 internal fun carColumnsFor(widthDp: Float): Int = when {
     widthDp >= FOUR_COLUMN_MIN_DP -> 4
     widthDp >= THREE_COLUMN_MIN_DP -> 3
