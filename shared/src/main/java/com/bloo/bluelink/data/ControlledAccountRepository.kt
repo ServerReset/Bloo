@@ -8,6 +8,20 @@ interface PinnedSession {
 }
 
 /**
+ * A brand session for a controlled account: its access and refresh tokens, the device it is bound to, and the PIN that unlocks control.
+ * Canada and Kia US both hold exactly this; the wire names stay in each brand's own headers. Canada's and Kia's session names are aliases of it.
+ */
+data class ControlSession(
+    val token: String,
+    val refresh: String?,
+    val deviceId: String,
+    override val pin: String?,
+) : PinnedSession
+
+typealias CanadaSession = ControlSession
+typealias KiaSession = ControlSession
+
+/**
  * The plumbing the Canada, EU and Kia repositories share, on top of [SessionRepository]. The account's vehicle list is cached by VIN. A
  * car may have a PIN-derived control token, cached per VIN and minted again once if a command 401s ([controlTokenAuth]). A brand supplies
  * its own session type, API calls, how a control token is minted, and how a session is renewed; everything else is here, once.

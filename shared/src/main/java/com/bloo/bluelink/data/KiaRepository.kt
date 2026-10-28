@@ -50,7 +50,7 @@ class KiaRepository(
     private suspend fun save(session: KiaSession, username: String, pin: String) {
         store.save(
             SessionStore.Session.of(
-                accessToken = session.sid, refreshToken = session.rmtoken, deviceId = session.deviceId,
+                accessToken = session.token, refreshToken = session.refresh, deviceId = session.deviceId,
                 username = username, pin = pin, brand = Brand.KIA,
             )
         )
@@ -115,7 +115,7 @@ class KiaRepository(
     )
 
     override fun SessionStore.Session.toSession() =
-        KiaSession(sid = accessToken, rmtoken = refreshToken, deviceId = deviceId ?: ApiHttp.newDeviceId(), pin = pin)
+        KiaSession(token = accessToken, refresh = refreshToken, deviceId = deviceId ?: ApiHttp.newDeviceId(), pin = pin)
 
     override suspend fun fetchVehicles(s: KiaSession): List<KiaVehicleSummary> = api.vehicles(s)
 

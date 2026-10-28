@@ -97,7 +97,7 @@ class KiaUsaApi {
      *  session and *which* car a command applies to - every authenticated
      *  call (status, lock/unlock, climate, etc.) goes through this. */
     internal fun Request.Builder.authedHeaders(session: KiaSession, vehicle: KiaVehicleSummary): Request.Builder =
-        apiHeaders(session.deviceId).header("sid", session.sid).header("vinkey", vehicle.key)
+        apiHeaders(session.deviceId).header("sid", session.token).header("vinkey", vehicle.key)
 
     // --- Auth ------------------------------------------------------------
 
@@ -164,7 +164,7 @@ class KiaUsaApi {
      *  for a pure EV. */
     suspend fun vehicles(session: KiaSession): List<KiaVehicleSummary> = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(API + "ownr/gvl").get()
-            .apiHeaders(session.deviceId).header("sid", session.sid).build()
+            .apiHeaders(session.deviceId).header("sid", session.token).build()
         val root = call(req)
         val list = root.path("payload", "vehicleSummary") as? JsonArray ?: JsonArray(emptyList())
         list.mapNotNull { e ->

@@ -7,13 +7,6 @@ package com.bloo.bluelink.data
  * [rmtoken] lets us re-authenticate silently (skipping the OTP step); [deviceId]
  * must stay stable across logins (the rmtoken is bound to it).
  */
-data class KiaSession(
-    val sid: String,
-    val rmtoken: String?,
-    val deviceId: String,
-    override val pin: String?,
-) : PinnedSession
-
 /** A Kia US vehicle. [key] (the "vinkey") is session-specific and refreshed on login. */
 data class KiaVehicleSummary(
     override val id: String,

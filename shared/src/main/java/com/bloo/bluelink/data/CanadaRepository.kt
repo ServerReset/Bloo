@@ -45,7 +45,7 @@ class CanadaRepository(
     }
 
     private suspend fun save(session: CanadaSession, username: String, pin: String) {
-        store.saveLogin(session.accessToken, session.refreshToken, session.deviceId, username, pin, brand)
+        store.saveLogin(session.token, session.refresh, session.deviceId, username, pin, brand)
     }
 
     // --- Vehicles / status ---------------------------------------------------

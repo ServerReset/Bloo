@@ -19,13 +19,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * obtain [CanadaApi.pinAuth] before any command); [deviceId] must stay stable across logins - the
  * 90-day "remembered device" (mfaYn) is bound to it, and re-sending a fresh one forces a new OTP.
  */
-data class CanadaSession(
-    val accessToken: String,
-    val refreshToken: String?,
-    val deviceId: String,
-    override val pin: String?,
-) : PinnedSession
-
 /**
  * A Canada-account vehicle summary. [id] is the API's own `vehicleId`, sent back as the `vehicleId`
  * header on every vehicle-scoped call - unlike Kia US there is no separate session-scoped "vinkey"
@@ -114,7 +107,7 @@ class CanadaApi(private val brand: Brand) {
 
     /** [apiHeaders] plus the access token every authenticated call needs. */
     internal fun Request.Builder.authHeaders(session: CanadaSession): Request.Builder =
-        apiHeaders(session.deviceId).header("accessToken", session.accessToken)
+        apiHeaders(session.deviceId).header("accessToken", session.token)
 
     /** [authHeaders] plus which car a vehicle-scoped call applies to. */
     internal fun Request.Builder.vehicleHeaders(session: CanadaSession, vehicleId: String): Request.Builder =
