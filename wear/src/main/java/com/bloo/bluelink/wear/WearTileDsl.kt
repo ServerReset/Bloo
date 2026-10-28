@@ -137,7 +137,7 @@ internal fun tileModifiers(
  * exactly what a press on the face would, through the same PIN gate. With neither, it just opens the app.
  */
 /** What a tile draws from: the phone's snapshot, or nothing while the watch is sealed after a restart. Every tile loads it this way. */
-internal class TileSnapshot(val sealed: Boolean, val snapshot: com.bloo.bluelink.data.SnapshotStore.SnapshotData?)
+internal data class TileSnapshot(val sealed: Boolean, val snapshot: com.bloo.bluelink.data.SnapshotStore.SnapshotData?)
 
 /** Reads the phone's accent and the tile's snapshot, in that order. Both tiles start here. */
 internal suspend fun loadTileSnapshot(context: Context): TileSnapshot {
