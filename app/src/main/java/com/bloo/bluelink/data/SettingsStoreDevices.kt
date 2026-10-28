@@ -95,7 +95,7 @@ suspend fun SettingsStore.setLastSyncError(error: String?) {
 suspend fun SettingsStore.syncWifiOnly(): Boolean = syncWifiOnly(context.settingsDataStore.data.first())
 
 fun SettingsStore.syncWifiOnly(p: Preferences): Boolean =
-    p[stringPreferencesKey("sync_wifi")]?.toBooleanStrictOrNull() ?: true
+    p.flag(stringPreferencesKey("sync_wifi"), true)
 
 suspend fun SettingsStore.setSyncWifiOnly(value: Boolean) {
     editTracked { it[stringPreferencesKey("sync_wifi")] = value.toString() }

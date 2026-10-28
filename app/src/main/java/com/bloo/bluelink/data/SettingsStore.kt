@@ -157,7 +157,7 @@ class SettingsStore(internal val context: Context) {
             },
             fontChoice = enumOrNull<FontChoice>(prefs[Keys.FONT])
                 ?: FontChoice.SYSTEM,
-            dynamicColor = prefs[Keys.DYNAMIC]?.toBooleanStrictOrNull() ?: true,
+            dynamicColor = prefs.flag(Keys.DYNAMIC, true),
             colorPalette = enumOrNull<ColorPalette>(prefs[Keys.PALETTE])
                 ?: ColorPalette.BLUE,
             customPalettes = prefs[Keys.CUSTOM_PALETTES]?.let { json ->
@@ -168,20 +168,20 @@ class SettingsStore(internal val context: Context) {
             weatherLon = prefs[Keys.WEATHER_LON]?.toDoubleOrNull(),
             weatherLabel = prefs[Keys.WEATHER_LABEL],
             weatherFollowsDevice = prefs[Keys.WEATHER_FOLLOWS_DEVICE]?.toBoolean() ?: false,
-            biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
+            biometricLock = prefs.flag(Keys.BIOMETRIC, false),
             lockTiming = enumOrNull<LockTiming>(prefs[Keys.LOCK_TIMING])
                 ?: LockTiming.IMMEDIATE,
-            columnsFlipped = prefs[Keys.FLIPPED]?.toBooleanStrictOrNull() ?: false,
+            columnsFlipped = prefs.flag(Keys.FLIPPED, false),
             // Clamp on read: a corrupt/hand-edited/foreign backup with e.g. ui_scale="10" would
             // otherwise scale the whole UI 10x and lock the user out of Settings, so a bad stored
             // value can never take effect.
             uiScale = (prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f).coerceIn(0.85f, 1.3f),
             vibrancy = (prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f).coerceIn(0.5f, 1.6f),
             glassClarity = (prefs[Keys.GLASS_CLARITY]?.toFloatOrNull() ?: 0.8f).coerceIn(0f, 1f),
-            ultraGlass = prefs[Keys.ULTRA_GLASS]?.toBooleanStrictOrNull() ?: false,
-            heroEdge = prefs[Keys.HERO_EDGE]?.toBooleanStrictOrNull() ?: true,
-            hapticsEnabled = prefs[Keys.HAPTICS]?.toBooleanStrictOrNull() ?: true,
-            auroraBackground = prefs[Keys.AURORA]?.toBooleanStrictOrNull() ?: false,
+            ultraGlass = prefs.flag(Keys.ULTRA_GLASS, false),
+            heroEdge = prefs.flag(Keys.HERO_EDGE, true),
+            hapticsEnabled = prefs.flag(Keys.HAPTICS, true),
+            auroraBackground = prefs.flag(Keys.AURORA, false),
             unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",
             // Shared rule -- see FormatUtils.useFahrenheit for why this stopped being written out
             // separately per surface. The per-measurement overrides only apply in Advanced mode,
@@ -190,7 +190,7 @@ class SettingsStore(internal val context: Context) {
             metricDistance = resolveMetricDistance(prefs[Keys.UNIT_SYSTEM], prefs[Keys.DISTANCE_UNIT].takeIf { prefs[Keys.SETTINGS_MODE] == "advanced" }),
             tempUnit = prefs[Keys.TEMP_UNIT] ?: "auto",
             distanceUnit = prefs[Keys.DISTANCE_UNIT] ?: "auto",
-            seamlessInstallShizuku = prefs[Keys.SEAMLESS_INSTALL_SHIZUKU]?.toBooleanStrictOrNull() ?: false,
+            seamlessInstallShizuku = prefs.flag(Keys.SEAMLESS_INSTALL_SHIZUKU, false),
         )
     }
         // Off the main thread. This is a ~40-field decode including two JSON parses (custom
@@ -321,5 +321,9 @@ class SettingsStore(internal val context: Context) {
  * The store as `name -> value`: the ONE view of the preferences that both Drive sync's export and
  * search's live index are built from, so what syncs and what can be found cannot drift apart.
  */
+/** A stored true/false preference, or [default] when it has never been written or is not a boolean. */
+internal fun Preferences.flag(key: Preferences.Key<String>, default: Boolean): Boolean =
+    this[key]?.toBooleanStrictOrNull() ?: default
+
 internal fun androidx.datastore.preferences.core.Preferences.toNameMap(): Map<String, Any> =
     asMap().entries.associate { it.key.name to it.value }
