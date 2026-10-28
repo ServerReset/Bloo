@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.work.Configuration
 import coil.imageLoader
 import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import com.bloo.bluelink.data.snapshot
 import com.bloo.bluelink.data.warmUp
@@ -39,7 +40,7 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
         // onCreate's "begin" mark are emitted while the flag is still at its default, so a release
         // build logged exactly those two lines and then went quiet.
         StartupTrace.logcatEnabled = BuildConfig.DEBUG
-        StartupTrace.mark("Application.attachBaseContext")
+        StartupTrace.mark(StartupLabels.APPLICATION_ATTACH_BASE_CONTEXT)
         // Begin collecting per-frame timings as early as a Looper exists; the monitor is idempotent
         // and self-terminating (see its own doc), so starting it here rather than at setContent()
         // means the very first Compose frames are inside the window.
@@ -53,7 +54,7 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
             // Reached the first time ANY caller asks WorkManager for an instance, which
             // self-initializes its Room database + executors on that thread. Timed because it is
             // the one piece of lazy init that can land on the main thread.
-            StartupTrace.mark("WorkManager configuration requested (lazy init)")
+            StartupTrace.mark(StartupLabels.WORK_MANAGER_CONFIGURATION_REQUESTED)
         }
 
     /** Caps Coil's in-memory bitmap cache explicitly (48MB), replacing the library default.
@@ -77,21 +78,21 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
     // kill), and delegating would show the system "app has stopped" dialog over CrashActivity.
     @android.annotation.SuppressLint("DefaultUncaughtExceptionDelegation")
     override fun onCreate() {
-        StartupTrace.mark("Application.onCreate: begin")
+        StartupTrace.mark(StartupLabels.APPLICATION_ON_CREATE_BEGIN)
         super.onCreate()
         installStartupStrictMode()
-        StartupTrace.mark("Application.super.onCreate done")
+        StartupTrace.mark(StartupLabels.APPLICATION_SUPER_ON_CREATE_DONE)
         DeviceStatus.ensureInitialized(this)
         // Keeps any homescreen widget in step with the car data.
         com.bloo.bluelink.widget.BlooWidgetUpdater.start(this)
-        StartupTrace.mark("DeviceStatus.ensureInitialized done")
+        StartupTrace.mark(StartupLabels.DEVICE_STATUS_INITIALIZED)
         // Warm the biggest data classes off the main thread. SettingsStore() measured ~50ms on Main
         // on the first launch after install (1ms once warm) -- that is class-load/JIT of a very
         // large class, not its fields, and it lands inside AppViewModel's constructor, i.e. before
         // the first frame.
         Thread {
             runCatching {
-                StartupTrace.trace("class warm-up (stores)") {
+                StartupTrace.trace(StartupLabels.CLASS_WARM_UP_STORES) {
                     val app = applicationContext
                     com.bloo.bluelink.data.SettingsStore(app)
                     com.bloo.bluelink.data.SnapshotStore(app)
@@ -102,15 +103,15 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                 // CredentialStore.warmUp's own doc: this is the ~470ms the cold-start auto-login
                 // otherwise pays on the critical path, right ahead of the app-lock check and the
                 // garage load. Runs here, over a second earlier, on this same background thread.
-                StartupTrace.trace("credential crypto warm-up") {
+                StartupTrace.trace(StartupLabels.CREDENTIAL_CRYPTO_WARM_UP) {
                     com.bloo.bluelink.data.CredentialStore(applicationContext).warmUp()
                 }
                 // OkHttp's class graph is the heaviest class-load chain; a throwaway client loads it here.
-                StartupTrace.trace("okhttp class warm-up") {
+                StartupTrace.trace(StartupLabels.OKHTTP_CLASS_WARM_UP) {
                     okhttp3.OkHttpClient.Builder().build()
                 }
                 // Coil's singleton loader otherwise builds on main at the first map tile.
-                StartupTrace.trace("coil image loader warm-up") {
+                StartupTrace.trace(StartupLabels.COIL_IMAGE_LOADER_WARM_UP) {
                     applicationContext.imageLoader
                 }
                 // Compose's own animation class graph (Spring/Animatable/AnimationVector, the
@@ -119,7 +120,7 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                 // animation the user ever triggers -- typically the very first card they tap to
                 // expand, which is also usually still inside the first several seconds of a cold
                 // process, i.e. exactly the window ART hasn't finished JIT-warming yet.
-                StartupTrace.trace("compose animation class warm-up") {
+                StartupTrace.trace(StartupLabels.COMPOSE_ANIMATION_CLASS_WARM_UP) {
                     androidx.compose.animation.core.Animatable(0f)
                     androidx.compose.animation.core.spring<Float>()
                     androidx.compose.animation.core.tween<Float>(140)
@@ -127,7 +128,7 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                 // Settings DataStore first read (file open + preferences protobuf parse), which the
                 // auto-login's own appearance.first() otherwise pays on the path to the garage --
                 // 452ms measured on the API 34 emulator.
-                StartupTrace.trace("settings datastore warm-up") {
+                StartupTrace.trace(StartupLabels.SETTINGS_DATASTORE_WARM_UP) {
                     kotlinx.coroutines.runBlocking {
                         com.bloo.bluelink.data.SettingsStore(applicationContext).warmUp()
                         com.bloo.bluelink.data.StatusCache(applicationContext).warmUp()
@@ -149,7 +150,7 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
             // sessions. See UpdateCleanup's own doc.
             runCatching { com.bloo.bluelink.update.UpdateCleanup.clearStagedDownloads(applicationContext) }
         }.apply { priority = Thread.MIN_PRIORITY }.start()
-        StartupTrace.mark("Application.onCreate: end")
+        StartupTrace.mark(StartupLabels.APPLICATION_ON_CREATE_END)
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val trace = Log.getStackTraceString(throwable)
             Log.e("BlooCrash", "Uncaught exception on ${thread.name}:\n$trace")
@@ -246,7 +247,7 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                     .penaltyLog()
                     .build(),
             )
-            StartupTrace.mark("StrictMode installed (debug): main-thread disk/network will be logged")
+            StartupTrace.mark(StartupLabels.STRICT_MODE_INSTALLED)
         }
     }
 

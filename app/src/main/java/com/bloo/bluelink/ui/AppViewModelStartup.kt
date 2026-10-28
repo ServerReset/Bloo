@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
@@ -35,7 +36,7 @@ internal fun AppViewModel.bootstrapColdStart() {
     // (debounced internally - see UpdateChecker). Also re-run on every user-triggered refresh,
     // see refreshStatus below.
     checkForUpdate()
-    StartupTrace.markIfStarting("AppViewModel init block: synchronous tail done")
+    StartupTrace.markIfStarting(StartupLabels.APP_VIEW_MODEL_INIT_TAIL_DONE)
     // Restore the last-known status/location from disk so the UI shows stale-but-useful data
     // immediately, before any network call returns.
     viewModelScope.launch {

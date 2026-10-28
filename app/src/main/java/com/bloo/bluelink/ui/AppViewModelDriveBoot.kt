@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import com.bloo.bluelink.data.syncFileChangedRemotely
 import android.app.Application
@@ -32,11 +33,11 @@ import kotlinx.coroutines.launch
 
 internal fun AppViewModel.bootstrapDriveSync() {
     if (!driveSyncBootstrapped.compareAndSet(false, true)) return
-    StartupTrace.markIfStarting("bootstrapDriveSync: entered")
+    StartupTrace.markIfStarting(StartupLabels.BOOTSTRAP_DRIVE_SYNC_ENTERED)
     // Restore auto-sync Drive URI and last sync timestamp from preferences.
     viewModelScope.launch {
         val snap = settingsStore.snapshot()
-        StartupTrace.markIfStarting("bootstrapDriveSync: prefs snapshot read")
+        StartupTrace.markIfStarting(StartupLabels.BOOTSTRAP_DRIVE_SYNC_PREFS_READ)
         val uri = settingsStore.syncUri(snap)
         val lastSync = settingsStore.lastSyncMs(snap)
         // Restores a failure the background periodic worker hit while the app was closed, so it's
@@ -67,9 +68,9 @@ internal fun AppViewModel.bootstrapDriveSync() {
         val myDeviceId = settingsStore.syncDeviceId(snap) ?: settingsStore.syncDeviceId()
         val myDeviceName = settingsStore.syncDeviceName(snap)
         val fileFingerprint = settingsStore.syncFileFingerprint(snap)
-        StartupTrace.markIfStarting("seedDefaultClimatePresets: starting")
+        StartupTrace.markIfStarting(StartupLabels.SEED_CLIMATE_PRESETS_STARTING)
         seedDefaultClimatePresets()
-        StartupTrace.markIfStarting("seedDefaultClimatePresets: done")
+        StartupTrace.markIfStarting(StartupLabels.SEED_CLIMATE_PRESETS_DONE)
         _state.update {
             it.copy(
                 syncUri = uri, lastSyncMs = lastSync, syncError = lastError, syncWifiOnly = wifiOnly,

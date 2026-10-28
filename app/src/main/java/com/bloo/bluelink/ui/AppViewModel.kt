@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import android.app.Application
 import androidx.compose.runtime.Stable
@@ -86,17 +87,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // the main thread by MainActivity's `viewModels()` dereference, so anything a constructor does
     // (opening SharedPreferences, resolving DataStore files, building an ML Kit client) is on the
     // critical path to the first frame.
-    internal val store = StartupTrace.trace("SessionStore()") { SessionStore(app) }
+    internal val store = StartupTrace.trace(StartupLabels.SESSION_STORE_CONSTRUCTED) { SessionStore(app) }
 
-    internal val settingsStore = StartupTrace.trace("SettingsStore()") { SettingsStore(app) }
+    internal val settingsStore = StartupTrace.trace(StartupLabels.SETTINGS_STORE_CONSTRUCTED) { SettingsStore(app) }
 
-    internal val credentialStore = StartupTrace.trace("CredentialStore()") { CredentialStore(app) }
+    internal val credentialStore = StartupTrace.trace(StartupLabels.CREDENTIAL_STORE_CONSTRUCTED) { CredentialStore(app) }
 
-    internal val snapshotStore = StartupTrace.trace("SnapshotStore()") { SnapshotStore(app) }
+    internal val snapshotStore = StartupTrace.trace(StartupLabels.SNAPSHOT_STORE_CONSTRUCTED) { SnapshotStore(app) }
 
-    internal val statusCache = StartupTrace.trace("StatusCache()") { StatusCache(app) }
+    internal val statusCache = StartupTrace.trace(StartupLabels.STATUS_CACHE_CONSTRUCTED) { StatusCache(app) }
 
-    internal val ai = StartupTrace.trace("Ai()") { com.bloo.bluelink.data.Ai(app) }
+    internal val ai = StartupTrace.trace(StartupLabels.AI_CONSTRUCTED) { com.bloo.bluelink.data.Ai(app) }
 
     // One repository per signed-in brand (any mix of brands can be active).
     internal val repos = mutableMapOf<Brand, VehicleRepository>()

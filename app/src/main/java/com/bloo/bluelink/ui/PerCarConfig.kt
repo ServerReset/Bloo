@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.climatePresets
@@ -90,9 +91,9 @@ internal suspend fun AppViewModel.refreshLocalCarConfig() {
     val prefs = settingsStore.snapshot()
     val vehicles = _state.value.vehicles
     if (vehicles.isEmpty()) return
-    StartupTrace.markIfStarting("loadGarageInner: prefs snapshot + order applied, perCarConfig starting")
+    StartupTrace.markIfStarting(StartupLabels.LOAD_GARAGE_PREFS_APPLIED)
     val cfg = perCarConfig(vehicles, prefs)
-    StartupTrace.markIfStarting("loadGarageInner: perCarConfig done")
+    StartupTrace.markIfStarting(StartupLabels.LOAD_GARAGE_PER_CAR_CONFIG_DONE)
     _state.update { cfg.apply(it) }
     // Quick-tile / shortcut changes must also re-push the launcher shortcuts, exactly as
     // loadGarageInner does, so an imported shortcut-set change is reflected in the app-icon

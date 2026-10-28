@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.unit.Density
@@ -126,7 +127,7 @@ private fun CarMapBody(
     val context = LocalContext.current
     val weight by rememberUpdatedState(panWeight)
     // Cold-start diagnostic; see HeroVisual's matching mark.
-    StartupTrace.once("carmap-composing", "CarMap composing (first one)")
+    StartupTrace.once("carmap-composing", StartupLabels.CAR_MAP_COMPOSING_FIRST)
 
     // The car's pin uses the dynamic/custom-palette primary so it matches the car's screen.
     val pinColor = MaterialTheme.colorScheme.primary

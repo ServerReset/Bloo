@@ -202,7 +202,7 @@ class SnapshotStore(private val context: Context) {
 
     /** One-shot read of the current snapshot data. */
     suspend fun current(): SnapshotData = withContext(Dispatchers.IO) {
-        StartupTrace.markIfStarting("SnapshotStore.current(): begin (disk read)")
+        StartupTrace.markIfStarting(StartupLabels.SNAPSHOT_STORE_CURRENT_BEGIN)
         // withContext for the same reason as `payload` above: .first() resumes on the CALLER's
         // dispatcher, and the caller is often the main thread.
         decode(context.snapshotDataStore.data.first()[Keys.PAYLOAD])

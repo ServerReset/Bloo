@@ -3,6 +3,7 @@ package com.bloo.bluelink
 import android.os.SystemClock
 import android.view.Choreographer
 import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import java.util.Locale
 
@@ -94,7 +95,7 @@ object StartupFrameMonitor {
             val nowUptime = SystemClock.uptimeMillis()
             if (firstFrameAtUptime == 0L) {
                 firstFrameAtUptime = nowUptime
-                StartupTrace.mark("first frame drawn")
+                StartupTrace.mark(StartupLabels.FIRST_FRAME_DRAWN)
                 // The system's own "fully drawn" signal (activity launched -> first draw),
                 // which is also what `am start -W` reports -- marked separately so the
                 // app-side trace and the shell's number can be compared directly.

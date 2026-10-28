@@ -85,9 +85,9 @@ suspend fun SettingsStore.warmUp() {
  * prevent.
  */
 suspend fun SettingsStore.snapshot(): Preferences {
-    StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() begin")
+    StartupTrace.markIfStarting(StartupLabels.SETTINGS_SNAPSHOT_BEGIN)
     val prefs = context.settingsDataStore.data.first()
-    StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() done")
+    StartupTrace.markIfStarting(StartupLabels.SETTINGS_SNAPSHOT_DONE)
     return prefs
 }
 

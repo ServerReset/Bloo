@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.ui.offerSharedFile
@@ -90,10 +91,10 @@ class MainActivity : FragmentActivity() {
      * [onStart]/[onStop] for that).
      */
     override fun onCreate(savedInstanceState: Bundle?) {
-        StartupTrace.mark("MainActivity.onCreate: begin")
+        StartupTrace.mark(StartupLabels.MAIN_ACTIVITY_ON_CREATE_BEGIN)
         super.onCreate(savedInstanceState)
         current = this
-        StartupTrace.mark("MainActivity.super.onCreate done")
+        StartupTrace.mark(StartupLabels.MAIN_ACTIVITY_SUPER_ON_CREATE_DONE)
         // ACTION_SCREEN_OFF is a protected broadcast (a manifest receiver never sees it) but a
         // runtime-registered one does. Exported so the SYSTEM can deliver it.
         ContextCompat.registerReceiver(
@@ -136,14 +137,14 @@ class MainActivity : FragmentActivity() {
             handleShareIntent(intent)
             setIntent(Intent())
         }
-        StartupTrace.mark("MainActivity: pre-setContent work done")
+        StartupTrace.mark(StartupLabels.MAIN_ACTIVITY_PRE_SET_CONTENT_DONE)
         // Touched HERE, before setContent, and deliberately not for its value. Six stores, five
         // DataStore collectors and the auto-login kick-off all landed on the first-frame critical
         // path.
         @Suppress("UNUSED_EXPRESSION")
         viewModel
-        StartupTrace.mark("MainActivity: AppViewModel constructed (the `viewModel` deref)")
-        StartupTrace.mark("MainActivity: setContent begin")
+        StartupTrace.mark(StartupLabels.MAIN_ACTIVITY_VIEW_MODEL_CONSTRUCTED)
+        StartupTrace.mark(StartupLabels.MAIN_ACTIVITY_SET_CONTENT_BEGIN)
         setContent {
             val appearance by viewModel.appearance.collectAsStateWithLifecycle()
             // Memoize palette lookup to avoid repeated linear search through custom palettes
@@ -190,7 +191,7 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onStart() {
-        StartupTrace.mark("MainActivity.onStart")
+        StartupTrace.mark(StartupLabels.MAIN_ACTIVITY_ON_START)
         super.onStart()
         com.bloo.bluelink.perf.PerfMonitor.foreground(true)
         viewModel.appForeground.value = true
@@ -227,9 +228,9 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onResume() {
-        StartupTrace.mark("MainActivity.onResume: begin")
+        StartupTrace.mark(StartupLabels.MAIN_ACTIVITY_ON_RESUME_BEGIN)
         super.onResume()
-        StartupTrace.mark("MainActivity.onResume: end")
+        StartupTrace.mark(StartupLabels.MAIN_ACTIVITY_ON_RESUME_END)
     }
 
     /** Remove the Shizuku listener so it doesn't leak past this Activity instance. */
