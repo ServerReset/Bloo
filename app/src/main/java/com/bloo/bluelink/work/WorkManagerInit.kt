@@ -1,7 +1,11 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequest
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 
 /**
  * Thin wrapper around `WorkManager.getInstance(context)`.
@@ -39,3 +43,21 @@ internal fun connectedConstraints(): androidx.work.Constraints =
     androidx.work.Constraints.Builder()
         .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
         .build()
+
+/**
+ * Schedules the periodic worker [W] under [name], on the connected-network constraint every periodic worker here asks for. A schedule
+ * already under [name] is replaced by this one. [configure] adds anything a worker needs on top (backoff, say).
+ */
+internal inline fun <reified W : androidx.work.ListenableWorker> enqueuePeriodic(
+    context: Context,
+    name: String,
+    interval: Long,
+    unit: TimeUnit,
+    configure: PeriodicWorkRequest.Builder.() -> Unit = {},
+) {
+    val request = PeriodicWorkRequestBuilder<W>(interval, unit)
+        .setConstraints(connectedConstraints())
+        .apply(configure)
+        .build()
+    WorkManagerInit.of(context).enqueueUniquePeriodicWork(name, ExistingPeriodicWorkPolicy.UPDATE, request)
+}

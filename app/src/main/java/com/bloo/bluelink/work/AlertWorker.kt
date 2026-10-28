@@ -2,7 +2,6 @@ package com.bloo.bluelink.work
 
 import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.AppLog
@@ -211,15 +210,6 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
          * UPDATE refreshes the request in place while keeping the existing schedule, which is
          * what KEEP was actually chosen for -- not resetting the timer on every app start.
          */
-        fun schedule(context: Context) {
-            val request = PeriodicWorkRequestBuilder<AlertWorker>(30, TimeUnit.MINUTES)
-                .setConstraints(connectedConstraints())
-                .build()
-            WorkManagerInit.of(context).enqueueUniquePeriodicWork(
-                "bloo_alerts",
-                ExistingPeriodicWorkPolicy.UPDATE,
-                request,
-            )
-        }
+        fun schedule(context: Context) = enqueuePeriodic<AlertWorker>(context, "bloo_alerts", 30, TimeUnit.MINUTES)
     }
 }

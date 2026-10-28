@@ -1,8 +1,6 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.postUpdateAvailable
@@ -90,15 +88,6 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : BlooWorker
          *  Registered as unique periodic work with KEEP so re-invoking schedule()
          *  (e.g. on every app start) doesn't reset the already-running periodic
          *  timer. */
-        fun schedule(context: Context) {
-            val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(12, TimeUnit.HOURS)
-                .setConstraints(connectedConstraints())
-                .build()
-            WorkManagerInit.of(context).enqueueUniquePeriodicWork(
-                NAME,
-                ExistingPeriodicWorkPolicy.UPDATE,
-                request,
-            )
-        }
+        fun schedule(context: Context) = enqueuePeriodic<UpdateCheckWorker>(context, NAME, 12, TimeUnit.HOURS)
     }
 }

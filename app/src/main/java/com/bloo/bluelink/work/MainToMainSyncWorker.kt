@@ -1,8 +1,6 @@
 package com.bloo.bluelink.work
 
 import android.content.Context
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
@@ -101,30 +99,12 @@ class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : BlooWorker(
         /** Every 2 hours is frequent enough that changes propagate within a normal
          *  day of use, without the battery/data cost of anything tighter for a
          *  low-urgency settings-sync convenience feature. */
-        fun schedule(context: Context) {
-            val request = PeriodicWorkRequestBuilder<MainToMainSyncWorker>(2, TimeUnit.HOURS)
-                // Requires any usable network connection (not Wi-Fi-only at the
-                // WorkManager level) since the Wi-Fi-only preference, if the user
-                // set one, is instead re-checked inside performMainToMainSync() itself
-                // every run -- letting the constraint here stay the loosest
-                // possible so the worker is scheduled to run as often as intended
-                // and only skips the actual network call when the user's own
-                // preference says to.
-                .setConstraints(connectedConstraints())
-                // Explicit (rather than relying on the platform default) so a
-                // transient failure is retried within a minute, not the
-                // default's much longer first backoff step.
-                .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
-                .build()
-            // enqueueUniquePeriodicWork + KEEP: if a periodic job under this name
-            // is already scheduled, leave the existing one running as-is rather
-            // than replacing it -- so calling schedule() again (e.g. on every app
-            // launch) doesn't reset the periodic timer or cancel an in-flight run.
-            WorkManagerInit.of(context).enqueueUniquePeriodicWork(
-                NAME,
-                ExistingPeriodicWorkPolicy.UPDATE,
-                request,
-            )
+        fun schedule(context: Context) = enqueuePeriodic<MainToMainSyncWorker>(context, NAME, 2, TimeUnit.HOURS) {
+            // Requires any usable network connection (not Wi-Fi-only at the WorkManager level): the Wi-Fi-only preference is re-checked
+            // inside performMainToMainSync() on every run, so the schedule itself stays as loose as possible.
+            // Explicit (rather than the platform default) so a transient failure is retried within a minute, not the default's much
+            // longer first backoff step.
+            setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
         }
     }
 }
