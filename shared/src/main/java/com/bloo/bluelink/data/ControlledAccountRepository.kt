@@ -26,8 +26,12 @@ abstract class ControlledAccountRepository<S : PinnedSession, Sum : AccountVehic
     /** Every vehicle on the account, from the brand's API. */
     protected abstract suspend fun fetchVehicles(s: S): List<Sum>
 
-    /** A control token for [summary]'s car, minted from the session and its PIN. */
-    protected abstract suspend fun mintControlToken(s: S, summary: Sum, pin: String): String
+    /**
+     * A control token for [summary]'s car, minted from the session and its PIN. Only a brand whose commands need one overrides this; for
+     * the others, [withCommandAuth] is never reached.
+     */
+    protected open suspend fun mintControlToken(s: S, summary: Sum, pin: String): String =
+        throw BlueLinkException("This brand's commands do not use a control token")
 
     /** Whether [e] means the session has died and should be renewed, as this brand reports it. */
     protected abstract fun isSessionFailure(e: BlueLinkException): Boolean
