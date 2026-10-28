@@ -19,7 +19,6 @@ import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import com.bloo.bluelink.data.BlooColors
-import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.chargeLeftLabel
@@ -56,12 +55,7 @@ class BlooTileService : TileService() {
         answerTile(scope, "BlooTile", fallback = { tileOf(layoutFor(null)) }) { buildTile(requestParams) }
 
     private suspend fun buildTile(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
-        // The phone's accent, read before anything is drawn (the tile has no Compose theme to carry it).
-        WearAccent.load(this)
-                // Sealed after a restart: the tile shows nothing about the car until the PIN is entered.
-                val sealed = runCatching { WearBootGate.isLocked(applicationContext) }.getOrDefault(true)
-                val snapshot = if (sealed) null
-                else runCatching { SnapshotStore(applicationContext).current() }.getOrNull()
+        val (sealed, snapshot) = loadTileSnapshot(this)
                 // The hub is the refresh button: a press reloads the tile with this id, and a refresh is asked for as it does.
                 // Not more than once in HUB_REFRESH_GAP_MS: the tile keeps reporting the last pressed id on later reloads (its own
                 // freshness updates, the redraw a refresh causes), and each would otherwise start another refresh.

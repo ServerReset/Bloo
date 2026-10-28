@@ -15,7 +15,6 @@ import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
-import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.ioScope
@@ -58,9 +57,7 @@ class BlooClimateTileService : TileService() {
         answerTile(scope, "BlooClimateTile", fallback = { tileOf(messageLayout("Open Bloo")) }) { buildTile(requestParams) }
 
     private suspend fun buildTile(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
-        WearAccent.load(this)
-        val sealed = runCatching { WearBootGate.isLocked(applicationContext) }.getOrDefault(true)
-        val snapshot = if (sealed) null else runCatching { SnapshotStore(applicationContext).current() }.getOrNull()
+        val (sealed, snapshot) = loadTileSnapshot(this)
         val car = snapshot?.let { WearTileCar.pick(applicationContext, it.vehicles) ?: it.selected }
             ?: return tileOf(messageLayout(if (sealed) "Enter your PIN in Bloo" else "Add a car in Bloo on your phone"))
         WearPresets.ensureLoaded(applicationContext)
