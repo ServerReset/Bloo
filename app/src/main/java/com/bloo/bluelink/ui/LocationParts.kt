@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.HourPoint
 import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.WeatherCode
+import com.bloo.bluelink.data.cToF
 import com.bloo.bluelink.data.formatSpeed
 import com.bloo.bluelink.data.weatherTemp
 import com.bloo.uicommon.PrimaryTextStyle
@@ -279,7 +280,7 @@ private fun WeatherForecastRow(weather: Weather, fahrenheit: Boolean) {
 
 /** A day's temperature in the display unit, rounded; null when the source is unknown. */
 private fun dayTemp(c: Double?, fahrenheit: Boolean): Int? =
-    c?.let { (if (fahrenheit) it * 9 / 5 + 32 else it).roundToInt() }
+    c?.let { (if (fahrenheit) cToF(it) else it).roundToInt() }
 
 /**
  * One day's low-to-high as a segment on a shared track, positioned against the week's coldest low and

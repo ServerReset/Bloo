@@ -71,7 +71,9 @@ import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
+import com.bloo.bluelink.data.cToF
 import com.bloo.bluelink.data.climatePresetTemp
+import com.bloo.bluelink.data.fToC
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.ButtonEmphasis
@@ -358,8 +360,8 @@ internal fun ChargeLimitPill(
 /** One step of a temperature in the unit the car is shown in, kept inside the car's range and never off a whole degree. */
 internal fun stepTempF(tempF: Int, step: Int, fahrenheit: Boolean): Int {
     if (fahrenheit) return (tempF + step).coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last)
-    val c = ((tempF - 32) * 5 / 9f).roundToInt() + step
-    return (c * 9 / 5f + 32).roundToInt().coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last)
+    val c = fToC(tempF.toDouble()).roundToInt() + step
+    return cToF(c.toDouble()).roundToInt().coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last)
 }
 
 /**

@@ -25,6 +25,7 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.ambientFahrenheit
+import com.bloo.bluelink.data.cToF
 import com.bloo.bluelink.data.climatePresets
 import com.bloo.bluelink.data.degLabel
 import com.bloo.bluelink.data.deleteClimatePreset
@@ -338,7 +339,7 @@ private fun SavePresetDialog(onSave: (String) -> Unit, onDismiss: () -> Unit) {
 
 private fun TempValue.asFahrenheit(): Int? {
     val n = value?.toDoubleOrNull() ?: return null
-    return (if (unit == 0) n * 9 / 5 + 32 else n).roundToInt()
+    return (if (unit == 0) cToF(n) else n).roundToInt()
 }
 
 /** How long after a start the car's old reading of its settings is distrusted (see `lastSent`). */
