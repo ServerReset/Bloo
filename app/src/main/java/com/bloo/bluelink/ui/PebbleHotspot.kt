@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.BounceDamping
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.GapGroup
@@ -123,7 +124,7 @@ internal fun HotspotSlot(
     // The seat leans toward the finger while a dragged pebble is over it, then springs back.
     val seatScale by animateFloatAsState(
         targetValue = if (hovered) 1.015f else 1f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
+        animationSpec = spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow),
         label = "hotSeatScale",
     )
     // No `spacedBy`: a hidden slot must leave NOTHING behind, and `spacedBy` still inserts a gap
@@ -177,7 +178,7 @@ internal fun HotspotSlot(
                         visible = secondaryPebble == null && hotDrag?.pendingPin == null,
                         enter = expandVertically(
                             expandFrom = Alignment.Top,
-                            animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow),
+                            animationSpec = spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow),
                         ),
                         exit = shrinkVertically(
                             shrinkTowards = Alignment.Top,
@@ -235,7 +236,7 @@ internal fun PinnedPebble(v: Vehicle, stateSource: State<UiState>, vm: AppViewMo
             pastUnpin -> 1.08f
             else -> 1.04f
         },
-        spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
+        spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow),
         label = "pickScale",
     )
     fun release() {
@@ -315,7 +316,7 @@ internal fun PinnedPebble(v: Vehicle, stateSource: State<UiState>, vm: AppViewMo
 @Composable
 private fun EmptyDropZone(hovered: Boolean) {
     val scheme = MaterialTheme.colorScheme
-    val glow by animateFloatAsState(if (hovered) 1f else 0f, spring(dampingRatio = SettleDamping, stiffness = Spring.StiffnessMediumLow), label = "hotseatGlow")
+    val glow by animateFloatAsState(if (hovered) 1f else 0f, spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow), label = "hotseatGlow")
     val tone = lerp(scheme.onSurfaceVariant, scheme.primary, glow)
     val outline = lerp(scheme.outline.copy(alpha = 0.5f), scheme.primary, glow)
     val fill = scheme.primary.copy(alpha = 0.14f * glow)

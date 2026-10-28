@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.BounceDamping
 import kotlin.math.roundToInt
 import com.bloo.uicommon.GapRow
 
@@ -81,13 +82,12 @@ internal fun BoxScope.HeroBackground(
         // reads as an object arriving rather than filling in.
         enter = expandEnterSized() +
             slideInVertically(
-                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
+                animationSpec = spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow),
             ) { with(heroPhotoDensity) { -HeroPhotoSlideDistance.roundToPx() } } +
             scaleIn(
                 initialScale = 0.85f,
                 animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
+                    dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow,
                 ),
             ),
         exit = expandExitSized() +

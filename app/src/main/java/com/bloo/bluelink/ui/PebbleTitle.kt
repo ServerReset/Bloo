@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.PrimaryTextStyle
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
@@ -59,7 +60,7 @@ internal fun PebbleTitleRow(
     val headerTState = animateFloatAsState(
         targetValue = if (expandingTitle) 1f else 0f,
         animationSpec = if (expandingTitle) {
-            lowPowerAwareSpring(dampingRatio = 0.62f, stiffness = Spring.StiffnessVeryLow)
+            lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
         } else {
             lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = PebbleBounceStiffness)
         },

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.BounceDamping
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContent
 import kotlinx.coroutines.delay
@@ -70,11 +71,11 @@ internal val MorphedCornerPercent get() = com.bloo.uicommon.MorphedCornerPercent
 // internal: PebbleShell's corner-radius morph shares these springs so height and corners move as
 // one.
 /** The springs the app settles things with, named so the same feel is one value everywhere. */
-internal const val SettleDamping = 0.7f
+internal const val SettleDamping = com.bloo.uicommon.BounceDamping
 internal const val GentleDamping = 0.9f
-internal const val PopDamping = 0.6f
+internal const val PopDamping = com.bloo.uicommon.BounceDamping
 
-internal val PebbleBounceDamping = 0.68f
+internal val PebbleBounceDamping = com.bloo.uicommon.BounceDamping
 
 // Slightly underdamped (0.95) for a smoother close that isn't stiff.
 internal val PebbleCloseDamping = 0.95f
@@ -164,13 +165,13 @@ internal fun PopVisible(
         modifier = modifier,
         enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
             scaleIn(
-                lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
+                lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow),
                 initialScale = 0.8f,
             ) +
-            (if (sizeAnimated) expandVertically(lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)) else EnterTransition.None),
+            (if (sizeAnimated) expandVertically(lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)) else EnterTransition.None),
         exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
             scaleOut(MaterialTheme.motionScheme.defaultSpatialSpec<Float>(), targetScale = 0.8f) +
-            (if (sizeAnimated) shrinkVertically(lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)) else ExitTransition.None),
+            (if (sizeAnimated) shrinkVertically(lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)) else ExitTransition.None),
         content = content,
     )
 }

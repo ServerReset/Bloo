@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.uicommon.BounceDamping
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.GapRow
@@ -282,13 +283,13 @@ private fun BoxScope.SearchElement(
     // without recomposing it every frame.
     // Two springs: SIZE overshoots a little, POSITION is bouncier still so the edge-snap reads as
     // landing. Numbers are the shared PebbleBounce tokens.
-    val sizeSpec = lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
+    val sizeSpec = lowPowerAwareSpring<Dp>(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
     val w = animateDpAsState(targetW, sizeSpec, label = "searchW")
     val h = animateDpAsState(targetH, sizeSpec, label = "searchH")
     // A spring is wrong for a drag (it trails the finger); position snaps 1:1 while the finger is
     // down.
     val posSpec = if (dragging) snap<Dp>() else {
-        lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
+        lowPowerAwareSpring<Dp>(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
     }
     val targetX = if (dragging && !dragX.isNaN()) dragX.dp.coerceIn(minX, dragMaxX) else restX
     val x = animateDpAsState(targetX, posSpec, label = "searchX")

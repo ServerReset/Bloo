@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.BounceDamping
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
 import com.bloo.uicommon.LocalHaptics
@@ -104,7 +105,7 @@ internal fun PullRefreshIndicatorHost(state: RefreshIndicatorState, hazeState: H
             if (refreshSpring.value < 0.01f) refreshSpring.snapTo(finger)
             // Bouncy: an over-pull (dragged below the resting spot) springs back up and settles,
             // rather than easing flat.
-            refreshSpring.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow))
+            refreshSpring.animateTo(1f, spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow))
         } else if (refreshSpring.value > 0.01f) {
             retracting = true
             refreshSpring.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))

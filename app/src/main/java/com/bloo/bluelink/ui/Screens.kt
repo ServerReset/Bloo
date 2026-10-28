@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.bloo.uicommon.BounceDamping
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.delay
@@ -112,7 +113,7 @@ fun BlooApp(vm: AppViewModel) {
     val searchHidden = locked || mapExpanded
     val searchRise = remember { Animatable(if (searchHidden) 1f else 0f) }
     // Built here, in composition: lowPowerAwareSpring is @Composable, so it cannot be read inside the coroutine below.
-    val searchRiseSpec = lowPowerAwareSpring<Float>(dampingRatio = SearchRiseDamping, stiffness = Spring.StiffnessLow)
+    val searchRiseSpec = lowPowerAwareSpring<Float>(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
     LaunchedEffect(searchHidden) {
         // A lock hides the bar at once, under the blur. Everything else animates it.
         if (locked) searchRise.snapTo(1f) else searchRise.animateTo(if (searchHidden) 1f else 0f, searchRiseSpec)
@@ -457,8 +458,6 @@ internal const val FOUR_COLUMN_MIN_DP = 1500
  * (An earlier take collapsed this to `width / 600`, which showed one wide car instead of the grid --
  * wrong: a large screen wants MORE columns, not fewer.)
  */
-/** A soft spring: the search bar floats up and overshoots its rest by about a tenth of the travel, then settles. */
-private const val SearchRiseDamping = 0.6f
 
 internal fun carColumnsFor(widthDp: Float): Int = when {
     widthDp >= FOUR_COLUMN_MIN_DP -> 4

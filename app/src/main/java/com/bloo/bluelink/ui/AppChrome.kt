@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.ButtonEmphasis
@@ -283,10 +284,10 @@ internal fun AuroraBackground(
     val explosion = remember { Animatable(0f) }
     LaunchedEffect(refreshing) {
         if (refreshing) {
-            explosion.animateTo(1f, spring(dampingRatio = PopDamping, stiffness = Spring.StiffnessMedium))
+            explosion.animateTo(1f, spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow))
             delay(220)
         }
-        explosion.animateTo(0f, spring(dampingRatio = SettleDamping, stiffness = Spring.StiffnessMediumLow))
+        explosion.animateTo(0f, spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow))
     }
     // Fades the blobs in from nothing on the first frame this composable exists -- for a cold start,
     // that IS the very first frame the app paints at all (LoadingScreen/LoginScreen both use this).
@@ -358,7 +359,7 @@ internal fun AuroraBackground(
                         if (energy.value < 0.02f) { follow.snapTo(p); glowAt.value = p }
                         coroutineScope {
                             launch { energy.animateTo(1f, tween(160)) }
-                            launch { follow.animateTo(p, spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow)) }
+                            launch { follow.animateTo(p, spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)) }
                         }
                     } else {
                         energy.animateTo(0f, tween(1100))
@@ -396,8 +397,8 @@ internal fun AuroraBackground(
             snapshotFlow { reactions.kick.intValue }.collect { k ->
                 if (k > 0) {
                     kick.snapTo(0f)
-                    kick.animateTo(1f, spring(dampingRatio = PopDamping, stiffness = Spring.StiffnessMedium))
-                    kick.animateTo(0f, spring(dampingRatio = SettleDamping, stiffness = Spring.StiffnessMediumLow))
+                    kick.animateTo(1f, spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow))
+                    kick.animateTo(0f, spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow))
                 }
             }
         }

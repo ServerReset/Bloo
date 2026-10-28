@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.doorLockLabel
 import com.bloo.bluelink.data.supportsHornLights
+import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
@@ -117,7 +118,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     val corner = animateDpAsState(
         targetValue = if (expanded) PebbleCornerExpanded else PebbleCornerCollapsed,
         animationSpec = if (expanded) {
-            lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
+            lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
         } else {
             lowPowerAwareSpring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness)
         },

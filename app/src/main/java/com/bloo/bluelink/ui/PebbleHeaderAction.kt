@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.BounceDamping
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.ButtonTargetHeight
@@ -81,7 +82,7 @@ internal fun SplitExpandButton(
     val bounceY = remember { Animatable(0f) }
     val bounceScope = rememberCoroutineScope()
     val bounceUpSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh)
-    val bounceDownSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+    val bounceDownSpring = lowPowerAwareSpring<Float>(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
     var bouncing by remember { mutableStateOf(false) }
 
     val chevronSource = remember { MutableInteractionSource() }

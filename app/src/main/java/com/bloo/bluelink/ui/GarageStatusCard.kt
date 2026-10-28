@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.SecondaryTextStyle
 import dev.chrisbanes.haze.HazeState
@@ -100,7 +101,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
     val contentOffset = remember { Animatable(16f) }
     LaunchedEffect(Unit) {
         launch { contentAlpha.animateTo(1f, tween(MotionLong)) }
-        launch { contentOffset.animateTo(0f, spring(dampingRatio = SettleDamping, stiffness = Spring.StiffnessMediumLow)) }
+        launch { contentOffset.animateTo(0f, spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)) }
     }
 
     // loadGarage() sets state.loading (not state.refreshing, which only ever covers a single car's

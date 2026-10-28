@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.segmentsOf
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -179,7 +180,7 @@ internal fun FloatingIcon(
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.88f else 1f,
-        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        animationSpec = lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow),
         label = "floatIconScale",
     )
     // GlassSurface supplies the shared fill/blur/rim/shadow.

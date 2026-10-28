@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.LocalReduceMotion
 import androidx.compose.animation.core.LinearEasing
@@ -143,7 +144,10 @@ internal fun ExpandableMapLayer(
     val barGapPx = with(density) { GapSection.toPx() * 2f }
     // The bar's gutter, from the screen's edges and from the top, read here for the same reason.
     val barInsetPx = with(density) { GapSection.toPx() }
-    val chromeInSpec: AnimationSpec<Float> = if (plainMotion) tween(120) else spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow)
+    val chromeInSpec: AnimationSpec<Float> = if (plainMotion) tween(120) else spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
+    // The sheet comes in from above the screen, from behind the status bar: it starts a screen's height up and springs down to its place.
+    val entrySpec: AnimationSpec<Float> = if (plainMotion) tween(160, easing = LinearEasing) else spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
+    val entry = remember { Animatable(0f) }
 
     val placed = rootPos != null
     LaunchedEffect(placed) {
@@ -160,6 +164,8 @@ internal fun ExpandableMapLayer(
         com.bloo.bluelink.perf.PerfMonitor.scope("map-open", 1_000)
         // The sheet grows and the bar flies in together: the bar comes down from above the screen, under the status bar, and
         // overshoots its place a little before it settles.
+        entry.snapTo(-windowSize.height.toFloat())
+        launch { entry.animateTo(0f, animationSpec = entrySpec) }
         launch { expandFraction.animateTo(1f, animationSpec = openSpec) }
         launch { chrome.animateTo(1f, animationSpec = chromeInSpec) }
     }
@@ -243,7 +249,7 @@ internal fun ExpandableMapLayer(
                     val sheet = Rect(0f, h - sheetH + dragPx.value, w, h + dragPx.value)
                     val root = rootPos
                     val origin = if (root == null) sheet else originBounds.translate(-root.x, -root.y)
-                    val r = lerp(origin, sheet, progress())
+                    val r = lerp(origin, sheet, progress()).translate(0f, entry.value)
                     val placeable = measurable.measure(
                         androidx.compose.ui.unit.Constraints.fixed(r.width.roundToInt().coerceAtLeast(1), r.height.roundToInt().coerceAtLeast(1)),
                     )
