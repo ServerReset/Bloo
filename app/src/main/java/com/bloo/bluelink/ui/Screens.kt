@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.offset
 import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import android.content.ClipData
@@ -51,6 +52,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.bloo.uicommon.BounceDamping
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.LocalPowerPolicy
@@ -371,8 +373,9 @@ fun BlooApp(vm: AppViewModel) {
         // Hidden while the map overlay is expanded: its bottom action row occupies the same corner.
         if (searchable) {
             // No `.padding(padding)`: SearchLayer reads WindowInsets itself, and padding here would
-            // subtract the nav bar twice.
-            Box(Modifier.fillMaxSize().graphicsLayer { translationY = searchRise.value * screenHeightPx }) {
+            // subtract the nav bar twice. The rise is a layout offset, not a graphicsLayer translation: the glass samples the
+            // backdrop by layout position, so a translated layer drew its blur a few pixels off from the content it sits behind.
+            Box(Modifier.fillMaxSize().offset { IntOffset(0, (searchRise.value * screenHeightPx).roundToInt()) }) {
                 SearchLayer(
                     vm = vm,
                     state = stateHolder,
