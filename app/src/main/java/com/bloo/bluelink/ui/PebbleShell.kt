@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.uicommon.BounceDamping
+import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.motionBlurWhenMoving
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
@@ -210,7 +211,7 @@ internal fun PebbleShell(
         else -> collapsedCorner
     }
     val cornerSpec = if (expanded || chevronPressed) {
-        lowPowerAwareSpring<Dp>(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
+        lowPowerBounce<Dp>(stiffness = Spring.StiffnessLow)
     } else {
         lowPowerAwareSpring<Dp>(dampingRatio = PebbleCloseDamping, stiffness = Spring.StiffnessLow)
     }

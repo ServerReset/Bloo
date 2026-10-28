@@ -1,5 +1,10 @@
 package com.bloo.uicommon
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.Composable
+
 /**
  * App-wide spring animation constants used by the phone UI. [SoftDamping] is the standard damping
  * ratio for most transitions - slightly overdamped (0.82) so motions feel settled without
@@ -27,3 +32,12 @@ const val FloatingStiffness = 50f
  */
 const val PillCornerPercent = 50f
 const val MorphedCornerPercent = 28f
+
+/**
+ * The app's bounce as a spring: [BounceDamping] at [stiffness]. For coroutines and top-level values, where no composable can run.
+ */
+fun <T> bounceSpring(stiffness: Float = Spring.StiffnessLow): SpringSpec<T> = spring(dampingRatio = BounceDamping, stiffness = stiffness)
+
+/** The same bounce, leaning to a plain tween under battery saver (see [lowPowerAwareSpring]). For composables. */
+@Composable
+fun <T> lowPowerBounce(stiffness: Float = Spring.StiffnessLow) = lowPowerAwareSpring<T>(dampingRatio = BounceDamping, stiffness = stiffness)

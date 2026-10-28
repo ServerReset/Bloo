@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.uicommon.BounceDamping
+import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.FloatingStiffness
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContent
@@ -161,13 +162,13 @@ internal fun PopVisible(
         modifier = modifier.motionBlurWhenMoving(),
         enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
             scaleIn(
-                lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = FloatingStiffness),
+                lowPowerBounce(stiffness = FloatingStiffness),
                 initialScale = 0.8f,
             ) +
-            (if (sizeAnimated) expandVertically(lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = FloatingStiffness)) else EnterTransition.None),
+            (if (sizeAnimated) expandVertically(lowPowerBounce(stiffness = FloatingStiffness)) else EnterTransition.None),
         exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
             scaleOut(MaterialTheme.motionScheme.defaultSpatialSpec<Float>(), targetScale = 0.8f) +
-            (if (sizeAnimated) shrinkVertically(lowPowerAwareSpring(dampingRatio = BounceDamping, stiffness = FloatingStiffness)) else ExitTransition.None),
+            (if (sizeAnimated) shrinkVertically(lowPowerBounce(stiffness = FloatingStiffness)) else ExitTransition.None),
         content = content,
     )
 }

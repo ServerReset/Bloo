@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.BounceDamping
 import com.bloo.uicommon.ButtonIcon
 import com.bloo.uicommon.GapGroup
@@ -207,7 +208,7 @@ internal fun LiftedPiece(
     val reduce = com.bloo.uicommon.LocalReduceMotion.current
     val lift = remember(key) { androidx.compose.animation.core.Animatable(if (reduce) 1f else 0f) }
     LaunchedEffect(key) {
-        if (!reduce) lift.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow))
+        if (!reduce) lift.animateTo(1f, bounceSpring(stiffness = Spring.StiffnessLow))
     }
     // A faint, steady angle per piece (a fraction of a degree to a degree and a half), so a stack reads as loose sheets.
     val tilt = ((key.hashCode() and 7) - 3) * 0.4f

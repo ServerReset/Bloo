@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.uicommon.BounceDamping
+import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.ExpressiveButtonGroup
 import com.bloo.uicommon.PrimaryTextStyle
 import dev.chrisbanes.haze.HazeState
@@ -128,7 +129,7 @@ internal fun MapTopBar(
     var pillPressed by remember { mutableStateOf(false) }
     val pillScale by animateFloatAsState(
         targetValue = if (pillPressed) 1.04f else 1f,
-        animationSpec = spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = bounceSpring(stiffness = Spring.StiffnessLow),
         label = "mapBarPop",
     )
     GlassSurface(
@@ -264,7 +265,7 @@ internal fun Modifier.pullToRefreshOrDismiss(
                 }
                 raw = 0f
                 lastNotch = 0
-                scope.launch { pull.up.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)) }
+                scope.launch { pull.up.animateTo(0f, bounceSpring(stiffness = Spring.StiffnessLow)) }
             } else {
                 val thresholdPx = with(density) { 96.dp.toPx() }
                 if (dragPx.value > thresholdPx) close() else scope.launch { dragPx.animateTo(0f, spring) }

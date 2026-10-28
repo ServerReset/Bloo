@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.uicommon.BounceDamping
+import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.MorphIconButton
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -69,7 +70,7 @@ private fun SwatchDisc(color: Color, selected: Boolean, description: String, onC
     val ring by animateDpAsState(if (selected) 3.dp else 0.dp, spring(stiffness = Spring.StiffnessMediumLow), label = "swatchRing")
     val scale by animateFloatAsState(
         if (selected) 1.12f else 1f,
-        spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow),
+        bounceSpring(stiffness = Spring.StiffnessLow),
         label = "swatchScale",
     )
     // The 58dp slot leaves room for the 1.12x pop. Exposed as a RadioButton so TalkBack announces

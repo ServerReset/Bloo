@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.bloo.uicommon.BounceDamping
+import com.bloo.uicommon.lowPowerBounce
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlin.math.roundToInt
@@ -118,7 +119,7 @@ fun BlooApp(vm: AppViewModel) {
     val searchHidden = locked || mapExpanded
     val searchRise = remember { Animatable(if (searchHidden) 1f else 0f) }
     // Built here, in composition: lowPowerAwareSpring is @Composable, so it cannot be read inside the coroutine below.
-    val searchRiseSpec = lowPowerAwareSpring<Float>(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
+    val searchRiseSpec = lowPowerBounce<Float>(stiffness = Spring.StiffnessLow)
     LaunchedEffect(searchHidden) {
         // A lock hides the bar at once, under the blur. Everything else animates it.
         if (locked) searchRise.snapTo(1f) else searchRise.animateTo(if (searchHidden) 1f else 0f, searchRiseSpec)

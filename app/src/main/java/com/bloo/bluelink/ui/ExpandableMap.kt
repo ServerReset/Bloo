@@ -4,6 +4,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import com.bloo.uicommon.BounceDamping
+import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.LocalReduceMotion
 import androidx.compose.animation.core.LinearEasing
@@ -144,7 +145,7 @@ internal fun ExpandableMapLayer(
     val barGapPx = with(density) { GapSection.toPx() * 2f }
     // The bar's gutter, from the screen's edges and from the top, read here for the same reason.
     val barInsetPx = with(density) { GapSection.toPx() }
-    val chromeInSpec: AnimationSpec<Float> = if (plainMotion) tween(120) else spring(dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow)
+    val chromeInSpec: AnimationSpec<Float> = if (plainMotion) tween(120) else bounceSpring(stiffness = Spring.StiffnessLow)
 
 
     val placed = rootPos != null

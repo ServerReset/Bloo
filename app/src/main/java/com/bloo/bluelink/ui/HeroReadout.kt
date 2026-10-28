@@ -46,6 +46,7 @@ import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.isPluggedOrCharging
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
+import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.BounceDamping
 import kotlin.math.roundToInt
 import com.bloo.uicommon.MotionMedium
@@ -158,9 +159,7 @@ internal fun animatedChargeFrac(target: Float): State<Float> {
     // Deliberately bouncy: the fill overshoots the new charge a touch and springs back, which reads as the bar "landing" on
     // the value. It also STARTS empty in the app's first moments: the first bar drawn fills up to the charge, with the same bounce,
     // instead of appearing already full. (The charging animation is a separate thing: a slight sheen over the full part, see ChargeSegmentBar.)
-    val spec = lowPowerAwareSpring<Float>(
-        dampingRatio = BounceDamping, stiffness = Spring.StiffnessLow,
-    )
+    val spec = lowPowerBounce<Float>()
     // Starts empty only in the app's first moments; a bar composed later (the next car in a swipe) starts at its charge, so
     // it does not spring up from nothing while the page slides in.
     val fill = remember { Animatable(if (com.bloo.uicommon.ColdStartWindow.isOpen()) 0f else target) }
