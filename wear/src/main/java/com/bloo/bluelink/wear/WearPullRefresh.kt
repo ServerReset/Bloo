@@ -53,6 +53,10 @@ import androidx.compose.ui.unit.dp
 private val PullDistance = 64.dp
 private val DiscSize = 38.dp
 
+/** The disc springs out to the arm point, bouncing a little, and back to rest without overshoot. */
+private val ArmSpring = spring<Float>(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow)
+private val ReturnSpring = spring<Float>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+
 /** Where the disc rests, measured from the top of the display (clear of the clock). */
 private val RestTop = 30.dp
 
@@ -145,16 +149,16 @@ fun BoxScope.WearPullIndicator(state: WearPullState, refreshing: Boolean) {
         if (active) {
             // From where the finger left it (it is already back to 0 by now), not from the top.
             if (settle.value < 0.01f) settle.snapTo(fingerOf(state.lastPull))
-            settle.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow))
+            settle.animateTo(1f, ArmSpring)
         } else if (settle.value > 0.01f) {
-            settle.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+            settle.animateTo(0f, ReturnSpring)
         }
     }
     // A pull let go before the arm point springs back from where the finger left it.
     LaunchedEffect(dragging) {
         if (!dragging && !active && state.lastPull > 0.01f) {
             settle.snapTo(fingerOf(state.lastPull))
-            settle.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+            settle.animateTo(0f, ReturnSpring)
         }
     }
     // Driven by the finger 1:1 while pulling; by the spring otherwise (a refresh, or springing back).
