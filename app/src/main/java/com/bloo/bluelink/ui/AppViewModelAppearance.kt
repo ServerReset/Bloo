@@ -40,35 +40,35 @@ import kotlinx.coroutines.launch
 fun AppViewModel.setThemeMode(mode: ThemeMode) = viewModelScope.launch {
     settingsStore.setThemeMode(mode)
 }
-fun AppViewModel.setFontChoice(choice: FontChoice) = viewModelScope.launch { settingsStore.setFontChoice(choice) }
+fun AppViewModel.setFontChoice(choice: FontChoice) = persist { setFontChoice(choice) }
 fun AppViewModel.setDynamicColor(enabled: Boolean) = viewModelScope.launch { settingsStore.setDynamicColor(enabled); pushPaletteToWatch() }
 fun AppViewModel.setColorPalette(palette: ColorPalette) = viewModelScope.launch { settingsStore.setColorPalette(palette); pushPaletteToWatch() }
 fun AppViewModel.saveCustomPalette(palette: CustomPaletteData) = viewModelScope.launch { settingsStore.saveCustomPalette(palette); pushPaletteToWatch() }
-fun AppViewModel.deleteCustomPalette(id: String) = viewModelScope.launch { settingsStore.deleteCustomPalette(id) }
+fun AppViewModel.deleteCustomPalette(id: String) = persist { deleteCustomPalette(id) }
 fun AppViewModel.setActiveCustomPaletteId(id: String?) = viewModelScope.launch { settingsStore.setActiveCustomPaletteId(id); pushPaletteToWatch() }
 
 /** Swap which dual-column side the "hot spot" pebble lives on. */
-fun AppViewModel.setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
+fun AppViewModel.setColumnsFlipped(flipped: Boolean) = persist { setColumnsFlipped(flipped) }
 
 // Deferred variants for the settings sliders: these two values recompose ~the whole app
 // (colorScheme / LocalDensity), so the commit waits a beat past slider release to let the
 // settle-bounce animation get a clean run.
 fun AppViewModel.setUiScaleSoon(value: Float) =
-    viewModelScope.launch { settingsStore.setUiScale(value) }
+    persist { setUiScale(value) }
 fun AppViewModel.setGlassClaritySoon(value: Float) =
-    viewModelScope.launch { settingsStore.setGlassClarity(value) }
+    persist { setGlassClarity(value) }
 
 fun AppViewModel.setUltraGlass(value: Boolean) =
-    viewModelScope.launch { settingsStore.setUltraGlass(value) }
+    persist { setUltraGlass(value) }
 
 fun AppViewModel.setHeroEdge(value: Boolean) =
-    viewModelScope.launch { settingsStore.setHeroEdge(value) }
+    persist { setHeroEdge(value) }
 fun AppViewModel.setVibrancySoon(value: Float) =
     viewModelScope.launch { settingsStore.setVibrancy(value); pushPaletteToWatch() }
 
 /** The watch wears the phone's palette (see WatchAccent), so a change to it is sent along at once. */
 private fun AppViewModel.pushPaletteToWatch() = com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
-fun AppViewModel.setHapticsEnabled(value: Boolean) = viewModelScope.launch { settingsStore.setHapticsEnabled(value) }
+fun AppViewModel.setHapticsEnabled(value: Boolean) = persist { setHapticsEnabled(value) }
 
 // More of the same appearance-setter pattern described above the setThemeMode group: DataStore
 // write only, UI updates via the `appearance` StateFlow mirror. the animated background's colors
@@ -80,7 +80,7 @@ fun AppViewModel.setHapticsEnabled(value: Boolean) = viewModelScope.launch { set
  */
 suspend fun AppViewModel.searchBubblePosition(): Pair<Float, Float>? = settingsStore.searchBubblePosition()
 fun AppViewModel.setSearchBubblePosition(xFrac: Float, yFrac: Float) =
-    viewModelScope.launch { settingsStore.setSearchBubblePosition(xFrac, yFrac) }
+    persist { setSearchBubblePosition(xFrac, yFrac) }
 
 /**
  * Toggle the opt-in Shizuku silent-install path (device-local; see SettingsStore). Turning it ON
@@ -89,7 +89,7 @@ fun AppViewModel.setSearchBubblePosition(xFrac: Float, yFrac: Float) =
  * running, guide the user.
  */
 fun AppViewModel.setSeamlessInstallShizuku(value: Boolean) {
-    viewModelScope.launch { settingsStore.setSeamlessInstallShizuku(value) }
+    persist { setSeamlessInstallShizuku(value) }
     if (value) {
         val installer = com.bloo.bluelink.update.shizukuInstall()
         if (installer.hasPermission()) return
@@ -115,11 +115,11 @@ fun AppViewModel.refreshShizukuAvailable() {
     }
 }
 
-fun AppViewModel.setAuroraBackground(value: Boolean) = viewModelScope.launch { settingsStore.setAuroraBackground(value) }
+fun AppViewModel.setAuroraBackground(value: Boolean) = persist { setAuroraBackground(value) }
 
 /** Imperial vs. metric display throughout the app. */
-fun AppViewModel.setUnitSystem(value: String) = viewModelScope.launch { settingsStore.setUnitSystem(value) }
+fun AppViewModel.setUnitSystem(value: String) = persist { setUnitSystem(value) }
 
-fun AppViewModel.setTempUnit(value: String) = viewModelScope.launch { settingsStore.setTempUnit(value) }
+fun AppViewModel.setTempUnit(value: String) = persist { setTempUnit(value) }
 
-fun AppViewModel.setDistanceUnit(value: String) = viewModelScope.launch { settingsStore.setDistanceUnit(value) }
+fun AppViewModel.setDistanceUnit(value: String) = persist { setDistanceUnit(value) }

@@ -26,12 +26,12 @@ private val AI_COMMANDS = setOf(
 
 fun AppViewModel.setAiEnabled(value: Boolean) {
     _state.update { it.copy(aiEnabled = value) }
-    viewModelScope.launch { settingsStore.setAiEnabled(value) }
+    persist { setAiEnabled(value) }
 }
 
 fun AppViewModel.setAiAutoSummarize(value: Boolean) {
     _state.update { it.copy(aiAutoSummarize = value) }
-    viewModelScope.launch { settingsStore.setAiAutoSummarize(value) }
+    persist { setAiAutoSummarize(value) }
 }
 
 /**

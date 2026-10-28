@@ -217,7 +217,7 @@ fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
             com.bloo.bluelink.work.ClimateExtendWorker.cancel(ctx, v.vin)
         }
     }.also {
-    viewModelScope.launch { settingsStore.saveClimate(v.vin, req) }
+    persist { saveClimate(v.vin, req) }
 }
 
 // These hit EV-only endpoints, so route through electric(v) (forces isEv for user-marked PHEVs).

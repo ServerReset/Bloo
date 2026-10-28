@@ -357,6 +357,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Switch between simple and advanced settings view. */
     fun setSettingsMode(mode: String) {
         _state.update { it.copy(settingsMode = mode) }
-        viewModelScope.launch { settingsStore.setSettingsMode(mode) }
+        persist { setSettingsMode(mode) }
     }
 }

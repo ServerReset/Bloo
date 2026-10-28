@@ -53,7 +53,7 @@ fun AppViewModel.selectIndex(index: Int) {
         return
     }
     _currentIndex.value = index
-    viewModelScope.launch { settingsStore.setLastVehicleVin(v.vin) }
+    persist { setLastVehicleVin(v.vin) }
     // After a beat, and only if this is still the car on screen: a fetch (and the state emission, disk
     // writes and recomposition that follow it) started right at settle would land on the next swipe.
     viewModelScope.launch {
@@ -107,7 +107,7 @@ fun AppViewModel.togglePebble(v: Vehicle, section: String) {
     _state.update {
         it.copy(collapsedPebbles = if (collapsedNow) it.collapsedPebbles + key else it.collapsedPebbles - key)
     }
-    viewModelScope.launch { settingsStore.setSectionCollapsed(v.vin, section, collapsedNow) }
+    persist { setSectionCollapsed(v.vin, section, collapsedNow) }
 }
 
 /** Fetch recent EV trips once per session (the Trips pebble calls this lazily). */

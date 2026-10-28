@@ -29,7 +29,7 @@ fun AppViewModel.setVehicleImage(vin: String, url: String) {
     _state.update {
         it.copy(imageUrls = it.imageUrls.withEntry(vin, url.trim().ifBlank { null }))
     }
-    viewModelScope.launch { settingsStore.setImageUrl(vin, url) }
+    persist { setImageUrl(vin, url) }
 }
 
 fun AppViewModel.setLicensePlate(vin: String, plate: String) {
@@ -39,7 +39,7 @@ fun AppViewModel.setLicensePlate(vin: String, plate: String) {
     // Store write immediate (durability), cross-surface publish debounced -- see publishDebounced.
     // Still republishes rather than waiting for the next status refresh to rebuild the snapshot;
     // just not once per keypress.
-    viewModelScope.launch { settingsStore.setLicensePlate(vin, plate) }
+    persist { setLicensePlate(vin, plate) }
     publishDebounced("plate:$vin")
 }
 
@@ -47,7 +47,7 @@ fun AppViewModel.setLastServiceMiles(vin: String, miles: Int?) {
     _state.update {
         it.copy(lastServiceMiles = it.lastServiceMiles.withEntry(vin, miles))
     }
-    viewModelScope.launch { settingsStore.setLastServiceMiles(vin, miles) }
+    persist { setLastServiceMiles(vin, miles) }
     publishDebounced("lastService:$vin")
 }
 
@@ -55,7 +55,7 @@ fun AppViewModel.setServiceIntervalMiles(vin: String, miles: Int?) {
     _state.update {
         it.copy(serviceIntervalMiles = it.serviceIntervalMiles.withEntry(vin, miles))
     }
-    viewModelScope.launch { settingsStore.setServiceIntervalMiles(vin, miles) }
+    persist { setServiceIntervalMiles(vin, miles) }
     publishDebounced("serviceInterval:$vin")
 }
 
@@ -80,7 +80,7 @@ fun AppViewModel.setSeatFlag(v: Vehicle, field: String, value: Boolean) {
         else -> current
     }
     _state.update { it.copy(seatConfigs = it.seatConfigs + (v.vin to updated)) }
-    viewModelScope.launch { settingsStore.setSeatFlag(v.vin, field, value) }
+    persist { setSeatFlag(v.vin, field, value) }
 }
 
 fun AppViewModel.setPowertrain(v: Vehicle, value: Powertrain) {
@@ -103,11 +103,11 @@ fun AppViewModel.setHotspot(v: Vehicle, section: String) {
         val updated = if (current == section) null else section
         it.copy(hotspotSections = it.hotspotSections.withEntry(v.vin, updated))
     }
-    viewModelScope.launch { settingsStore.setHotspots(v.vin, _state.value.hotspotSections[v.vin]) }
+    persist { setHotspots(v.vin, _state.value.hotspotSections[v.vin]) }
 }
 
 /** Persist a new pebble order for a car (drag-and-drop on the card). */
 fun AppViewModel.setSectionOrder(v: Vehicle, order: List<String>) {
     _state.update { it.copy(sectionOrders = it.sectionOrders + (v.vin to order)) }
-    viewModelScope.launch { settingsStore.setSectionOrder(v.vin, order) }
+    persist { setSectionOrder(v.vin, order) }
 }

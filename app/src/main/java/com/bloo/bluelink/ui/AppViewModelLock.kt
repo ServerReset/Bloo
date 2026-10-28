@@ -79,7 +79,7 @@ fun AppViewModel.lockToLogin() = _state.update { it.copy(locked = false, addingA
  * back out of [SettingsStore] on the next foreground).
  */
 fun AppViewModel.setLockTiming(value: LockTiming) {
-    viewModelScope.launch { settingsStore.setLockTiming(value) }
+    persist { setLockTiming(value) }
 }
 
 /**
@@ -126,7 +126,7 @@ fun AppViewModel.canUseBiometrics(): Boolean =
  * foreground.
  */
 fun AppViewModel.setBiometricLock(enabled: Boolean) {
-    viewModelScope.launch { settingsStore.setBiometricLock(enabled) }
+    persist { setBiometricLock(enabled) }
 }
 
 /** Whether a PIN record currently exists in the credential store. */
