@@ -147,7 +147,8 @@ internal fun HeroHeader(
     CompositionLocalProvider(LocalHeroTone provides tone) {
         PebbleShell(
             expanded = heroShown,
-            edge = LocalAppearance.current.heroEdge && !floatingPhoto,
+            // A collapsed card always has its edge. The setting and a cut-out only take the edge off the open card.
+            edge = !heroShown || (LocalAppearance.current.heroEdge && !cutout),
             glass = !floatingPhoto,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
             icon = AppIcons.DirectionsCar,
