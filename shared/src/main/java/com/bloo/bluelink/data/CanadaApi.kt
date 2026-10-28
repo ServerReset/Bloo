@@ -1,5 +1,6 @@
 package com.bloo.bluelink.data
 
+import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray

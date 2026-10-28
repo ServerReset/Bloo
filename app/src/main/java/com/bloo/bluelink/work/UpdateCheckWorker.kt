@@ -1,5 +1,6 @@
 package com.bloo.bluelink.work
 
+import com.bloo.bluelink.data.Notifications
 import android.content.Context
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.postUpdateAvailable

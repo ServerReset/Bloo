@@ -1,5 +1,7 @@
 package com.bloo.bluelink.wear
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.semantics.role
 import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.background
 import com.bloo.uicommon.Dot
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row

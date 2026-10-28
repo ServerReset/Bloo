@@ -1,5 +1,6 @@
 package com.bloo.bluelink.data
 
+import java.util.UUID
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale

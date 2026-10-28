@@ -1,5 +1,6 @@
 package com.bloo.bluelink.data
 
+import androidx.core.net.toUri
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
