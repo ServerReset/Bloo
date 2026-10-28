@@ -13,7 +13,6 @@ import com.bloo.bluelink.data.setSeamlessInstallShizuku
 import com.bloo.bluelink.data.setSearchBubblePosition
 import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.setUiScale
-import com.bloo.bluelink.data.setHeroEdge
 import com.bloo.bluelink.data.setUltraGlass
 import com.bloo.bluelink.data.setVibrancy
 import kotlinx.coroutines.flow.update
@@ -50,8 +49,6 @@ fun AppViewModel.setGlassClaritySoon(value: Float) =
 fun AppViewModel.setUltraGlass(value: Boolean) =
     persist { setUltraGlass(value) }
 
-fun AppViewModel.setHeroEdge(value: Boolean) =
-    persist { setHeroEdge(value) }
 fun AppViewModel.setVibrancySoon(value: Float) =
     viewModelScope.launch { settingsStore.setVibrancy(value); pushPaletteToWatch() }
 

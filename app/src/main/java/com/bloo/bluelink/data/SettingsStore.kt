@@ -44,7 +44,6 @@ class SettingsStore(internal val context: Context) {
         val VIBRANCY = stringPreferencesKey(PrefKeys.VIBRANCY)
         val GLASS_CLARITY = stringPreferencesKey(PrefKeys.GLASS_CLARITY)
         val ULTRA_GLASS = stringPreferencesKey(PrefKeys.ULTRA_GLASS)
-        val HERO_EDGE = stringPreferencesKey(PrefKeys.HERO_EDGE)
         val HAPTICS = stringPreferencesKey(PrefKeys.HAPTICS_ENABLED)
         val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey(PrefKeys.SEAMLESS_INSTALL_SHIZUKU)
         // Fractions (0f..1f) of the search bubble's own drag range, not raw dp -- the display
@@ -116,8 +115,6 @@ class SettingsStore(internal val context: Context) {
          * included. See GlassChrome.glassCardFill.
          */
         val ultraGlass: Boolean = false,
-        /** The rim and shadow around the hero card. Off gives the car photo a seamless, floating look. */
-        val heroEdge: Boolean = true,
         /** Show an aurora gradient as the app background instead of solid surface. */
         val auroraBackground: Boolean = false,
         /** Unit system: "imperial" (miles, mph, F) or "metric" (km, km/h, C). */
@@ -179,7 +176,6 @@ class SettingsStore(internal val context: Context) {
             vibrancy = (prefs.floatOr(Keys.VIBRANCY, 1f)).coerceIn(0.5f, 1.6f),
             glassClarity = (prefs.floatOr(Keys.GLASS_CLARITY, 0.8f)).coerceIn(0f, 1f),
             ultraGlass = prefs.flag(Keys.ULTRA_GLASS, false),
-            heroEdge = prefs.flag(Keys.HERO_EDGE, true),
             hapticsEnabled = prefs.flag(Keys.HAPTICS, true),
             auroraBackground = prefs.flag(Keys.AURORA, false),
             unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",

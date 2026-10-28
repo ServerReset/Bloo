@@ -98,6 +98,7 @@ object SettingsCatalog {
 
         // --- Per-car, synced (suffix: the car's VIN) -----------------------------------------
         car("img_", Kind.IMAGE, "Car photo", "photo picture image hero"),
+        car("text_clear_", Kind.TOGGLE, "Floating photo", "floating photo text clear padding hero card edge"),
         car("plate_", Kind.TEXT, "Licence plate", "plate licence registration"),
         car("platform_", Kind.CHOICE, "Head-unit generation", "gen5w ccnc platform generation"),
         car("ptrain_", Kind.CHOICE, "Powertrain", "ev gas hybrid phev"),

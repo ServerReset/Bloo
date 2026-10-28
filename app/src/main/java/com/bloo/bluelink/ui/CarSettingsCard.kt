@@ -81,9 +81,9 @@ internal fun CarSettingsCard(
             CarPhotoButtons(hasPhoto, onPick = onPickPhoto, onClear = { vm.setVehicleImage(v.vin, "") })
             CarPictureButton(v, storedImage, vm)
             ToggleRow(
-                "Text clear of the photo",
+                "Floating photo",
                 textClear,
-                description = "The name and charge sit above and below the photo, so nothing covers it. The card grows to fit.",
+                description = "The name and charge sit above and below the photo, on the page. The card drops its edge and glass, and grows to fit.",
             ) { vm.setTextClearPhoto(v, it) }
         }
 

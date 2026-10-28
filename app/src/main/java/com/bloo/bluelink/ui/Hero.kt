@@ -126,11 +126,12 @@ internal fun HeroHeader(
     // What the photo looks like behind the title and the readout decides their colours (dark text on a light photo, light on a dark
     // one), and a gradient or a photo that changes behind the text is covered by judging each band's worst part.
     val photoTone by rememberHeroPhotoTone(imageUrl, MaterialTheme.colorScheme.background)
-    // A cut-out car photo floats on the page: no rim and no glass behind it, whatever the edge setting says.
+    // A cut-out car photo starts out floating (see clearOfText below) unless the car's own choice says otherwise.
     val cutout = imageUrl != null && isCutoutPhoto(imageUrl)
     val clearOfText = textClear ?: cutout
-    // An open cut-out floats on the page: no rim and no glass behind it. Collapsed, it is a card again, with both.
-    val floatingPhoto = cutout && heroShown
+    // A floating photo (the name and charge sit on the page, around it) is the one state with no edge and no glass, expanded or not.
+    // Collapsed, and every other photo, is a card with both.
+    val floating = clearOfText && heroShown
     // A screen reader's actions menu on the readout: the three things most wanted of a car, without hunting for the buttons.
     val doorLocked = status?.doorLock
     val spokenActions = remember(v.vin, v.name, doorLocked) {
@@ -149,8 +150,8 @@ internal fun HeroHeader(
         PebbleShell(
             expanded = heroShown,
             // A collapsed card always has its edge. The setting and a cut-out only take the edge off the open card.
-            edge = !heroShown || (LocalAppearance.current.heroEdge && !cutout),
-            glass = !floatingPhoto,
+            edge = !floating,
+            glass = !floating,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
             icon = AppIcons.DirectionsCar,
             title = v.name,

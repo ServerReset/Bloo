@@ -24,7 +24,6 @@ object PrefKeys {
     const val FONT_CHOICE = "font_choice"
     const val GLASS_CLARITY = "glass_clarity"
     const val HAPTICS_ENABLED = "haptics_enabled"
-    const val HERO_EDGE = "hero_edge"
     const val LAST_CHECKED_AT = "last_checked_at"
     const val LAST_NOTIFIED_RUN = "last_notified_run"
     const val LAST_VEHICLE_VIN = "last_vehicle_vin"
