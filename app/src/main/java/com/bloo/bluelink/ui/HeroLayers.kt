@@ -188,7 +188,7 @@ internal fun HeroPhotoPreview(state: UiState, v: Vehicle, imageUrl: String?, met
     val tone by rememberHeroPhotoTone(imageUrl, MaterialTheme.colorScheme.background)
     val cardCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
     // Clear of the photo, the text sits on the page, so it takes the page's own colour rather than the photo's.
-    val textTone = if (clearOfText) HeroPhotoTone.None else tone
+    val textTone = if (clearOfText) pageTone(MaterialTheme.colorScheme.background) else tone
     CompositionLocalProvider(LocalHeroTone provides textTone) {
         Box(Modifier.fillMaxWidth()) {
             // The photo takes its own 16:9 height here, so the height passed is not used.

@@ -142,7 +142,7 @@ internal fun HeroHeader(
         )
     }
     // Clear of the photo, the title and readout sit on the page, so they take the page's colour, not the photo's.
-    val tone = if (clearOfText) HeroPhotoTone.None else photoTone
+    val tone = if (clearOfText) pageTone(MaterialTheme.colorScheme.background) else photoTone
     val heroTitleColorNow = heroTitleColor(tone, titleStep)
     CompositionLocalProvider(LocalHeroTone provides tone) {
         PebbleShell(

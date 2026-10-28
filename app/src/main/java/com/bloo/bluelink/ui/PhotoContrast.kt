@@ -81,6 +81,16 @@ private val LightTextLuma = relativeLuminance(0xF7, 0xF7, 0xFA)
 internal fun overlayFor(band: BandLuma): BandOverlay =
     BandOverlay(darkText = worstContrast(DarkTextLuma, band) >= worstContrast(LightTextLuma, band), behind = band)
 
+/**
+ * The text colours for a page of colour [page], for text that sits on the page rather than on the photo. The text takes whichever of dark
+ * or light has the better contrast against the page's brightness, so it reads on a dark page as well as a light one.
+ */
+internal fun pageTone(page: Color): HeroPhotoTone {
+    val luma = backdropLumaOf(page)
+    val text = overlayFor(BandLuma(mean = luma, low = luma, high = luma))
+    return HeroPhotoTone(top = text, bottom = text)
+}
+
 /** The decision for the two bands the hero's text sits in; a null band means "not measured", and the theme's own tone applies. */
 @Immutable
 internal data class HeroPhotoTone(val top: BandOverlay?, val bottom: BandOverlay?) {

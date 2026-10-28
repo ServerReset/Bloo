@@ -163,8 +163,8 @@ internal fun HeroPhotoBackdrop(
 }
 
 /** The space above the photo for the header, and below it for the charge readout, when the text sits clear of the car. Tuned by eye. */
-private val HeroTextClearTop = 72.dp
-private val HeroTextClearBottom = 120.dp
+private val HeroTextClearTop = 44.dp
+private val HeroTextClearBottom = 96.dp
 
 /**
  * Spaces out hero photo loads that start close together so a multi-car account doesn't decode and

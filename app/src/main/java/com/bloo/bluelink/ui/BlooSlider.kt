@@ -71,7 +71,7 @@ internal fun BlooSlider(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(GapRow)) {
         if (label != null) StepRow(label, readout?.invoke(draft).orEmpty())
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            MorphIconButton(onClick = { press(-1) }, enabled = canDecrease) {
+            MorphIconButton(onClick = { press(-1) }, enabled = canDecrease, filled = true) {
                 ButtonIcon(Icons.Filled.Remove, "Lower ${label ?: "value"}")
             }
             val track = Modifier.weight(1f).padding(horizontal = GapRow)
@@ -92,7 +92,7 @@ internal fun BlooSlider(
                 // An inert slider wears the same standard disabled treatment as every button.
                 modifier = if (enabled) track else track.inertButtonFrost(true),
             )
-            MorphIconButton(onClick = { press(1) }, enabled = canIncrease) {
+            MorphIconButton(onClick = { press(1) }, enabled = canIncrease, filled = true) {
                 ButtonIcon(Icons.Filled.Add, "Raise ${label ?: "value"}")
             }
         }
