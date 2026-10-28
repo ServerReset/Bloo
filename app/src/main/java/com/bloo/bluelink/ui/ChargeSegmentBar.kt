@@ -1,8 +1,16 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,6 +39,8 @@ import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.SoftDamping
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlin.math.PI
+import kotlin.math.sin
 
 /**
  * The hero's segmented charge bar and its layout math. Split out of HeroReadout.kt to separate this
@@ -107,6 +117,9 @@ internal fun ChargeSegmentBar(
     } else {
         null
     }
+    // The fill is a wave, as every progress bar in the app is. It travels only while the car is plugged in with motion allowed; otherwise
+    // it stands still, so an idle car pays nothing for it.
+    val waveShift: State<Float>? = if (plugged && LocalPowerPolicy.current.ambientMotion) rememberWaveShift() else null
     // One Canvas pass costs nothing per frame that isn't already being paid for the fill's own
     // animateFloatAsState.
     Canvas(modifier.fillMaxWidth().height(ChargeBarHeight)) {
@@ -124,14 +137,16 @@ internal fun ChargeSegmentBar(
             gap = ChargeSegmentGap.toPx(),
         )
         if (layout.fillWidth > 0f) {
-            drawRoundRect(
+            val wave = wavyFillPath(layout.fillWidth, h, waveShift?.value ?: 0f)
+            val stroke = Stroke(width = h * WaveStrokeFraction, cap = StrokeCap.Round)
+            drawPath(
+                path = wave,
                 brush = Brush.horizontalGradient(
                     listOf(fill.fillDark, fill.fillLight),
                     startX = 0f,
                     endX = layout.fillWidth,
                 ),
-                size = Size(layout.fillWidth, h),
-                cornerRadius = radius,
+                style = stroke,
             )
             // The shimmer band: transparent everywhere except a soft white peak that travels with
             // shimmerX. Drawn as a SECOND rounded rect the same size as the fill (rather than a
@@ -143,14 +158,14 @@ internal fun ChargeSegmentBar(
                 // restarts, so the band is fully clear of the fill at each wrap. Read here, in the
                 // DrawScope, so the 20fps step invalidates a DRAW rather than recomposing the bar.
                 val bandCenter = layout.fillWidth * (-0.6f + shimmer.value * 2.2f)
-                drawRoundRect(
+                drawPath(
+                    path = wave,
                     brush = Brush.linearGradient(
                         colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.38f), Color.Transparent),
                         start = Offset(bandCenter - bandWidth, 0f),
                         end = Offset(bandCenter + bandWidth, 0f),
                     ),
-                    size = Size(layout.fillWidth, h),
-                    cornerRadius = radius,
+                    style = stroke,
                 )
             }
         }
@@ -187,6 +202,41 @@ internal fun ChargeSegmentBar(
         }
     }
 }
+
+/** The fill's wave: a sine stroke this thick, as a fraction of the bar's height, its crest a fraction of the height, and its length. */
+private const val WaveStrokeFraction = 0.6f
+private const val WaveAmplitudeFraction = 0.2f
+private const val WaveLengthFraction = 2.2f
+
+/** The fill's centreline as a wave from the bar's start to [width]; [phase] (radians) slides the wave along. */
+private fun wavyFillPath(width: Float, h: Float, phase: Float): Path {
+    val amp = h * WaveAmplitudeFraction
+    val length = h * WaveLengthFraction
+    val mid = h / 2f
+    return Path().apply {
+        moveTo(0f, mid + amp * sin(phase))
+        var x = 0f
+        while (x < width) {
+            x = minOf(x + WaveSampleStep, width)
+            lineTo(x, mid + amp * sin(2f * PI.toFloat() * x / length + phase))
+        }
+    }
+}
+
+/** How far the wave's phase moves over one cycle of the sweep: a full wave every [period] of a wave's length. */
+@Composable
+private fun rememberWaveShift(): State<Float> {
+    val transition = rememberInfiniteTransition(label = "chargeWave")
+    return transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * PI.toFloat(),
+        animationSpec = infiniteRepeatable(tween(WaveCycleMs, easing = LinearEasing), RepeatMode.Restart),
+        label = "chargeWaveShift",
+    )
+}
+
+private const val WaveSampleStep = 2f
+private const val WaveCycleMs = 2400
 
 /** How often the charging shimmer advances, in nanos: ~20fps. See [rememberSlowShimmer]. */
 private const val ShimmerStepNanos = 50_000_000L

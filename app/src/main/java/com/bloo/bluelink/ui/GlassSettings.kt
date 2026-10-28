@@ -15,8 +15,8 @@ import kotlin.math.roundToInt
 internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     // The last, Ultra, turns every glass effect up past maximum on EVERY surface; the rest set how
     // transparent the floating glass is.
-    DraftSlider(
-        "Glass",
+    BlooSlider(
+        label = "Glass",
         value = (if (appearance.ultraGlass) GlassStops.lastIndex else nearestGlassStop(appearance.glassClarity)).toFloat(),
         valueRange = 0f..GlassStops.lastIndex.toFloat(),
         steps = GlassStops.size - 2,
@@ -25,7 +25,7 @@ internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppVie
             if (stop.ultra) "Ultra · everything turned up past maximum" else "${stop.name} · ${(stop.transparency * 100).roundToInt()}% transparent"
         },
         snap = { it.roundToInt().coerceIn(0, GlassStops.lastIndex).toFloat() },
-        onCommit = {
+        onValueSettled = {
             val picked = GlassStops[it.roundToInt()]
             vm.setGlassClaritySoon(picked.transparency)
             vm.setUltraGlass(picked.ultra)

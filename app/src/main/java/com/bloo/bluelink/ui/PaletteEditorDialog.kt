@@ -122,28 +122,27 @@ internal fun vibrancyIndexFor(v: Float): Int =
  */
 @Composable
 internal fun VibrancySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
-    DraftSlider(
-        "Vibrancy",
+    BlooSlider(
+        label = "Vibrancy",
         value = vibrancyIndexFor(appearance.vibrancy).toFloat(),
         valueRange = 0f..2f,
         steps = 1,
         readout = { VibrancyLabels[it.roundToInt().coerceIn(0, 2)] },
         snap = { it.roundToInt().coerceIn(0, 2).toFloat() },
-        onCommit = { vm.setVibrancySoon(VibrancySteps[it.roundToInt()]) },
-        key = appearance.vibrancy,
+        onValueSettled = { vm.setVibrancySoon(VibrancySteps[it.roundToInt()]) },
     )
 }
 
 @Composable
 internal fun UiScaleSlider(appearance: SettingsStore.Appearance, vm: AppViewModel, label: String = "Text & layout scale") {
-    DraftSlider(
-        label,
+    BlooSlider(
+        label = label,
         value = appearance.uiScale,
         valueRange = 0.8f..1.3f,
         steps = 4,
         readout = { "${(it * 100).roundToInt()}%" },
         snap = { (it * 10).roundToInt() / 10f },
-        onCommit = { vm.setUiScaleSoon(it) },
+        onValueSettled = { vm.setUiScaleSoon(it) },
     )
 }
 

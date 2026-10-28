@@ -1,10 +1,6 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.material3.Surface
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -170,18 +166,16 @@ internal fun Modifier.hapticClickable(onClickLabel: String? = null, onClick: () 
     return clickable(interactionSource = source, indication = null, onClickLabel = onClickLabel) { haptics?.click(); onClick() }
 }
 
-/** The app's one progress bar: a slim rounded track with the fill inside it; indeterminate (running, with no end in sight) when [progress] is null. */
+/**
+ * The app's one progress bar: the expressive wavy indicator, the same as every other progress in the app. Indeterminate (running, with no
+ * end in sight) when [progress] is null.
+ */
 @Composable
 internal fun ProgressBar(progress: Float?, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth().height(8.dp),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-    ) {
-        if (progress != null) {
-            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
-        } else {
-            LinearProgressIndicator(modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
-        }
+    val track = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    if (progress != null) {
+        LinearWavyProgressIndicator(progress = { progress }, modifier = modifier.fillMaxWidth(), trackColor = track)
+    } else {
+        LinearWavyProgressIndicator(modifier = modifier.fillMaxWidth(), trackColor = track)
     }
 }

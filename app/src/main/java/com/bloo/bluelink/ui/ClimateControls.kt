@@ -12,8 +12,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
@@ -344,11 +342,11 @@ internal fun ChargeLimitPill(
             Modifier.fillMaxWidth().heightIn(min = ButtonTargetHeight),
         )
         Spacer(Modifier.height(GapRow))
-        AnimatedSlider(
+        BlooSlider(
             value = limit.toFloat(),
-            onValueChange = { onValueChange((it / 10f).roundToInt() * 10) },
             valueRange = CHARGE_LIMIT_RANGE.first.toFloat()..CHARGE_LIMIT_RANGE.last.toFloat(),
             steps = 4,
+            onValueChange = { onValueChange((it / 10f).roundToInt() * 10) },
             enabled = enabled,
         )
         Spacer(Modifier.height(GapHairline))
@@ -365,8 +363,8 @@ internal fun stepTempF(tempF: Int, step: Int, fahrenheit: Boolean): Int {
 }
 
 /**
- * A climate setting as a big value above a slider, with a round −/+ at either end of it. The temperature (big) and the run time both
- * use this. The value rolls when it changes.
+ * A climate setting as a big value above the one slider. The value rolls when it changes, and the −/+ at either end step it by
+ * [nextValue]. The temperature (big) and the run time both use this.
  */
 @Composable
 internal fun ClimateStepper(
@@ -377,8 +375,7 @@ internal fun ClimateStepper(
     range: IntRange,
     tint: Color,
     onChange: (Int) -> Unit,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit,
+    nextValue: (current: Float, direction: Int) -> Float = { c, d -> c + d },
 ) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         RollingNumber(
@@ -389,19 +386,14 @@ internal fun ClimateStepper(
         )
         BodySmallText(caption, color = mutedContentColor())
         Spacer(Modifier.height(GapRow))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            MorphIconButton(onClick = onDecrease, enabled = current > range.first) { ButtonIcon(Icons.Filled.Remove, "Lower $caption") }
-            Box(Modifier.weight(1f).padding(horizontal = GapRow)) {
-                AnimatedSlider(
-                    value = current.toFloat(),
-                    onValueChange = { onChange(it.roundToInt()) },
-                    valueRange = range.first.toFloat()..range.last.toFloat(),
-                    // One stop per whole value: the stops in between the two ends.
-                    steps = range.last - range.first - 1,
-                )
-            }
-            MorphIconButton(onClick = onIncrease, enabled = current < range.last) { ButtonIcon(Icons.Filled.Add, "Raise $caption") }
-        }
+        BlooSlider(
+            value = current.toFloat(),
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            // One stop per whole value: the stops in between the two ends.
+            steps = range.last - range.first - 1,
+            nextValue = nextValue,
+            onValueChange = { onChange(it.roundToInt()) },
+        )
     }
 }
 

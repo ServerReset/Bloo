@@ -173,8 +173,8 @@ internal fun ClimateControlsSection(
             range = CLIMATE_TEMP_RANGE_F,
             tint = tempColor,
             onChange = onTempF,
-            onDecrease = { onTempF(stepTempF(tempF, -1, fahrenheit)) },
-            onIncrease = { onTempF(stepTempF(tempF, +1, fahrenheit)) },
+            // A −/+ moves a whole degree in the unit the car is shown in, not a whole Fahrenheit.
+            nextValue = { c, d -> stepTempF(c.roundToInt(), d, fahrenheit).toFloat() },
         )
         ClimateStepper(
             value = "$duration min",
@@ -184,8 +184,6 @@ internal fun ClimateControlsSection(
             range = CLIMATE_DURATION_RANGE,
             tint = MaterialTheme.colorScheme.onSurface,
             onChange = onDuration,
-            onDecrease = { onDuration(duration - 1) },
-            onIncrease = { onDuration(duration + 1) },
         )
 
         var seatsOpen by remember { mutableStateOf(false) }

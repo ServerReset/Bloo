@@ -42,14 +42,14 @@ internal fun AutoLockGraceSearchRow(v: Vehicle, vm: AppViewModel) {
     var config by remember(v.vin) { mutableStateOf<AutoLockConfig?>(null) }
     LaunchedEffect(v.vin) { config = vm.autoLockConfig(v.vin) }
     val current = config ?: return
-    DraftSlider(
-        "Grace period",
+    BlooSlider(
+        label = "Grace period",
         value = current.graceSeconds.toFloat(),
         valueRange = 10f..120f,
         steps = 10,
         readout = { "${it.roundToInt()}s" },
         snap = { it.roundToInt().toFloat() },
-        onCommit = {
+        onValueSettled = {
             val updated = current.copy(graceSeconds = it.roundToInt())
             config = updated
             vm.setAutoLockConfig(v.vin, updated)

@@ -37,7 +37,6 @@ import com.bloo.uicommon.SecondaryTextStyle
 import kotlin.math.roundToInt
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.AnimatedSlider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
@@ -330,14 +329,15 @@ private fun AutoLockSettings(
                 "First Bloo waits for Android to confirm you have actually walked away from the car. " +
                     "That usually takes 10 to 15 seconds, and up to 20.",
             )
-            StepRow("Grace period", "${grace.roundToInt()}s")
-            AnimatedSlider(
+            BlooSlider(
+                label = "Grace period",
+                readout = { "${it.roundToInt()}s" },
                 value = grace,
-                onValueChange = { grace = it },
-                onValueSettled = { update(current.copy(graceSeconds = it.roundToInt())) },
                 valueRange = GraceMinSeconds.toFloat()..GraceMaxSeconds.toFloat(),
                 // 5s steps across the (short) range, so every stop is a distinct, low delay.
                 steps = (GraceMaxSeconds - GraceMinSeconds) / 5 - 1,
+                onValueChange = { grace = it },
+                onValueSettled = { update(current.copy(graceSeconds = it.roundToInt())) },
             )
             val graceNow = grace.roundToInt()
             BodySmallText(
