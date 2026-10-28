@@ -27,12 +27,7 @@ class SessionStore(private val context: Context) {
         // --- Hyundai EU OneApp/CCI token set (nullable; only EU populates it) ---
         // The CCI tokens are needed to REFRESH an EU session (the CCS access token can't be
         // refreshed on its own), so they must persist alongside it. See EuApiCci.
-        val cciAccessToken: String? = null,
-        val exchangeableToken: String? = null,
-        val exchangeableRefreshToken: String? = null,
-        val nonCcsToken: String? = null,
-        val nonCcsRefreshToken: String? = null,
-        val idToken: String? = null,
+        val cci: CciTokens = CciTokens(),
     ) {
         companion object {
             /**
@@ -93,12 +88,12 @@ class SessionStore(private val context: Context) {
                 session.deviceId?.let { put(key(session.brand, "device"), it) }
                 // CCI token set (EU only) -- written only when present, so a non-EU session never
                 // touches these keys and an EU refresh that clears one leaves the others intact.
-                session.cciAccessToken?.let { put(key(session.brand, "cciAccess"), it) }
-                session.exchangeableToken?.let { put(key(session.brand, "cciExchangeable"), it) }
-                session.exchangeableRefreshToken?.let { put(key(session.brand, "cciExchangeableRefresh"), it) }
-                session.nonCcsToken?.let { put(key(session.brand, "cciNonCcs"), it) }
-                session.nonCcsRefreshToken?.let { put(key(session.brand, "cciNonCcsRefresh"), it) }
-                session.idToken?.let { put(key(session.brand, "cciId"), it) }
+                session.cci.cciAccessToken?.let { put(key(session.brand, "cciAccess"), it) }
+                session.cci.exchangeableToken?.let { put(key(session.brand, "cciExchangeable"), it) }
+                session.cci.exchangeableRefreshToken?.let { put(key(session.brand, "cciExchangeableRefresh"), it) }
+                session.cci.nonCcsToken?.let { put(key(session.brand, "cciNonCcs"), it) }
+                session.cci.nonCcsRefreshToken?.let { put(key(session.brand, "cciNonCcsRefresh"), it) }
+                session.cci.idToken?.let { put(key(session.brand, "cciId"), it) }
                 put(brandsKey, (brandNames(v) + session.brand.name).joinToString(","))
             }
         }
@@ -138,12 +133,14 @@ class SessionStore(private val context: Context) {
         val pin = v.getString(key(brand, "pin")) ?: return null
         return Session(
             access, v.getString(key(brand, "refresh")), username, pin, brand, v.getString(key(brand, "device")),
-            cciAccessToken = v.getString(key(brand, "cciAccess")),
-            exchangeableToken = v.getString(key(brand, "cciExchangeable")),
-            exchangeableRefreshToken = v.getString(key(brand, "cciExchangeableRefresh")),
-            nonCcsToken = v.getString(key(brand, "cciNonCcs")),
-            nonCcsRefreshToken = v.getString(key(brand, "cciNonCcsRefresh")),
-            idToken = v.getString(key(brand, "cciId")),
+            cci = CciTokens(
+                cciAccessToken = v.getString(key(brand, "cciAccess")),
+                exchangeableToken = v.getString(key(brand, "cciExchangeable")),
+                exchangeableRefreshToken = v.getString(key(brand, "cciExchangeableRefresh")),
+                nonCcsToken = v.getString(key(brand, "cciNonCcs")),
+                nonCcsRefreshToken = v.getString(key(brand, "cciNonCcsRefresh")),
+                idToken = v.getString(key(brand, "cciId")),
+            ),
         )
     }
 

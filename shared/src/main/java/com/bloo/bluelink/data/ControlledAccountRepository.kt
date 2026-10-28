@@ -11,18 +11,26 @@ interface PinnedSession {
  * A brand session for a controlled account: its access and refresh tokens, the device it is bound to, and the PIN that unlocks control.
  * Canada and Kia US both hold exactly this; the wire names stay in each brand's own headers. Canada's and Kia's session names are aliases of it.
  */
-data class ControlSession(
-    val token: String,
-    val refresh: String?,
-    val deviceId: String,
-    override val pin: String?,
-    // Europe's OneApp/CCI token set: a token refresh needs the CCI set, so it is carried and persisted. Null for every other brand.
+/**
+ * Europe's OneApp/CCI token set. A token refresh needs the whole set, not just the CCS token, so the stored session and the in-memory session
+ * both carry it as one value. Null in every field for the brands that never use it.
+ */
+data class CciTokens(
     val cciAccessToken: String? = null,
     val exchangeableToken: String? = null,
     val exchangeableRefreshToken: String? = null,
     val nonCcsToken: String? = null,
     val nonCcsRefreshToken: String? = null,
     val idToken: String? = null,
+)
+
+data class ControlSession(
+    val token: String,
+    val refresh: String?,
+    val deviceId: String,
+    override val pin: String?,
+    // Europe's OneApp/CCI token set: a token refresh needs the CCI set, so it is carried and persisted. Null for every other brand.
+    val cci: CciTokens = CciTokens(),
 ) : PinnedSession
 
 typealias CanadaSession = ControlSession

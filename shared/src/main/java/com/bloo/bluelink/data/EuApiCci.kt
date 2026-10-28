@@ -119,12 +119,14 @@ internal suspend fun EuApi.loginCci(username: String, password: String, deviceId
         refresh = cci.path("refreshToken").str(),
         deviceId = deviceId,
         pin = pin,
-        cciAccessToken = cciAccess,
-        exchangeableToken = exchangeable,
-        exchangeableRefreshToken = cci.path("exchangeableRefreshToken").str(),
-        nonCcsToken = nonCcs,
-        nonCcsRefreshToken = cci.path("nonCcsRefreshToken").str(),
-        idToken = cci.path("idToken").str(),
+        cci = CciTokens(
+            cciAccessToken = cciAccess,
+            exchangeableToken = exchangeable,
+            exchangeableRefreshToken = cci.path("exchangeableRefreshToken").str(),
+            nonCcsToken = nonCcs,
+            nonCcsRefreshToken = cci.path("nonCcsRefreshToken").str(),
+            idToken = cci.path("idToken").str(),
+        ),
     )
 }
 
@@ -161,13 +163,13 @@ internal suspend fun EuApi.refreshCci(session: EuSession): EuSession {
     val deviceId = session.deviceId
     val body = buildString {
         append("{")
-        append("\"accessToken\":\"").append(session.cciAccessToken.orEmpty().removePrefix("Bearer ").trim()).append("\",")
+        append("\"accessToken\":\"").append(session.cci.cciAccessToken.orEmpty().removePrefix("Bearer ").trim()).append("\",")
         append("\"refreshToken\":\"").append(session.refresh.orEmpty()).append("\",")
-        append("\"exchangeableAccessToken\":\"").append(session.exchangeableToken.orEmpty()).append("\",")
-        append("\"exchangeableRefreshToken\":\"").append(session.exchangeableRefreshToken.orEmpty()).append("\",")
-        append("\"nonCcsToken\":\"").append(session.nonCcsToken.orEmpty()).append("\",")
-        append("\"nonCcsRefreshToken\":\"").append(session.nonCcsRefreshToken.orEmpty()).append("\",")
-        append("\"idToken\":\"").append(session.idToken.orEmpty()).append("\"")
+        append("\"exchangeableAccessToken\":\"").append(session.cci.exchangeableToken.orEmpty()).append("\",")
+        append("\"exchangeableRefreshToken\":\"").append(session.cci.exchangeableRefreshToken.orEmpty()).append("\",")
+        append("\"nonCcsToken\":\"").append(session.cci.nonCcsToken.orEmpty()).append("\",")
+        append("\"nonCcsRefreshToken\":\"").append(session.cci.nonCcsRefreshToken.orEmpty()).append("\",")
+        append("\"idToken\":\"").append(session.cci.idToken.orEmpty()).append("\"")
         append("}")
     }
     val data = cciPost(
@@ -175,14 +177,14 @@ internal suspend fun EuApi.refreshCci(session: EuSession): EuSession {
         body = body,
         query = "",
         deviceId = deviceId,
-        cciAccessToken = session.cciAccessToken,
-        nonCcsToken = session.nonCcsToken,
-        exchangeableToken = session.exchangeableToken,
+        cciAccessToken = session.cci.cciAccessToken,
+        nonCcsToken = session.cci.nonCcsToken,
+        exchangeableToken = session.cci.exchangeableToken,
         jsonBody = true,
     )
-    val cciAccess = data.path("accessToken").str() ?: session.cciAccessToken.orEmpty()
-    val nonCcs = data.path("nonCcsToken").str() ?: session.nonCcsToken.orEmpty()
-    val exchangeable = data.path("exchangeableAccessToken").str() ?: session.exchangeableToken.orEmpty()
+    val cciAccess = data.path("accessToken").str() ?: session.cci.cciAccessToken.orEmpty()
+    val nonCcs = data.path("nonCcsToken").str() ?: session.cci.nonCcsToken.orEmpty()
+    val exchangeable = data.path("exchangeableAccessToken").str() ?: session.cci.exchangeableToken.orEmpty()
     val ccs = ccsExchange(deviceId, cciAccess, nonCcs, exchangeable)
     return session.copy(
         // Bare token: EuApi.authHeaders / controlToken prepend "Bearer " themselves. Storing
@@ -190,12 +192,14 @@ internal suspend fun EuApi.refreshCci(session: EuSession): EuSession {
         // rejects with a 403 (the vehicle list was the first call to hit it).
         token = ccs.removePrefix("Bearer ").trim(),
         refresh = data.path("refreshToken").str() ?: session.refresh,
-        cciAccessToken = cciAccess,
-        exchangeableToken = exchangeable,
-        exchangeableRefreshToken = data.path("exchangeableRefreshToken").str() ?: session.exchangeableRefreshToken,
-        nonCcsToken = nonCcs,
-        nonCcsRefreshToken = data.path("nonCcsRefreshToken").str() ?: session.nonCcsRefreshToken,
-        idToken = data.path("idToken").str() ?: session.idToken,
+        cci = CciTokens(
+            cciAccessToken = cciAccess,
+            exchangeableToken = exchangeable,
+            exchangeableRefreshToken = data.path("exchangeableRefreshToken").str() ?: session.cci.exchangeableRefreshToken,
+            nonCcsToken = nonCcs,
+            nonCcsRefreshToken = data.path("nonCcsRefreshToken").str() ?: session.cci.nonCcsRefreshToken,
+            idToken = data.path("idToken").str() ?: session.cci.idToken,
+        ),
     )
 }
 

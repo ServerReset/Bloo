@@ -30,10 +30,7 @@ class EuRepository(
         store.save(
             SessionStore.Session(
                 accessToken = session.token, refreshToken = session.refresh, username = username,
-                pin = pin, brand = brand, deviceId = session.deviceId, cciAccessToken = session.cciAccessToken,
-                exchangeableToken = session.exchangeableToken,
-                exchangeableRefreshToken = session.exchangeableRefreshToken, nonCcsToken = session.nonCcsToken,
-                nonCcsRefreshToken = session.nonCcsRefreshToken, idToken = session.idToken,
+                pin = pin, brand = brand, deviceId = session.deviceId, cci = session.cci,
             ),
         )
     }
@@ -79,12 +76,7 @@ class EuRepository(
             accessToken, refreshToken, deviceId ?: EuApi.newDeviceId(), pin,
             // The OneApp/CCI token set a refresh needs. It used to be dropped here (and never saved below), so every
             // token expiry fell through to a full password sign-in through the WAF-prone flow.
-            cciAccessToken = cciAccessToken,
-            exchangeableToken = exchangeableToken,
-            exchangeableRefreshToken = exchangeableRefreshToken,
-            nonCcsToken = nonCcsToken,
-            nonCcsRefreshToken = nonCcsRefreshToken,
-            idToken = idToken,
+            cci = cci,
         )
 
     override suspend fun fetchVehicles(s: EuSession): List<EuVehicleSummary> = api.vehicles(s)
