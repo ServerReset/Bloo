@@ -7,12 +7,9 @@ package com.bloo.bluelink.data
  */
 class KiaRepository(
     private val api: KiaUsaApi,
-    private val store: SessionStore,
+    store: SessionStore,
     private val credentialStore: CredentialStore,
-) : VehicleRepository {
-    /** Session-specific vinkeys + EV flags, keyed by vehicle id (our [Vehicle.vin]). */
-    private val summaries = java.util.concurrent.ConcurrentHashMap<String, KiaVehicleSummary>()
-
+) : ControlledAccountRepository<KiaSession, KiaVehicleSummary>(store, Brand.KIA) {
     /** Device id carried between the password step and the OTP steps. */
     private var pendingDeviceId: String? = null
 
@@ -59,21 +56,7 @@ class KiaRepository(
         )
     }
 
-    // Drops the in-memory vinkey cache (it's meaningless without a session) before clearing the
-    // persisted session, so a subsequent login starts with a clean slate.
-    override suspend fun logout() {
-        summaries.clear()
-        store.clear(Brand.KIA)
-    }
-
     // --- Vehicles / status ---------------------------------------------------
-
-    // Every vehicles() call re-fetches summaries from the API (via fetchSummaries, which also
-    // repopulates the `summaries` cache) rather than reading the cache, so the returned list always
-    // reflects the account's current garage.
-    override suspend fun vehicles(): List<Vehicle> = withSession { s ->
-        fetchSummaries(s).map { it.toVehicle() }
-    }
 
     // When `refresh` is requested, wakes the car with forceRefresh() first (a separate API call
     // that tells the car to phone home with live data) and only then reads status(); without
@@ -118,8 +101,8 @@ class KiaRepository(
     // Maps a Kia-specific vehicle summary onto the shared cross-brand Vehicle model; `generation`
     // is left blank since Kia's API doesn't expose a head-unit generation (see
     // Vehicle.supportsConnectedStore in Brand.kt, which treats a blank generation for Kia as
-    // always-eligible rather than "unknown/old").
-    private fun KiaVehicleSummary.toVehicle() = Vehicle(
+    // always-eligible rather than "unknown/old"). Kia's regId is its vinkey, not its id.
+    override fun KiaVehicleSummary.asVehicle() = Vehicle(
         vin = id,
         regId = key,
         name = name,
@@ -131,42 +114,17 @@ class KiaRepository(
         trim = trim,
     )
 
-    // Fetches the account's full vehicle-summary list from the API and replaces the entire
-    // `summaries` cache with it (clear, then repopulate keyed by vehicle id), rather than merging -
-    // so a car removed from the account also disappears from the cache instead of lingering with
-    // stale data.
-    private suspend fun fetchSummaries(s: KiaSession): List<KiaVehicleSummary> =
-        api.vehicles(s).also { list ->
-            summaries.clear()
-            list.forEach { summaries[it.id] = it }
-        }
-
-    /** The session-specific summary (vinkey) for this vehicle, fetching if absent. */
-    private suspend fun summaryFor(s: KiaSession, v: Vehicle): KiaVehicleSummary =
-        summaries[v.vin]
-            ?: fetchSummaries(s).firstOrNull { it.id == v.vin }
-            ?: throw BlueLinkException("Vehicle not found on this Kia account")
-
-    private fun SessionStore.Session.toKia() =
+    override fun SessionStore.Session.toSession() =
         KiaSession(sid = accessToken, rmtoken = refreshToken, deviceId = deviceId ?: KiaUsaApi.newDeviceId(), pin = pin)
 
-    /**
-     * Runs [block] with the saved Kia session. On an expired session (401/403), re-authenticates once with the stored rmtoken -
-     * silently, no OTP - and retries.
-     */
-    private suspend fun <T> withSession(block: suspend (KiaSession) -> T): T {
-        val stored = store.load(Brand.KIA) ?: throw BlueLinkException("Not logged in")
-        return withReauthOnce(
-            stored.toKia(),
-            isAuthFailure = { it.isUnauthorized() },
-            reauthenticate = { e -> renewSession(stored, e) },
-            block = block,
-        )
-    }
+    override suspend fun fetchVehicles(s: KiaSession): List<KiaVehicleSummary> = api.vehicles(s)
 
-    /** A fresh session from the stored rmtoken, and the session-bound vinkeys refetched for it, in place of the expired one. */
-    private suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): KiaSession {
-        val creds = credentialStore.load(Brand.KIA)
+    /** A 401 or 403 means the Kia session has expired. */
+    override fun isSessionFailure(e: BlueLinkException): Boolean = e.isUnauthorized()
+
+    /** Re-authenticates with the stored rmtoken, silently (no OTP), and refreshes the session-bound vinkeys before the retry. */
+    override suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): KiaSession {
+        val creds = credentialStore.load(brand)
             ?: throw BlueLinkException("Kia session expired - please sign in again")
         AppLog.log("Kia session expired; re-authenticating with stored rmtoken")
         val auth = api.authUser(
@@ -178,9 +136,9 @@ class KiaRepository(
             throw BlueLinkException("Kia session expired - please sign out and sign in again")
         }
         save(auth.session, creds.email, stored.pin)
-        val fresh = store.load(Brand.KIA) ?: throw e
+        val fresh = store.load(brand) ?: throw e
         // vinkeys are bound to the session, so refresh them before retrying.
-        fetchSummaries(fresh.toKia())
-        return fresh.toKia()
+        fetchSummaries(fresh.toSession())
+        return fresh.toSession()
     }
 }

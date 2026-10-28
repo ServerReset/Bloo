@@ -38,7 +38,10 @@ abstract class ControlledAccountRepository<S : PinnedSession, Sum : AccountVehic
     /** Drops every cached control token, for when the session they were minted for is gone. */
     protected fun clearControlTokens() = controlTokens.clear()
 
-    override suspend fun vehicles(): List<Vehicle> = withSession { s -> fetchSummaries(s).map { it.toVehicle(brand) } }
+    override suspend fun vehicles(): List<Vehicle> = withSession { s -> fetchSummaries(s).map { it.asVehicle() } }
+
+    /** The cross-brand [Vehicle] for a summary. A brand whose cars identify themselves differently overrides it. */
+    protected open fun Sum.asVehicle(): Vehicle = toVehicle(brand)
 
     override suspend fun logout() {
         summaries.clear()

@@ -11,19 +11,22 @@ data class KiaSession(
     val sid: String,
     val rmtoken: String?,
     val deviceId: String,
-    val pin: String?,
-)
+    override val pin: String?,
+) : PinnedSession
 
 /** A Kia US vehicle. [key] (the "vinkey") is session-specific and refreshed on login. */
 data class KiaVehicleSummary(
-    val id: String,
-    val name: String,
-    val model: String,
+    override val id: String,
+    override val name: String,
+    override val model: String,
     val key: String,
-    val isEv: Boolean,
-    val colour: String? = null,
-    val trim: String? = null,
-)
+    override val isEv: Boolean,
+    override val colour: String? = null,
+    override val trim: String? = null,
+) : AccountVehicle {
+    /** Kia keys its cars by vehicle id, which is the VIN. */
+    override val vin: String get() = id
+}
 
 /** Outcome of a Kia US login: a ready session, or an OTP challenge to solve. */
 sealed interface KiaAuth {
