@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.wrapRealIndex
+import com.bloo.uicommon.wrapPageToward
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

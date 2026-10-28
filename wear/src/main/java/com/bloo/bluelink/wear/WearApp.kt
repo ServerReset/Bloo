@@ -19,7 +19,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.pager.HorizontalPager
-import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.HorizontalPageIndicator
 import androidx.wear.compose.material3.ScreenScaffold
@@ -143,16 +142,18 @@ private fun Cars(
     val startPage = remember {
         WearTileCar.saved(context)?.let { vin -> vehicles.indexOfFirst { it.vin == vin } }?.coerceAtLeast(0) ?: 0
     }
-    val pagerState = rememberPagerState(initialPage = startPage, pageCount = { vehicles.size })
+    // The cars wrap: swiping on from the last car brings up the first, and the other way round.
+    val wrap = rememberWearWrap(realCount = vehicles.size, initialRealIndex = startPage)
+    val pagerState = wrap.pager
     // The tile follows the car on screen: it shows this car, with this car's actions, as the face does.
     LaunchedEffect(pagerState.currentPage, vehicles) {
-        vehicles.getOrNull(pagerState.currentPage)?.vin?.let { vin ->
+        vehicles.getOrNull(wrap.wrap.real(pagerState.currentPage))?.vin?.let { vin ->
             if (WearTileCar.save(context, vin)) WearSurfaces.refresh(context)
         }
     }
     Box(Modifier.fillMaxSize()) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-            vehicles.getOrNull(page)?.let { car ->
+            vehicles.getOrNull(wrap.wrap.real(page))?.let { car ->
                 WearCarPage(
                     repo = repo,
                     car = car,
@@ -166,6 +167,6 @@ private fun Cars(
                 )
             }
         }
-        if (vehicles.size > 1) HorizontalPageIndicator(pagerState = pagerState)
+        if (vehicles.size > 1) CarPageDots(count = vehicles.size, current = wrap.wrap.real(pagerState.currentPage))
     }
 }

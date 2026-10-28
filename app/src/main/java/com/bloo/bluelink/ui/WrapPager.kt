@@ -3,92 +3,26 @@ package com.bloo.bluelink.ui
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import com.bloo.uicommon.VirtualPager
+import com.bloo.uicommon.WrapPositions
+import com.bloo.uicommon.startingVirtualPage
+import com.bloo.uicommon.virtualPageCount
 
-// Pages are keyed by raw virtual index (see [WrapPagerState]) because real-index keying crashed
-// ("Key already used") twice.
-private const val WRAP_MULTIPLIER = 1000
-/**
- * Recenter once the pager drifts within this many real-item-widths of either edge of the virtual
- * range -- see [WRAP_MULTIPLIER]'s own doc.
- */
-private const val RECENTER_MARGIN_CYCLES = 10
-
-/** Pure wrap arithmetic: the real item index a virtual page maps to. */
-internal fun wrapRealIndex(page: Int, realCount: Int): Int =
-    if (realCount <= 1) 0 else ((page % realCount) + realCount) % realCount
-
-/**
- * Pure wrap arithmetic: the nearest virtual page whose real index is [target], without animating a
- * long fly-through across the virtual range. [currentPage] is the page the pager is on, [pageCount]
- * is the pager's total virtual page count, [realCount] is the number of real items.
- */
-internal fun wrapPageToward(currentPage: Int, pageCount: Int, realCount: Int, target: Int): Int {
-    if (realCount <= 1) return currentPage
-    val t = target.coerceIn(0, realCount - 1)
-    val delta = t - wrapRealIndex(currentPage, realCount)
-    return (currentPage + delta).coerceIn(0, pageCount - 1)
-}
-
-@Stable
-internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
-    fun real(page: Int): Int = wrapRealIndex(page, realCount)
-
-    // Pager pages are keyed by raw virtual index (`key = { page }`), never by real(page):
-    // real-index keying made two virtual copies of one item share a composition slot and crashed.
-
-    /**
-     * Jump so the currently-shown page maps to [target], picking the nearest virtual page in the
-     * current direction (no long fly-through).
-     */
-    suspend fun snapToReal(target: Int) {
-        if (realCount <= 1) return
-        val page = wrapPageToward(pager.currentPage, pager.pageCount, realCount, target)
-        if (page != pager.currentPage) pager.scrollToPage(page)
-    }
-
-    /**
-     * Swipe (animated) so the shown page maps to [target], taking the nearest virtual page in either
-     * direction. Direction-neutral: it works in page indices, so a right-to-left layout, where the
-     * pager itself lays page 0 out at the right, gets the same swipe mirrored.
-     */
-    suspend fun animateToReal(target: Int) {
-        if (realCount <= 1) return
-        val page = wrapPageToward(pager.currentPage, pager.pageCount, realCount, target)
-        if (page != pager.currentPage) pager.animateScrollToPage(page)
-    }
-
-    /**
-     * Call after every settle (never mid-drag -- see each call site's own `snapshotFlow {
-     * pager.settledPage }` collector): if the pager has drifted within [RECENTER_MARGIN_CYCLES]
-     * real-item-widths of either edge of the (small, fixed) virtual range, silently jump back to
-     * the page nearest the middle that maps to the SAME real index -- so nothing visibly changes,
-     * but the pager has room to keep going in either direction.
-     */
-    suspend fun recenterIfNearEdge() {
-        if (realCount <= 1) return
-        val margin = realCount * RECENTER_MARGIN_CYCLES
-        val page = pager.currentPage
-        val count = pager.pageCount
-        // Comfortably inside both edges already -- nothing to do.
-        if (page in margin..(count - 1 - margin)) return
-        val center = count / 2
-        val target = center - (center % realCount) + real(page)
-        if (target != page) pager.scrollToPage(target)
-    }
+/** The phone's pager as a [VirtualPager]: the wrap rules live in :uicommon, and this only says how to move the pager. */
+private class PhonePager(private val pager: PagerState) : VirtualPager {
+    override val currentPage: Int get() = pager.currentPage
+    override val pageCount: Int get() = pager.pageCount
+    override suspend fun scrollTo(page: Int) = pager.scrollToPage(page)
+    override suspend fun animateTo(page: Int) = pager.animateScrollToPage(page)
 }
 
 /**
- * Creates a [WrapPagerState] seeded at the middle of the virtual range plus [initialRealIndex], so
- * the pager opens on that real item and can wrap in both directions. Falls back to a plain
- * single-page state when [realCount] <= 1.
+ * Creates a [WrapPositions] over a phone pager seeded at the middle of its range plus [initialRealIndex], so the pager opens on that real
+ * item and can wrap in both directions. Falls back to a plain single page when [realCount] <= 1.
  */
 @Composable
-internal fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0): WrapPagerState {
-    val loop = realCount > 1
-    val virtualCount = if (loop) realCount * WRAP_MULTIPLIER else realCount.coerceAtLeast(1)
-    val start = (if (loop) virtualCount / 2 else 0) + initialRealIndex.coerceIn(0, (realCount - 1).coerceAtLeast(0))
-    val pager = rememberPagerState(initialPage = start) { virtualCount }
-    return remember(pager, realCount) { WrapPagerState(pager, realCount) }
+internal fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0): WrapPositions {
+    val pager = rememberPagerState(initialPage = startingVirtualPage(realCount, initialRealIndex)) { virtualPageCount(realCount) }
+    return remember(pager, realCount) { WrapPositions(PhonePager(pager), realCount) }
 }
