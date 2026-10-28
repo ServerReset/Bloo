@@ -64,7 +64,7 @@ fun AppViewModel.downloadUpdateInBackground() {
         _updateDownloadProgress.value = null
         _state.update { it.copy(updateDownloading = false, updateApkReady = ok) }
         if (!ok) {
-            _state.update { it.copy(message = "Download failed. Check your connection and try again.") }
+            _state.update { it.copy(message = com.bloo.bluelink.update.UpdateMessages.DOWNLOAD_FAILED) }
         }
     }
 }
@@ -132,7 +132,7 @@ private fun AppViewModel.seamlessInstall(dest: java.io.File) {
                     it.copy(
                         updateInstalling = false,
                         updateApkReady = false,
-                        message = "Update installed. Reopen Bloo to finish.",
+                        message = com.bloo.bluelink.update.UpdateMessages.INSTALLED_REOPEN,
                         messageType = ToastKind.INFO,
                     )
                 }

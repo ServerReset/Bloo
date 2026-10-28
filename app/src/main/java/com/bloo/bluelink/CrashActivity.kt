@@ -218,7 +218,7 @@ class CrashActivity : ComponentActivity() {
                             withContext(Dispatchers.Main) {
                                 installing = false
                                 if (ok) {
-                                    statusMessage = "Update installed. Reopen Bloo to finish."
+                                    statusMessage = com.bloo.bluelink.update.UpdateMessages.INSTALLED_REOPEN
                                 } else if (!installDownloadedApk(context, apkFile)) {
                                     statusMessage = "Couldn't open the installer. Find Bloo.apk in your downloads."
                                 } else {
@@ -250,7 +250,7 @@ class CrashActivity : ComponentActivity() {
                             val ok = UpdateApi.downloadApk(url, apkFile) { downloadProgress = it }
                             downloading = false
                             apkReady = ok
-                            statusMessage = if (ok) null else "Download failed. Check your connection and try again."
+                            statusMessage = if (ok) null else com.bloo.bluelink.update.UpdateMessages.DOWNLOAD_FAILED
                         }
                     },
                 )
