@@ -82,12 +82,12 @@ internal fun ChargeSegmentBar(
     val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else Color.Black.copy(alpha = 0.14f)
     // Springing both gradient stops gives that moment an actual transition instead of a colour
     // popping mid-draw.
-    val fill = rememberChargeFillColors(stuckAtLimit, lowPowerSoft(Spring.StiffnessLow))
+    val fill = rememberChargeFillColors(stuckAtLimit, com.bloo.uicommon.chargeRamp())
     val limitAnim = remember { Animatable(0f) }
     var limitSeen by remember { mutableStateOf(false) }
     // Read here, at composable scope, not inline inside the LaunchedEffect below --
     // lowPowerAwareSpring is itself @Composable, so it can't be called from a suspend lambda.
-    val limitSpring = lowPowerCalm<Float>(Spring.StiffnessMediumLow)
+    val limitSpring = com.bloo.uicommon.chargeRamp<Float>()
     LaunchedEffect(limit) {
         val target = (limit ?: return@LaunchedEffect) / 100f
         if (limitSeen) {
@@ -215,7 +215,8 @@ private fun rememberSlowShimmer(periodMs: Long): State<Float> {
                 // panel's full rate for as long as the car charged, only to skip most of those frames.
                 kotlinx.coroutines.delay(ShimmerStepNanos / 1_000_000L)
                 val now = System.nanoTime()
-                state.floatValue = ((now - start) % periodNanos).toFloat() / periodNanos.toFloat()
+                // The sheen's sweep follows the same ramp as the fill: it slows at each end of the band's travel.
+                state.floatValue = com.bloo.uicommon.ChargeRampEasing.transform(((now - start) % periodNanos).toFloat() / periodNanos.toFloat())
             }
         }
     }

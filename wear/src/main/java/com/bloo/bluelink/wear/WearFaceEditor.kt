@@ -59,6 +59,7 @@ internal fun WearFaceEditor(car: VehicleSnapshot, slots: List<String>, onPickSlo
                                 }
                             }
                             WearQuadrantGrid(actions, Modifier.fillMaxSize(), press)
+                            WearRingLabels(actions)
                             WearRoundButton(
                                 size = face * 0.27f,
                                 description = "Done",

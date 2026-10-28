@@ -66,6 +66,8 @@ fun WearCarFace(
             )
             Box(Modifier.fillMaxSize().padding((RingStroke + RingGap) * unit), contentAlignment = Alignment.Center) {
                 WearQuadrantGrid(actions = actions, modifier = Modifier.fillMaxSize(), press = press)
+                // The names run round the inside of the ring, each along its own quarter's outer edge.
+                WearRingLabels(actions)
                 BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     val w = constraints.maxWidth
                     val h = constraints.maxHeight

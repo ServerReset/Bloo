@@ -1,6 +1,10 @@
 package com.bloo.uicommon
 
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.TweenSpec
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
@@ -73,3 +77,15 @@ fun <T> floatingSpring(): SpringSpec<T> = spring(dampingRatio = FloatingDamping,
 /** A pop-up's spring, leaning to a plain tween under battery saver. For composables. */
 @Composable
 fun <T> lowPowerFloating() = lowPowerAwareSpring<T>(dampingRatio = FloatingDamping, stiffness = FloatingStiffness)
+
+/**
+ * The ease for anything that charges: it starts slowly, ramps up through the middle, and slows into its value. Every charge animation on the
+ * phone and the watch uses it, so the fill, its colour, the limit marker and the sheen all move the same way.
+ */
+val ChargeRampEasing: Easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
+
+/** How long a charge fill takes to ramp to its value. */
+const val ChargeRampMs = 900
+
+/** The charge ramp as an animation spec, for the fill, its colour and the limit marker. */
+fun <T> chargeRamp(durationMs: Int = ChargeRampMs): TweenSpec<T> = tween(durationMillis = durationMs, easing = ChargeRampEasing)

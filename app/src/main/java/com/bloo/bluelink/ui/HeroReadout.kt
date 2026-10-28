@@ -153,10 +153,10 @@ internal fun chargeReadoutOf(
 /** The one spring the charge fill uses, so collapsed and expanded bars animate identically. */
 @Composable
 internal fun animatedChargeFrac(target: Float): State<Float> {
-    // Deliberately bouncy: the fill overshoots the new charge a touch and springs back, which reads as the bar "landing" on
-    // the value. It also STARTS empty in the app's first moments: the first bar drawn fills up to the charge, with the same bounce,
-    // instead of appearing already full. (The charging animation is a separate thing: a slight sheen over the full part, see ChargeSegmentBar.)
-    val spec = lowPowerBounce<Float>()
+    // A ramp, not a spring: the fill starts slowly, climbs, and slows into the charge. It also STARTS empty in the app's first moments: the
+    // first bar drawn fills up to the charge the same way, instead of appearing already full. (The charging sheen is a separate thing, see
+    // ChargeSegmentBar.)
+    val spec = com.bloo.uicommon.chargeRamp<Float>()
     // Starts empty only in the app's first moments; a bar composed later (the next car in a swipe) starts at its charge, so
     // it does not spring up from nothing while the page slides in.
     val fill = remember { Animatable(if (com.bloo.uicommon.ColdStartWindow.isOpen()) 0f else target) }

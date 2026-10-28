@@ -197,7 +197,7 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
         shapeForCorner = { morph, _ -> shape(morph) },
         onClickHaptic = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
     ) {
-        // The glyph and its label sit in the quarter's own corner, pushed out toward the edge of the face and kept inside its circle.
+        // The glyph sits in the quarter's own corner, pushed out toward the edge of the face and kept inside its circle; the name curves along the ring.
         val toward = when (quadrant) {
             0 -> Alignment.TopStart
             1 -> Alignment.TopEnd
@@ -215,13 +215,36 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
                         MorphButtonLabel(icon = it, label = "", pending = action.pending, iconSize = 28.dp * unit)
                     }
                 }
-                // The action's name, straight in the corner under its glyph, cut to fit the quarter.
-                Text(
-                    text = action.label.let { if (it.length > 12) it.take(11) + "…" else it },
-                    style = TextStyle(fontSize = with(LocalDensity.current) { (11f * unit).dp.toSp() }, fontWeight = FontWeight.SemiBold),
-                    color = if (action.active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+            }
+        }
+    }
+}
+
+/**
+ * The four labels, curved to the ring: anchored at each quarter's middle (clockwise from 3 o'clock: top-left 225,
+ * top-right 315, bottom-right 45, bottom-left 135), the bottom two reversed so they still read left to right.
+ */
+@Composable
+internal fun WearRingLabels(actions: List<WearQuickAction?>) {
+    val scheme = MaterialTheme.colorScheme
+    val anchors = floatArrayOf(225f, 315f, 135f, 45f)
+    // The label is part of the drawing, so it is sized with the face (and ignores the font-size setting, which would
+    // grow it past the arc it is curved along) -- 12dp on the 227dp design.
+    val labelSize = with(LocalDensity.current) { (12f * LocalFaceUnit.current).dp.toSp() }
+    Box(Modifier.fillMaxSize()) {
+        for (q in 0 until 4) {
+            val action = actions.getOrNull(q) ?: continue
+            val color = if (action.active) scheme.onPrimary else scheme.onSurface
+            CurvedLayout(
+                modifier = Modifier.fillMaxSize(),
+                anchor = anchors[q],
+                angularDirection = if (q >= 2) CurvedDirection.Angular.Reversed
+                else CurvedDirection.Angular.Normal,
+            ) {
+                basicCurvedText(
+                    // A preset's name is the phone's to choose: cut so it stays on its own quarter's arc.
+                    action.label.let { if (it.length > 14) it.take(13) + "…" else it },
+                    style = { CurvedTextStyle(fontSize = labelSize, fontWeight = FontWeight.SemiBold, color = color) },
                 )
             }
         }

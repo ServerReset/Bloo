@@ -57,23 +57,23 @@ fun WearEdgeRing(
     // the screen would redraw the whole ring 60 times a second for nobody.
     LoopWhileInFront(active = sheenOn, onRest = { sheenPhase.snapTo(0f) }) {
         sheenPhase.snapTo(0f)
-        sheenPhase.animateTo(1f, tween(1000, easing = LinearEasing))
+        sheenPhase.animateTo(1f, com.bloo.uicommon.chargeRamp(1000))
     }
     val sheen = if (sheenOn) sheenPhase.asState() else null
-    // The level lands with a bounce (it overshoots the new charge and settles), as the phone's bar does.
+    // The level ramps up to the new charge and slows into it, as the phone's bar does.
     val sweep by animateFloatAsState(
         frac,
-        animationSpec = if (policy.bouncySprings) spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow) else snap(),
+        animationSpec = if (policy.bouncySprings) com.bloo.uicommon.chargeRamp() else snap(),
         label = "edgeRing",
     )
     // The phone's two stops of the fill: the darker end where it starts, the lighter where it ends.
-    val fill = rememberChargeFillColors(stuck, if (policy.bouncySprings) tween(500) else snap())
+    val fill = rememberChargeFillColors(stuck, if (policy.bouncySprings) com.bloo.uicommon.chargeRamp() else snap())
     // The limit glides when it changes; the first value is where it starts, not an animation from nothing.
     val limitAnim = remember { Animatable(0f) }
     var limitSeen by remember { mutableStateOf(false) }
     LaunchedEffect(limit) {
         val target = (limit ?: return@LaunchedEffect) / 100f
-        if (limitSeen && policy.bouncySprings) limitAnim.animateTo(target, tween(450)) else { limitSeen = true; limitAnim.snapTo(target) }
+        if (limitSeen && policy.bouncySprings) limitAnim.animateTo(target, com.bloo.uicommon.chargeRamp()) else { limitSeen = true; limitAnim.snapTo(target) }
     }
     val track = Color.White.copy(alpha = 0.22f)
     val dim = Color.White.copy(alpha = 0.09f)
