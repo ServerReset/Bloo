@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import kotlin.math.abs
 
 /** Speed, in pixels per second, at which a moving layer reaches its full touch of blur. Tuned low on purpose: a softness, not a smear. */
