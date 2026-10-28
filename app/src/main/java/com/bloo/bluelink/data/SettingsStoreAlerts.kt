@@ -9,18 +9,18 @@ import kotlinx.coroutines.flow.first
 
 internal fun SettingsStore.decodeNotificationPrefs(p: Preferences): SettingsStore.NotificationPrefs =
     SettingsStore.NotificationPrefs(
-        service = p[booleanPreferencesKey("notify_service")] ?: true,
-        doorOpen = p[booleanPreferencesKey("notify_door")] ?: true,
-        doorOpenMinutes = p[stringPreferencesKey("notify_door_min")]?.toIntOrNull() ?: 5,
-        running = p[booleanPreferencesKey("notify_running")] ?: true,
-        runningMinutes = p[stringPreferencesKey("notify_running_min")]?.toIntOrNull() ?: 10,
-        unlocked = p[booleanPreferencesKey("notify_unlocked")] ?: true,
-        unlockedMinutes = p[stringPreferencesKey("notify_unlocked_min")]?.toIntOrNull() ?: 10,
-        charging = p[booleanPreferencesKey("notify_charging")] ?: true,
-        autoLockAlerts = p[booleanPreferencesKey("notify_autolock")] ?: true,
-        carStarted = p[booleanPreferencesKey("notify_start")] ?: true,
-        chargeComplete = p[booleanPreferencesKey("notify_charge_complete")] ?: true,
-        watchLowBattery = p[booleanPreferencesKey("notify_watch_low")] ?: true,
+        service = p[booleanPreferencesKey(AlertKeys.SERVICE)] ?: true,
+        doorOpen = p[booleanPreferencesKey(AlertKeys.DOOR)] ?: true,
+        doorOpenMinutes = p[stringPreferencesKey(AlertKeys.DOOR_MINUTES)]?.toIntOrNull() ?: 5,
+        running = p[booleanPreferencesKey(AlertKeys.RUNNING)] ?: true,
+        runningMinutes = p[stringPreferencesKey(AlertKeys.RUNNING_MINUTES)]?.toIntOrNull() ?: 10,
+        unlocked = p[booleanPreferencesKey(AlertKeys.UNLOCKED)] ?: true,
+        unlockedMinutes = p[stringPreferencesKey(AlertKeys.UNLOCKED_MINUTES)]?.toIntOrNull() ?: 10,
+        charging = p[booleanPreferencesKey(AlertKeys.CHARGING)] ?: true,
+        autoLockAlerts = p[booleanPreferencesKey(AlertKeys.AUTOLOCK)] ?: true,
+        carStarted = p[booleanPreferencesKey(AlertKeys.CAR_STARTED)] ?: true,
+        chargeComplete = p[booleanPreferencesKey(AlertKeys.CHARGE_COMPLETE)] ?: true,
+        watchLowBattery = p[booleanPreferencesKey(AlertKeys.WATCH_LOW_BATTERY)] ?: true,
     )
 
 /**
@@ -36,18 +36,18 @@ private suspend fun SettingsStore.putSwitch(key: String, v: Boolean) { editTrack
 
 private suspend fun SettingsStore.putMinutes(key: String, v: Int) { editTracked { it[stringPreferencesKey(key)] = v.toString() } }
 
-suspend fun SettingsStore.setNotifyService(v: Boolean) = putSwitch("notify_service", v)
-suspend fun SettingsStore.setNotifyDoor(v: Boolean) = putSwitch("notify_door", v)
-suspend fun SettingsStore.setDoorOpenMinutes(v: Int) = putMinutes("notify_door_min", v)
-suspend fun SettingsStore.setNotifyRunning(v: Boolean) = putSwitch("notify_running", v)
-suspend fun SettingsStore.setRunningMinutes(v: Int) = putMinutes("notify_running_min", v)
-suspend fun SettingsStore.setNotifyUnlocked(v: Boolean) = putSwitch("notify_unlocked", v)
-suspend fun SettingsStore.setUnlockedMinutes(v: Int) = putMinutes("notify_unlocked_min", v)
-suspend fun SettingsStore.setNotifyCharging(v: Boolean) = putSwitch("notify_charging", v)
-suspend fun SettingsStore.setNotifyAutoLock(v: Boolean) = putSwitch("notify_autolock", v)
-suspend fun SettingsStore.setNotifyCarStarted(v: Boolean) = putSwitch("notify_start", v)
-suspend fun SettingsStore.setNotifyChargeComplete(v: Boolean) = putSwitch("notify_charge_complete", v)
-suspend fun SettingsStore.setNotifyWatchLowBattery(v: Boolean) = putSwitch("notify_watch_low", v)
+suspend fun SettingsStore.setNotifyService(v: Boolean) = putSwitch(AlertKeys.SERVICE, v)
+suspend fun SettingsStore.setNotifyDoor(v: Boolean) = putSwitch(AlertKeys.DOOR, v)
+suspend fun SettingsStore.setDoorOpenMinutes(v: Int) = putMinutes(AlertKeys.DOOR_MINUTES, v)
+suspend fun SettingsStore.setNotifyRunning(v: Boolean) = putSwitch(AlertKeys.RUNNING, v)
+suspend fun SettingsStore.setRunningMinutes(v: Int) = putMinutes(AlertKeys.RUNNING_MINUTES, v)
+suspend fun SettingsStore.setNotifyUnlocked(v: Boolean) = putSwitch(AlertKeys.UNLOCKED, v)
+suspend fun SettingsStore.setUnlockedMinutes(v: Int) = putMinutes(AlertKeys.UNLOCKED_MINUTES, v)
+suspend fun SettingsStore.setNotifyCharging(v: Boolean) = putSwitch(AlertKeys.CHARGING, v)
+suspend fun SettingsStore.setNotifyAutoLock(v: Boolean) = putSwitch(AlertKeys.AUTOLOCK, v)
+suspend fun SettingsStore.setNotifyCarStarted(v: Boolean) = putSwitch(AlertKeys.CAR_STARTED, v)
+suspend fun SettingsStore.setNotifyChargeComplete(v: Boolean) = putSwitch(AlertKeys.CHARGE_COMPLETE, v)
+suspend fun SettingsStore.setNotifyWatchLowBattery(v: Boolean) = putSwitch(AlertKeys.WATCH_LOW_BATTERY, v)
 
 // Mechanism: when AlertWorker (see work/AlertWorker.kt) first observes a door open (or engine
 // running), it stamps "door_since_$vin"/"engine_since_$vin" with the current time via the setters

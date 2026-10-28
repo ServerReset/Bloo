@@ -2,6 +2,7 @@ package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.AiSettingResolver
 import com.bloo.bluelink.data.AiSettingResolver.Option
+import com.bloo.bluelink.data.AlertKeys
 import com.bloo.bluelink.data.SettingsCatalog
 import com.bloo.bluelink.data.SettingsStore
 
@@ -179,19 +180,19 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         range(
-            "r_unlocked", "notify_unlocked_min", "", 1.0, 120.0,
+            "r_unlocked", AlertKeys.UNLOCKED_MINUTES, "", 1.0, 120.0,
             { it.notif.unlockedMinutes.toString() }, { vm, v -> vm.setUnlockedMinutes(v.toDouble().toInt()) },
         ),
     )
     add(
         range(
-            "r_door", "notify_door_min", "", 1.0, 120.0,
+            "r_door", AlertKeys.DOOR_MINUTES, "", 1.0, 120.0,
             { it.notif.doorOpenMinutes.toString() }, { vm, v -> vm.setDoorOpenMinutes(v.toDouble().toInt()) },
         ),
     )
     add(
         range(
-            "r_running", "notify_running_min", "", 1.0, 120.0,
+            "r_running", AlertKeys.RUNNING_MINUTES, "", 1.0, 120.0,
             { it.notif.runningMinutes.toString() }, { vm, v -> vm.setRunningMinutes(v.toDouble().toInt()) },
         ),
     )

@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
+import com.bloo.bluelink.data.AlertKeys
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SettingsCatalog
@@ -63,43 +64,43 @@ internal val ToggleSettings = listOf(
         checked = { a, _, _ -> a.hapticsEnabled }, onToggle = { vm, v -> vm.setHapticsEnabled(v) },
     ),
     ToggleSpec(
-        key = "notify_charging",
+        key = AlertKeys.CHARGING,
         checked = { _, n, _ -> n.charging }, onToggle = { vm, v -> vm.setNotifyCharging(v) },
     ),
     ToggleSpec(
-        key = "notify_service",
+        key = AlertKeys.SERVICE,
         checked = { _, n, _ -> n.service }, onToggle = { vm, v -> vm.setNotifyService(v) },
     ),
     ToggleSpec(
-        key = "notify_door",
+        key = AlertKeys.DOOR,
         checked = { _, n, _ -> n.doorOpen }, onToggle = { vm, v -> vm.setNotifyDoor(v) },
     ),
     ToggleSpec(
-        key = "notify_running",
+        key = AlertKeys.RUNNING,
         checked = { _, n, _ -> n.running }, onToggle = { vm, v -> vm.setNotifyRunning(v) },
     ),
     ToggleSpec(
-        key = "notify_charge_complete",
+        key = AlertKeys.CHARGE_COMPLETE,
         phrases = "tell me when the car is done charging",
         checked = { _, n, _ -> n.chargeComplete }, onToggle = { vm, v -> vm.setNotifyChargeComplete(v) },
     ),
     ToggleSpec(
-        key = "notify_start",
+        key = AlertKeys.CAR_STARTED,
         phrases = "tell me when somebody starts my car",
         checked = { _, n, _ -> n.carStarted }, onToggle = { vm, v -> vm.setNotifyCarStarted(v) },
     ),
     ToggleSpec(
-        key = "notify_watch_low",
+        key = AlertKeys.WATCH_LOW_BATTERY,
         phrases = "warn me on my watch when the battery is low",
         checked = { _, n, _ -> n.watchLowBattery }, onToggle = { vm, v -> vm.setNotifyWatchLowBattery(v) },
     ),
     ToggleSpec(
-        key = "notify_autolock",
+        key = AlertKeys.AUTOLOCK,
         phrases = "tell me when autolock locks the car",
         checked = { _, n, _ -> n.autoLockAlerts }, onToggle = { vm, v -> vm.setNotifyAutoLock(v) },
     ),
     ToggleSpec(
-        key = "notify_unlocked",
+        key = AlertKeys.UNLOCKED,
         checked = { _, n, _ -> n.unlocked }, onToggle = { vm, v -> vm.setNotifyUnlocked(v) },
     ),
     ToggleSpec(

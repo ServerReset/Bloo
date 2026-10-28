@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.AlertKeys
 import com.bloo.uicommon.segmentsOf
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -41,15 +42,15 @@ internal val RangeSettings: List<SettingSpec> = listOf(
         phrases = "make the colors brighter less colorful more vivid washed out",
     ) { a, _, _, vm -> VibrancySlider(a, vm) },
     SettingSpec(
-        key = "notify_unlocked_min", kind = SettingKind.Range,
+        key = AlertKeys.UNLOCKED_MINUTES, kind = SettingKind.Range,
         phrases = "how long before it warns me the car is unlocked",
     ) { _, n, _, vm -> MinutesField(n.unlockedMinutes, "Left unlocked: minutes before alerting", vm::setUnlockedMinutes) },
     SettingSpec(
-        key = "notify_door_min", kind = SettingKind.Range,
+        key = AlertKeys.DOOR_MINUTES, kind = SettingKind.Range,
         phrases = "how long before it warns me a door is open",
     ) { _, n, _, vm -> MinutesField(n.doorOpenMinutes, "Door left open: minutes before alerting", vm::setDoorOpenMinutes) },
     SettingSpec(
-        key = "notify_running_min", kind = SettingKind.Range,
+        key = AlertKeys.RUNNING_MINUTES, kind = SettingKind.Range,
         phrases = "how long before it warns me the car is still running",
     ) { _, n, _, vm -> MinutesField(n.runningMinutes, "Car left running: minutes before alerting", vm::setRunningMinutes) },
 )
