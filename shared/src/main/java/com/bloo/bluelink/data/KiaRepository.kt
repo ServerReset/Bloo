@@ -20,7 +20,7 @@ class KiaRepository(
      * or [KiaAuth.OtpRequired] (caller must pick a destination, then [sendOtp] and [verifyOtp]).
      */
     suspend fun startLogin(username: String, password: String, pin: String): KiaAuth {
-        val deviceId = store.load(Brand.KIA)?.deviceId ?: KiaUsaApi.newDeviceId()
+        val deviceId = store.load(Brand.KIA)?.deviceId ?: ApiHttp.newDeviceId()
         pendingDeviceId = deviceId
         val rmtoken = store.load(Brand.KIA)?.refreshToken
         val auth = api.authUser(username, password, deviceId, rmtoken, pin.ifBlank { null })
@@ -30,13 +30,13 @@ class KiaRepository(
 
     /** Step 2a: deliver the one-time code ("EMAIL" or "SMS"). */
     suspend fun sendOtp(challenge: KiaAuth.OtpRequired, notifyType: String) {
-        val deviceId = pendingDeviceId ?: KiaUsaApi.newDeviceId().also { pendingDeviceId = it }
+        val deviceId = pendingDeviceId ?: ApiHttp.newDeviceId().also { pendingDeviceId = it }
         api.sendOtp(challenge.otpKey, notifyType, challenge.xid, deviceId)
     }
 
     /** Step 2b: verify the code, complete the login and save the session. */
     suspend fun verifyOtp(username: String, password: String, pin: String, code: String, challenge: KiaAuth.OtpRequired) {
-        val deviceId = pendingDeviceId ?: KiaUsaApi.newDeviceId()
+        val deviceId = pendingDeviceId ?: ApiHttp.newDeviceId()
         val session = api.verifyOtpAndComplete(
             username, password, code, challenge.otpKey, challenge.xid, deviceId, pin.ifBlank { null },
         )
@@ -115,7 +115,7 @@ class KiaRepository(
     )
 
     override fun SessionStore.Session.toSession() =
-        KiaSession(sid = accessToken, rmtoken = refreshToken, deviceId = deviceId ?: KiaUsaApi.newDeviceId(), pin = pin)
+        KiaSession(sid = accessToken, rmtoken = refreshToken, deviceId = deviceId ?: ApiHttp.newDeviceId(), pin = pin)
 
     override suspend fun fetchVehicles(s: KiaSession): List<KiaVehicleSummary> = api.vehicles(s)
 
@@ -128,7 +128,7 @@ class KiaRepository(
             ?: throw BlueLinkException("Kia session expired - please sign in again")
         AppLog.log("Kia session expired; re-authenticating with stored rmtoken")
         val auth = api.authUser(
-            creds.email, creds.password, stored.deviceId ?: KiaUsaApi.newDeviceId(),
+            creds.email, creds.password, stored.deviceId ?: ApiHttp.newDeviceId(),
             stored.refreshToken, stored.pin.ifBlank { null },
         )
         if (auth !is KiaAuth.LoggedIn) {

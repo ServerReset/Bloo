@@ -19,7 +19,7 @@ class CanadaRepository(
     // --- Sign-in (OTP) -----------------------------------------------------
 
     suspend fun startLogin(username: String, password: String, pin: String): CanadaAuth {
-        val deviceId = store.load(brand)?.deviceId ?: CanadaApi.newDeviceId()
+        val deviceId = store.load(brand)?.deviceId ?: ApiHttp.newDeviceId()
         pendingDeviceId = deviceId
         val auth = api.authUser(username, password, deviceId, pin.ifBlank { null })
         if (auth is CanadaAuth.LoggedIn) save(auth.session, username, pin)
@@ -28,14 +28,14 @@ class CanadaRepository(
 
     /** Step 2a: email the one-time code. */
     suspend fun sendOtp(challenge: CanadaAuth.OtpRequired) {
-        val deviceId = pendingDeviceId ?: CanadaApi.newDeviceId().also { pendingDeviceId = it }
+        val deviceId = pendingDeviceId ?: ApiHttp.newDeviceId().also { pendingDeviceId = it }
         val email = challenge.email ?: throw BlueLinkException("No email on file to send the code to")
         pendingOtpKey = api.sendOtp(challenge.userInfoUuid, email, deviceId)
     }
 
     /** Step 2b: verify the code, complete the login and save the session. */
     suspend fun verifyOtp(username: String, pin: String, code: String, challenge: CanadaAuth.OtpRequired) {
-        val deviceId = pendingDeviceId ?: CanadaApi.newDeviceId()
+        val deviceId = pendingDeviceId ?: ApiHttp.newDeviceId()
         val otpKey = pendingOtpKey ?: throw BlueLinkException("Request a new code and try again")
         val email = challenge.email ?: username
         val session = api.verifyOtpAndComplete(username, email, otpKey, code, deviceId, pin.ifBlank { null })
@@ -82,7 +82,7 @@ class CanadaRepository(
     // --- Brand plumbing ------------------------------------------------------
 
     override fun SessionStore.Session.toSession() =
-        CanadaSession(accessToken, refreshToken, deviceId ?: CanadaApi.newDeviceId(), pin)
+        CanadaSession(accessToken, refreshToken, deviceId ?: ApiHttp.newDeviceId(), pin)
 
     override suspend fun fetchVehicles(s: CanadaSession): List<CanadaVehicleSummary> = api.vehicles(s)
 
@@ -101,7 +101,7 @@ class CanadaRepository(
             ?: throw BlueLinkException("Session expired - please sign in again", code = e.code)
         AppLog.log("${brand.label} session expired; re-authenticating silently")
         val auth = runCatching {
-            api.authUser(creds.email, creds.password, stored.deviceId ?: CanadaApi.newDeviceId(), stored.pin)
+            api.authUser(creds.email, creds.password, stored.deviceId ?: ApiHttp.newDeviceId(), stored.pin)
         }.onFailure { rethrowIfCancellation(it) }.getOrNull()
         if (auth !is CanadaAuth.LoggedIn) {
             throw BlueLinkException("Session expired - please sign out and sign in again", code = e.code)

@@ -1,5 +1,7 @@
 package com.bloo.bluelink.data
 
+import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -9,6 +11,11 @@ import okhttp3.logging.HttpLoggingInterceptor
 
 /** The one HTTP stack and JSON parser every brand API client shares. */
 object ApiHttp {
+    /**
+     * A fresh, stable device id in the upper-case form the Canada and Kia US apps send (persist it: the login grant is bound to it).
+     */
+    fun newDeviceId(): String = UUID.randomUUID().toString().uppercase(Locale.US)
+
     val json: Json = Json {
         // The OEM payloads evolve (new fields, generation-specific quirks) faster than the models
         // are updated, so unknown keys are ignored instead of throwing.

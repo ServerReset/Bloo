@@ -37,8 +37,6 @@ class KiaUsaApi {
         // to key some behavior off a recognized User-Agent string.
         private const val USER_AGENT = "KIAPrimo_iOS/37 CFNetwork/1335.0.3.4 Darwin/21.6.0"
 
-        /** A fresh, stable device id (persist it; the rmtoken is bound to it). */
-        fun newDeviceId(): String = UUID.randomUUID().toString().uppercase(Locale.US)
 
         // The one shared OkHttp/Json stack -- see [ApiHttp]. This class is
         // constructed per call on the hot command paths (notification actions,

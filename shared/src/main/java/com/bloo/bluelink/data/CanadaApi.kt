@@ -1,8 +1,6 @@
 package com.bloo.bluelink.data
 
 import java.util.Base64
-import java.util.Locale
-import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
@@ -79,8 +77,6 @@ class CanadaApi(private val brand: Brand) {
                 "Chrome/130.0.0.0 Mobile Safari/537.36"
         private const val MFA_API_CODE = "0107"
 
-        /** A fresh, stable device id (persist it; the 90-day mfaYn grant is bound to it). */
-        fun newDeviceId(): String = UUID.randomUUID().toString().uppercase(Locale.US)
 
         // The one shared OkHttp/Json stack -- see [ApiHttp]. This class is constructed per call on
         // hot command paths, so a per-call client would cost a fresh TCP + TLS handshake every
