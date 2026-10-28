@@ -43,7 +43,7 @@ internal suspend fun AppViewModel.loadGarageInternal() {
     if (loadingGarage) return
     loadingGarage = true
     try {
-        loadGarageInner()
+        com.bloo.bluelink.perf.PerfMonitor.span("garage.load", thresholdMs = 16) { loadGarageInner() }
     } finally {
         loadingGarage = false
     }

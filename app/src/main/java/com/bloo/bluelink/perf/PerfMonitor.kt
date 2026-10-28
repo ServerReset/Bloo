@@ -1,7 +1,12 @@
 package com.bloo.bluelink.perf
 
 import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
+import android.os.PowerManager
 import android.os.Debug
 import android.os.Handler
 import android.os.HandlerThread
@@ -11,8 +16,19 @@ import android.view.FrameMetrics
 import android.view.Window
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.core.content.ContextCompat
 import com.bloo.bluelink.data.AppLog
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
@@ -33,6 +49,8 @@ object PerfMonitor {
     private const val STALL_MS = 60L
     private const val SLOW_FRAME_LOG_MS = 100f
     private const val KEEP = 30
+    private const val RECENT_EVENTS = 200
+    private const val PROBE_MS = 2_000L
 
     private val clock = ScopeClock()
     private val stats = ConcurrentHashMap<String, ScopeStats>()
@@ -45,6 +63,20 @@ object PerfMonitor {
     private val counters = ConcurrentHashMap<String, AtomicLong>()
     private val lastRecomp = HashMap<String, Long>()
     private val lastCount = HashMap<String, Long>()
+    // The recent story: screens, scopes, power, thermal and battery changes, newest last.
+    private val recentEvents = ArrayDeque<String>()
+    // How long the main thread, and the two shared pools, take to answer a request. Reset each window.
+    private val mainPost = LatencyStats()
+    private val defaultPool = LatencyStats()
+    private val ioPool = LatencyStats()
+    private val probes = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var probeJob: Job? = null
+    private var device: Context? = null
+    private var thermalListener: PowerManager.OnThermalStatusChangedListener? = null
+    private var powerReceiver: BroadcastReceiver? = null
+    private var lastBatteryBucket = -2
+    private var lastCharging: Boolean? = null
+    private var lastScreen = "start"
 
     private var budgetMs = 16.7f
     private var startedAt = SystemClock.uptimeMillis()
@@ -84,12 +116,83 @@ object PerfMonitor {
         }
         windowTick = tick
         h.postDelayed(tick, WINDOW_MS)
-        AppLog.log("perf: monitor on (display ${"%.0f".format(1000f / budgetMs)} Hz, frame budget ${fmt(budgetMs)} ms)")
+        val app = activity.applicationContext
+        device = app
+        PerfFile.init(app)
+        PerfDevice.header(app, budgetMs).forEach { PerfFile.append("HEADER $it") }
+        PerfFile.append("HEADER log ${PerfFile.path()}")
+        AppLog.log("perf: monitor on (display ${"%.0f".format(1000f / budgetMs)} Hz, frame budget ${fmt(budgetMs)} ms); log ${PerfFile.path()}")
+        event("install", "frame budget ${fmt(budgetMs)} ms")
+        registerDeviceListeners(activity, h)
+        startProbes()
+    }
+
+    /** Thermal, power-save and battery changes, as events: they explain a sudden change in the frames that follows them. */
+    private fun registerDeviceListeners(activity: Activity, h: Handler) {
+        val power = activity.getSystemService(PowerManager::class.java)
+        if (power != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val l = PowerManager.OnThermalStatusChangedListener { status ->
+                event("thermal", "now ${PerfDevice.thermalName(power)} (status $status)")
+            }
+            thermalListener = l
+            power.addThermalStatusListener(Executor { h.post(it) }, l)
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                when (intent.action) {
+                    Intent.ACTION_BATTERY_CHANGED -> {
+                        val level = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+                        val scale = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+                        val percent = if (level >= 0 && scale > 0) level * 100 / scale else -1
+                        val status = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
+                        val charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                            status == android.os.BatteryManager.BATTERY_STATUS_FULL
+                        val bucket = percent / 5
+                        if (bucket != lastBatteryBucket || charging != lastCharging) {
+                            lastBatteryBucket = bucket
+                            lastCharging = charging
+                            event("battery", "$percent% ${if (charging) "charging" else "on battery"}")
+                        }
+                    }
+                    PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
+                        event("power-save", "${activity.getSystemService(PowerManager::class.java)?.isPowerSaveMode}")
+                    }
+                }
+            }
+        }
+        powerReceiver = receiver
+        ContextCompat.registerReceiver(
+            activity, receiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_BATTERY_CHANGED)
+                addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+            },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+    }
+
+    /** Probes the main thread and both shared pools every two seconds: a pool that is busy shows here before a frame does. */
+    private fun startProbes() {
+        probeJob?.cancel()
+        probeJob = probes.launch {
+            while (isActive) {
+                probe(Dispatchers.Default, defaultPool)
+                probe(Dispatchers.IO, ioPool)
+                delay(PROBE_MS)
+            }
+        }
+    }
+
+    private suspend fun probe(dispatcher: CoroutineDispatcher, into: LatencyStats) {
+        val t0 = System.nanoTime()
+        withContext(dispatcher) { }
+        into.add((System.nanoTime() - t0) / 1_000_000f)
     }
 
     /** The watchdog wakes twenty times a second, so it runs only while the app is on screen. */
     @Synchronized fun foreground(on: Boolean) {
         if (attachedTo == null) return
+        event(if (on) "foreground" else "background")
         if (on) {
             startWatchdog()
         } else {
@@ -108,6 +211,13 @@ object PerfMonitor {
         watchdog?.interrupt()
         watchdog = null
         windowTick?.let { handler?.removeCallbacks(it) }
+        probeJob?.cancel()
+        probeJob = null
+        thermalListener?.let { l -> (device?.getSystemService(PowerManager::class.java))?.removeThermalStatusListener(l) }
+        thermalListener = null
+        powerReceiver?.let { r -> runCatching { device?.unregisterReceiver(r) } }
+        powerReceiver = null
+        event("uninstall")
         thread?.quitSafely()
         thread = null
         handler = null
@@ -116,10 +226,28 @@ object PerfMonitor {
     // --- Labels ---------------------------------------------------------------------------------------------
 
     /** The screen now showing; frames with no [scope] running are filed under it. */
-    fun screen(name: String) { clock.screen = name }
+    fun screen(name: String) {
+        if (name == lastScreen) return
+        lastScreen = name
+        clock.screen = name
+        event("screen", name)
+    }
 
     /** For the next [durationMs], frames are filed under [label] (on top of the screen): "map-open", "garage-swipe". */
-    fun scope(label: String, durationMs: Long = 1_000L) = clock.begin(label, durationMs, System.nanoTime())
+    fun scope(label: String, durationMs: Long = 1_000L) {
+        clock.begin(label, durationMs, System.nanoTime())
+        event("scope", "$label for ${durationMs} ms")
+    }
+
+    /**
+     * Writes one line of the story to the performance file and the in-app ring: what happened, and when (uptime since install).
+     * Use it for a discrete moment (a screen, a toggle, a request starting) so the frames that follow can be read against it.
+     */
+    fun event(name: String, detail: String = "") {
+        val line = "${uptime()} EVENT $name${if (detail.isEmpty()) "" else " $detail"}"
+        synchronized(recentEvents) { recentEvents.addLast(line); while (recentEvents.size > RECENT_EVENTS) recentEvents.removeFirst() }
+        PerfFile.append(line)
+    }
 
     // --- Counting -------------------------------------------------------------------------------------------
 
@@ -141,7 +269,11 @@ object PerfMonitor {
 
     @PublishedApi internal fun spanDone(name: String, ms: Float, thresholdMs: Long) {
         spans.getOrPut(name) { SpanStats() }.add(ms)
-        if (ms >= thresholdMs && Looper.myLooper() == Looper.getMainLooper()) AppLog.log("perf span $name ${fmt(ms)} ms on main")
+        if (ms >= thresholdMs && Looper.myLooper() == Looper.getMainLooper()) {
+            val line = "${uptime()} SPAN $name ${fmt(ms)} ms on main"
+            PerfFile.append(line)
+            AppLog.log("perf span $name ${fmt(ms)} ms on main")
+        }
     }
 
     // --- Frames ---------------------------------------------------------------------------------------------
@@ -171,6 +303,7 @@ object PerfMonitor {
         if (cost.totalMs >= SLOW_FRAME_LOG_MS) {
             val line = "${uptime()} [$label] ${fmt(cost.totalMs)} ms, mostly ${cost.worstPhase()}: ${cost.phases()}"
             synchronized(worstFrames) { worstFrames.addLast(line); while (worstFrames.size > KEEP) worstFrames.removeFirst() }
+            PerfFile.append("SLOW $line")
             AppLog.log("perf slow frame $line")
         }
     }
@@ -191,21 +324,24 @@ object PerfMonitor {
         val busyPct = if (frames > 0) snapshot.totalMs / WINDOW_MS * 100.0 else 0.0
         val allocMbPerSec = gcDelta.allocatedMb / seconds
         val pssMb = memoryPssMb()
-        if (frames > 0) {
-            val label = clock.labelAt(System.nanoTime())
-            AppLog.log(
-                "perf ${WINDOW_MS / 1000}s [$label]: $frames frames, ${snapshot.missed} missed (${snapshot.missedPercent()}%), " +
-                    "busy ${"%.0f".format(busyPct)}%, p50 ${fmt(snapshot.percentile(0.5))} p95 ${fmt(snapshot.percentile(0.95))} " +
-                    "p99 ${fmt(snapshot.percentile(0.99))} worst ${fmt(snapshot.worstMs)} ms" +
-                    (if (windowDropped > 0) ", $windowDropped dropped" else "") +
-                    " | avg ms: ${snapshot.avgPhases()}" +
-                    " | gc ${gcDelta.count} (blocking ${gcDelta.blocking}, ${gcDelta.timeMs} ms), alloc ${"%.1f".format(allocMbPerSec)} MB/s" +
-                    ", heap $heapMb MB, pss $pssMb MB, threads ${threadCount()}" +
-                    (if (windowStalls > 0) " | stalls $windowStalls (${windowStallMs} ms)" else "") +
-                    (if (recomp.isNotEmpty()) " | recomposed/s: ${top(recomp, seconds)}" else "") +
-                    (if (events.isNotEmpty()) " | events/s: ${top(events, seconds)}" else ""),
-            )
+        val label = clock.labelAt(System.nanoTime())
+        val line = buildString {
+            append("WINDOW ${WINDOW_MS / 1000}s [$label] $frames frames, ${snapshot.missed} missed (${snapshot.missedPercent()}%), ")
+            append("busy ${"%.0f".format(busyPct)}%, p50 ${fmt(snapshot.percentile(0.5))} p95 ${fmt(snapshot.percentile(0.95))} ")
+            append("p99 ${fmt(snapshot.percentile(0.99))} worst ${fmt(snapshot.worstMs)} ms")
+            if (windowDropped > 0) append(", $windowDropped dropped")
+            if (frames > 0) append(" | avg ms: ${snapshot.avgPhases()} | distribution ${snapshot.distribution()}")
+            append(" | gc ${gcDelta.count} (blocking ${gcDelta.blocking}, ${gcDelta.timeMs} ms), alloc ${"%.1f".format(allocMbPerSec)} MB/s")
+            append(", heap $heapMb MB, pss $pssMb MB, threads ${threadCount()}")
+            append(" | main-post ${mainPost.line()} | pool-default ${defaultPool.line()} | pool-io ${ioPool.line()}")
+            if (windowStalls > 0) append(" | stalls $windowStalls (${windowStallMs} ms)")
+            if (recomp.isNotEmpty()) append(" | recomposed/s: ${top(recomp, seconds)}")
+            if (events.isNotEmpty()) append(" | events/s: ${top(events, seconds)}")
         }
+        PerfFile.append(line)
+        // The in-app log gets a line only when something was wrong, so the activity log keeps its room for the rest of the app.
+        if (frames > 0 && (snapshot.missed > 0 || windowStalls > 0 || gcDelta.blocking > 0)) AppLog.log("perf $line")
+        mainPost.reset(); defaultPool.reset(); ioPool.reset()
         resetWindow()
     }
 
@@ -258,6 +394,7 @@ object PerfMonitor {
                         if (waited >= STALL_MS - 10 && (waited % 50L == 0L || samples.isEmpty())) samples += main.thread.stackTrace.toList()
                     }
                     val took = SystemClock.uptimeMillis() - posted
+                    mainPost.add(took.toFloat())
                     if (took >= STALL_MS && samples.isNotEmpty()) recordStall(took, samples)
                     Thread.sleep(50)
                 } catch (_: InterruptedException) {
@@ -277,6 +414,7 @@ object PerfMonitor {
         synchronized(stalls) { stalls.addLast(line); while (stalls.size > KEEP) stalls.removeFirst() }
         windowStalls++
         windowStallMs += tookMs
+        PerfFile.append("STALL $line")
         AppLog.log("perf STALL $line")
     }
 
@@ -292,6 +430,8 @@ object PerfMonitor {
     fun report(): String = buildString {
         val gc = GcSample.read()
         appendLine("== Bloo performance report ==")
+        device?.let { d -> PerfDevice.header(d, budgetMs).forEach { appendLine(it) } }
+        appendLine("Log file: ${PerfFile.path() ?: "not started"}")
         appendLine("Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), ${Build.MANUFACTURER} ${Build.MODEL}, ${"%.0f".format(1000f / budgetMs)} Hz (budget ${fmt(budgetMs)} ms)")
         appendLine("Watching for ${(SystemClock.uptimeMillis() - startedAt) / 1000} s. Heap now ${(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024)} MB, peak seen $peakHeapMb MB, threads ${threadCount()}.")
         appendLine("GC since process start: ${gc.count} runs, ${gc.blocking} blocking, ${gc.timeMs} ms, ${gc.allocatedMb} MB allocated.")
@@ -314,6 +454,12 @@ object PerfMonitor {
         appendLine("-- Timed spans (count, total, average, worst ms) --")
         if (spans.isEmpty()) appendLine("none") else spans.entries.sortedByDescending { it.value.totalMs }.forEach { (n, s) -> appendLine("$n: ${s.count} runs, ${fmt(s.totalMs)} total, ${fmt(s.totalMs / s.count)} avg, ${fmt(s.worstMs)} worst") }
         appendLine()
+        appendLine("-- Latency, last window: main thread answering a request, and the shared pools --")
+        appendLine("main-post ${mainPost.line()}; pool-default ${defaultPool.line()}; pool-io ${ioPool.line()}")
+        appendLine()
+        appendLine("-- The last events (newest last) --")
+        synchronized(recentEvents) { if (recentEvents.isEmpty()) appendLine("none") else recentEvents.forEach { appendLine(it) } }
+        appendLine()
         appendLine("-- Recompositions since start --")
         if (recompositions.isEmpty()) appendLine("none") else recompositions.entries.sortedByDescending { it.value.get() }.take(30).forEach { appendLine("${it.key}: ${it.value.get()}") }
         appendLine()
@@ -328,6 +474,27 @@ object PerfMonitor {
         synchronized(stalls) { stalls.clear() }
         startedAt = SystemClock.uptimeMillis()
         peakHeapMb = 0
+    }
+
+    /** How long something took to answer, across a window: the count, the average and the worst. */
+    private class LatencyStats {
+        private var count = 0
+        private var sum = 0f
+        private var worst = 0f
+
+        @Synchronized fun add(ms: Float) {
+            count++
+            sum += ms
+            if (ms > worst) worst = ms
+        }
+
+        @Synchronized fun reset() {
+            count = 0
+            sum = 0f
+            worst = 0f
+        }
+
+        @Synchronized fun line(): String = if (count == 0) "idle" else "avg ${fmt(sum / count)} max ${fmt(worst)} ms (${count} asks)"
     }
 
     private class SpanStats {

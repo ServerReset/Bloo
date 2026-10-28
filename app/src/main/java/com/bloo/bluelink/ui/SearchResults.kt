@@ -72,7 +72,9 @@ internal fun SettingsSearchResults(
     // Live read of the whole store, so a value changed here or by a sync from another device shows up.
     val prefs by remember(vm) { vm.settingsStore.allPrefs }.collectAsState(initial = emptyMap())
     val entries = remember(state, appearance, notif, vm, canBio, state.settingsMode, prefs) {
-        buildSettingsSearchEntries(state, appearance, notif, vm, canBio, prefs)
+        com.bloo.bluelink.perf.PerfMonitor.span("search.entries", thresholdMs = 4) {
+            buildSettingsSearchEntries(state, appearance, notif, vm, canBio, prefs)
+        }
     }
     val facts = remember(state, appearance) { carFacts(state, appearance) }
     val pieces = remember(facts, tokens) { rankPieces(tokens, facts) }

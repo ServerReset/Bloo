@@ -224,6 +224,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * once the write's turn comes: a save started earlier can no longer land after (and overwrite) a newer one.
      */
     internal fun persistCache() {
+        com.bloo.bluelink.perf.PerfMonitor.count("persistCache")
         viewModelScope.launch {
             cacheWrite.withLock {
                 val s = _state.value
@@ -267,7 +268,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal val pendingPublishes = mutableMapOf<String, Job>()
 
     internal suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
-        snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) })
+        com.bloo.bluelink.perf.PerfMonitor.span("snapshot.save", thresholdMs = 8) {
+            snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) })
+        }
         refreshLiveChargeBar(vehicles)
     }
 
