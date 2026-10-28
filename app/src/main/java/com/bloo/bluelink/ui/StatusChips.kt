@@ -28,8 +28,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.lowPowerBounce
-import com.bloo.uicommon.FloatingStiffness
+import com.bloo.uicommon.lowPowerFloating
 import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.rememberRelativeTime
 import dev.chrisbanes.haze.HazeState
@@ -140,7 +139,7 @@ internal fun UpdateBadgedCard(visible: Boolean, modifier: Modifier = Modifier, c
         androidx.compose.animation.AnimatedVisibility(
             visible = visible,
             enter = androidx.compose.animation.scaleIn(
-                lowPowerBounce(stiffness = FloatingStiffness),
+                lowPowerFloating(),
             ) + androidx.compose.animation.fadeIn(),
             exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
             modifier = Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-4).dp),

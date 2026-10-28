@@ -1,9 +1,8 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.uicommon.calmSpring
-import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.motionBlurWhenMoving
-import com.bloo.uicommon.FloatingStiffness
+import com.bloo.uicommon.floatingSpring
 import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.MorphIconButton
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -72,7 +71,7 @@ import androidx.compose.ui.graphics.TransformOrigin
  * a quick no-bounce slide back off the screen, and the toasts around it glide on a damped reflow when the slots change.
  * It never comes from, or goes into, the search bar: the bar is just something the toast passes in front of or behind.
  */
-private val EnterSpring = bounceSpring<Float>(stiffness = FloatingStiffness)
+private val EnterSpring = floatingSpring<Float>()
 private val ExitSpring = calmSpring<Float>(Spring.StiffnessMedium)
 private val ReflowSpring = spring<Float>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium)
 

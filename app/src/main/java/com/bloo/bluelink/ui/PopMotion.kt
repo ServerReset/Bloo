@@ -11,8 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import com.bloo.uicommon.bounceSpring
-import com.bloo.uicommon.FloatingStiffness
+import com.bloo.uicommon.floatingSpring
 
 /**
  * The app's one pop: a surface rises into place (a springy rise that overshoots a little and settles
@@ -20,11 +19,11 @@ import com.bloo.uicommon.FloatingStiffness
  * from. Dialogs and toasts both ride it, so everything that appears over the app arrives and leaves
  * the same way.
  */
-internal val PopEnterSpec = bounceSpring<Float>(stiffness = FloatingStiffness)
+internal val PopEnterSpec = floatingSpring<Float>()
 
 /** The exit's two beats: an anticipatory lift, then the retreat. Springs, not linear tweens, so the
  *  end of each eases in instead of stopping hard (the "stiff end"). */
-private val PopLiftSpec = bounceSpring<Float>(stiffness = FloatingStiffness)
+private val PopLiftSpec = floatingSpring<Float>()
 private val PopExitSpec = spring<Float>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)
 
 /**

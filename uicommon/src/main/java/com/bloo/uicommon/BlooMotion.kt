@@ -26,6 +26,12 @@ const val BounceDamping = 0.6f
 const val FloatingStiffness = 50f
 
 /**
+ * The damping for pop-ups, toasts and badges. A little more than [BounceDamping], so the rebound at the end of a rise is softer: the bounce
+ * stays, without the snap back.
+ */
+const val FloatingDamping = 0.7f
+
+/**
  * The morph button's two corner states, as a percentage of the shorter side: a true pill at rest, a
  * rounded rectangle while active or pressed. Here rather than in the surface because this pair IS
  * the shape half of the morph vocabulary. Note this shares only the two corner numbers.
@@ -60,3 +66,10 @@ fun <T> softSpring(stiffness: Float): SpringSpec<T> = spring(dampingRatio = Soft
 /** The same soft spring, leaning to a plain tween under battery saver (see [lowPowerAwareSpring]). For composables. */
 @Composable
 fun <T> lowPowerSoft(stiffness: Float) = lowPowerAwareSpring<T>(dampingRatio = SoftDamping, stiffness = stiffness)
+
+/** A pop-up's spring: [FloatingDamping] at [FloatingStiffness]. For coroutines and top-level values. */
+fun <T> floatingSpring(): SpringSpec<T> = spring(dampingRatio = FloatingDamping, stiffness = FloatingStiffness)
+
+/** A pop-up's spring, leaning to a plain tween under battery saver. For composables. */
+@Composable
+fun <T> lowPowerFloating() = lowPowerAwareSpring<T>(dampingRatio = FloatingDamping, stiffness = FloatingStiffness)
