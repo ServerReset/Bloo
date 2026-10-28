@@ -392,9 +392,10 @@ fun BlooApp(vm: AppViewModel) {
     }
     // The status bar's own strip: a blur of what is behind it, strongest at the top and nearly gone
     // by the bottom of the strip. It is the ONLY edge treatment in the app.
-    StatusBarScrim(searchHazeState)
-    // The expanded car's map, above the status bar's blur: the floating bar it brings in is not cut by the blur, and the app is behind both.
+    // The expanded car's map sits over the app and under the status bar's blur, so the part of it that goes behind the status bar is
+    // blurred rather than cut off at the content's edge. The map is drawn here, at screen level, for that reason.
     if (target == Screen.Garage && !(locked && !unlockedThisSession)) GarageMapOverlay(stateHolder, vm, expandedMap)
+    StatusBarScrim(searchHazeState)
     // The app-wide pull-to-refresh disc, drawn above content; refracts searchHazeState. The lock overlay
     // and dialogs sit above it.
     PullRefreshIndicatorHost(state = refreshIndicator, hazeState = searchHazeState)
