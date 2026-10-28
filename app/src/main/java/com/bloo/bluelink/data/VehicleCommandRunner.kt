@@ -59,7 +59,7 @@ object VehicleCommandRunner {
                     "charge_off" -> { repo.stopCharge(v); "Stopping charge" }
                     "climate" -> runClimate(ctx, repo, v, snap, climateTarget, smart)
                     "climate_on" -> runClimateStart(ctx, repo, v, snap, climateTarget, smart)
-                    "climate_off" -> stopClimateAndChain(ctx, repo, v)
+                    "climate_off" -> stopClimate(repo, v)
                     // No arguments, no state to predict: these two make the car do something
                     // audible/visible and change nothing that any surface displays, which is why
                     // they need no optimistic write below.
@@ -102,14 +102,9 @@ object VehicleCommandRunner {
         }
     }
 
-    /**
-     * Stop climate AND cancel any pending auto-extend chain. Both of this runner's stop paths
-     * ("climate_off" and the "climate" toggle landing on off) go through here so they cannot drift
-     * apart.
-     */
-    private suspend fun stopClimateAndChain(ctx: Context, repo: VehicleRepository, v: Vehicle): String {
+    /** Stop climate. Both of this runner's stop paths ("climate_off" and the "climate" toggle landing on off) go through here. */
+    private suspend fun stopClimate(repo: VehicleRepository, v: Vehicle): String {
         repo.stopClimate(v)
-        runCatching { com.bloo.bluelink.work.ClimateExtendWorker.cancel(ctx, v.vin) }
         return "Stopping climate"
     }
 
@@ -126,7 +121,7 @@ object VehicleCommandRunner {
         target: String,
         smart: ClimateRequest?,
     ): String {
-        if (snap.climateOn == true) return stopClimateAndChain(ctx, repo, v)
+        if (snap.climateOn == true) return stopClimate(repo, v)
         return runClimateStart(ctx, repo, v, snap, target, smart)
     }
 

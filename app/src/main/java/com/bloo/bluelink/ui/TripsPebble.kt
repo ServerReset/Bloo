@@ -1,6 +1,6 @@
 package com.bloo.bluelink.ui
 
-/** Trips/drive-history pebbles: TripsPebble, TripRow and climateChunksLabel. */
+/** Trips/drive-history pebbles: TripsPebble and TripRow. */
 
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.runtime.State
@@ -23,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.brand
-import com.bloo.bluelink.data.climateChunks
 import com.bloo.bluelink.data.fmtMinutes
 import com.bloo.bluelink.data.formatSpeedMph
 import com.bloo.bluelink.data.formatTripDistance
@@ -154,9 +153,3 @@ private fun TripStat(label: String, value: String, captionColor: Color, clock: S
     }
 }
 
-/**
- * "10 + 3 min" for a 13-minute request: the per-command chunks [climateChunks] splits an
- * auto-extended climate run into, shown on the Run time slider.
- */
-internal fun climateChunksLabel(totalMinutes: Int): String =
-    climateChunks(totalMinutes).joinToString(" + ") + " min"

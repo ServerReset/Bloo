@@ -166,13 +166,9 @@ fun AppViewModel.unlock(v: Vehicle) =
 fun AppViewModel.flashLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Lights flashing", null) { repoFor(v).flashLights(v) }
 fun AppViewModel.hornAndLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Horn & lights", null) { repoFor(v).hornAndLights(v) }
 
-/**
- * Turn climate off; optimistically flips [VehicleStatus.airCtrlOn] and cancels any pending
- * [ClimateExtendWorker] chain so a scheduled follow-up cannot turn climate back on.
- */
+/** Turn climate off; optimistically flips [VehicleStatus.airCtrlOn]. */
 fun AppViewModel.stopClimate(v: Vehicle) =
     runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }, confirm = { it.airCtrlOn == false }) {
-        com.bloo.bluelink.work.ClimateExtendWorker.cancel(getApplication(), v.vin)
         repoFor(v).stopClimate(v)
     }
 
@@ -192,30 +188,7 @@ fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
         { it.copy(airCtrlOn = true) },
         confirm = { it.airCtrlOn == true },
     ) {
-        val chunks = com.bloo.bluelink.data.climateChunks(req.durationMinutes)
-        // Unchanged behavior for every request already within the single- command cap: chunks is
-        // just [req.durationMinutes] and this is the same call it always was.
-        repoFor(v).startClimate(v, req.copy(durationMinutes = chunks.first()))
-        val remaining = chunks.drop(1).sum()
-        val ctx = getApplication<android.app.Application>()
-        if (remaining > 0) {
-            com.bloo.bluelink.work.ClimateExtendWorker.schedule(
-                context = ctx,
-                vin = v.vin,
-                remainingMinutes = remaining,
-                tempF = req.tempF,
-                defrost = req.defrost,
-                steeringWheelHeat = req.steeringWheelHeat.apiValue,
-                seatFrontLeft = req.seatFrontLeft.apiValue,
-                seatFrontRight = req.seatFrontRight.apiValue,
-                seatRearLeft = req.seatRearLeft.apiValue,
-                seatRearRight = req.seatRearRight.apiValue,
-                delayMinutes = chunks.first(),
-            )
-        } else {
-            // This request covers everything; clear any chain from a prior, longer request.
-            com.bloo.bluelink.work.ClimateExtendWorker.cancel(ctx, v.vin)
-        }
+        repoFor(v).startClimate(v, req)
     }.also {
     persist { saveClimate(v.vin, req) }
 }

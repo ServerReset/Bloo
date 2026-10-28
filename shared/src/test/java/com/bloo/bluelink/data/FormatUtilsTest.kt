@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 /**
  * Pure-JVM tests for the FormatUtils helpers that had NO coverage at all before
- * this file: [smartClimateTargetF]/[smartClimateIsCooling], [climateChunks],
+ * this file: [smartClimateTargetF]/[smartClimateIsCooling],
  * [tripDate], [maskEmail], [formatSpeedMph] and
  * [parseOdometerMiles]. Several of these functions' own doc comments describe a
  * real historical bug they were written to fix (a flat-offset smart-climate target
@@ -51,26 +51,6 @@ class FormatUtilsTest {
     fun smartClimateIsCooling_matchesTargetF_coolCutoff() {
         assertTrue(smartClimateIsCooling(70))
         assertFalse(smartClimateIsCooling(69))
-    }
-
-    // ---- climateChunks ----
-
-    @Test
-    fun climateChunks_splitsIntoTenMinuteChunksPlusRemainder() {
-        assertEquals(listOf(10, 3), climateChunks(13))
-        assertEquals(listOf(10, 10, 5), climateChunks(25))
-    }
-
-    @Test
-    fun climateChunks_underTenMinutes_isOneChunk() {
-        assertEquals(listOf(7), climateChunks(7))
-        assertEquals(listOf(10), climateChunks(10))
-    }
-
-    @Test
-    fun climateChunks_zeroOrNegative_coercesToOneMinute() {
-        assertEquals(listOf(1), climateChunks(0))
-        assertEquals(listOf(1), climateChunks(-5))
     }
 
     // ---- tripDate ----

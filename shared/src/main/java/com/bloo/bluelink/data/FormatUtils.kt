@@ -85,31 +85,10 @@ fun climatePresetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
 }
 
 /**
- * The valid range (in minutes) for a SINGLE remote-start climate command's duration -- the vendor
- * API itself rejects/clamps anything past 10 minutes per command. The default within this range
- * stays its own constant, [DEFAULT_CLIMATE_DURATION_MIN].
+ * The range (in minutes) for a remote-start climate run, sent as ONE command: the car runs for the whole of it.
+ * The default within this range stays its own constant, [DEFAULT_CLIMATE_DURATION_MIN].
  */
-val CLIMATE_DURATION_RANGE: IntRange = 1..10
-
-/** UI range for the "Run time" picker. Wider than [CLIMATE_DURATION_RANGE]: longer runs are
- *  chained into multiple commands (see [climateChunks], ClimateExtendWorker). */
-val CLIMATE_EXTENDED_DURATION_RANGE: IntRange = 1..20
-
-/**
- * Splits a total climate-run [minutes] into per-command durations within [CLIMATE_DURATION_RANGE]
- * (13 -> [10, 3]). The first chunk fires immediately, the rest are scheduled. [minutes] is clamped to >= 1.
- */
-fun climateChunks(minutes: Int): List<Int> {
-    val max = CLIMATE_DURATION_RANGE.last
-    var remaining = minutes.coerceAtLeast(1)
-    val chunks = mutableListOf<Int>()
-    while (remaining > 0) {
-        val chunk = remaining.coerceAtMost(max)
-        chunks += chunk
-        remaining -= chunk
-    }
-    return chunks
-}
+val CLIMATE_DURATION_RANGE: IntRange = 1..20
 
 /** Valid range for a car's AC/DC charge-limit percentage sliders. */
 val CHARGE_LIMIT_RANGE = 50..100

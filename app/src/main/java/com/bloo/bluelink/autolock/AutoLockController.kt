@@ -17,7 +17,7 @@ import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.carContext
 import com.bloo.bluelink.data.notificationPrefs
 import com.bloo.bluelink.data.repositoryFor
-import com.bloo.bluelink.data.runCarCommand
+import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.toSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -52,7 +52,7 @@ data class AutoLockEvalState(
 /**
  * Single source of truth for AutoLock evaluations, one per VIN. Ported from i5-AutoLock's
  * `AutoLockController` (github.com/Vel-San/i5-AutoLock) onto Bloo's own multi-brand vehicle
- * plumbing: [repositoryFor]/[BlueLinkGate] to read status, [runCarCommand] (the same path
+ * plumbing: [repositoryFor]/[BlueLinkGate] to read status, [CarCommandRunner.execute] (the same path
  * the app UI already uses) to send the lock.
  *
  * A plain object, not a Hilt-injected singleton -- matching how every other cross-cutting
@@ -314,11 +314,11 @@ object AutoLockController {
         // ONE retry, and only here. A walk-away lock is the moment to spend it: the alternative is
         // that a single network blip, or a token that expired a minute ago, leaves the car open and
         // reports an error. Nothing else in this flow is retried, and this is bounded at one.
-        var result = runCatching { runCarCommand(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
+        var result = runCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
         if (result?.ok != true) {
             AppLog.log("AutoLock: the lock command failed for $vin (${result?.message ?: "no response"}); trying once more.")
             delay(2500)
-            result = runCatching { runCarCommand(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
+            result = runCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
         }
         if (result?.ok == true) {
             AppLog.log("AutoLock: car locked automatically ($vin).")

@@ -111,7 +111,7 @@ class CarActionCallback : ActionCallback {
 
         val pendingKey = "$vin:$action"
         edit { it[WidgetKeys.PENDING] = pendingKey; it.remove(WidgetKeys.NOTE) }
-        val result = runCatching { com.bloo.bluelink.data.runCarCommand(context, CarCommand(vin, action)) }.getOrNull()
+        val result = runCatching { com.bloo.bluelink.data.CarCommandRunner.execute(context, CarCommand(vin, action)) }.getOrNull()
         edit {
             // Only this command's own marker: a second tap while this ran replaced it, and clearing that one here
             // switched off the busy state of a command that is still running.

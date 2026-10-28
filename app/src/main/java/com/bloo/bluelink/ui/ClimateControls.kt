@@ -99,7 +99,6 @@ import com.bloo.uicommon.ButtonPaddingH
 import com.bloo.uicommon.ChipPaddingH
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.lowPowerAwareSpring
-import com.bloo.uicommon.AnimatedSlider
 import com.bloo.uicommon.content
 
 /**
@@ -282,7 +281,8 @@ internal fun PresetPill(
                 content = { ButtonIcon(Icons.Filled.Edit, "Edit $name") },
             ),
         ),
-        modifier = modifier.fillMaxWidth(),
+        // The same standard button height as the lock and unlock buttons beside it, not the height of its own text.
+        modifier = modifier.fillMaxWidth().heightIn(min = ButtonTargetHeight),
     )
 }
 
@@ -365,30 +365,44 @@ internal fun stepTempF(tempF: Int, step: Int, fahrenheit: Boolean): Int {
     return (c * 9 / 5f + 32).roundToInt().coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last)
 }
 
-/** A value with a round −/+ either side: the temperature (big) or the run time. The value rolls when it changes. */
+/**
+ * A climate setting as a big value above a slider, with a round −/+ at either end of it. The temperature (big) and the run time both
+ * use this. The value rolls when it changes.
+ */
 @Composable
 internal fun ClimateStepper(
     value: String,
     caption: String,
     big: Boolean,
-    canDecrease: Boolean,
-    canIncrease: Boolean,
+    current: Int,
+    range: IntRange,
     tint: Color,
+    onChange: (Int) -> Unit,
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        MorphIconButton(onClick = onDecrease, enabled = canDecrease) { ButtonIcon(Icons.Filled.Remove, "Lower $caption") }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            RollingNumber(
-                text = value,
-                style = if (big) MaterialTheme.typography.displaySmall else SecondaryTextStyle(),
-                fontWeight = FontWeight.Bold,
-                color = tint,
-            )
-            BodySmallText(caption, color = mutedContentColor())
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        RollingNumber(
+            text = value,
+            style = if (big) MaterialTheme.typography.displaySmall else SecondaryTextStyle(),
+            fontWeight = FontWeight.Bold,
+            color = tint,
+        )
+        BodySmallText(caption, color = mutedContentColor())
+        Spacer(Modifier.height(GapRow))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            MorphIconButton(onClick = onDecrease, enabled = current > range.first) { ButtonIcon(Icons.Filled.Remove, "Lower $caption") }
+            Box(Modifier.weight(1f).padding(horizontal = GapRow)) {
+                AnimatedSlider(
+                    value = current.toFloat(),
+                    onValueChange = { onChange(it.roundToInt()) },
+                    valueRange = range.first.toFloat()..range.last.toFloat(),
+                    // One stop per whole value: the stops in between the two ends.
+                    steps = range.last - range.first - 1,
+                )
+            }
+            MorphIconButton(onClick = onIncrease, enabled = current < range.last) { ButtonIcon(Icons.Filled.Add, "Raise $caption") }
         }
-        MorphIconButton(onClick = onIncrease, enabled = canIncrease) { ButtonIcon(Icons.Filled.Add, "Raise $caption") }
     }
 }
 

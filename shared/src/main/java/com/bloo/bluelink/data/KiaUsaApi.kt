@@ -42,7 +42,7 @@ class KiaUsaApi {
 
         // The one shared OkHttp/Json stack -- see [ApiHttp]. This class is
         // constructed per call on the hot command paths (notification actions,
-        // AutoLock, climate auto-extend), and a per-call OkHttpClient would mean
+        // AutoLock), and a per-call OkHttpClient would mean
         // a fresh TCP + TLS handshake every time.
 
         /** Shared because SimpleDateFormat construction parses the pattern and

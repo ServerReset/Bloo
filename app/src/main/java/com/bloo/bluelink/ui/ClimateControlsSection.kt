@@ -31,7 +31,6 @@ import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
-import com.bloo.bluelink.data.CLIMATE_EXTENDED_DURATION_RANGE
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
@@ -177,9 +176,10 @@ internal fun ClimateControlsSection(
             value = degLabel(tempF.toString(), fahrenheit),
             caption = "Temperature",
             big = true,
-            canDecrease = tempF > CLIMATE_TEMP_RANGE_F.first,
-            canIncrease = tempF < CLIMATE_TEMP_RANGE_F.last,
+            current = tempF,
+            range = CLIMATE_TEMP_RANGE_F,
             tint = tempColor,
+            onChange = onTempF,
             onDecrease = { onTempF(stepTempF(tempF, -1, fahrenheit)) },
             onIncrease = { onTempF(stepTempF(tempF, +1, fahrenheit)) },
         )
@@ -187,16 +187,13 @@ internal fun ClimateControlsSection(
             value = "$duration min",
             caption = "Duration",
             big = false,
-            canDecrease = duration > CLIMATE_EXTENDED_DURATION_RANGE.first,
-            canIncrease = duration < CLIMATE_EXTENDED_DURATION_RANGE.last,
+            current = duration,
+            range = CLIMATE_DURATION_RANGE,
             tint = MaterialTheme.colorScheme.onSurface,
+            onChange = onDuration,
             onDecrease = { onDuration(duration - 1) },
             onIncrease = { onDuration(duration + 1) },
         )
-        // Beyond one command's own cap the run is chained into follow-up commands (see AppViewModel.startClimate).
-        ExpandVisibility(duration > CLIMATE_DURATION_RANGE.last, from = Alignment.Bottom) {
-            BodySmallText("Sent as ${climateChunksLabel(duration)}, continued automatically")
-        }
 
         var seatsOpen by remember { mutableStateOf(false) }
         val hasSeats = showSeats && (seats.driverHeat || seats.driverCool || seats.passHeat || seats.passCool ||

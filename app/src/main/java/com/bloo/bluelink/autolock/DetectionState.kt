@@ -4,7 +4,7 @@ package com.bloo.bluelink.autolock
  * High-level lifecycle of one "did I leave the car?" evaluation. Ported from the
  * i5-AutoLock reference app (github.com/Vel-San/i5-AutoLock) and adapted onto Bloo's own
  * multi-brand [com.bloo.bluelink.data.Vehicle]/[com.bloo.bluelink.data.VehicleStatus] and
- * [com.bloo.bluelink.data.runCarCommand] plumbing instead of a dedicated BlueLink client.
+ * [com.bloo.bluelink.data.CarCommandRunner] plumbing instead of a dedicated BlueLink client.
  */
 enum class DetectionState {
     IDLE,

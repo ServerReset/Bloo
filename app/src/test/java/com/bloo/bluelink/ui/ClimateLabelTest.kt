@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.climatePresetDetail
 import com.bloo.bluelink.data.climatePresetTemp
-import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WheelHeatLevel
@@ -17,34 +16,6 @@ import kotlin.test.assertEquals
  * future drift fail loudly instead of displaying 68° in Celsius.
  */
 class ClimateLabelTest {
-
-    // --- climateChunksLabel ---------------------------------------------------
-
-    @Test
-    fun climateChunks_singleRun() {
-        // One run within the cap renders without the "+" chain.
-        assertEquals("10 min", climateChunksLabel(CLIMATE_DURATION_RANGE.last))
-    }
-
-    @Test
-    fun climateChunks_composedFromRuns() {
-        // 13 = the cap (10) + the remainder (3); the label chains the run
-        // lengths and says " min" once at the end: "10 + 3 min".
-        assertEquals("${CLIMATE_DURATION_RANGE.last} + 3 min", climateChunksLabel(13))
-        // 70 = seven capped runs; every chunk is chained.
-        assertEquals(
-            List(7) { "${CLIMATE_DURATION_RANGE.last}" }.joinToString(" + ") + " min",
-            climateChunksLabel(70),
-        )
-    }
-
-    @Test
-    fun climateChunks_zeroCoercesToOneMinute() {
-        // climateChunks coerces a 0-minute request to 1 (a "run for 0" would
-        // otherwise produce an empty chunks list); the LABEL documents that --
-        // and pins it, because "1 min" for zero is deliberate, not a glitch.
-        assertEquals("1 min", climateChunksLabel(0))
-    }
 
     // --- climatePresetDetail ----------------------------------------------------------
 
