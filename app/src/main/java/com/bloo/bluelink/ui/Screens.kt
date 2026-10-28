@@ -96,12 +96,12 @@ fun BlooApp(vm: AppViewModel) {
     // a successful (re)composition instead. Latching the instant a non-locked frame is composed is
     // what lets the garage start building on that very frame.
     SideEffect { if (!locked) unlockedThisSession = true }
-    // The search bar rises from below the bottom edge when the app opens after a lock ("you're in"). It starts
-    // fully off screen while locked, and springs to rest on unlock with a little overshoot. Held here because
-    // SearchLayer is not composed while locked.
+    // The search bar floats up from below the bottom edge when the app unlocks ("you're in"), overshoots its rest a
+    // little, and settles. It is composed the whole time, parked off screen while locked, so the first unlock frame
+    // does not pay for composing it, and the rise runs on frames that are already drawn.
     val searchRise = remember { Animatable(if (locked) 1f else 0f) }
     // The spring is built here, in composition: lowPowerAwareSpring is @Composable, so it cannot be read inside the coroutine below.
-    val searchRiseSpec = lowPowerAwareSpring<Float>(dampingRatio = SearchRiseDamping, stiffness = Spring.StiffnessMediumLow)
+    val searchRiseSpec = lowPowerAwareSpring<Float>(dampingRatio = SearchRiseDamping, stiffness = Spring.StiffnessLow)
     LaunchedEffect(locked) {
         if (locked) searchRise.snapTo(1f)
         else searchRise.animateTo(0f, searchRiseSpec)
@@ -367,7 +367,7 @@ fun BlooApp(vm: AppViewModel) {
         // onSettingsPageSlot tracks it.
         val effectivelyInSettings = onSettingsPageSlot
         // Hidden while the map overlay is expanded: its bottom action row occupies the same corner.
-        if (searchable && !locked && !mapExpanded) {
+        if (searchable && !mapExpanded) {
             // No `.padding(padding)`: SearchLayer reads WindowInsets itself, and padding here would
             // subtract the nav bar twice.
             Box(Modifier.fillMaxSize().graphicsLayer { translationY = searchRise.value * screenHeightPx }) {
@@ -456,8 +456,8 @@ internal const val FOUR_COLUMN_MIN_DP = 1500
  * (An earlier take collapsed this to `width / 600`, which showed one wide car instead of the grid --
  * wrong: a large screen wants MORE columns, not fewer.)
  */
-/** Low damping so the search bar overshoots a little as it rises into place on unlock. */
-private const val SearchRiseDamping = 0.45f
+/** A soft spring: the search bar floats up and overshoots its rest by about a tenth of the travel, then settles. */
+private const val SearchRiseDamping = 0.6f
 
 internal fun carColumnsFor(widthDp: Float): Int = when {
     widthDp >= FOUR_COLUMN_MIN_DP -> 4
