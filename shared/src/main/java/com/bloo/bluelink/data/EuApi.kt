@@ -163,7 +163,7 @@ class EuApi(private val brand: Brand) {
         val root = call(req)
         val access = root.path("access_token").str()
             ?: throw BlueLinkException("Session expired - please sign in again", code = 401)
-        session.copy(accessToken = access, refreshToken = root.path("refresh_token").str() ?: refresh)
+        session.copy(token = access, refresh = root.path("refresh_token").str() ?: refresh)
     }
 
     /**
