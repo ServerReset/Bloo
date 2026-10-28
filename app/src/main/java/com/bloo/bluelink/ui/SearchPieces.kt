@@ -27,7 +27,6 @@ import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.parseOdometerMiles
 import com.bloo.uicommon.AppIcons
-import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText

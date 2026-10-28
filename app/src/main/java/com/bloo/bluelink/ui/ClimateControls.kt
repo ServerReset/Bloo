@@ -73,7 +73,6 @@ import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
-import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.climatePresetTemp
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.ReorderColumn

@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.bloo.bluelink.data.SettingsStore
 import kotlin.math.roundToInt

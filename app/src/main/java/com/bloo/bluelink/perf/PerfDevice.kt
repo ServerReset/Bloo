@@ -8,8 +8,6 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
-import android.util.DisplayMetrics
-import android.view.Display
 import com.bloo.bluelink.BuildConfig
 import java.util.Locale
 

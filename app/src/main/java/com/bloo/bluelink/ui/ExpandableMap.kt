@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,13 +55,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.toSize
 import com.bloo.bluelink.data.GeoLocation
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.AppIcons
-import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.lowPowerAwareSpring
