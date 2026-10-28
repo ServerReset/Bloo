@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.softSpring
 import com.bloo.uicommon.lowPowerAwareSpring
 import androidx.compose.foundation.layout.offset
 import com.bloo.bluelink.data.StartupLabels
@@ -255,7 +256,7 @@ fun BlooApp(vm: AppViewModel) {
                 // fadeIn/fadeOut keep their own (fast, linear-feeling) defaults on purpose: only
                 // the SLIDE -- the part that actually travels screen-sized distance -- needed the
                 // softer landing.
-                val slideSpec = spring<IntOffset>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
+                val slideSpec = softSpring<IntOffset>(Spring.StiffnessMediumLow)
                 (slideInHorizontally(slideSpec) { w -> -w } + fadeIn()) togetherWith
                     (slideOutHorizontally(slideSpec) { w -> w } + fadeOut())
             },

@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.bloo.uicommon.lowPowerSoft
 import com.bloo.uicommon.lowPowerCalm
 import com.bloo.uicommon.rememberChargeFillColors
 import androidx.compose.ui.Modifier
@@ -81,7 +82,7 @@ internal fun ChargeSegmentBar(
     val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else Color.Black.copy(alpha = 0.14f)
     // Springing both gradient stops gives that moment an actual transition instead of a colour
     // popping mid-draw.
-    val fill = rememberChargeFillColors(stuckAtLimit, lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow))
+    val fill = rememberChargeFillColors(stuckAtLimit, lowPowerSoft(Spring.StiffnessLow))
     val limitAnim = remember { Animatable(0f) }
     var limitSeen by remember { mutableStateOf(false) }
     // Read here, at composable scope, not inline inside the LaunchedEffect below --

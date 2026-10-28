@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.update.UpdateInfo
+import com.bloo.uicommon.lowPowerSoft
 import com.bloo.uicommon.IconBadgeContainer
 import com.bloo.uicommon.ProgressBar
 import com.bloo.uicommon.RevealText
@@ -148,7 +149,7 @@ internal fun UpdateStatusLine(
     // fill-colour spring does rather than cutting on one frame.
     val animatedStatusTint by androidx.compose.animation.animateColorAsState(
         targetValue = statusTint,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = lowPowerSoft(Spring.StiffnessLow),
         label = "updateStatusTint",
     )
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {

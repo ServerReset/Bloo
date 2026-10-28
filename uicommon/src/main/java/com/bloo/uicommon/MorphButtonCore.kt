@@ -157,7 +157,7 @@ private fun BoxScope.MorphChrome(
     // outer cap and seam corners out of agreement with its neighbour; they react to PRESS only.
     val morph by animateFloatAsState(
         targetValue = if ((active && shapeForCorner == null) || pressed) 1f else 0f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = softSpring(Spring.StiffnessLow),
         label = "morphProgress",
     )
     val cornerPercent = (pillCornerPercent + (morphedCornerPercent - pillCornerPercent) * morph).roundToInt()

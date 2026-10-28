@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.lowPowerSoft
 import com.bloo.uicommon.ButtonIconOnlySize
 import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.SoftDamping
@@ -28,7 +29,7 @@ private const val ChevronSpinMs = 500
 internal fun rememberChevronRotation(expanded: Boolean, label: String): State<Float> =
     animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = lowPowerSoft(Spring.StiffnessLow),
         label = label,
     )
 

@@ -51,3 +51,12 @@ fun <T> calmSpring(stiffness: Float): SpringSpec<T> = spring(dampingRatio = Spri
 /** The same calm spring, leaning to a plain tween under battery saver (see [lowPowerAwareSpring]). For composables. */
 @Composable
 fun <T> lowPowerCalm(stiffness: Float) = lowPowerAwareSpring<T>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = stiffness)
+
+/**
+ * A soft spring: [SoftDamping], slightly overdamped, so a value settles without ringing. For coroutines and top-level values.
+ */
+fun <T> softSpring(stiffness: Float): SpringSpec<T> = spring(dampingRatio = SoftDamping, stiffness = stiffness)
+
+/** The same soft spring, leaning to a plain tween under battery saver (see [lowPowerAwareSpring]). For composables. */
+@Composable
+fun <T> lowPowerSoft(stiffness: Float) = lowPowerAwareSpring<T>(dampingRatio = SoftDamping, stiffness = stiffness)

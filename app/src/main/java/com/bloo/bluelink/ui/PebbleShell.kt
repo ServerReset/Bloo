@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.settingsMode
+import com.bloo.uicommon.lowPowerSoft
 import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.motionBlurWhenMoving
 import com.bloo.uicommon.GapHairline
@@ -304,7 +305,7 @@ internal fun PebbleShell(
                             // arriving, notes loading) still jumped the card's height. This
                             // animates those in place too.
                             modifier = Modifier.animateContentSize(
-                                lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                                lowPowerSoft(Spring.StiffnessMediumLow),
                             ).padding(start = GapSection, end = GapSection, bottom = GapSection, top = GapHairline),
                             verticalGap = contentGap,
                             content = content,

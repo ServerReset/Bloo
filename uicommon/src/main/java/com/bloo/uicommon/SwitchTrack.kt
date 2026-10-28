@@ -47,12 +47,12 @@ fun SwitchTrack(
     val inset = 3.dp
     val thumbSize by animateDpAsState(
         if (checked) 20.dp else 16.dp,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = lowPowerSoft(Spring.StiffnessMediumLow),
         label = "toggleThumbSize",
     )
     val thumbOffset by animateDpAsState(
         if (checked) trackWidth - thumbSize - inset else inset,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = lowPowerSoft(Spring.StiffnessMediumLow),
         label = "toggleThumbOffset",
     )
     Box(

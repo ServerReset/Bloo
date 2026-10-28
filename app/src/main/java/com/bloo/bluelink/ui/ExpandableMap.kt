@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import com.bloo.uicommon.lowPowerSoft
 import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.LocalReduceMotion
@@ -180,7 +181,7 @@ internal fun ExpandableMapLayer(
     // Read here, at composable scope, not inline inside the scope.launch{} blocks below --
     // lowPowerAwareSpring is itself @Composable (it reads battery-saver state), so it can't be
     // called from inside a suspend lambda.
-    val dragSpring = lowPowerAwareSpring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium)
+    val dragSpring = lowPowerSoft<Float>(Spring.StiffnessMedium)
     // How far down the pull has gone, 0..1 over 40% of the screen. The sheet shrinks toward its
     // pebble as it is dragged, so letting go carries the SAME motion on, instead of the sheet snapping
     // back to full size and then shrinking.
