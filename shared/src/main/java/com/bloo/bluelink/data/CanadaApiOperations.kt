@@ -28,25 +28,21 @@ internal fun CanadaApi.parseStatus(vs: JsonObject, modelYear: Int?): VehicleStat
         batteryCharge = ev["batteryCharge"].flag(),
         batteryStatus = ev["batteryStatus"].int(),
         batteryPlugin = (ev["batteryPlugin"] ?: vs["batteryPlugin"]).int(),
-        drvDistance = run {
-            // `ev` FIRST, falling back to the top-level status object -- the same shape
-            // `batteryPlugin` three lines above already uses, and for the same reason: CA
-            // puts some EV fields under evStatus and some beside it. This read was
-            // top-level ONLY, so EvStatus.drvDistance was always empty for a Canadian EV
-            // and every surface that shows electric range fell back to nothing.
-            val range = ev.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
+        drvDistance = electricRange(
+            // `ev` FIRST, falling back to the top-level status object -- the same shape `batteryPlugin` three lines above already uses,
+            // and for the same reason: CA puts some EV fields under evStatus and some beside it. This read was top-level ONLY, so
+            // EvStatus.drvDistance was always empty for a Canadian EV and every surface that shows electric range fell back to nothing.
+            ev.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
                 ?: ev.path("drvDistance", "0", "rangeByFuel", "evModeRange")
                 ?: vs.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
-                ?: vs.path("drvDistance", "0", "rangeByFuel", "evModeRange")
-            range?.path("value").dbl()?.kmToMi()
-                ?.let { listOf(DrvDistance(RangeByFuel(Dte(it, range.path("unit").int())))) }
-                ?: emptyList()
-        },
-        remainTime2 = RemainTime2(
-            atc = ev.path("remainTime2", "atc", "value").dbl()?.let { TimeValue(it, 1) },
-            etc1 = ev.path("remainTime2", "etc1", "value").dbl()?.let { TimeValue(it, 1) },
-            etc3 = ev.path("remainTime2", "etc3", "value").dbl()?.let { TimeValue(it, 1) },
-        ).takeIf { it.atc != null || it.etc1 != null || it.etc3 != null },
+                ?: vs.path("drvDistance", "0", "rangeByFuel", "evModeRange"),
+            toMiles = { it.kmToMi() },
+        ),
+        remainTime2 = remainingChargeTime(
+            atc = ev.path("remainTime2", "atc", "value").dbl(),
+            etc1 = ev.path("remainTime2", "etc1", "value").dbl(),
+            etc3 = ev.path("remainTime2", "etc3", "value").dbl(),
+        ),
         // KNOWN GAP: reservChargeInfos (the AC/DC charge-LIMIT targets) is left null for
         // Canada. Because of that, the UI now hides the editable charge-limit controls on
         // CA cars (Brand.supportsChargeLimits = !isCanada) rather than show sliders seeded

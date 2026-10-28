@@ -74,19 +74,16 @@ internal fun KiaUsaApi.parseStatus(info: JsonObject): VehicleStatus {
         batteryCharge = ev.path("batteryCharge").flag(),
         batteryStatus = ev.path("batteryStatus").int(),
         batteryPlugin = ev.path("batteryPlugin").int(),
-        drvDistance = run {
-            val range = ev.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
-                ?: ev.path("drvDistance", "0", "rangeByFuel", "evModeRange")
-            range.path("value").dbl()
-                ?.let { listOf(DrvDistance(RangeByFuel(Dte(it, range.path("unit").int())))) }
-                ?: emptyList()
-        },
-        remainTime2 = RemainTime2(
-            // Current-plug estimate, then AC/DC estimates, all in minutes.
-            atc = ev.path("remainChargeTime", "0", "timeInterval", "value").dbl()?.let { TimeValue(it, 1) },
-            etc1 = ev.path("remainChargeTime", "0", "etc1", "value").dbl()?.let { TimeValue(it, 1) },
-            etc3 = ev.path("remainChargeTime", "0", "etc3", "value").dbl()?.let { TimeValue(it, 1) },
-        ).takeIf { it.atc != null || it.etc1 != null || it.etc3 != null },
+        drvDistance = electricRange(
+            ev.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
+                ?: ev.path("drvDistance", "0", "rangeByFuel", "evModeRange"),
+        ),
+        // Current-plug estimate, then AC/DC estimates, all in minutes.
+        remainTime2 = remainingChargeTime(
+            atc = ev.path("remainChargeTime", "0", "timeInterval", "value").dbl(),
+            etc1 = ev.path("remainChargeTime", "0", "etc1", "value").dbl(),
+            etc3 = ev.path("remainChargeTime", "0", "etc3", "value").dbl(),
+        ),
     )
 
     return VehicleStatus(
