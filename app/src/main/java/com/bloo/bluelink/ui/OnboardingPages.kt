@@ -41,6 +41,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.setBiometricLock
+import com.bloo.bluelink.data.setNotifyDoor
+import com.bloo.bluelink.data.setNotifyService
+import com.bloo.bluelink.data.setNotifyUnlocked
 import com.bloo.bluelink.data.setSyncUri
 import com.bloo.bluelink.data.syncUri
 import com.bloo.uicommon.IconBadge
@@ -272,9 +275,9 @@ internal fun OnboardingAlertsPage(notif: SettingsStore.NotificationPrefs, vm: Ap
     Column(Modifier.fillMaxWidth().innerGlassPanel(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
         ToggleRow("Live charging updates", notif.charging, description = "Progress and a Stop button while a car charges.") { vm.setNotifyCharging(it) }
         ToggleRow("Charge complete", notif.chargeComplete) { vm.setNotifyChargeComplete(it) }
-        ToggleRow("Left unlocked", notif.unlocked) { vm.setNotifyUnlocked(it) }
-        ToggleRow("Door left open", notif.doorOpen) { vm.setNotifyDoor(it) }
-        ToggleRow("Service due", notif.service) { vm.setNotifyService(it) }
+        ToggleRow("Left unlocked", notif.unlocked) { vm.persist { setNotifyUnlocked(it) } }
+        ToggleRow("Door left open", notif.doorOpen) { vm.persist { setNotifyDoor(it) } }
+        ToggleRow("Service due", notif.service) { vm.persist { setNotifyService(it) } }
     }
 }
 

@@ -49,7 +49,7 @@ internal suspend fun AppViewModel.reverseGeocode(loc: GeoLocation): com.bloo.blu
 internal suspend fun AppViewModel.applyPlace(v: Vehicle, loc: GeoLocation): Boolean {
     val place = reverseGeocode(loc) ?: return false
     _state.update {
-        it.copy(placeNames = it.placeNames + (v.vin to place.full), placeZips = it.placeZips + (v.vin to place.compact))
+        it.copy(placeNames = it.placeNames.withCar(v.vin, place.full), placeZips = it.placeZips.withCar(v.vin, place.compact))
     }
     return true
 }

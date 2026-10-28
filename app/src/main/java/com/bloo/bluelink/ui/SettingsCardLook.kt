@@ -90,7 +90,7 @@ private fun displayStatus(appearance: SettingsStore.Appearance): String = listOf
 private fun FontGroup(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     SettingsGroup("Font") {
         FontChoice.entries.forEach { choice ->
-            ChoiceRow(choice.label, appearance.fontChoice == choice) { vm.setFontChoice(choice) }
+            ChoiceRow(choice.label, appearance.fontChoice == choice) { vm.persist { setFontChoice(choice) } }
         }
     }
 }
@@ -102,7 +102,7 @@ internal fun SoundsVibrationCardContent(appearance: SettingsStore.Appearance, vm
         "Sounds & vibration",
         Icons.Filled.Vibration,
         vm,
-        inlineSetting = { InlineToggle(appearance.hapticsEnabled) { vm.setHapticsEnabled(it) } },
+        inlineSetting = { InlineToggle(appearance.hapticsEnabled) { vm.persist { setHapticsEnabled(it) } } },
     ) {}
 }
 
@@ -123,7 +123,7 @@ private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean,
                             "Aurora background",
                             appearance.auroraBackground,
                             description = "a gradient aurora drifts behind the content instead of a solid surface.",
-                        ) { vm.setAuroraBackground(it) }
+                        ) { vm.persist { setAuroraBackground(it) } }
                     }
                     SettingsGroup {
                         ToggleRow(
@@ -185,7 +185,7 @@ private fun PaletteChooser(appearance: SettingsStore.Appearance, vm: AppViewMode
         PaletteEditorDialog(
             editing = editing,
             onSave = { vm.saveCustomPalette(it); vm.setActiveCustomPaletteId(it.id); showEditor = false },
-            onDelete = { vm.deleteCustomPalette(it); showEditor = false },
+            onDelete = { vm.persist { deleteCustomPalette(it) }; showEditor = false },
             onDismiss = { showEditor = false },
         )
     }

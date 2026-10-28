@@ -12,8 +12,11 @@ import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.setAiEnabled
 import com.bloo.bluelink.data.setAuroraBackground
+import com.bloo.bluelink.data.setColumnsFlipped
 import com.bloo.bluelink.data.setDynamicColor
 import com.bloo.bluelink.data.setHapticsEnabled
+import com.bloo.bluelink.data.setNotifyAutoLock
+import com.bloo.bluelink.data.setNotifyCarStarted
 import com.bloo.bluelink.data.setNotifyCharging
 import com.bloo.bluelink.data.setNotifyDoor
 import com.bloo.bluelink.data.setNotifyRunning
@@ -62,7 +65,7 @@ internal class ToggleSpec(
 internal val ToggleSettings = listOf(
     ToggleSpec(
         key = PrefKeys.HAPTICS_ENABLED,
-        checked = { a, _, _ -> a.hapticsEnabled }, onToggle = { vm, v -> vm.setHapticsEnabled(v) },
+        checked = { a, _, _ -> a.hapticsEnabled }, onToggle = { vm, v -> vm.persist { setHapticsEnabled(v) } },
     ),
     ToggleSpec(
         key = AlertKeys.CHARGING,
@@ -70,15 +73,15 @@ internal val ToggleSettings = listOf(
     ),
     ToggleSpec(
         key = AlertKeys.SERVICE,
-        checked = { _, n, _ -> n.service }, onToggle = { vm, v -> vm.setNotifyService(v) },
+        checked = { _, n, _ -> n.service }, onToggle = { vm, v -> vm.persist { setNotifyService(v) } },
     ),
     ToggleSpec(
         key = AlertKeys.DOOR,
-        checked = { _, n, _ -> n.doorOpen }, onToggle = { vm, v -> vm.setNotifyDoor(v) },
+        checked = { _, n, _ -> n.doorOpen }, onToggle = { vm, v -> vm.persist { setNotifyDoor(v) } },
     ),
     ToggleSpec(
         key = AlertKeys.RUNNING,
-        checked = { _, n, _ -> n.running }, onToggle = { vm, v -> vm.setNotifyRunning(v) },
+        checked = { _, n, _ -> n.running }, onToggle = { vm, v -> vm.persist { setNotifyRunning(v) } },
     ),
     ToggleSpec(
         key = AlertKeys.CHARGE_COMPLETE,
@@ -88,7 +91,7 @@ internal val ToggleSettings = listOf(
     ToggleSpec(
         key = AlertKeys.CAR_STARTED,
         phrases = "tell me when somebody starts my car",
-        checked = { _, n, _ -> n.carStarted }, onToggle = { vm, v -> vm.setNotifyCarStarted(v) },
+        checked = { _, n, _ -> n.carStarted }, onToggle = { vm, v -> vm.persist { setNotifyCarStarted(v) } },
     ),
     ToggleSpec(
         key = AlertKeys.WATCH_LOW_BATTERY,
@@ -98,15 +101,15 @@ internal val ToggleSettings = listOf(
     ToggleSpec(
         key = AlertKeys.AUTOLOCK,
         phrases = "tell me when autolock locks the car",
-        checked = { _, n, _ -> n.autoLockAlerts }, onToggle = { vm, v -> vm.setNotifyAutoLock(v) },
+        checked = { _, n, _ -> n.autoLockAlerts }, onToggle = { vm, v -> vm.persist { setNotifyAutoLock(v) } },
     ),
     ToggleSpec(
         key = AlertKeys.UNLOCKED,
-        checked = { _, n, _ -> n.unlocked }, onToggle = { vm, v -> vm.setNotifyUnlocked(v) },
+        checked = { _, n, _ -> n.unlocked }, onToggle = { vm, v -> vm.persist { setNotifyUnlocked(v) } },
     ),
     ToggleSpec(
         key = PrefKeys.AURORA_BACKGROUND,
-        checked = { a, _, _ -> a.auroraBackground }, onToggle = { vm, v -> vm.setAuroraBackground(v) },
+        checked = { a, _, _ -> a.auroraBackground }, onToggle = { vm, v -> vm.persist { setAuroraBackground(v) } },
     ),
     ToggleSpec(
         key = PrefKeys.DYNAMIC_COLOR, label = "Dynamic colour (Material You)",
@@ -115,7 +118,7 @@ internal val ToggleSettings = listOf(
     ToggleSpec(
         key = PrefKeys.COLUMNS_FLIPPED,
         phrases = "put the controls on the other side swap the two columns",
-        checked = { a, _, _ -> a.columnsFlipped }, onToggle = { vm, v -> vm.setColumnsFlipped(v) },
+        checked = { a, _, _ -> a.columnsFlipped }, onToggle = { vm, v -> vm.persist { setColumnsFlipped(v) } },
     ),
     // Same top-level gate the AI card itself uses -- these two only mean anything on a device
     // Gemini Nano actually supports, same reason the card is hidden entirely rather than shown

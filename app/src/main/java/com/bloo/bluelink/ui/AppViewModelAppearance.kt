@@ -40,15 +40,12 @@ import kotlinx.coroutines.launch
 fun AppViewModel.setThemeMode(mode: ThemeMode) = viewModelScope.launch {
     settingsStore.setThemeMode(mode)
 }
-fun AppViewModel.setFontChoice(choice: FontChoice) = persist { setFontChoice(choice) }
 fun AppViewModel.setDynamicColor(enabled: Boolean) = viewModelScope.launch { settingsStore.setDynamicColor(enabled); pushPaletteToWatch() }
 fun AppViewModel.setColorPalette(palette: ColorPalette) = viewModelScope.launch { settingsStore.setColorPalette(palette); pushPaletteToWatch() }
 fun AppViewModel.saveCustomPalette(palette: CustomPaletteData) = viewModelScope.launch { settingsStore.saveCustomPalette(palette); pushPaletteToWatch() }
-fun AppViewModel.deleteCustomPalette(id: String) = persist { deleteCustomPalette(id) }
 fun AppViewModel.setActiveCustomPaletteId(id: String?) = viewModelScope.launch { settingsStore.setActiveCustomPaletteId(id); pushPaletteToWatch() }
 
 /** Swap which dual-column side the "hot spot" pebble lives on. */
-fun AppViewModel.setColumnsFlipped(flipped: Boolean) = persist { setColumnsFlipped(flipped) }
 
 // Deferred variants for the settings sliders: these two values recompose ~the whole app
 // (colorScheme / LocalDensity), so the commit waits a beat past slider release to let the
@@ -68,7 +65,6 @@ fun AppViewModel.setVibrancySoon(value: Float) =
 
 /** The watch wears the phone's palette (see WatchAccent), so a change to it is sent along at once. */
 private fun AppViewModel.pushPaletteToWatch() = com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
-fun AppViewModel.setHapticsEnabled(value: Boolean) = persist { setHapticsEnabled(value) }
 
 // More of the same appearance-setter pattern described above the setThemeMode group: DataStore
 // write only, UI updates via the `appearance` StateFlow mirror. the animated background's colors
@@ -115,11 +111,7 @@ fun AppViewModel.refreshShizukuAvailable() {
     }
 }
 
-fun AppViewModel.setAuroraBackground(value: Boolean) = persist { setAuroraBackground(value) }
 
 /** Imperial vs. metric display throughout the app. */
-fun AppViewModel.setUnitSystem(value: String) = persist { setUnitSystem(value) }
 
-fun AppViewModel.setTempUnit(value: String) = persist { setTempUnit(value) }
 
-fun AppViewModel.setDistanceUnit(value: String) = persist { setDistanceUnit(value) }

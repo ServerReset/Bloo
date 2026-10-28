@@ -79,17 +79,17 @@ fun AppViewModel.setSeatFlag(v: Vehicle, field: String, value: Boolean) {
         "sw" -> current.copy(steeringWheel = value)
         else -> current
     }
-    _state.update { it.copy(seatConfigs = it.seatConfigs + (v.vin to updated)) }
+    _state.update { it.copy(seatConfigs = it.seatConfigs.withCar(v.vin, updated)) }
     persist { setSeatFlag(v.vin, field, value) }
 }
 
 fun AppViewModel.setPowertrain(v: Vehicle, value: Powertrain) {
-    _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
+    _state.update { it.copy(powertrains = it.powertrains.withCar(v.vin, value)) }
     viewModelScope.launch { settingsStore.setPowertrain(v.vin, value); persistSnapshots() }
 }
 
 fun AppViewModel.setPlatform(v: Vehicle, value: VehiclePlatform) {
-    _state.update { it.copy(platforms = it.platforms + (v.vin to value)) }
+    _state.update { it.copy(platforms = it.platforms.withCar(v.vin, value)) }
     // persistSnapshots writes the EFFECTIVE (override-applied) generation number into the synced
     // VehicleSnapshot -- see snapshotOf.
     viewModelScope.launch { settingsStore.setPlatform(v.vin, value); persistSnapshots() }
@@ -108,6 +108,6 @@ fun AppViewModel.setHotspot(v: Vehicle, section: String) {
 
 /** Persist a new pebble order for a car (drag-and-drop on the card). */
 fun AppViewModel.setSectionOrder(v: Vehicle, order: List<String>) {
-    _state.update { it.copy(sectionOrders = it.sectionOrders + (v.vin to order)) }
+    _state.update { it.copy(sectionOrders = it.sectionOrders.withCar(v.vin, order)) }
     persist { setSectionOrder(v.vin, order) }
 }

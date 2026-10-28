@@ -125,7 +125,7 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location upda
     }
     when {
         loc != null -> {
-            _state.update { it.copy(locations = it.locations + (v.vin to loc)) }
+            _state.update { it.copy(locations = it.locations.withCar(v.vin, loc)) }
             applyPlace(v, loc)
             loadCarWeather(v, force = true)
             persistCache()

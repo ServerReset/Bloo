@@ -28,6 +28,15 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.isBackgroundUnrestricted
 import com.bloo.bluelink.data.openLiveUpdateSettings
 import com.bloo.bluelink.data.requestBackgroundUnrestricted
+import com.bloo.bluelink.data.setDoorOpenMinutes
+import com.bloo.bluelink.data.setNotifyAutoLock
+import com.bloo.bluelink.data.setNotifyCarStarted
+import com.bloo.bluelink.data.setNotifyDoor
+import com.bloo.bluelink.data.setNotifyRunning
+import com.bloo.bluelink.data.setNotifyService
+import com.bloo.bluelink.data.setNotifyUnlocked
+import com.bloo.bluelink.data.setRunningMinutes
+import com.bloo.bluelink.data.setUnlockedMinutes
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapGroup
@@ -106,38 +115,38 @@ internal fun NotificationsCardContent(
                 "Left unlocked",
                 notif.unlocked,
                 description = "Unlocked for over ${notif.unlockedMinutes} min.",
-            ) { vm.setNotifyUnlocked(it) }
+            ) { vm.persist { setNotifyUnlocked(it) } }
             PopVisible(visible = notif.unlocked && advanced) {
-                MinutesField(notif.unlockedMinutes, "Minutes before alerting", vm::setUnlockedMinutes)
+                MinutesField(notif.unlockedMinutes, "Minutes before alerting", { vm.persist { setUnlockedMinutes(it) } })
             }
             ToggleRow(
                 "Door left open",
                 notif.doorOpen,
                 description = "Open for over ${notif.doorOpenMinutes} min.",
-            ) { vm.setNotifyDoor(it) }
+            ) { vm.persist { setNotifyDoor(it) } }
             PopVisible(visible = notif.doorOpen && advanced) {
-                MinutesField(notif.doorOpenMinutes, "Minutes before alerting", vm::setDoorOpenMinutes)
+                MinutesField(notif.doorOpenMinutes, "Minutes before alerting", { vm.persist { setDoorOpenMinutes(it) } })
             }
             ToggleRow(
                 "Service due",
                 notif.service,
                 description = "When the odometer passes the service interval.",
-            ) { vm.setNotifyService(it) }
+            ) { vm.persist { setNotifyService(it) } }
             PopVisible(visible = advanced) {
                 Column {
                     ToggleRow(
                         "Car left running",
                         notif.running,
                         description = "Running for over ${notif.runningMinutes} min.",
-                    ) { vm.setNotifyRunning(it) }
+                    ) { vm.persist { setNotifyRunning(it) } }
                     PopVisible(visible = notif.running) {
-                        MinutesField(notif.runningMinutes, "Minutes before alerting", vm::setRunningMinutes)
+                        MinutesField(notif.runningMinutes, "Minutes before alerting", { vm.persist { setRunningMinutes(it) } })
                     }
                     ToggleRow(
                         "Car started",
                         notif.carStarted,
                         description = "Each time the engine starts.",
-                    ) { vm.setNotifyCarStarted(it) }
+                    ) { vm.persist { setNotifyCarStarted(it) } }
                 }
             }
             BodySmallText("About every 30 minutes, and never while a car is driving.")
@@ -152,7 +161,7 @@ internal fun NotificationsCardContent(
                         "AutoLock alerts",
                         notif.autoLockAlerts,
                         description = "When AutoLock locks the car, or would have.",
-                    ) { vm.setNotifyAutoLock(it) }
+                    ) { vm.persist { setNotifyAutoLock(it) } }
                     PopVisible(visible = autoLockOn) {
                         Column {
                             SettingsCaption(

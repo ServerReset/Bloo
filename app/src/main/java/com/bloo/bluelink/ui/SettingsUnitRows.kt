@@ -1,5 +1,8 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.setDistanceUnit
+import com.bloo.bluelink.data.setTempUnit
+import com.bloo.bluelink.data.setUnitSystem
 import com.bloo.uicommon.segmentsOf
 import androidx.compose.runtime.Composable
 import com.bloo.bluelink.data.SettingsStore
@@ -11,7 +14,7 @@ internal fun UnitSystemRow(appearance: SettingsStore.Appearance, vm: AppViewMode
         label = "Units",
         options = segmentsOf("imperial" to "Imperial", "metric" to "Metric"),
         selectedKey = appearance.unitSystem,
-        onSelect = { vm.setUnitSystem(it) },
+        onSelect = { vm.persist { setUnitSystem(it) } },
     )
 }
 
@@ -21,7 +24,7 @@ internal fun TempUnitRow(appearance: SettingsStore.Appearance, vm: AppViewModel)
         label = "Temperature",
         options = segmentsOf("auto" to "Auto", "f" to "°F", "c" to "°C"),
         selectedKey = appearance.tempUnit,
-        onSelect = { vm.setTempUnit(it) },
+        onSelect = { vm.persist { setTempUnit(it) } },
     )
 }
 
@@ -31,6 +34,6 @@ internal fun DistanceUnitRow(appearance: SettingsStore.Appearance, vm: AppViewMo
         label = "Distance and mileage",
         options = segmentsOf("auto" to "Auto", "mi" to "Miles", "km" to "Km"),
         selectedKey = appearance.distanceUnit,
-        onSelect = { vm.setDistanceUnit(it) },
+        onSelect = { vm.persist { setDistanceUnit(it) } },
     )
 }

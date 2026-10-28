@@ -2,6 +2,10 @@ package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.AlertKeys
 import com.bloo.bluelink.data.PrefKeys
+import com.bloo.bluelink.data.setDoorOpenMinutes
+import com.bloo.bluelink.data.setFontChoice
+import com.bloo.bluelink.data.setRunningMinutes
+import com.bloo.bluelink.data.setUnlockedMinutes
 import com.bloo.uicommon.segmentsOf
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -45,15 +49,15 @@ internal val RangeSettings: List<SettingSpec> = listOf(
     SettingSpec(
         key = AlertKeys.UNLOCKED_MINUTES, kind = SettingKind.Range,
         phrases = "how long before it warns me the car is unlocked",
-    ) { _, n, _, vm -> MinutesField(n.unlockedMinutes, "Left unlocked: minutes before alerting", vm::setUnlockedMinutes) },
+    ) { _, n, _, vm -> MinutesField(n.unlockedMinutes, "Left unlocked: minutes before alerting", { vm.persist { setUnlockedMinutes(it) } }) },
     SettingSpec(
         key = AlertKeys.DOOR_MINUTES, kind = SettingKind.Range,
         phrases = "how long before it warns me a door is open",
-    ) { _, n, _, vm -> MinutesField(n.doorOpenMinutes, "Door left open: minutes before alerting", vm::setDoorOpenMinutes) },
+    ) { _, n, _, vm -> MinutesField(n.doorOpenMinutes, "Door left open: minutes before alerting", { vm.persist { setDoorOpenMinutes(it) } }) },
     SettingSpec(
         key = AlertKeys.RUNNING_MINUTES, kind = SettingKind.Range,
         phrases = "how long before it warns me the car is still running",
-    ) { _, n, _, vm -> MinutesField(n.runningMinutes, "Car left running: minutes before alerting", vm::setRunningMinutes) },
+    ) { _, n, _, vm -> MinutesField(n.runningMinutes, "Car left running: minutes before alerting", { vm.persist { setRunningMinutes(it) } }) },
 )
 
 /** Every app-wide picker: one choice out of a few. */
@@ -111,7 +115,7 @@ internal val ChoiceSettings: List<SettingSpec> = listOf(
     ) { a, _, _, vm ->
         Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
             FontChoice.entries.forEach { choice ->
-                ChoiceRow(choice.label, a.fontChoice == choice) { vm.setFontChoice(choice) }
+                ChoiceRow(choice.label, a.fontChoice == choice) { vm.persist { setFontChoice(choice) } }
             }
         }
     },

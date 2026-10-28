@@ -21,19 +21,12 @@ import kotlinx.coroutines.launch
 
 // Simple notification-preference setters: each just fires a coroutine that writes one field to
 // SettingsStore's DataStore.
-fun AppViewModel.setNotifyService(v: Boolean) = persist { setNotifyService(v) }
 
-fun AppViewModel.setNotifyDoor(v: Boolean) = persist { setNotifyDoor(v) }
 
-fun AppViewModel.setDoorOpenMinutes(m: Int) = persist { setDoorOpenMinutes(m) }
 
-fun AppViewModel.setNotifyRunning(v: Boolean) = persist { setNotifyRunning(v) }
 
-fun AppViewModel.setRunningMinutes(m: Int) = persist { setRunningMinutes(m) }
 
-fun AppViewModel.setNotifyUnlocked(v: Boolean) = persist { setNotifyUnlocked(v) }
 
-fun AppViewModel.setUnlockedMinutes(m: Int) = persist { setUnlockedMinutes(m) }
 
 /**
  * Turning the live charging bar off clears anything already posted at once, and kills the poll
@@ -48,7 +41,6 @@ fun AppViewModel.setNotifyCharging(v: Boolean) = viewModelScope.launch {
     }
 }
 
-fun AppViewModel.setNotifyCarStarted(v: Boolean) = persist { setNotifyCarStarted(v) }
 
 fun AppViewModel.setNotifyChargeComplete(v: Boolean) = viewModelScope.launch {
     settingsStore.setNotifyChargeComplete(v)
@@ -56,7 +48,6 @@ fun AppViewModel.setNotifyChargeComplete(v: Boolean) = viewModelScope.launch {
 }
 
 /** Whether AutoLock posts its "Locked" / "Would have locked" notification. */
-fun AppViewModel.setNotifyAutoLock(v: Boolean) = persist { setNotifyAutoLock(v) }
 
 /** The watch's own low-battery notification; pushed to the watch with the next sync. */
 fun AppViewModel.setNotifyWatchLowBattery(v: Boolean) = viewModelScope.launch {

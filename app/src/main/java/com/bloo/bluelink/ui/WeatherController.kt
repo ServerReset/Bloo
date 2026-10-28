@@ -104,7 +104,7 @@ internal class WeatherController(
         // Same guard as loadHomeWeather above.
         if (isFresh(cached?.fetchedAt, force)) return@launch
         WeatherApi.fetch(loc.latitude, loc.longitude)?.let { w ->
-            state.update { it.copy(carWeather = it.carWeather + (v.vin to w)) }
+            state.update { it.copy(carWeather = it.carWeather.withCar(v.vin, w)) }
         }
     }
 

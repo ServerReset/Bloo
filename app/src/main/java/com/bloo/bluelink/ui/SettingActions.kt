@@ -5,6 +5,9 @@ import com.bloo.bluelink.data.AiSettingResolver.Option
 import com.bloo.bluelink.data.AlertKeys
 import com.bloo.bluelink.data.SettingsCatalog
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.setDistanceUnit
+import com.bloo.bluelink.data.setTempUnit
+import com.bloo.bluelink.data.setUnitSystem
 
 /** Everything a setting's current value is read from: the same three sources search draws its controls from. */
 internal class SettingContext(
@@ -103,7 +106,7 @@ internal val SettingActions: List<SettingAction> = buildList {
             "c_units", "unit_system", "kilometres miles celsius fahrenheit",
             listOf(Option("imperial", "Imperial (miles, °F)"), Option("metric", "Metric (km, °C)")),
             { it.appearance.unitSystem },
-            { vm, v -> vm.setUnitSystem(v) },
+            { vm, v -> vm.persist { setUnitSystem(v) } },
         ),
     )
     add(
@@ -111,7 +114,7 @@ internal val SettingActions: List<SettingAction> = buildList {
             "c_temp", "temp_unit", "degrees",
             listOf(Option("auto", "Follow units"), Option("f", "Fahrenheit"), Option("c", "Celsius")),
             { it.appearance.tempUnit },
-            { vm, v -> vm.setTempUnit(v) },
+            { vm, v -> vm.persist { setTempUnit(v) } },
         ),
     )
     add(
@@ -119,7 +122,7 @@ internal val SettingActions: List<SettingAction> = buildList {
             "c_distance", "distance_unit", "mileage odometer range",
             listOf(Option("auto", "Follow units"), Option("mi", "Miles"), Option("km", "Kilometres")),
             { it.appearance.distanceUnit },
-            { vm, v -> vm.setDistanceUnit(v) },
+            { vm, v -> vm.persist { setDistanceUnit(v) } },
         ),
     )
     add(
