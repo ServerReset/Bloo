@@ -29,7 +29,7 @@ const val FloatingStiffness = 200f
  * The damping for pop-ups, toasts and badges. Low enough to swing past the rest point and come back under it once more, which is the small
  * bounce off the top and the bottom before it settles in the middle. Keep it low: higher values lose the second swing and read as a snap.
  */
-const val FloatingDamping = 0.3f
+const val FloatingDamping = 0.6f
 
 /**
  * The morph button's two corner states, as a percentage of the shorter side: a true pill at rest, a
