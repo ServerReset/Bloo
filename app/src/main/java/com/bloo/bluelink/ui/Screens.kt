@@ -57,6 +57,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.MotionShort
+import com.bloo.uicommon.motionBlur
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.FieldShape
@@ -377,7 +378,7 @@ fun BlooApp(vm: AppViewModel) {
             // No `.padding(padding)`: SearchLayer reads WindowInsets itself, and padding here would
             // subtract the nav bar twice. The rise is a layout offset, not a graphicsLayer translation: the glass samples the
             // backdrop by layout position, so a translated layer drew its blur a few pixels off from the content it sits behind.
-            Box(Modifier.fillMaxSize().offset { IntOffset(0, (searchRise.value * screenHeightPx).roundToInt()) }) {
+            Box(Modifier.fillMaxSize().offset { IntOffset(0, (searchRise.value * screenHeightPx).roundToInt()) }.motionBlur { searchRise.value * screenHeightPx }) {
                 SearchLayer(
                     vm = vm,
                     state = stateHolder,

@@ -385,7 +385,9 @@ internal fun ClimateStepper(
         RollingNumber(
             text = value,
             style = if (big) MaterialTheme.typography.displaySmall else SecondaryTextStyle(),
-            fontWeight = FontWeight.Bold,
+            // Heavier than the rest of the panel's type: the values are the point of the row, and a Bold stroke read as thin on a tinted
+            // surface.
+            fontWeight = if (big) FontWeight.Black else FontWeight.ExtraBold,
             color = tint,
         )
         BodySmallText(caption, color = mutedContentColor())
