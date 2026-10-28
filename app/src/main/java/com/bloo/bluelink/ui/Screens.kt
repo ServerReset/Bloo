@@ -129,6 +129,8 @@ fun BlooApp(vm: AppViewModel) {
     // One blur source shared by GarageScreen, SettingsScreen and SearchLayer, which floats over
     // either.
     val searchHazeState = remember { HazeState() }
+    // The expanded car's map. Held here, not in the garage, so the map can be drawn above the status bar's blur (see GarageMapOverlay).
+    val expandedMap = remember { ExpandedMapState() }
     val backdropHaze = remember { HazeState() }
     // The one "is the user touching anything" clock the aurora reads; observed at the root below.
     val ambientActivity = remember { AmbientActivity() }
@@ -345,7 +347,7 @@ fun BlooApp(vm: AppViewModel) {
                         }
                         // Cold-start lock: don't compose (and blur) the full garage behind a lock
                         // the user hasn't passed; it composes once `locked` flips.
-                        if (!(locked && !unlockedThisSession)) GarageScreen(stateHolder, vm, hazeState = searchHazeState)
+                        if (!(locked && !unlockedThisSession)) GarageScreen(stateHolder, vm, expandedMap, hazeState = searchHazeState)
                         }
                     }
                 }
@@ -391,6 +393,8 @@ fun BlooApp(vm: AppViewModel) {
     // The status bar's own strip: a blur of what is behind it, strongest at the top and nearly gone
     // by the bottom of the strip. It is the ONLY edge treatment in the app.
     StatusBarScrim(searchHazeState)
+    // The expanded car's map, above the status bar's blur: the floating bar it brings in is not cut by the blur, and the app is behind both.
+    if (target == Screen.Garage && !(locked && !unlockedThisSession)) GarageMapOverlay(stateHolder, vm, expandedMap)
     // The app-wide pull-to-refresh disc, drawn above content; refracts searchHazeState. The lock overlay
     // and dialogs sit above it.
     PullRefreshIndicatorHost(state = refreshIndicator, hazeState = searchHazeState)

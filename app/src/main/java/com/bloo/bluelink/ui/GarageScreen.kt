@@ -30,6 +30,8 @@ import com.bloo.uicommon.LocalHaptics
 internal fun GarageScreen(
     state: State<UiState>,
     vm: AppViewModel,
+    /** The one expanded-map holder, shared with [GarageMapOverlay] which the screen draws above the status bar's blur. */
+    expandedMap: ExpandedMapState,
     /** Defaults to a fresh one for every existing caller's exact prior behavior. */
     hazeState: HazeState = remember { HazeState() },
 ) {
@@ -89,7 +91,6 @@ internal fun GarageScreen(
     val windowInfo = LocalWindowInfo.current
     val widthDp = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
     // See StatusBarScrim's doc for why plain Modifier.blur never worked here.
-    val expandedMap = remember { ExpandedMapState() }
     // Mirrors expandedMap.vin into shared UiState -- see UiState.mapExpanded's own doc -- so
     // Screens.kt (a sibling of this screen, not a descendant, and so unable to read
     // expandedMap/LocalExpandedMap directly) can hide the floating search bubble while the map
@@ -150,36 +151,44 @@ internal fun GarageScreen(
                 }
             },
         )
-        // THE SINGLE CarMap instance (ExpandedMapState.mapFor), moved here from the pebble's slot and sized from the pebble's rectangle
-        // to the screen's by ExpandableMapLayer, then moved back when it closes: the same composed map, not two.
-        val expandedVin = expandedMap.vin
-        val expandedVehicle = if (expandedVin != null) vehicles.firstOrNull { it.vin == expandedVin } else null
-        val expandedLocation = expandedVehicle?.let { state.value.locations[it.vin] }
-        val originBounds = expandedVehicle?.vin?.let { expandedMap.originBoundsFor(it).value }
-
-        if (expandedVehicle != null && expandedLocation != null && originBounds != null) {
-            val locateExpandedVehicle = rememberLocateAction(vm, expandedVehicle)
-            val (chargePercent, chargeRange) = mapChargeStats(state.value, expandedVehicle, appearance.metricDistance)
-            ExpandableMapLayer(
-                isExpanded = true,
-                originBounds = originBounds,
-                location = expandedLocation,
-                vehicleName = expandedVehicle.name,
-                chargePercent = chargePercent,
-                chargeRange = chargeRange,
-                photo = state.value.imageUrls[expandedVehicle.vin],
-                deviceLocation = deviceLocation,
-                mapState = expandedMap.mapStateFor(expandedVehicle.vin),
-                map = expandedMap.mapFor(expandedVehicle.vin),
-                onRefreshLocation = locateExpandedVehicle,
-                deviceRequest = rememberDeviceLocationRequest(vm),
-                // The real command-pending flag, not a guessed timer -- see MapTopBar's own doc --
-                // so the refresh icon's spin genuinely tracks the in-flight fetch this same button
-                // just kicked off.
-                refreshing = state.value.isPending(expandedVehicle.vin, "locate"),
-                onDismiss = { expandedMap.vin = null },
-            )
-        }
     }
+    }
+}
+
+/**
+ * The expanded car's map, over the whole screen. It is drawn by the screen above the status bar's blur, not inside the garage, so the
+ * floating bar it brings in is not cut by that blur. The map itself is the same composed instance the pebble hands over (see [ExpandedMapState]).
+ */
+@Composable
+internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedMap: ExpandedMapState) {
+    val vehicles by remember { derivedStateOf { state.value.vehicles } }
+    val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
+    val appearance = LocalAppearance.current
+    val expandedVin = expandedMap.vin
+    val expandedVehicle = if (expandedVin != null) vehicles.firstOrNull { it.vin == expandedVin } else null
+    val expandedLocation = expandedVehicle?.let { state.value.locations[it.vin] }
+    val originBounds = expandedVehicle?.vin?.let { expandedMap.originBoundsFor(it).value }
+
+    if (expandedVehicle != null && expandedLocation != null && originBounds != null) {
+        val locateExpandedVehicle = rememberLocateAction(vm, expandedVehicle)
+        val (chargePercent, chargeRange) = mapChargeStats(state.value, expandedVehicle, appearance.metricDistance)
+        ExpandableMapLayer(
+            isExpanded = true,
+            originBounds = originBounds,
+            location = expandedLocation,
+            vehicleName = expandedVehicle.name,
+            chargePercent = chargePercent,
+            chargeRange = chargeRange,
+            photo = state.value.imageUrls[expandedVehicle.vin],
+            deviceLocation = deviceLocation,
+            mapState = expandedMap.mapStateFor(expandedVehicle.vin),
+            map = expandedMap.mapFor(expandedVehicle.vin),
+            onRefreshLocation = locateExpandedVehicle,
+            deviceRequest = rememberDeviceLocationRequest(vm),
+            // The real command-pending flag, not a guessed timer -- see MapTopBar's own doc -- so the refresh icon's spin genuinely
+            // tracks the in-flight fetch this same button just kicked off.
+            refreshing = state.value.isPending(expandedVehicle.vin, "locate"),
+            onDismiss = { expandedMap.vin = null },
+        )
     }
 }
