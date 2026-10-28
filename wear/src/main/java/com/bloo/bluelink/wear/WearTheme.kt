@@ -26,11 +26,11 @@ internal fun WearTheme(content: @Composable () -> Unit) {
         darkColorScheme(
             primary = primary,
             onPrimary = onPrimary,
-            secondary = accent?.let { Color(it.secondary) } ?: Color(0xFFCCC2DC),
-            tertiary = accent?.let { Color(it.tertiary) } ?: Color(0xFFEFB8C8),
-            secondaryContainer = Color(0xFF2A2A33),
+            secondary = accent?.let { Color(it.secondary) } ?: WearSecondary,
+            tertiary = accent?.let { Color(it.tertiary) } ?: WearTertiary,
+            secondaryContainer = WearSecondaryContainer,
             onSecondaryContainer = Color.White,
-            surfaceContainer = Color(0xFF1C1C22),
+            surfaceContainer = WearSurfaceContainer,
             background = Color.Black,
             onBackground = Color.White,
         )
@@ -66,3 +66,10 @@ internal fun WearTheme(content: @Composable () -> Unit) {
         }
     }
 }
+
+// The watch's dark palette beyond the user's accent: the one place these values live. The accent (primary, onPrimary, and the watch's
+// secondary and tertiary when the phone sends them) comes from WearAccent; these are the fallbacks and the surfaces.
+private val WearSecondary = Color(0xFFCCC2DC)
+private val WearTertiary = Color(0xFFEFB8C8)
+private val WearSecondaryContainer = Color(0xFF2A2A33)
+private val WearSurfaceContainer = Color(0xFF1C1C22)
