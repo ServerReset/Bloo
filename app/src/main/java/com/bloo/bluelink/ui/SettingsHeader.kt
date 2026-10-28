@@ -169,7 +169,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
     val expanded = "$SETTINGS_CARD_VIN:Updates" !in collapsed
     val context = LocalContext.current
     val appearance = LocalAppearance.current
-    UpdateBadgedCard(visible = state.updateAvailable != null, modifier = Modifier.fillMaxWidth()) {
+    UpdateBadgedCard(visible = state.updateOffered(), modifier = Modifier.fillMaxWidth()) {
     Surface(
         modifier = Modifier.fillMaxWidth().semantics { heading() },
         shape = RoundedCornerShape(22.dp),
@@ -215,103 +215,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
             AnimatedVisibility(visible = expanded, enter = expandEnterSized(), exit = expandExitSized(fade = false)) {
                 Column {
                     Spacer(Modifier.height(GapGroup))
-                    // Which update row this is depends on how the app was distributed, and nothing
-                    // the user can do here changes that. A Play copy is updated by Play and cannot be
-                    // handed an APK, so the row is the store page. This one is updated by the app
-                    // itself, so it gets both sources: the CI checker (primary) and the GitHub
-                    // Releases page, which works when the checker says up-to-date or its API is flaky.
-                    if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(context)) {
-                        BodySmallText("Google Play keeps this copy up to date.")
-                        Spacer(Modifier.height(GapHairline))
-                        PlayStoreLinks()
-                    } else ActionRow {
-                        MorphTextButton(
-                            "Check",
-                            onClick = { vm.checkForUpdateManually() },
-                            enabled = !state.updateChecking,
-                            icon = Icons.Filled.Refresh,
-                            pending = state.updateChecking,
-                            emphasis = ButtonEmphasis.Confirm,
-                        )
-                        MorphTextButton(
-                            "GitHub",
-                            onClick = {
-                                context.tryStart(
-                                    Intent(Intent.ACTION_VIEW, com.bloo.bluelink.data.UpdateApi.RELEASES_URL.toUri()),
-                                )
-                            },
-                        )
-                    }
-                    // The Shizuku row is gated on Shizuku being present; the card and update
-                    // controls are not. When it is NOT present, point the user at how to get it --
-                    // silently hiding the whole seamless-install option left no way to discover it.
-                    // Neither branch in a Play build: it has no Shizuku and cannot self-install, so
-                    // the prompt to go and get Shizuku -- which is what this rendered, since
-                    // shizukuAvailable is false there -- was advice that led nowhere.
-                    if (state.shizukuAvailable) {
-                        Spacer(Modifier.height(GapHairline))
-                        ToggleRow("Install seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
-                            vm.setSeamlessInstallShizuku(it)
-                        }
-                    } else if (com.bloo.bluelink.update.UpdateRuntime.usesGitHub(context)) {
-                        Spacer(Modifier.height(GapHairline))
-                        BodySmallText(
-                            "Update without tapping through Android's installer. " +
-                                "No root needed.",
-                        )
-                        Spacer(Modifier.height(GapHairline))
-                        MorphTextButton(
-                            "Get Shizuku",
-                            onClick = { openUrl(context, "https://shizuku.rikka.app/") },
-                            icon = Icons.AutoMirrored.Filled.OpenInNew,
-                        )
-                    }
-                    // The full download-install flow, driven by the same state machine as the
-                    // update pebble and rendered through the shared UpdateStatusLine.
-                    val updateInfo = state.updateAvailable
-                    PopVisible(visible = updateInfo != null && !state.updateTileDismissed, sizeAnimated = true) {
-                        if (updateInfo != null) {
-                            val seamless = appearance.seamlessInstallShizuku && state.shizukuAvailable
-                            val act = updateAction(state, updateInfo, seamless)
-                            val newLabel = com.bloo.bluelink.data.buildLabel(updateInfo.run.runNumber)
-                            val deltaLabel = if (vm.currentBuildNumber > 0) {
-                                "${com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber)} → $newLabel"
-                            } else newLabel
-                            Spacer(Modifier.height(GapGroup))
-                            // One tinted panel, no second outline: the version jump is already the
-                            // big number above.
-                            Column(
-                                Modifier.tintedPanel(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)),
-                                verticalArrangement = Arrangement.spacedBy(GapRow),
-                            ) {
-                                RevealText(
-                                    "Update available",
-                                    style = PrimaryTextStyle(),
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                                // The status line carries the download's own progress bar.
-                                UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = false)
-                                // Both actions full width, stacked: side by side the download
-                                // button collapsed to an icon.
-                                MorphButton(
-                                    onClick = { runUpdateAction(state, vm, updateInfo, context) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    active = act.ready,
-                                    activeContainerColor = confirmTone().container,
-                                    activeContentColor = confirmTone().content,
-                                    enabled = !state.updateInstalling && !state.updateDownloading,
-                                    expressive = true,
-                                ) {
-                                    MorphButtonLabel(act.icon, act.label, pending = false)
-                                }
-                                // Shared dismissal row, giving the same undo window as the app
-                                // tile.
-                                UpdateDismissRow(state, vm)
-                                UpdateReleaseNotes(updateInfo)
-                            }
-                        }
-                    }
+                    // One update body for both tracks: the Play copy and the GitHub build differ in what they offer, not in layout.
+                    UpdatePanel(state, vm)
                 }
             }
         }

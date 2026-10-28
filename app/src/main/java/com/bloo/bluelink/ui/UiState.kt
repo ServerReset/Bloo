@@ -182,6 +182,8 @@ data class UiState(
     val updateAvailable: com.bloo.bluelink.update.UpdateInfo? = null,
     /** "Remind me" also sets this, plus a snooze and a 1-day reminder worker. */
     val updateTileDismissed: Boolean = false,
+    /** Play reports a newer build for this copy (Play-installed copies only). Mirrored from PlayUpdates so the pebble list sees it. */
+    val playUpdateAvailable: Boolean = false,
     /** True while the update APK downloads in-app (see AppViewModel.downloadUpdateInBackground). */
     val updateDownloading: Boolean = false,
     // Download progress is NOT here: it ticks per 64KB chunk and would recompose every live pebble.
@@ -327,7 +329,7 @@ data class UiState(
             "trips" -> hasBattery(v) && !isGen5WEffective(v) && v.brand.supportsTrips
             // `!updateTileDismissed`: a dismissed tile renders nothing and would leave a phantom
             // slot.
-            "update" -> updateAvailable != null && !updateTileDismissed
+            "update" -> updateOffered()
             else -> true
         }
     }

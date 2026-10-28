@@ -7,6 +7,18 @@ import kotlinx.coroutines.launch
 // --- Update checks (extracted from AppViewModel) --
 
 /**
+ * Mirrors Play's own answer into UiState, so a Play copy's update is seen by the update pebble and its section gate exactly as a GitHub
+ * build is. Started once from the view model's init; Play publishes the flag, this only copies it.
+ */
+internal fun AppViewModel.mirrorPlayUpdates() {
+    viewModelScope.launch {
+        com.bloo.bluelink.update.PlayUpdates.available.collect { waiting ->
+            _state.update { it.copy(playUpdateAvailable = waiting) }
+        }
+    }
+}
+
+/**
  * Shared by the cold-start check and every refreshStatus(); debounced/snoozed internally (see
  * UpdateChecker). [force] bypasses the debounce/snooze; [surfaceResult] reports UpToDate/Failed to
  * the snackbar (auto checks stay silent).
@@ -23,8 +35,10 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
         // MainActivity.onStart. See UpdateRuntime for why this is decided from the installer rather
         // than from the flavor.
         if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(getApplication())) {
+            // The same surface either way: Play's answer lands in PlayUpdates.available, which the update panel reads.
+            com.bloo.bluelink.update.PlayUpdates.refresh(getApplication())
             if (surfaceResult) _state.update {
-                it.copy(message = "Updates come from Google Play.", messageType = ToastKind.INFO)
+                it.copy(message = "Checked with Google Play.", messageType = ToastKind.INFO)
             }
             return@launch
         }
