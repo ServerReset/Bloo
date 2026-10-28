@@ -12,20 +12,6 @@ fun vehicleDisplayName(nickName: String?, modelName: String?, id: String): Strin
         ?: modelName?.takeIf { it.isNotBlank() }
         ?: id.takeLast(6).ifBlank { "Car" }
 
-/** Label for a WMO weather code; each branch lists a whole group of codes, unknown codes give "-". */
-fun weatherLabel(code: Int): String = when (code) {
-    0 -> "Clear"
-    1, 2 -> "Partly cloudy"
-    3 -> "Cloudy"
-    45, 48 -> "Fog"
-    51, 53, 55, 56, 57 -> "Drizzle"
-    61, 63, 65, 66, 67 -> "Rain"
-    71, 73, 75, 77, 85, 86 -> "Snow"
-    80, 81, 82 -> "Showers"
-    95, 96, 99 -> "Thunderstorm"
-    else -> "-"
-}
-
 /** Formats a Celsius temperature as °F or °C per the user preference; weather data is always Celsius.
  *
  *  Rounds in both branches (truncating made readings up to a degree cold). Not routed through

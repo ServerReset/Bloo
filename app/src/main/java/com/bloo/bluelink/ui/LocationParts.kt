@@ -48,7 +48,7 @@ import com.bloo.uicommon.weatherTint
 
 /** The icon for a condition, picking a sun/moon variant by day vs night. */
 internal fun weatherIcon(code: WeatherCode, isDay: Boolean): ImageVector =
-    com.bloo.uicommon.weatherIcon(code.toCode(), isDay)
+    com.bloo.uicommon.weatherIcon(code, isDay)
 
 /**
  * A weather symbol in its condition's own tint -- the icon + tint + size every weather surface
@@ -66,7 +66,7 @@ internal fun WeatherGlyph(code: WeatherCode, isDay: Boolean, size: Dp, describe:
 
 @Composable
 internal fun weatherTint(code: WeatherCode, isDay: Boolean): Color =
-    com.bloo.uicommon.weatherTint(code.toCode(), isDay, MaterialTheme.colorScheme.onSurfaceVariant)
+    com.bloo.uicommon.weatherTint(code, isDay, MaterialTheme.colorScheme.onSurfaceVariant)
 
 /**
  * A compact one-line weather readout: icon, temperature and condition, with a small [caption] underneath
