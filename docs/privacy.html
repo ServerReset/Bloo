@@ -25,12 +25,15 @@
 </header>
 <main>
 <section class="wrap doc" style="padding-top:40px">
-<span class="stamp">Last updated 14 October 2026</span>
+<span class="stamp">Last updated 29 October 2026</span>
 <h1>Privacy policy</h1>
 <p>Bloo is a client for the Bluelink / Connected Car services of Hyundai, Genesis and Kia. It is an independent app: it is <b>not affiliated with, endorsed by, or operated by</b> Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries.</p>
 <p>This policy describes what the app does with your information. It is deliberately short, because the app does very little with it.</p>
+<h2>Locked up, and why</h2>
+<p>Bloo treats your secrets like a bag of keys: they live in a locked box, and only the app holds the combination. Your Bluelink password, your service PIN, your sign-in tokens and your app-lock PIN all go into one <b>AES-256-GCM vault</b>. The vault's own key is sealed by the <b>hardware-backed Android Keystore</b>, which keeps it inside your phone's security chip where the app can't read it back out.</p>
+<p>Everything else the app keeps (preferences, widget settings, the last car status it fetched) sits in the app's private storage on your phone. Android encrypts that storage at rest, so it is unreadable while your phone is locked. Nothing in it is ever sent to us, because there is no "us" on the other end.</p>
 <h2>What the app stores, and where</h2>
-<p>Everything below is stored <b>on your device</b>, and the credentials are encrypted using the Android Keystore:</p>
+<p>Everything below is stored <b>on your device</b>:</p>
 <ul><li><b>Your Bluelink account email and password</b>, and your service PIN if you set one. These are the credentials you would otherwise type into the manufacturer's own app.</li><li><b>Your cars' status</b>: lock state, charge and fuel, climate, location, odometer, trips and service data, as fetched from the manufacturer's service.</li><li><b>Your app preferences</b>: theme, layout, alert settings, widget and watch options.</li></ul>
 <p>If you turn on <b>Drive sync</b>, your settings (not your password) are written to a file <b>in your own Google Drive</b> using the account you pick, so your other devices can read them. That file is yours; the app has no server and never sees it.</p>
 <h2>Where your information is sent</h2>
@@ -44,8 +47,12 @@
 <p>The app is not directed at children and does not knowingly collect information from them.</p>
 <h2>Permissions</h2>
 <p>The app asks only for what a given feature needs, and each is optional: location (to find your car and to run AutoLock), notifications (car alerts), Bluetooth (AutoLock with your car's own connection), and activity recognition (AutoLock's driving detection). The Play Store listing lists them all.</p>
-<h2>Changes</h2>
-<p>If this policy changes, the date at the top changes with it.</p>
+<h2>Change log</h2>
+<p>Every edit gets a line here, and the date at the top moves with it.</p>
+<ul>
+<li><b>29 October 2026.</b> Rewrote the encryption section so it says exactly what is encrypted, how, and where the key lives: the secrets sit in an AES-256-GCM vault sealed by the Android Keystore, and the rest of the app's storage is encrypted at rest by Android. Added this change log.</li>
+<li><b>14 October 2026.</b> First published.</li>
+</ul>
 <h2>Contact</h2>
 <p>Questions about this policy: <b><a href="mailto:adi1.perets@gmail.com">adi1.perets@gmail.com</a></b></p>
 
