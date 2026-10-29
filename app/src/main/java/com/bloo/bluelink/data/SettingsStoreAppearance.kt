@@ -10,6 +10,10 @@ suspend fun SettingsStore.setSeamlessInstallShizuku(value: Boolean) {
     putFlag(SettingsStore.Keys.SEAMLESS_INSTALL_SHIZUKU, value)
 }
 
+suspend fun SettingsStore.setClassicHeadings(value: Boolean) {
+    putFlag(SettingsStore.Keys.CLASSIC_HEADINGS, value)
+}
+
 suspend fun SettingsStore.setMotionBlur(value: Boolean) {
     putFlag(SettingsStore.Keys.MOTION_BLUR, value)
 }

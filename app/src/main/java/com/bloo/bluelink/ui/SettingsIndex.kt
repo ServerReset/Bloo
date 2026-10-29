@@ -143,6 +143,11 @@ internal val ToggleSettings = listOf(
         checked = { a, _, _ -> a.motionBlur }, onToggle = { vm, v -> vm.setMotionBlur(v) },
     ),
     ToggleSpec(
+        key = PrefKeys.CLASSIC_HEADINGS, label = "Classic headings",
+        phrases = "serif font classical titles headings elegant old style letters",
+        checked = { a, _, _ -> a.classicHeadings }, onToggle = { vm, v -> vm.setClassicHeadings(v) },
+    ),
+    ToggleSpec(
         key = PrefKeys.REDUCE_MOTION, label = "Reduce motion",
         phrases = "less movement stop the bouncing calm things down motion sickness accessibility battery saver",
         checked = { a, _, _ -> a.reduceMotion }, onToggle = { vm, v -> vm.setReduceMotion(v) },

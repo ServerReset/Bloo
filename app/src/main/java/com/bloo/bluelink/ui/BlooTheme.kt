@@ -27,6 +27,7 @@ import com.bloo.uicommon.content
 fun BlooTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     fontChoice: FontChoice = FontChoice.SYSTEM,
+    classicHeadings: Boolean = false,
     dynamicColor: Boolean = true,
     colorPalette: ColorPalette = ColorPalette.BLUE,
     customPalette: CustomPaletteData? = null,
@@ -102,7 +103,7 @@ fun BlooTheme(
     // applied on every screen -- so the answer is cached for the process instead.
     val reduceMotion = remember(context.contentResolver) { reduceMotionCached(context) }
     // Memoize typography and motion to avoid recomputing on every recomposition.
-    val typography = remember(fontChoice) { expressiveTypography(fontChoice) }
+    val typography = remember(fontChoice, classicHeadings) { expressiveTypography(fontChoice, classicHeadings) }
     val motionScheme = remember { MotionScheme.expressive() }
     MaterialExpressiveTheme(
         colorScheme = scheme,

@@ -14,6 +14,7 @@ import com.bloo.bluelink.data.setSearchBubblePosition
 import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.setUiScale
 import com.bloo.bluelink.data.setKeyboardShortcuts
+import com.bloo.bluelink.data.setClassicHeadings
 import com.bloo.bluelink.data.setMotionBlur
 import com.bloo.bluelink.data.setReduceMotion
 import com.bloo.bluelink.data.setUltraGlass
@@ -54,6 +55,9 @@ fun AppViewModel.setUltraGlass(value: Boolean) =
 
 fun AppViewModel.setMotionBlur(value: Boolean) =
     persist { setMotionBlur(value) }
+
+fun AppViewModel.setClassicHeadings(value: Boolean) =
+    persist { setClassicHeadings(value) }
 
 fun AppViewModel.setReduceMotion(value: Boolean) =
     persist { setReduceMotion(value) }

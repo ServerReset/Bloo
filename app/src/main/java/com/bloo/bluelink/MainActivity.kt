@@ -158,6 +158,7 @@ class MainActivity : FragmentActivity() {
             BlooTheme(
                 themeMode = appearance.themeMode,
                 fontChoice = appearance.fontChoice,
+                classicHeadings = appearance.classicHeadings,
                 dynamicColor = appearance.dynamicColor,
                 colorPalette = appearance.colorPalette,
                 customPalette = activeCustom,

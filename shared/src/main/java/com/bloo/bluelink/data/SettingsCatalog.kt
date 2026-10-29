@@ -86,6 +86,7 @@ object SettingsCatalog {
         app(PrefKeys.THEME_MODE, Kind.CHOICE, "Display mode", "theme light dark amoled oled system appearance"),
         app(PrefKeys.UI_SCALE, Kind.NUMBER, "Text & layout scale", "display size zoom bigger smaller text interface density"),
         app(PrefKeys.ULTRA_GLASS, Kind.TOGGLE, "Ultra glass", "liquid glass edge refraction"),
+        app(PrefKeys.CLASSIC_HEADINGS, Kind.TOGGLE, "Classic headings", "font serif classical headings titles display elegant old style"),
         app(PrefKeys.MOTION_BLUR, Kind.TOGGLE, "Motion blur", "blur motion moving sliders pebbles floating buttons animation smear battery saver"),
         app(PrefKeys.REDUCE_MOTION, Kind.TOGGLE, "Reduce motion", "accessibility less motion animation bounce vestibular calm still battery saver"),
         app(PrefKeys.KEYBOARD_SHORTCUTS, Kind.TOGGLE, "Keyboard shortcuts", "keyboard shortcuts hotkeys ctrl desktop keys accessibility"),
@@ -159,7 +160,7 @@ object SettingsCatalog {
         AlertKeys.UNLOCKED, AlertKeys.UNLOCKED_MINUTES, AlertKeys.WATCH_LOW_BATTERY, "theme_mode",
         "ui_scale", "vibrancy", "enabled_shortcuts", "color_palette", "columns_flipped", "settings_mode",
         // The accessibility suite's own switches (AccessibilityGroup in Settings, ToggleSpec in search).
-        PrefKeys.MOTION_BLUR, PrefKeys.REDUCE_MOTION, PrefKeys.KEYBOARD_SHORTCUTS,
+        PrefKeys.MOTION_BLUR, PrefKeys.REDUCE_MOTION, PrefKeys.KEYBOARD_SHORTCUTS, PrefKeys.CLASSIC_HEADINGS,
         "vehicle_order", "custom_palettes", "weather_label", "weather_follows_device",
         "hotspots_", "sections_", "collapsed_", "img_",
         // Covered by an existing control: the App lock row (timing), the Glass stops (Ultra).

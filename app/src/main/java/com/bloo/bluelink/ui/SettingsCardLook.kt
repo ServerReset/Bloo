@@ -93,6 +93,11 @@ private fun FontGroup(appearance: SettingsStore.Appearance, vm: AppViewModel) {
         FontChoice.entries.forEach { choice ->
             ChoiceRow(choice.label, appearance.fontChoice == choice) { vm.persist { setFontChoice(choice) } }
         }
+        ToggleRow(
+            "Classic headings",
+            appearance.classicHeadings,
+            description = "Titles and big headings in a classical serif. Everything else stays in the font you chose above.",
+        ) { vm.setClassicHeadings(it) }
     }
 }
 

@@ -228,8 +228,10 @@ private fun fontFamilyFor(choice: FontChoice): FontFamily = when (choice) {
  * title step is a notch bigger than Material's and carries at least Medium weight, so text stands out
  * instead of receding. One place decides this, so the whole app moves together.
  */
-fun expressiveTypography(choice: FontChoice): Typography {
+fun expressiveTypography(choice: FontChoice, classicHeadings: Boolean = false): Typography {
     val family = fontFamilyFor(choice)
+    // Headings and titles take a classical serif when asked; body text keeps the chosen font.
+    val heading = if (classicHeadings) FontFamily.Serif else family
     val base = Typography()
     fun TextStyle.bigger(scale: Float, weight: FontWeight? = null): TextStyle = copy(
         fontFamily = family,
@@ -238,13 +240,13 @@ fun expressiveTypography(choice: FontChoice): Typography {
         lineHeight = lineHeight * scale,
     )
     return base.copy(
-        displayLarge = base.displayLarge.copy(fontFamily = family, fontWeight = FontWeight.Black),
-        displayMedium = base.displayMedium.copy(fontFamily = family, fontWeight = FontWeight.Black),
-        displaySmall = base.displaySmall.copy(fontFamily = family, fontWeight = FontWeight.ExtraBold),
-        headlineLarge = base.headlineLarge.copy(fontFamily = family, fontWeight = FontWeight.ExtraBold),
-        headlineMedium = base.headlineMedium.copy(fontFamily = family, fontWeight = FontWeight.Bold),
-        headlineSmall = base.headlineSmall.copy(fontFamily = family, fontWeight = FontWeight.Bold),
-        titleLarge = base.titleLarge.bigger(1.0f, FontWeight.SemiBold),
+        displayLarge = base.displayLarge.copy(fontFamily = heading, fontWeight = FontWeight.Black),
+        displayMedium = base.displayMedium.copy(fontFamily = heading, fontWeight = FontWeight.Black),
+        displaySmall = base.displaySmall.copy(fontFamily = heading, fontWeight = FontWeight.ExtraBold),
+        headlineLarge = base.headlineLarge.copy(fontFamily = heading, fontWeight = FontWeight.ExtraBold),
+        headlineMedium = base.headlineMedium.copy(fontFamily = heading, fontWeight = FontWeight.Bold),
+        headlineSmall = base.headlineSmall.copy(fontFamily = heading, fontWeight = FontWeight.Bold),
+        titleLarge = base.titleLarge.bigger(1.0f, FontWeight.SemiBold).copy(fontFamily = heading),
         titleMedium = base.titleMedium.bigger(1.06f, FontWeight.SemiBold),
         titleSmall = base.titleSmall.bigger(1.08f, FontWeight.SemiBold),
         bodyLarge = base.bodyLarge.bigger(1.06f, FontWeight.Medium),
