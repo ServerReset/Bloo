@@ -54,7 +54,7 @@ class KeyboardNavigationTest {
         // Tab from nothing focused did not reach the switch in the emulator run (the tree printed it unfocused), so focus the switch
         // through its RequestFocus semantics action. Enter on it then turns it off.
         val motion = rule.onNodeWithTag("motion").fetchSemanticsNode()
-        rule.runOnIdle { motion.config.getOrNull(SemanticsActions.RequestFocus)?.action?.invoke() }
+        rule.runOnIdle { motion.config[SemanticsActions.RequestFocus].action?.invoke() }
         rule.waitForIdle()
         // Diagnostics: which node holds focus before the Enter, and what the switch reports after it.
         rule.onRoot(useUnmergedTree = true).printToLog("KeyboardNav-before-enter")
