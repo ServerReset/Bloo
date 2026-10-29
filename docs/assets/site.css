@@ -227,3 +227,30 @@ footer nav { display: flex; flex-wrap: wrap; gap: 6px 22px; }
   .final { border-radius: 32px; margin-top: 56px; }
   .marquee { margin-top: 48px; }
 }
+
+/* Privacy policy: the same design as the homepage, with a contents list beside the text on wide screens. */
+.doc-layout { display: block; padding-bottom: 24px; }
+.toc { margin: 0 0 32px; padding: 20px 22px; border: 3px solid var(--ink); border-radius: 24px; background: var(--paper); }
+.toc-title { font-family: var(--sans); font-variation-settings: "wdth" 130, "wght" 800; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 10px; }
+.toc ol { margin: 0; padding-left: 22px; }
+.toc li { margin: 6px 0; }
+.toc a { text-decoration: none; font-weight: 600; }
+.toc a:hover { color: var(--rust); text-decoration: underline; }
+.doc h2 { scroll-margin-top: 24px; }
+.callout { border: 3px solid var(--ink); border-radius: 24px; padding: 20px 24px; background: var(--sun); color: var(--ink); margin: 24px 0; box-shadow: 8px 8px 0 var(--ink); }
+.callout.warm { background: var(--mint); }
+.callout p { margin: 0; color: var(--ink); }
+.doc details { border-top: 3px solid var(--ink); padding: 14px 0; }
+.doc details:last-of-type { border-bottom: 3px solid var(--ink); }
+.doc summary { cursor: pointer; font-family: var(--serif); font-weight: 650; font-size: 22px; }
+.doc code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; background: var(--wash, #ecebe6); padding: 2px 6px; border-radius: 6px; overflow-wrap: anywhere; word-break: break-word; }
+.doc hr { border: 0; border-top: 3px solid var(--ink); margin: 56px 0 24px; }
+.doc .fine { font-size: 15px; color: var(--ink-soft); }
+.doc a { color: var(--rust); font-weight: 600; }
+@media (min-width: 960px) {
+  .doc-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 56px; align-items: start; max-width: 1180px; }
+  .toc { position: sticky; top: 24px; margin: 0; }
+}
+
+/* Without scripts (or without the features the animation needs) content is simply shown. */
+html:not(.js) .rise, html:not(.js) .stretch-in { opacity: 1; transform: none; }

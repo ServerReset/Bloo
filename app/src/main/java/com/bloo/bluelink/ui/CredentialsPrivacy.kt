@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import android.content.Context
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
@@ -82,13 +83,13 @@ internal fun CredentialsPrivacyNote(brandLabel: String?, modifier: Modifier = Mo
                 MorphTextButton(text = "In the app", onClick = { choosing = false; reading = true })
                 MorphTextButton(
                     text = "HTML page",
-                    onClick = { choosing = false; openUrl(context, PrivacyCopy.PLAIN_URL) },
+                    onClick = { choosing = false; openPrivacyPage(context, styled = false) },
                     icon = Icons.AutoMirrored.Filled.OpenInNew,
                     fillOnPress = false,
                 )
                 MorphTextButton(
                     text = "Web page",
-                    onClick = { choosing = false; openUrl(context, PrivacyCopy.STYLED_URL) },
+                    onClick = { choosing = false; openPrivacyPage(context, styled = true) },
                     icon = Icons.AutoMirrored.Filled.OpenInNew,
                     fillOnPress = false,
                 )
@@ -103,6 +104,15 @@ internal fun CredentialsPrivacyNote(brandLabel: String?, modifier: Modifier = Mo
  * bundled with the app before any pull. It is pulled again whenever the viewer opens and the site can be reached, so it stays current
  * and still reads offline. JavaScript stays off: the policy is a document, not a page.
  */
+/**
+ * Opens the privacy policy in a browser: the styled web page, or the plain HTML page. If the styled page cannot be opened (no browser
+ * that can start, or a device that cannot show it), the plain HTML page is opened instead.
+ */
+internal fun openPrivacyPage(context: Context, styled: Boolean) {
+    val target = if (styled) PrivacyCopy.STYLED_URL else PrivacyCopy.PLAIN_URL
+    if (!context.openExternalUrl(target)) context.openExternalUrl(PrivacyCopy.PLAIN_URL)
+}
+
 @Composable
 internal fun PrivacyPolicyViewer(onClose: () -> Unit) {
     val context = LocalContext.current
@@ -164,13 +174,13 @@ internal fun PrivacyPolicyViewer(onClose: () -> Unit) {
                         MorphTextButton(text = "Close", onClick = onClose)
                         MorphTextButton(
                             text = "HTML page",
-                            onClick = { openUrl(context, PrivacyCopy.PLAIN_URL) },
+                            onClick = { openPrivacyPage(context, styled = false) },
                             icon = Icons.AutoMirrored.Filled.OpenInNew,
                             fillOnPress = false,
                         )
                         MorphTextButton(
                             text = "Web page",
-                            onClick = { openUrl(context, PrivacyCopy.STYLED_URL) },
+                            onClick = { openPrivacyPage(context, styled = true) },
                             icon = Icons.AutoMirrored.Filled.OpenInNew,
                             fillOnPress = false,
                         )

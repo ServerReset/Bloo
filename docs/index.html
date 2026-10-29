@@ -12,6 +12,15 @@
 <meta property="og:image" content="img/feature-graphic.png">
 <link rel="icon" href="img/icon.png">
 <link rel="stylesheet" href="assets/site.css">
+<script>
+  // Browsers that cannot show this site properly get the plain HTML version instead.
+  (function () {
+    document.documentElement.classList.add('js');
+    var ok = window.CSS && CSS.supports && CSS.supports('display', 'grid') && 'IntersectionObserver' in window;
+    if (!ok) location.replace('index-plain.html');
+  })();
+</script>
+<noscript><meta http-equiv="refresh" content="0; url=index-plain.html"></noscript>
 <style>
 /* The floating bar: the three places that matter, always one thumb away. */
 .dock {
