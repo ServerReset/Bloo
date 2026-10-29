@@ -55,9 +55,10 @@ object SettingsCatalog {
         app(PrefKeys.COLOR_PALETTE, Kind.CHOICE, "Colour palette", "color theme palette accent blue violet teal forest amber rose bloo"),
         app(PrefKeys.CUSTOM_PALETTES, Kind.LIST, "Custom palettes", "color theme palette accent custom saved"),
         app(PrefKeys.ACTIVE_CUSTOM_PALETTE_ID, Kind.CHOICE),
-        app(PrefKeys.WATCH_FACE_SLOTS, Kind.LIST, "Watch face controls", "watch wear face quarters controls tile buttons layout"),
-        app(PrefKeys.WATCH_REDUCE_EFFECTS, Kind.TOGGLE, "Reduce watch effects", "watch wear effects animations blur motion battery"),
-        app(PrefKeys.WATCH_AUTOLOCK, Kind.TOGGLE, "Watch auto lock", "watch wear autolock walk away lock motion"),
+        // Edited on the watch, so no title: it syncs but is not offered as a phone search result.
+        app(PrefKeys.WATCH_FACE_SLOTS, Kind.LIST, "", "watch wear face quarters controls tile buttons layout"),
+        app(PrefKeys.WATCH_REDUCE_EFFECTS, Kind.TOGGLE, "", "watch wear effects animations blur motion battery"),
+        app(PrefKeys.WATCH_AUTOLOCK, Kind.TOGGLE, "", "watch wear autolock walk away lock motion"),
         app(PrefKeys.COLUMNS_FLIPPED, Kind.TOGGLE, "Flip columns", "layout columns swap sides left right wide screen tablet hot seat pebbles controls"),
         app(PrefKeys.DISTANCE_UNIT, Kind.CHOICE, "Distance unit", "distance mileage odometer range miles kilometres km units"),
         app(PrefKeys.TEMP_UNIT, Kind.CHOICE, "Temperature unit", "temperature celsius fahrenheit degrees c f units"),
