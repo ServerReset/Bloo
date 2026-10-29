@@ -6,8 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsOff
@@ -27,13 +25,12 @@ import org.junit.Test
 /**
  * Tab moves through a settings-style form in reading order, one control at a time, and Shift+Tab goes back; Enter acts on whichever
  * control has focus. The checks are on what each key does, not on a focus flag: where the keys land is what a keyboard user feels. The
- * form starts on its first switch, as the app's shortcut layer gives it. Runs on the emulator in CI.
+ * first Tab from nothing focused lands on the first switch, as it would for a keyboard user. Runs on the emulator in CI.
  */
 class KeyboardNavigationTest {
     @get:Rule val rule = createComposeRule()
 
     @Test fun tabAndShiftTab_moveFocus_andEnterActsOnWhereFocusIs() {
-        val first = FocusRequester()
         var saves = 0
         rule.setContent {
             BlooTheme {
@@ -42,7 +39,7 @@ class KeyboardNavigationTest {
                     var shortcuts by remember { mutableStateOf(true) }
                     ToggleRow(
                         "Motion blur", motion,
-                        modifier = Modifier.testTag("motion").focusRequester(first),
+                        modifier = Modifier.testTag("motion"),
                         onChange = { motion = it },
                     )
                     ToggleRow("Keyboard shortcuts", shortcuts, modifier = Modifier.testTag("shortcuts"), onChange = { shortcuts = it })
@@ -51,10 +48,10 @@ class KeyboardNavigationTest {
             }
         }
         rule.waitForIdle()
-        rule.runOnIdle { first.requestFocus() }
-        rule.waitForIdle()
 
-        // Enter on the first switch turns it off.
+        // The first Tab from nothing focused lands on the first switch; Enter on it turns it off.
+        rule.onRoot().performKeyInput { pressKey(Key.Tab) }
+        rule.waitForIdle()
         rule.onRoot().performKeyInput { pressKey(Key.Enter) }
         rule.waitForIdle()
         rule.onNodeWithTag("motion").assertIsOff()
