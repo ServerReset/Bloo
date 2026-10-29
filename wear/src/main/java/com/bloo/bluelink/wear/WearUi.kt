@@ -1,5 +1,13 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.uicommon.newCascade
+import com.bloo.uicommon.cascadeItem
+import com.bloo.uicommon.LocalCascade
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.semantics.role
 import com.bloo.uicommon.AppIcons
@@ -142,11 +150,12 @@ internal fun WearBackable(onBack: () -> Unit, content: @Composable () -> Unit) {
 @Composable
 fun WearPebble(title: String, icon: ImageVector, modifier: Modifier = Modifier, body: @Composable () -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    WearCascade {
     Column(modifier.fillMaxWidth().padding(horizontal = ListInset), verticalArrangement = Arrangement.spacedBy(RowGap)) {
         // The same heading as the phone's sections (:uicommon), centred for the round face and in the watch's own tint and size.
         SectionHeading(
             title, icon,
-            modifier = Modifier.fitRound(),
+            modifier = Modifier.fitRound().cascadeItem(),
             centered = true,
             iconTint = scheme.primary,
             iconSize = 16.dp,
@@ -156,6 +165,19 @@ fun WearPebble(title: String, icon: ImageVector, modifier: Modifier = Modifier, 
         )
         body()
     }
+    }
+}
+
+/**
+ * Opens the cascade for one watch pebble: the components inside pop in, in order, the first time the pebble is composed. It is the
+ * same cascade the phone's pebbles use (:uicommon), so a row pops the same way on both.
+ */
+@Composable
+internal fun WearCascade(content: @Composable () -> Unit) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { progress.animateTo(1f, tween(durationMillis = 520, easing = LinearEasing)) }
+    val cascade = remember { newCascade(progress = { progress.value }, closing = { false }) }
+    CompositionLocalProvider(LocalCascade provides cascade) { content() }
 }
 
 /** A quiet heading inside a section, for a group of rows within it (the section has the one title; this names a part). */
@@ -212,7 +234,7 @@ fun WearActionRow(
     WearButton(
         active = active,
         enabled = enabled && !pending,
-        modifier = modifier
+        modifier = modifier.cascadeItem()
             .fillMaxWidth()
             .fitRound()
             .then(
@@ -364,7 +386,7 @@ fun WearListRow(
     WearButton(
         active = active,
         enabled = enabled && !pending,
-        modifier = modifier.fillMaxWidth().fitRound(),
+        modifier = modifier.cascadeItem().fillMaxWidth().fitRound(),
         contentPadding = RowPadding,
         onClick = onClick,
     ) {
@@ -426,7 +448,7 @@ fun WearCenteredText(
 ) {
     RevealText(
         text,
-        modifier = modifier.fillMaxWidth().padding(horizontal = 20.dp).fitRound(),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 20.dp).fitRound().cascadeItem(),
         textAlign = TextAlign.Center,
         style = style,
         color = color,
@@ -544,7 +566,7 @@ internal fun WearStatRow(label: String, value: String, valueColor: Color? = null
     val scheme = MaterialTheme.colorScheme
     // A glass pill, like the phone's status rows.
     Row(
-        Modifier.fillMaxWidth().fitRound().clip(CircleShape)
+        Modifier.fillMaxWidth().fitRound().cascadeItem().clip(CircleShape)
             .background(scheme.surfaceContainerHigh.copy(alpha = 0.5f))
             .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
