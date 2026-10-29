@@ -89,10 +89,10 @@ p { margin: 0 0 16px; }
 
 /* Top bar: floats, sticks, and the wordmark wobbles when you look at it. */
 .bar { position: sticky; top: 0; z-index: 20; padding: 14px 0; background: var(--paper); border-bottom: 2px solid var(--ink); }
-.bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.bar .wrap { display: flex; align-items: center; justify-content: flex-start; gap: 16px; }
 .logo { font-family: var(--serif); font-variation-settings: "opsz" 72, "WONK" 1; font-weight: 800; font-size: 30px; text-decoration: none; letter-spacing: -0.03em; transition: transform 0.6s var(--spring); display: inline-flex; gap: 10px; align-items: center; }
 .logo:hover { transform: rotate(-4deg) scale(1.06); }
-.logo img { width: 34px; height: 34px; border-radius: 10px; }
+.logo img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
 .bar nav { display: flex; gap: 20px; font-size: 15px; font-variation-settings: "wdth" 115; font-weight: 600; }
 .bar nav a { text-decoration: none; position: relative; }
 .bar nav a::after { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 3px; background: var(--rust); transform: scaleX(0); transform-origin: left; transition: transform 0.45s var(--spring); }
