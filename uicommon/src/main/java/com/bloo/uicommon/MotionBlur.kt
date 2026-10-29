@@ -16,13 +16,13 @@ import androidx.compose.ui.unit.Velocity
 import kotlin.math.abs
 
 /** Speed, in pixels per second, at which a moving layer reaches its full touch of blur. Tuned low on purpose: a softness, not a smear. */
-private const val FullBlurSpeedPx = 1_500f
+private const val FullBlurSpeedPx = 2_500f
 
 /** The most a moving layer blurs, in dp. */
-private const val MaxMotionBlurDp = 6f
+private const val MaxMotionBlurDp = 3f
 
 /** Below this the blur is invisible and is not applied at all. */
-private const val MinMotionBlurDp = 0.5f
+private const val MinMotionBlurDp = 0.75f
 
 /**
  * The app's one motion blur. Two ways to say what moves, and one gate that decides whether any of it draws:

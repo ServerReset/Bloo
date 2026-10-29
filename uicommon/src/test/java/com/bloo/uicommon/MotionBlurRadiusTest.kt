@@ -14,17 +14,18 @@ class MotionBlurRadiusTest {
         assertEquals(0f, motionBlurRadiusDp(100f))
     }
 
-    @Test fun anOrdinarySlide_isVisiblySoft() {
-        // A pebble sliding or growing at about 1000 px/s should read as a few dp of softness, not 1dp.
-        assertTrue(motionBlurRadiusDp(1000f) >= 3f, "a 1000 px/s slide blurs by at least 3dp (was ${motionBlurRadiusDp(1000f)})")
+    @Test fun anOrdinaryCardMove_isSoftButNotBlurry() {
+        // A card moving at about 2500 px/s reads as a soft smear; a slow drift stays clear.
+        assertTrue(motionBlurRadiusDp(2500f) >= 2f, "a 2500 px/s move blurs by at least 2dp (was ${motionBlurRadiusDp(2500f)})")
+        assertEquals(0f, motionBlurRadiusDp(600f))
     }
 
     @Test fun aFastFlick_isCappedAtTheMaximum() {
-        assertEquals(6f, motionBlurRadiusDp(10_000f))
+        assertEquals(3f, motionBlurRadiusDp(10_000f))
     }
 
     @Test fun theRadiusRisesWithSpeed() {
-        assertTrue(motionBlurRadiusDp(800f) < motionBlurRadiusDp(1200f))
-        assertTrue(motionBlurRadiusDp(1200f) < motionBlurRadiusDp(1500f))
+        assertTrue(motionBlurRadiusDp(1000f) < motionBlurRadiusDp(2000f))
+        assertTrue(motionBlurRadiusDp(2000f) < motionBlurRadiusDp(2500f))
     }
 }

@@ -61,7 +61,6 @@ import com.bloo.uicommon.LocalMotionBlur
 import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.MotionShort
-import com.bloo.uicommon.motionBlur
 import com.bloo.uicommon.motionBlurScrollGate
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.LocalHaptics
@@ -290,7 +289,6 @@ fun BlooApp(vm: AppViewModel) {
                     translationY = away * 8.dp.toPx()
                     cameraDistance = 420.dp.toPx()
                 }
-                .motionBlur { turn * 1000f },
             ) {
             // The garage draws full-bleed; other screens are inset by the Scaffold.
             when (screen) {
@@ -391,7 +389,7 @@ fun BlooApp(vm: AppViewModel) {
             // No `.padding(padding)`: SearchLayer reads WindowInsets itself, and padding here would
             // subtract the nav bar twice. The rise is a layout offset, not a graphicsLayer translation: the glass samples the
             // backdrop by layout position, so a translated layer drew its blur a few pixels off from the content it sits behind.
-            Box(Modifier.fillMaxSize().offset { IntOffset(0, (searchRise.value * screenHeightPx).roundToInt()) }.motionBlur { searchRise.value * screenHeightPx }) {
+            Box(Modifier.fillMaxSize().offset { IntOffset(0, (searchRise.value * screenHeightPx).roundToInt()) }) {
                 SearchLayer(
                     vm = vm,
                     state = stateHolder,
