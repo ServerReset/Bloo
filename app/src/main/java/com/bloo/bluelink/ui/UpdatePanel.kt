@@ -110,11 +110,13 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
         val newLabel = buildLabel(info.run.runNumber)
         // Build delta ("build 812 → build 828") when the installed build is known, else just the target.
         val deltaLabel = if (current > 0) "${buildLabel(current)} → $newLabel" else newLabel
-        if (showHeadline) UpdateDeltaHero(current, info.run.runNumber)
-        NestedGlassPanel(hazeState) {
-            Column(Modifier.padding(GapGroup)) {
-                // The version is already above, so the status line says what is happening, not the version again.
-                UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = false)
+        if (showHeadline) EnterOnce(expandFrom = Alignment.Top) { UpdateDeltaHero(current, info.run.runNumber) }
+        EnterOnce(expandFrom = Alignment.Top) {
+            NestedGlassPanel(hazeState) {
+                Column(Modifier.padding(GapGroup)) {
+                    // The version is already above, so the status line says what is happening, not the version again.
+                    UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = false)
+                }
             }
         }
         if (primaryInBody) {
@@ -131,7 +133,7 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
                 MorphButtonLabel(act.icon, act.label, pending = false)
             }
         }
-        UpdateDismissRow(state, vm)
+        EnterOnce(expandFrom = Alignment.Top) { UpdateDismissRow(state, vm) }
     }
 
     // 4. Everything secondary sits behind one disclosure: what is new, how to install, and Shizuku.
@@ -143,17 +145,19 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
     PopVisible(visible = showDetails, sizeAnimated = true) {
         Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
             if (info != null) {
-                UpdateReleaseNotes(info, hazeState = hazeState)
-                if (!seamless) InstallHelp(state, info, hazeState)
+                EnterOnce(expandFrom = Alignment.Top) { UpdateReleaseNotes(info, hazeState = hazeState) }
+                if (!seamless) EnterOnce(expandFrom = Alignment.Top) { InstallHelp(state, info, hazeState) }
             }
-            NestedGlassPanel(hazeState) {
-                Column(Modifier.padding(GapGroup)) { ShizukuSetting(state, vm) }
+            EnterOnce(expandFrom = Alignment.Top) {
+                NestedGlassPanel(hazeState) {
+                    Column(Modifier.padding(GapGroup)) { ShizukuSetting(state, vm) }
+                }
             }
         }
     }
 
     // 5. The two ways to look for this yourself, always at the foot.
-    ActionRow {
+    EnterOnce(expandFrom = Alignment.Top) { ActionRow {
         MorphTextButton(
             "Check",
             onClick = { vm.checkForUpdateManually() },
@@ -168,7 +172,7 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
             icon = Icons.AutoMirrored.Filled.OpenInNew,
             fillOnPress = false,
         )
-    }
+    } }
 }
 
 /**
@@ -198,15 +202,20 @@ private fun InstallHelp(state: UiState, info: UpdateInfo, hazeState: HazeState?)
 @Composable
 private fun ShizukuSetting(state: UiState, vm: AppViewModel) {
     val context = LocalContext.current
-    if (state.shizukuAvailable) {
-        ToggleRow("Install seamlessly (Shizuku)", LocalAppearance.current.seamlessInstallShizuku) { vm.setSeamlessInstallShizuku(it) }
-    } else {
-        BodySmallText("Update without tapping through Android's installer. No root needed.")
-        MorphTextButton(
-            "Get Shizuku",
-            onClick = { openUrl(context, "https://shizuku.rikka.app/") },
-            icon = Icons.AutoMirrored.Filled.OpenInNew,
-        )
+    // The switch and the install-it prompt trade places through the card's own content motion, not a snap.
+    AnimatedContent(targetState = state.shizukuAvailable, transitionSpec = { expandContentTransform() }, label = "shizukuSetting") { available ->
+        Column {
+            if (available) {
+                ToggleRow("Install seamlessly (Shizuku)", LocalAppearance.current.seamlessInstallShizuku) { vm.setSeamlessInstallShizuku(it) }
+            } else {
+                BodySmallText("Update without tapping through Android's installer. No root needed.")
+                MorphTextButton(
+                    "Get Shizuku",
+                    onClick = { openUrl(context, "https://shizuku.rikka.app/") },
+                    icon = Icons.AutoMirrored.Filled.OpenInNew,
+                )
+            }
+        }
     }
 }
 
@@ -245,7 +254,7 @@ private fun PlayUpdateBody(hazeState: HazeState?, primaryInBody: Boolean) {
             )
         }
     }
-    if (available && primaryInBody) {
+    PopVisible(visible = available && primaryInBody, sizeAnimated = true) {
         // Play's own flow does the download and the install; this only opens it.
         MorphButton(
             onClick = { context.hostActivity()?.let { PlayUpdates.start(it) } },
@@ -258,14 +267,20 @@ private fun PlayUpdateBody(hazeState: HazeState?, primaryInBody: Boolean) {
             MorphButtonLabel(Icons.Filled.SystemUpdate, "Update in Google Play", pending = false)
         }
     }
-    ActionRow {
-        MorphTextButton(
-            "Check",
-            onClick = { PlayUpdates.refresh(context.applicationContext) },
-            icon = Icons.Filled.Refresh,
-            emphasis = ButtonEmphasis.Confirm,
-        )
+    EnterOnce(expandFrom = Alignment.Top) {
+        ActionRow {
+            MorphTextButton(
+                "Check",
+                onClick = { PlayUpdates.refresh(context.applicationContext) },
+                icon = Icons.Filled.Refresh,
+                emphasis = ButtonEmphasis.Confirm,
+            )
+        }
     }
-    BodySmallText("Google Play installs updates for this copy.")
-    PlayStoreLinks()
+    EnterOnce(expandFrom = Alignment.Top) {
+        Column {
+            BodySmallText("Google Play installs updates for this copy.")
+            PlayStoreLinks()
+        }
+    }
 }
