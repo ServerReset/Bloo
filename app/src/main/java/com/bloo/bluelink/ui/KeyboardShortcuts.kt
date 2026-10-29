@@ -102,6 +102,9 @@ internal fun Modifier.appShortcuts(enabled: Boolean, onShortcut: (Shortcut) -> U
     val on by rememberUpdatedState(enabled)
     // Takes focus again whenever the window gains it. In a desktop or freeform window, switching away and back drops the focus the
     // app had, and shortcuts would go quiet until something was tapped; this keeps them live without a tap.
+    // Also on first composition, so keys have somewhere to go before the window reports focus (a test window, or a window that is
+    // not yet focused, never reports it).
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     val windowFocused = LocalWindowInfo.current.isWindowFocused
     LaunchedEffect(windowFocused) { if (windowFocused) runCatching { focus.requestFocus() } }
     return this
