@@ -60,6 +60,7 @@ import kotlinx.coroutines.launch
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.motionBlur
+import com.bloo.uicommon.motionBlurScrollGate
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.FieldShape
@@ -217,7 +218,10 @@ fun BlooApp(vm: AppViewModel) {
     // Biometric lock overlay: blur the whole app behind it and fade the blur away once unlocked.
     // Hoisted into their own small composables below so only those tiny scopes recompose per frame;
     // everything else just gets redrawn under the blurred/faded layer.
-    Box(Modifier.fillMaxSize().observeUserActivity(ambientActivity).appShortcuts(enabled = !locked, onShortcut = vm::onShortcut)) {
+    Box(
+        Modifier.fillMaxSize().observeUserActivity(ambientActivity).appShortcuts(enabled = !locked, onShortcut = vm::onShortcut)
+            .motionBlurScrollGate(),
+    ) {
     // "Content settled": the garage's first composition has finished. Gates two full-screen blurs
     // (lock blur, Aurora backdrop blur) that dominate cold-start frame cost.
     var contentSettled by remember { mutableStateOf(screen == Screen.Garage) }
@@ -278,7 +282,8 @@ fun BlooApp(vm: AppViewModel) {
                     alpha = 1f - 0.4f * away
                     translationY = away * 8.dp.toPx()
                     cameraDistance = 420.dp.toPx()
-                },
+                }
+                .motionBlur { turn * 1000f },
             ) {
             // The garage draws full-bleed; other screens are inset by the Scaffold.
             when (screen) {

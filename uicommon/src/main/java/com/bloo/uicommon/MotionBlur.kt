@@ -3,11 +3,16 @@ package com.bloo.uicommon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.Velocity
 import kotlin.math.abs
 
 /** Speed, in pixels per second, at which a moving layer reaches its full touch of blur. Tuned low on purpose: a softness, not a smear. */
@@ -49,9 +54,59 @@ fun Modifier.motionBlurWhenMoving(): Modifier {
         .graphicsLayer { applyMotionBlur(tracker.speedAt(System.nanoTime())) }
 }
 
+/**
+ * Marks the app's scrolling, so the blur stays off while a list, pager or sheet is being scrolled or flung. Scrolling is not motion
+ * blur: the content moves under the finger and stays sharp. Set by [motionBlurScrollGate] on the app root.
+ */
+private object MotionBlurScrollGate {
+    @Volatile
+    private var quietUntilNanos = 0L
+
+    fun scrolling(nanos: Long): Boolean = nanos < quietUntilNanos
+
+    fun touch(nanos: Long) {
+        quietUntilNanos = nanos + ScrollQuietNanos
+    }
+
+    private const val ScrollQuietNanos = 250_000_000L
+}
+
+private val MotionBlurScrollConnection = object : NestedScrollConnection {
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (available != Offset.Zero) MotionBlurScrollGate.touch(System.nanoTime())
+        return Offset.Zero
+    }
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        if (consumed != Offset.Zero) MotionBlurScrollGate.touch(System.nanoTime())
+        return Offset.Zero
+    }
+
+    override suspend fun onPreFling(available: Velocity): Velocity {
+        MotionBlurScrollGate.touch(System.nanoTime())
+        return Velocity.Zero
+    }
+
+    override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+        MotionBlurScrollGate.touch(System.nanoTime())
+        return Velocity.Zero
+    }
+}
+
+/**
+ * Put once, on the app root: every scroll, swipe and fling beneath it turns the motion blur off while it lasts. It consumes nothing, so
+ * it changes no scrolling behaviour.
+ */
+fun Modifier.motionBlurScrollGate(): Modifier = nestedScroll(MotionBlurScrollConnection)
+
 /** Draws the blur for a layer moving at [pxPerSecond]: nothing below the visible threshold, and never more than the cap. */
 private fun GraphicsLayerScope.applyMotionBlur(pxPerSecond: Float) {
-    val radius = (pxPerSecond / FullBlurSpeedPx * MaxMotionBlurDp).coerceAtMost(MaxMotionBlurDp)
+    val now = System.nanoTime()
+    val radius = if (MotionBlurScrollGate.scrolling(now)) {
+        0f
+    } else {
+        (pxPerSecond / FullBlurSpeedPx * MaxMotionBlurDp).coerceAtMost(MaxMotionBlurDp)
+    }
     renderEffect = if (radius >= MinMotionBlurDp) {
         val px = radius * density
         BlurEffect(px, px)

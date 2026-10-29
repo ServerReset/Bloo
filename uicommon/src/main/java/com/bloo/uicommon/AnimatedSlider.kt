@@ -46,6 +46,9 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
+/** The thumb's travel across the whole track, as the motion-blur position: a fraction of the range times this, read per frame. */
+private const val SliderTravelPx = 1000f
+
 /**
  * Bloo's hand-drawn slider (track, thumb, ticks, gestures). Colour, haptic and motion context
  * come in as parameters so the module stays theme-neutral.
@@ -212,7 +215,8 @@ fun AnimatedSlider(
                 }
                 true
             }
-            // No motion blur: a blurred render target reads as the slider going low-resolution.
+            // The thumb's own travel blurs in proportion to how fast it moves, the same subtle touch as the app's other moving things.
+            .motionBlur { (anim.value - valueRange.start) / (valueRange.endInclusive - valueRange.start) * SliderTravelPx }
             .onSizeChanged { widthPx = it.width.toFloat() }
             // Same tap-vs-drag disambiguation as MorphSegmented's gesture handler: `claimed` starts
             // false (undecided) and only flips true once horizontal movement exceeds touch slop and
