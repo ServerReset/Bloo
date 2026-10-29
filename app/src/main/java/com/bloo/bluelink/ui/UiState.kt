@@ -110,6 +110,8 @@ data class UiState(
     val serviceIntervalMiles: Map<String, Int> = emptyMap(),
     /** In-flight commands, keyed "vin:action", so each control can show its own spinner. */
     val pending: Set<String> = emptySet(),
+    /** Commands the car has accepted but not yet confirmed, as "vin:action". Their controls stay blurred until it confirms. */
+    val awaitingCar: Set<String> = emptySet(),
     /**
      * Recent remote commands by VIN, newest first, a rolling [REMOTE_ACTION_HISTORY_DAYS]-day
      * window written by [AppViewModel.runCommand]. Shown by RemoteActionsInline.
@@ -257,6 +259,7 @@ data class UiState(
     fun fetchedAt(v: Vehicle): Long? = lastFetched[v.vin]
 
     fun isPending(vin: String, action: String): Boolean = "$vin:$action" in pending
+    fun isAwaitingCar(vin: String, action: String): Boolean = "$vin:$action" in awaitingCar
 
     fun isPebbleExpanded(vin: String, section: String): Boolean = "$vin:$section" !in collapsedPebbles
 

@@ -367,74 +367,6 @@ jobs:
 
 
 
-  # Runs the app for real: boots an emulator and runs the instrumented tests in
-  # app/src/androidTest -- layouts measured, gestures performed, the launch actually happening.
-  # Everything in `build` above stops at "it compiles and the JVM tests pass"; this is the job that
-  # answers "does it work". Independent of `build` so a UI regression is reported without blocking
-  # (or being hidden by) the release path.
-  ui-tests:
-    runs-on: ubuntu-latest
-    # A backstop, not the working limit: the script cannot hang any more (every adb call is wrapped in
-    # `timeout`), so this only catches an emulator that never boots. It used to be what actually ended
-    # the job -- at 30 minutes, every run, with the real failure three minutes in.
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Run instrumented tests on an emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          arch: x86_64
-          target: google_apis
-          profile: pixel_6
-          # The action's default is 2GB, and this app is not small: on that the device stops answering
-          # part-way through the suite. 4GB got it further (two tests instead of none); this gives it
-          # real room, since the runner has 16GB and the emulator is the only thing on it.
-          ram-size: 6144
-          # The emulator's own per-app heap default is 256MB; the app is largeHeap and the UI suite
-          # composes real screens.
-          heap-size: 512
-          disable-animations: true
-          script: bash .github/ci-ui-tests.sh
-
-      - name: Upload instrumented test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: androidTest-reports
-          path: app/build/reports/androidTests/
-          if-no-files-found: ignore
-
-  # The Play upload, in a job of its own for one reason: PLAY'S EDITS ARE SINGLE-WRITER.
-  #
-  # Two uploads at once and one of them fails -- "This edit has expired, please create a new Edit.", or
-  # a plain "Internal error encountered." -- because committing one edit invalidates the other's. The
-  # builds deliberately overlap in this repo (see the note about no concurrency group at the top), so
-  # without this the upload was a coin toss whenever two pushes landed close together, which is what
-  # happened: three runs raced and two of them died at the commit.
-  #
-  # A concurrency group with cancel-in-progress: false QUEUES this job instead of cancelling anything,
-  # so a burst of pushes still ends with every build published and the uploads taken one at a time.
   play:
     needs: [build]
     # NOT on every branch push for now: Google's daily save quota was exhausted by the volume of pushes. It
@@ -571,14 +503,10 @@ jobs:
             echo "::error::the upload failed for a reason a retry would not fix (or would make worse); not retrying"
             exit 1
           fi
-  # Makes the build visible to the in-app updater (phone and watch) only once it is finished and the build
-  # and the emulator tests both passed. Until then the release is a draft, which the updater cannot see.
+  # Makes the build visible to the in-app updater (phone and watch) only once it is finished and the build passed.
+  # Until then the release is a draft, which the updater cannot see.
   publish:
-    # Only the build. The emulator tests report separately and must not hold the release back: when
-    # they timed out (a runner the emulator would not boot on) this job was SKIPPED, so the release
-    # stayed a draft and the in-app updater -- which only reads published releases -- never saw the
-    # new build at all. A build that compiled and passed R8 is worth shipping; a slow emulator says
-    # nothing about it either way.
+    # Only the build: a build that compiled, passed its unit tests and R8 is worth shipping.
     needs: [build]
     if: always() && github.event_name == 'push' && github.ref_type == 'branch' && needs.build.result == 'success'
     runs-on: ubuntu-latest

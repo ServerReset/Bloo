@@ -103,7 +103,8 @@ class AlertActionReceiver : BroadcastReceiver() {
                 // LiveCharge's own notion of "a bar is showing for this vin" was then describing
                 // a notification that is not a bar. `confirmId` lets the live-charge path opt out
                 // while every alert keeps the replace-in-place behaviour it was written for.
-                if (confirmId != -1) Notifications.post(ctx, confirmId, title, text)
+                // A refused tap sent nothing and the command already in flight is the one that reports, so it says nothing here.
+                if (confirmId != -1 && result?.refused != true) Notifications.post(ctx, confirmId, title, text)
             } finally {
                 pending.finish()
             }

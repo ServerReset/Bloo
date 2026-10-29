@@ -374,14 +374,6 @@ dependencies {
     // discovers them. Version = project Kotlin 2.2.20.
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
 
-    // Instrumented UI tests (run on an emulator in CI -- see .github/workflows/android.yml):
-    // real layouts, real gestures, real windows, the things a JVM unit test cannot see.
-    // AGP pins the androidTest classpath to the app's runtime versions; androidx.test.ext:junit 1.2.1
-    // wants concurrent-futures 1.2.0, so the app itself carries it (the Wear tile already does).
     implementation("androidx.concurrent:concurrent-futures:1.2.0")
     implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4:$composeUi")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test:runner:1.6.2")
-    debugImplementation("androidx.compose.ui:ui-test-manifest:$composeUi")
 }

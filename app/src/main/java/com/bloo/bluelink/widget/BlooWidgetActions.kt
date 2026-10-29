@@ -109,6 +109,8 @@ class CarActionCallback : ActionCallback {
             }
         }
 
+        // Already on its way from the app, an alert or the watch: this tap sends nothing and shows nothing, and that command reports.
+        if (com.bloo.bluelink.data.CarCommandGate.busy(com.bloo.bluelink.data.CarCommandGate.keyFor(vin, action))) return
         val pendingKey = "$vin:$action"
         edit { it[WidgetKeys.PENDING] = pendingKey; it.remove(WidgetKeys.NOTE) }
         val result = runCatching { com.bloo.bluelink.data.CarCommandRunner.execute(context, CarCommand(vin, action)) }.getOrNull()

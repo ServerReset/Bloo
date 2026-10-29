@@ -4,6 +4,39 @@ import android.content.Context
 import kotlinx.coroutines.sync.withLock
 
 /**
+ * The car commands in flight, by car and by what they do. Phone, widget, watch and alert commands all claim the same keys, so one car
+ * never gets the same command twice at once. Lock and unlock share a key, as do the climate and charge pairs.
+ */
+object CarCommandGate {
+    private val inFlight = HashSet<String>()
+
+    /** The key for [action] on [vin], using the group of actions that cannot run together. */
+    fun keyFor(vin: String, action: String): String = "$vin:${groupOf(action)}"
+
+    /** Claims [key]; false when a command for it is already in flight. */
+    @Synchronized
+    fun begin(key: String): Boolean = inFlight.add(key)
+
+    @Synchronized
+    fun end(key: String) {
+        inFlight.remove(key)
+    }
+
+    /** True while a command for [key] is in flight. */
+    @Synchronized
+    fun busy(key: String): Boolean = key in inFlight
+
+    private fun groupOf(action: String): String = when (action) {
+        CarAction.TOGGLE_LOCK, CarAction.LOCK, CarAction.UNLOCK -> "doors"
+        CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_ON, CarAction.CLIMATE_OFF, CarAction.CLIMATE_SMART -> "climate"
+        CarAction.TOGGLE_CHARGE, CarAction.CHARGE_ON, CarAction.CHARGE_OFF -> "charge"
+        CarAction.SET_CHARGE_LIMITS -> "chargeLimit"
+        CarAction.FLASH_LIGHTS, CarAction.HORN_AND_LIGHTS -> "hornLights"
+        else -> action
+    }
+}
+
+/**
  * Executes a [CarCommand] against the car backend using the stored session, and folds the result
  * into the on-disk [SnapshotStore].
  */
@@ -21,6 +54,20 @@ object CarCommandRunner {
             val ok = runCatching { refresh(context, command.vin, force = false) }.getOrDefault(false)
             return CarCommandResult(command.vin, command.action, ok = ok, message = if (ok) null else "Couldn't refresh")
         }
+        // A request for something this car is already doing is refused, not queued: the first one is still going, and it is the one that
+        // reports. So a repeat tap, or the same command from another path, sends nothing and posts nothing.
+        val key = CarCommandGate.keyFor(command.vin, command.action)
+        if (!CarCommandGate.begin(key)) {
+            return CarCommandResult(command.vin, command.action, ok = false, message = "Already sending that", refused = true)
+        }
+        try {
+            return dispatch(context, command)
+        } finally {
+            CarCommandGate.end(key)
+        }
+    }
+
+    private suspend fun dispatch(context: Context, command: CarCommand): CarCommandResult {
         val store = SnapshotStore(context)
         // Smart climate's weather lookup is network, so it happens BEFORE the lock (the lock is the whole account's).
         val smart = if (command.action == CarAction.CLIMATE_SMART) smartClimateRequestFor(context, command.vin) else null

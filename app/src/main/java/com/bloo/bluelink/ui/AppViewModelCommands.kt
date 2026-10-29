@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.CarCommandGate
 import com.bloo.bluelink.data.CarCommandIds
 import kotlinx.coroutines.flow.collectLatest
 import androidx.lifecycle.viewModelScope
@@ -283,6 +284,8 @@ internal fun AppViewModel.runCommand(
         // One request per action at a time: a second press while the first is still in flight used to fire a second request
         // and raise its notice again. (The controls are disabled meanwhile; this covers every other way in.)
         if (key in _state.value.pending) return@launch
+        // Refused too while a background path (an alert, the widget or the watch) is already sending this command.
+        if (!CarCommandGate.begin(key)) return@launch
         val startedAt = System.currentTimeMillis()
         _state.update { it.copy(pending = it.pending + key, message = null) }
         // Snapshot the pre-command status so a failure can revert locally (no network).
@@ -311,7 +314,10 @@ internal fun AppViewModel.runCommand(
                 st.copy(statuses = statuses)
             }
             persistSnapshots()
-            if (confirm != null) confirmWithCar(vin, key, success, confirm)
+            if (confirm != null) {
+                _state.update { it.copy(awaitingCar = it.awaitingCar + key) }
+                confirmWithCar(vin, key, success, confirm)
+            }
             // Auto-AI: a command changed the car's state, refresh the summary.
             _state.value.vehicles.firstOrNull { it.vin == vin }?.let { autoSummarize(it) }
         } catch (e: Exception) {
@@ -334,6 +340,7 @@ internal fun AppViewModel.runCommand(
             val elapsed = System.currentTimeMillis() - startedAt
             if (elapsed < MIN_COMMAND_LOCK_MS) kotlinx.coroutines.delay(MIN_COMMAND_LOCK_MS - elapsed)
             _state.update { it.copy(pending = it.pending - key) }
+            CarCommandGate.end(key)
         }
     }
 }
@@ -378,25 +385,31 @@ private const val CONFIRM_ATTEMPTS = 9
 private fun AppViewModel.confirmWithCar(vin: String, key: String, success: String, confirm: (VehicleStatus) -> Boolean) {
     commandConfirmJobs[key]?.cancel()
     commandConfirmJobs[key] = viewModelScope.launch {
-        val v = _state.value.vehicles.firstOrNull { it.vin == vin } ?: return@launch
-        repeat(CONFIRM_ATTEMPTS) {
-            kotlinx.coroutines.delay(CONFIRM_INTERVAL_MS)
-            val seen = try {
-                statusMutex.withLock { repoFor(v).status(v, refresh = false) }
-            } catch (e: Exception) {
-                rethrowIfCancellation(e)
-                null
+        val me = kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]
+        try {
+            val v = _state.value.vehicles.firstOrNull { it.vin == vin } ?: return@launch
+            repeat(CONFIRM_ATTEMPTS) {
+                kotlinx.coroutines.delay(CONFIRM_INTERVAL_MS)
+                val seen = try {
+                    statusMutex.withLock { repoFor(v).status(v, refresh = false) }
+                } catch (e: Exception) {
+                    rethrowIfCancellation(e)
+                    null
+                }
+                if (seen != null && confirm(seen)) {
+                    // Take the car's reading in (location, alerts and all), then say it is done.
+                    loadStatus(v, refresh = false, errorMessage = "Refresh failed", surfaceErrors = false)
+                    AppLog.log("$success: confirmed by the car")
+                    _state.update { it.copy(message = "$success, confirmed by the car", messageType = ToastKind.SUCCESS) }
+                    return@launch
+                }
             }
-            if (seen != null && confirm(seen)) {
-                // Take the car's reading in (location, alerts and all), then say it is done.
-                loadStatus(v, refresh = false, errorMessage = "Refresh failed", surfaceErrors = false)
-                AppLog.log("$success: confirmed by the car")
-                _state.update { it.copy(message = "$success, confirmed by the car", messageType = ToastKind.SUCCESS) }
-                return@launch
-            }
+            AppLog.log("$success: sent, the car has not confirmed yet")
+            loadStatus(v, refresh = false, errorMessage = "Refresh failed", surfaceErrors = false)
+            _state.update { it.copy(message = "$success was sent. The car hasn't confirmed yet", messageType = ToastKind.INFO) }
+        } finally {
+            // Only the newest confirmation clears the mark: one it replaced is cancelled and must not unblur a command it no longer owns.
+            if (commandConfirmJobs[key] === me) _state.update { it.copy(awaitingCar = it.awaitingCar - key) }
         }
-        AppLog.log("$success: sent, the car has not confirmed yet")
-        loadStatus(v, refresh = false, errorMessage = "Refresh failed", surfaceErrors = false)
-        _state.update { it.copy(message = "$success was sent. The car hasn't confirmed yet", messageType = ToastKind.INFO) }
     }
 }

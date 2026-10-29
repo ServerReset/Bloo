@@ -93,4 +93,6 @@ data class CarCommandResult(
     val action: String,
     val ok: Boolean,
     val message: String? = null,
+    /** True when the request was turned away because the same command was already in flight. Nothing was sent, so nothing should be announced. */
+    val refused: Boolean = false,
 )
