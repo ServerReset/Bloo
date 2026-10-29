@@ -40,7 +40,6 @@ internal fun rememberAccessibility(appearance: SettingsStore.Appearance, powerPo
     val screenReaderOn = rememberScreenReaderOn()
     val choices = AccessibilityChoices(
         reduceMotion = appearance.reduceMotion,
-        motionBlur = appearance.motionBlur,
         keyboardShortcuts = appearance.keyboardShortcuts,
     )
     val device = AccessibilityDevice(
@@ -86,11 +85,6 @@ internal fun AccessibilityGroup(appearance: SettingsStore.Appearance, vm: AppVie
             resolved = a11y.reduceMotion,
         ) { vm.setReduceMotion(it) }
         AccessibilitySwitch(
-            label = "Motion blur",
-            description = "Moving things soften a little as they travel: sliders, pebbles opening, floating buttons. Never while you scroll.",
-            resolved = a11y.motionBlur,
-        ) { vm.setMotionBlur(it) }
-        AccessibilitySwitch(
             label = "Keyboard shortcuts",
             description = "For a hardware keyboard or a desktop window. Ctrl + / lists them.",
             resolved = a11y.keyboardShortcuts,
@@ -115,7 +109,6 @@ private fun AccessibilitySwitch(label: String, description: String, resolved: Re
 private fun heldBecause(reason: OverrideReason): String = when (reason) {
     OverrideReason.BATTERY_SAVER -> "Battery Saver is on, so this is held. It returns to your choice when Battery Saver is off."
     OverrideReason.SYSTEM_SETTING -> "Android's Remove animations is on, so this is held. Turn it off in Android's Accessibility settings."
-    OverrideReason.REDUCE_MOTION -> "Reduce motion is on, so motion blur is held off. Turn Reduce motion off to change it."
 }
 
 /**

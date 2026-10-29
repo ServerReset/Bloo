@@ -46,7 +46,6 @@ class SettingsStore(internal val context: Context) {
         val ULTRA_GLASS = stringPreferencesKey(PrefKeys.ULTRA_GLASS)
         val HAPTICS = stringPreferencesKey(PrefKeys.HAPTICS_ENABLED)
         val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey(PrefKeys.SEAMLESS_INSTALL_SHIZUKU)
-        val MOTION_BLUR = stringPreferencesKey(PrefKeys.MOTION_BLUR)
         val CLASSIC_HEADINGS = stringPreferencesKey(PrefKeys.CLASSIC_HEADINGS)
         val REDUCE_MOTION = stringPreferencesKey(PrefKeys.REDUCE_MOTION)
         val KEYBOARD_SHORTCUTS = stringPreferencesKey(PrefKeys.KEYBOARD_SHORTCUTS)
@@ -132,8 +131,6 @@ class SettingsStore(internal val context: Context) {
          * SyncMerge.DEVICE_LOCAL_KEYS).
          */
         val seamlessInstallShizuku: Boolean = false,
-        /** The user's motion blur switch. The blur also stops in Battery Saver, which is decided by the device, not here. */
-        val motionBlur: Boolean = true,
         /** Headings and titles in a classical serif, whatever the body font is. */
         val classicHeadings: Boolean = false,
         /** The app's own reduce-motion switch, on top of Android's. Battery Saver and Android can hold it on; see resolveAccessibility. */
@@ -198,7 +195,6 @@ class SettingsStore(internal val context: Context) {
             tempUnit = prefs[Keys.TEMP_UNIT] ?: "auto",
             distanceUnit = prefs[Keys.DISTANCE_UNIT] ?: "auto",
             seamlessInstallShizuku = prefs.flag(Keys.SEAMLESS_INSTALL_SHIZUKU, false),
-            motionBlur = prefs.flag(Keys.MOTION_BLUR, true),
             classicHeadings = prefs.flag(Keys.CLASSIC_HEADINGS, false),
             reduceMotion = prefs.flag(Keys.REDUCE_MOTION, false),
             keyboardShortcuts = prefs.flag(Keys.KEYBOARD_SHORTCUTS, true),

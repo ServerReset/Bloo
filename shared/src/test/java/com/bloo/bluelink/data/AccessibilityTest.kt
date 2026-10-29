@@ -8,25 +8,22 @@ import kotlin.test.assertTrue
 
 class AccessibilityTest {
     @Test fun aPlainDevice_keepsEveryChoice() {
-        val r = resolveAccessibility(AccessibilityChoices(reduceMotion = false, motionBlur = true, keyboardShortcuts = false), AccessibilityDevice())
+        val r = resolveAccessibility(AccessibilityChoices(reduceMotion = false, keyboardShortcuts = false), AccessibilityDevice())
         assertFalse(r.reduceMotion.value); assertNull(r.reduceMotion.override)
-        assertTrue(r.motionBlur.value); assertNull(r.motionBlur.override)
         assertFalse(r.keyboardShortcuts.value); assertFalse(r.keyboardShortcuts.locked)
     }
 
-    @Test fun batterySaver_forcesReduceMotionOn_andMotionBlurOff_andSaysWhy() {
-        val r = resolveAccessibility(AccessibilityChoices(reduceMotion = false, motionBlur = true), AccessibilityDevice(batterySaver = true))
+    @Test fun batterySaver_forcesReduceMotionOn_andSaysWhy() {
+        val r = resolveAccessibility(AccessibilityChoices(reduceMotion = false), AccessibilityDevice(batterySaver = true))
         assertTrue(r.reduceMotion.value); assertEquals(OverrideReason.BATTERY_SAVER, r.reduceMotion.override)
-        assertFalse(r.motionBlur.value); assertEquals(OverrideReason.BATTERY_SAVER, r.motionBlur.override)
-        assertTrue(r.reduceMotion.locked && r.motionBlur.locked)
+        assertTrue(r.reduceMotion.locked)
     }
 
-    @Test fun batterySaver_keepsTheUsersChoices_forWhenItGoesOff() {
-        val choices = AccessibilityChoices(reduceMotion = false, motionBlur = true)
+    @Test fun batterySaver_keepsTheUsersChoice_forWhenItGoesOff() {
+        val choices = AccessibilityChoices(reduceMotion = false)
         resolveAccessibility(choices, AccessibilityDevice(batterySaver = true))
         val back = resolveAccessibility(choices, AccessibilityDevice(batterySaver = false))
-        assertFalse(back.reduceMotion.locked)
-        assertTrue(back.motionBlur.value); assertFalse(back.motionBlur.locked)
+        assertFalse(back.reduceMotion.value); assertFalse(back.reduceMotion.locked)
     }
 
     @Test fun batterySaver_doesNotOverrideKeyboardShortcuts() {
@@ -34,32 +31,24 @@ class AccessibilityTest {
         assertTrue(r.keyboardShortcuts.value); assertFalse(r.keyboardShortcuts.locked)
     }
 
-    @Test fun systemRemoveAnimations_winsOverEverything_andLocksBoth() {
+    @Test fun systemRemoveAnimations_winsOverEverything_andLocks() {
         val r = resolveAccessibility(
-            AccessibilityChoices(reduceMotion = false, motionBlur = true),
+            AccessibilityChoices(reduceMotion = false),
             AccessibilityDevice(systemReduceMotion = true, batterySaver = false),
         )
+        assertTrue(r.reduceMotion.value)
         assertEquals(OverrideReason.SYSTEM_SETTING, r.reduceMotion.override)
-        assertEquals(OverrideReason.SYSTEM_SETTING, r.motionBlur.override)
-        assertFalse(r.motionBlur.value)
-    }
-
-    @Test fun theUsersOwnReduceMotion_turnsMotionBlurOff_withItsOwnReason() {
-        val r = resolveAccessibility(AccessibilityChoices(reduceMotion = true, motionBlur = true), AccessibilityDevice())
-        assertTrue(r.reduceMotion.value); assertNull(r.reduceMotion.override)
-        assertFalse(r.motionBlur.value); assertEquals(OverrideReason.REDUCE_MOTION, r.motionBlur.override)
     }
 
     @Test fun screenReader_isReportedButChangesNoSwitch() {
         val r = resolveAccessibility(AccessibilityChoices(), AccessibilityDevice(screenReaderOn = true))
         assertTrue(r.screenReaderOn)
-        assertFalse(r.reduceMotion.locked); assertFalse(r.motionBlur.locked); assertFalse(r.keyboardShortcuts.locked)
+        assertFalse(r.reduceMotion.locked); assertFalse(r.keyboardShortcuts.locked)
     }
 
     @Test fun theDefault_isTheUnforcedDefaults() {
         val d = AccessibilityResolved.Default
         assertFalse(d.reduceMotion.value)
-        assertTrue(d.motionBlur.value)
         assertTrue(d.keyboardShortcuts.value)
         assertFalse(d.screenReaderOn)
     }

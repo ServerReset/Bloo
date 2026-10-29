@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.TransformOrigin
@@ -46,20 +45,17 @@ fun newCascade(progress: () -> Float, closing: () -> Boolean): Cascade = Cascade
 fun Modifier.cascadeItem(): Modifier {
     val cascade = LocalCascade.current ?: return this
     val index = remember(cascade) { cascade.claim() }
-    val blurAllowed = motionBlurAllowed()
-    return graphicsLayer { applyCascade(cascade, index, blurAllowed) }
+    return graphicsLayer { applyCascade(cascade, index) }
 }
 
 /** The cascade's pop for one component at [index]: its own short window of the shared progress, with a soft overshoot on the way in. */
-private fun GraphicsLayerScope.applyCascade(cascade: Cascade, index: Int, blurAllowed: Boolean) {
+private fun GraphicsLayerScope.applyCascade(cascade: Cascade, index: Int) {
     val progress = cascade.progressNow()
     val total = max(1, cascade.count)
     // Where this component sits in the surface, 0 at the top to just under 1 at the bottom.
     val reached = index.toFloat() / total
     val vis: Float
     val scaleT: Float
-    // How far this component has got through its own pop, 0 at rest and 1 at its end. Its blur follows this, so only the part moving is soft.
-    val popClock: Float
     if (cascade.closingNow()) {
         // Closing: the bottom components leave first. progress falls 1 to 0, so (1 - progress) is the closing clock.
         val start = ((1f - reached) * CascadeExitCoverage + CascadePopDelay).coerceAtMost(0.9f)
@@ -67,22 +63,11 @@ private fun GraphicsLayerScope.applyCascade(cascade: Cascade, index: Int, blurAl
         val gone = raw * raw * (3f - 2f * raw)
         vis = 1f - gone
         scaleT = 1f - gone
-        popClock = raw
     } else {
         val start = (reached * CascadeRevealCoverage + CascadePopDelay).coerceAtMost(0.9f)
         val raw = ((progress - start) / CascadePopWindow).coerceIn(0f, 1f)
         vis = raw * raw * (3f - 2f * raw)
         scaleT = cascadeOvershoot(raw)
-        popClock = raw
-    }
-    if (blurAllowed) {
-        val dp = movingPartBlurDp(popClock)
-        renderEffect = if (dp >= MinMovingBlurDp) {
-            val px = dp * density
-            BlurEffect(px, px)
-        } else {
-            null
-        }
     }
     // Opacity is modulated, not rendered into its own buffer, so glass rows do not get an offscreen copy for the length of the open.
     compositingStrategy = CompositingStrategy.ModulateAlpha
@@ -92,9 +77,6 @@ private fun GraphicsLayerScope.applyCascade(cascade: Cascade, index: Int, blurAl
     scaleY = 0.82f + 0.18f * scaleT
     transformOrigin = TransformOrigin(0f, 0.5f)
 }
-
-/** Below this a component's blur is not drawn at all. */
-internal const val MinMovingBlurDp = 0.75f
 
 /** How much of the opening a component's position maps onto. */
 internal const val CascadeRevealCoverage = 0.6f

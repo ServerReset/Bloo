@@ -73,7 +73,6 @@ fun SwitchTrack(
     ) {
         Box(
             Modifier.padding(start = thumbOffset).size(thumbSize).clip(CircleShape)
-                .movingPartBlur { moveProgress }
                 .background(thumbColor),
         )
     }

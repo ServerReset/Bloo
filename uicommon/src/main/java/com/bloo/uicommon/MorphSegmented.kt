@@ -8,7 +8,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -66,9 +66,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlinx.coroutines.launch
-
-/** How far the highlight travels per segment, in pixels, as the motion-blur position: the pill's speed sets how soft it gets. */
-private const val SegmentTravelPx = 1000f
 
 /** One option in a [MorphSegmented] control. [icon] is optional. */
 data class SegmentOption(val key: String, val label: String, val icon: ImageVector? = null)
@@ -351,74 +348,73 @@ private fun SegmentTrack(
     modifier: Modifier,
     segment: @Composable (Int) -> Unit,
 ) {
-    Box(modifier.height(height)) {
-        // The highlight is on a layer of its own, so only it blurs as it travels between segments. The layout below sizes this box.
-        Canvas(Modifier.matchParentSize().motionBlur { position() * SegmentTravelPx }) {
-            val vis = shown()
-            if (vis <= 0.01f) return@Canvas
-            val g = gap.toPx()
-            // Left and right edge of every segment, from the widths the last layout settled on.
-            val lefts = FloatArray(n)
-            val rights = FloatArray(n)
-            var x = 0f
-            for (i in 0 until n) {
-                lefts[i] = x
-                x += widths[i]
-                rights[i] = x
-                x += g
-            }
-            // The highlight: edges blended between the two segments it is travelling across.
-            val p = position().coerceIn(0f, (n - 1).toFloat())
-            val i = p.toInt().coerceAtMost(n - 1)
-            val j = (i + 1).coerceAtMost(n - 1)
-            val f = p - i
-            val l = lefts[i] + (lefts[j] - lefts[i]) * f
-            val r = rights[i] + (rights[j] - rights[i]) * f
-            // A pane of tinted glass rather than a flat chip: the theme colour at ~three
-            // quarters so the track shows through, a bright sheen across the top, and a
-            // light-catching rim.
-            val topLeft = Offset(l, 0f)
-            val sz = Size((r - l).coerceAtLeast(0f), size.height)
-            val corner = CornerRadius(12.dp.toPx())
-            drawRoundRect(indicatorColor.copy(alpha = indicatorColor.alpha * 0.78f * vis), topLeft, sz, corner)
-            drawRoundRect(
-                androidx.compose.ui.graphics.Brush.verticalGradient(
-                    0f to Color.White.copy(alpha = 0.30f * vis),
-                    0.55f to Color.Transparent,
-                    1f to Color.Black.copy(alpha = 0.10f * vis),
-                    startY = 0f,
-                    endY = size.height,
-                ),
-                topLeft, sz, corner,
-            )
-            drawRoundRect(
-                androidx.compose.ui.graphics.Brush.verticalGradient(
-                    0f to Color.White.copy(alpha = 0.55f * vis),
-                    1f to Color.White.copy(alpha = 0.12f * vis),
-                    startY = 0f,
-                    endY = size.height,
-                ),
-                topLeft, sz, corner,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
-            )
-        }
-        Layout(
-            content = { for (i in 0 until n) Box(Modifier.layoutId(i)) { segment(i) } },
-        ) { measurables, constraints ->
-            val g = gap.roundToPx()
-            val full = if (constraints.hasBoundedWidth) constraints.maxWidth else 0
-            val free = (full - g * (n - 1)).coerceAtLeast(0)
-            val h = constraints.maxHeight.takeIf { it != Constraints.Infinity } ?: height.roundToPx()
-            val naturals = FloatArray(n) { measurables[it].maxIntrinsicWidth(h).toFloat() }
-            val fitted = fitSegmentWidths(free.toFloat(), weights(), naturals)
-            for (i in 0 until n) widths[i] = fitted[i]
-            var left = 0
-            val placeables = measurables.mapIndexed { i, m -> m.measure(Constraints.fixed(fitted[i].toInt().coerceAtLeast(0), h)) }
-            layout(full, h) {
-                placeables.forEachIndexed { i, p ->
-                    p.placeRelative(left, 0)
-                    left += p.width + g
+    Layout(
+        content = { for (i in 0 until n) Box(Modifier.layoutId(i)) { segment(i) } },
+        modifier = modifier
+            .height(height)
+            .drawBehind {
+                val vis = shown()
+                if (vis <= 0.01f) return@drawBehind
+                val g = gap.toPx()
+                // Left and right edge of every segment, from the widths the last layout settled on.
+                val lefts = FloatArray(n)
+                val rights = FloatArray(n)
+                var x = 0f
+                for (i in 0 until n) {
+                    lefts[i] = x
+                    x += widths[i]
+                    rights[i] = x
+                    x += g
                 }
+                // The highlight: edges blended between the two segments it is travelling across.
+                val p = position().coerceIn(0f, (n - 1).toFloat())
+                val i = p.toInt().coerceAtMost(n - 1)
+                val j = (i + 1).coerceAtMost(n - 1)
+                val f = p - i
+                val l = lefts[i] + (lefts[j] - lefts[i]) * f
+                val r = rights[i] + (rights[j] - rights[i]) * f
+                // A pane of tinted glass rather than a flat chip: the theme colour at ~three
+                // quarters so the track shows through, a bright sheen across the top, and a
+                // light-catching rim.
+                val topLeft = Offset(l, 0f)
+                val sz = Size((r - l).coerceAtLeast(0f), size.height)
+                val corner = CornerRadius(12.dp.toPx())
+                drawRoundRect(indicatorColor.copy(alpha = indicatorColor.alpha * 0.78f * vis), topLeft, sz, corner)
+                drawRoundRect(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = 0.30f * vis),
+                        0.55f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.10f * vis),
+                        startY = 0f,
+                        endY = size.height,
+                    ),
+                    topLeft, sz, corner,
+                )
+                drawRoundRect(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = 0.55f * vis),
+                        1f to Color.White.copy(alpha = 0.12f * vis),
+                        startY = 0f,
+                        endY = size.height,
+                    ),
+                    topLeft, sz, corner,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
+                )
+            },
+    ) { measurables, constraints ->
+        val g = gap.roundToPx()
+        val full = if (constraints.hasBoundedWidth) constraints.maxWidth else 0
+        val free = (full - g * (n - 1)).coerceAtLeast(0)
+        val h = constraints.maxHeight.takeIf { it != Constraints.Infinity } ?: height.roundToPx()
+        val naturals = FloatArray(n) { measurables[it].maxIntrinsicWidth(h).toFloat() }
+        val fitted = fitSegmentWidths(free.toFloat(), weights(), naturals)
+        for (i in 0 until n) widths[i] = fitted[i]
+        var left = 0
+        val placeables = measurables.mapIndexed { i, m -> m.measure(Constraints.fixed(fitted[i].toInt().coerceAtLeast(0), h)) }
+        layout(full, h) {
+            placeables.forEachIndexed { i, p ->
+                p.placeRelative(left, 0)
+                left += p.width + g
             }
         }
     }

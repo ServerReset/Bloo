@@ -52,17 +52,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.bloo.uicommon.lowPowerBounce
-import com.bloo.uicommon.movingPartBlur
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.bloo.uicommon.LocalMotionBlur
 import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.MotionShort
-import com.bloo.uicommon.motionBlurScrollGate
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.FieldShape
@@ -224,7 +221,6 @@ fun BlooApp(vm: AppViewModel) {
         LocalPowerPolicy provides powerPolicy,
         LocalAccessibility provides a11y,
         LocalReduceMotion provides a11y.reduceMotion.value,
-        LocalMotionBlur provides a11y.motionBlur.value,
         LocalTilt provides tilt,
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
@@ -234,8 +230,7 @@ fun BlooApp(vm: AppViewModel) {
     // Hoisted into their own small composables below so only those tiny scopes recompose per frame;
     // everything else just gets redrawn under the blurred/faded layer.
     Box(
-        Modifier.fillMaxSize().observeUserActivity(ambientActivity).appShortcuts(enabled = !locked && a11y.keyboardShortcuts.value, onShortcut = vm::onShortcut)
-            .motionBlurScrollGate(),
+        Modifier.fillMaxSize().observeUserActivity(ambientActivity).appShortcuts(enabled = !locked && a11y.keyboardShortcuts.value, onShortcut = vm::onShortcut),
     ) {
     // "Content settled": the garage's first composition has finished. Gates two full-screen blurs
     // (lock blur, Aurora backdrop blur) that dominate cold-start frame cost.
@@ -398,8 +393,7 @@ fun BlooApp(vm: AppViewModel) {
             // No `.padding(padding)`: SearchLayer reads WindowInsets itself, and padding here would
             // subtract the nav bar twice. The rise is a layout offset, not a graphicsLayer translation: the glass samples the
             // backdrop by layout position, so a translated layer drew its blur a few pixels off from the content it sits behind.
-            // The blur is a render effect on the same layer, so it softens the bar as it travels without moving it.
-            Box(Modifier.fillMaxSize().offset { IntOffset(0, (searchRise.value * screenHeightPx).roundToInt()) }.movingPartBlur { searchRise.value }) {
+            Box(Modifier.fillMaxSize().offset { IntOffset(0, (searchRise.value * screenHeightPx).roundToInt()) }) {
                 SearchLayer(
                     vm = vm,
                     state = stateHolder,

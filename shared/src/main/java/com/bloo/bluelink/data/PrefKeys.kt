@@ -68,7 +68,6 @@ object PrefKeys {
     const val THEME_MODE = "theme_mode"
     const val UI_SCALE = "ui_scale"
     const val ULTRA_GLASS = "ultra_glass"
-    const val MOTION_BLUR = "motion_blur"
     const val CLASSIC_HEADINGS = "classic_headings"
     const val REDUCE_MOTION = "reduce_motion"
     const val KEYBOARD_SHORTCUTS = "keyboard_shortcuts"

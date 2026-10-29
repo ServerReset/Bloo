@@ -5,7 +5,6 @@ import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import com.bloo.uicommon.lowPowerSoft
 import com.bloo.uicommon.bounceSpring
-import com.bloo.uicommon.movingPartBlur
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.LocalReduceMotion
 import androidx.compose.animation.core.LinearEasing
@@ -328,8 +327,7 @@ internal fun ExpandableMapLayer(
                             // 0 is off the top of the screen, 1 its place; the bounce takes it a little past 1 either way.
                             alpha = 1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)
                             translationY = -(1f - chrome.value) * (windowSize.height * 0.15f + size.height + barGapPx)
-                        }
-                        .movingPartBlur { chrome.value },
+                        },
                 )
             }
 
@@ -342,8 +340,7 @@ internal fun ExpandableMapLayer(
                             // 0 is off the bottom of the screen, 1 its place; the bounce takes it a little past 1 either way.
                             alpha = 1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)
                             translationY = (1f - chrome.value) * (size.height + 120.dp.toPx())
-                        }
-                        .movingPartBlur { chrome.value },
+                        },
                 ) {
                     MapFeatureRow(
                         features = listOf(

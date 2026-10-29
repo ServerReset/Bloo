@@ -73,7 +73,7 @@ Pick one route and stick with it. Moving between them means an uninstall, and an
 - **On-device AI.** Gemini Nano summaries and plain-language commands. The model runs on your phone.
 - **Sync.** Settings and photos follow you across devices through a file in your own Google Drive.
 - **Big screens.** Adaptive layouts for foldables and tablets, with reorderable pebbles, custom palettes and an animated background.
-- **Accessible.** Reduce motion, motion blur, keyboard shortcuts (Ctrl + / lists them), and labels for screen readers.
+- **Accessible.** Reduce motion, keyboard shortcuts (Ctrl + / lists them), and labels for screen readers.
 
 ---
 

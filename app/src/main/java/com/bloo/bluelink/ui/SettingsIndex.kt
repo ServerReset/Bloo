@@ -138,11 +138,6 @@ internal val ToggleSettings = listOf(
         visible = { it.shizukuAvailable }, checked = { a, _, _ -> a.seamlessInstallShizuku }, onToggle = { vm, v -> vm.setSeamlessInstallShizuku(v) },
     ),
     ToggleSpec(
-        key = PrefKeys.MOTION_BLUR, label = "Motion blur",
-        phrases = "turn off the blur on moving things make things sharper stop the smearing battery saver",
-        checked = { a, _, _ -> a.motionBlur }, onToggle = { vm, v -> vm.setMotionBlur(v) },
-    ),
-    ToggleSpec(
         key = PrefKeys.CLASSIC_HEADINGS, label = "Classic headings",
         phrases = "serif font classical titles headings elegant old style letters",
         checked = { a, _, _ -> a.classicHeadings }, onToggle = { vm, v -> vm.setClassicHeadings(v) },

@@ -46,9 +46,6 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
-/** The thumb's travel across the whole track, as the motion-blur position: a fraction of the range times this, read per frame. */
-private const val SliderTravelPx = 1000f
-
 /**
  * Bloo's hand-drawn slider (track, thumb, ticks, gestures). Colour, haptic and motion context
  * come in as parameters so the module stays theme-neutral.
@@ -309,15 +306,6 @@ fun AnimatedSlider(
                     drawCircle(if (x <= thumbX) dotOnActive else dotOnInactive, rPx * (1f + 0.7f * near * press), Offset(x, cy))
                 }
             }
-        }
-        // The thumb and its glow alone, on a layer of their own, so only they blur while they travel. The geometry matches the track above.
-        Canvas(Modifier.fillMaxWidth().height(thumbH).motionBlur { anim.value * SliderTravelPx }) {
-            val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
-            val frac = (anim.value - valueRange.start) / span
-            val padPx = edgePad.toPx()
-            val travel = (size.width - 2 * padPx).coerceAtLeast(0f)
-            val thumbX = padPx + travel * frac
-            val cy = size.height / 2f
             // A glow under the thumb while held, then the thumb, narrowing as it is pressed.
             if (press > 0.01f) {
                 drawCircle(

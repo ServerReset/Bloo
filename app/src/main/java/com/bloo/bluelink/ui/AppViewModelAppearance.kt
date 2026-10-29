@@ -19,7 +19,6 @@ import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.setUiScale
 import com.bloo.bluelink.data.setKeyboardShortcuts
 import com.bloo.bluelink.data.setClassicHeadings
-import com.bloo.bluelink.data.setMotionBlur
 import com.bloo.bluelink.data.setReduceMotion
 import com.bloo.bluelink.data.setUltraGlass
 import com.bloo.bluelink.data.setVibrancy
@@ -69,9 +68,6 @@ private fun playUltraGlassDing(context: Context) {
         }
     }
 }
-
-fun AppViewModel.setMotionBlur(value: Boolean) =
-    persist { setMotionBlur(value) }
 
 fun AppViewModel.setClassicHeadings(value: Boolean) =
     persist { setClassicHeadings(value) }

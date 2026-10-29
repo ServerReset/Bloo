@@ -14,10 +14,6 @@ suspend fun SettingsStore.setClassicHeadings(value: Boolean) {
     putFlag(SettingsStore.Keys.CLASSIC_HEADINGS, value)
 }
 
-suspend fun SettingsStore.setMotionBlur(value: Boolean) {
-    putFlag(SettingsStore.Keys.MOTION_BLUR, value)
-}
-
 suspend fun SettingsStore.setReduceMotion(value: Boolean) {
     putFlag(SettingsStore.Keys.REDUCE_MOTION, value)
 }
