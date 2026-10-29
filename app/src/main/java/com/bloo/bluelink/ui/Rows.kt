@@ -99,6 +99,11 @@ fun ToggleRow(
     checked: Boolean,
     modifier: Modifier = Modifier,
     /**
+     * False holds the switch where it is: it is drawn dimmed and cannot be tapped or set by a screen reader. Used when something else
+     * (Battery Saver, Android's own setting) has decided its value; the description says why.
+     */
+    enabled: Boolean = true,
+    /**
      * The explanatory line under the switch. Owning it here gives one style and rhythm, and keeps
      * it outside the toggleable so TalkBack reports a single switch.
      */
@@ -109,10 +114,10 @@ fun ToggleRow(
     // layout it had -- a Column around a single fillMaxWidth Row measures the same, but "the same"
     // is not worth asserting across ~25 call sites for a branch that costs nothing.
     if (description == null) {
-        ToggleRowControl(label, checked, modifier, onChange)
+        ToggleRowControl(label, checked, enabled, modifier, onChange)
     } else {
         Column(modifier.fillMaxWidth()) {
-            ToggleRowControl(label, checked, onChange = onChange)
+            ToggleRowControl(label, checked, enabled, onChange = onChange)
             SettingsCaption(description)
         }
     }
@@ -141,17 +146,21 @@ internal fun SettingsCaption(
     )
 }
 
+/** How faint a held switch is: dimmed, but still legible, so the reason under it reads as the point. */
+private const val DisabledAlpha = 0.45f
+
 /**
  * The `toggleable` (for checked/Role.Switch semantics), no-ripple and toggle-haptics wrapper shared
  * by [InlineToggle] and [ToggleRowControl].
  */
 @Composable
-private fun Modifier.hapticToggleable(checked: Boolean, onChange: (Boolean) -> Unit): Modifier {
+private fun Modifier.hapticToggleable(checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit): Modifier {
     val haptics = LocalHaptics.current
     // No blockPageSwipe: a sideways drag from a toggle swipes the page (a real tap is inside the
     // touch slop, so the toggle still wins).
     return toggleable(
         value = checked,
+        enabled = enabled,
         interactionSource = remember { MutableInteractionSource() },
         indication = null,
         role = Role.Switch,
@@ -168,19 +177,20 @@ private fun Modifier.hapticToggleable(checked: Boolean, onChange: (Boolean) -> U
  */
 @Composable
 internal fun InlineToggle(checked: Boolean, modifier: Modifier = Modifier, onChange: (Boolean) -> Unit) {
-    Box(modifier.hapticToggleable(checked, onChange)) {
+    Box(modifier.hapticToggleable(checked, enabled = true, onChange = onChange)) {
         MorphToggleTrack(checked)
     }
 }
 
 @Composable
-private fun ToggleRowControl(label: String, checked: Boolean, modifier: Modifier = Modifier, onChange: (Boolean) -> Unit) {
+private fun ToggleRowControl(label: String, checked: Boolean, enabled: Boolean, modifier: Modifier = Modifier, onChange: (Boolean) -> Unit) {
     SettingRow(
         modifier
             .fillMaxWidth()
             // toggleable gives a Role.Switch + checked node; the track clears its own so TalkBack
             // sees one toggle.
-            .hapticToggleable(checked, onChange)
+            .hapticToggleable(checked, enabled, onChange)
+            .alpha(if (enabled) 1f else DisabledAlpha)
             .padding(vertical = GapHairline),
         gap = GapGroup,
         label = { labelModifier ->

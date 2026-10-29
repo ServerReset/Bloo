@@ -66,6 +66,7 @@ internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: 
                 BodySmallText("The cards you swipe through on first open.")
                 MorphTextButton("Show welcome cards", onClick = { vm.showWelcomeCards() }, icon = Icons.Filled.Style)
             }
+            AccessibilityGroup(appearance, vm)
             SettingsGroup("Keyboard") {
                 BodySmallText("Shortcuts for a hardware keyboard: switch cars, refresh, lock, search and more. Press F1 anywhere.")
                 MorphTextButton("Show keyboard shortcuts", onClick = { vm.shortcutEvents.tryEmit(Shortcut.Help) }, icon = Icons.Filled.Keyboard)
@@ -136,11 +137,6 @@ private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean,
                     }
                     SettingsGroup("Style") {
                         GlassClaritySlider(appearance, vm)
-                        ToggleRow(
-                            "Motion blur",
-                            appearance.motionBlur,
-                            description = "Moving things soften a little as they travel: sliders, pebbles opening, floating buttons. Off in Battery Saver, and never while you scroll.",
-                        ) { vm.setMotionBlur(it) }
                     }
                 }
             }

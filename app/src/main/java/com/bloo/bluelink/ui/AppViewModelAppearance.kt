@@ -13,7 +13,9 @@ import com.bloo.bluelink.data.setSeamlessInstallShizuku
 import com.bloo.bluelink.data.setSearchBubblePosition
 import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.setUiScale
+import com.bloo.bluelink.data.setKeyboardShortcuts
 import com.bloo.bluelink.data.setMotionBlur
+import com.bloo.bluelink.data.setReduceMotion
 import com.bloo.bluelink.data.setUltraGlass
 import com.bloo.bluelink.data.setVibrancy
 import kotlinx.coroutines.flow.update
@@ -52,6 +54,12 @@ fun AppViewModel.setUltraGlass(value: Boolean) =
 
 fun AppViewModel.setMotionBlur(value: Boolean) =
     persist { setMotionBlur(value) }
+
+fun AppViewModel.setReduceMotion(value: Boolean) =
+    persist { setReduceMotion(value) }
+
+fun AppViewModel.setKeyboardShortcuts(value: Boolean) =
+    persist { setKeyboardShortcuts(value) }
 
 fun AppViewModel.setVibrancySoon(value: Float) =
     viewModelScope.launch { settingsStore.setVibrancy(value); pushPaletteToWatch() }

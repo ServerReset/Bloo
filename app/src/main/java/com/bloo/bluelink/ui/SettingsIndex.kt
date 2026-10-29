@@ -142,6 +142,16 @@ internal val ToggleSettings = listOf(
         phrases = "turn off the blur on moving things make things sharper stop the smearing battery saver",
         checked = { a, _, _ -> a.motionBlur }, onToggle = { vm, v -> vm.setMotionBlur(v) },
     ),
+    ToggleSpec(
+        key = PrefKeys.REDUCE_MOTION, label = "Reduce motion",
+        phrases = "less movement stop the bouncing calm things down motion sickness accessibility battery saver",
+        checked = { a, _, _ -> a.reduceMotion }, onToggle = { vm, v -> vm.setReduceMotion(v) },
+    ),
+    ToggleSpec(
+        key = PrefKeys.KEYBOARD_SHORTCUTS, label = "Keyboard shortcuts",
+        phrases = "hotkeys ctrl keys desktop keyboard navigate without touch",
+        checked = { a, _, _ -> a.keyboardShortcuts }, onToggle = { vm, v -> vm.setKeyboardShortcuts(v) },
+    ),
 )
 
 /**

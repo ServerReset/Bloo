@@ -86,6 +86,8 @@ object SettingsCatalog {
         app(PrefKeys.UI_SCALE, Kind.NUMBER, "Text & layout scale", "display size zoom bigger smaller text interface density"),
         app(PrefKeys.ULTRA_GLASS, Kind.TOGGLE, "Ultra glass", "liquid glass edge refraction"),
         app(PrefKeys.MOTION_BLUR, Kind.TOGGLE, "Motion blur", "blur motion moving sliders pebbles floating buttons animation smear battery saver"),
+        app(PrefKeys.REDUCE_MOTION, Kind.TOGGLE, "Reduce motion", "accessibility less motion animation bounce vestibular calm still battery saver"),
+        app(PrefKeys.KEYBOARD_SHORTCUTS, Kind.TOGGLE, "Keyboard shortcuts", "keyboard shortcuts hotkeys ctrl desktop keys accessibility"),
         app(PrefKeys.VIBRANCY, Kind.NUMBER, "Colour vibrancy", "color saturation vivid material you monochrome best buy tv muted"),
         app(PrefKeys.VEHICLE_ORDER, Kind.LIST, "Car order", "garage cars order reorder sort"),
         app(PrefKeys.WEATHER_FOLLOWS_DEVICE, Kind.TOGGLE, "Weather follows my location", "weather location device gps"),

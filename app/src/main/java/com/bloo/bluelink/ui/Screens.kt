@@ -58,6 +58,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.LocalMotionBlur
+import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.motionBlur
@@ -199,6 +200,8 @@ fun BlooApp(vm: AppViewModel) {
             }
         }
     }
+    // The accessibility suite, resolved once here; everything below reads LocalAccessibility, not the stored switches.
+    val a11y = rememberAccessibility(appearance, powerPolicy)
     CompositionLocalProvider(
         // Removes the default ripple app-wide (see NoTapHighlight). Material 3 components ignore
         // LocalIndication, so LocalRippleConfiguration = null turns off theirs.
@@ -211,7 +214,9 @@ fun BlooApp(vm: AppViewModel) {
         LocalBackdropHaze provides backdropHaze,
         LocalAmbientActivity provides ambientActivity,
         LocalPowerPolicy provides powerPolicy,
-        LocalMotionBlur provides (appearance.motionBlur && !powerPolicy.batterySaver),
+        LocalAccessibility provides a11y,
+        LocalReduceMotion provides a11y.reduceMotion.value,
+        LocalMotionBlur provides a11y.motionBlur.value,
         LocalTilt provides tilt,
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.
@@ -221,7 +226,7 @@ fun BlooApp(vm: AppViewModel) {
     // Hoisted into their own small composables below so only those tiny scopes recompose per frame;
     // everything else just gets redrawn under the blurred/faded layer.
     Box(
-        Modifier.fillMaxSize().observeUserActivity(ambientActivity).appShortcuts(enabled = !locked, onShortcut = vm::onShortcut)
+        Modifier.fillMaxSize().observeUserActivity(ambientActivity).appShortcuts(enabled = !locked && a11y.keyboardShortcuts.value, onShortcut = vm::onShortcut)
             .motionBlurScrollGate(),
     ) {
     // "Content settled": the garage's first composition has finished. Gates two full-screen blurs

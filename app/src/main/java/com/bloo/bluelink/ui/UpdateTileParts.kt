@@ -154,7 +154,7 @@ internal fun UpdateStatusLine(
                 Icon(icon, contentDescription = null, tint = animatedStatusTint, modifier = Modifier.size(20.dp))
             }
         }
-        AnimatedSwap(statusKind, label = "updateStatusText", modifier = Modifier.weight(1f)) { kind ->
+        AnimatedSwap(statusKind, label = "updateStatusText", modifier = Modifier.weight(1f).announcesChanges()) { kind ->
             val textStyle = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = LocalContentColor.current,

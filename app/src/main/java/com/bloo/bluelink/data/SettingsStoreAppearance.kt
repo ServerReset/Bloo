@@ -14,6 +14,14 @@ suspend fun SettingsStore.setMotionBlur(value: Boolean) {
     putFlag(SettingsStore.Keys.MOTION_BLUR, value)
 }
 
+suspend fun SettingsStore.setReduceMotion(value: Boolean) {
+    putFlag(SettingsStore.Keys.REDUCE_MOTION, value)
+}
+
+suspend fun SettingsStore.setKeyboardShortcuts(value: Boolean) {
+    putFlag(SettingsStore.Keys.KEYBOARD_SHORTCUTS, value)
+}
+
 suspend fun SettingsStore.setBiometricLock(enabled: Boolean) {
     putFlag(SettingsStore.Keys.BIOMETRIC, enabled)
 }
