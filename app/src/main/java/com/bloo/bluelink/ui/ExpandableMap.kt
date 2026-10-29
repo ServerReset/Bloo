@@ -277,6 +277,15 @@ internal fun ExpandableMapLayer(
             mapInputs,
         )
 
+        // Whether the car itself is still on screen: its details fold away once the map has scrolled it out of view.
+        val carOnScreen by remember {
+            derivedStateOf {
+                val margin = with(LocalDensity.current) { 40.dp.toPx() }
+                kotlin.math.abs(mapState.panX * mapState.scale) < windowSize.width / 2f - margin &&
+                    kotlin.math.abs(mapState.panY * mapState.scale) < windowSize.height / 2f - margin
+            }
+        }
+
         // The bars. The sheet's own frame, where it comes to rest (85% of the screen, taller as it is pulled up): it holds only the
         // bars now, and moves only with the pull-down.
         Box(
@@ -298,6 +307,7 @@ internal fun ExpandableMapLayer(
                 MapTopBar(
                     // The bar sits 15% down from the top of the screen, so its clear strip starts below that and its own height.
                     modifier = Modifier.onSizeChanged { chromeInsets?.topPx = windowSize.height * 0.15f + it.height },
+                    carOnScreen = carOnScreen,
                     vehicleName = vehicleName,
                     photo = photo,
                     chargePercent = chargePercent,

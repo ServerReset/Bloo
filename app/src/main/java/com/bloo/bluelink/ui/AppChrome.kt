@@ -121,7 +121,8 @@ internal fun GlassAlertDialog(
     Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         GlassSurface(
             shape = ExtraLargeShape,
-            modifier = Modifier.padding(horizontal = GapBlock).widthIn(max = 560.dp).fillMaxWidth(),
+            // Fills the screen: a small inset on a phone, a wider card on a tablet.
+            modifier = Modifier.padding(horizontal = GapGroup).widthIn(max = 640.dp).fillMaxWidth(),
             tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.97f),
         ) { card() }
     }

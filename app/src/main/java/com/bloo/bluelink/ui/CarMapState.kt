@@ -162,7 +162,8 @@ internal class ExpandedMapState {
         movableContentOf { modifier: Modifier, inputs: MapInputs ->
             CarMap(
                 inputs.location, modifier, state, inputs.deviceLocation, inputs.interactive, inputs.tileArea, inputs.panWeight,
-                otherCars = this@ExpandedMapState.otherCars,
+                // Only the full-screen map shows the other cars: the pebble's own map is this car alone.
+                otherCars = if (this@ExpandedMapState.vin == vin) this@ExpandedMapState.otherCars else emptyList(),
                 chromeInsets = this@ExpandedMapState.chromeInsets,
             )
         }
