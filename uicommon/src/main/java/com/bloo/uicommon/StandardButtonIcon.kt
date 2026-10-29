@@ -3,6 +3,11 @@
 package com.bloo.uicommon
 
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -150,15 +155,24 @@ fun MorphButtonLabel(
     Layout(
         content = {
             MorphButtonGlyph(icon, pending, iconSize, spinning)
+            // The label crossfades when its text changes, so a button that says "Update" then "Install" does not snap.
             // The one button label style, shared with MorphTextButton.
-            RevealText(
-                label,
-                style = style,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
-            )
+            AnimatedContent(
+                targetState = label,
+                transitionSpec = {
+                    fadeIn(tween(MotionShort)) togetherWith fadeOut(tween(MotionShort)) using SizeTransform(clip = false)
+                },
+                label = "buttonLabelText",
+            ) { text ->
+                RevealText(
+                    text,
+                    style = style,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                )
+            }
         },
         measurePolicy = remember(gap) {
             object : MeasurePolicy {
