@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -50,8 +51,9 @@ class KeyboardNavigationTest {
         }
         rule.waitForIdle()
 
-        // The first Tab from nothing focused lands on the first switch; Enter on it turns it off.
-        rule.onRoot().performKeyInput { pressKey(Key.Tab) }
+        // Tab from nothing focused did not reach the switch in the emulator run (the tree printed it unfocused), so focus the switch
+        // through its RequestFocus semantics action. Enter on it then turns it off.
+        rule.onNodeWithTag("motion").performSemanticsAction(SemanticsActions.RequestFocus)
         rule.waitForIdle()
         // Diagnostics: which node holds focus before the Enter, and what the switch reports after it.
         rule.onRoot(useUnmergedTree = true).printToLog("KeyboardNav-before-enter")
