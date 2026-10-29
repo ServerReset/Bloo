@@ -88,7 +88,7 @@ p { margin: 0 0 16px; }
 .btn.ghost:hover { background: var(--sun); border-color: var(--ink); color: var(--ink); }
 
 /* Top bar: floats, sticks, and the wordmark wobbles when you look at it. */
-.bar { position: sticky; top: 0; z-index: 20; padding: 16px 0; background: color-mix(in srgb, var(--paper) 82%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.bar { position: sticky; top: 0; z-index: 20; padding: 14px 0; background: var(--paper); border-bottom: 2px solid var(--ink); }
 .bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .logo { font-family: var(--serif); font-variation-settings: "opsz" 72, "WONK" 1; font-weight: 800; font-size: 30px; text-decoration: none; letter-spacing: -0.03em; transition: transform 0.6s var(--spring); display: inline-flex; gap: 10px; align-items: center; }
 .logo:hover { transform: rotate(-4deg) scale(1.06); }
@@ -118,13 +118,13 @@ p { margin: 0 0 16px; }
 @keyframes slide { to { transform: translateX(-50%); } }
 
 /* Sections. */
-section { padding: 88px 0 0; }
+section { padding: 72px 0 0; }
 .story { display: grid; gap: 44px; }
 @media (min-width: 900px) { .story { grid-template-columns: 1fr 1fr; align-items: center; } }
 .tall-word { font-family: var(--serif); font-variation-settings: "opsz" 144, "WONK" 1; font-weight: 800; font-size: clamp(120px, 22vw, 340px); line-height: 0.8; letter-spacing: -0.05em; margin: 0; transform: scaleY(1.4); transform-origin: top left; color: var(--rust); }
 
 /* Facts: stretched numbers, no boxes. */
-.numbers { display: grid; gap: 36px; grid-template-columns: 1fr; }
+.numbers { display: grid; gap: 24px; grid-template-columns: 1fr; }
 @media (min-width: 720px) { .numbers { grid-template-columns: repeat(3, 1fr); } }
 .numbers b { display: block; font-family: var(--serif); font-variation-settings: "opsz" 144; font-weight: 900; font-size: clamp(96px, 16vw, 200px); line-height: 0.8; letter-spacing: -0.05em; }
 .numbers b.tall { transform: scaleY(1.5); transform-origin: bottom; display: inline-block; }
@@ -157,7 +157,7 @@ section { padding: 88px 0 0; }
 .trail a { font-weight: 700; color: var(--rust); }
 
 /* Quotes and asides. */
-.aside { background: var(--plum); color: #fbf6ec; border-radius: 40px; padding: clamp(32px, 6vw, 72px); margin-top: 64px; position: relative; overflow: hidden; }
+.aside { background: var(--plum); color: #fbf6ec; border-radius: 40px; padding: clamp(28px, 6vw, 64px); margin-top: 56px; position: relative; overflow: hidden; }
 .aside .h2 { color: #fbf6ec; }
 .aside p { color: #e8dfd0; max-width: 56ch; font-size: 19px; }
 .aside::after { content: "\201C"; position: absolute; right: 20px; top: -40px; font-family: var(--serif); font-size: 340px; line-height: 1; color: rgba(255, 200, 61, 0.18); }
@@ -173,7 +173,7 @@ section { padding: 88px 0 0; }
 .qa details p { padding-bottom: 20px; margin: 0; font-size: 18px; }
 
 /* Closing: a bold block that wiggles. */
-.final { margin: 88px 0 0; background: var(--rust); color: #fff; border-radius: 48px; padding: clamp(40px, 8vw, 110px) clamp(24px, 6vw, 80px); text-align: center; overflow: hidden; }
+.final { margin: 72px 0 0; background: var(--rust); color: #fff; border-radius: 48px; padding: clamp(40px, 8vw, 110px) clamp(24px, 6vw, 80px); text-align: center; overflow: hidden; }
 .final .display { font-size: clamp(60px, 13vw, 190px); color: #fff; }
 .final .display em { color: var(--sun); }
 .final .btns { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 40px; }
@@ -213,13 +213,17 @@ footer nav { display: flex; flex-wrap: wrap; gap: 6px 22px; }
   .glow { display: none; }
 }
 
-/* Small screens: the header keeps the name and the call to action, and the long link row steps aside. */
+/* Small screens: the header keeps only the name, so nothing crowds the hero text; sections and rows are tighter. */
 @media (max-width: 620px) {
   .bar nav { display: none; }
-  .bar .wrap { justify-content: flex-start; }
-  section { padding-top: 64px; }
-  .hero { padding-top: 16px; }
+  section { padding-top: 56px; }
+  .hero { padding-top: 12px; }
+  .numbers { gap: 16px; }
   .numbers b { font-size: clamp(72px, 24vw, 120px); }
-  .trail li { grid-template-columns: 64px 1fr; gap: 16px; }
-  .final { border-radius: 32px; }
+  .stickers { gap: 16px; margin-top: 32px; }
+  .sticker { padding: 22px 22px 26px; }
+  .trail li { grid-template-columns: 64px 1fr; gap: 16px; padding: 24px 0; }
+  .aside { margin-top: 40px; border-radius: 28px; }
+  .final { border-radius: 32px; margin-top: 56px; }
+  .marquee { margin-top: 48px; }
 }
