@@ -1,5 +1,9 @@
 package com.bloo.bluelink.ui
 
+import android.app.Application
+import android.content.Context
+import android.media.MediaPlayer
+import com.bloo.bluelink.R
 import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import androidx.lifecycle.viewModelScope
@@ -19,6 +23,7 @@ import com.bloo.bluelink.data.setMotionBlur
 import com.bloo.bluelink.data.setReduceMotion
 import com.bloo.bluelink.data.setUltraGlass
 import com.bloo.bluelink.data.setVibrancy
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -50,8 +55,20 @@ fun AppViewModel.setUiScaleSoon(value: Float) =
 fun AppViewModel.setGlassClaritySoon(value: Float) =
     persist { setGlassClarity(value) }
 
-fun AppViewModel.setUltraGlass(value: Boolean) =
-    persist { setUltraGlass(value) }
+fun AppViewModel.setUltraGlass(value: Boolean): Job {
+    if (value) playUltraGlassDing(getApplication<Application>())
+    return persist { setUltraGlass(value) }
+}
+
+/** The sound that marks Ultra glass switching on. Played from the user's own tap; a failed play is ignored. */
+private fun playUltraGlassDing(context: Context) {
+    runCatching {
+        MediaPlayer.create(context, R.raw.ultra_glass_ding)?.apply {
+            setOnCompletionListener { release() }
+            start()
+        }
+    }
+}
 
 fun AppViewModel.setMotionBlur(value: Boolean) =
     persist { setMotionBlur(value) }
