@@ -21,7 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
-import com.bloo.uicommon.calmSpring
+import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.LocalHaptics
 
 /**
@@ -118,7 +118,9 @@ internal fun GarageScreen(
     // that flips on its own track, so the column change, the block growth and the two-column reflow move as one, the way the map's
     // own open does.
     val perPageTarget = if (fullScreen && multiColumn) 1 else naturalColumns
-    val carSpring = calmSpring<Float>(Spring.StiffnessMediumLow)
+    // The app's bounce spring, the same one the pebbles and the search bar use, so a car opening into two columns settles the way
+    // everything else on screen does instead of arriving flat.
+    val carSpring = lowPowerBounce<Float>(stiffness = Spring.StiffnessMediumLow)
     val perPageAnim = remember { androidx.compose.animation.core.Animatable(perPageTarget.toFloat()) }
     LaunchedEffect(perPageTarget) { perPageAnim.animateTo(perPageTarget.toFloat(), carSpring) }
     val density = LocalDensity.current
