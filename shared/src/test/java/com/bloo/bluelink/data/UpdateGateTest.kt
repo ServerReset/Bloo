@@ -158,9 +158,11 @@ class UpdateGateTest {
     }
 
     @Test
-    fun `an unstamped branch falls back to the default`() {
-        assertEquals(UpdateApi.DEFAULT_BRANCH, UpdateGate.resolveBranch(""))
-        assertEquals(UpdateApi.DEFAULT_BRANCH, UpdateGate.resolveBranch("   "))
-        assertEquals("some-branch", UpdateGate.resolveBranch("some-branch"))
+    fun `an unstamped or mainline branch shows no branch suffix`() {
+        assertEquals("build 5", buildLabel(5, ""))
+        assertEquals("build 5", buildLabel(5, "   "))
+        assertEquals("build 5", buildLabel(5, UpdateApi.DEFAULT_BRANCH))
+        assertEquals("build 5", buildLabel(5, "main"))
+        assertEquals("build 5 · some-branch", buildLabel(5, "some-branch"))
     }
 }

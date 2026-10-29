@@ -34,8 +34,8 @@ class EuApiTest {
         // prepends another, so every authenticated Europe call (the vehicle list first) went out as
         // "Bearer Bearer ..." and the EU API rejected it with a 403.
         val session = EuSession(
-            accessToken = "ccs-access-token",
-            refreshToken = null,
+            token = "ccs-access-token",
+            refresh = null,
             deviceId = "device-1",
             pin = null,
         )
@@ -43,7 +43,7 @@ class EuApiTest {
         assertEquals("Bearer ccs-access-token", header)
         // A session saved before the fix carries the prefix too; the header must correct it rather
         // than emit "Bearer Bearer ..." and force a re-login.
-        val legacy = session.copy(accessToken = "Bearer ccs-access-token")
+        val legacy = session.copy(token = "Bearer ccs-access-token")
         val legacyHeader = with(api) { Request.Builder().url("https://example.com/").authHeaders(legacy, 0) }.build().header("Authorization")
         assertEquals("Bearer ccs-access-token", legacyHeader)
     }
