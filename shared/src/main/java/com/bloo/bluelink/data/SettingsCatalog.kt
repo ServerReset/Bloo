@@ -156,6 +156,8 @@ object SettingsCatalog {
         AlertKeys.DOOR_MINUTES, AlertKeys.RUNNING, AlertKeys.RUNNING_MINUTES, AlertKeys.SERVICE, AlertKeys.CAR_STARTED,
         AlertKeys.UNLOCKED, AlertKeys.UNLOCKED_MINUTES, AlertKeys.WATCH_LOW_BATTERY, "theme_mode",
         "ui_scale", "vibrancy", "enabled_shortcuts", "color_palette", "columns_flipped", "settings_mode",
+        // The accessibility suite's own switches (AccessibilityGroup in Settings, ToggleSpec in search).
+        PrefKeys.MOTION_BLUR, PrefKeys.REDUCE_MOTION, PrefKeys.KEYBOARD_SHORTCUTS,
         "vehicle_order", "custom_palettes", "weather_label", "weather_follows_device",
         "hotspots_", "sections_", "collapsed_", "img_",
         // Covered by an existing control: the App lock row (timing), the Glass stops (Ultra).
