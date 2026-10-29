@@ -1,5 +1,8 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.Box
 import com.bloo.bluelink.data.CarCommandIds
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -138,6 +141,7 @@ internal fun GarageScreen(
         // ONE page, ALWAYS the pager: a car's own layout scales with the device width, so there is no
         // expand or collapse to reconcile -- the pebbles slide from under the hero to beside it purely
         // as the page grows wide enough.
+        BlurredBehindMap(expandedMap) {
         CollapsedGaragePager(
             vehicles, count, slots, perPage, naturalColumns, perPageAnim.asState(), vm.currentIndex,
             windowInfo.containerSize.width, state, vm, hazeState,
@@ -160,6 +164,7 @@ internal fun GarageScreen(
                 }
             },
         )
+        }
     }
     }
 }
@@ -209,5 +214,30 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
             frostHaze = frostHaze,
             onDismiss = { expandedMap.vin = null },
         )
+    }
+}
+
+/** Milliseconds the garage takes to blur or clear behind an open map. */
+private const val MapBlurMs = 320
+
+/** How soft the garage gets behind an open full-screen map, at its fullest. */
+private const val MapBlurDp = 14f
+
+/** The garage behind an open full-screen map: softly blurred while it is open, and clear again once the map closes. */
+@Composable
+private fun BlurredBehindMap(expandedMap: ExpandedMapState, content: @Composable () -> Unit) {
+    val target = if (expandedMap.vin != null) 1f else 0f
+    val amount by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = target,
+        animationSpec = androidx.compose.animation.core.tween(MapBlurMs),
+        label = "garageBehindMap",
+    )
+    Box(
+        Modifier.fillMaxSize().graphicsLayer {
+            val px = MapBlurDp * density * amount
+            renderEffect = if (amount > 0.01f) androidx.compose.ui.graphics.BlurEffect(px, px) else null
+        },
+    ) {
+        content()
     }
 }
