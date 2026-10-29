@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.bloo.bluelink.shared"
     compileSdk = 37
+    compileSdkMinor = 0
 
     defaultConfig {
         // Must be <= the lowest consumer minSdk. The phone app targets 26 and the

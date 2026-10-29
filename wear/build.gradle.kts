@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.bloo.bluelink.wear"
     compileSdk = 37
+    compileSdkMinor = 0
 
     defaultConfig {
         // The SAME applicationId as the phone app, and deliberately so: the Wearable Data Layer only
@@ -31,7 +32,13 @@ android {
         // build), while on a phone only this one is incompatible -- it requires the watch feature -- and
         // the phone bundle wins. One listing, one install each, no targeting rules to maintain.
         versionCode = 10_000_000 + runNumber.coerceAtLeast(1)
-        versionName = if (runNumber > 0) "build $runNumber" else "dev"
+        val major = System.getenv("BLOO_MAJOR")?.toIntOrNull() ?: 0
+        versionName = when {
+            major > 0 && runNumber > 0 -> "major $major · build $runNumber"
+            major > 0 -> "major $major"
+            runNumber > 0 -> "build $runNumber"
+            else -> "dev"
+        }
         // Same CI run number as the phone, so the watch can tell whether the phone is
         // advertising a newer watch build than the one it is running.
         buildConfigField("int", "BUILD_RUN_NUMBER", System.getenv("GITHUB_RUN_NUMBER") ?: "0")
@@ -205,7 +212,7 @@ androidComponents {
     onVariants { variant ->
         variant.outputs.forEach { output ->
             if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                output.outputFileName = "Bloo-watch.apk"
+                output.outputFileName = if (variant.flavorName == "play") "Bloo-watch-play.apk" else "Bloo-watch.apk"
             }
         }
     }

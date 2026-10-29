@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.bloo.uicommon"
     compileSdk = 37
+    compileSdkMinor = 0
 
     defaultConfig {
         // <= the lowest consumer minSdk (phone 26, watch 30).

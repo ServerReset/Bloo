@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "com.bloo.bluelink"
     compileSdk = 37
+    compileSdkMinor = 0
 
     defaultConfig {
         applicationId = "com.bloo.bluelink"

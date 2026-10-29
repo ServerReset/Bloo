@@ -27,7 +27,7 @@ internal fun OnboardingStepKind.isInfoSwipe(): Boolean =
  * returning: flip this the moment the form factor is live and the deck carries it again, in the same
  * place, with no other change.
  */
-internal const val WatchInstallableFromPlay = false
+internal const val WatchInstallableFromPlay = true
 
 internal data class OnboardingStep(val kind: OnboardingStepKind, val vin: String? = null)
 

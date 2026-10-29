@@ -146,7 +146,7 @@ jobs:
           BLOO_UPLOAD_STORE_PASSWORD: ${{ secrets.BLOO_UPLOAD_STORE_PASSWORD }}
           BLOO_UPLOAD_KEY_ALIAS: ${{ secrets.BLOO_UPLOAD_KEY_ALIAS }}
           BLOO_UPLOAD_KEY_PASSWORD: ${{ secrets.BLOO_UPLOAD_KEY_PASSWORD }}
-        run: ./gradlew testSideloadDebugUnitTest testPlayDebugUnitTest assembleSideloadRelease bundlePlayRelease :wear:assembleSideloadRelease :wear:bundlePlayRelease --stacktrace
+        run: ./gradlew testSideloadDebugUnitTest testPlayDebugUnitTest :wear:testSideloadDebugUnitTest :wear:testPlayDebugUnitTest assembleSideloadRelease bundlePlayRelease :wear:assembleSideloadRelease :wear:bundlePlayRelease --stacktrace
 
       # The Play artifact must never carry the restricted installer permissions. It does not today --
       # verified against the merged manifest, which is also what this checks on every run. Two things
@@ -171,6 +171,25 @@ jobs:
               echo "::error::$p is in the Play bundle"; fail=1
             else
               echo "  absent: $p"
+            fi
+          done
+          for aab in app/build/outputs/bundle/playRelease/app-play-release.aab wear/build/outputs/bundle/playRelease/wear-play-release.aab; do
+            if [ ! -f "$aab" ]; then echo "::error::no play bundle at $aab"; exit 1; fi
+            echo "checking $aab"
+            for p in android.permission.REQUEST_INSTALL_PACKAGES moe.shizuku.manager.permission.API_V23; do
+              if unzip -p "$aab" base/manifest/AndroidManifest.xml | grep -qa "$p"; then
+                echo "::error::$p is in $aab"; fail=1
+              else
+                echo "  absent: $p"
+              fi
+            done
+          done
+          wear_aab=wear/build/outputs/bundle/playRelease/wear-play-release.aab
+          for req in android.hardware.type.watch com.google.android.wearable.standalone; do
+            if unzip -p "$wear_aab" base/manifest/AndroidManifest.xml | grep -qa "$req"; then
+              echo "  present in wear bundle: $req"
+            else
+              echo "::error::$req is missing from $wear_aab"; fail=1
             fi
           done
           exit $fail
