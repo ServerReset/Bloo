@@ -21,6 +21,10 @@ on:
         description: "Also upload this build to a Play track (internal, alpha, beta). Empty = build only."
         type: string
         default: ""
+      play_notes:
+        description: "What's new on Play for this upload, in plain text (Play caps it at 480 characters). Empty = the commit subjects since the last build."
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -486,6 +490,8 @@ jobs:
       # at the top. A separate step because this job does not have the build job's release_notes.md --
       # it checks the repository out itself and can read the log.
       - name: Build the Play patch notes
+        env:
+          PLAY_NOTES_INPUT: ${{ inputs.play_notes }}
         run: |
           set -euo pipefail
           # The previous BUILD TAG THAT IS NOT THIS COMMIT. Naively taking the newest `build-*` tag
@@ -497,6 +503,10 @@ jobs:
           for n in $(git tag -l 'build-*' | sed 's/^build-//' | sort -rn); do
             if [ "$(git rev-parse "build-$n^{commit}" 2>/dev/null)" != "$head_sha" ]; then prev="$n"; break; fi
           done
+          if [ -n "${PLAY_NOTES_INPUT:-}" ]; then
+            # A written changelog for this upload, from the dispatch input.
+            printf '%s\n' "$PLAY_NOTES_INPUT" > "$RUNNER_TEMP/play-notes.txt"
+          else
           {
             echo "Build ${{ github.run_number }}"
             echo
@@ -506,6 +516,7 @@ jobs:
               git log --pretty=format:'- %s' -n 10
             fi
           } > "$RUNNER_TEMP/play-notes.txt"
+          fi
           echo "--- Play patch notes ($(wc -c < "$RUNNER_TEMP/play-notes.txt") bytes, since build ${prev:-none})"
           cat "$RUNNER_TEMP/play-notes.txt"
 
