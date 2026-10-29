@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.bloo.uicommon.lowPowerBounce
+import com.bloo.uicommon.movingPartBlur
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlin.math.roundToInt
@@ -124,7 +125,15 @@ fun BlooApp(vm: AppViewModel) {
     val searchRiseSpec = lowPowerBounce<Float>(stiffness = Spring.StiffnessLow)
     LaunchedEffect(searchHidden) {
         // A lock hides the bar at once, under the blur. Everything else animates it.
-        if (locked) searchRise.snapTo(1f) else searchRise.animateTo(if (searchHidden) 1f else 0f, searchRiseSpec)
+        if (locked) {
+            searchRise.snapTo(1f)
+        } else {
+            val target = if (searchHidden) 1f else 0f
+            searchRise.animateTo(target, searchRiseSpec)
+            // The spring stops a hair short of its target, and the offset below is that fraction of the whole screen: land on the
+            // target exactly, so the bar rests where it belongs and not a pixel off it.
+            searchRise.snapTo(target)
+        }
     }
     val screenHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
     // Derived too, so only a photo pick / welcome-card / install-guide change recomposes the root:
@@ -389,7 +398,8 @@ fun BlooApp(vm: AppViewModel) {
             // No `.padding(padding)`: SearchLayer reads WindowInsets itself, and padding here would
             // subtract the nav bar twice. The rise is a layout offset, not a graphicsLayer translation: the glass samples the
             // backdrop by layout position, so a translated layer drew its blur a few pixels off from the content it sits behind.
-            Box(Modifier.fillMaxSize().offset { IntOffset(0, (searchRise.value * screenHeightPx).roundToInt()) }) {
+            // The blur is a render effect on the same layer, so it softens the bar as it travels without moving it.
+            Box(Modifier.fillMaxSize().offset { IntOffset(0, (searchRise.value * screenHeightPx).roundToInt()) }.movingPartBlur { searchRise.value }) {
                 SearchLayer(
                     vm = vm,
                     state = stateHolder,
