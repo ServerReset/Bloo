@@ -42,7 +42,9 @@ import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.PrimaryTextStyle
+import com.bloo.uicommon.ButtonLabelStyle
 import com.bloo.uicommon.RevealText
+import androidx.compose.ui.text.style.TextOverflow
 import com.bloo.uicommon.SecondaryTextStyle
 
 /**
@@ -81,25 +83,28 @@ internal fun CredentialsPrivacyNote(brandLabel: String?, modifier: Modifier = Mo
                 fillOnPress = false,
             )
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                MorphTextButton(text = "In the app", onClick = { choosing = false; reading = true })
-                MorphTextButton(
-                    text = "HTML page",
-                    onClick = { choosing = false; openPrivacyPage(context, styled = false) },
-                    icon = Icons.AutoMirrored.Filled.OpenInNew,
-                    fillOnPress = false,
-                )
-                MorphTextButton(
-                    text = "Web page",
-                    onClick = { choosing = false; openPrivacyPage(context, styled = true) },
-                    icon = Icons.AutoMirrored.Filled.OpenInNew,
-                    fillOnPress = false,
-                )
-            }
+            // The three ways to read it, as one button set rather than three stacked buttons.
+            ButtonCluster(
+                listOf(
+                    privacyChoice("In the app") { choosing = false; reading = true },
+                    privacyChoice("HTML page") { choosing = false; openPrivacyPage(context, styled = false) },
+                    privacyChoice("Web page") { choosing = false; openPrivacyPage(context, styled = true) },
+                ),
+            )
         }
         if (reading) PrivacyPolicyViewer(onClose = { reading = false })
     }
 }
+
+/** One choice in the privacy button set: an equal share of the row, labelled in one line. */
+private fun privacyChoice(label: String, onClick: () -> Unit) = ClusterButton(
+    onClick = onClick,
+    weight = 1f,
+    onClickHaptic = null,
+    content = {
+        RevealText(label, style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    },
+)
 
 /**
  * The privacy policy, shown inside the app. The text is the plain copy the app keeps: the last one it pulled from the site, or the one
@@ -134,7 +139,11 @@ internal fun PrivacyPolicyViewer(onClose: () -> Unit) {
     var html by remember { mutableStateOf(PrivacyCopy.local(context)) }
     LaunchedEffect(Unit) { PrivacyCopy.pull(context.applicationContext)?.let { html = it } }
     val page = remember(html, scheme) { themedPage(html, scheme.onSurface, scheme.primary) }
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    // Edge to edge: the dialog draws behind the system bars, and the title and the bottom bar pad themselves for them.
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
         Surface(Modifier.fillMaxSize(), color = scheme.surface) {
             Box(Modifier.fillMaxSize()) {
                 // The text fills the screen between the title and the floating bar, so nothing scrolls under either.
