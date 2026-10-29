@@ -57,6 +57,7 @@ import dev.chrisbanes.haze.hazeSource
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.bloo.uicommon.LocalMotionBlur
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.motionBlur
@@ -210,6 +211,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalBackdropHaze provides backdropHaze,
         LocalAmbientActivity provides ambientActivity,
         LocalPowerPolicy provides powerPolicy,
+        LocalMotionBlur provides (appearance.motionBlur && !powerPolicy.batterySaver),
         LocalTilt provides tilt,
         LocalHaptics provides haptics,
         // Provided once so pebbles read LocalAppearance.current instead of each collecting.

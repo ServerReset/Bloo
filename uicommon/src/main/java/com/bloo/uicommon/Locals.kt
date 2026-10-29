@@ -23,6 +23,11 @@ val LocalReduceMotion = staticCompositionLocalOf { false }
  * directly. Collected once because every call site used to collect the flow itself: about ten per
  * pebble, hundreds of live collectors across the pages in the pager, all created mid-swipe.
  */
+/**
+ * Whether motion blur draws at all. The app sets it from the user's switch and Battery Saver ([motionBlur] reads it); its default is on.
+ */
+val LocalMotionBlur = compositionLocalOf { true }
+
 val LocalPowerPolicy = compositionLocalOf {
     com.bloo.bluelink.data.PowerPolicy.of(com.bloo.bluelink.data.DeviceState())
 }

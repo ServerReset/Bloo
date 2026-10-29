@@ -136,6 +136,11 @@ private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean,
                     }
                     SettingsGroup("Style") {
                         GlassClaritySlider(appearance, vm)
+                        ToggleRow(
+                            "Motion blur",
+                            appearance.motionBlur,
+                            description = "Moving things soften a little as they travel: sliders, pebbles opening, floating buttons. Off in Battery Saver, and never while you scroll.",
+                        ) { vm.setMotionBlur(it) }
                     }
                 }
             }

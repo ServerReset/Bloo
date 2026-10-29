@@ -12,7 +12,7 @@ import android.os.SystemClock
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
-import com.bloo.uicommon.motionBlurWhenMoving
+import com.bloo.uicommon.motionBlur
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
@@ -274,7 +274,7 @@ internal fun ToastHost(state: ToastState, hazeState: HazeState, onCopy: (String)
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
             .padding(start = ToastEdge, end = ToastEdge, bottom = ToastEdge)
-            .motionBlurWhenMoving(),
+            .motionBlur(),
     ) {
         visible.forEachIndexed { i, toast ->
             key(toast.id) {

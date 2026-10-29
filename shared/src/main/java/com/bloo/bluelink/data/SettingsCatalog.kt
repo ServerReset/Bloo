@@ -85,6 +85,7 @@ object SettingsCatalog {
         app(PrefKeys.THEME_MODE, Kind.CHOICE, "Display mode", "theme light dark amoled oled system appearance"),
         app(PrefKeys.UI_SCALE, Kind.NUMBER, "Text & layout scale", "display size zoom bigger smaller text interface density"),
         app(PrefKeys.ULTRA_GLASS, Kind.TOGGLE, "Ultra glass", "liquid glass edge refraction"),
+        app(PrefKeys.MOTION_BLUR, Kind.TOGGLE, "Motion blur", "blur motion moving sliders pebbles floating buttons animation smear battery saver"),
         app(PrefKeys.VIBRANCY, Kind.NUMBER, "Colour vibrancy", "color saturation vivid material you monochrome best buy tv muted"),
         app(PrefKeys.VEHICLE_ORDER, Kind.LIST, "Car order", "garage cars order reorder sort"),
         app(PrefKeys.WEATHER_FOLLOWS_DEVICE, Kind.TOGGLE, "Weather follows my location", "weather location device gps"),

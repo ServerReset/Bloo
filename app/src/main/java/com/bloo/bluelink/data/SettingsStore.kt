@@ -46,6 +46,7 @@ class SettingsStore(internal val context: Context) {
         val ULTRA_GLASS = stringPreferencesKey(PrefKeys.ULTRA_GLASS)
         val HAPTICS = stringPreferencesKey(PrefKeys.HAPTICS_ENABLED)
         val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey(PrefKeys.SEAMLESS_INSTALL_SHIZUKU)
+        val MOTION_BLUR = stringPreferencesKey(PrefKeys.MOTION_BLUR)
         // Fractions (0f..1f) of the search bubble's own drag range, not raw dp -- the display
         // doesn't change size between sessions, but a fraction still degrades gracefully if it ever
         // did, where a raw dp coordinate could clamp to a corner it wasn't actually dropped near.
@@ -128,6 +129,8 @@ class SettingsStore(internal val context: Context) {
          * SyncMerge.DEVICE_LOCAL_KEYS).
          */
         val seamlessInstallShizuku: Boolean = false,
+        /** The user's motion blur switch. The blur also stops in Battery Saver, which is decided by the device, not here. */
+        val motionBlur: Boolean = true,
         /**
          * Opt-in "liquid glass" appearance. Off by default = current look; when on, floating chrome
          * and cards use real backdrop refraction (API 31+) or an enhanced-frosted fallback below
@@ -187,6 +190,7 @@ class SettingsStore(internal val context: Context) {
             tempUnit = prefs[Keys.TEMP_UNIT] ?: "auto",
             distanceUnit = prefs[Keys.DISTANCE_UNIT] ?: "auto",
             seamlessInstallShizuku = prefs.flag(Keys.SEAMLESS_INSTALL_SHIZUKU, false),
+            motionBlur = prefs.flag(Keys.MOTION_BLUR, true),
         )
     }
         // Off the main thread. This is a ~40-field decode including two JSON parses (custom

@@ -137,6 +137,11 @@ internal val ToggleSettings = listOf(
         key = PrefKeys.SEAMLESS_INSTALL_SHIZUKU, label = "Install updates seamlessly (Shizuku)",
         visible = { it.shizukuAvailable }, checked = { a, _, _ -> a.seamlessInstallShizuku }, onToggle = { vm, v -> vm.setSeamlessInstallShizuku(v) },
     ),
+    ToggleSpec(
+        key = PrefKeys.MOTION_BLUR, label = "Motion blur",
+        phrases = "turn off the blur on moving things make things sharper stop the smearing battery saver",
+        checked = { a, _, _ -> a.motionBlur }, onToggle = { vm, v -> vm.setMotionBlur(v) },
+    ),
 )
 
 /**

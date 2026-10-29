@@ -25,26 +25,28 @@ private const val MaxMotionBlurDp = 2f
 private const val MinMotionBlurDp = 0.25f
 
 /**
- * A touch of motion blur for anything that moves: the layer softens in proportion to how fast [positionPx] is changing, and sharpens as
- * it settles. Used for surfaces that slide, grow or swipe, so the motion reads as motion rather than as a sequence of stills.
+ * The app's one motion blur. Two ways to say what moves, and one gate that decides whether any of it draws:
  *
- * [positionPx] is read in the draw phase, so a moving layer is never recomposed for its blur. Blur needs Android 12 (API 31); below that
- * the effect is simply not drawn, and the motion is unchanged.
+ * - `motionBlur { position }`: the layer blurs with the speed of [positionPx], for motion the layer does not get from its own layout (a
+ *   slider thumb, a sheet moved by a graphics translation, a screen turn).
+ * - `motionBlur()`: the layer measures its own window position and size on each layout, and blurs with how fast those change. Use it on
+ *   surfaces that slide, grow or swipe with their parent (pebbles, pop-ups, the toast stack).
+ *
+ * Off when the user has switched motion blur off, in Battery Saver, under reduce motion, and for the length of any scroll ([motionBlurScrollGate]).
+ * Blur needs Android 12 (API 31); below that the effect is not drawn and the motion is unchanged.
+ * Not for text, scrolling lists, progress bars, the map or a haze source: those are read every frame or must stay sharp to be read.
  */
 @Composable
 fun Modifier.motionBlur(positionPx: () -> Float): Modifier {
+    if (!motionBlurAllowed()) return this
     val speed = remember { MotionSpeed() }
     return graphicsLayer { applyMotionBlur(speed.sample(positionPx(), System.nanoTime())) }
 }
 
-/**
- * The same touch of blur for any layer that moves or changes size, with no caller having to say what moves it: the layer measures its own
- * window position and size on each layout, and blurs in proportion to how fast those change. Use it on surfaces that slide, grow or swipe
- * with their parent (cards in a pager, pop-ups, toasts). Not for text, scrolling lists, progress bars, the map or a haze source: those are
- * either read every frame or must stay sharp to be read.
- */
+/** The layer tracks its own window position and size; see the [motionBlur] doc for when to use it. */
 @Composable
-fun Modifier.motionBlurWhenMoving(): Modifier {
+fun Modifier.motionBlur(): Modifier {
+    if (!motionBlurAllowed()) return this
     val tracker = remember { MovementTracker() }
     return this
         .onGloballyPositioned { coords ->
@@ -53,6 +55,10 @@ fun Modifier.motionBlurWhenMoving(): Modifier {
         }
         .graphicsLayer { applyMotionBlur(tracker.speedAt(System.nanoTime())) }
 }
+
+/** The one gate every blur reads: the user's switch (already folded into [LocalMotionBlur] with Battery Saver), and reduce motion. */
+@Composable
+private fun motionBlurAllowed(): Boolean = LocalMotionBlur.current && !LocalReduceMotion.current
 
 /**
  * Marks the app's scrolling, so the blur stays off while a list, pager or sheet is being scrolled or flung. Scrolling is not motion

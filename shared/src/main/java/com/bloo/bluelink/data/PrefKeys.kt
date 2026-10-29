@@ -68,6 +68,7 @@ object PrefKeys {
     const val THEME_MODE = "theme_mode"
     const val UI_SCALE = "ui_scale"
     const val ULTRA_GLASS = "ultra_glass"
+    const val MOTION_BLUR = "motion_blur"
     const val UNIT_SYSTEM = "unit_system"
     const val VEHICLE_ORDER = "vehicle_order"
     const val VIBRANCY = "vibrancy"
