@@ -1,6 +1,13 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.Alignment
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -71,9 +78,28 @@ internal fun Modifier.innerGlassPanel(padding: Dp = GapSection): Modifier =
  */
 @Composable
 internal fun SettingsGroup(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    if (title.isNullOrBlank()) {
+        Column(Modifier.fillMaxWidth().innerGlassPanel(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+            content()
+        }
+        return
+    }
+    // A titled group folds: its heading is the button, and the group remembers whether it was open.
+    var open by rememberSaveable(title) { mutableStateOf(true) }
+    val spin = rememberChevronSpin(open, label = "settingsGroup")
     Column(Modifier.fillMaxWidth().innerGlassPanel(GapSection), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        if (!title.isNullOrBlank()) GroupHeading(title)
-        content()
+        Row(
+            Modifier.fillMaxWidth().clickable(role = Role.Button) { open = !open },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.weight(1f)) { GroupHeading(title) }
+            ExpandChevronIcon(open, spin)
+        }
+        AnimatedVisibility(visible = open, enter = expandEnterSized(), exit = expandExitSized(fade = false)) {
+            Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                content()
+            }
+        }
     }
 }
 
