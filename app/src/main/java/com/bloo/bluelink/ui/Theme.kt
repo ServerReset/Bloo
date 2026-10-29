@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
@@ -238,7 +238,8 @@ fun expressiveTypography(choice: FontChoice, classicHeadings: Boolean = false): 
     fun TextStyle.heading(weight: FontWeight? = null): TextStyle = copy(
         fontFamily = heading,
         fontWeight = weight ?: fontWeight,
-        letterSpacing = if (classicHeadings) (-0.02).em else letterSpacing,
+        // In sp, like the default: a TextStyle that mixes em and sp cannot be animated, and the hero blends its styles.
+        letterSpacing = if (classicHeadings && fontSize.isSpecified) (-0.02f * fontSize.value).sp else letterSpacing,
     )
     fun TextStyle.bigger(scale: Float, weight: FontWeight? = null): TextStyle = copy(
         fontFamily = family,
