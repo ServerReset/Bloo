@@ -14,6 +14,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.LaunchedEffect
+import com.bloo.bluelink.data.PrivacyCopy
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
@@ -61,7 +63,7 @@ internal fun CredentialsPrivacyNote(brandLabel: String?, modifier: Modifier = Mo
             style = SecondaryTextStyle(),
             color = scheme.onSurfaceVariant,
         )
-        // Two ways to read it: the copy inside the app, or the same policy as an HTML page in the browser.
+        // Three ways to read it: inside the app (the plain copy, kept for offline), the plain HTML page, or the styled web page.
         var choosing by remember { mutableStateOf(false) }
         var reading by remember { mutableStateOf(false) }
         val context = LocalContext.current
@@ -73,11 +75,17 @@ internal fun CredentialsPrivacyNote(brandLabel: String?, modifier: Modifier = Mo
                 fillOnPress = false,
             )
         } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(GapRow)) {
+            Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 MorphTextButton(text = "In the app", onClick = { choosing = false; reading = true })
                 MorphTextButton(
-                    text = "As a web page",
-                    onClick = { choosing = false; openUrl(context, PRIVACY_POLICY_URL) },
+                    text = "HTML page",
+                    onClick = { choosing = false; openUrl(context, PrivacyCopy.PLAIN_URL) },
+                    icon = Icons.AutoMirrored.Filled.OpenInNew,
+                    fillOnPress = false,
+                )
+                MorphTextButton(
+                    text = "Web page",
+                    onClick = { choosing = false; openUrl(context, PrivacyCopy.STYLED_URL) },
                     icon = Icons.AutoMirrored.Filled.OpenInNew,
                     fillOnPress = false,
                 )
@@ -87,15 +95,16 @@ internal fun CredentialsPrivacyNote(brandLabel: String?, modifier: Modifier = Mo
     }
 }
 
-/** The privacy policy as an HTML page on the project site, for reading in a browser. */
-internal const val PRIVACY_POLICY_URL = "https://serverreset.github.io/Bloo/privacy.html"
-
 /**
- * The privacy policy, shown inside the app from the copy bundled with it (assets/privacy.html), so it reads the same offline and
- * matches the website's page. JavaScript stays off: the policy is a document, not a page.
+ * The privacy policy, shown inside the app. The text is the plain copy the app keeps: the last one it pulled from the site, or the one
+ * bundled with the app before any pull. It is pulled again whenever the viewer opens and the site can be reached, so it stays current
+ * and still reads offline. JavaScript stays off: the policy is a document, not a page.
  */
 @Composable
 internal fun PrivacyPolicyViewer(onClose: () -> Unit) {
+    val context = LocalContext.current
+    var html by remember { mutableStateOf(PrivacyCopy.local(context)) }
+    LaunchedEffect(Unit) { PrivacyCopy.pull(context.applicationContext)?.let { html = it } }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -110,10 +119,15 @@ internal fun PrivacyPolicyViewer(onClose: () -> Unit) {
                     factory = { ctx ->
                         WebView(ctx).apply {
                             settings.javaScriptEnabled = false
-                            settings.allowFileAccess = true
                             webViewClient = WebViewClient()
                             setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                            loadUrl("file:///android_asset/privacy.html")
+                        }
+                    },
+                    // Reload only when the text changes, so a recomposition does not restart the page.
+                    update = { view ->
+                        if (view.tag != html) {
+                            view.tag = html
+                            view.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
                         }
                     },
                 )

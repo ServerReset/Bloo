@@ -4,76 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bloo privacy policy</title>
-<meta name="description" content="What Bloo stores (everything sensitive is encrypted), where it goes, what happens to a transaction, and what to do if a pirate takes the wheel.">
-<meta name="theme-color" content="#fdf8ff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#14121a" media="(prefers-color-scheme: dark)">
 <style>
-  :root {
-    color-scheme: light dark;
-    --surface: #fdf8ff; --surface-2: #f3edf7; --surface-3: #ece6f0;
-    --on-surface: #1d1b20; --on-surface-2: #49454f;
-    --primary: #6750a4; --on-primary: #ffffff; --primary-container: #eaddff; --on-primary-container: #21005d;
-    --tertiary-container: #ffd8e4; --on-tertiary-container: #31111d;
-    --outline: #79747e; --outline-variant: #cac4d0;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --surface: #14121a; --surface-2: #1d1b23; --surface-3: #2b2930;
-      --on-surface: #e6e0e9; --on-surface-2: #cac4d0;
-      --primary: #d0bcff; --on-primary: #381e72; --primary-container: #4f378b; --on-primary-container: #eaddff;
-      --tertiary-container: #633b48; --on-tertiary-container: #ffd8e4;
-      --outline: #938f99; --outline-variant: #49454f;
-    }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--surface); color: var(--on-surface); font: 400 16px/1.6 system-ui, -apple-system, "Roboto", "Segoe UI", sans-serif; }
-  main { max-width: 680px; margin: 0 auto; padding: 32px 20px 64px; }
-  h1 { font-size: 40px; line-height: 1.1; font-weight: 500; margin: 8px 0 12px; }
-  h2 { font-size: 22px; font-weight: 500; margin: 40px 0 10px; color: var(--primary); }
-  p, li { color: var(--on-surface); }
-  ul { padding-left: 20px; }
-  li { margin-bottom: 6px; }
-  .stamp { display: inline-block; font-size: 13px; padding: 6px 14px; border-radius: 999px; background: var(--primary-container); color: var(--on-primary-container); }
-  .card { background: var(--surface-3); border-radius: 24px; padding: 18px 20px; margin: 20px 0; }
-  .card.primary { background: var(--primary-container); color: var(--on-primary-container); }
-  .card.warm { background: var(--tertiary-container); color: var(--on-tertiary-container); }
-  .card p:last-child { margin-bottom: 0; }
-  .lede { font-size: 18px; color: var(--on-surface-2); }
-  .fine { font-size: 14px; color: var(--on-surface-2); }
-  a { color: var(--primary); }
-  details { background: var(--surface-2); border-radius: 16px; padding: 4px 16px; margin: 16px 0; }
-  summary { cursor: pointer; padding: 12px 0; font-weight: 500; color: var(--primary); }
-  details[open] summary { margin-bottom: 4px; }
-  code { overflow-wrap: anywhere; word-break: break-word; font-size: 14px; background: var(--surface-3); padding: 1px 6px; border-radius: 6px; }
-
-  .layout { display: block; }
-  .toc { margin: 8px 0 24px; padding: 16px 18px; background: var(--surface-2); border-radius: 20px; }
-  .toc-title { margin: 0 0 8px; font-weight: 500; color: var(--primary); }
-  .toc ol { margin: 0; padding-left: 20px; }
-  .toc li { margin: 4px 0; }
-  .toc a { color: var(--on-surface); text-decoration: none; }
-  .toc a:hover { color: var(--primary); text-decoration: underline; }
-  h2 { scroll-margin-top: 16px; }
-  @media (min-width: 620px) and (max-width: 899px) { .toc ol { columns: 2; } }
-  @media (min-width: 900px) {
-    main { max-width: 1040px; }
-    .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 40px; align-items: start; }
-    .toc { position: sticky; top: 24px; margin: 8px 0 0; }
-  }
-  hr { border: 0; border-top: 1px solid var(--outline-variant); margin: 40px 0 16px; }
+  body { max-width: 680px; margin: 0 auto; padding: 24px 18px 48px; font: 16px/1.6 system-ui, sans-serif; color: #111; background: #fff; }
+  h1 { font-size: 30px; } h2 { font-size: 20px; margin-top: 32px; }
+  code { overflow-wrap: anywhere; word-break: break-word; }
+  a { color: #1a4fd1; overflow-wrap: anywhere; } details { margin: 12px 0; } summary { cursor: pointer; }
 </style>
 </head>
 <body>
-<main>
-<div class="layout">
-<nav class="toc" aria-label="Contents"><p class="toc-title">In this policy</p><ol><li><a href="#who-we-are-and-who-we-are-not">Who we are, and who we are not</a></li><li><a href="#what-bloo-stores-and-how-it-is-encrypted">What Bloo stores, and how it is encrypted</a></li><li><a href="#where-things-go">Where things go</a></li><li><a href="#transactions">Transactions</a></li><li><a href="#if-a-pirate-takes-control-of-your-car">If a pirate takes control of your car</a></li><li><a href="#what-bloo-never-collects">What Bloo never collects</a></li><li><a href="#permissions-and-why-we-ask">Permissions, and why we ask</a></li><li><a href="#your-control">Your control</a></li><li><a href="#open-source-please-check-our-work">Open source: please check our work</a></li><li><a href="#children">Children</a></li><li><a href="#changes">Changes</a></li><li><a href="#contact">Contact</a></li></ol></nav>
-<div class="body">
-
 <span class="stamp">Last updated 29 October 2026</span>
 <h1>Privacy policy</h1>
 <p class="lede">Bloo is an app that opens your car from your phone. It keeps your sensitive things encrypted, and it keeps nothing about you on any server, because there isn't one. Below is the full detail.</p>
 
-<div class="card primary">
+<div>
   <p><strong>The short version.</strong> Your password, PIN and sign-in details are encrypted on your phone. Nothing sensitive is stored in plain text, anywhere. We run no server, track nothing, sell nothing, and the whole app is open source, so you can check every claim here against the code.</p>
 </div>
 
@@ -90,7 +33,7 @@
 </ul>
 <p>In plain words: your password is encrypted once by Bloo, and then the phone encrypts the whole app's storage as well. The password is never sitting around as text. Not on the phone, not on a server, not in a log.</p>
 
-<div class="card warm">
+<div>
   <p><strong>A note on the phrase "nothing unencrypted."</strong> It is accurate for your phone and for everything Bloo writes to it. It is not a claim about your car maker's servers, which have their own policy, or about what Google does with a file in your Google Drive if you turn sync on. Those are covered below.</p>
 </div>
 
@@ -179,9 +122,5 @@
 </details>
 
 <p class="fine">Bloo is unofficial. It is not affiliated with, endorsed by, or operated by Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries.</p>
-
-</div>
-</div>
-</main>
 </body>
 </html>
