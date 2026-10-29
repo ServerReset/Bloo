@@ -1,7 +1,7 @@
 package com.bloo.uicommon
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateFloatAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
