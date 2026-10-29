@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -83,10 +82,6 @@ internal fun PebbleTitleRow(
     } else {
         { collapsedTitleScale + (1f - collapsedTitleScale) * headerTState.value }
     }
-    // True when the title is at its collapsed rest size (every non-hero pebble, or the hero settled
-    // near 0). Rest renders a native titleMedium Text so its baseline matches the hero numbers
-    // beside it.
-    val atRestScale = !growTitleOnExpand || headerTState.value < 0.02f
     // Only a genuinely LARGE display/font scale may wrap the title (and the summary below), so the
     // header grows instead of cutting. At normal zoom a long title ellipsizes cleanly on one line --
     // wrapping there made "AI summary" a broken "AI / sum…" and turned ordinary pebbles into tall,
@@ -113,54 +108,38 @@ internal fun PebbleTitleRow(
         // Minimum gap before titleTrailing, on the title so SpaceBetween still sees two children.
         .then(if (titleTrailingAtEnd) Modifier.padding(end = GapGroup) else Modifier)
     if (growTitleOnExpand) {
-        // Only the hero flips atRestScale. The Crossfade hides the pop when the scaled and native
-        // paths swap; CenterStart keeps their glyphs aligned despite differing box heights.
-        Box(modifier = titleBaseModifier, contentAlignment = Alignment.CenterStart) {
-        Crossfade(targetState = atRestScale, animationSpec = tween(MotionFast), label = "heroTitleRestSwap") { atRest ->
-            RevealText(
-                title,
-                modifier = if (atRest) {
-                    Modifier
-                } else {
-                    Modifier
-                        // Reports the drawn size: graphicsLayer scales drawing but not the measured
-                        // box. Measured once at headlineSmall, then sized by the draw scale.
-                        .layout { measurable, constraints ->
-                            // Measured against constraints widened by 1/titleScale so the text
-                            // ellipsizes at the width it is actually drawn at.
-                            val scale = titleScale()
-                            val room = if (constraints.hasBoundedWidth && scale > 0f) {
-                                constraints.copy(
-                                    maxWidth = (constraints.maxWidth / scale)
-                                        .roundToInt()
-                                        .coerceAtLeast(constraints.maxWidth),
-                                )
-                            } else {
-                                constraints
-                            }
-                            val placeable = measurable.measure(room)
-                            val w = (placeable.width * scale).roundToInt()
-                            val h = (placeable.height * scale).roundToInt()
-                            val yOffset = (h - placeable.height) / 2
-                            layout(w, h) {
-                                placeable.place(0, yOffset)
-                            }
-                        }
-                        .graphicsLayer {
-                            val s = titleScale()
-                            scaleX = s
-                            scaleY = s
-                            transformOrigin = TransformOrigin(0f, 0.5f)
-                        }
+        // One title, drawn once at headline size and scaled down to its rest size. It used to swap between two copies (a native one at
+        // rest, a scaled one while open) in a Crossfade, and for a beat the copies drew in different states, which read as a flicker when
+        // the name collapsed.
+        RevealText(
+            title,
+            modifier = titleBaseModifier
+                .layout { measurable, constraints ->
+                    // Measured against constraints widened by 1/titleScale, so the text ellipsizes at the width it is drawn at.
+                    val scale = titleScale()
+                    val room = if (constraints.hasBoundedWidth && scale > 0f) {
+                        constraints.copy(maxWidth = (constraints.maxWidth / scale).roundToInt().coerceAtLeast(constraints.maxWidth))
+                    } else {
+                        constraints
+                    }
+                    val placeable = measurable.measure(room)
+                    val w = (placeable.width * scale).roundToInt()
+                    val h = (placeable.height * scale).roundToInt()
+                    val yOffset = (h - placeable.height) / 2
+                    layout(w, h) { placeable.place(0, yOffset) }
+                }
+                .graphicsLayer {
+                    val s = titleScale()
+                    scaleX = s
+                    scaleY = s
+                    transformOrigin = TransformOrigin(0f, 0.5f)
                 },
-                style = if (atRest) MaterialTheme.typography.titleMedium else titleStyle,
-                color = titleColor,
-                fontWeight = FontWeight.Bold,
-                maxLines = if (allowWrap) 2 else 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        }
+            style = titleStyle,
+            color = titleColor,
+            fontWeight = FontWeight.Bold,
+            maxLines = if (allowWrap) 2 else 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     } else {
         // The common case: no grow/shrink, no rest-scale swap ever, so no Crossfade wrapper either
         // -- always native titleMedium.
