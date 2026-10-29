@@ -9,6 +9,8 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -122,7 +124,11 @@ internal fun MapTopBar(
     /** The car's charge, and its range, at the bar's end. Null leaves that line out. */
     chargePercent: String? = null,
     chargeRange: String? = null,
+    /** The rest of the car's details, shown when the bar is tapped open: label to value. */
+    details: List<Pair<String, String>> = emptyList(),
 ) {
+    // Tapping the bar opens it into the car's details; tapping again folds it back to the handle.
+    var detailsOpen by remember { mutableStateOf(false) }
     // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without
     // consuming, so dragModifier and the refresh click still receive the touch.
     var pillPressed by remember { mutableStateOf(false) }
@@ -151,8 +157,9 @@ internal fun MapTopBar(
     ) {
         // Three parts: the car at the start, the drag handle in the middle, and its charge and range at the end. Equal weights either
         // side keep the handle centred, whatever the name or the figures are.
+        Column {
         Row(
-            Modifier.fillMaxWidth().then(dragModifier).heightIn(min = 60.dp).padding(horizontal = GapPage),
+            Modifier.fillMaxWidth().then(dragModifier).clickable { detailsOpen = !detailsOpen }.heightIn(min = 60.dp).padding(horizontal = GapPage),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
@@ -211,6 +218,20 @@ internal fun MapTopBar(
                     )
                 }
             }
+        }
+        AnimatedVisibility(visible = detailsOpen, enter = expandEnterSized(), exit = expandExitSized()) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = GapPage).padding(bottom = GapGroup),
+                verticalArrangement = Arrangement.spacedBy(GapRow),
+            ) {
+                details.forEach { (label, value) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SecondaryText(label, modifier = Modifier.weight(1f))
+                        RevealText(value, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    }
+                }
+            }
+        }
         }
     }
 }
