@@ -204,7 +204,7 @@ internal fun LoginScreen(
         } catch (e: CancellationException) {
             throw e
         } catch (e: NoCredentialException) {
-            if (!quiet) savedNote = "No saved login yet. Sign in once and your password manager will offer to keep it."
+            if (!quiet) savedNote = "No saved sign-in yet. Sign in once and your password manager can save it."
             return
         } catch (e: Exception) {
             return
@@ -298,10 +298,10 @@ internal fun LoginScreen(
                     GlassSurface(shape = ExtraLargeShape, hazeState = hazeState, modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopStart) {
                         Column(Modifier.fillMaxWidth().padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                LoginSectionLabel(Icons.Filled.VpnKey, "Your ${brand.label} login")
+                                LoginSectionLabel(Icons.Filled.VpnKey, "${brand.label} sign-in")
                                 Spacer(Modifier.weight(1f))
                                 MorphTextButton(
-                                    text = "Saved login",
+                                    text = "Saved sign-in",
                                     onClick = { scope.launch { fillFromManager(quiet = false) } },
                                     icon = Icons.Filled.VpnKey,
                                 )

@@ -88,7 +88,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         PebbleStatusGate(status, state.refreshing) { status ->
             val hasBattery = state.hasBattery(v)
             PebbleSection("Status", AppIcons.Info) {
-                status.engine?.let { StatusRow("Vehicle", if (it) "On" else "Off") }
+                status.engine?.let { StatusRow("Engine", if (it) "On" else "Off") }
                 doorLockLabel(status.doorLock)?.let { StatusRow("Doors", it) }
                 status.doorOpen?.openLabels()?.takeIf { it.isNotEmpty() }
                     ?.let { StatusRow("Doors open", it.joinToString(", ")) }

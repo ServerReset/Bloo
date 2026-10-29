@@ -87,7 +87,7 @@ internal fun CarSettingsCard(
             ) { vm.setTextClearPhoto(v, it) }
         }
 
-        SettingsGroup("Vehicle") {
+        SettingsGroup("Car") {
             SecondaryText("Powertrain")
             PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
             // Only Hyundai/Genesis US vehicles have a real head-unit generation to confirm -- see

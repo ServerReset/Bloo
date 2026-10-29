@@ -213,11 +213,11 @@ object AutoLockController {
             }
             val v = snapshot.toVehicle()
             val status = runCatching { statusFor(context, v) }.getOrElse {
-                fail(vin, "Could not read vehicle status: ${it.message}")
+                fail(vin, "Couldn't read car status: ${it.message}")
                 return@withLock
             }
             if (status == null) {
-                fail(vin, "Could not read vehicle status.")
+                fail(vin, "Couldn't read car status.")
                 return@withLock
             }
 

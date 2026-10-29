@@ -105,7 +105,7 @@ object UpdateChecker {
         // Stamp unconditionally -- even a failed fetch counts against the debounce, so a
         // rate-limited call doesn't retry in a tight loop.
         store.setLastCheckedAt(now)
-        if (run == null) return UpdateCheckResult.Failed("Could not reach GitHub (rate limited or offline)")
+        if (run == null) return UpdateCheckResult.Failed("Couldn't reach GitHub. Rate limited or offline.")
         if (!UpdateGate.isNewer(run, BuildConfig.BUILD_RUN_NUMBER)) return UpdateCheckResult.UpToDate
         return UpdateCheckResult.Available(UpdateInfo(run))
     }
