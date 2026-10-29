@@ -3,65 +3,137 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bloo: privacy policy</title>
-<meta name="description" content="What the Bloo app stores, where it sends it, and what it never collects.">
-<meta name="theme-color" content="#f7f5f0" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#121317" media="(prefers-color-scheme: dark)">
+<title>Bloo: the privacy policy, read for pleasure</title>
+<meta name="description" content="What the Bloo app stores, where it sends it, what happens to a transaction, and what to do if a pirate takes over your car.">
+<meta name="theme-color" content="#fbf6ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14110d" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="img/icon.png">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
-<header class="site-header">
+
+<header class="bar">
   <div class="wrap">
-    <a class="wordmark" href="./"><img src="img/icon.png" alt="" width="28" height="28">Bloo</a>
+    <a class="logo" href="./"><img src="img/icon.png" alt="" width="34" height="34">Bloo</a>
     <nav aria-label="Main">
-      <a href="./#what">What it does</a>
+      <a href="./#what">The stuff</a>
       <a href="./#get">Get it</a>
       <a href="./#data">Your data</a>
-      <a href="./#questions">Questions</a>
+      <a href="./">Home</a>
     </nav>
   </div>
 </header>
-<main>
-<section class="doc wrap">
-<span class="stamp">Last updated 29 October 2026</span>
-<h1>Privacy policy</h1>
-<p>Bloo is a client for the Bluelink / Connected Car services of Hyundai, Genesis and Kia. It is an independent app: it is <b>not affiliated with, endorsed by, or operated by</b> Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries.</p>
-<p>This policy describes what the app does with your information. It is deliberately short, because the app does very little with it.</p>
-<h2>Locked up, and why</h2>
-<p>Bloo treats your secrets like a bag of keys: they live in a locked box, and only the app holds the combination. Your Bluelink password, your service PIN, your sign-in tokens and your app-lock PIN all go into one <b>AES-256-GCM vault</b>. The vault's own key is sealed by the <b>hardware-backed Android Keystore</b>, which keeps it inside your phone's security chip where the app can't read it back out.</p>
-<p>Everything else the app keeps (preferences, widget settings, the last car status it fetched) sits in the app's private storage on your phone. Android encrypts that storage at rest, so it is unreadable while your phone is locked. Nothing in it is ever sent to us, because there is no "us" on the other end.</p>
-<h2>What the app stores, and where</h2>
-<p>Everything below is stored <b>on your device</b>:</p>
-<ul><li><b>Your Bluelink account email and password</b>, and your service PIN if you set one. These are the credentials you would otherwise type into the manufacturer's own app.</li><li><b>Your cars' status</b>: lock state, charge and fuel, climate, location, odometer, trips and service data, as fetched from the manufacturer's service.</li><li><b>Your app preferences</b>: theme, layout, alert settings, widget and watch options.</li></ul>
-<p>If you turn on <b>Drive sync</b>, your settings (not your password) are written to a file <b>in your own Google Drive</b> using the account you pick, so your other devices can read them. That file is yours; the app has no server and never sees it.</p>
-<h2>Where your information is sent</h2>
-<ul><li><b>To the manufacturer's own service</b> (Hyundai, Genesis or Kia, depending on your car), using your own account. This is the app's entire purpose: it is how your car is locked, started, located and read. That service's own privacy policy governs what it does with the request.</li><li><b>To GitHub</b>, a version check asking whether a newer build exists. It sends no account details, no car data and no identifier for you.</li><li><b>Nowhere else.</b> There is no analytics, no advertising, no crash-reporting SDK, no tracking, and no server operated by this app.</li></ul>
-<p>The <b>on-device AI summary</b> feature runs entirely on your phone. Nothing you summarise is sent anywhere.</p>
-<h2>What is never collected</h2>
-<ul><li>No name, address, phone number or contacts.</li><li>No precise location of <i>you</i> - only of your car, and only because the manufacturer's service reports it.</li><li>No data from other apps, and no data about how you use your phone.</li><li>Nothing is sold, and nothing is shared with data brokers or advertisers.</li></ul>
-<h2>Your control over it</h2>
-<ul><li><b>Sign out</b> in Settings to delete your stored credentials.</li><li><b>Clear the app's data</b> in Android Settings, or uninstall the app, to remove everything it stored.</li><li>If you enabled Drive sync, delete the sync file from your own Google Drive.</li></ul>
-<h2>Children</h2>
-<p>The app is not directed at children and does not knowingly collect information from them.</p>
-<h2>Permissions</h2>
-<p>The app asks only for what a given feature needs, and each is optional: location (to find your car and to run AutoLock), notifications (car alerts), Bluetooth (AutoLock with your car's own connection), and activity recognition (AutoLock's driving detection). The Play Store listing lists them all.</p>
-<h2>Change log</h2>
-<p>Every edit gets a line here, and the date at the top moves with it.</p>
-<ul>
-<li><b>29 October 2026.</b> Rewrote the encryption section so it says exactly what is encrypted, how, and where the key lives: the secrets sit in an AES-256-GCM vault sealed by the Android Keystore, and the rest of the app's storage is encrypted at rest by Android. Added this change log.</li>
-<li><b>14 October 2026.</b> First published.</li>
-</ul>
-<h2>Contact</h2>
-<p>Questions about this policy: <b><a href="mailto:adi1.perets@gmail.com">adi1.perets@gmail.com</a></b></p>
 
+<main>
+
+<section class="doc-hero">
+  <div class="wrap">
+    <span class="kicker">Last updated 29 October 2026</span>
+    <h1 class="display" style="font-size:clamp(60px,11vw,160px)">Privacy<br><em>policy.</em></h1>
+    <p class="lede" style="margin-top:28px">An app this small should not need a policy this long. We wrote it anyway, so you can read it on a train and feel informed rather than tricked.</p>
+  </div>
 </section>
+
+<article class="doc">
+
+<div class="aside-note">The short version: we do not run a server, we do not track you, and your car maker's password only goes to your car maker. Everything else is detail, and the detail is below.</div>
+
+<h2><span class="n">1.</span>Who we are, and who we are not</h2>
+<p>Bloo is an independent app that talks to the Bluelink and Connected Car services of Hyundai, Genesis and Kia. It is <strong>not</strong> made by, endorsed by, or affiliated with Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries. We have never met them. They have never met us. Everyone is happier that way.</p>
+
+<h2><span class="n">2.</span>What the app keeps, and where</h2>
+<p>Everything the app keeps stays <strong>on your phone</strong>. There is no Bloo server to keep it on, because there is no Bloo server.</p>
+<ul>
+<li><strong>Your Bluelink, Genesis or Kia password, and any service PIN.</strong> Encrypted with AES-256-GCM, with the key sealed in the Android Keystore. Think of it as a diary that only the phone can read, locked in a safe that only the phone has the combination for.</li>
+<li><strong>Your sign-in tokens and the app-lock PIN.</strong> Kept in the same encrypted vault, for the same reason you do not keep your house key taped to the door.</li>
+<li><strong>Your settings, widget choices, and the last car status the app fetched.</strong> Kept in the app's private storage, which Android encrypts whenever your phone is locked.</li>
+</ul>
+<p>If you turn on <strong>Drive sync</strong>, your settings (never your password) go to a file in <em>your own</em> Google Drive, so your other devices can read them. That file is yours. We cannot see it. We would not know what to do with it if we could.</p>
+
+<h2><span class="n">3.</span>Where things go</h2>
+<ul>
+<li><strong>To your car maker's service,</strong> using your own account. This is the whole point of the app. Locking, starting, finding and reading your car all happen there. Their privacy policy governs what they do with the request, and we would read it too, if we were you.</li>
+<li><strong>To GitHub,</strong> to check whether a newer build exists. It sends no account details, no car data, and no identifier that points at you.</li>
+<li><strong>Nowhere else.</strong> No analytics, no advertising, no crash-reporting service, no tracking pixels hiding in the buttons.</li>
+</ul>
+<p>The on-device AI summaries run on your phone. Nothing you summarise leaves it. The AI is a very well-read houseguest that does not talk to the neighbours.</p>
+
+<h2><span class="n">4.</span>Transactions</h2>
+<p>Bloo does not sell anything. There is no shop, no subscription box, no "premium" button glowing at you in the corner. Bloo does not take payments, hold money, or store card details, and it is not a bank, a car dealer, or a fairground ride.</p>
+<p>A <strong>transaction</strong>, in the sense of "something you asked the car to do," looks like this:</p>
+<ul>
+<li>You tap <em>Lock</em>. Bloo sends that request to your car maker's service, using your account. The service locks the car and reports back. That round trip is the transaction. Bloo writes down the outcome in the app so you can see it, and that is the end of our involvement.</li>
+<li>You start the climate or set a charge limit. The same thing happens. Your car does the work, the car maker's service records it under their rules, and Bloo keeps only enough to show you what happened.</li>
+<li>If your car maker charges you for a feature (a subscription for remote start, say), that charge happens between you and them. Bloo never sees the money, and cannot refund you, apologise on their behalf, or be blamed for the price of anything.</li>
+</ul>
+<p class="aside-note">If you ever see a charge on your card with the word "Bloo" on it, it was not us. We would very much like to know who is impersonating us, and we would also like a word with them about their taste.</p>
+
+<h2><span class="n">5.</span>If a pirate takes control of your car</h2>
+<p>We are going to be honest here, because this is the part where a less careful policy would start doing jazz hands. Nobody can promise that a determined criminal will never get into your car. What Bloo does is make sure that <strong>the app is not the weak link</strong>, and that you are never left without a plan.</p>
+<p><strong>What protects you already:</strong></p>
+<ul>
+<li>Your password and PIN are encrypted on the phone, with the key held in hardware. A thief who copies your phone's files gets an expensive paperweight.</li>
+<li>Your credentials go only to your car maker. Nothing is sent to a Bloo server, so there is no Bloo database for a pirate to raid. There is no Bloo database. We did mention that.</li>
+<li>The app can lock itself behind your phone's own biometric or PIN lock. Turn that on. It is the pirate's least favourite setting.</li>
+</ul>
+<p><strong>What you should do if you think your car has been taken over:</strong></p>
+<ul>
+<li><strong>Change your car maker's account password,</strong> from their own website or app, and turn on whatever two-step sign-in they offer. This is the single most useful thing you can do, and it works whether or not Bloo is involved at all.</li>
+<li><strong>Sign out in Bloo's Settings,</strong> which deletes the credentials the app has stored on that phone.</li>
+<li><strong>Change your service PIN</strong> in your car maker's app, if they let you. Remote commands need it, so a new PIN means the old one stops working for anyone who copied it.</li>
+<li><strong>Call your car maker.</strong> They can see the requests coming in, and they can cut off a session in ways we cannot.</li>
+<li><strong>If the car is in front of you and it is not yours to drive,</strong> call the police and the car maker. Please do not argue with the pirate. The car is not worth it.</li>
+</ul>
+<p>If we learn of a weakness in the app that a pirate could use, we will fix it, say so in the change log below, and tell you what to do. We would rather you heard it from us than from a news item about a car that drove itself into a lake.</p>
+
+<h2><span class="n">6.</span>What we never collect</h2>
+<ul>
+<li>Your name, address, phone number, or contacts.</li>
+<li>Your location. Only your <em>car's</em> location, and only because your car maker's service reports it to you. Your phone's own position is used on the device, to put your dot on the map, and goes nowhere.</li>
+<li>Anything from other apps, or how you use your phone.</li>
+<li>Money, or anything that would make a data broker's eyes light up.</li>
+</ul>
+
+<h2><span class="n">7.</span>Permissions, and why we ask</h2>
+<p>Bloo asks only for what a feature needs, and every one of them is optional. Location, to find your car and to run AutoLock. Notifications, for car alerts. Bluetooth, for AutoLock using your car's own connection. Activity recognition, so AutoLock knows when you are driving. Say no to any of them and that feature quietly sulks; nothing else breaks.</p>
+
+<h2><span class="n">8.</span>Your control</h2>
+<ul>
+<li><strong>Sign out</strong> in Settings to delete your stored credentials.</li>
+<li><strong>Clear the app's data</strong> in Android's settings, or uninstall the app, to remove everything it stored.</li>
+<li><strong>Delete the sync file</strong> from your own Google Drive, if you turned on Drive sync.</li>
+</ul>
+<p>There is nothing for us to export, delete, or correct, because we do not have it. This is the one time a lack of infrastructure works in your favour.</p>
+
+<h2><span class="n">9.</span>Children</h2>
+<p>Bloo is not for children, and we do not knowingly collect anything from them. If you are a child reading this, go and ask a grown-up to show you a car instead.</p>
+
+<h2><span class="n">10.</span>Changes</h2>
+<p>When this policy changes, the date at the top changes too, and the change is written down below, in plain words, with the date. We do not keep quiet edits in a drawer.</p>
+
+<h2><span class="n">11.</span>Change log</h2>
+<ul class="changes">
+<li><strong>29 October 2026.</strong> Rewritten as a funny read. Added sections on transactions and on what to do if a pirate takes control of your car. Spelled out the encryption: AES-256-GCM for your credentials, with the key sealed in the Android Keystore, and Android's own at-rest encryption for everything else.</li>
+<li><strong>14 October 2026.</strong> First published.</li>
+</ul>
+
+<h2><span class="n">12.</span>Contact</h2>
+<p>Questions about this policy, complaints, or a pirate who would like to apologise: <a href="mailto:adi1.perets@gmail.com"><strong>adi1.perets@gmail.com</strong></a>.</p>
+
+</article>
+
 </main>
+
 <footer>
   <div class="wrap">
-    <div>Bloo is unofficial. It is not affiliated with, endorsed by, or operated by Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries.</div>
-    <div class="links"><a href="privacy.html">Privacy policy</a><a href="https://github.com/ServerReset/Bloo">Source on GitHub</a><a href="https://groups.google.com/g/bloo-testing">Testing group</a></div>
+    <div>Bloo is unofficial. It is not affiliated with, endorsed by, or operated by Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries. Their cars, their logos, their problem.</div>
+    <nav aria-label="Footer">
+      <a href="privacy.html">Privacy policy</a>
+      <a href="https://github.com/ServerReset/Bloo">Source on GitHub</a>
+      <a href="https://groups.google.com/g/bloo-testing">Testing group</a>
+    </nav>
   </div>
 </footer>
+
 </body>
 </html>

@@ -3,157 +3,143 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bloo: an independent app for your Hyundai, Genesis or Kia</title>
-<meta name="description" content="Bloo is an independent Android and Wear OS app for Hyundai, Genesis and Kia cars. Lock, climate and charge from your phone or watch. Nothing is stored on a server.">
-<meta name="theme-color" content="#f7f5f0" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#121317" media="(prefers-color-scheme: dark)">
-<meta property="og:title" content="Bloo: an independent app for your Hyundai, Genesis or Kia">
-<meta property="og:description" content="Lock, climate and charge from your phone or watch. No server of ours, no tracking.">
+<title>Bloo: your car, but make it a bit smug</title>
+<meta name="description" content="Bloo is an independent Android and Wear OS app for Hyundai, Genesis and Kia. Lock, cool and charge your car from your phone or watch. Nothing is stored on a server.">
+<meta name="theme-color" content="#fbf6ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14110d" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Bloo: your car, but make it a bit smug">
+<meta property="og:description" content="Lock, cool and charge your car from your phone or watch. No server of ours, no tracking, and no pirates allowed.">
 <meta property="og:image" content="img/feature-graphic.png">
 <link rel="icon" href="img/icon.png">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
+<div class="glow" aria-hidden="true"></div>
 
-<header class="site-header">
+<header class="bar">
   <div class="wrap">
-    <a class="wordmark" href="./"><img src="img/icon.png" alt="" width="28" height="28">Bloo</a>
+    <a class="logo" href="./"><img src="img/icon.png" alt="" width="34" height="34">Bloo</a>
     <nav aria-label="Main">
-      <a href="#what">What it does</a>
+      <a href="#what">The stuff</a>
       <a href="#get">Get it</a>
       <a href="#data">Your data</a>
-      <a href="#questions">Questions</a>
-      <a href="privacy.html">Privacy policy</a>
+      <a href="privacy.html">Privacy (funny)</a>
     </nav>
   </div>
 </header>
 
 <main>
 
-<section class="hero">
+<section class="hero" style="padding-top:0">
   <div class="wrap">
-    <span class="eyebrow">Closed testing on Google Play</span>
-    <h1>Lock, cool and charge your car from your phone.</h1>
-    <p class="lede" style="margin-top:24px">Bloo is an independent app for Hyundai, Genesis and Kia cars in the US, Canada and Europe. It talks to the same services the manufacturer's app uses, and it keeps nothing on a server of ours.</p>
-    <div class="actions">
-      <a class="button primary" href="#get">How to get it</a>
-      <a class="button" href="https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk">Download the APK</a>
+    <h1 class="display hero-title rise">
+      <span class="stretch-tall" style="transform:none"><em>Lock it.</em></span>
+      <span class="wide">Cool it.</span>
+      <span>Charge it <span class="swap" id="swap"><span class="in">from bed</span></span></span>
+    </h1>
+
+    <div class="hero-foot">
+      <div class="rise" style="--d:.15s">
+        <p class="lede">Bloo is an independent app for Hyundai, Genesis and Kia cars. It talks to the same services the official app does, politely, and then gets out of the way.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:14px">
+          <a class="btn" href="#get">Get it, it is in testing <span aria-hidden="true">&rarr;</span></a>
+          <a class="btn ghost" href="https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk">Or the APK</a>
+        </div>
+      </div>
+      <div class="rise" style="--d:.3s;justify-self:end">
+        <div class="badge" aria-hidden="true">no server.<br>no tracking.<br>no nonsense.</div>
+      </div>
     </div>
-    <p class="small">Bloo is not made by Hyundai, Genesis or Kia. You sign in with your own account.</p>
+  </div>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track">
+      <span>Lock the doors</span><span>Start the climate</span><span>Charge limits</span><span>Find the car</span><span>AutoLock</span><span>Widgets</span><span>Wear OS</span><span>Lock the doors</span><span>Start the climate</span><span>Charge limits</span><span>Find the car</span><span>AutoLock</span><span>Widgets</span><span>Wear OS</span>
+    </div>
   </div>
 </section>
 
-<div class="wrap">
-  <div class="facts">
-    <div><strong>3</strong><span>brands: Hyundai, Genesis and Kia</span></div>
-    <div><strong>3</strong><span>regions: US, Canada and Europe</span></div>
-    <div><strong>None</strong><span>servers run by Bloo, so nothing of yours is kept on one</span></div>
+<section id="numbers">
+  <div class="wrap">
+    <div class="numbers">
+      <div class="rise"><b class="tall" data-count="3">3</b><span>brands, all of them car companies that make you download an app to press a button</span></div>
+      <div class="rise" style="--d:.1s"><b class="tall" data-count="3">3</b><span>regions: the US, Canada and Europe, in that order of how much we fret about each</span></div>
+      <div class="rise" style="--d:.2s"><b>0</b><span>servers run by us, so there is nowhere for your stuff to pile up</span></div>
+    </div>
   </div>
-</div>
+</section>
 
 <section id="what">
   <div class="wrap">
-    <span class="eyebrow">What it does</span>
-    <h2>The things you would open the app for.</h2>
-    <p class="lede">Your car's status, and the controls that change it, in one place.</p>
-    <div class="features">
-      <div>
-        <h3>Lock and unlock</h3>
-        <p>Lock or unlock the doors, and see the lock state the car reports.</p>
-      </div>
-      <div>
-        <h3>Climate</h3>
-        <p>Start the climate with a preset, or let smart climate pick a temperature for the weather where the car is parked. Seat and wheel heat are included where the car has them.</p>
-      </div>
-      <div>
-        <h3>Charging</h3>
-        <p>The charge level, the range, the time left, and the limit you have set.</p>
-      </div>
-      <div>
-        <h3>Location</h3>
-        <p>Find the car on a map, with your phone's position beside it when you allow it.</p>
-      </div>
-      <div>
-        <h3>AutoLock</h3>
-        <p>Locks the car when you walk away from it.</p>
-      </div>
-      <div>
-        <h3>Widgets and Wear OS</h3>
-        <p>Lock, charge and climate on the home screen. A watch face with quick controls, tiles, and complications.</p>
-      </div>
-      <div>
-        <h3>Several accounts</h3>
-        <p>Sign in to more than one account and move between cars.</p>
-      </div>
-      <div>
-        <h3>Tablets and foldables</h3>
-        <p>Several cars side by side, with the cards in an order you choose.</p>
-      </div>
+    <span class="kicker rise">The stuff it does</span>
+    <h2 class="h2 rise">Everything your car does, <em>on purpose.</em></h2>
+    <div class="stickers">
+      <article class="sticker rise"><span class="num">01</span><h3 class="h3">Lock and unlock</h3><p>Lock the doors from the couch. Unlock them from the car park, or from the couch if you are the sort who forgets. The lock state updates as the car reports it, which is honest of it.</p></article>
+      <article class="sticker rise" style="--d:.08s"><span class="num">02</span><h3 class="h3">Climate</h3><p>Start the climate with a preset, or let smart climate pick a temperature for the weather where the car is parked. Seat and wheel heat too, where the car has them. Warm, unlike your first date.</p></article>
+      <article class="sticker rise" style="--d:.16s"><span class="num">03</span><h3 class="h3">Charging</h3><p>Level, range, time left, and the limit you set, marked on the bar so you can stop worrying about the number.</p></article>
+      <article class="sticker rise wide" style="--d:.1s"><span class="num">04</span><h3 class="h3">Find the car</h3><p>A map with the car on it, and your own phone's position beside it when you allow that. Useful for finding a car you parked in a car park shaped like a sad maze.</p></article>
+      <article class="sticker rise" style="--d:.2s"><span class="num">05</span><h3 class="h3">AutoLock</h3><p>Locks the car when you walk away from it. It does not lock you out, which is a design choice we are proud of.</p></article>
+      <article class="sticker rise" style="--d:.26s"><span class="num">06</span><h3 class="h3">Widgets and a watch</h3><p>Lock, charge and climate on the home screen, and a watch face with quick controls, tiles and complications. Your wrist, finally, with a job.</p></article>
+      <article class="sticker rise" style="--d:.32s"><span class="num">07</span><h3 class="h3">Several cars</h3><p>More than one account, more than one car, and a swipe to move between them. Your household, sorted.</p></article>
+      <article class="sticker rise" style="--d:.38s"><span class="num">08</span><h3 class="h3">Big screens</h3><p>On a tablet or a folding phone, several cars sit side by side, in an order you choose, because a single car on a tablet is a waste of a tablet.</p></article>
     </div>
   </div>
 </section>
 
 <section id="get">
   <div class="wrap">
-    <span class="eyebrow">How to get it</span>
-    <h2>Three steps.</h2>
-    <ol class="steps">
-      <li>
-        <div><h3>Join the testing group</h3>
-        <p>Use the Google account on your phone. <a href="https://groups.google.com/g/bloo-testing">Join the Bloo testing group</a>.</p></div>
-      </li>
-      <li>
-        <div><h3>Install from Google Play</h3>
-        <p>Open the <a href="https://play.google.com/store/apps/details?id=com.bloo.bluelink">Bloo page on Google Play</a>, tap Become a tester, then install. Play keeps it up to date.</p></div>
-      </li>
-      <li>
-        <div><h3>Sign in</h3>
-        <p>Use your Bluelink, Genesis or Kia Connect account. Your cars appear once you are in.</p></div>
-      </li>
-    </ol>
-    <div class="alt">
-      <p><strong>Without Google Play</strong>, download the APK from the newest release. The Play copy and the APK copy are signed differently and cannot update each other, so switching between them means one uninstall first.</p>
+    <div class="story">
+      <div>
+        <p class="tall-word rise" aria-hidden="true">3</p>
+      </div>
+      <div>
+        <span class="kicker rise">How to get it</span>
+        <h2 class="h2 rise">Three steps. <em>Count them.</em></h2>
+      </div>
     </div>
+    <ol class="trail">
+      <li class="rise"><div><h3 class="h3">Join the testing group</h3><p>Use the Google account that is on your phone, so Google knows you are allowed in. <a href="https://groups.google.com/g/bloo-testing">Join the Bloo testing group</a>. It takes one tap, which is one more than most apps ask.</p></div></li>
+      <li class="rise"><div><h3 class="h3">Install it from Google Play</h3><p>Open the <a href="https://play.google.com/store/apps/details?id=com.bloo.bluelink">Bloo page on Google Play</a>, tap Become a tester, then install. Play keeps it up to date, so you never have to think about it again.</p></div></li>
+      <li class="rise"><div><h3 class="h3">Sign in and stop walking to the car</h3><p>Use your Bluelink, Genesis or Kia Connect account. Your cars appear. You can now lock the car while still in bed, which is the whole idea.</p></div></li>
+    </ol>
+    <p class="rise" style="margin-top:36px;font-size:17px">Not on Google Play? <a href="https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk"><strong>Download the APK.</strong></a> The Play copy and the APK copy are signed differently and cannot update each other, so switching means one uninstall first. We are sorry. Google is sorry too, in its own way.</p>
   </div>
 </section>
 
 <section id="data">
   <div class="wrap">
-    <span class="eyebrow">Your data</span>
-    <h2>Your password stays on your phone.</h2>
-    <p class="lede">Your Bluelink or Kia password and any service PIN are encrypted on the phone with AES-256-GCM. The key for that is kept in the Android Keystore, the hardware security chip in your phone.</p>
-    <ul class="plain">
-      <li>They are sent only to your car maker's service, to sign in and to send commands.</li>
-      <li>Bloo runs no server that could keep them.</li>
-      <li>There are no analytics, no advertising, and no crash-reporting service.</li>
-      <li>Summaries from the on-device AI run on the phone and are not sent anywhere.</li>
-      <li>If you turn on sync, your settings go to a file in your own Google Drive. Bloo never sees that file.</li>
-    </ul>
-    <p style="margin-top:28px"><a class="button" href="privacy.html">Read the full privacy policy</a></p>
+    <div class="aside rise">
+      <span class="kicker" style="background:var(--sun);color:var(--ink)">Your data</span>
+      <h2 class="h2">Your password lives in a locked box. <em>The box is locked, too.</em></h2>
+      <p>Your Bluelink or Kia password and any service PIN are encrypted on your phone with AES-256-GCM. The key for that is sealed in the Android Keystore, which is a tiny vault inside the phone's security chip. Even we cannot get the key out, and we did not try, because we are not that kind of people.</p>
+      <p>Your password only goes to your car maker, to sign in and to send commands. Bloo has no server to keep it on. There is no analytics and no advertising, and no crash-reporting service to phone home with your business. The AI summaries run on your phone and go nowhere.</p>
+      <p style="margin-top:28px"><a class="btn" style="background:var(--sun);border-color:var(--sun);color:var(--ink)" href="privacy.html">Read the privacy policy (it is funny, we promise)</a></p>
+    </div>
   </div>
 </section>
 
 <section id="questions">
   <div class="wrap">
-    <span class="eyebrow">Questions</span>
-    <h2>Straight answers.</h2>
-    <div class="faq">
-      <details>
-        <summary>Is this the official app?</summary>
-        <p>No. Bloo is independent. It uses your own account with the same services as the official app. It is not affiliated with Hyundai, Genesis or Kia.</p>
-      </details>
-      <details>
-        <summary>Which cars work?</summary>
-        <p>Hyundai, Genesis and Kia cars on Bluelink or Connected Car in the US, Canada and Europe. A feature only appears when your car supports it.</p>
-      </details>
-      <details>
-        <summary>Does it work on an iPhone?</summary>
-        <p>No. Bloo is for Android phones, tablets, foldables and Wear OS watches.</p>
-      </details>
-      <details>
-        <summary>What happens to my data if I stop using it?</summary>
-        <p>Sign out in Settings to remove the stored credentials. Uninstalling the app removes everything it stored on the phone.</p>
-      </details>
+    <span class="kicker rise">Questions nobody asked, answered anyway</span>
+    <h2 class="h2 rise">Straight answers, <em>with jokes.</em></h2>
+    <div class="qa">
+      <details class="rise"><summary>Is this the official app?</summary><p>No. Bloo is independent. It signs in with your own account, the same way the official app does. It is not affiliated with Hyundai, Genesis or Kia, and they have not endorsed it, which is a shame for them.</p></details>
+      <details class="rise"><summary>Which cars work?</summary><p>Hyundai, Genesis and Kia cars on Bluelink or Connected Car, in the US, Canada and Europe. A feature only appears when your car supports it, the same way your car only does what it feels like.</p></details>
+      <details class="rise"><summary>Does it work on an iPhone?</summary><p>No. It is for Android phones, tablets, foldables and Wear OS watches. An iPhone would need its own app, and we have not met an iPhone we trust with the keys.</p></details>
+      <details class="rise"><summary>What happens to my stuff if I stop?</summary><p>Sign out in Settings to delete the stored credentials. Uninstalling removes everything the app kept on the phone. Your car will carry on being a car.</p></details>
+    </div>
+  </div>
+</section>
+
+<section style="padding-bottom:0">
+  <div class="wrap">
+    <div class="final rise">
+      <p class="display">Get in<br>the <em>car.</em></p>
+      <div class="btns">
+        <a class="btn" href="https://groups.google.com/g/bloo-testing">Join the testers</a>
+        <a class="btn ghost" href="https://play.google.com/store/apps/details?id=com.bloo.bluelink">Google Play</a>
+        <a class="btn ghost" href="privacy.html">Privacy policy, with jokes</a>
+      </div>
     </div>
   </div>
 </section>
@@ -162,14 +148,71 @@
 
 <footer>
   <div class="wrap">
-    <div>Bloo is unofficial. It is not affiliated with, endorsed by, or operated by Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries.</div>
-    <div class="links">
+    <div>Bloo is unofficial. It is not affiliated with, endorsed by, or operated by Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries. Their cars, their logos, their problem.</div>
+    <nav aria-label="Footer">
       <a href="privacy.html">Privacy policy</a>
       <a href="https://github.com/ServerReset/Bloo">Source on GitHub</a>
       <a href="https://groups.google.com/g/bloo-testing">Testing group</a>
-    </div>
+    </nav>
   </div>
 </footer>
 
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Things rise into place as they scroll in, with a stagger from their data-d delay.
+  const rises = document.querySelectorAll('.rise, .stretch-in');
+  if ('IntersectionObserver' in window && !reduce) {
+    const io = new IntersectionObserver(entries => entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    }), { threshold: 0.15 });
+    rises.forEach(el => io.observe(el));
+  } else {
+    rises.forEach(el => el.classList.add('in'));
+  }
+
+  // The hero's last word keeps swapping: from bed, from the car park, from the kitchen.
+  const swap = document.getElementById('swap');
+  const words = ['from bed', 'from the car park', 'from the sofa', 'in the rain', 'while you nap'];
+  if (swap && !reduce) {
+    let i = 0;
+    setInterval(() => {
+      const cur = swap.firstElementChild;
+      cur.classList.remove('in'); cur.classList.add('out');
+      setTimeout(() => {
+        i = (i + 1) % words.length;
+        cur.textContent = words[i];
+        cur.classList.remove('out'); cur.classList.add('in');
+      }, 380);
+    }, 2600);
+  }
+
+  // Numbers count up when they arrive.
+  document.querySelectorAll('[data-count]').forEach(el => {
+    const to = Number(el.dataset.count);
+    if (reduce) return;
+    const io2 = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      io2.disconnect();
+      const t0 = performance.now();
+      const step = t => {
+        const p = Math.min(1, (t - t0) / 900);
+        el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }, { threshold: 0.6 });
+    io2.observe(el);
+  });
+
+  // A glow that follows the cursor.
+  const glow = document.querySelector('.glow');
+  if (!reduce && glow) addEventListener('pointermove', e => {
+    document.documentElement.style.setProperty('--mx', e.clientX + 'px');
+    document.documentElement.style.setProperty('--my', e.clientY + 'px');
+  }, { passive: true });
+})();
+</script>
 </body>
 </html>
