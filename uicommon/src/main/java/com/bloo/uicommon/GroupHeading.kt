@@ -26,7 +26,7 @@ fun GroupHeading(
 ) {
     RevealText(
         text,
-        modifier = modifier.semantics { heading() },
+        modifier = modifier.cascadeItem().semantics { heading() },
         style = style,
         color = color,
         fontWeight = weight,

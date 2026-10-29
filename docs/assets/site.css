@@ -7,6 +7,7 @@
   --ink: #15130f;
   --ink-soft: #3d3a33;
   --rust: #e2552b;
+  --rust-ink: #b23a14;
   --sun: #ffc83d;
   --sky: #6fc3ff;
   --mint: #8fe3b1;
@@ -23,6 +24,7 @@
     --ink: #fbf6ec;
     --ink-soft: #d8d0bf;
     --plum: #2a1638;
+    --rust-ink: #ff9a78;
   }
 }
 
@@ -292,3 +294,25 @@ body { padding-bottom: 96px; }
 .bar nav .plain-cta { padding: 8px 14px; border: 2px solid var(--ink); border-radius: 999px; color: var(--ink); }
 .bar nav .plain-cta:hover { background: var(--ink); color: var(--paper); }
 
+
+/* Contrast: small text uses the deeper accent; the bright one is for large display type only. */
+a { color: var(--rust-ink); }
+.trail a, .doc a, .fine a, footer a { color: var(--rust-ink); }
+.marquee-track span:nth-child(even) { color: var(--ink); }
+.kicker { color: var(--paper); }
+.toc a:hover, .toc a:focus-visible { color: var(--rust-ink); }
+.lede { color: var(--ink-soft); }
+footer, .fine, .doc .fine { color: var(--ink-soft); }
+
+/* Reflow: a changing word keeps its room, so the line never shifts what sits under it. */
+.swap { min-width: 16ch; text-align: left; contain: layout style; }
+.hero-foot { min-height: 220px; contain: layout; }
+.toc { contain: layout style; }
+
+/* Details open with a height animation rather than snapping the content below them down. */
+:root { interpolate-size: allow-keywords; }
+.doc details::details-content, .qa details::details-content {
+  block-size: 0; overflow: hidden;
+  transition: block-size 0.45s var(--ease), content-visibility 0.45s allow-discrete;
+}
+.doc details[open]::details-content, .qa details[open]::details-content { block-size: auto; }

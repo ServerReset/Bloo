@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.cascadeItem
 import com.bloo.uicommon.secondaryTextStyle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -51,7 +52,7 @@ internal fun <T : Any> PebbleStatusGate(status: T?, refreshing: Boolean, content
 /** The app's ONE muted secondary text: [secondaryTextStyle] (bodyMedium, semi-bold, with a soft halo) in the muted colour. */
 @Composable
 internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: Color = secondaryTextColor()) {
-    RevealText(text, style = SecondaryTextStyle(), modifier = modifier, color = color)
+    RevealText(text, style = SecondaryTextStyle(), modifier = modifier.cascadeItem(), color = color)
 }
 
 /** Secondary text in the muted on-surface-variant tone: the caption under a heading, a hint, a "nothing here" line. */

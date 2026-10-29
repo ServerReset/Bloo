@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.cascadeItem
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Row
@@ -115,13 +116,14 @@ fun ToggleRow(
     description: String? = null,
     onChange: (Boolean) -> Unit,
 ) {
+    val rowModifier = modifier.cascadeItem()
     // No wrapper at all when there is no caption, so every existing call site keeps exactly the
     // layout it had -- a Column around a single fillMaxWidth Row measures the same, but "the same"
     // is not worth asserting across ~25 call sites for a branch that costs nothing.
     if (description == null) {
-        ToggleRowControl(label, checked, enabled, modifier, onChange)
+        ToggleRowControl(label, checked, enabled, rowModifier, onChange)
     } else {
-        Column(modifier.fillMaxWidth()) {
+        Column(rowModifier.fillMaxWidth()) {
             ToggleRowControl(label, checked, enabled, onChange = onChange)
             SettingsCaption(description)
         }
@@ -146,7 +148,7 @@ internal fun SettingsCaption(
     RevealText(
         text,
         style = secondaryTextStyle(),
-        modifier = modifier.padding(top = 2.dp, bottom = bottomGap),
+        modifier = modifier.cascadeItem().padding(top = 2.dp, bottom = bottomGap),
         color = secondaryTextColor(),
     )
 }

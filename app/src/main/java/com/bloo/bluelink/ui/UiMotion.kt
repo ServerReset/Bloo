@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.cascadeOvershoot
 import com.bloo.uicommon.lowPowerFloating
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContent
@@ -187,12 +188,7 @@ object NoOpColumnScope : ColumnScope {
  * (a real spring would be a third timed animation beside the shared [Transition] progress). The
  * overshoot stays small (the canonical 1.70158 is too showy for a row-sized element).
  */
-fun pebbleRowOvershoot(t: Float): Float {
-    val overshoot = 1.15f
-    val c3 = overshoot + 1f
-    val x = t - 1f
-    return 1f + c3 * x * x * x + overshoot * x * x
-}
+fun pebbleRowOvershoot(t: Float): Float = cascadeOvershoot(t)
 
 /**
  * Shows [content] with the app's one expand/collapse transition: it grows [from] that edge as it appears and shrinks back
