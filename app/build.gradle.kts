@@ -4,8 +4,20 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// The plain privacy policy the app's viewer shows comes from docs/ (the GitHub Pages site). It is copied into the build here, so
+// changing the page changes what the app shows, and no code or copy in the app needs editing.
+val privacyAssets = layout.buildDirectory.dir("generated/privacyAssets")
+val copyPrivacyPolicy by tasks.registering(Copy::class) {
+    from(rootProject.file("docs/privacy-plain.html"))
+    into(privacyAssets)
+}
+tasks.matching { it.name.matches(Regex("merge.*Assets")) }.configureEach { dependsOn(copyPrivacyPolicy) }
+
 android {
     namespace = "com.bloo.bluelink"
+    sourceSets.getByName("main") {
+        assets.srcDir(privacyAssets)
+    }
     compileSdk = 37
 
     defaultConfig {

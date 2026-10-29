@@ -1,117 +1,121 @@
-# Bloo
-
 <p align="center">
-  <img src="docs/img/icon.png" width="104" alt="Bloo">
+  <img src="docs/img/icon.png" width="104" alt="Bloo icon">
 </p>
 
-<p align="center"><b>Lock, climate, charge and live status for your Hyundai, Genesis or Kia - without the slow official app.</b></p>
+<h1 align="center">Bloo</h1>
+
+<p align="center"><b>Lock it from the couch. Cool it from the car park. Charge it from bed.</b></p>
 
 <p align="center">
-  <img src="docs/img/garage.png" width="22%" alt="Garage">
-  <img src="docs/img/lock.png" width="22%" alt="App lock">
-  <img src="docs/img/garage-dark.png" width="22%" alt="Garage, dark">
-  <img src="docs/img/lock-dark.png" width="22%" alt="App lock, dark">
+  An independent app for Hyundai, Genesis and Kia cars, for phones, foldables, tablets and Wear OS.<br>
+  Open source. No server of ours. Your password is encrypted on your phone.
 </p>
 
-## Get it
+<p align="center">
+  <a href="https://serverreset.github.io/Bloo/"><b>Website</b></a> ·
+  <a href="https://serverreset.github.io/Bloo/privacy.html"><b>Privacy policy</b></a> ·
+  <a href="https://serverreset.github.io/Bloo/privacy-plain.html">Privacy (plain HTML)</a> ·
+  <a href="https://github.com/ServerReset/Bloo/releases/latest">Latest release</a>
+</p>
 
-**On Google Play (closed test).** Two steps, and both use the Google account you use on your phone:
+---
 
-1. **Join the testing group** - **[groups.google.com/g/bloo-testing](https://groups.google.com/g/bloo-testing)**.
-   This is what puts you on the tester list; the opt-in below only works for accounts in it.
-2. **Install from Google Play** - **[play.google.com/store/apps/details?id=com.bloo.bluelink](https://play.google.com/store/apps/details?id=com.bloo.bluelink)**.
-   Once you are in the group it resolves, and Play keeps the app up to date from there.
+## 🚪 Get in
 
-Testing builds skip review, so new versions land the day they're built.
+Two ways in. Both are the same app.
 
-**Or install the APK directly** - the same app, built for installing by hand:
+**Google Play (closed test)**
 
-- **[Bloo.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk)** - the phone app.
-- **[Bloo-watch.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo-watch.apk)** - the watch app.
+1. **Join the testing group:** [groups.google.com/g/bloo-testing](https://groups.google.com/g/bloo-testing). This puts your Google account on the tester list. The Play link only works after this step.
+2. **Install from Google Play:** [play.google.com/store/apps/details?id=com.bloo.bluelink](https://play.google.com/store/apps/details?id=com.bloo.bluelink). Play keeps it updated from there.
 
-Both are always the newest build. Step-by-step instructions are under [Install](#install) below.
+Testing builds skip review, so new versions arrive the day they are built.
 
-### Which one?
+**Or the APK, straight from a release**
 
-The same app either way, but **not interchangeable**. The package name is the same; the **signing key is
-not** - Play re-signs every upload with Google's app-signing key, so a Play-installed copy and an APK copy
-cannot update each other. Moving between them costs one uninstall, and an uninstall takes the app's data
-with it: export first, from Settings → Export. They differ in **how they update, and how the watch gets
-its app**:
+- **[Bloo.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo.apk)**: the phone app.
+- **[Bloo-watch.apk](https://github.com/ServerReset/Bloo/releases/latest/download/Bloo-watch.apk)**: the watch app.
+
+No Play account and no GitHub sign-in needed. Step-by-step instructions are under [Install](#-install).
+
+### Play or APK? Pick a team
+
+They are the same app, but they are **not interchangeable**. The package name matches, but the signing key does not. Play re-signs every upload with Google's app-signing key, so a Play copy and an APK copy cannot update each other. Switching costs one uninstall, and an uninstall takes the app's data with it. Export first, from **Settings → Export**.
 
 | | Google Play | The APK |
 |---|---|---|
-| **Updates** | Play downloads and installs them | the app does it itself - silently if you have [Shizuku](https://shizuku.rikka.app/), otherwise through Android's installer |
-| **Watch app** | Play installs it on the watch | the phone pairs with the watch's wireless debugging and pushes it across |
-| **Needs** | a Google account on the tester list | nothing but the file |
-| **Size** | smaller: no installer of its own | larger: it carries one |
+| **Updates** | Play downloads and installs them | The app updates itself: silently with [Shizuku](https://shizuku.rikka.app/), otherwise through Android's installer |
+| **Watch app** | Play installs it on the watch | The phone pairs with the watch's wireless debugging and pushes it across |
+| **Needs** | A Google account on the tester list | Nothing but the file |
+| **Size** | Smaller, no installer of its own | Larger, because it carries one |
 
-The APK is the fuller of the two, and that is the whole reason it exists: it installs the watch app and
-updates itself, and Play does not allow an app to install other apps. Neither is a test build in the
-"unfinished" sense - both are the same release, published by the same pipeline at the same moment.
+The APK is the fuller of the two, and that is the reason it exists. It installs the watch app and updates itself, which Play does not allow an app to do. Neither is a "test build" in the unfinished sense. Both are the same release, published by the same pipeline at the same moment.
 
-A third-party Android app for **Hyundai**, **Genesis** and **Kia** vehicles (US, Canada, Hyundai Europe). Built with Jetpack Compose and Material 3 Expressive for phones, foldables and tablets. Every screen talks to live servers; nothing is simulated.
+---
 
-## What it does
+## 🚗 What it does
 
-- **Control**: lock and unlock, remote climate, charging, live location, full vehicle status, trips, weather.
-- **On-device AI**: Gemini Nano summaries and natural-language commands.
-- **AutoLock**: locks the car when you walk away from it.
-- **Sync**: settings and photos sync across your devices through Google Drive.
-- **Layouts**: adaptive for foldables and tablets, with reorderable pebbles, custom palettes and an animated background.
-- **Multiple accounts**, signed in at once.
-- **Widgets**: a full homescreen widget (car photo background, corner shape, text size, colour by level, any size from 2x2 to 5x5) and a slim 4x1 strip, both with lock, climate and charge buttons.
-- **Watch app**: the charge as a ring round the display with four controls you choose from a dozen (lock, climate, charge, flash, horn, refresh and more), pull down to refresh, a Tile, and a complication for any watch face.
+- **Control.** Lock and unlock, remote climate, charging, live location, full vehicle status, trips and weather.
+- **On-device AI.** Gemini Nano summaries and plain-language commands. The model runs on your phone.
+- **AutoLock.** Locks the car when you walk away from it.
+- **Sync.** Settings and photos follow you across devices through your own Google Drive.
+- **Big screens.** Adaptive layouts for foldables and tablets, with reorderable pebbles, custom palettes and an animated background.
+- **Several accounts,** signed in at once.
+- **Widgets.** A full home-screen widget (car photo behind it, corner shape, text size, colour by charge level, any size from 2×2 to 5×5), plus a slim 4×1 strip. Both have lock, climate and charge buttons.
+- **Watch app.** The charge as a ring round the display, with four controls you choose from a dozen (lock, climate, charge, flash, horn, refresh and more), pull-to-refresh, a Tile, and a complication for any watch face.
 
-## Security
+---
 
-- **One encrypted vault.** Sign-in credentials, car service PINs, session tokens and the app-lock PIN record all live in a single AES-256-GCM encrypted file. Nothing sensitive is stored anywhere else.
-- **Two keys over one data key.** The vault's data key is sealed by a hardware-backed Android Keystore key, so background refresh, notifications and AutoLock keep working. If you set an app PIN, the same key is also sealed under a key derived from your PIN (PBKDF2-HMAC-SHA256, 210,000 rounds), so entering the PIN recovers your accounts if the device key is ever lost.
+## 🔐 Security, without the hand-waving
+
+- **One encrypted vault.** Sign-in credentials, car service PINs, session tokens and the app-lock PIN record live in a single AES-256-GCM encrypted file. Nothing sensitive is stored anywhere else.
+- **Two keys over one data key.** The vault's data key is sealed by a hardware-backed Android Keystore key, so background refresh, notifications and AutoLock keep working. If you set an app PIN, the same data key is also sealed under a key derived from your PIN (PBKDF2-HMAC-SHA256, 210,000 rounds). Entering the PIN recovers your accounts if the device key is ever lost.
 - **App lock.** Biometric unlock, with an optional 4 to 8 digit PIN backup, a lockout after repeated wrong PINs, and a choice of when to re-lock.
-- **Sealed after a restart.** After your phone reboots, Bloo hands out nothing and runs nothing (no alerts, AutoLock or refreshes) until you sign in with your account and then your fingerprint or PIN. A notification reminds you. You can turn this off in Settings.
+- **Sealed after a restart.** After your phone reboots, Bloo hands out nothing and runs nothing (no alerts, AutoLock or refreshes) until you sign in with your account, then your fingerprint or PIN. A notification reminds you. You can turn this off in Settings.
 - **Nothing leaves the device** except requests to the car brand's own servers. The app collects no data.
 
-## Install
+The full privacy policy is on the [website](https://serverreset.github.io/Bloo/privacy.html), and the same text is shown inside the app. It is also written in [plain HTML](https://serverreset.github.io/Bloo/privacy-plain.html), in case you prefer your privacy policies undecorated.
 
-Bloo is in closed testing on Google Play (join above), or you can install it straight from a release -
-no Play account and no GitHub sign-in needed.
+---
 
-1. On your phone, open the [latest release](https://github.com/ServerReset/Bloo/releases/latest) and, under **Assets**, download **`Bloo.apk`**. (Wear OS owners: `Bloo-watch.apk` is there too.)
-2. Open the downloaded file. If you can't find it, pull down your notifications and tap the finished download, or open **Downloads** - in your browser it's usually behind the **⋮** or **☰** menu, or use the **Files** app → **Downloads**.
-3. Android warns that Bloo isn't from a trusted source. What you tap depends on the warning you get:
-   - **"Blocked by Play Protect" / "unsafe app"**: tap **More details** - if you don't see it, look for a **⌄** or **⋮** on the warning sheet to expand it - then **Install anyway**.
-   - **"For your security…" (unknown sources)**: tap **Settings**, turn on **Allow from this source** for the app you're installing with (your browser, or Files), then go **Back** and tap **Install**.
+## 🛠️ Install
+
+Bloo is in closed testing on Google Play (see [Get in](#-get-in)), or you can install it straight from a release.
+
+1. On your phone, open the [latest release](https://github.com/ServerReset/Bloo/releases/latest) and, under **Assets**, download **`Bloo.apk`**. Wear OS owners: `Bloo-watch.apk` is there too.
+2. Open the downloaded file. If you can't find it, pull down your notifications and tap the finished download, or open **Downloads**. In your browser it is usually behind the **⋮** or **☰** menu. Or use the **Files** app → **Downloads**.
+3. Android will warn that Bloo isn't from a trusted source. What you tap depends on the warning:
+   - **"Blocked by Play Protect" or "unsafe app":** tap **More details** (if you don't see it, look for a **⌄** or **⋮** on the warning sheet to expand it), then **Install anyway**.
+   - **"For your security…" (unknown sources):** tap **Settings**, turn on **Allow from this source** for the app you are installing with (your browser, or Files), go **Back**, then tap **Install**.
 4. Confirm with your **fingerprint, face, PIN, pattern or password**.
 
-After that the app updates itself: every push publishes a new release, and the build number is the version.
+After that the app updates itself. Every push publishes a new release, and the build number is the version.
 
 ### If an update says "App not installed"
 
-Bloo was signed with a new key in October 2026, and Android will not install an update signed with a
-different key than the copy already on your phone. A version installed before that change has to be
-replaced rather than updated - the download is fine, the installer just refuses it.
+Bloo was signed with a new key in October 2026. Android will not install an update signed with a different key than the copy already on your phone, so a version installed before that change has to be replaced rather than updated. The download is fine. The installer just refuses it.
 
-Export your settings first (**Settings → Backup & sync → Export**), then uninstall Bloo, install the
-newest **`Bloo.apk`** from the [releases page](https://github.com/ServerReset/Bloo/releases), sign in
-again, and restore the backup. Until you do, the old copy keeps working exactly as it did - it just
-stops receiving updates.
+Export your settings first (**Settings → Backup & sync → Export**), uninstall Bloo, install the newest `Bloo.apk` from the [releases page](https://github.com/ServerReset/Bloo/releases), sign in again, and restore the backup. Until you do, the old copy keeps working exactly as it did. It just stops receiving updates.
 
-## Build
+---
+
+## 🧑‍💻 For the curious
 
 ```bash
 ./gradlew assembleDebug
 ```
 
-Needs JDK 17 and Android Studio Meerkat or newer.
+You need JDK 17 and Android Studio Meerkat or newer.
 
-## Wording
+- **`:app`** is the UI, the workers and AutoLock.
+- **`:shared`** holds the API clients, models and stores.
+- **`:uicommon`** holds the shared Compose components.
+- **`docs/`** is the website. Its privacy policy is copied into the app at build time, so editing the page updates what the app shows.
 
 Every user-facing string follows one page of rules: **[docs/COPY.md](docs/COPY.md)**.
 
-## Modules
+---
 
-`:app` is the UI, workers and AutoLock. `:shared` holds the API clients, models and stores. `:uicommon` holds shared Compose components.
+## ⚠️ Disclaimer
 
-## Disclaimer
-
-Unofficial. Not affiliated with Hyundai, Genesis or Kia. Remote commands physically operate your vehicle; use them responsibly.
+Bloo is unofficial and is not affiliated with Hyundai, Genesis or Kia. Remote commands physically operate your vehicle, so use them responsibly.
