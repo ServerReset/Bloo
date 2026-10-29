@@ -182,6 +182,13 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
     if (expandedVehicle != null && expandedLocation != null && originBounds != null) {
         val locateExpandedVehicle = rememberLocateAction(vm, expandedVehicle)
         val (chargePercent, chargeRange) = mapChargeStats(state.value, expandedVehicle, appearance.metricDistance)
+        val carDetails = buildList {
+            expandedVehicle.modelYear?.let { add("Year" to it) }
+            expandedVehicle.trim?.let { add("Trim" to it) }
+            add("Model" to expandedVehicle.model)
+            chargePercent?.let { add("Charge" to it) }
+            chargeRange?.let { add("Range" to it) }
+        }
         ExpandableMapLayer(
             isExpanded = true,
             originBounds = originBounds,
@@ -189,6 +196,7 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
             vehicleName = expandedVehicle.name,
             chargePercent = chargePercent,
             chargeRange = chargeRange,
+            details = carDetails,
             photo = state.value.imageUrls[expandedVehicle.vin],
             deviceLocation = deviceLocation,
             mapState = expandedMap.mapStateFor(expandedVehicle.vin),

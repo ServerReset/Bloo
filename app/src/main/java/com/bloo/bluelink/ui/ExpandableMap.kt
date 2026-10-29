@@ -98,6 +98,8 @@ internal fun ExpandableMapLayer(
     /** The car's charge and range for the bar's end (see [mapChargeStats]). */
     chargePercent: String? = null,
     chargeRange: String? = null,
+    /** The car's other details (year, trim and so on), shown when the bar is opened. */
+    details: List<Pair<String, String>> = emptyList(),
     /** The car's stored photo, at the bar's start in place of the car glyph. */
     photo: String? = null,
     deviceLocation: GeoLocation?,
@@ -295,6 +297,7 @@ internal fun ExpandableMapLayer(
                     photo = photo,
                     chargePercent = chargePercent,
                     chargeRange = chargeRange,
+                    details = details,
                     mapHazeState = mapHazeState,
                     // No refresh button: pull the bar up to full tension and let go instead.
                     dragModifier = Modifier.pullToRefreshOrDismiss(
