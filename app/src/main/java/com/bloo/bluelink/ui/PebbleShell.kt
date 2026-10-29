@@ -291,7 +291,12 @@ internal fun PebbleShell(
                         ),
                         // No whole-body fade on the way out: closing is a per-row cascade too (see
                         // StaggeredRevealColumn), and a body fade would wash the cascade out.
-                        exit = shrinkVertically(shrinkTowards = Alignment.Top, clip = false),
+                        // The same spring as the open, so the close mirrors it and the rows share the one clock on the way out.
+                        exit = shrinkVertically(
+                            animationSpec = pebbleOpenSizeSpec(),
+                            shrinkTowards = Alignment.Top,
+                            clip = false,
+                        ),
                     ) {
                         // StaggeredRevealColumn cascades rows; `transition` is this
                         // AnimatedVisibilityScope's, so the card cannot finish closing before its
