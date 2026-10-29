@@ -47,6 +47,8 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                 )
             }
             if (accounts.any { it.brand.requiresPin }) BodySmallText("Wrong-PIN attempts lock it for a few minutes.")
+            // The promise about where the password lives, said here too, so it is found where the accounts are.
+            CredentialsPrivacyNote(brandLabel = null)
         }
     }
 }

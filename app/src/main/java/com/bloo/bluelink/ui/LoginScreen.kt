@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -237,17 +238,9 @@ internal fun LoginScreen(
         Brand.KIA, Brand.KIA_CA -> "Kia Connect email"
     }
 
-    // Each block eases in a beat after the one above it.
-    var heroIn by remember { mutableStateOf(false) }
-    var accountIn by remember { mutableStateOf(false) }
-    var loginIn by remember { mutableStateOf(false) }
-    var footerIn by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        heroIn = true
-        delay(110); accountIn = true
-        delay(110); loginIn = true
-        delay(110); footerIn = true
-    }
+    // One screen, no scrolling: the sign-in form fits on a normal phone. Only a very short window scrolls, so nothing is cut off.
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
 
     if (onCancel != null) BackHandler { onCancel() }
 
@@ -258,179 +251,149 @@ internal fun LoginScreen(
     Box(Modifier.fillMaxSize()) {
         // Same gate as LoadingScreen.
         if (LocalAppearance.current.auroraBackground) AuroraBackground(Modifier.matchParentSize().hazeSource(hazeState))
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding(),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        AnimatedVisibility(
+            visible = shown,
+            modifier = Modifier.fillMaxSize(),
+            enter = fadeIn(tween(MotionLong)) + slideInVertically(tween(MotionLong)) { it / 8 },
         ) {
-            val blockModifier = Modifier.fillMaxWidth().widthIn(max = 480.dp).padding(horizontal = GapSection)
-            val enter = slideInVertically(tween(MotionLong, easing = LinearOutSlowInEasing)) { it / 4 } + fadeIn(tween(MotionLong))
-
-            // The hero: the app tile with a soft glow behind it, the wordmark, and the brand line crossfading beneath.
-            AnimatedVisibility(visible = heroIn, enter = enter) {
-                LoginHero(
-                    subtitle = brandSubtitle,
-                    compact = shortScreen,
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp).statusBarsPadding()
-                        .padding(horizontal = GapBlock)
-                        .padding(top = if (shortScreen) 16.dp else 40.dp, bottom = if (shortScreen) 14.dp else 22.dp),
-                )
-            }
-
-            // Which account: where it lives, then which brand.
-            AnimatedVisibility(visible = accountIn, enter = enter) {
-                GlassSurface(
-                    shape = ExtraLargeShape,
-                    hazeState = hazeState,
-                    modifier = blockModifier.padding(bottom = GapGroup),
-                    contentAlignment = Alignment.TopStart,
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(GapPage), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-                        LoginSectionLabel(Icons.Filled.Public, "Where is your account?")
-                        MorphSegmented(
-                            options = segmentsOf("US" to "United States", "CA" to "Canada", "EU" to "Europe"),
-                            selectedKey = region,
-                            onSelect = { key ->
-                                region = key
-                                brand = Brand.brandsForRegion(key).first()
-                            },
-                        )
-                        val brandOptions = Brand.brandsForRegion(region)
-                        MorphSegmented(
-                            options = brandOptions.map { b -> SegmentOption(b.name, Brand.shortLabel(b), null) },
-                            selectedKey = brand.name,
-                            onSelect = { key -> brand = Brand.valueOf(key) },
-                        )
-                    }
-                }
-            }
-
-            // Your login: the saved-login shortcut, the fields, the PIN when the brand wants one, and the button.
-            AnimatedVisibility(visible = loginIn, enter = enter) {
-                GlassSurface(
-                    shape = ExtraLargeShape,
-                    hazeState = hazeState,
-                    modifier = blockModifier.padding(bottom = GapBlock),
-                    contentAlignment = Alignment.TopStart,
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(GapPage), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-                        LoginSectionLabel(Icons.Filled.VpnKey, "Your ${brand.label} login")
-                        MorphTextButton(
-                            text = "Use a saved login",
-                            onClick = { scope.launch { fillFromManager(quiet = false) } },
-                            icon = Icons.Filled.VpnKey,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        AnimatedVisibility(visible = savedNote != null) {
-                            BodySmallText(savedNote.orEmpty())
-                        }
-
-                        BlooTextField(
-                            value = email,
-                            onValueChange = { email = it },
-                            label = { RevealText(emailLabel) },
-                            singleLine = true,
-                            leadingIcon = { Icon(Icons.Filled.MailOutline, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                            keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Down) }),
-                            modifier = Modifier.fillMaxWidth().semantics {
-                                contentType = ContentType.Username + ContentType.EmailAddress
-                            },
-                        )
-                        BlooTextField(
-                            value = password,
-                            onValueChange = { password = it },
-                            label = { RevealText("Password") },
-                            singleLine = true,
-                            leadingIcon = { Icon(AppIcons.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            trailingIcon = { RevealToggle(showPassword, "password") { showPassword = !showPassword } },
-                            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                            // Next to the PIN when the brand has one, else Go signs in from the keyboard.
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Password,
-                                imeAction = if (brand.requiresPin) ImeAction.Next else ImeAction.Go,
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onNext = { focus.moveFocus(FocusDirection.Down) },
-                                onGo = { submit() },
-                            ),
-                            modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.Password },
-                        )
-
-                        ExpandVisibility(brand.requiresPin, from = Alignment.Bottom) {
-                            Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                                PinField(
-                                    value = pin,
-                                    onValueChange = { pin = it },
-                                    label = if (brand.pinRequiredToSignIn) "Service PIN" else "Service PIN (optional)",
-                                    digitsOnly = false,
-                                    revealed = showPin,
-                                    trailingIcon = { RevealToggle(showPin, "service PIN") { showPin = !showPin } },
-                                    onDone = { submit() },
-                                )
-                                if (!brand.pinRequiredToSignIn) {
-                                    BodySmallText("Only needed to run remote commands. Leave it blank if you never set one in the Hyundai app; you can add it later in Settings.")
-                                }
-                            }
-                        }
-
-                        MorphTextButton(
-                            text = "Sign in to ${brand.label}",
-                            onClick = { submit() },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !loading,
-                            pending = loading,
-                            emphasis = ButtonEmphasis.Confirm,
-                        )
-
-                        // Said where the credentials are typed, in one line: where they go.
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
-                            Icon(AppIcons.Lock, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                            AnimatedContent(
-                                targetState = brand.label,
-                                transitionSpec = { fadeIn(tween(MotionShort)) togetherWith fadeOut(tween(MotionShort)) },
-                                label = "privacyNote",
-                            ) { label ->
-                                RevealText(
-                                    "Sent only to $label's servers; stored encrypted on this device.",
-                                    style = SecondaryTextStyle(),
-                                    color = scheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // The quiet things last: forgot password, cancel, and the update check (available WITHOUT signing in -- the normal
-            // surface lives in Settings behind sign-in; it reads "Update available" once a check finds a build).
-            AnimatedVisibility(visible = footerIn, enter = enter) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .then(if (shortScreen) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                    .padding(horizontal = GapSection, vertical = GapGroup),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(GapGroup),
+            ) {
                 Column(
-                    blockModifier.padding(bottom = GapBlock),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                    Modifier.fillMaxWidth().widthIn(max = 480.dp),
                     verticalArrangement = Arrangement.spacedBy(GapGroup),
                 ) {
-                    ActionRow {
-                        MorphTextButton(
-                            text = "Forgot password?",
-                            onClick = { openUrl(context, brand.forgotPasswordUrl) },
-                        )
-                        if (onCancel != null) MorphTextButton(text = "Cancel", onClick = onCancel)
+                    // The app tile and the brand, on one row to keep the height for the form.
+                    LoginHero(subtitle = brandSubtitle, compact = true, modifier = Modifier.fillMaxWidth())
+
+                    // Where the account lives, and which brand: two rows of segments.
+                    GlassSurface(shape = ExtraLargeShape, hazeState = hazeState, modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopStart) {
+                        Column(Modifier.fillMaxWidth().padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                            MorphSegmented(
+                                options = segmentsOf("US" to "United States", "CA" to "Canada", "EU" to "Europe"),
+                                selectedKey = region,
+                                onSelect = { key ->
+                                    region = key
+                                    brand = Brand.brandsForRegion(key).first()
+                                },
+                            )
+                            MorphSegmented(
+                                options = Brand.brandsForRegion(region).map { b -> SegmentOption(b.name, Brand.shortLabel(b), null) },
+                                selectedKey = brand.name,
+                                onSelect = { key -> brand = Brand.valueOf(key) },
+                            )
+                        }
                     }
-                    MorphTextButton(
-                        text = when {
-                            updateChecking -> "Checking…"
-                            updateAvailableUrl != null -> "Update available"
-                            else -> "Check for updates"
-                        },
-                        onClick = {
-                            val url = updateAvailableUrl
-                            if (url != null) openUrl(context, url) else onCheckForUpdates()
-                        },
-                        icon = if (updateAvailableUrl != null) Icons.AutoMirrored.Filled.OpenInNew else Icons.Filled.SystemUpdate,
-                        enabled = !updateChecking,
-                        pending = updateChecking,
-                        contentColor = scheme.onSurfaceVariant,
-                    )
+
+                    // Your login: the fields, the PIN when the brand wants one, the button, and the saved-login shortcut.
+                    GlassSurface(shape = ExtraLargeShape, hazeState = hazeState, modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopStart) {
+                        Column(Modifier.fillMaxWidth().padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                LoginSectionLabel(Icons.Filled.VpnKey, "Your ${brand.label} login")
+                                Spacer(Modifier.weight(1f))
+                                MorphTextButton(
+                                    text = "Saved login",
+                                    onClick = { scope.launch { fillFromManager(quiet = false) } },
+                                    icon = Icons.Filled.VpnKey,
+                                )
+                            }
+                            AnimatedVisibility(visible = savedNote != null) {
+                                BodySmallText(savedNote.orEmpty())
+                            }
+
+                            BlooTextField(
+                                value = email,
+                                onValueChange = { email = it },
+                                label = { RevealText(emailLabel) },
+                                singleLine = true,
+                                leadingIcon = { Icon(Icons.Filled.MailOutline, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                                keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Down) }),
+                                modifier = Modifier.fillMaxWidth().semantics {
+                                    contentType = ContentType.Username + ContentType.EmailAddress
+                                },
+                            )
+                            BlooTextField(
+                                value = password,
+                                onValueChange = { password = it },
+                                label = { RevealText("Password") },
+                                singleLine = true,
+                                leadingIcon = { Icon(AppIcons.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                trailingIcon = { RevealToggle(showPassword, "password") { showPassword = !showPassword } },
+                                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                                // Next to the PIN when the brand has one, else Go signs in from the keyboard.
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Password,
+                                    imeAction = if (brand.requiresPin) ImeAction.Next else ImeAction.Go,
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onNext = { focus.moveFocus(FocusDirection.Down) },
+                                    onGo = { submit() },
+                                ),
+                                modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.Password },
+                            )
+
+                            ExpandVisibility(brand.requiresPin, from = Alignment.Bottom) {
+                                Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                                    PinField(
+                                        value = pin,
+                                        onValueChange = { pin = it },
+                                        label = if (brand.pinRequiredToSignIn) "Service PIN" else "Service PIN (optional)",
+                                        digitsOnly = false,
+                                        revealed = showPin,
+                                        trailingIcon = { RevealToggle(showPin, "service PIN") { showPin = !showPin } },
+                                        onDone = { submit() },
+                                    )
+                                    if (!brand.pinRequiredToSignIn) {
+                                        BodySmallText("Only needed to run remote commands. Leave it blank if you never set one; you can add it later in Settings.")
+                                    }
+                                }
+                            }
+
+                            MorphTextButton(
+                                text = "Sign in to ${brand.label}",
+                                onClick = { submit() },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !loading,
+                                pending = loading,
+                                emphasis = ButtonEmphasis.Confirm,
+                            )
+                        }
+                    }
+
+                    // The privacy promise, in full, on the screen where the credentials are typed.
+                    GlassSurface(shape = ExtraLargeShape, hazeState = hazeState, modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopStart) {
+                        CredentialsPrivacyNote(brand.label, modifier = Modifier.padding(GapGroup))
+                    }
+
+                    // The quiet things last, on one row.
+                    ActionRow {
+                        MorphTextButton(text = "Forgot password?", onClick = { openUrl(context, brand.forgotPasswordUrl) })
+                        if (onCancel != null) MorphTextButton(text = "Cancel", onClick = onCancel)
+                        MorphTextButton(
+                            text = when {
+                                updateChecking -> "Checking…"
+                                updateAvailableUrl != null -> "Update available"
+                                else -> "Check for updates"
+                            },
+                            onClick = {
+                                val url = updateAvailableUrl
+                                if (url != null) openUrl(context, url) else onCheckForUpdates()
+                            },
+                            icon = if (updateAvailableUrl != null) Icons.AutoMirrored.Filled.OpenInNew else Icons.Filled.SystemUpdate,
+                            enabled = !updateChecking,
+                            pending = updateChecking,
+                            contentColor = scheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
