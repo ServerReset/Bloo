@@ -11,7 +11,8 @@ val copyPrivacyPolicy by tasks.registering(Copy::class) {
     from(rootProject.file("docs/privacy-plain.html"))
     into(privacyAssets)
 }
-tasks.matching { it.name.matches(Regex("merge.*Assets")) }.configureEach { dependsOn(copyPrivacyPolicy) }
+// Every task that could read the assets (merging, lint, packaging) runs after the copy, so none reads a stale or missing file.
+tasks.configureEach { if (name != copyPrivacyPolicy.name) dependsOn(copyPrivacyPolicy) }
 
 android {
     namespace = "com.bloo.bluelink"
