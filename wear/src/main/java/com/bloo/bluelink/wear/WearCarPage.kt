@@ -68,7 +68,7 @@ internal class WearCarUi(
  * What the app hands a car page: the gate its commands go through, and a request from the watch's Tile to act on, and the call that
  * says the request was handled. Passed as one value, since every page takes all three.
  */
-internal class CarPageActions(
+internal data class CarPageActions(
     val send: (() -> Unit) -> Unit,
     val tileRequest: WearMainActivity.TileRequest?,
     val onTileRequestHandled: () -> Unit,
@@ -80,9 +80,7 @@ internal fun WearCarPage(
     car: VehicleSnapshot,
     actions: CarPageActions,
 ) {
-    val send = actions.send
-    val tileRequest = actions.tileRequest
-    val onTileRequestHandled = actions.onTileRequestHandled
+    val (send, tileRequest, onTileRequestHandled) = actions
     val context = LocalContext.current
     val signedIn by WearCredentialSync.signedIn.collectAsStateWithLifecycle()
     val pending by WearCommands.pending.collectAsStateWithLifecycle()

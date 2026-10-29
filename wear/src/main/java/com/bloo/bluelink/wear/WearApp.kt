@@ -135,9 +135,7 @@ private fun Cars(
     vehicles: List<com.bloo.bluelink.data.VehicleSnapshot>,
     actions: CarPageActions,
 ) {
-    val send = actions.send
-    val tileRequest = actions.tileRequest
-    val onTileRequestHandled = actions.onTileRequestHandled
+    val (send, tileRequest, onTileRequestHandled) = actions
     val context = LocalContext.current
     val startPage = remember {
         WearTileCar.saved(context)?.let { vin -> vehicles.indexOfFirst { it.vin == vin } }?.coerceAtLeast(0) ?: 0
