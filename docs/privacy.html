@@ -44,12 +44,30 @@
   details { background: var(--surface-2); border-radius: 16px; padding: 4px 16px; margin: 16px 0; }
   summary { cursor: pointer; padding: 12px 0; font-weight: 500; color: var(--primary); }
   details[open] summary { margin-bottom: 4px; }
-  code { font-size: 14px; background: var(--surface-3); padding: 1px 6px; border-radius: 6px; }
+  code { overflow-wrap: anywhere; word-break: break-word; font-size: 14px; background: var(--surface-3); padding: 1px 6px; border-radius: 6px; }
+
+  .layout { display: block; }
+  .toc { margin: 8px 0 24px; padding: 16px 18px; background: var(--surface-2); border-radius: 20px; }
+  .toc-title { margin: 0 0 8px; font-weight: 500; color: var(--primary); }
+  .toc ol { margin: 0; padding-left: 20px; }
+  .toc li { margin: 4px 0; }
+  .toc a { color: var(--on-surface); text-decoration: none; }
+  .toc a:hover { color: var(--primary); text-decoration: underline; }
+  h2 { scroll-margin-top: 16px; }
+  @media (min-width: 620px) and (max-width: 899px) { .toc ol { columns: 2; } }
+  @media (min-width: 900px) {
+    main { max-width: 1040px; }
+    .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 40px; align-items: start; }
+    .toc { position: sticky; top: 24px; margin: 8px 0 0; }
+  }
   hr { border: 0; border-top: 1px solid var(--outline-variant); margin: 40px 0 16px; }
 </style>
 </head>
 <body>
 <main>
+<div class="layout">
+<nav class="toc" aria-label="Contents"><p class="toc-title">In this policy</p><ol><li><a href="#who-we-are-and-who-we-are-not">Who we are, and who we are not</a></li><li><a href="#what-bloo-stores-and-how-it-is-encrypted">What Bloo stores, and how it is encrypted</a></li><li><a href="#where-things-go">Where things go</a></li><li><a href="#transactions">Transactions</a></li><li><a href="#if-a-pirate-takes-control-of-your-car">If a pirate takes control of your car</a></li><li><a href="#what-bloo-never-collects">What Bloo never collects</a></li><li><a href="#permissions-and-why-we-ask">Permissions, and why we ask</a></li><li><a href="#your-control">Your control</a></li><li><a href="#open-source-please-check-our-work">Open source: please check our work</a></li><li><a href="#children">Children</a></li><li><a href="#changes">Changes</a></li><li><a href="#contact">Contact</a></li></ol></nav>
+<div class="body">
 
 <span class="stamp">Last updated 29 October 2026</span>
 <h1>Privacy policy</h1>
@@ -59,10 +77,10 @@
   <p><strong>The short version.</strong> Your password, PIN and sign-in details are encrypted on your phone. Nothing sensitive is stored in plain text, anywhere. We run no server, track nothing, sell nothing, and the whole app is open source, so you can check every claim here against the code.</p>
 </div>
 
-<h2>1. Who we are, and who we are not</h2>
+<h2 id="who-we-are-and-who-we-are-not">1. Who we are, and who we are not</h2>
 <p>Bloo is an independent app that talks to the Bluelink and Connected Car services of Hyundai, Genesis and Kia. It is not made by, endorsed by, or affiliated with Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries. We have never met them. This is working out well for everyone.</p>
 
-<h2>2. What Bloo stores, and how it is encrypted</h2>
+<h2 id="what-bloo-stores-and-how-it-is-encrypted">2. What Bloo stores, and how it is encrypted</h2>
 <p>Every sensitive thing Bloo keeps is encrypted <strong>before it is written to your phone</strong>:</p>
 <ul>
   <li><strong>Your Bluelink, Genesis or Kia password</strong>, and any service PIN, are sealed with <strong>AES-256-GCM</strong>.</li>
@@ -76,7 +94,7 @@
   <p><strong>A note on the phrase "nothing unencrypted."</strong> It is accurate for your phone and for everything Bloo writes to it. It is not a claim about your car maker's servers, which have their own policy, or about what Google does with a file in your Google Drive if you turn sync on. Those are covered below.</p>
 </div>
 
-<h2>3. Where things go</h2>
+<h2 id="where-things-go">3. Where things go</h2>
 <ul>
   <li><strong>To your car maker's service,</strong> using your own account. That is the point of the app: locking, starting, finding and reading your car all happen there. Their privacy policy governs what they do with the request, and you should read it too.</li>
   <li><strong>To GitHub,</strong> to check whether a newer build exists. It sends no account details, no car data, and no identifier that points at you.</li>
@@ -85,7 +103,7 @@
 <p>If you turn on <strong>Drive sync</strong>, your settings (never your password) are written to a file in <em>your own</em> Google Drive, so your other devices can read them. We cannot see that file. We would not know what to do with it if we could.</p>
 <p>The on-device AI summaries run on your phone. Nothing you summarise leaves it.</p>
 
-<h2>4. Transactions</h2>
+<h2 id="transactions">4. Transactions</h2>
 <p>Bloo does not sell anything. There is no shop, no subscription, and no button that asks you to upgrade. Bloo does not take payments, hold money, or store card details. It is not a bank, a car dealer, or a fairground ride.</p>
 <p>A <strong>transaction</strong>, meaning something you asked the car to do, works like this:</p>
 <ul>
@@ -95,7 +113,7 @@
 </ul>
 <p>If you ever see a charge on your card with the word "Bloo" on it, it was not us. We would like to know who is impersonating us, and we would like a word with them about their taste.</p>
 
-<h2>5. If a pirate takes control of your car</h2>
+<h2 id="if-a-pirate-takes-control-of-your-car">5. If a pirate takes control of your car</h2>
 <p>We will be straight with you here, because a less careful policy would start doing jazz hands. Nobody can promise a determined criminal will never get into your car. What Bloo does is make sure the app is not the weak link, and that you always have a plan.</p>
 <p><strong>What protects you already:</strong></p>
 <ul>
@@ -113,7 +131,7 @@
 </ul>
 <p>If we learn of a weakness in the app that a pirate could use, we will fix it, record it in the change log below, and tell you what to do. We would rather you heard it from us than from a news story about a car that drove itself into a lake.</p>
 
-<h2>6. What Bloo never collects</h2>
+<h2 id="what-bloo-never-collects">6. What Bloo never collects</h2>
 <ul>
   <li>Your name, address, phone number, or contacts.</li>
   <li>Your location. Only your <em>car's</em> location, and only because your car maker's service reports it to you. Your phone's own position is used on the device to draw your dot on the map, and goes nowhere.</li>
@@ -121,10 +139,10 @@
   <li>Money, or anything that would make a data broker's eyes light up.</li>
 </ul>
 
-<h2>7. Permissions, and why we ask</h2>
+<h2 id="permissions-and-why-we-ask">7. Permissions, and why we ask</h2>
 <p>Bloo asks only for what a feature needs, and every one of them is optional. Location, to find your car and to run AutoLock. Notifications, for car alerts. Bluetooth, for AutoLock with your car's own connection. Activity recognition, so AutoLock knows when you are driving. Say no to any of them and that feature sulks quietly. Nothing else breaks.</p>
 
-<h2>8. Your control</h2>
+<h2 id="your-control">8. Your control</h2>
 <ul>
   <li><strong>Sign out</strong> in Settings to delete your stored credentials.</li>
   <li><strong>Clear the app's data</strong> in Android's settings, or uninstall the app, to remove everything it stored.</li>
@@ -132,7 +150,7 @@
 </ul>
 <p>There is nothing for us to export, delete, or correct, because we do not have it. This is the one time a lack of infrastructure works in your favour.</p>
 
-<h2>9. Open source: please check our work</h2>
+<h2 id="open-source-please-check-our-work">9. Open source: please check our work</h2>
 <p>Bloo is open source. The whole app, including the encryption code, is on GitHub, and you do not have to take our word for any of this:</p>
 <ul>
   <li>The vault that seals your credentials: <code>shared/src/main/java/com/bloo/bluelink/data/SecureVault.kt</code>.</li>
@@ -141,17 +159,17 @@
 </ul>
 <p>If you are suspicious, good. Go and look. If you find something that does not match this page, please tell us, and we will fix the code or the page, whichever is wrong.</p>
 
-<h2>10. Children</h2>
+<h2 id="children">10. Children</h2>
 <p>Bloo is not for children, and we do not knowingly collect anything from them. If you are a child reading this, go and ask a grown-up to show you a car instead.</p>
 
-<h2>11. Changes</h2>
+<h2 id="changes">11. Changes</h2>
 <p>When this policy changes, the date at the top changes too, and the change is written below in plain words, with the date. We do not make quiet edits in a drawer.</p>
 <ul>
   <li><strong>29 October 2026.</strong> Rewritten. States plainly that sensitive data is encrypted before it is stored, and that the rest of the app's storage is encrypted on the device. Adds sections on transactions, on what to do if a pirate takes control of your car, and on the open source code. The policy is now also inside the app.</li>
   <li><strong>14 October 2026.</strong> First published.</li>
 </ul>
 
-<h2>12. Contact</h2>
+<h2 id="contact">12. Contact</h2>
 <p>Questions, complaints, or a pirate who would like to apologise: <a href="mailto:adi1.perets@gmail.com">adi1.perets@gmail.com</a>.</p>
 
 <hr>
@@ -162,6 +180,8 @@
 
 <p class="fine">Bloo is unofficial. It is not affiliated with, endorsed by, or operated by Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries.</p>
 
+</div>
+</div>
 </main>
 </body>
 </html>

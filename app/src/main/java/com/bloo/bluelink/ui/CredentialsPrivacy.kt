@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
@@ -60,16 +61,34 @@ internal fun CredentialsPrivacyNote(brandLabel: String?, modifier: Modifier = Mo
             style = SecondaryTextStyle(),
             color = scheme.onSurfaceVariant,
         )
+        // Two ways to read it: the copy inside the app, or the same policy as an HTML page in the browser.
+        var choosing by remember { mutableStateOf(false) }
         var reading by remember { mutableStateOf(false) }
-        MorphTextButton(
-            text = "Read the privacy policy",
-            onClick = { reading = true },
-            icon = Icons.AutoMirrored.Filled.OpenInNew,
-            fillOnPress = false,
-        )
+        val context = LocalContext.current
+        if (!choosing) {
+            MorphTextButton(
+                text = "Read the privacy policy",
+                onClick = { choosing = true },
+                icon = Icons.AutoMirrored.Filled.OpenInNew,
+                fillOnPress = false,
+            )
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(GapRow)) {
+                MorphTextButton(text = "In the app", onClick = { choosing = false; reading = true })
+                MorphTextButton(
+                    text = "As a web page",
+                    onClick = { choosing = false; openUrl(context, PRIVACY_POLICY_URL) },
+                    icon = Icons.AutoMirrored.Filled.OpenInNew,
+                    fillOnPress = false,
+                )
+            }
+        }
         if (reading) PrivacyPolicyViewer(onClose = { reading = false })
     }
 }
+
+/** The privacy policy as an HTML page on the project site, for reading in a browser. */
+internal const val PRIVACY_POLICY_URL = "https://serverreset.github.io/Bloo/privacy.html"
 
 /**
  * The privacy policy, shown inside the app from the copy bundled with it (assets/privacy.html), so it reads the same offline and
