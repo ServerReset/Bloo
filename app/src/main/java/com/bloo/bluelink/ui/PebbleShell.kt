@@ -234,7 +234,7 @@ internal fun PebbleShell(
             Modifier.fillMaxWidth()
                 // The card's bounding box is glass (GlassCardBackdrop, its first child below, so the blur
                 // can be skipped while the pager moves); its own panels stay solid.
-                .then(if (edge) Modifier.pebbleCardEdge(pebbleShape) else Modifier)
+                .then(if (edge) Modifier.pebbleCardEdge(pebbleShape) else Modifier),
             shape = pebbleShape,
             // No shadow elevation: the whole card is scaled by ReorderColumn's drag lift and the
             // cold-start intro (a graphicsLayer on the pebble's own Box above), and the default 1dp
