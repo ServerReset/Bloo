@@ -82,12 +82,12 @@ internal fun ChargeSegmentBar(
     val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else Color.Black.copy(alpha = 0.14f)
     // Springing both gradient stops gives that moment an actual transition instead of a colour
     // popping mid-draw.
-    val fill = rememberChargeFillColors(stuckAtLimit, com.bloo.uicommon.chargeRamp())
+    val fill = rememberChargeFillColors(stuckAtLimit, lowPowerSoft(Spring.StiffnessLow))
     val limitAnim = remember { Animatable(0f) }
     var limitSeen by remember { mutableStateOf(false) }
     // Read here, at composable scope, not inline inside the LaunchedEffect below --
     // lowPowerAwareSpring is itself @Composable, so it can't be called from a suspend lambda.
-    val limitSpring = com.bloo.uicommon.chargeRamp<Float>()
+    val limitSpring = lowPowerCalm<Float>(Spring.StiffnessMediumLow)
     LaunchedEffect(limit) {
         val target = (limit ?: return@LaunchedEffect) / 100f
         if (limitSeen) {
