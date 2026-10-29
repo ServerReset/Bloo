@@ -1,5 +1,8 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material.icons.filled.Map
 import android.content.Context
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -68,9 +71,12 @@ import com.bloo.uicommon.content
 internal fun OnboardingWelcomePage() {
     OnboardingTipListPage(
         tips = listOf(
-            Triple(AppIcons.Bolt, "Live status", "Battery, fuel, and lock state at a glance"),
-            Triple(Icons.Filled.Thermostat, "Remote climate", "Warm it up or cool it down before you get in"),
-            Triple(Icons.Filled.SwapHoriz, "Multiple cars", "Swipe between every car on your account"),
+            Triple(AppIcons.Bolt, "Live status", "Charge or fuel, range, lock state, tyre pressure and trips, straight from your car's own service"),
+            Triple(Icons.Filled.Thermostat, "Remote climate", "Start the cabin with a preset, or let smart climate pick a temperature for the weather where the car is parked"),
+            Triple(Icons.Filled.Lock, "Lock and unlock", "Lock, unlock and check that the doors really are shut, from anywhere with a signal"),
+            Triple(Icons.Filled.Map, "Find your car", "A map with the car on it, and your phone's position beside it if you allow it"),
+            Triple(Icons.Filled.Widgets, "Widgets and a watch", "Home-screen widgets with lock, climate and charge buttons, and a Wear OS face with quick controls"),
+            Triple(Icons.Filled.SwapHoriz, "Several cars", "Sign in to more than one account and swipe between every car you own"),
         ),
     )
 }
