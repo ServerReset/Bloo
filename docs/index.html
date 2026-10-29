@@ -12,6 +12,26 @@
 <meta property="og:image" content="img/feature-graphic.png">
 <link rel="icon" href="img/icon.png">
 <link rel="stylesheet" href="assets/site.css">
+<style>
+/* The floating bar: the three places that matter, always one thumb away. */
+.dock {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 60;
+  display: flex; gap: 4px; padding: 6px; border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
+  border: 2px solid var(--ink); box-shadow: 0 10px 30px -12px color-mix(in srgb, var(--ink) 40%, transparent);
+  max-width: calc(100% - 24px);
+}
+.dock a { padding: 10px 16px; border-radius: 999px; text-decoration: none; font-weight: 700; font-size: 14px; white-space: nowrap; color: var(--ink); }
+.dock a:hover { background: var(--sun); }
+.dock a[aria-current="page"] { background: var(--ink); color: var(--paper); }
+body { padding-bottom: 96px; }
+@media (max-width: 420px) { .dock a { padding: 9px 11px; font-size: 13px; } }
+
+/* The plain HTML policy, pinned to the top bar so it is one tap from anywhere. */
+.bar nav .plain-cta { padding: 8px 14px; border: 2px solid var(--ink); border-radius: 999px; color: var(--ink); }
+.bar nav .plain-cta:hover { background: var(--ink); color: var(--paper); }
+</style>
 </head>
 <body>
 <div class="glow" aria-hidden="true"></div>
@@ -23,7 +43,8 @@
       <a href="#what">The stuff</a>
       <a href="#get">Get it</a>
       <a href="#data">Your data</a>
-      <a href="privacy.html">Privacy policy</a>
+      <a href="privacy.html">Privacy</a>
+      <a class="plain-cta" href="privacy-plain.html">Plain HTML</a>
     </nav>
   </div>
 </header>
@@ -153,7 +174,7 @@
       <a href="privacy.html">Privacy policy</a>
       <a href="https://github.com/ServerReset/Bloo">Source on GitHub</a>
       <a href="https://groups.google.com/g/bloo-testing">Testing group</a>
-      <a href="simple.html">Plain version</a>
+      <a href="privacy-plain.html">Privacy (simple)</a>
     </nav>
   </div>
 </footer>
@@ -215,5 +236,10 @@
   }, { passive: true });
 })();
 </script>
+<nav class="dock" aria-label="Site">
+  <a href="index.html" aria-current="page">Homepage</a>
+  <a href="privacy.html">Privacy</a>
+  <a href="privacy-plain.html">Privacy (simple)</a>
+</nav>
 </body>
 </html>
