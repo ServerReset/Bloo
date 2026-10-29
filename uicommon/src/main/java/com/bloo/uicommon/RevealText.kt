@@ -98,22 +98,22 @@ private const val MaxRevealChars = 320
  * streams or ticks would otherwise flash, and the components that want an ANIMATED update --
  * [RollingNumber] for values, `AnimatedContent` for a swap -- already provide it around their text.
  */
-/** Serif text from this size up is a heading, and is drawn stretched and slanted. */
-private const val ClassicHeadingMinSp = 20f
+/** Serif text from this size up is an important heading, and is drawn a little wider and slanted. Smaller serif text is left alone. */
+private const val ClassicHeadingMinSp = 26f
 
 /**
- * The classic heading's distortion: taller and narrower than the serif draws it, slanted a little to the right. It changes how the
- * text is drawn, not how much room it takes.
+ * The classic heading's distortion: a touch wider than the serif draws it, and slanted a little to the right. It changes how the text
+ * is drawn, not how much room it takes.
  */
 private fun Modifier.classicHeadingDistortion(): Modifier = this
     .graphicsLayer {
-        scaleX = 0.92f
-        scaleY = 1.07f
+        scaleX = 1.04f
+        scaleY = 1.0f
     }
     .drawWithContent {
         val canvas = drawContext.canvas.nativeCanvas
         canvas.save()
-        canvas.skew(-0.12f, 0f)
+        canvas.skew(-0.06f, 0f)
         drawContent()
         canvas.restore()
     }
