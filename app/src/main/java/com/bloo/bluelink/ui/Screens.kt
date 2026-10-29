@@ -309,6 +309,7 @@ fun BlooApp(vm: AppViewModel) {
                     val loginUpdateAvailable by remember { derivedStateOf { stateHolder.value.updateAvailable } }
                     val loginUpdateChecking by remember { derivedStateOf { stateHolder.value.updateChecking } }
                     val bootReauth by remember { derivedStateOf { stateHolder.value.bootReauth } }
+                    val loginContext = LocalContext.current
                     LoginScreen(
                         loading = loading,
                         onLogin = if (bootReauth) vm::reauthAfterRestart else vm::login,
@@ -318,6 +319,17 @@ fun BlooApp(vm: AppViewModel) {
                         onCheckForUpdates = { vm.checkForUpdate(force = true, surfaceResult = true) },
                         updateChecking = loginUpdateChecking,
                         updateAvailableUrl = loginUpdateAvailable?.run?.htmlUrl,
+                        onFingerprint = if (vm.canUseBiometrics()) ({
+                            loginContext.findFragmentActivity()?.let { activity ->
+                                showBiometricPrompt(
+                                    activity = activity,
+                                    title = "Unlock Bloo",
+                                    subtitle = "Confirm it's you to access your cars",
+                                    onSuccess = { vm.unlocked() },
+                                    onError = { },
+                                )
+                            }
+                        }) else null,
                     )
                     kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
                     canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.material.icons.filled.Fingerprint
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.segmentsOf
@@ -133,6 +134,8 @@ internal fun LoginScreen(
      * Settings behind sign-in.
      */
     onCheckForUpdates: () -> Unit = {},
+    /** Unlocks Bloo with the fingerprint sensor; null when the device has no biometrics. */
+    onFingerprint: (() -> Unit)? = null,
     updateChecking: Boolean = false,
     /**
      * Set once a check finds a newer build; the button then reads "Update available" and opens the
@@ -300,6 +303,10 @@ internal fun LoginScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 LoginSectionLabel(Icons.Filled.VpnKey, "${brand.label} sign-in")
                                 Spacer(Modifier.weight(1f))
+                                onFingerprint?.let { unlock ->
+                                    MorphTextButton(text = "Fingerprint", onClick = unlock, icon = Icons.Filled.Fingerprint)
+                                    Spacer(Modifier.width(GapRow))
+                                }
                                 MorphTextButton(
                                     text = "Saved sign-in",
                                     onClick = { scope.launch { fillFromManager(quiet = false) } },
