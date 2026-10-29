@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.isUnspecified
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -97,6 +98,26 @@ private const val MaxRevealChars = 320
  * streams or ticks would otherwise flash, and the components that want an ANIMATED update --
  * [RollingNumber] for values, `AnimatedContent` for a swap -- already provide it around their text.
  */
+/** Serif text from this size up is a heading, and is drawn stretched and slanted. */
+private const val ClassicHeadingMinSp = 20f
+
+/**
+ * The classic heading's distortion: taller and narrower than the serif draws it, slanted a little to the right. It changes how the
+ * text is drawn, not how much room it takes.
+ */
+private fun Modifier.classicHeadingDistortion(): Modifier = this
+    .graphicsLayer {
+        scaleX = 0.92f
+        scaleY = 1.07f
+    }
+    .drawWithContent {
+        val canvas = drawContext.canvas.nativeCanvas
+        canvas.save()
+        canvas.skew(-0.12f, 0f)
+        drawContent()
+        canvas.restore()
+    }
+
 @Composable
 fun RevealText(
     text: String,
@@ -116,7 +137,37 @@ fun RevealText(
     minLines: Int = 1,
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
     style: TextStyle = LocalTextStyle.current,
+    /** Set by the classic-heading wrapper below, so the text is drawn once, inside it. Callers leave it alone. */
+    skipClassic: Boolean = false,
 ) {
+    // Classic serif headings are drawn stretched and slanted, so every heading in the serif gets the same treatment. The text
+    // is drawn once more inside a box that does the distortion; the layout keeps the text's own size.
+    val headingSize = if (fontSize.isSpecified) fontSize else style.fontSize
+    val headingFamily = fontFamily ?: style.fontFamily
+    if (!skipClassic && headingFamily == FontFamily.Serif && headingSize.isSpecified && headingSize.value >= ClassicHeadingMinSp) {
+        Box(modifier.classicHeadingDistortion()) {
+            RevealText(
+                text = text,
+                color = color,
+                fontSize = fontSize,
+                fontStyle = fontStyle,
+                fontWeight = fontWeight,
+                fontFamily = fontFamily,
+                letterSpacing = letterSpacing,
+                textDecoration = textDecoration,
+                textAlign = textAlign,
+                lineHeight = lineHeight,
+                overflow = overflow,
+                softWrap = softWrap,
+                maxLines = maxLines,
+                minLines = minLines,
+                onTextLayout = onTextLayout,
+                style = style,
+                skipClassic = true,
+            )
+        }
+        return
+    }
     // Draw settled -- no reveal machinery at all (the layout capture, the draw node, the chained
     // callback) -- when the entrance is off, or the text is too long to animate cheaply. Both cases
     // want it gone entirely.
