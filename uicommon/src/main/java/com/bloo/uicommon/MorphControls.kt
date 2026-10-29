@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -24,6 +25,11 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun MorphIconButton(
     onClick: () -> Unit,
+    /**
+     * What a screen reader says for the button. Required: an icon has no words of its own, so every icon-only button is named here, and
+     * its icon is read as part of it rather than on its own.
+     */
+    description: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
@@ -34,7 +40,9 @@ fun MorphIconButton(
     val scheme = MaterialTheme.colorScheme
     MorphButton(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minWidth = IconButtonMinWidth, minHeight = IconButtonMinWidth),
+        modifier = modifier
+            .defaultMinSize(minWidth = IconButtonMinWidth, minHeight = IconButtonMinWidth)
+            .semantics(mergeDescendants = true) { contentDescription = description },
         enabled = enabled,
         interactionSource = interactionSource,
         containerColor = if (filled) emphasis.container() else Color.Transparent,

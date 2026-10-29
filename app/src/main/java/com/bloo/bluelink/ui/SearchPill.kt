@@ -235,7 +235,10 @@ internal fun SearchPill(
                                 },
                             )
                         }
-                        MorphIconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) }) {
+                        MorphIconButton(
+                            onClick = { if (query.isNotEmpty()) onQueryChange("") else onFocusChange(false) },
+                            description = if (query.isNotEmpty()) "Clear" else "Close",
+                        ) {
                             Icon(AppIcons.Close, contentDescription = if (query.isNotEmpty()) "Clear" else "Close")
                         }
                     }

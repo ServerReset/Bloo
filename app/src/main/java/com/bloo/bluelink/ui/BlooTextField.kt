@@ -93,7 +93,7 @@ internal fun PinField(
 /** The eye button that shows or hides a secret ([noun] is what it reveals, for TalkBack): password fields and secret rows. */
 @Composable
 internal fun RevealToggle(shown: Boolean, noun: String, onToggle: () -> Unit) {
-    MorphIconButton(onClick = onToggle) {
+    MorphIconButton(onClick = onToggle, description = if (shown) "Hide $noun" else "Show $noun") {
         Icon(
             if (shown) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
             contentDescription = if (shown) "Hide $noun" else "Show $noun",

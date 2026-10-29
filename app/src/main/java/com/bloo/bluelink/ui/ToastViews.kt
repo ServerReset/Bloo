@@ -295,7 +295,7 @@ private fun ToastCard(
                 RevealText(toast.message, style = SecondaryTextStyle(), maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             CopyButton(toast, accent, onCopy)
-            MorphIconButton(onClick = onDismiss) { Icon(AppIcons.Close, contentDescription = "Dismiss") }
+            MorphIconButton(onClick = onDismiss, description = "Dismiss") { Icon(AppIcons.Close, contentDescription = null) }
         }
     }
 }
@@ -306,6 +306,7 @@ private fun CopyButton(toast: Toast, accent: Color, onCopy: (String) -> Unit) {
     var copied by remember(toast.id) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     MorphIconButton(
+        description = if (copied) "Copied" else "Copy message",
         onClick = {
             onCopy(toast.message)
             copied = true

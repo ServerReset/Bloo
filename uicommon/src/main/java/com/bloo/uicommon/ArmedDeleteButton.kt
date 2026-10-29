@@ -25,6 +25,7 @@ fun ArmedDeleteButton(
     val confirm = rememberConfirmArm()
     MorphIconButton(
         onClick = { if (confirm.armed) onConfirm() else confirm.arm() },
+        description = if (confirm.armed) "Confirm delete $name" else "Delete $name",
         modifier = modifier,
         filled = confirm.armed,
         emphasis = ButtonEmphasis.Deny,

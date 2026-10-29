@@ -170,7 +170,7 @@ private fun PaletteChooser(appearance: SettingsStore.Appearance, vm: AppViewMode
                 )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                MorphIconButton(onClick = { editing = null; showEditor = true }) {
+                MorphIconButton(onClick = { editing = null; showEditor = true }, description = "New custom palette") {
                     Icon(Icons.Filled.Add, contentDescription = "New custom palette")
                 }
                 BodySmallText("New")

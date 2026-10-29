@@ -124,7 +124,7 @@ internal fun CustomPaletteSwatch(palette: CustomPaletteData, selected: Boolean, 
             RevealText(palette.name, style = SecondaryTextStyle(), color = swatchLabelColor(selected))
             // 32dp, not 48dp: it sits in a caption row inside a 58dp-wide swatch column in a tight
             // grid.
-            MorphIconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+            MorphIconButton(onClick = onEdit, description = "Edit palette", modifier = Modifier.size(32.dp)) {
                 Icon(
                     AppIcons.Settings,
                     contentDescription = "Edit palette",

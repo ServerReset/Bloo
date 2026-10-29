@@ -202,6 +202,7 @@ internal fun ClimatePresetSection(
                         editing = null
                         removePreset(preset.id)
                     },
+                    description = "Delete ${preset.name}",
                     emphasis = ButtonEmphasis.Deny,
                 ) {
                     ButtonIcon(Icons.Filled.Delete, "Delete ${preset.name}")

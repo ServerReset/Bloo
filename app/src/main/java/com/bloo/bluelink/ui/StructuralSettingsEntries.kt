@@ -86,10 +86,12 @@ private fun CarOrderControl(state: UiState, vm: AppViewModel) {
                 MorphIconButton(
                     onClick = { vm.reorderVehicles(state.vehicles.toMutableList().also { it.add(i - 1, it.removeAt(i)) }) },
                     enabled = i > 0,
+                    description = "Move ${v.name} up",
                 ) { Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move ${v.name} up") }
                 MorphIconButton(
                     onClick = { vm.reorderVehicles(state.vehicles.toMutableList().also { it.add(i + 1, it.removeAt(i)) }) },
                     enabled = i < state.vehicles.lastIndex,
+                    description = "Move ${v.name} down",
                 ) { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move ${v.name} down") }
             }
         }

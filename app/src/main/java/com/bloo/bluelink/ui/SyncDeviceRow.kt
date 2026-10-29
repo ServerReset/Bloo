@@ -146,7 +146,7 @@ internal fun SyncDeviceRow(
             }
         }
         if (isSelf) {
-            MorphIconButton(onClick = onRename) {
+            MorphIconButton(onClick = onRename, description = "Rename this device") {
                 ButtonIcon(Icons.Filled.Edit, "Rename this device")
             }
         } else {
@@ -167,7 +167,7 @@ internal fun DeviceTag(text: String, color: Color) {
 @Composable
 internal fun RemoveDeviceButton(name: String, fallbackNoun: String, onRemove: () -> Unit) {
     val who = name.ifBlank { fallbackNoun }
-    MorphIconButton(onClick = onRemove) {
+    MorphIconButton(onClick = onRemove, description = "Remove $who from synced devices") {
         Icon(
             Icons.Filled.Delete,
             contentDescription = "Remove $who from synced devices",
