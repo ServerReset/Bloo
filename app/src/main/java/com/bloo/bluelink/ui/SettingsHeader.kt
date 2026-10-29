@@ -5,6 +5,7 @@ package com.bloo.bluelink.ui
  * SettingsHeaderRow title row.
  */
 
+import com.bloo.bluelink.update.UpdateRuntime
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.container
 import com.bloo.uicommon.content
@@ -177,10 +178,13 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     RevealText("Bloo", style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                     RevealMutedText(if (carCount == 0) "No vehicles yet" else "$carCount car${if (carCount == 1) "" else "s"}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                MorphExpandButton(
-                    expanded = expanded,
-                    onToggle = { vm.togglePebble(SettingsPseudoVehicle, "Updates") },
-                )
+                // Only the GitHub build updates itself. The Play build updates through Play, so it has no updates control here.
+                if (UpdateRuntime.usesGitHub(LocalContext.current)) {
+                    MorphExpandButton(
+                        expanded = expanded,
+                        onToggle = { vm.togglePebble(SettingsPseudoVehicle, "Updates") },
+                    )
+                }
             }
             Spacer(Modifier.height(GapSection))
             // The build number is the app's real version (versionName stays "0.1"), so it carries
