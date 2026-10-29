@@ -100,6 +100,8 @@ jobs:
       # line and runs whichever of their shared dependencies only need building
       # once.
       #
+      # :shared and :uicommon have no product flavours, so their JVM tests are named by module here; the flavoured
+      # task below reaches only :app and :wear. Without this line their tests (the accessibility resolver among them) never ran.
       # The unit tests run per flavor -- testSideloadDebugUnitTest, testPlayDebugUnitTest --
       # rather than as a bare testDebugUnitTest, which does not exist now that the `distribution`
       # flavor dimension does. They only compile and run test sources, an internal step with no
@@ -146,7 +148,7 @@ jobs:
           BLOO_UPLOAD_STORE_PASSWORD: ${{ secrets.BLOO_UPLOAD_STORE_PASSWORD }}
           BLOO_UPLOAD_KEY_ALIAS: ${{ secrets.BLOO_UPLOAD_KEY_ALIAS }}
           BLOO_UPLOAD_KEY_PASSWORD: ${{ secrets.BLOO_UPLOAD_KEY_PASSWORD }}
-        run: ./gradlew testSideloadDebugUnitTest testPlayDebugUnitTest assembleSideloadRelease bundlePlayRelease :wear:assembleSideloadRelease :wear:bundlePlayRelease --stacktrace
+        run: ./gradlew :shared:testDebugUnitTest :uicommon:testDebugUnitTest testSideloadDebugUnitTest testPlayDebugUnitTest assembleSideloadRelease bundlePlayRelease :wear:assembleSideloadRelease :wear:bundlePlayRelease --stacktrace
 
       # The Play artifact must never carry the restricted installer permissions. It does not today --
       # verified against the merged manifest, which is also what this checks on every run. Two things

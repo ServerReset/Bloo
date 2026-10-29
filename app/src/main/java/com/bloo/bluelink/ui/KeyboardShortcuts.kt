@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -99,7 +100,10 @@ internal fun Modifier.appShortcuts(enabled: Boolean, onShortcut: (Shortcut) -> U
     val focus = remember { FocusRequester() }
     val latest by rememberUpdatedState(onShortcut)
     val on by rememberUpdatedState(enabled)
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    // Takes focus again whenever the window gains it. In a desktop or freeform window, switching away and back drops the focus the
+    // app had, and shortcuts would go quiet until something was tapped; this keeps them live without a tap.
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
+    LaunchedEffect(windowFocused) { if (windowFocused) runCatching { focus.requestFocus() } }
     return this
         .focusRequester(focus)
         .focusable()
