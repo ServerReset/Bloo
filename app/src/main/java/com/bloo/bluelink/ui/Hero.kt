@@ -165,6 +165,8 @@ internal fun HeroHeader(
             // becomes a photo of that car, so the name scaling up reads as the card taking over. On
             // "Location" or "Diagnostics" it is a heading resizing for no reason.
             growTitleOnExpand = true,
+            // A floating photo has the name and the icon on the page: they are the chevron's height, so they read as the card's name.
+            largeHeader = floating,
             // No `summary`: the bar is the summary. The photo is the card's BACKGROUND, running behind
             // the header row, with the title and chevron overlaid.
             background = {

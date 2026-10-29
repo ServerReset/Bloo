@@ -75,6 +75,8 @@ internal fun PebbleHeaderRow(
     rowWidthDp: Dp,
     onMeasured: (heightPx: Int, widthDp: Dp) -> Unit,
     onChevronPressChange: (Boolean) -> Unit,
+    /** A floating card: the icon is the chevron's height and the title a size up. */
+    largeHeader: Boolean = false,
 ) {
     val haptics = LocalHaptics.current
     val density = LocalDensity.current
@@ -121,13 +123,14 @@ internal fun PebbleHeaderRow(
             icon,
             contentDescription = null,
             tint = titleColor.takeOrElse { LocalContentColor.current },
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(if (largeHeader) ControlHeight else 20.dp),
         )
         // ButtonIconGap: the standard icon-then-label gap.
         Spacer(Modifier.width(ButtonIconGap))
         Column(Modifier.weight(1f)) {
             PebbleTitleRow(
                 title = title, expanded = expanded, growTitleOnExpand = growTitleOnExpand, titleColor = titleColor,
+                largeTitle = largeHeader,
                 titleTrailing = titleTrailing, titleTrailingAtEnd = titleTrailingAtEnd,
             )
             if (summary != null) {

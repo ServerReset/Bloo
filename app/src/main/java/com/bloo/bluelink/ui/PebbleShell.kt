@@ -148,6 +148,7 @@ internal fun PebbleShell(
      * font size, so every frame misses the SINGLE-SLOT ParagraphLayoutCache and re-lays the text
      * out.
      */
+    largeHeader: Boolean = false,
     growTitleOnExpand: Boolean = false,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     headerAction: PebbleHeaderAction? = null,
@@ -273,6 +274,7 @@ internal fun PebbleShell(
                         rowWidthDp = headerRowWidthDp,
                         onMeasured = { h, w -> headerRowHeightPx = h; headerRowWidthDp = w },
                         onChevronPressChange = { chevronPressed = it },
+                        largeHeader = largeHeader,
                     )
                     // Animate the body sliding open/closed; the exit fades the block so the
                     // shrinking bottom edge doesn't visibly clip the content.

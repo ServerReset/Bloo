@@ -53,6 +53,8 @@ internal fun PebbleTitleRow(
     titleColor: Color,
     titleTrailing: (@Composable () -> Unit)?,
     titleTrailingAtEnd: Boolean,
+    /** A floating card's title is a size up, so it reads as the card's name. */
+    largeTitle: Boolean = false,
 ) {
     // The hero title grows on expand via a slow, lightly bouncy spring (damping 0.62,
     // StiffnessVeryLow) so intermediate sizes read as motion.
@@ -69,11 +71,11 @@ internal fun PebbleTitleRow(
     // Drawn at the larger size and scaled down (draw phase only): animating the font size would
     // relayout the text every frame (single-slot ParagraphLayoutCache). Scaling down keeps glyphs
     // crisp.
-    val titleStyle = MaterialTheme.typography.headlineSmall
+    val titleStyle = if (largeTitle) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineSmall
     // Ratio of the real type steps, so the collapsed size equals titleMedium exactly.
     val collapsedTitleScale = with(LocalDensity.current) {
         MaterialTheme.typography.titleMedium.fontSize.toPx() /
-            MaterialTheme.typography.headlineSmall.fontSize.toPx()
+            titleStyle.fontSize.toPx()
     }
     // Plain arithmetic: the Float `lerp` overload is not imported here. A lambda so each reader
     // pulls the current value in its own phase.
