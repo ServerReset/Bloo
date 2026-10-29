@@ -1,6 +1,7 @@
 package com.bloo.uicommon
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateFloatAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
@@ -55,6 +56,12 @@ fun SwitchTrack(
         animationSpec = lowPowerSoft(Spring.StiffnessMediumLow),
         label = "toggleThumbOffset",
     )
+    // The thumb's own move, 0 at rest and 1 when it has arrived, for the moving-part blur: the thumb alone is soft while it slides.
+    val moveProgress by animateFloatAsState(
+        if (checked) 1f else 0f,
+        animationSpec = lowPowerSoft<Float>(Spring.StiffnessMediumLow),
+        label = "toggleMove",
+    )
     Box(
         modifier
             .size(trackWidth, trackHeight)
@@ -66,6 +73,7 @@ fun SwitchTrack(
     ) {
         Box(
             Modifier.padding(start = thumbOffset).size(thumbSize).clip(CircleShape)
+                .movingPartBlur { moveProgress }
                 .background(thumbColor),
         )
     }

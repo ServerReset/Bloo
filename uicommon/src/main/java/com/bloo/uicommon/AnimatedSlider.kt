@@ -216,7 +216,6 @@ fun AnimatedSlider(
                 true
             }
             // The thumb's own travel blurs in proportion to how fast it moves, the same subtle touch as the app's other moving things.
-            .motionBlur { (anim.value - valueRange.start) / (valueRange.endInclusive - valueRange.start) * SliderTravelPx }
             .onSizeChanged { widthPx = it.width.toFloat() }
             // Same tap-vs-drag disambiguation as MorphSegmented's gesture handler: `claimed` starts
             // false (undecided) and only flips true once horizontal movement exceeds touch slop and

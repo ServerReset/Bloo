@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,8 +67,14 @@ fun BlooSlider(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(GapRow)) {
         if (label != null) StepRow(label, readout?.invoke(draft).orEmpty())
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            MorphIconButton(onClick = { press(-1) }, description = "Lower ${label ?: "value"}", enabled = canDecrease, filled = true) {
-                ButtonIcon(Icons.Filled.Remove, "Lower ${label ?: "value"}")
+            var minusRoll by remember { mutableIntStateOf(0) }
+            MorphIconButton(
+                onClick = { minusRoll++; press(-1) },
+                description = "Lower ${label ?: "value"}",
+                enabled = canDecrease,
+                filled = true,
+            ) {
+                RollingGlyph(Icons.Filled.Remove, trigger = minusRoll, direction = -1)
             }
             val track = Modifier.weight(1f).padding(horizontal = GapRow)
             com.bloo.uicommon.AnimatedSlider(
@@ -87,8 +94,14 @@ fun BlooSlider(
                 // An inert slider wears the same standard disabled treatment as every button.
                 modifier = if (enabled) track else track.inertButtonFrost(true),
             )
-            MorphIconButton(onClick = { press(1) }, description = "Raise ${label ?: "value"}", enabled = canIncrease, filled = true) {
-                ButtonIcon(Icons.Filled.Add, "Raise ${label ?: "value"}")
+            var plusRoll by remember { mutableIntStateOf(0) }
+            MorphIconButton(
+                onClick = { plusRoll++; press(1) },
+                description = "Raise ${label ?: "value"}",
+                enabled = canIncrease,
+                filled = true,
+            ) {
+                RollingGlyph(Icons.Filled.Add, trigger = plusRoll, direction = 1)
             }
         }
     }

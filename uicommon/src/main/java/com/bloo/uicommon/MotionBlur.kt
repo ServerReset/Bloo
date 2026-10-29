@@ -58,7 +58,7 @@ fun Modifier.motionBlur(): Modifier {
 
 /** The one gate every blur reads: the user's switch (already folded into [LocalMotionBlur] with Battery Saver), and reduce motion. */
 @Composable
-private fun motionBlurAllowed(): Boolean = LocalMotionBlur.current && !LocalReduceMotion.current
+internal fun motionBlurAllowed(): Boolean = LocalMotionBlur.current && !LocalReduceMotion.current
 
 /**
  * Marks the app's scrolling, so the blur stays off while a list, pager or sheet is being scrolled or flung. Scrolling is not motion
@@ -197,5 +197,33 @@ private class MotionSpeed {
 
     private companion object {
         const val StillAfterSeconds = 0.1f
+    }
+}
+
+/** The most a moving part blurs, in dp. A part's own motion is softer than a layer's, so this is lower than [MaxMotionBlurDp]. */
+private const val MaxMovingPartBlurDp = 3f
+
+/**
+ * How soft a moving part is at [progress] of its move: clear at rest and at its end, softest in the middle of the move. It follows the
+ * move itself rather than sampling speed, so a part that has stopped is always clear.
+ */
+fun movingPartBlurDp(progress: Float): Float =
+    (MaxMovingPartBlurDp * 4f * progress * (1f - progress)).coerceIn(0f, MaxMovingPartBlurDp)
+
+/**
+ * Blurs only the part it is applied to, and only while that part is moving: [progress] runs 0 to 1 over the move. Put it on the moving
+ * part itself (a switch's thumb, a stepper's glyph), never on the container around it.
+ */
+@Composable
+fun Modifier.movingPartBlur(progress: () -> Float): Modifier {
+    if (!motionBlurAllowed()) return this
+    return graphicsLayer {
+        val dp = movingPartBlurDp(progress())
+        renderEffect = if (dp >= MinMotionBlurDp) {
+            val px = dp * density
+            BlurEffect(px, px)
+        } else {
+            null
+        }
     }
 }

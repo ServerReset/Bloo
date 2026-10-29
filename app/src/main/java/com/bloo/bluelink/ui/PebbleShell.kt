@@ -23,7 +23,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
-import com.bloo.uicommon.motionBlur
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -236,7 +235,6 @@ internal fun PebbleShell(
                 // The card's bounding box is glass (GlassCardBackdrop, its first child below, so the blur
                 // can be skipped while the pager moves); its own panels stay solid.
                 .then(if (edge) Modifier.pebbleCardEdge(pebbleShape) else Modifier)
-                .motionBlur(),
             shape = pebbleShape,
             // No shadow elevation: the whole card is scaled by ReorderColumn's drag lift and the
             // cold-start intro (a graphicsLayer on the pebble's own Box above), and the default 1dp
