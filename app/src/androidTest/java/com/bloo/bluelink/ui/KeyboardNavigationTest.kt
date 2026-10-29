@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.fetchSemanticsNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.semantics.SemanticsActions
@@ -53,7 +54,8 @@ class KeyboardNavigationTest {
 
         // Tab from nothing focused did not reach the switch in the emulator run (the tree printed it unfocused), so focus the switch
         // through its RequestFocus semantics action. Enter on it then turns it off.
-        rule.onNodeWithTag("motion").performSemanticsAction(SemanticsActions.RequestFocus)
+        val motion = rule.onNodeWithTag("motion").fetchSemanticsNode()
+        rule.runOnIdle { motion.config.getOrNull(SemanticsActions.RequestFocus)?.action?.invoke() }
         rule.waitForIdle()
         // Diagnostics: which node holds focus before the Enter, and what the switch reports after it.
         rule.onRoot(useUnmergedTree = true).printToLog("KeyboardNav-before-enter")
