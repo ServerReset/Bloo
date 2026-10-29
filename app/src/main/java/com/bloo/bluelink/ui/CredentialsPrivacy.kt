@@ -4,6 +4,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -19,7 +22,6 @@ import com.bloo.bluelink.data.PrivacyCopy
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.MorphIconButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.PrimaryTextStyle
@@ -103,19 +106,19 @@ internal fun CredentialsPrivacyNote(brandLabel: String?, modifier: Modifier = Mo
 @Composable
 internal fun PrivacyPolicyViewer(onClose: () -> Unit) {
     val context = LocalContext.current
+    val scheme = MaterialTheme.colorScheme
     var html by remember { mutableStateOf(PrivacyCopy.local(context)) }
     LaunchedEffect(Unit) { PrivacyCopy.pull(context.applicationContext)?.let { html = it } }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MorphIconButton(onClick = onClose, description = "Close the privacy policy") {
-                        Icon(AppIcons.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
-                    }
-                    RevealText("Privacy policy", style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                }
+        Surface(Modifier.fillMaxSize(), color = scheme.surface) {
+            Box(Modifier.fillMaxSize()) {
+                // The text fills the screen between the title and the floating bar, so nothing scrolls under either.
                 AndroidView(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .padding(top = TitleHeight)
+                        .padding(bottom = BarReserve),
                     factory = { ctx ->
                         WebView(ctx).apply {
                             settings.javaScriptEnabled = false
@@ -131,7 +134,55 @@ internal fun PrivacyPolicyViewer(onClose: () -> Unit) {
                         }
                     },
                 )
+                // The title, at the top, over the status bar's own space.
+                Row(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .height(TitleHeight)
+                        .padding(horizontal = GapGroup),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RevealText("Privacy policy", style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
+                }
+                // The actions float at the bottom edge in a frosted pill, above the navigation bar.
+                GlassSurface(
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(horizontal = GapGroup, vertical = GapGroup)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = GapRow, vertical = GapRow),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                    ) {
+                        MorphTextButton(text = "Close", onClick = onClose)
+                        MorphTextButton(
+                            text = "HTML page",
+                            onClick = { openUrl(context, PrivacyCopy.PLAIN_URL) },
+                            icon = Icons.AutoMirrored.Filled.OpenInNew,
+                            fillOnPress = false,
+                        )
+                        MorphTextButton(
+                            text = "Web page",
+                            onClick = { openUrl(context, PrivacyCopy.STYLED_URL) },
+                            icon = Icons.AutoMirrored.Filled.OpenInNew,
+                            fillOnPress = false,
+                        )
+                    }
+                }
             }
         }
     }
 }
+
+/** The title strip at the top of the viewer. */
+private val TitleHeight = 56.dp
+
+/** Room left at the bottom of the text for the floating action pill, so the last lines of the policy can clear it. */
+private val BarReserve = 120.dp
