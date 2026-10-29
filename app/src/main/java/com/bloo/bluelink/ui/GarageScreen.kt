@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Box

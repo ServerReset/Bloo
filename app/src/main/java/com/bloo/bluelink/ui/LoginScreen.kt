@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Fingerprint
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.SecondaryTextStyle

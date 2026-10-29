@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.RevealText
+import androidx.compose.foundation.layout.Column
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -129,9 +131,9 @@ internal fun MapTopBar(
     /** False once the car has scrolled off screen: the details fold back to the handle. */
     carOnScreen: Boolean = true,
 ) {
-    LaunchedEffect(carOnScreen) { if (!carOnScreen) detailsOpen = false }
     // Tapping the bar opens it into the car's details; tapping again folds it back to the handle.
     var detailsOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(carOnScreen) { if (!carOnScreen) detailsOpen = false }
     // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without
     // consuming, so dragModifier and the refresh click still receive the touch.
     var pillPressed by remember { mutableStateOf(false) }

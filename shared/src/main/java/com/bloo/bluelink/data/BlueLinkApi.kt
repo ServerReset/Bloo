@@ -396,6 +396,7 @@ class BlueLinkApi(override val brand: Brand = Brand.HYUNDAI) : BrandEndpoints {
  */
 private fun VehicleDetails.toVehicle(brand: Brand): Vehicle = Vehicle(
     vin = vin,
+    modelYear = modelYear,
     regId = regid,
     name = vehicleDisplayName(nickName, modelName, vin),
     model = listOfNotNull(modelYear, modelName).joinToString(" ").ifBlank { brand.label },

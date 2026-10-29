@@ -278,11 +278,11 @@ internal fun ExpandableMapLayer(
         )
 
         // Whether the car itself is still on screen: its details fold away once the map has scrolled it out of view.
+        val carMargin = with(LocalDensity.current) { 40.dp.toPx() }
         val carOnScreen by remember {
             derivedStateOf {
-                val margin = with(LocalDensity.current) { 40.dp.toPx() }
-                kotlin.math.abs(mapState.panX * mapState.scale) < windowSize.width / 2f - margin &&
-                    kotlin.math.abs(mapState.panY * mapState.scale) < windowSize.height / 2f - margin
+                kotlin.math.abs(mapState.panX * mapState.scale) < windowSize.width / 2f - carMargin &&
+                    kotlin.math.abs(mapState.panY * mapState.scale) < windowSize.height / 2f - carMargin
             }
         }
 
@@ -305,8 +305,6 @@ internal fun ExpandableMapLayer(
             // doc).
             if (isExpanded && chromeShown) {
                 MapTopBar(
-                    // The bar sits 15% down from the top of the screen, so its clear strip starts below that and its own height.
-                    modifier = Modifier.onSizeChanged { chromeInsets?.topPx = windowSize.height * 0.15f + it.height },
                     carOnScreen = carOnScreen,
                     vehicleName = vehicleName,
                     photo = photo,
@@ -326,6 +324,8 @@ internal fun ExpandableMapLayer(
                     ),
                     modifier = Modifier
                         .align(Alignment.TopStart)
+                        // The bar sits 15% down from the top of the screen, so its clear strip starts below that and its own height.
+                        .onSizeChanged { chromeInsets?.topPx = windowSize.height * 0.15f + it.height }
                         // The bar's width follows the sheet's: as wide as the pebble at the start, the sheet's side gutters when open,
                         // and back again on close, from the first frame of either.
                         .then(if (frostHaze != null) Modifier.hazeSource(frostHaze) else Modifier)

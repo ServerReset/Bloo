@@ -67,6 +67,8 @@ data class Vehicle(
     /** The paint colour and trim the account lists for this car, when it lists them (see [paintOf]). */
     val colour: String? = null,
     val trim: String? = null,
+    /** The model year, when the account lists it. */
+    val modelYear: String? = null,
 )
 
 // --- Vehicle status -------------------------------------------------------
