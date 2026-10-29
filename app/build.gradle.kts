@@ -6,7 +6,7 @@ plugins {
 
 // The plain privacy policy the app's viewer shows comes from docs/ (the GitHub Pages site). It is copied into the build here, so
 // changing the page changes what the app shows, and no code or copy in the app needs editing.
-val privacyAssets = layout.buildDirectory.dir("generated/privacyAssets")
+val privacyAssets = layout.buildDirectory.dir("generated/privacyAssets").get().asFile
 val copyPrivacyPolicy by tasks.registering(Copy::class) {
     from(rootProject.file("docs/privacy-plain.html"))
     into(privacyAssets)
