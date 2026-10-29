@@ -21,6 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -158,6 +163,11 @@ private fun Modifier.hapticToggleable(checked: Boolean, enabled: Boolean, onChan
     val haptics = LocalHaptics.current
     // No blockPageSwipe: a sideways drag from a toggle swipes the page (a real tap is inside the
     // touch slop, so the toggle still wins).
+    val flip = {
+        val next = !checked
+        if (next) haptics?.toggleOn() else haptics?.toggleOff()
+        onChange(next)
+    }
     return toggleable(
         value = checked,
         enabled = enabled,
@@ -165,9 +175,15 @@ private fun Modifier.hapticToggleable(checked: Boolean, enabled: Boolean, onChan
         indication = null,
         role = Role.Switch,
     ) {
-        val next = !checked
-        if (next) haptics?.toggleOn() else haptics?.toggleOff()
-        onChange(next)
+        flip()
+    }.onKeyEvent { event ->
+        // A keyboard user presses Enter or Space on the focused switch. Keys from a focused descendant bubble up to here.
+        if (enabled && event.type == KeyEventType.KeyDown && (event.key == Key.Enter || event.key == Key.Spacebar)) {
+            flip()
+            true
+        } else {
+            false
+        }
     }
 }
 
