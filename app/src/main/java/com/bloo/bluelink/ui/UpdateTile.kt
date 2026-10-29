@@ -7,6 +7,7 @@ package com.bloo.bluelink.ui
 
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
@@ -39,8 +40,8 @@ internal fun UpdateAvailableTile(
 ) {
     AnimatedVisibility(
         visible = state.updateOffered(),
-        enter = expandEnter(Alignment.Bottom),
-        exit = expandExit(Alignment.Bottom),
+        enter = expandEnterSized(Alignment.Bottom),
+        exit = expandExitSized(Alignment.Bottom),
     ) {
         val context = LocalContext.current
         // Play's answer and the GitHub build are both read here, so the tile can name whichever one is waiting.
@@ -53,7 +54,8 @@ internal fun UpdateAvailableTile(
         } else {
             playHeaderAction()
         }
-        UpdateBadgedCard(visible = true, modifier = Modifier.fillMaxWidth()) {
+        // Animates the card's own height as its state changes (the Play and GitHub bodies, the Details disclosure, a new summary).
+        UpdateBadgedCard(visible = true, modifier = Modifier.fillMaxWidth().animateContentSize(pebbleOpenSizeSpec())) {
             PebbleShell(
                 expanded = expanded,
                 onToggle = { expanded = !expanded },

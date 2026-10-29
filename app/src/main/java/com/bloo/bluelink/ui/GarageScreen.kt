@@ -158,11 +158,12 @@ internal fun GarageScreen(
 }
 
 /**
- * The expanded car's map, over the whole screen. It is drawn by the screen above the status bar's blur, not inside the garage, so the
- * floating bar it brings in is not cut by that blur. The map itself is the same composed instance the pebble hands over (see [ExpandedMapState]).
+ * The expanded car's map, over the whole screen. It is drawn by the screen under the status bar's frost, not inside the garage, so the
+ * floating bar it brings in comes down behind that frost. [frostHaze] is the frost's source; the bar is part of it. The map itself is the
+ * same composed instance the pebble hands over (see [ExpandedMapState]).
  */
 @Composable
-internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedMap: ExpandedMapState) {
+internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedMap: ExpandedMapState, frostHaze: HazeState) {
     val vehicles by remember { derivedStateOf { state.value.vehicles } }
     val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
     val appearance = LocalAppearance.current
@@ -190,6 +191,7 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
             // The real command-pending flag, not a guessed timer -- see MapTopBar's own doc -- so the refresh icon's spin genuinely
             // tracks the in-flight fetch this same button just kicked off.
             refreshing = state.value.isPending(expandedVehicle.vin, CarCommandIds.LOCATE),
+            frostHaze = frostHaze,
             onDismiss = { expandedMap.vin = null },
         )
     }

@@ -108,6 +108,11 @@ internal fun ExpandableMapLayer(
     refreshing: Boolean = false,
     /** Asks for the phone's location so its dot can be drawn; see [DeviceLocationRequest]. */
     deviceRequest: DeviceLocationRequest? = null,
+    /**
+     * The status bar's frost source. The bar is part of it, so as the bar comes down from above the screen it is frosted by the status
+     * strip, not cut off at the strip's lower edge.
+     */
+    frostHaze: HazeState? = null,
     onDismiss: () -> Unit,
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("ExpandableMapLayer")
@@ -304,6 +309,7 @@ internal fun ExpandableMapLayer(
                         .align(Alignment.TopStart)
                         // The bar's width follows the sheet's: as wide as the pebble at the start, the sheet's side gutters when open,
                         // and back again on close, from the first frame of either.
+                        .then(if (frostHaze != null) Modifier.hazeSource(frostHaze) else Modifier)
                         .layout { measurable, constraints ->
                             val p = progress().coerceIn(0f, 1f)
                             val root = rootPos ?: androidx.compose.ui.geometry.Offset.Zero
