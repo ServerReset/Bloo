@@ -16,7 +16,7 @@ class MotionBlurRadiusTest {
 
     @Test fun anOrdinarySlide_isVisiblySoft() {
         // A pebble sliding or growing at about 1000 px/s should read as a few dp of softness, not 1dp.
-        assertTrue("a 1000 px/s slide blurs by at least 3dp (was ${motionBlurRadiusDp(1000f)})", motionBlurRadiusDp(1000f) >= 3f)
+        assertTrue(motionBlurRadiusDp(1000f) >= 3f, "a 1000 px/s slide blurs by at least 3dp (was ${motionBlurRadiusDp(1000f)})")
     }
 
     @Test fun aFastFlick_isCappedAtTheMaximum() {
