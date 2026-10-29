@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
