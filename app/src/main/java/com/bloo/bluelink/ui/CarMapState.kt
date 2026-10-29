@@ -163,12 +163,16 @@ internal class ExpandedMapState {
             CarMap(
                 inputs.location, modifier, state, inputs.deviceLocation, inputs.interactive, inputs.tileArea, inputs.panWeight,
                 otherCars = this@ExpandedMapState.otherCars,
+                chromeInsets = this@ExpandedMapState.chromeInsets,
             )
         }
     }
 
     /** The other cars' locations, drawn as pins on every map of this host: the expanded map shows all of them at once. */
     var otherCars by mutableStateOf<List<GeoLocation>>(emptyList())
+
+    /** The space the expanded map's top bar and bottom buttons take, so the off-screen pointers keep clear of them. */
+    val chromeInsets = MapChromeInsets()
 
     /** VIN of the car whose map is currently expanded, or null. */
     var vin by mutableStateOf<String?>(null)

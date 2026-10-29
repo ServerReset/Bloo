@@ -81,6 +81,7 @@ internal fun CarMap(
     panWeight: () -> Float = { 1f },
     /** The other cars on this map, each drawn at its own place. */
     otherCars: List<GeoLocation> = emptyList(),
+    chromeInsets: MapChromeInsets = MapChromeInsets(),
 ) {
     var started by remember { mutableStateOf(MapStartGate.open) }
     if (!started) {
@@ -92,7 +93,7 @@ internal fun CarMap(
         Box(modifier)
         return
     }
-    CarMapBody(location, modifier, state, deviceLocation, interactive, tileArea, panWeight, otherCars)
+    CarMapBody(location, modifier, state, deviceLocation, interactive, tileArea, panWeight, otherCars, chromeInsets)
 }
 
 /**
@@ -125,6 +126,7 @@ private fun CarMapBody(
     /** How much of [state]'s pan shows right now (0 to 1); read in the draw phase, so ramping it recomposes nothing. */
     panWeight: () -> Float = { 1f },
     otherCars: List<GeoLocation> = emptyList(),
+    chromeInsets: MapChromeInsets = MapChromeInsets(),
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("CarMapBody")
     val context = LocalContext.current
@@ -421,6 +423,9 @@ private fun CarMapBody(
                 marginPx = with(density) { 22.dp.toPx() },
                 color = deviceLocationColor,
                 onCenter = { state.showDevice(location.latitude, location.longitude, dev.latitude, dev.longitude) },
+                chromeInsets = chromeInsets,
+                carColor = pinColor,
+                onCenterCar = { state.recenter() },
             )
         }
         // Expand/Open-in-Maps render as a MapFeatureRow in the caller, not over the map.

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -100,6 +101,8 @@ internal fun ExpandableMapLayer(
     chargeRange: String? = null,
     /** The car's other details (year, trim and so on), shown when the bar is opened. */
     details: List<Pair<String, String>> = emptyList(),
+    /** Where the bar and the bottom buttons sit, measured as they lay out, for the off-screen pointers. */
+    chromeInsets: MapChromeInsets? = null,
     /** The car's stored photo, at the bar's start in place of the car glyph. */
     photo: String? = null,
     deviceLocation: GeoLocation?,
@@ -293,6 +296,8 @@ internal fun ExpandableMapLayer(
             // doc).
             if (isExpanded && chromeShown) {
                 MapTopBar(
+                    // The bar sits 15% down from the top of the screen, so its clear strip starts below that and its own height.
+                    modifier = Modifier.onSizeChanged { chromeInsets?.topPx = windowSize.height * 0.15f + it.height },
                     vehicleName = vehicleName,
                     photo = photo,
                     chargePercent = chargePercent,
@@ -338,6 +343,7 @@ internal fun ExpandableMapLayer(
                 Column(
                     modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
                         .imePadding()
+                        .onSizeChanged { chromeInsets?.bottomPx = it.height.toFloat() }
                         .graphicsLayer {
                             // 0 is off the bottom of the screen, 1 its place; the bounce takes it a little past 1 either way. It stays solid as it goes.
                             translationY = (1f - chrome.value) * (size.height + 120.dp.toPx())
