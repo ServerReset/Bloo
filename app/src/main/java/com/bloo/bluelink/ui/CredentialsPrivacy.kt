@@ -15,6 +15,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.platform.LocalContext
@@ -105,6 +107,18 @@ internal fun CredentialsPrivacyNote(brandLabel: String?, modifier: Modifier = Mo
  * and still reads offline. JavaScript stays off: the policy is a document, not a page.
  */
 /**
+ * The policy in the app's own colours: the page's white background goes, so the app's surface shows through, and its text and links
+ * take the theme's colours. The site's stylesheet is left alone; this only overrides the colours, for this page in the app.
+ */
+private fun themedPage(html: String, text: Color, link: Color): String {
+    val style = "<style>html,body{background:transparent!important;color:${text.cssHex()}!important}" +
+        "a{color:${link.cssHex()}!important}</style>"
+    return if ("</head>" in html) html.replace("</head>", "$style</head>") else style + html
+}
+
+private fun Color.cssHex(): String = "#%06X".format(0xFFFFFF and toArgb())
+
+/**
  * Opens the privacy policy in a browser: the styled web page, or the plain HTML page. If the styled page cannot be opened (no browser
  * that can start, or a device that cannot show it), the plain HTML page is opened instead.
  */
@@ -119,6 +133,7 @@ internal fun PrivacyPolicyViewer(onClose: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     var html by remember { mutableStateOf(PrivacyCopy.local(context)) }
     LaunchedEffect(Unit) { PrivacyCopy.pull(context.applicationContext)?.let { html = it } }
+    val page = remember(html, scheme) { themedPage(html, scheme.onSurface, scheme.primary) }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = scheme.surface) {
             Box(Modifier.fillMaxSize()) {
@@ -138,9 +153,9 @@ internal fun PrivacyPolicyViewer(onClose: () -> Unit) {
                     },
                     // Reload only when the text changes, so a recomposition does not restart the page.
                     update = { view ->
-                        if (view.tag != html) {
-                            view.tag = html
-                            view.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+                        if (view.tag != page) {
+                            view.tag = page
+                            view.loadDataWithBaseURL(null, page, "text/html", "utf-8", null)
                         }
                     },
                 )
