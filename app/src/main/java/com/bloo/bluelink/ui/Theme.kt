@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
@@ -233,6 +234,12 @@ fun expressiveTypography(choice: FontChoice, classicHeadings: Boolean = false): 
     // Headings and titles take a classical serif when asked; body text keeps the chosen font.
     val heading = if (classicHeadings) FontFamily.Serif else family
     val base = Typography()
+    // Headings in the classic serif sit a little tighter: the serif reads as a deliberate, modern-classic setting rather than a default.
+    fun TextStyle.heading(weight: FontWeight? = null): TextStyle = copy(
+        fontFamily = heading,
+        fontWeight = weight ?: fontWeight,
+        letterSpacing = if (classicHeadings) (-0.02).em else letterSpacing,
+    )
     fun TextStyle.bigger(scale: Float, weight: FontWeight? = null): TextStyle = copy(
         fontFamily = family,
         fontWeight = weight ?: fontWeight,
@@ -240,13 +247,13 @@ fun expressiveTypography(choice: FontChoice, classicHeadings: Boolean = false): 
         lineHeight = lineHeight * scale,
     )
     return base.copy(
-        displayLarge = base.displayLarge.copy(fontFamily = heading, fontWeight = FontWeight.Black),
-        displayMedium = base.displayMedium.copy(fontFamily = heading, fontWeight = FontWeight.Black),
-        displaySmall = base.displaySmall.copy(fontFamily = heading, fontWeight = FontWeight.ExtraBold),
-        headlineLarge = base.headlineLarge.copy(fontFamily = heading, fontWeight = FontWeight.ExtraBold),
-        headlineMedium = base.headlineMedium.copy(fontFamily = heading, fontWeight = FontWeight.Bold),
-        headlineSmall = base.headlineSmall.copy(fontFamily = heading, fontWeight = FontWeight.Bold),
-        titleLarge = base.titleLarge.bigger(1.0f, FontWeight.SemiBold).copy(fontFamily = heading),
+        displayLarge = base.displayLarge.heading(FontWeight.Black),
+        displayMedium = base.displayMedium.heading(FontWeight.Black),
+        displaySmall = base.displaySmall.heading(FontWeight.ExtraBold),
+        headlineLarge = base.headlineLarge.heading(FontWeight.ExtraBold),
+        headlineMedium = base.headlineMedium.heading(FontWeight.Bold),
+        headlineSmall = base.headlineSmall.heading(FontWeight.Bold),
+        titleLarge = base.titleLarge.bigger(1.0f, FontWeight.SemiBold).heading(),
         titleMedium = base.titleMedium.bigger(1.06f, FontWeight.SemiBold),
         titleSmall = base.titleSmall.bigger(1.08f, FontWeight.SemiBold),
         bodyLarge = base.bodyLarge.bigger(1.06f, FontWeight.Medium),
