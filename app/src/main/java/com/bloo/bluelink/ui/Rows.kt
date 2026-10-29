@@ -170,7 +170,16 @@ private fun Modifier.hapticToggleable(checked: Boolean, enabled: Boolean, onChan
         if (next) haptics?.toggleOn() else haptics?.toggleOff()
         onChange(next)
     }
-    return toggleable(
+    // The key handler comes BEFORE the toggleable, so it wraps the focusable switch. A chained after it would sit inside that focus target,
+    // and the Enter or Space pressed on the focused switch would never reach it.
+    return onKeyEvent { event ->
+        if (enabled && event.type == KeyEventType.KeyDown && (event.key == Key.Enter || event.key == Key.Spacebar)) {
+            flip()
+            true
+        } else {
+            false
+        }
+    }.toggleable(
         value = checked,
         enabled = enabled,
         interactionSource = remember { MutableInteractionSource() },
@@ -178,14 +187,6 @@ private fun Modifier.hapticToggleable(checked: Boolean, enabled: Boolean, onChan
         role = Role.Switch,
     ) {
         flip()
-    }.onKeyEvent { event ->
-        // A keyboard user presses Enter or Space on the focused switch. Keys from a focused descendant bubble up to here.
-        if (enabled && event.type == KeyEventType.KeyDown && (event.key == Key.Enter || event.key == Key.Spacebar)) {
-            flip()
-            true
-        } else {
-            false
-        }
     }
 }
 
