@@ -324,8 +324,7 @@ internal fun ExpandableMapLayer(
                             }
                         }
                         .graphicsLayer {
-                            // 0 is off the top of the screen, 1 its place; the bounce takes it a little past 1 either way.
-                            alpha = 1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)
+                            // 0 is off the top of the screen, 1 its place; the bounce takes it a little past 1 either way. It stays solid as it goes.
                             translationY = -(1f - chrome.value) * (windowSize.height * 0.15f + size.height + barGapPx)
                         },
                 )
@@ -337,8 +336,7 @@ internal fun ExpandableMapLayer(
                     modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
                         .imePadding()
                         .graphicsLayer {
-                            // 0 is off the bottom of the screen, 1 its place; the bounce takes it a little past 1 either way.
-                            alpha = 1f - 0.7f * (dragPx.value / closeDistPx).coerceIn(0f, 1f)
+                            // 0 is off the bottom of the screen, 1 its place; the bounce takes it a little past 1 either way. It stays solid as it goes.
                             translationY = (1f - chrome.value) * (size.height + 120.dp.toPx())
                         },
                 ) {
