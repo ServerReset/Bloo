@@ -11,41 +11,41 @@
   code { overflow-wrap: anywhere; word-break: break-word; }
   a { color: #1a4fd1; overflow-wrap: anywhere; }
   .home { margin: 0 0 18px; font-weight: 600; } details { margin: 12px 0; } summary { cursor: pointer; }
+  .short { margin: 0 0 18px; padding: 12px 16px; border-left: 4px solid #1a4fd1; background: #f3f6fd; color: #111; font-weight: 600; border-radius: 6px; }
+  .short-label { display: block; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #1a4fd1; margin-bottom: 4px; }
 </style>
 </head>
 <body>
 <p class="home"><a href="index.html">&larr; Home (the full site)</a></p>
 <span class="stamp">Last updated 29 October 2026</span>
 <h1>Privacy policy</h1>
-<p class="lede">Bloo opens your car from your phone. Everything sensitive it keeps is encrypted, and it keeps nothing about you on a server, because there isn't one. Here is the full detail, in order.</p>
+<p class="lede">Bloo opens your car from your phone. The sensitive parts are encrypted, and it keeps nothing about you on a server, because there isn't one. Here is the full version, in order.</p>
 
-<div>
-  <p><strong>The short version.</strong> Your password, PIN and sign-in details are encrypted on your phone. Nothing sensitive is stored in plain text, anywhere. We run no server, track nothing, sell nothing, and the whole app is open source, so you can check every claim here against the code.</p>
-</div>
+<p class="short"><span class="short-label">Short version</span>Your password and PIN are encrypted on your phone. We run no server, track nothing and sell nothing. The code is public, so you can check.</p>
 
 <h2 id="who-we-are-and-who-we-are-not">1. Who we are, and who we are not</h2>
-<p class="simple">We are an independent app. We are not Hyundai, Genesis or Kia, and they have nothing to do with this app.</p>
+<p class="short"><span class="short-label">Short version</span>We are an independent app. We are not Hyundai, Genesis or Kia.</p>
 
-<p>Bloo is an independent app that talks to the Bluelink and Connected Car services of Hyundai, Genesis and Kia. It is not made by, endorsed by, or affiliated with Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries. We have never met them. This is working out well for everyone.</p>
+<p>Bloo is an independent app that talks to the Bluelink and Connected Car services of Hyundai, Genesis and Kia. It is not made by, endorsed by, or affiliated with Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries. If you were hoping for a corporate tie-in, we're sorry to disappoint. Our marketing budget is one biscuit.</p>
 
 <h2 id="what-bloo-stores-and-how-it-is-encrypted">2. What Bloo stores, and how it is encrypted</h2>
-<p class="simple">Everything sensitive is encrypted before it is saved. Your password and PIN sit in a vault on your phone, with a key kept in the phone’s security chip.</p>
+<p class="short"><span class="short-label">Short version</span>Your password and PIN are encrypted before they are saved, with the key kept in your phone's security chip.</p>
 
 <p>Every sensitive thing Bloo keeps is encrypted <strong>before it is written to your phone</strong>:</p>
 <ul>
   <li><strong>Your Bluelink, Genesis or Kia password</strong>, and any service PIN, are sealed with <strong>AES-256-GCM</strong>.</li>
   <li><strong>Your sign-in tokens and your app-lock PIN</strong> are sealed the same way, in the same vault.</li>
-  <li><strong>The key for that vault</strong> is itself wrapped by a key that lives in the <strong>Android Keystore</strong>, the security chip inside your phone. On phones with a hardware-backed Keystore, the key stays inside the security chip. Bloo cannot read it out, and nobody who takes the phone apart with a screwdriver can either.</li>
-  <li>Everything else Bloo keeps (your preferences, widget choices, the last car status it fetched) lives in the app's private storage, and <strong>Android encrypts that storage on the device</strong>. Nothing is kept in readable form on your phone.</li>
+  <li><strong>The key for that vault</strong> is itself wrapped by a key that lives in the <strong>Android Keystore</strong>, the security chip inside your phone. On phones with a hardware-backed Keystore, that key stays inside the chip. Bloo cannot read it out, and neither can anyone who opens the phone with a screwdriver.</li>
+  <li>Everything else Bloo keeps (your preferences, widget choices, the last car status it fetched) lives in the app's private storage, and <strong>Android encrypts that storage on the device</strong>.</li>
 </ul>
-<p>In plain words: your password is encrypted once by Bloo, and then the phone encrypts the whole app's storage as well. The password is never sitting around as text. Not on the phone, not on a server, not in a log.</p>
+<p>In plain words: Bloo encrypts your password once, and then the phone encrypts the app's storage as well. The password is never lying around as text. Not on the phone, not on a server, not in a log.</p>
 
 <div>
-  <p><strong>A note on the phrase "nothing unencrypted," which is doing a lot of work.</strong> It is accurate for your phone and for everything Bloo writes to it. It is not a claim about your car maker's servers, which have their own policy, or about what Google does with a file in your Google Drive if you turn sync on. Those are covered below.</p>
+  <p><strong>A note on the phrase "nothing unencrypted."</strong> It is accurate for your phone and for everything Bloo writes to it. It is not a claim about your car maker's servers, which have their own policy, or about what Google does with a file in your Google Drive if you turn sync on. Those are covered below.</p>
 </div>
 
 <h2 id="where-things-go">3. Where things go</h2>
-<p class="simple">Your car maker, when you use your car. GitHub, to check for new versions. Nowhere else.</p>
+<p class="short"><span class="short-label">Short version</span>Your car maker, when you use your car. GitHub, to check for updates. Nowhere else.</p>
 
 <ul>
   <li><strong>To your car maker's service,</strong> using your own account. That is the point of the app: locking, starting, finding and reading your car all happen there. Their privacy policy governs what they do with the request, and you should read it too.</li>
@@ -56,9 +56,9 @@
 <p>The on-device AI summaries run on your phone. Nothing you summarise leaves it.</p>
 
 <h2 id="transactions">4. Transactions</h2>
-<p class="simple">We sell nothing and take no payments. Your car maker runs your car commands and any charges they make.</p>
+<p class="short"><span class="short-label">Short version</span>We sell nothing and take no payments. Your car maker handles any charges.</p>
 
-<p>Bloo does not sell anything. There is no shop, no subscription, and no button that asks you to upgrade. Bloo does not take payments, hold money, or store card details. It is not a bank, a car dealer, or a fairground ride.</p>
+<p>Bloo does not sell anything. There is no shop, no subscription, and no button that begs you to upgrade. It does not take payments, hold money, or store card details. It is not a bank, a car dealer, or a fairground ride.</p>
 <p>A <strong>transaction</strong>, meaning something you asked the car to do, works like this:</p>
 <ul>
   <li>You tap <em>Lock</em>. Bloo sends that request to your car maker's service, using your account. The service locks the car and reports back. That round trip is the transaction. Bloo shows you the outcome, and that is the end of our involvement.</li>
@@ -68,7 +68,7 @@
 <p>If you ever see a charge on your card with the word "Bloo" on it, it was not us. We would like to know who is impersonating us, and we would like a word with them about their taste.</p>
 
 <h2 id="if-a-pirate-takes-control-of-your-car">5. If a pirate takes control of your car</h2>
-<p class="simple">Change your car maker password, sign out of Bloo, and call your car maker.</p>
+<p class="short"><span class="short-label">Short version</span>Change your car maker password, sign out of Bloo, and call your car maker.</p>
 
 <p>This is the part where policies start making promises, so we will stick to facts. Nobody can promise a determined criminal will never get into your car. What Bloo does is make sure the app is not the weak link, and that you always have a plan.</p>
 <p><strong>What protects you already:</strong></p>
@@ -88,22 +88,22 @@
 <p>If we learn of a weakness in the app that a pirate could use, we will fix it, record it in the change log below, and tell you what to do. We would rather you heard it from us than from a news story about a car that drove itself into a lake.</p>
 
 <h2 id="what-bloo-never-collects">6. What Bloo never collects</h2>
-<p class="simple">No name, address, contacts or your phone’s location. Only your car’s location, and only from your car maker.</p>
+<p class="short"><span class="short-label">Short version</span>No name, address, contacts or phone location. Only your car's location, from your car maker.</p>
 
 <ul>
   <li>Your name, address, phone number, or contacts.</li>
-  <li>Your location. Only your <em>car's</em> location, and only because your car maker's service reports it to you. Your phone's own position is used on the device to draw your dot on the map, and goes nowhere.</li>
+  <li>Your location. Only your <em>car's</em> location, and only because your car maker's service reports it to you. Your phone's own position draws your dot on the map on the device, and goes nowhere.</li>
   <li>Anything from other apps, or how you use your phone.</li>
   <li>Money, or anything that would make a data broker's eyes light up.</li>
 </ul>
 
 <h2 id="permissions-and-why-we-ask">7. Permissions, and why we ask</h2>
-<p class="simple">Every permission is optional, and each one unlocks one feature.</p>
+<p class="short"><span class="short-label">Short version</span>Every permission is optional, and each one unlocks one feature.</p>
 
 <p>Bloo asks only for what a feature needs, and every one of them is optional. Location, to find your car and to run AutoLock. Notifications, for car alerts. Bluetooth, for AutoLock with your car's own connection. Activity recognition, so AutoLock knows when you are driving. Say no to any of them and that feature sulks quietly. Nothing else breaks.</p>
 
 <h2 id="your-control">8. Your control</h2>
-<p class="simple">Sign out to delete your credentials. Uninstall to delete everything else.</p>
+<p class="short"><span class="short-label">Short version</span>Sign out to delete your credentials. Uninstall to delete everything else.</p>
 
 <ul>
   <li><strong>Sign out</strong> in Settings to delete your stored credentials.</li>
@@ -113,7 +113,7 @@
 <p>There is nothing for us to export, delete, or correct, because we do not have it. This is the one time a lack of infrastructure works in your favour.</p>
 
 <h2 id="open-source-please-check-our-work">9. Open source: please check our work</h2>
-<p class="simple">The code is public on GitHub. You can check every claim here.</p>
+<p class="short"><span class="short-label">Short version</span>The code is public on GitHub, so you can check every claim here.</p>
 
 <p>Bloo is open source. The whole app, including the encryption code, is on GitHub, and you do not have to take our word for any of this:</p>
 <ul>
@@ -124,21 +124,21 @@
 <p>If you are suspicious, good. Go and look. If you find something that does not match this page, please tell us, and we will fix the code or the page, whichever is wrong.</p>
 
 <h2 id="children">10. Children</h2>
-<p class="simple">Bloo is not for children.</p>
+<p class="short"><span class="short-label">Short version</span>Bloo is not for children.</p>
 
 <p>Bloo is not for children, and we do not knowingly collect anything from them. If you are a child reading this, go and ask a grown-up to show you a car instead.</p>
 
 <h2 id="changes">11. Changes</h2>
-<p class="simple">Every change is written in the change log below, with the date.</p>
+<p class="short"><span class="short-label">Short version</span>Every change is dated in the change log below.</p>
 
-<p>When this policy changes, the date at the top changes too, and the change is written below in plain words, with the date. We do not make quiet edits in a drawer.</p>
+<p>When this policy changes, the date at the top changes too, and the change is written below in plain words. We do not make quiet edits in a drawer.</p>
 <ul>
-  <li><strong>29 October 2026.</strong> Rewritten. States plainly that sensitive data is encrypted before it is stored, and that the rest of the app's storage is encrypted on the device. Adds sections on transactions, on what to do if a pirate takes control of your car, and on the open source code. The policy is now also inside the app.</li>
+  <li><strong>29 October 2026.</strong> Rewritten. States plainly that sensitive data is encrypted before it is stored, and that the rest of the app's storage is encrypted on the device. Adds sections on transactions, on what to do if a pirate takes control of your car, and on the open source code. The policy is now also inside the app. Short versions unified, and the wording tightened.</li>
   <li><strong>14 October 2026.</strong> First published.</li>
 </ul>
 
 <h2 id="contact">12. Contact</h2>
-<p class="simple">Questions go to adi1.perets@gmail.com.</p>
+<p class="short"><span class="short-label">Short version</span>Questions go to adi1.perets@gmail.com.</p>
 
 <p>Questions, complaints, or a pirate who would like to apologise: <a href="mailto:adi1.perets@gmail.com">adi1.perets@gmail.com</a>.</p>
 
