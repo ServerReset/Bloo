@@ -175,8 +175,12 @@ private class MovementTracker {
 private class MotionSpeed {
     private var lastPosition = Float.NaN
     private var lastNanos = 0L
-    private var smoothed = 0f
 
+    /**
+     * The layer's speed at this draw, from its own last draw. There is deliberately no smoothing: a layer's last drawn frame is the one
+     * it keeps until something draws it again, so that frame has to carry the real speed of its last movement (almost none, at the end of
+     * an eased move), not a lagging average that would leave the layer blurred at rest.
+     */
     fun sample(position: Float, nanos: Long): Float {
         if (lastPosition.isNaN()) {
             lastPosition = position
@@ -184,16 +188,14 @@ private class MotionSpeed {
             return 0f
         }
         val seconds = (nanos - lastNanos) / 1_000_000_000f
-        if (seconds <= 0f) return smoothed
-        val raw = if (seconds > StillAfterSeconds) 0f else abs(position - lastPosition) / seconds
-        smoothed += (raw - smoothed) * Smoothing
+        if (seconds <= 0f) return 0f
+        val speed = if (seconds > StillAfterSeconds) 0f else abs(position - lastPosition) / seconds
         lastPosition = position
         lastNanos = nanos
-        return smoothed
+        return speed
     }
 
     private companion object {
         const val StillAfterSeconds = 0.1f
-        const val Smoothing = 0.4f
     }
 }

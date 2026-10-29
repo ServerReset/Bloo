@@ -34,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -348,6 +349,7 @@ internal fun ExpandableMapLayer(
                         features = listOf(
                             MapFeature(AppIcons.DirectionsCar, "Car") { mapState.recenter() },
                             MapFeature(Icons.Filled.MyLocation, "Me") { showMe() },
+                            MapFeature(Icons.Filled.Refresh, "Refresh", enabled = !refreshing) { onRefreshLocation() },
                             MapFeature(Icons.Filled.Share, "Share") {
                                 shareLocation(context, location, vehicleName)
                             },
