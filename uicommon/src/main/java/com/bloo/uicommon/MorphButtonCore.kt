@@ -184,6 +184,8 @@ private fun BoxScope.MorphChrome(
             // in a Row and collapse to zero height under an unbounded (scrollable) height.
             .matchParentSize()
             .clip(shape)
+            // The edges blur only while the shape is morphing, and are clear at rest.
+            .movingPartBlur { morph }
             .then(
                 if (resolvedBorder != null) {
                     Modifier.background(color = fill, shape = shape).border(resolvedBorder, shape)
