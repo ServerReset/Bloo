@@ -21,35 +21,12 @@
   })();
 </script>
 <noscript><meta http-equiv="refresh" content="0; url=index-plain.html"></noscript>
-<style>
-/* The floating bar: the three places that matter, always one thumb away. */
-.dock {
-  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 60;
-  display: flex; gap: 4px; padding: 6px; border-radius: 999px;
-  background: color-mix(in srgb, var(--paper) 72%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
-  border: 2px solid var(--ink); box-shadow: 0 10px 30px -12px color-mix(in srgb, var(--ink) 40%, transparent);
-  max-width: calc(100% - 24px);
-}
-.dock a { padding: 10px 16px; border-radius: 999px; text-decoration: none; font-weight: 700; font-size: 14px; white-space: nowrap; color: var(--ink); }
-.dock a:hover { background: var(--sun); }
-.dock a[aria-current="page"] { background: var(--ink); color: var(--paper); }
-body { padding-bottom: 96px; }
-@media (max-width: 420px) { .dock a { padding: 9px 11px; font-size: 13px; } }
 
-/* The plain HTML policy, pinned to the top bar so it is one tap from anywhere. */
-.bar nav .plain-cta { padding: 8px 14px; border: 2px solid var(--ink); border-radius: 999px; color: var(--ink); }
-.bar nav .plain-cta:hover { background: var(--ink); color: var(--paper); }
-</style>
 </head>
 <body>
 <div class="glow" aria-hidden="true"></div>
 
-<header class="bar">
-  <div class="wrap">
-    <a class="logo" href="./"><img src="img/icon.png" alt="" width="36" height="36">Bloo</a>
-  </div>
-</header>
+<a class="brand-chip" href="./" aria-label="Bloo home"><img src="img/icon.png" alt="" width="34" height="34">Bloo</a>
 
 <main>
 
