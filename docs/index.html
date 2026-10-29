@@ -35,7 +35,7 @@
     <h1 class="display hero-title rise">
       <span class="stretch-tall" style="transform:none"><em>Lock it.</em></span>
       <span class="wide">Cool it.</span>
-      <span>Charge it <span class="swap" id="swap"><span class="in">from bed</span></span></span>
+      <span>Charge it <span class="swap" id="swap"><span>from bed</span></span></span>
     </h1>
 
     <div class="hero-foot">
@@ -179,11 +179,11 @@
     let i = 0;
     setInterval(() => {
       const cur = swap.firstElementChild;
-      cur.classList.remove('in'); cur.classList.add('out');
+      cur.classList.add('out');
       setTimeout(() => {
         i = (i + 1) % words.length;
         cur.textContent = words[i];
-        cur.classList.remove('out'); cur.classList.add('in');
+        cur.classList.remove('out');
       }, 380);
     }, 2600);
   }
