@@ -16,13 +16,13 @@ import androidx.compose.ui.unit.Velocity
 import kotlin.math.abs
 
 /** Speed, in pixels per second, at which a moving layer reaches its full touch of blur. Tuned low on purpose: a softness, not a smear. */
-private const val FullBlurSpeedPx = 2_500f
+private const val FullBlurSpeedPx = 1_500f
 
 /** The most a moving layer blurs, in dp. */
-private const val MaxMotionBlurDp = 2f
+private const val MaxMotionBlurDp = 6f
 
 /** Below this the blur is invisible and is not applied at all. */
-private const val MinMotionBlurDp = 0.25f
+private const val MinMotionBlurDp = 0.5f
 
 /**
  * The app's one motion blur. Two ways to say what moves, and one gate that decides whether any of it draws:
@@ -105,14 +105,19 @@ private val MotionBlurScrollConnection = object : NestedScrollConnection {
  */
 fun Modifier.motionBlurScrollGate(): Modifier = nestedScroll(MotionBlurScrollConnection)
 
+/**
+ * The blur radius, in dp, for a layer moving at [pxPerSecond]: zero when still, rising in step with speed, and capped. Below
+ * [MinMotionBlurDp] the blur is not drawn at all.
+ */
+internal fun motionBlurRadiusDp(pxPerSecond: Float): Float {
+    val radius = (pxPerSecond / FullBlurSpeedPx * MaxMotionBlurDp).coerceIn(0f, MaxMotionBlurDp)
+    return if (radius >= MinMotionBlurDp) radius else 0f
+}
+
 /** Draws the blur for a layer moving at [pxPerSecond]: nothing below the visible threshold, and never more than the cap. */
 private fun GraphicsLayerScope.applyMotionBlur(pxPerSecond: Float) {
     val now = System.nanoTime()
-    val radius = if (MotionBlurScrollGate.scrolling(now)) {
-        0f
-    } else {
-        (pxPerSecond / FullBlurSpeedPx * MaxMotionBlurDp).coerceAtMost(MaxMotionBlurDp)
-    }
+    val radius = if (MotionBlurScrollGate.scrolling(now)) 0f else motionBlurRadiusDp(pxPerSecond)
     renderEffect = if (radius >= MinMotionBlurDp) {
         val px = radius * density
         BlurEffect(px, px)
