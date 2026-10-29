@@ -340,3 +340,11 @@ footer, .fine, .doc .fine { color: var(--ink-soft); }
 @media (max-width: 420px) { .dock a { font-size: 15px; padding: 11px 13px; } .brand-chip { font-size: 19px; } }
 /* A short, plain read ahead of each section of the policy. */
 .simple { font-weight: 600; color: var(--ink); background: var(--wash, #ecebe6); border-left: 6px solid var(--sun); padding: 12px 16px; border-radius: 0 14px 14px 0; margin: 0 0 14px; }
+
+/* Light callouts stay light in dark mode, so their dark text always has contrast. */
+.callout, .callout p, .simple { color: #15130f; }
+.callout { background: #ffc83d; }
+.callout.warm { background: #a6e3bf; }
+.simple { background: #ecebe6; border-left-color: #ffc83d; }
+.callout strong, .simple strong { color: #15130f; }
+.doc .callout p strong, .doc .simple strong, .doc .callout strong { color: #15130f; }
