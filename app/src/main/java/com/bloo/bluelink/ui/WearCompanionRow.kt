@@ -115,26 +115,26 @@ internal fun DriveSyncSetupDialog(
                 onClick = onOpenFromDrive,
             )
             if (warnNewFile) {
-                // The trap, spelled out, with the safe alternative one tap away.
+                // The one risky step, said plainly, with the safe choice one tap away.
                 Column(
                     Modifier.tintedPanel(scheme.errorContainer.copy(alpha = 0.5f)),
                     verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
                     RevealText(
-                        "Starts a new Drive file. Your devices stop sharing settings.",
+                        "Your other devices stop sharing settings with this one.",
                         style = SecondaryTextStyle(),
                         color = scheme.onErrorContainer,
                     )
                     MorphTextButton(
-                        text = "Create a new file anyway", onClick = onSaveToDrive,
+                        text = "Start a new file", onClick = onSaveToDrive,
                         modifier = Modifier.fillMaxWidth(), emphasis = ButtonEmphasis.Deny,
                     )
                 }
             } else {
                 DriveSyncChoiceRow(
                     icon = Icons.Filled.CreateNewFolder,
-                    title = "Save to Drive",
-                    subtitle = "Start fresh with this device's settings.",
+                    title = if (hasExistingSync) "Start a new file" else "Save to Drive",
+                    subtitle = if (hasExistingSync) "Replaces the shared file." else "Start fresh with this device's settings.",
                     onClick = { if (hasExistingSync) warnNewFile = true else onSaveToDrive() },
                 )
             }
