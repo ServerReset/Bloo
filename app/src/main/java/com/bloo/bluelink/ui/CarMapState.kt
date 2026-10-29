@@ -160,9 +160,15 @@ internal class ExpandedMapState {
     fun mapFor(vin: String): @Composable (Modifier, MapInputs) -> Unit = perVinMap.getOrPut(vin) {
         val state = mapStateFor(vin)
         movableContentOf { modifier: Modifier, inputs: MapInputs ->
-            CarMap(inputs.location, modifier, state, inputs.deviceLocation, inputs.interactive, inputs.tileArea, inputs.panWeight)
+            CarMap(
+                inputs.location, modifier, state, inputs.deviceLocation, inputs.interactive, inputs.tileArea, inputs.panWeight,
+                otherCars = this@ExpandedMapState.otherCars,
+            )
         }
     }
+
+    /** The other cars' locations, drawn as pins on every map of this host: the expanded map shows all of them at once. */
+    var otherCars by mutableStateOf<List<GeoLocation>>(emptyList())
 
     /** VIN of the car whose map is currently expanded, or null. */
     var vin by mutableStateOf<String?>(null)

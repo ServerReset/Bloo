@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -128,6 +129,10 @@ internal fun GarageScreen(
         ColumnReflow(perPageAnim.asState(), widthDp = { windowInfo.containerSize.width / density.density })
     }
 
+    // The other cars, drawn as pins on the expanded map. The car that is expanded is the map's own pin, so it is left out.
+    SideEffect {
+        expandedMap.otherCars = state.value.vehicles.mapNotNull { v -> if (v.vin == expandedMap.vin) null else state.value.locations[v.vin] }
+    }
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
     BackdropHost {
         // ONE page, ALWAYS the pager: a car's own layout scales with the device width, so there is no

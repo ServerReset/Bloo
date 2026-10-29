@@ -79,6 +79,8 @@ internal fun CarMap(
     interactive: Boolean = true,
     tileArea: IntSize = IntSize.Zero,
     panWeight: () -> Float = { 1f },
+    /** The other cars on this map, each drawn at its own place. */
+    otherCars: List<GeoLocation> = emptyList(),
 ) {
     var started by remember { mutableStateOf(MapStartGate.open) }
     if (!started) {
@@ -90,7 +92,7 @@ internal fun CarMap(
         Box(modifier)
         return
     }
-    CarMapBody(location, modifier, state, deviceLocation, interactive, tileArea, panWeight)
+    CarMapBody(location, modifier, state, deviceLocation, interactive, tileArea, panWeight, otherCars)
 }
 
 /**
@@ -122,6 +124,7 @@ private fun CarMapBody(
     tileArea: IntSize = IntSize.Zero,
     /** How much of [state]'s pan shows right now (0 to 1); read in the draw phase, so ramping it recomposes nothing. */
     panWeight: () -> Float = { 1f },
+    otherCars: List<GeoLocation> = emptyList(),
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("CarMapBody")
     val context = LocalContext.current
@@ -379,6 +382,20 @@ private fun CarMapBody(
                 modifier = Modifier.align(Alignment.Center)
                     // The car is the map's pan origin, so the container's own translation already
                     // puts it dead-centre -- no per-frame offset here any more.
+                    .size(40.dp)
+                    .offset(y = (-20).dp),
+            )
+        }
+        // Every other car on the map, at its own place. They ride with the map's pan, as the car's own pin does.
+        for (other in otherCars) {
+            val ox = ((MapTiles.tileX(other.longitude, zoom) - xTileF) * tilePx).toFloat()
+            val oy = ((MapTiles.tileY(other.latitude, zoom) - yTileF) * tilePx).toFloat()
+            Icon(
+                Icons.Filled.LocationOn,
+                contentDescription = "Another car",
+                tint = pinColor.copy(alpha = 0.7f),
+                modifier = Modifier.align(Alignment.Center)
+                    .offset { IntOffset(ox.roundToInt(), oy.roundToInt()) }
                     .size(40.dp)
                     .offset(y = (-20).dp),
             )
