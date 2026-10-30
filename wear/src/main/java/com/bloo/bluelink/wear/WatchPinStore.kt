@@ -52,13 +52,15 @@ class WatchPinStore(private val context: Context) {
     /** When the phone says the watch should lock. Pushed over the Data Layer; OFF until then. */
     var timing: WatchLockTiming
         get() = WatchLockTiming.fromWire(vault.getString(K_TIMING))
-        set(value) = vault.edit { put(K_TIMING, value.wireKey) }
+        set(value) { vault.edit { put(K_TIMING, value.wireKey) } }
 
     /** The mirrored PIN record, or null when the phone has no PIN set. */
     var record: PinRecord?
         get() = PinRecord.decode(vault.getString(K_RECORD))
-        set(value) = vault.edit {
-            if (value == null) remove(K_RECORD) else put(K_RECORD, value.encode())
+        set(value) {
+            vault.edit {
+                if (value == null) remove(K_RECORD) else put(K_RECORD, value.encode())
+            }
         }
 
     /** Whether the phone has pushed a PIN to gate with. */
@@ -70,10 +72,12 @@ class WatchPinStore(private val context: Context) {
         lockedUntilElapsedMs = vault.getString(K_ELAPSED)?.toLongOrNull() ?: 0L,
     )
 
-    private fun save(l: PinLockout) = vault.edit {
+    private fun save(l: PinLockout) {
+        vault.edit {
         put(K_FAILURES, l.failures.toString())
         put(K_WALL, l.lockedUntilEpochMs.toString())
         put(K_ELAPSED, l.lockedUntilElapsedMs.toString())
+        }
     }
 
     /**
