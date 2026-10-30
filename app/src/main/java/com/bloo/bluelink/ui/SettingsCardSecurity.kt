@@ -19,7 +19,6 @@ import com.bloo.uicommon.GapGroup
 /** The "Security" card: the app lock, which the phone's own lock unlocks. */
 @Composable
 internal fun SecurityCardContent(
-    state: UiState,
     vm: AppViewModel,
     canBio: Boolean,
     context: Context,
@@ -36,7 +35,7 @@ internal fun SecurityCardContent(
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             SettingsGroup("App lock") {
                 if (canBio) {
-                    AppLockRow(state, appearance, vm, context)
+                    AppLockRow(appearance, vm, context)
                 } else {
                     // No screen lock on the phone: there is nothing for the app to unlock with, so say so plainly.
                     BodySmallText("Bloo locks with your phone's own lock. Set a screen lock (fingerprint, face, PIN, pattern or password) to turn it on.")
@@ -62,7 +61,7 @@ internal fun SecurityCardContent(
  * search, so the two can never disagree about what turning the lock off means.
  */
 @Composable
-internal fun AppLockRow(state: UiState, appearance: SettingsStore.Appearance, vm: AppViewModel, context: Context) {
+internal fun AppLockRow(appearance: SettingsStore.Appearance, vm: AppViewModel, context: Context) {
     val lockOn = appearance.biometricLock
     SettingsSegmentedRow(
         label = "Ask for your phone's lock",

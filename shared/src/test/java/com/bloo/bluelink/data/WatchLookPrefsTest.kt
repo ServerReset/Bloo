@@ -16,7 +16,7 @@ class WatchLookPrefsTest {
 
     @Test fun aPayloadFromAnOlderPhoneHasNoSettings() {
         // No `look` field at all: the watch then offers its own rather than taking defaults from a phone that has none.
-        val payload = json.decodeFromString(WatchSyncPayload.serializer(), """{"lockTiming":"off"}""")
+        val payload = json.decodeFromString(WatchSyncPayload.serializer(), "{}")
         assertNull(payload.look)
     }
 

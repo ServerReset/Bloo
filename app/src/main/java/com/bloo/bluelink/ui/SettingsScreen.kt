@@ -179,7 +179,7 @@ internal fun SettingsScreen(
             }
             item {
             // Security
-            SecurityCardContent(state, vm, canBio, context, appearance)
+            SecurityCardContent(vm, canBio, context, appearance)
             }
             item {
             // Sounds & vibration One switch, rendered as a single row (SettingsCard inlineSetting).

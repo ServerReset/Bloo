@@ -17,7 +17,7 @@ class WatchAccentTest {
 
     @Test fun aPayloadFromAnOlderPhoneHasNoColours() {
         // No `accent` field at all: the watch keeps the brand's colours rather than taking defaults from a phone that has none.
-        val payload = json.decodeFromString(WatchSyncPayload.serializer(), """{"lockTiming":"off"}""")
+        val payload = json.decodeFromString(WatchSyncPayload.serializer(), "{}")
         assertNull(payload.accent)
     }
 }

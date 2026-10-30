@@ -66,7 +66,7 @@ internal fun buildSettingsSearchEntries(
     // exactly the words someone would type for this.
     if (canBio) {
         add("App lock", "biometric biometrics fingerprint face lock security app unlock require timing grace re-lock screen off immediate") {
-            AppLockRow(state, appearance, vm, LocalContext.current)
+            AppLockRow(appearance, vm, LocalContext.current)
         }
     }
     // The welcome-cards replay action: SettingsCardLook's Visuals card draws this button by hand, so

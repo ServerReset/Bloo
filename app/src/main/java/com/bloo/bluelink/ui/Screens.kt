@@ -51,7 +51,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.lowPowerCalm
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
