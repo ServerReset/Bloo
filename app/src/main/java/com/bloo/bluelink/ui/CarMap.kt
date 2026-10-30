@@ -10,7 +10,6 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
@@ -21,17 +20,13 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.State
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.semantics.Role
 import com.bloo.uicommon.lowPowerBounce
 import kotlin.math.hypot
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.semantics
-import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -55,7 +50,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -63,6 +57,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.imageLoader
@@ -492,30 +487,21 @@ private fun CarPinMarker(
             .semantics { contentDescription = contentDesc },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            Modifier.size(width = PinPhotoWidth, height = PinPhotoHeight)
-                .graphicsLayer {
-                    alpha = bubbleT.coerceIn(0f, 1f)
-                    scaleX = 0.5f + 0.5f * bubbleT
-                    scaleY = 0.5f + 0.5f * bubbleT
-                    transformOrigin = TransformOrigin(0.5f, 1f)
-                }
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .border(if (selected) 2.dp else 1.dp, if (selected) tint else Color.White.copy(alpha = 0.8f), shape),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (photo != null) {
-                AsyncImage(
-                    model = rememberPhotoModel(photo),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Icon(AppIcons.DirectionsCar, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-            }
-        }
+        CarPhotoTile(
+            photo = photo,
+            tint = tint,
+            contentDescription = null,
+            onClick = null,
+            size = DpSize(PinPhotoWidth, PinPhotoHeight),
+            selected = selected,
+            glyphSize = 20.dp,
+            modifier = Modifier.graphicsLayer {
+                alpha = bubbleT.coerceIn(0f, 1f)
+                scaleX = 0.5f + 0.5f * bubbleT
+                scaleY = 0.5f + 0.5f * bubbleT
+                transformOrigin = TransformOrigin(0.5f, 1f)
+            },
+        )
         Spacer(Modifier.height(2.dp))
         Icon(Icons.Filled.LocationOn, contentDescription = null, tint = tint, modifier = Modifier.size(PinGlyphSize))
     }
@@ -626,36 +612,21 @@ internal fun BoxScope.CarPinLayer(
                     for (spot in cluster) {
                         val pin = spot.pin
                         val selected = selectedVin == pin.vin
-                        Box(
-                            Modifier.size(width = 40.dp, height = 28.dp)
-                                .graphicsLayer {
-                                    val g = (state.scale).coerceIn(1f, 1.8f)
-                                    scaleX = g
-                                    scaleY = g
-                                    transformOrigin = TransformOrigin(0.5f, 1f)
-                                }
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                .border(
-                                    if (selected) 2.dp else 1.dp,
-                                    if (selected) tint else Color.White.copy(alpha = 0.85f),
-                                    RoundedCornerShape(8.dp),
-                                )
-                                .clickable(role = Role.Button) { onPinTap(pin.vin) }
-                                .semantics { contentDescription = "${pin.name}. Tap to select it" },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (pin.photo != null) {
-                                AsyncImage(
-                                    model = rememberPhotoModel(pin.photo),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            } else {
-                                Icon(AppIcons.DirectionsCar, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
-                            }
-                        }
+                        CarPhotoTile(
+                            photo = pin.photo,
+                            tint = tint,
+                            contentDescription = "${pin.name}. Tap to select it",
+                            onClick = { onPinTap(pin.vin) },
+                            size = DpSize(40.dp, 28.dp),
+                            selected = selected,
+                            glyphSize = 16.dp,
+                            modifier = Modifier.graphicsLayer {
+                                val g = (state.scale).coerceIn(1f, 1.8f)
+                                scaleX = g
+                                scaleY = g
+                                transformOrigin = TransformOrigin(0.5f, 1f)
+                            },
+                        )
                     }
                 }
             }

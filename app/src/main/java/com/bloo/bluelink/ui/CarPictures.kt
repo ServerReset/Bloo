@@ -19,6 +19,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -182,3 +196,43 @@ private fun CarPictureGrid(
         }
     }
 }
+
+/**
+ * A car's photo in a small rounded tile: the one picture every car marker on the map shares, the pin's bubble, a cluster's chip and an
+ * off-screen pointer. With no photo it shows the car glyph in the tile instead. [selected] outlines the tile in [tint].
+ */
+@Composable
+internal fun CarPhotoTile(
+    photo: String?,
+    tint: Color,
+    contentDescription: String?,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    size: DpSize = DpSize(44.dp, 32.dp),
+    selected: Boolean = false,
+    glyphSize: Dp = 18.dp,
+) {
+    val shape = RoundedCornerShape(8.dp)
+    Box(
+        modifier
+            .size(size)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(if (selected) 2.dp else 1.dp, if (selected) tint else Color.White.copy(alpha = 0.85f), shape)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (photo != null) {
+            AsyncImage(
+                model = rememberPhotoModel(photo),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(AppIcons.DirectionsCar, contentDescription = null, tint = tint, modifier = Modifier.size(glyphSize))
+        }
+    }
+}
+

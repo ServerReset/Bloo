@@ -1,18 +1,10 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
-import coil.compose.AsyncImage
-import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -102,7 +94,7 @@ internal fun BoxScope.DeviceMarker(
     }
 
     if (carOff) {
-        CarPointer(
+        CarPhotoTile(
             photo = carPhoto,
             tint = carColor,
             contentDescription = "Your car is off screen. Tap to centre on it",
@@ -144,42 +136,6 @@ internal fun BoxScope.DeviceMarker(
 private const val PointerSeparationPx = 36f
 
 /**
- * A car's photo as a pointer, for a car that is off screen: a small rounded tile with the car's picture in it (its glyph when there is no
- * photo). Tapping it selects the car, or centres on it for the car this map is on.
- */
-@Composable
-internal fun CarPointer(
-    photo: String?,
-    tint: Color,
-    contentDescription: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val shape = RoundedCornerShape(8.dp)
-    Box(
-        modifier
-            .size(width = 44.dp, height = 32.dp)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .border(1.dp, Color.White.copy(alpha = 0.85f), shape)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { this.contentDescription = contentDescription },
-        contentAlignment = Alignment.Center,
-    ) {
-        if (photo != null) {
-            AsyncImage(
-                model = rememberPhotoModel(photo),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Icon(AppIcons.DirectionsCar, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
-        }
-    }
-}
-
-/**
  * The cars that are off screen, each as its photo at the edge of the visible strip, in the direction the car lies. The strip is the map
  * less the top bar and the bottom buttons ([chromeInsets]), so a pointer never sits under one of them.
  */
@@ -212,7 +168,7 @@ internal fun BoxScope.OffScreenCarPointers(
         val sy = (((MapTiles.tileY(car.location.latitude, zoom) - yTileF) * tilePx).toFloat() + panY * weight) * scale
         if (!markerOffVisible(sx, sy, halfW, halfH, marginPx, topPx, bottomPx)) continue
         val (x, y) = clampMarkerToVisible(sx, sy, halfW, halfH, marginPx, topPx, bottomPx)
-        CarPointer(
+        CarPhotoTile(
             photo = car.photo,
             tint = tint,
             contentDescription = "${car.name} is off screen. Tap to select it",
