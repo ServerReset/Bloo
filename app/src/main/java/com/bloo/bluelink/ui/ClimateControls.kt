@@ -5,6 +5,7 @@ package com.bloo.bluelink.ui
  * section and [ChargeLimitPill].
  */
 
+import com.bloo.bluelink.data.WheelHeatLevel
 import androidx.compose.foundation.layout.padding
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -138,6 +139,7 @@ internal fun ClimatePresetSection(
     onUpdate: (id: String, name: String, request: ClimateRequest) -> Unit,
     seats: SeatConfig,
     showSeats: Boolean,
+    steeringLevels: List<WheelHeatLevel> = WheelHeatLevel.entries,
 ) {
     // Track IDs mid-exit so the item stays visible until its shrink animation ends.
     var deletingIds by remember { mutableStateOf(setOf<String>()) }
@@ -217,7 +219,7 @@ internal fun ClimatePresetSection(
                     // What the preset does: the same controls the climate section uses, with its save button left out.
                     ClimateControlsSection(
                         form = form, locked = false, fahrenheit = fahrenheit, seats = seats, showSeats = showSeats,
-                        onSaveAsPreset = null,
+                        onSaveAsPreset = null, steeringLevels = steeringLevels,
                     )
                 }
             },

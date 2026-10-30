@@ -259,6 +259,7 @@ internal fun ClimatePebble(
             },
             onReorder = { vm.reorderClimatePresets(v, it) },
             onUpdate = { id, name, request -> vm.updateClimatePreset(v, id, name, request) },
+            steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries,
             seats = seats,
             showSeats = showSeatControls,
         )
@@ -284,6 +285,7 @@ internal fun ClimatePebble(
             // too.
             showSeats = showSeatControls,
             onSaveAsPreset = { showAddPreset = true },
+            steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries,
         )
 
         if (showAddPreset) {

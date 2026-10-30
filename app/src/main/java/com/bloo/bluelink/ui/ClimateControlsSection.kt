@@ -85,6 +85,9 @@ internal class ClimateFormState(initial: ClimateRequest? = null) {
 internal fun rememberClimateForm(key: Any?, initial: ClimateRequest? = null): ClimateFormState =
     remember(key) { ClimateFormState(initial) }
 
+/** The steering wheel heater on a Gen 5W car: one level, so it steps Off and On. */
+internal val Gen5WSteeringLevels: List<WheelHeatLevel> = listOf(WheelHeatLevel.OFF, WheelHeatLevel.LOW)
+
 /** The climate controls wired to a [form]: every slider and switch reads and writes it. */
 @Composable
 internal fun ClimateControlsSection(
@@ -94,6 +97,7 @@ internal fun ClimateControlsSection(
     seats: SeatConfig,
     showSeats: Boolean,
     onSaveAsPreset: (() -> Unit)?,
+    steeringLevels: List<WheelHeatLevel> = WheelHeatLevel.entries,
 ) = ClimateControlsSection(
     locked = locked,
     fahrenheit = fahrenheit,
@@ -103,6 +107,7 @@ internal fun ClimateControlsSection(
     steeringHeat = form.steeringHeat, onSteeringHeat = { form.steeringHeat = it },
     seats = seats,
     showSeats = showSeats,
+    steeringLevels = steeringLevels,
     driver = form.driver, onDriver = { form.driver = it },
     passenger = form.passenger, onPassenger = { form.passenger = it },
     rearLeft = form.rearLeft, onRearLeft = { form.rearLeft = it },
@@ -126,6 +131,8 @@ internal fun ClimateControlsSection(
     onDefrost: (Boolean) -> Unit,
     steeringHeat: WheelHeatLevel,
     onSteeringHeat: (WheelHeatLevel) -> Unit,
+    /** The levels the steering wheel heater steps through. A car with one level only steps Off and On. */
+    steeringLevels: List<WheelHeatLevel> = WheelHeatLevel.entries,
     seats: SeatConfig,
     showSeats: Boolean,
     driver: SeatLevel,
@@ -192,9 +199,11 @@ internal fun ClimateControlsSection(
         val tiles = buildList {
             add(ClimateTile("Defrost", Icons.Filled.Air, active = defrost, detail = if (defrost) "On" else "Off") { onDefrost(!defrost) })
             if (seats.steeringWheel) {
-                add(ClimateTile("Steering wheel", Icons.Filled.Adjust, active = steeringHeat.isOn, detail = steeringHeat.label) {
-                    // Off, then Low, then High, then Off again: one tap per step, the way the car's own button steps.
-                    onSteeringHeat(WheelHeatLevel.entries[(steeringHeat.ordinal + 1) % WheelHeatLevel.entries.size])
+                val wheelDetail = if (steeringLevels.size == 2) (if (steeringHeat.isOn) "On" else "Off") else steeringHeat.label
+                add(ClimateTile("Steering wheel", Icons.Filled.Adjust, active = steeringHeat.isOn, detail = wheelDetail) {
+                    // Off, then each level in turn, then Off again: one tap per step, the way the car's own button steps.
+                    val at = steeringLevels.indexOf(steeringHeat).coerceAtLeast(0)
+                    onSteeringHeat(steeringLevels[(at + 1) % steeringLevels.size])
                 })
             }
             if (hasSeats) {
