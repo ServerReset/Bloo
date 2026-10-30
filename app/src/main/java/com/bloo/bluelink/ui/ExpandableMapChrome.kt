@@ -4,6 +4,10 @@ import com.bloo.uicommon.RevealText
 import androidx.compose.foundation.layout.Column
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.ui.unit.IntSize
+import com.bloo.uicommon.lowPowerCalm
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -189,8 +193,15 @@ internal fun MapTopBar(
         animationSpec = bounceSpring(stiffness = Spring.StiffnessMediumLow),
         label = "mapBarDetails",
     )
+    // The bar is liquid glass: the refraction and specular sheen of the app's floating glass, drawn over the map behind it.
+    val headerMinHeight by animateDpAsState(
+        targetValue = if (selected) 60.dp else 22.dp,
+        animationSpec = lowPowerCalm(Spring.StiffnessMediumLow),
+        label = "mapBarHeader",
+    )
     GlassSurface(
         shape = CornerBlendShape(detailsT),
+        liquid = true,
         modifier = modifier.fillMaxWidth()
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -206,7 +217,9 @@ internal fun MapTopBar(
         // so a forced white glyph vanishes on a light map. GlassSurface's onSurface default tracks
         // the theme and custom palettes.
     ) {
-        Column {
+        // The bar's own size follows its content, on the same spring as the handle's growth, so the handle, the line and the details
+        // read as one motion.
+        Column(Modifier.animateContentSize(lowPowerCalm<IntSize>(Spring.StiffnessMediumLow))) {
             // The header: the car at the start, the drag handle in the middle, its charge and range at the end. The car sides appear only
             // with a selection, so with none the handle sits alone in the middle.
             Row(
@@ -214,7 +227,7 @@ internal fun MapTopBar(
                     .then(dragModifier)
                     .then(if (selected) Modifier.clickable { onDetailsOpenChange(!detailsOpen) } else Modifier)
                     .onSizeChanged { onHeaderHeight(it.height) }
-                    .heightIn(min = if (selected) 60.dp else 22.dp)
+                    .heightIn(min = headerMinHeight)
                     .padding(horizontal = if (selected) GapPage else 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
