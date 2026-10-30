@@ -166,12 +166,14 @@ internal fun MapTopBar(
     carOnScreen: Boolean = true,
     /** Whether a car is selected, which opens the bar to its single line. */
     selected: Boolean = false,
+    /** Whether the details are open, held by the caller so a dismiss can fold them first. */
+    detailsOpen: Boolean = false,
+    onDetailsOpenChange: (Boolean) -> Unit = {},
     onHeaderHeight: (Int) -> Unit = {},
 ) {
     // Tapping the single line opens it into the car's details; tapping again folds it back. Nothing selected closes it all the way.
-    var detailsOpen by remember { mutableStateOf(false) }
-    LaunchedEffect(carOnScreen) { if (!carOnScreen) detailsOpen = false }
-    LaunchedEffect(selected) { if (!selected) detailsOpen = false }
+    LaunchedEffect(carOnScreen) { if (!carOnScreen) onDetailsOpenChange(false) }
+    LaunchedEffect(selected) { if (!selected) onDetailsOpenChange(false) }
     // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without
     // consuming, so dragModifier and the tap still receive the touch.
     var pillPressed by remember { mutableStateOf(false) }
@@ -210,7 +212,7 @@ internal fun MapTopBar(
             Row(
                 Modifier
                     .then(dragModifier)
-                    .then(if (selected) Modifier.clickable { detailsOpen = !detailsOpen } else Modifier)
+                    .then(if (selected) Modifier.clickable { onDetailsOpenChange(!detailsOpen) } else Modifier)
                     .onSizeChanged { onHeaderHeight(it.height) }
                     .heightIn(min = if (selected) 60.dp else 22.dp)
                     .padding(horizontal = if (selected) GapPage else 0.dp),

@@ -423,12 +423,7 @@ private fun CarMapBody(
             tint = pinColor.copy(alpha = 0.7f),
             chromeInsets = chromeInsets,
             // A pointer picks its car and brings it into view, so the car it selects is on screen.
-            onPick = { vin ->
-                onPinTap(vin)
-                otherCars.firstOrNull { it.vin == vin }?.let { car ->
-                    state.showDevice(location.latitude, location.longitude, car.location.latitude, car.location.longitude)
-                }
-            },
+            onPick = onPinTap,
         )
         CarPinLayer(
             state = state,

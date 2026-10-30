@@ -220,12 +220,15 @@ internal fun ExpandableMapLayer(
         return expandFraction.value * (1f - 0.5f * drag)
     }
     var closing by remember { mutableStateOf(false) }
+    // The bar's details, held here: a dismiss folds them back to the car's single line first.
+    var barDetailsOpen by remember { mutableStateOf(false) }
     // The top bar and bottom buttons exist only once the chrome's own track has left zero. A derived
     // boolean, so the sheet recomposes when it FLIPS, not on every frame of the springs.
     val chromeShown by remember { derivedStateOf { chrome.value > 0.01f } }
     fun close() {
         if (closing) return
         closing = true
+        barDetailsOpen = false
         onDismissDrag(1f)
         com.bloo.bluelink.perf.PerfMonitor.scope("map-close", 1_000)
         scope.launch {
@@ -340,7 +343,8 @@ internal fun ExpandableMapLayer(
                 MapTopBar(
                     carOnScreen = carOnScreen,
                     selected = barSelected,
-                    onHeaderHeight = { headerPx -> chromeInsets?.topPx = windowSize.height * 0.15f + barInsetPx + headerPx },
+                    detailsOpen = barDetailsOpen,
+                    onDetailsOpenChange = { barDetailsOpen = it },
                     vehicleName = vehicleName,
                     photo = photo,
                     chargePercent = chargePercent,
@@ -377,6 +381,8 @@ internal fun ExpandableMapLayer(
                                 bar.place(left.roundToInt(), barInsetPx.roundToInt())
                             }
                         }
+                        // The strip the off-screen pointers keep to starts under the bar's real bottom edge, so it follows the bar as it grows.
+                        .onSizeChanged { chromeInsets?.topPx = windowSize.height * 0.15f + it.height }
                         .graphicsLayer {
                             // 0 is off the top of the screen, 1 its place; the bounce takes it a little past 1 either way. It stays solid as it goes.
                             translationY = -(1f - chrome.value) * (windowSize.height * 0.15f + size.height + barGapPx)

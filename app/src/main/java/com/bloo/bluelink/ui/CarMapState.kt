@@ -184,9 +184,24 @@ internal class ExpandedMapState {
     var selectedVin by mutableStateOf<String?>(null)
 
     /** Selects a car's pin. Tapping the selected pin again keeps it selected: the bar stays on its line; only leaving the screen clears it. */
+    /**
+     * A single tap on a car switches to it: it becomes the selection, and the map centres on it. The car the map is on is centred from
+     * where it was given (see [expandedLocation]).
+     */
     fun tapPin(vin: String) {
         selectedVin = vin
+        val own = this.vin ?: return
+        if (vin == own) {
+            mapStateFor(own).recenter()
+            return
+        }
+        val origin = expandedLocation ?: return
+        val target = otherCars.firstOrNull { it.vin == vin }?.location ?: return
+        mapStateFor(own).showDevice(origin.latitude, origin.longitude, target.latitude, target.longitude)
     }
+
+    /** Where the car the full-screen map is on is, so a tap on another car can centre the map from it. */
+    var expandedLocation: GeoLocation? = null
 
     /** Opens the full-screen map on [vin], with that car selected, so its bar is already on its line. */
     fun open(vin: String) {
