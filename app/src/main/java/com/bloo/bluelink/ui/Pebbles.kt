@@ -41,7 +41,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.calmSpring
-import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.ReorderableRows
 import com.bloo.uicommon.LocalHaptics
 
 /**
@@ -137,7 +137,7 @@ internal fun PebbleList(
     // grow in, rows of the first composition simply are there.
     var columnSettled by remember(v.vin) { mutableStateOf(false) }
     LaunchedEffect(v.vin) { columnSettled = true }
-    ReorderColumn(
+    ReorderableRows(
         items = displayed,
         keyOf = { it },
         // Only the full-screen view lets a pebble be carried sideways (to the hot seat); in the
