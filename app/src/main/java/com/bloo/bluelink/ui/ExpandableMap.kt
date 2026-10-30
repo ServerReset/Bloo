@@ -293,7 +293,10 @@ internal fun ExpandableMapLayer(
                     // Not drawn until it knows where the overlay is, rather than for a frame in the wrong place.
                     alpha = if (rootPos == null) 0f else 1f
                     val t = progress().coerceIn(0f, 1f)
-                    val top = lerp(pebbleCornerPx, sheetCornerPx, t)
+                    // Pulled up toward the top of the screen, the sheet's top corners flatten, so the map runs to the edge (and under the
+                    // status bar's blur) instead of being rounded off there.
+                    val pulled = (pull.up.value / gapPx).coerceIn(0f, 1f)
+                    val top = lerp(pebbleCornerPx, sheetCornerPx, t) * (1f - pulled)
                     val bottom = lerp(pebbleCornerPx, 0f, t)
                     shape = RoundedCornerShape(
                         topStart = CornerSize(top), topEnd = CornerSize(top), bottomEnd = CornerSize(bottom), bottomStart = CornerSize(bottom),
