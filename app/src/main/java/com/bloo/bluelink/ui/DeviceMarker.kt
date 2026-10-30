@@ -77,8 +77,9 @@ internal fun BoxScope.DeviceMarker(
     val topPx = chromeInsets.topPx
     val bottomPx = chromeInsets.bottomPx
     // The phone: its tile delta from the car, plus the pan, all times the scale.
-    val sx = (((MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx).toFloat() + panX * weight) * scale
-    val sy = (((MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx).toFloat() + panY * weight) * scale
+    val devScreen = mapScreenOffset(tilePlace(dev.latitude, dev.longitude, zoom, xTileF, yTileF, tilePx), panX, panY, weight, scale)
+    val sx = devScreen.x
+    val sy = devScreen.y
     // The car is the map's pan origin, so its only offset is the pan.
     val cx = panX * weight * scale
     val cy = panY * weight * scale
@@ -164,8 +165,9 @@ internal fun BoxScope.OffScreenCarPointers(
     val bottomPx = chromeInsets.bottomPx
     for (car in cars) {
         // The same tile arithmetic as the phone's own pointer: the car's tile delta from the map centre, plus the pan, all times the scale.
-        val sx = (((MapTiles.tileX(car.location.longitude, zoom) - xTileF) * tilePx).toFloat() + panX * weight) * scale
-        val sy = (((MapTiles.tileY(car.location.latitude, zoom) - yTileF) * tilePx).toFloat() + panY * weight) * scale
+        val carScreen = mapScreenOffset(tilePlace(car.location.latitude, car.location.longitude, zoom, xTileF, yTileF, tilePx), panX, panY, weight, scale)
+        val sx = carScreen.x
+        val sy = carScreen.y
         if (!markerOffVisible(sx, sy, halfW, halfH, marginPx, topPx, bottomPx)) continue
         val (x, y) = clampMarkerToVisible(sx, sy, halfW, halfH, marginPx, topPx, bottomPx)
         CarPhotoTile(

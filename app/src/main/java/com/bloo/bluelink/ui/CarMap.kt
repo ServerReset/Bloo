@@ -611,9 +611,10 @@ internal fun BoxScope.CarPinLayer(
             val spot = spots.firstOrNull { it.pin.vin == selectedVin } ?: return@derivedStateOf false
             val b = box.value
             val w = panWeight()
+            val at = mapScreenOffset(spot.dx, spot.dy, state.panX, state.panY, w, state.scale)
             markerOffVisible(
-                (spot.dx + state.panX * w) * state.scale,
-                (spot.dy + state.panY * w) * state.scale,
+                at.x,
+                at.y,
                 b.width / 2f, b.height / 2f, marginPx, chromeInsets.topPx, chromeInsets.bottomPx,
             )
         }
@@ -625,8 +626,8 @@ internal fun BoxScope.CarPinLayer(
         val cx = cluster.sumOf { it.dx.toDouble() }.toFloat() / cluster.size
         val cy = cluster.sumOf { it.dy.toDouble() }.toFloat() / cluster.size
         // Where the cluster sits on screen: its place plus the pan, times the scale, from the map's centre.
-        fun screenX() = (cx + state.panX * panWeight()) * state.scale
-        fun screenY() = (cy + state.panY * panWeight()) * state.scale
+        fun screenX() = mapScreenOffset(cx, cy, state.panX, state.panY, panWeight(), state.scale).x
+        fun screenY() = mapScreenOffset(cx, cy, state.panX, state.panY, panWeight(), state.scale).y
         // A cluster keeps its identity by its first car, so a car joining or leaving morphs the same pill rather than starting a new one.
         key(cluster.first().pin.vin) {
             val members = cluster.map { it.pin }.take(MaxClusterCars)
