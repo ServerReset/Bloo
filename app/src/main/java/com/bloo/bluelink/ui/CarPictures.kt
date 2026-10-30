@@ -43,6 +43,7 @@ import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.PhotoTile
 
 private val NonAlnum = Regex("[^a-z0-9]+")
 
@@ -199,8 +200,8 @@ private fun CarPictureGrid(
 }
 
 /**
- * A car's photo in a small rounded tile: the one picture every car marker on the map shares, the pin's bubble, a cluster's chip and an
- * off-screen pointer. With no photo it shows the car glyph in the tile instead. [selected] outlines the tile in [tint].
+ * A car's photo in the shared [PhotoTile]: the picture from the car's photo URL, or the car glyph without one. The map's pins, cluster
+ * chips and off-screen pointers all show a car this way.
  */
 @Composable
 internal fun CarPhotoTile(
@@ -213,27 +214,23 @@ internal fun CarPhotoTile(
     selected: Boolean = false,
     glyphSize: Dp = 18.dp,
 ) {
-    val shape = RoundedCornerShape(8.dp)
-    Box(
-        modifier
-            .size(size)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .border(if (selected) 2.dp else 1.dp, if (selected) tint else Color.White.copy(alpha = 0.85f), shape)
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
-            .then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (photo != null) {
+    PhotoTile(
+        hasPhoto = photo != null,
+        glyph = AppIcons.DirectionsCar,
+        tint = tint,
+        contentDescription = contentDescription,
+        onClick = onClick,
+        modifier = modifier,
+        size = size,
+        selected = selected,
+        glyphSize = glyphSize,
+        photo = { tileModifier ->
             AsyncImage(
-                model = rememberPhotoModel(photo),
+                model = rememberPhotoModel(photo!!),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                modifier = tileModifier,
             )
-        } else {
-            Icon(AppIcons.DirectionsCar, contentDescription = null, tint = tint, modifier = Modifier.size(glyphSize))
-        }
-    }
+        },
+    )
 }
-
