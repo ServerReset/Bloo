@@ -225,35 +225,14 @@ private fun PlayUpdateBody(hazeState: HazeState?, primaryInBody: Boolean) {
     val available by PlayUpdates.available.collectAsStateWithLifecycle()
     val scheme = MaterialTheme.colorScheme
 
-    // Play keeps the copy current; this only says what Play last reported.
-    NestedGlassPanel(hazeState) {
-        Row(
-            Modifier.padding(GapGroup),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(GapRow),
-        ) {
-            val tint = if (available) scheme.primary else scheme.onSurfaceVariant
-            IconBadgeContainer(containerColor = tint.copy(alpha = 0.15f), size = 36.dp) {
-                AnimatedContent(
-                    targetState = available,
-                    transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.6f)) togetherWith (fadeOut() + scaleOut(targetScale = 0.6f)) },
-                    label = "playUpdateIcon",
-                ) { waiting ->
-                    Icon(
-                        if (waiting) Icons.Filled.SystemUpdate else AppIcons.CheckCircle,
-                        contentDescription = null,
-                        tint = tint,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-            RevealText(
-                if (available) "Ready in Google Play" else "Up to date on Google Play",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = LocalContentColor.current),
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
+    // Play keeps the copy current; this only says what Play last reported. The same status card as the GitHub track.
+    UpdateStatusCard(
+        icon = if (available) Icons.Filled.SystemUpdate else AppIcons.CheckCircle,
+        tint = if (available) scheme.primary else scheme.onSurfaceVariant,
+        title = if (available) "Ready in Google Play" else "Up to date on Google Play",
+        subtitle = "Google Play installs updates for this copy.",
+        hazeState = hazeState,
+    )
     PopVisible(visible = available && primaryInBody, sizeAnimated = true) {
         // Play's own flow does the download and the install; this only opens it.
         MorphButton(
@@ -278,9 +257,6 @@ private fun PlayUpdateBody(hazeState: HazeState?, primaryInBody: Boolean) {
         }
     }
     EnterOnce(expandFrom = Alignment.Top) {
-        Column {
-            BodySmallText("Google Play installs updates for this copy.")
-            PlayStoreLinks()
-        }
+        PlayStoreLinks()
     }
 }

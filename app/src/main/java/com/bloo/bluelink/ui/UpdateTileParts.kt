@@ -136,6 +136,38 @@ internal fun UpdateDismissRow(state: UiState, vm: AppViewModel, modifier: Modifi
 }
 
 /**
+ * The update surfaces' one status card, the same on both tracks (GitHub and Google Play): a tonal icon badge, a bold title, and an
+ * optional muted line under it saying what that means.
+ */
+@Composable
+internal fun UpdateStatusCard(
+    icon: ImageVector,
+    tint: Color,
+    title: String,
+    subtitle: String?,
+    hazeState: dev.chrisbanes.haze.HazeState?,
+) {
+    NestedGlassPanel(hazeState) {
+        Row(
+            Modifier.padding(GapGroup),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(GapRow),
+        ) {
+            IconBadgeContainer(containerColor = tint.copy(alpha = 0.15f), size = 36.dp) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
+                RevealText(
+                    title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = LocalContentColor.current),
+                )
+                if (subtitle != null) RevealMutedText(subtitle, style = SecondaryTextStyle())
+            }
+        }
+    }
+}
+
+/**
  * The live status half of the update flow: the tonal icon badge, the animated one-line status
  * ("Downloading", "Downloaded · tap Install", "Installing silently via Shizuku…") and the download
  * progress bar.
