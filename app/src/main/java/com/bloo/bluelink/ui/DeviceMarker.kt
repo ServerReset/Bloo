@@ -19,7 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.graphicsLayer
 import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.lowPowerCalm
@@ -258,31 +258,35 @@ internal fun rememberPointerMotion(key: Any, x: Float, y: Float, offscreen: Bool
     val reduceMotion = LocalReduceMotion.current
     // Read here, in composition: lowPowerCalm is a composable, so it cannot be called from the coroutines below.
     val positionSpring = lowPowerCalm<Float>(Spring.StiffnessMediumLow)
-    val latestX by rememberUpdatedState(x)
-    val latestY by rememberUpdatedState(y)
-    LaunchedEffect(x, y) {
-        if (!motion.springing) {
-            motion.x.snapTo(x)
-            motion.y.snapTo(y)
+    val scope = rememberCoroutineScope()
+    // One effect for the place and the side, so a side change and the snap cannot race (a snap that ran first would put the pointer at the
+    // edge with no motion). A side change springs from where the pointer was last drawn. The spring runs in [scope], not in this effect, so
+    // a pan that restarts the effect does not cut it short.
+    LaunchedEffect(x, y, offscreen) {
+        if (offscreen == motion.offscreen) {
+            if (!motion.springing) {
+                motion.x.snapTo(x)
+                motion.y.snapTo(y)
+            }
+            return@LaunchedEffect
         }
-    }
-    LaunchedEffect(offscreen) {
-        if (offscreen == motion.offscreen) return@LaunchedEffect
         motion.offscreen = offscreen
         val show = if (offscreen) 1f else 0f
         if (reduceMotion) {
-            motion.x.snapTo(latestX)
-            motion.y.snapTo(latestY)
+            motion.x.snapTo(x)
+            motion.y.snapTo(y)
             motion.show.snapTo(show)
             return@LaunchedEffect
         }
         motion.springing = true
-        coroutineScope {
-            launch { motion.show.animateTo(show, tween(PointerFadeMs)) }
-            launch { motion.x.animateTo(latestX, positionSpring) }
-            launch { motion.y.animateTo(latestY, positionSpring) }
+        scope.launch {
+            coroutineScope {
+                launch { motion.show.animateTo(show, tween(PointerFadeMs)) }
+                launch { motion.x.animateTo(x, positionSpring) }
+                launch { motion.y.animateTo(y, positionSpring) }
+            }
+            motion.springing = false
         }
-        motion.springing = false
     }
     return motion
 }
