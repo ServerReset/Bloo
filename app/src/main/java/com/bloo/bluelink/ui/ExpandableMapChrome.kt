@@ -6,6 +6,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -37,9 +39,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.font.FontWeight
@@ -110,10 +114,20 @@ internal fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modi
     }
 }
 
+/** The top bar's corner when its details are open: a rounded panel, so the details' text is not cut by a pill's curve. */
+private val DetailsPanelCorner = 28.dp
+
+/** The handle-only bar's width: the handle with a little glass around it. The bar grows from this to the single line when a car is selected. */
+internal val MapBarHandleWidth = 64.dp
+
 /**
- * The one-bar header over an expanded map sheet: the car (its photo and name) at the start, the drag handle centred, and its charge and
- * range at the end. [dragModifier] carries the drag-to-dismiss gesture, built by the caller because each call site closes over its own
- * drag state.
+ * The bar over an expanded map sheet, in three states:
+ *  - no car selected: only the drag handle, a small floating pill;
+ *  - a car selected (by a tap on its pin): one line, the car's photo and name at the start, its charge and range at the end;
+ *  - that line tapped: the car's other details open below it.
+ * [dragModifier] carries the drag-to-dismiss and pull-to-refresh gesture, built by the caller because each call site closes over its own
+ * drag state. [selected] says which of the three; [onHeaderHeight] reports the header's height, without the details, for the off-screen
+ * pointers' clear strip.
  */
 @Composable
 internal fun MapTopBar(
@@ -126,16 +140,20 @@ internal fun MapTopBar(
     /** The car's charge, and its range, at the bar's end. Null leaves that line out. */
     chargePercent: String? = null,
     chargeRange: String? = null,
-    /** The rest of the car's details, shown when the bar is tapped open: label to value. */
+    /** The rest of the car's details, shown when the single line is tapped open: label to value. */
     details: List<Pair<String, String>> = emptyList(),
-    /** False once the car has scrolled off screen: the details fold back to the handle. */
+    /** False once the car has scrolled off screen: the details fold back to the line. */
     carOnScreen: Boolean = true,
+    /** Whether a car is selected, which opens the bar to its single line. */
+    selected: Boolean = false,
+    onHeaderHeight: (Int) -> Unit = {},
 ) {
-    // Tapping the bar opens it into the car's details; tapping again folds it back to the handle.
+    // Tapping the single line opens it into the car's details; tapping again folds it back. Nothing selected closes it all the way.
     var detailsOpen by remember { mutableStateOf(false) }
     LaunchedEffect(carOnScreen) { if (!carOnScreen) detailsOpen = false }
+    LaunchedEffect(selected) { if (!selected) detailsOpen = false }
     // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without
-    // consuming, so dragModifier and the refresh click still receive the touch.
+    // consuming, so dragModifier and the tap still receive the touch.
     var pillPressed by remember { mutableStateOf(false) }
     val pillScale by animateFloatAsState(
         targetValue = if (pillPressed) 1.04f else 1f,
@@ -143,8 +161,8 @@ internal fun MapTopBar(
         label = "mapBarPop",
     )
     GlassSurface(
-        // A true pill, like the toasts and the search bar.
-        shape = CircleShape,
+        // A pill when it is one line or just the handle; a rounded panel when its details are open, so their text clears the curve.
+        shape = if (detailsOpen) RoundedCornerShape(DetailsPanelCorner) else CircleShape,
         modifier = modifier.fillMaxWidth()
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -160,83 +178,102 @@ internal fun MapTopBar(
         // so a forced white glyph vanishes on a light map. GlassSurface's onSurface default tracks
         // the theme and custom palettes.
     ) {
-        // Three parts: the car at the start, the drag handle in the middle, and its charge and range at the end. Equal weights either
-        // side keep the handle centred, whatever the name or the figures are.
         Column {
-        Row(
-            Modifier.fillMaxWidth().then(dragModifier).clickable { detailsOpen = !detailsOpen }.heightIn(min = 60.dp).padding(horizontal = GapPage),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+            // The header: the car at the start, the drag handle in the middle, its charge and range at the end. The car sides appear only
+            // with a selection, so with none the handle sits alone in the middle.
             Row(
-                Modifier.weight(1f),
+                Modifier
+                    .then(dragModifier)
+                    .then(if (selected) Modifier.clickable { detailsOpen = !detailsOpen } else Modifier)
+                    .onSizeChanged { onHeaderHeight(it.height) }
+                    .heightIn(min = if (selected) 60.dp else 22.dp)
+                    .padding(horizontal = if (selected) GapPage else 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(GapGroup),
             ) {
-                if (photo != null) {
-                    AsyncImage(
-                        model = rememberPhotoModel(photo),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(width = 48.dp, height = 36.dp).clip(RoundedCornerShape(10.dp)),
-                    )
-                } else {
-                    Icon(AppIcons.DirectionsCar, contentDescription = null, modifier = Modifier.size(24.dp))
+                AnimatedVisibility(
+                    visible = selected,
+                    modifier = Modifier.weight(1f).clipToBounds(),
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(GapGroup),
+                    ) {
+                        if (photo != null) {
+                            AsyncImage(
+                                model = rememberPhotoModel(photo),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(width = 48.dp, height = 36.dp).clip(RoundedCornerShape(10.dp)),
+                            )
+                        } else {
+                            Icon(AppIcons.DirectionsCar, contentDescription = null, modifier = Modifier.size(24.dp))
+                        }
+                        RollingNumber(
+                            vehicleName,
+                            style = PrimaryTextStyle(),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                    }
                 }
-                RollingNumber(
-                    vehicleName,
-                    style = PrimaryTextStyle(),
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-            }
-            // Frosted drag handle, centred. Purely visual: the pop and drag belong to the whole bar.
-            GlassSurface(
-                shape = CircleShape,
-                modifier = Modifier.size(width = 44.dp, height = 18.dp),
-                hazeState = mapHazeState,
-                shadow = false,
-            ) {
-                Box(
-                    Modifier
-                        .size(width = 24.dp, height = 4.dp)
-                        .background(LocalContentColor.current.copy(alpha = 0.55f), RoundedCornerShape(2.dp)),
-                )
-            }
-            // The charge and the range on one line at the end, so the car's figures read as a pair.
-            Row(
-                Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End,
-            ) {
-                if (chargePercent != null) {
-                    RollingNumber(chargePercent, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, maxLines = 1)
-                }
-                if (chargePercent != null && chargeRange != null) Spacer(Modifier.width(GapGroup))
-                if (chargeRange != null) {
-                    RollingNumber(
-                        chargeRange,
-                        style = PrimaryTextStyle(),
-                        fontWeight = FontWeight.Medium,
-                        color = mutedContentColor(),
-                        maxLines = 1,
+                // Frosted drag handle, centred. Purely visual: the pop and drag belong to the whole bar.
+                GlassSurface(
+                    shape = CircleShape,
+                    modifier = Modifier.size(width = 44.dp, height = 18.dp),
+                    hazeState = mapHazeState,
+                    shadow = false,
+                ) {
+                    Box(
+                        Modifier
+                            .size(width = 24.dp, height = 4.dp)
+                            .background(LocalContentColor.current.copy(alpha = 0.55f), RoundedCornerShape(2.dp)),
                     )
                 }
-            }
-        }
-        AnimatedVisibility(visible = detailsOpen, enter = expandEnterSized(), exit = expandExitSized()) {
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = GapPage).padding(bottom = GapGroup),
-                verticalArrangement = Arrangement.spacedBy(GapRow),
-            ) {
-                details.forEach { (label, value) ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        SecondaryText(label, modifier = Modifier.weight(1f))
-                        RevealText(value, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
+                AnimatedVisibility(
+                    visible = selected,
+                    modifier = Modifier.weight(1f).clipToBounds(),
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    // The charge and the range on one line at the end, so the car's figures read as a pair.
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        if (chargePercent != null) {
+                            RollingNumber(chargePercent, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
+                        if (chargePercent != null && chargeRange != null) Spacer(Modifier.width(GapGroup))
+                        if (chargeRange != null) {
+                            RollingNumber(
+                                chargeRange,
+                                style = PrimaryTextStyle(),
+                                fontWeight = FontWeight.Medium,
+                                color = mutedContentColor(),
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
-        }
+            AnimatedVisibility(visible = selected && detailsOpen, enter = expandEnterSized(), exit = expandExitSized()) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = GapPage).padding(bottom = GapGroup),
+                    verticalArrangement = Arrangement.spacedBy(GapRow),
+                ) {
+                    details.forEach { (label, value) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            SecondaryText(label, modifier = Modifier.weight(1f))
+                            RevealText(value, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        }
+                    }
+                }
+            }
         }
     }
 }

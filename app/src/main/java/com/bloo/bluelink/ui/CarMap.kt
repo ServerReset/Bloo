@@ -10,8 +10,18 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.semantics
+import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -80,8 +90,15 @@ internal fun CarMap(
     tileArea: IntSize = IntSize.Zero,
     panWeight: () -> Float = { 1f },
     /** The other cars on this map, each drawn at its own place. */
-    otherCars: List<GeoLocation> = emptyList(),
+    otherCars: List<CarPin> = emptyList(),
     chromeInsets: MapChromeInsets = MapChromeInsets(),
+    /** The car this map is centred on, and its photo for its pin; null leaves its pin a plain glyph. */
+    ownVin: String? = null,
+    ownPhoto: String? = null,
+    /** The car the top bar is showing: its pin is outlined, so the one the bar describes is easy to find. */
+    selectedVin: String? = null,
+    /** A pin was tapped: called with that car's VIN. */
+    onPinTap: (String) -> Unit = {},
 ) {
     var started by remember { mutableStateOf(MapStartGate.open) }
     if (!started) {
@@ -93,7 +110,10 @@ internal fun CarMap(
         Box(modifier)
         return
     }
-    CarMapBody(location, modifier, state, deviceLocation, interactive, tileArea, panWeight, otherCars, chromeInsets)
+    CarMapBody(
+        location, modifier, state, deviceLocation, interactive, tileArea, panWeight, otherCars, chromeInsets,
+        ownVin, ownPhoto, selectedVin, onPinTap,
+    )
 }
 
 /**
@@ -125,8 +145,12 @@ private fun CarMapBody(
     tileArea: IntSize = IntSize.Zero,
     /** How much of [state]'s pan shows right now (0 to 1); read in the draw phase, so ramping it recomposes nothing. */
     panWeight: () -> Float = { 1f },
-    otherCars: List<GeoLocation> = emptyList(),
+    otherCars: List<CarPin> = emptyList(),
     chromeInsets: MapChromeInsets = MapChromeInsets(),
+    ownVin: String? = null,
+    ownPhoto: String? = null,
+    selectedVin: String? = null,
+    onPinTap: (String) -> Unit = {},
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("CarMapBody")
     val context = LocalContext.current
@@ -363,43 +387,43 @@ private fun CarMapBody(
         val mergedOffsetPx = devTileOffsetPx?.takeIf { (dx, dy) ->
             kotlin.math.hypot(dx, dy) < mergeThresholdPx
         }
+        // The car's own pin: centred (the car is the map's pan origin, so the container's translation already puts it there). Tapping it
+        // selects the car for the top bar.
+        val ownTap: (() -> Unit)? = ownVin?.let { v -> { onPinTap(v) } }
+        val ownSelected = ownVin != null && selectedVin == ownVin
         if (mergedOffsetPx != null) {
             val (dx, dy) = mergedOffsetPx
             // One pin at the midpoint, tinted with an even mix of the car and device colours.
-            Icon(
-                Icons.Filled.LocationOn,
-                contentDescription = "Car and your location",
+            CarPinMarker(
+                photo = ownPhoto,
                 tint = lerp(pinColor, deviceLocationColor, 0.5f),
+                selected = ownSelected,
+                contentDesc = "Car and your location",
+                onClick = ownTap,
                 modifier = Modifier.align(Alignment.Center)
-                    .offset { IntOffset((dx / 2f).roundToInt(), (dy / 2f).roundToInt()) }
-                    .size(40.dp)
-                    .offset(y = (-20).dp),
+                    .offset { IntOffset((dx / 2f).roundToInt(), (dy / 2f).roundToInt()) },
             )
         } else {
-            // Pin offset from the box centre; rides along with pan like the tiles.
-            Icon(
-                Icons.Filled.LocationOn,
-                contentDescription = "Car location",
+            CarPinMarker(
+                photo = ownPhoto,
                 tint = pinColor,
-                modifier = Modifier.align(Alignment.Center)
-                    // The car is the map's pan origin, so the container's own translation already
-                    // puts it dead-centre -- no per-frame offset here any more.
-                    .size(40.dp)
-                    .offset(y = (-20).dp),
+                selected = ownSelected,
+                contentDesc = "Car location",
+                onClick = ownTap,
+                modifier = Modifier.align(Alignment.Center),
             )
         }
         // Every other car on the map, at its own place. They ride with the map's pan, as the car's own pin does.
         for (other in otherCars) {
-            val ox = ((MapTiles.tileX(other.longitude, zoom) - xTileF) * tilePx).toFloat()
-            val oy = ((MapTiles.tileY(other.latitude, zoom) - yTileF) * tilePx).toFloat()
-            Icon(
-                Icons.Filled.LocationOn,
-                contentDescription = "Another car",
+            val ox = ((MapTiles.tileX(other.location.longitude, zoom) - xTileF) * tilePx).toFloat()
+            val oy = ((MapTiles.tileY(other.location.latitude, zoom) - yTileF) * tilePx).toFloat()
+            CarPinMarker(
+                photo = other.photo,
                 tint = pinColor.copy(alpha = 0.7f),
-                modifier = Modifier.align(Alignment.Center)
-                    .offset { IntOffset(ox.roundToInt(), oy.roundToInt()) }
-                    .size(40.dp)
-                    .offset(y = (-20).dp),
+                selected = selectedVin == other.vin,
+                contentDesc = "${other.name}, another car",
+                onClick = { onPinTap(other.vin) },
+                modifier = Modifier.align(Alignment.Center).offset { IntOffset(ox.roundToInt(), oy.roundToInt()) },
             )
         }
         } // close the scaled layer
@@ -429,6 +453,56 @@ private fun CarMapBody(
             )
         }
         // Expand/Open-in-Maps render as a MapFeatureRow in the caller, not over the map.
+    }
+}
+
+/** The photo's size above a car's pin, and the pin glyph below it. The pin's tip is the car's place, so the stack is lifted by half its height. */
+private val PinPhotoWidth = 44.dp
+private val PinPhotoHeight = 30.dp
+private val PinGlyphSize = 24.dp
+private val PinStackHeight = PinPhotoHeight + 2.dp + PinGlyphSize
+
+/**
+ * A car's pin on the map: the car's photo as a rectangle above the pin, so it is clear which car each pin is. With no photo it shows the car
+ * glyph in the same rectangle. [selected] outlines the rectangle in the pin's colour.
+ */
+@Composable
+private fun CarPinMarker(
+    photo: String?,
+    tint: Color,
+    selected: Boolean,
+    contentDesc: String,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(8.dp)
+    Column(
+        modifier = modifier
+            .offset(y = -PinStackHeight / 2)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .semantics { contentDescription = contentDesc },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier.size(width = PinPhotoWidth, height = PinPhotoHeight)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .border(if (selected) 2.dp else 1.dp, if (selected) tint else Color.White.copy(alpha = 0.8f), shape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (photo != null) {
+                AsyncImage(
+                    model = rememberPhotoModel(photo),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Icon(AppIcons.DirectionsCar, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+            }
+        }
+        Spacer(Modifier.height(2.dp))
+        Icon(Icons.Filled.LocationOn, contentDescription = null, tint = tint, modifier = Modifier.size(PinGlyphSize))
     }
 }
 

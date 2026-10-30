@@ -12,6 +12,8 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.animation.core.animateFloatAsState
 import kotlin.math.roundToInt
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -119,6 +121,13 @@ internal fun ExpandableMapLayer(
      * strip, not cut off at the strip's lower edge.
      */
     frostHaze: HazeState? = null,
+    /** Whether a car is selected (by a pin tap), which opens the bar to its single line. */
+    barSelected: Boolean = false,
+    /** True when the selected car is the one this map is on: its leaving the screen clears the selection. */
+    selectedIsExpanded: Boolean = true,
+    onDeselect: () -> Unit = {},
+    /** How far the bar is being dragged toward closing, 0 to 1 (see [ExpandedMapState.dismissFade]). */
+    onDismissDrag: (Float) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("ExpandableMapLayer")
@@ -156,6 +165,13 @@ internal fun ExpandableMapLayer(
     val barGapPx = with(density) { GapSection.toPx() * 2f }
     // The bar's gutter, from the screen's edges and from the top, read here for the same reason.
     val barInsetPx = with(density) { GapSection.toPx() }
+    // The handle-only bar's width, and how far the bar has opened to its single line for a selected car (0 handle, 1 line).
+    val handleWidthPx = with(density) { MapBarHandleWidth.toPx() }
+    val barSelectedT by animateFloatAsState(
+        targetValue = if (barSelected) 1f else 0f,
+        animationSpec = lowPowerSoft<Float>(Spring.StiffnessMediumLow),
+        label = "mapBarSelected",
+    )
     val chromeInSpec: AnimationSpec<Float> = if (plainMotion) tween(120) else bounceSpring(stiffness = Spring.StiffnessLow)
 
     val placed = rootPos != null
@@ -210,6 +226,7 @@ internal fun ExpandableMapLayer(
     fun close() {
         if (closing) return
         closing = true
+        onDismissDrag(1f)
         com.bloo.bluelink.perf.PerfMonitor.scope("map-close", 1_000)
         scope.launch {
             // One motion: the bar retreats up while the sheet shrinks, and the bar's width follows the sheet from the first frame.
@@ -230,6 +247,16 @@ internal fun ExpandableMapLayer(
             onDismiss()
         }
     }
+
+    // The blur behind the map fades as soon as the bar is dragged toward closing, over the first 24dp of it. It returns if the drag is let
+    // go short of closing; a close keeps it faded (see the guard) until the map is gone.
+    val dismissFadeDp = with(density) { 24.dp.toPx() }
+    LaunchedEffect(Unit) {
+        snapshotFlow { dragPx.value }.collect { drag ->
+            if (!closing) onDismissDrag((drag / dismissFadeDp).coerceIn(0f, 1f))
+        }
+    }
+    DisposableEffect(Unit) { onDispose { onDismissDrag(0f) } }
 
     // Back handler for closing
     BackHandler(enabled = isExpanded) { close() }
@@ -285,6 +312,8 @@ internal fun ExpandableMapLayer(
                     kotlin.math.abs(mapState.panY * mapState.scale) < windowSize.height / 2f - carMargin
             }
         }
+        // The car the bar describes is off screen: nothing is selected any more, so the bar folds back to its handle.
+        LaunchedEffect(carOnScreen) { if (!carOnScreen && barSelected && selectedIsExpanded) onDeselect() }
 
         // The bars. The sheet's own frame, where it comes to rest (85% of the screen, taller as it is pulled up): it holds only the
         // bars now, and moves only with the pull-down.
@@ -306,6 +335,8 @@ internal fun ExpandableMapLayer(
             if (isExpanded && chromeShown) {
                 MapTopBar(
                     carOnScreen = carOnScreen,
+                    selected = barSelected,
+                    onHeaderHeight = { headerPx -> chromeInsets?.topPx = windowSize.height * 0.15f + barInsetPx + headerPx },
                     vehicleName = vehicleName,
                     photo = photo,
                     chargePercent = chargePercent,
@@ -324,8 +355,6 @@ internal fun ExpandableMapLayer(
                     ),
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        // The bar sits 15% down from the top of the screen, so its clear strip starts below that and its own height.
-                        .onSizeChanged { chromeInsets?.topPx = windowSize.height * 0.15f + it.height }
                         // The bar's width follows the sheet's: as wide as the pebble at the start, the sheet's side gutters when open,
                         // and back again on close, from the first frame of either.
                         .then(if (frostHaze != null) Modifier.hazeSource(frostHaze) else Modifier)
@@ -333,8 +362,11 @@ internal fun ExpandableMapLayer(
                             val p = progress().coerceIn(0f, 1f)
                             val root = rootPos ?: androidx.compose.ui.geometry.Offset.Zero
                             val o = originBounds.translate(-root.x, -root.y)
-                            val left = lerp(o.left, barInsetPx, p)
-                            val right = lerp(o.right, constraints.maxWidth - barInsetPx, p)
+                            // With no car selected the bar is only its handle, centred; it widens to the single line as a car is selected.
+                            val openLeft = lerp(o.left, barInsetPx, p)
+                            val openRight = lerp(o.right, constraints.maxWidth - barInsetPx, p)
+                            val left = lerp((constraints.maxWidth - handleWidthPx) / 2f, openLeft, barSelectedT)
+                            val right = lerp((constraints.maxWidth + handleWidthPx) / 2f, openRight, barSelectedT)
                             val w = (right - left).roundToInt().coerceAtLeast(1)
                             val bar = measurable.measure(constraints.copy(minWidth = w, maxWidth = w))
                             layout(constraints.maxWidth, bar.height + barInsetPx.roundToInt()) {

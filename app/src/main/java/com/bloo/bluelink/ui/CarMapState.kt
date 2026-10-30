@@ -165,12 +165,35 @@ internal class ExpandedMapState {
                 // Only the full-screen map shows the other cars: the pebble's own map is this car alone.
                 otherCars = if (this@ExpandedMapState.vin == vin) this@ExpandedMapState.otherCars else emptyList(),
                 chromeInsets = this@ExpandedMapState.chromeInsets,
+                ownVin = vin,
+                ownPhoto = if (this@ExpandedMapState.vin == vin) this@ExpandedMapState.expandedPhoto else null,
+                selectedVin = this@ExpandedMapState.selectedVin,
+                onPinTap = { tapped -> this@ExpandedMapState.tapPin(tapped) },
             )
         }
     }
 
-    /** The other cars' locations, drawn as pins on every map of this host: the expanded map shows all of them at once. */
-    var otherCars by mutableStateOf<List<GeoLocation>>(emptyList())
+    /** The other cars, drawn as photo pins on the expanded map: every car but the one it is open on. */
+    var otherCars by mutableStateOf<List<CarPin>>(emptyList())
+
+    /** The expanded car's photo, for its own pin. */
+    var expandedPhoto by mutableStateOf<String?>(null)
+
+    /**
+     * The car the top bar is showing, by a tap on its pin. Null is no selection: the bar is just its handle. Tapping the selected pin
+     * again clears it.
+     */
+    var selectedVin by mutableStateOf<String?>(null)
+
+    fun tapPin(vin: String) {
+        selectedVin = if (selectedVin == vin) null else vin
+    }
+
+    /**
+     * How far the bar is being dragged toward closing, 0 (not at all) to 1: the garage behind the map blur fades with it, so the map is
+     * seen clearly as it starts to close, and the blur comes back if the drag is let go before it closes.
+     */
+    var dismissFade by mutableFloatStateOf(0f)
 
     /** The space the expanded map's top bar and bottom buttons take, so the off-screen pointers keep clear of them. */
     val chromeInsets = MapChromeInsets()
@@ -200,6 +223,9 @@ internal class ExpandedMapState {
 }
 
 /** What the shared map is drawn from at the place it is hosted: where the car is, where the phone is, whether it takes touches, and the area to keep tiles for. */
+/** One car drawn as a pin on the expanded map: where it is, and what its pin shows (its photo above the pin, its name for a11y). */
+internal data class CarPin(val vin: String, val location: GeoLocation, val name: String, val photo: String?)
+
 internal data class MapInputs(
     val location: GeoLocation,
     val deviceLocation: GeoLocation?,

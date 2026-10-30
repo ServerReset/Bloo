@@ -135,7 +135,11 @@ internal fun GarageScreen(
 
     // The other cars, drawn as pins on the expanded map. The car that is expanded is the map's own pin, so it is left out.
     SideEffect {
-        expandedMap.otherCars = state.value.vehicles.mapNotNull { v -> if (v.vin == expandedMap.vin) null else state.value.locations[v.vin] }
+        val open = expandedMap.vin
+        expandedMap.otherCars = state.value.vehicles.mapNotNull { v ->
+            if (v.vin == open) null else state.value.locations[v.vin]?.let { CarPin(v.vin, it, v.name, state.value.imageUrls[v.vin]) }
+        }
+        expandedMap.expandedPhoto = open?.let { state.value.imageUrls[it] }
     }
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
     BackdropHost {
@@ -187,11 +191,13 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
 
     if (expandedVehicle != null && expandedLocation != null && originBounds != null) {
         val locateExpandedVehicle = rememberLocateAction(vm, expandedVehicle)
-        val (chargePercent, chargeRange) = mapChargeStats(state.value, expandedVehicle, appearance.metricDistance)
+        // The bar describes the selected car: the one this map is on, or another whose pin was tapped. The map itself stays on the first.
+        val barVehicle = expandedMap.selectedVin?.let { vin -> vehicles.firstOrNull { it.vin == vin } } ?: expandedVehicle
+        val (chargePercent, chargeRange) = mapChargeStats(state.value, barVehicle, appearance.metricDistance)
         val carDetails = buildList {
-            expandedVehicle.modelYear?.let { add("Year" to it) }
-            expandedVehicle.trim?.let { add("Trim" to it) }
-            add("Model" to expandedVehicle.model)
+            barVehicle.modelYear?.let { add("Year" to it) }
+            barVehicle.trim?.let { add("Trim" to it) }
+            add("Model" to barVehicle.model)
             chargePercent?.let { add("Charge" to it) }
             chargeRange?.let { add("Range" to it) }
         }
@@ -199,12 +205,16 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
             isExpanded = true,
             originBounds = originBounds,
             location = expandedLocation,
-            vehicleName = expandedVehicle.name,
+            vehicleName = barVehicle.name,
             chargePercent = chargePercent,
             chargeRange = chargeRange,
             details = carDetails,
             chromeInsets = expandedMap.chromeInsets,
-            photo = state.value.imageUrls[expandedVehicle.vin],
+            photo = state.value.imageUrls[barVehicle.vin],
+            barSelected = expandedMap.selectedVin != null,
+            selectedIsExpanded = expandedMap.selectedVin == null || expandedMap.selectedVin == expandedVehicle.vin,
+            onDeselect = { expandedMap.selectedVin = null },
+            onDismissDrag = { expandedMap.dismissFade = it },
             deviceLocation = deviceLocation,
             mapState = expandedMap.mapStateFor(expandedVehicle.vin),
             map = expandedMap.mapFor(expandedVehicle.vin),
@@ -214,7 +224,10 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
             // tracks the in-flight fetch this same button just kicked off.
             refreshing = state.value.isPending(expandedVehicle.vin, CarCommandIds.LOCATE),
             frostHaze = frostHaze,
-            onDismiss = { expandedMap.vin = null },
+            onDismiss = {
+                expandedMap.selectedVin = null
+                expandedMap.vin = null
+            },
         )
     }
 }
@@ -236,7 +249,8 @@ private fun BlurredBehindMap(expandedMap: ExpandedMapState, content: @Composable
     )
     Box(
         Modifier.fillMaxSize().graphicsLayer {
-            val px = MapBlurDp * density * amount
+            // The drag toward closing fades the blur out (see ExpandedMapState.dismissFade), and the release brings it back.
+            val px = MapBlurDp * density * amount * (1f - expandedMap.dismissFade)
             renderEffect = if (amount > 0.01f) androidx.compose.ui.graphics.BlurEffect(px, px) else null
         },
     ) {
