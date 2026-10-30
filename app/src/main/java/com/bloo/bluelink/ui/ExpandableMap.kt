@@ -222,6 +222,12 @@ internal fun ExpandableMapLayer(
     var closing by remember { mutableStateOf(false) }
     // The bar's details, held here: a dismiss folds them back to the car's single line first.
     var barDetailsOpen by remember { mutableStateOf(false) }
+    // The bar's one state, from what is selected and whether its details are open. Nothing selected is always the handle.
+    val barMode = when {
+        !barSelected -> MapBarMode.Handle
+        barDetailsOpen -> MapBarMode.Details
+        else -> MapBarMode.Line
+    }
     // The top bar and bottom buttons exist only once the chrome's own track has left zero. A derived
     // boolean, so the sheet recomposes when it FLIPS, not on every frame of the springs.
     val chromeShown by remember { derivedStateOf { chrome.value > 0.01f } }
@@ -342,8 +348,7 @@ internal fun ExpandableMapLayer(
             if (isExpanded && chromeShown) {
                 MapTopBar(
                     carOnScreen = carOnScreen,
-                    selected = barSelected,
-                    detailsOpen = barDetailsOpen,
+                    mode = barMode,
                     onDetailsOpenChange = { barDetailsOpen = it },
                     vehicleName = vehicleName,
                     photo = photo,

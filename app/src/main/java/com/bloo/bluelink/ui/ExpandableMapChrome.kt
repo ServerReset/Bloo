@@ -128,6 +128,9 @@ internal fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modi
 /** The top bar's corner when its details are open: a rounded panel, so the details' text is not cut by a pill's curve. */
 private val DetailsPanelCorner = 28.dp
 
+/** What the top bar shows: only its handle (no car selected), the selected car's single line, or that line with its details open. */
+internal enum class MapBarMode { Handle, Line, Details }
+
 /**
  * The bar's corner, between the pill it is as a handle or a line (radius half its height) and the rounded panel its details open into
  * ([DetailsPanelCorner]). [detailsT] is 0 for the pill and 1 for the panel; the value is animated by the caller.
@@ -168,14 +171,15 @@ internal fun MapTopBar(
     details: List<Pair<String, String>> = emptyList(),
     /** False once the car has scrolled off screen: the details fold back to the line. */
     carOnScreen: Boolean = true,
-    /** Whether a car is selected, which opens the bar to its single line. */
-    selected: Boolean = false,
-    /** Whether the details are open, held by the caller so a dismiss can fold them first. */
-    detailsOpen: Boolean = false,
+    /** What the bar shows: its handle, the selected car's line, or that line with the details open. */
+    mode: MapBarMode = MapBarMode.Handle,
+    /** Asks for the details to open or fold; the caller holds the state, so a dismiss can fold them first. */
     onDetailsOpenChange: (Boolean) -> Unit = {},
     onHeaderHeight: (Int) -> Unit = {},
 ) {
     // Tapping the single line opens it into the car's details; tapping again folds it back. Nothing selected closes it all the way.
+    val selected = mode != MapBarMode.Handle
+    val detailsOpen = mode == MapBarMode.Details
     LaunchedEffect(carOnScreen) { if (!carOnScreen) onDetailsOpenChange(false) }
     LaunchedEffect(selected) { if (!selected) onDetailsOpenChange(false) }
     // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without
