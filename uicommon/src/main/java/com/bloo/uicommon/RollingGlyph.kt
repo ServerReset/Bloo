@@ -1,8 +1,8 @@
 package com.bloo.uicommon
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.EaseInOutCubic
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -34,12 +34,14 @@ fun RollingGlyph(
     modifier: Modifier = Modifier,
     tint: Color = LocalContentColor.current,
 ) {
-    // 1 at rest. A press restarts it from 0; the spring runs past 1 and settles back, which is the overshoot.
+    // 1 at rest. A press restarts it from 0 and it eases across: a slow ramp up, then a slow settle, with no overshoot, so the
+    // direction of the move reads clearly. Reduce motion gets a short ease instead.
     val roll = remember { Animatable(1f) }
+    val rollSpec = if (LocalReduceMotion.current) tween<Float>(120) else tween<Float>(RollMs, easing = EaseInOutCubic)
     LaunchedEffect(trigger) {
         if (trigger > 0) {
             roll.snapTo(0f)
-            roll.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow))
+            roll.animateTo(1f, rollSpec)
         }
     }
     var heightPx by remember { mutableFloatStateOf(0f) }
@@ -60,3 +62,6 @@ fun RollingGlyph(
         )
     }
 }
+
+/** How long a −/+ glyph takes to roll across: long enough that the direction is clear. */
+private const val RollMs = 420
