@@ -55,15 +55,15 @@ internal fun notifRequiredOnSetup(
 ): Boolean = onSetup && notificationsSupported && !notifGranted
 
 /**
- * Whether a lock blocks leaving the SETUP card. Exactly ONE mechanism is required: biometrics when
- * the device has them enrolled, otherwise a PIN. Pure, so the truth table is testable.
+ * Whether a lock blocks leaving the SETUP card. The lock is the phone's own lock, so it needs a
+ * device that can authenticate (biometrics or a screen lock); without one there is nothing to turn
+ * on, and the card says so instead of blocking. Pure, so the truth table is testable.
  */
 internal fun lockRequiredOnSetup(
     onSetup: Boolean,
     canBio: Boolean,
     biometricLock: Boolean,
-    appPinSet: Boolean,
-): Boolean = onSetup && (if (canBio) !biometricLock else !appPinSet)
+): Boolean = onSetup && canBio && !biometricLock
 
 /** The SETUP card blocks Next while [notifRequiredOnSetup] or [lockRequiredOnSetup] is true. */
 internal fun setupIsBlocked(
@@ -72,10 +72,9 @@ internal fun setupIsBlocked(
     notifGranted: Boolean,
     canBio: Boolean,
     biometricLock: Boolean,
-    appPinSet: Boolean,
 ): Boolean =
     notifRequiredOnSetup(onSetup, notificationsSupported, notifGranted) ||
-        lockRequiredOnSetup(onSetup, canBio, biometricLock, appPinSet)
+        lockRequiredOnSetup(onSetup, canBio, biometricLock)
 
 /**
  * The cards in a deck, in order. - First run: welcome, restore-from-sync, setup (notifications,

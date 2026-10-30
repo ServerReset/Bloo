@@ -35,78 +35,70 @@ class OnboardingGatingTest {
 
     @Test
     fun lockNotRequiredOffSetup() {
-        assertFalse(lockRequiredOnSetup(onSetup = false, canBio = true, biometricLock = false, appPinSet = false))
-        assertFalse(lockRequiredOnSetup(onSetup = false, canBio = false, biometricLock = false, appPinSet = false))
+        assertFalse(lockRequiredOnSetup(onSetup = false, canBio = true, biometricLock = false))
+        assertFalse(lockRequiredOnSetup(onSetup = false, canBio = false, biometricLock = false))
     }
 
     @Test
-    fun biometricDeviceRequiresBiometricsNotPin() {
-        // canBio: biometrics is the required mechanism; a PIN does NOT satisfy the gate, and
-        // biometrics being on satisfies it regardless of the PIN.
-        assertTrue(lockRequiredOnSetup(onSetup = true, canBio = true, biometricLock = false, appPinSet = false))
-        assertTrue(lockRequiredOnSetup(onSetup = true, canBio = true, biometricLock = false, appPinSet = true))
-        assertFalse(lockRequiredOnSetup(onSetup = true, canBio = true, biometricLock = true, appPinSet = false))
-        assertFalse(lockRequiredOnSetup(onSetup = true, canBio = true, biometricLock = true, appPinSet = true))
+    fun biometricDeviceRequiresTheAppLockToBeOn() {
+        // The phone's own lock is the unlock, so the app lock must be on before setup can finish.
+        assertTrue(lockRequiredOnSetup(onSetup = true, canBio = true, biometricLock = false))
+        assertFalse(lockRequiredOnSetup(onSetup = true, canBio = true, biometricLock = true))
     }
 
     @Test
-    fun noBiometricDeviceRequiresPinNotBiometrics() {
-        // No biometrics: the PIN is the required mechanism, and a stale biometricLock flag
-        // cannot satisfy it (the mechanism does not exist on this device).
-        assertTrue(lockRequiredOnSetup(onSetup = true, canBio = false, biometricLock = false, appPinSet = false))
-        assertTrue(lockRequiredOnSetup(onSetup = true, canBio = false, biometricLock = true, appPinSet = false))
-        assertFalse(lockRequiredOnSetup(onSetup = true, canBio = false, biometricLock = false, appPinSet = true))
-        assertFalse(lockRequiredOnSetup(onSetup = true, canBio = false, biometricLock = true, appPinSet = true))
+    fun noScreenLockDeviceDoesNotBlockSetup() {
+        // Nothing can authenticate, so there is nothing to turn on: the card explains it and Next
+        // still works. A stale biometricLock flag changes nothing here.
+        assertFalse(lockRequiredOnSetup(onSetup = true, canBio = false, biometricLock = false))
+        assertFalse(lockRequiredOnSetup(onSetup = true, canBio = false, biometricLock = true))
     }
 
     // --- setupIsBlocked (the actual Next gate) ----------------------------------------------
 
     @Test
     fun neverBlockedOffSetup() {
-        for (supported in bools) for (granted in bools) for (bio in bools) for (lock in bools) for (pin in bools) {
-            assertFalse(setupIsBlocked(false, supported, granted, bio, lock, pin))
+        for (supported in bools) for (granted in bools) for (bio in bools) for (lock in bools) {
+            assertFalse(setupIsBlocked(false, supported, granted, bio, lock))
         }
     }
 
     @Test
     fun blockedUntilEveryRequirementMeets() {
-        // API 33, biometrics device: blocked until BOTH notifications granted AND biometrics on.
-        assertTrue(setupIsBlocked(true, notificationsSupported = true, notifGranted = false, canBio = true, biometricLock = false, appPinSet = false))
-        assertTrue(setupIsBlocked(true, notificationsSupported = true, notifGranted = true, canBio = true, biometricLock = false, appPinSet = false))
-        assertTrue(setupIsBlocked(true, notificationsSupported = true, notifGranted = false, canBio = true, biometricLock = true, appPinSet = false))
-        assertFalse(setupIsBlocked(true, notificationsSupported = true, notifGranted = true, canBio = true, biometricLock = true, appPinSet = false))
+        // API 33, biometrics device: blocked until BOTH notifications granted AND the app lock on.
+        assertTrue(setupIsBlocked(true, notificationsSupported = true, notifGranted = false, canBio = true, biometricLock = false))
+        assertTrue(setupIsBlocked(true, notificationsSupported = true, notifGranted = true, canBio = true, biometricLock = false))
+        assertTrue(setupIsBlocked(true, notificationsSupported = true, notifGranted = false, canBio = true, biometricLock = true))
+        assertFalse(setupIsBlocked(true, notificationsSupported = true, notifGranted = true, canBio = true, biometricLock = true))
     }
 
     @Test
-    fun appi33NoBiometricBlocksUntilNotificationsAndPin() {
-        assertFalse(setupIsBlocked(true, notificationsSupported = true, notifGranted = true, canBio = false, biometricLock = false, appPinSet = true))
-        assertTrue(setupIsBlocked(true, notificationsSupported = true, notifGranted = true, canBio = false, biometricLock = false, appPinSet = false))
+    fun appi33NoScreenLockOnlyBlocksOnNotifications() {
+        assertFalse(setupIsBlocked(true, notificationsSupported = true, notifGranted = true, canBio = false, biometricLock = false))
+        assertTrue(setupIsBlocked(true, notificationsSupported = true, notifGranted = false, canBio = false, biometricLock = false))
     }
 
     @Test
     fun belowApi33OnlyTheLockGateApplies() {
         // Pre-33 there is no notification permission, so only the lock blocks.
-        assertFalse(setupIsBlocked(true, notificationsSupported = false, notifGranted = false, canBio = true, biometricLock = true, appPinSet = false))
-        assertTrue(setupIsBlocked(true, notificationsSupported = false, notifGranted = false, canBio = true, biometricLock = false, appPinSet = true))
-        assertFalse(setupIsBlocked(true, notificationsSupported = false, notifGranted = false, canBio = false, biometricLock = false, appPinSet = true))
-        assertTrue(setupIsBlocked(true, notificationsSupported = false, notifGranted = false, canBio = false, biometricLock = false, appPinSet = false))
+        assertFalse(setupIsBlocked(true, notificationsSupported = false, notifGranted = false, canBio = true, biometricLock = true))
+        assertTrue(setupIsBlocked(true, notificationsSupported = false, notifGranted = false, canBio = true, biometricLock = false))
+        assertFalse(setupIsBlocked(true, notificationsSupported = false, notifGranted = false, canBio = false, biometricLock = false))
     }
 
     @Test
-    fun fullFuzzNeverStrandedWithNoLockAndNeverLetsAnUnlockedDeviceThrough() {
-        // Exhaustive over the 2^5 setup-relevant inputs: when NOT blocked, the device must
-        // actually HAVE a usable lock (biometrics-on, or a PIN) AND its notification gate (if
-        // applicable) must be satisfied. This is the invariant that matters -- never let a user
-        // through with no way to lock the app.
-        for (supported in bools) for (granted in bools) for (bio in bools) for (lock in bools) for (pin in bools) {
-            val blocked = setupIsBlocked(true, supported, granted, bio, lock, pin)
-            val hasLock = (bio && lock) || (!bio && pin)
+    fun fullFuzzNeverLetsAnUnlockedDeviceThrough() {
+        // Exhaustive over the setup-relevant inputs: when NOT blocked, a device that can authenticate
+        // must have the app lock on, and its notification gate (if applicable) must be satisfied. This
+        // is the invariant that matters -- never let a user through without the lock they can have.
+        for (supported in bools) for (granted in bools) for (bio in bools) for (lock in bools) {
+            val blocked = setupIsBlocked(true, supported, granted, bio, lock)
             if (!blocked) {
-                assertTrue(hasLock, "let through with no lock: bio=$bio lock=$lock pin=$pin")
+                assertTrue(!bio || lock, "let through with the lock off: bio=$bio lock=$lock")
                 assertTrue(!(supported && !granted), "let through without notifications")
             }
-            if (!hasLock || (supported && !granted)) {
-                assertTrue(blocked, "should have blocked: supported=$supported granted=$granted bio=$bio lock=$lock pin=$pin")
+            if ((bio && !lock) || (supported && !granted)) {
+                assertTrue(blocked, "should have blocked: supported=$supported granted=$granted bio=$bio lock=$lock")
             }
         }
     }

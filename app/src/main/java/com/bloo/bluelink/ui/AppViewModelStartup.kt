@@ -74,7 +74,6 @@ internal fun AppViewModel.coldStartAutoLogin() {
     // other check on purpose, because this function is the one place that decides Login vs Garage.
     if (com.bloo.bluelink.ui.DebugSampleGarage.enabled(getApplication())) {
         val sampleLocked = com.bloo.bluelink.ui.DebugSampleGarage.locked(getApplication())
-        if (sampleLocked) com.bloo.bluelink.ui.DebugSampleGarage.ensurePin(getApplication())
         logStartup("Cold start: DEBUG SAMPLE GARAGE (locked=$sampleLocked), not a real account")
         _state.update { com.bloo.bluelink.ui.DebugSampleGarage.apply(it, sampleLocked) }
         return
@@ -100,11 +99,7 @@ internal fun AppViewModel.coldStartAutoLogin() {
             // appearance and the PIN record, not repo construction or credentials (those run in
             // parallel below).
             val appearance = settingsStore.appearance.first()
-            val (lockMechanisms, appPinSet, lockout) = withContext(Dispatchers.IO) {
-                val pinSet = credentialStore.getPinRecord() != null
-                Triple((appearance.biometricLock && canUseBiometrics()) || pinSet, pinSet, credentialStore.pinLockout())
-            }
-            _state.update { it.copy(appPinSet = appPinSet, pinLockout = lockout) }
+            val lockMechanisms = withContext(Dispatchers.IO) { appearance.biometricLock && canUseBiometrics() }
             // Straight after a reboot the device's own unlock is the one just passed (the app only starts once it is unlocked),
             // so asking for the app's fingerprint again is a second prompt for the same person. Only in that window, and only
             // once the device is unlocked: any later cold start still locks.

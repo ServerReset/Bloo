@@ -203,7 +203,6 @@ class PhoneWatchSyncService : WearableListenerService() {
             val app = context.applicationContext
             val job = ioScope().launch {
                 val snapshot = SnapshotStore(app).current()
-                val pinRecord = runCatching { CredentialStore(app).getPinRecord() }.getOrNull()
                 val timing = SettingsStore(app).watchLockTiming()
                 if (watchUpdateRunNumber != null && watchUpdateApkUrl != null) {
                     lastAdvice = Triple(watchUpdateRunNumber, watchUpdateApkUrl, watchUpdateNotes)
@@ -214,7 +213,6 @@ class PhoneWatchSyncService : WearableListenerService() {
                     vehicles = snapshot.vehicles,
                     selectedVin = snapshot.selectedVin,
                     lockTiming = timing.wireKey,
-                    pinRecord = pinRecord,
                     sentAtMs = System.currentTimeMillis(),
                     watchUpdateRunNumber = advice?.first,
                     watchUpdateApkUrl = advice?.second,

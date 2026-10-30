@@ -5,11 +5,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,17 +20,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -44,37 +37,21 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.bloo.bluelink.data.PinCrypto
-import com.bloo.bluelink.data.PinLockout
-import com.bloo.bluelink.data.formatLockoutSeconds
-import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.SecondaryTextStyle
 import kotlin.math.max
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import com.bloo.uicommon.RevealText
-import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.MotionLong
 import com.bloo.uicommon.MorphButtonLabel
-import com.bloo.uicommon.ButtonTargetHeight
 import com.bloo.uicommon.GapHairline
-import com.bloo.uicommon.GapRow
-import com.bloo.uicommon.GapGroup
-import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.GapPage
 import com.bloo.uicommon.GapBlock
 import com.bloo.uicommon.GapHero
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.GroupWeightProportional
-import com.bloo.uicommon.ButtonEmphasis
-import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.content
 import com.bloo.uicommon.MorphButton
-import androidx.compose.animation.Crossfade
 
 @Composable
 internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
@@ -108,41 +85,18 @@ internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel, opaqueBackdrop:
 }
 
 /**
- * The app lock, drawn as an overlay on top of the blurred app. High-contrast white-on-scrim text
- * reads over any wallpaper of cars behind it; a floating back arrow returns to the login screen.
+ * The app lock, drawn as an overlay on top of the blurred app. The phone's own lock is the unlock
+ * (fingerprint, face, PIN, pattern or password), so this screen is one card with one button. High-contrast
+ * white-on-scrim text reads over any wallpaper of cars behind it; a floating back arrow returns to the login screen.
  */
 @Composable
 internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     val context = LocalContext.current
-    val appState by vm.state.collectAsStateWithLifecycle()
-    // The device-biometric gate is a binder call -- evaluate once per overlay mount, not per
-    // recomposition of the (frequently updating) state below.
-    val bioAvailable = remember { vm.canUseBiometrics() }
-    val appearance by vm.appearance.collectAsStateWithLifecycle()
-    // Start on the biometric prompt when there's one to show; the user can switch to PIN; devices
-    // without biometrics land straight on PIN.
-    // There is no app PIN any more: the device's own lock is the unlock, so the overlay never offers the PIN route.
-    val usePinMode = false
-    // Whether the app has a PIN installed, read from the VAULT -- the SAME check the lock gate uses.
-    // `appState.appPinSet` is only a mirror refreshed on IO, and trusting it alone left a device with
-    // NO biometrics staring at "Bloo is locked / Please try opening Bloo again" instead of its PIN
-    // pad: the gate had armed off the vault, the mirror had not caught up. With no biometrics the PIN
-    // is the only mechanism there is, so read it directly (and nudge the mirror along too).
-    val pinInstalled = false
-    var pin by remember { mutableStateOf("") }
-    // A wall-clock ticker that only runs while a rejection window is open -- the countdown line
-    // needs a fresh "seconds left" each second, and nothing else here wants a 1s recomposition
-    // loop.
-    var nowTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    // The monotonic reading is ticked alongside the wall clock, so the countdown this screen SHOWS
-    // agrees with the one verifyAppPin enforces. Reading only the wall clock here would have the UI
-    // cheerfully offer a keypad while the attempt was still being rejected.
-    var elapsedTick by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
-    val lockout = appState.pinLockout
-    val rejected = lockout.isLocked(nowTick, elapsedTick)
-    val remainingMs = lockout.remainingMs(nowTick, elapsedTick)
+    val lockFg = MaterialTheme.colorScheme.onBackground
+    val lockBg = MaterialTheme.colorScheme.background
+    val haptics = LocalHaptics.current
 
-    fun authenticateBiometric() {
+    fun authenticateDevice() {
         context.findFragmentActivity()?.let { activity ->
             showBiometricPrompt(
                 activity = activity,
@@ -153,33 +107,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             )
         }
     }
-    fun attemptPin() {
-        if (pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS && !rejected) {
-            vm.verifyAppPin(pin)
-            pin = ""
-        }
-    }
-    LaunchedEffect(Unit) {
-        // Fresh overlay (re-lock, cold start) → clear any stale rejection.
-        vm.acknowledgePinRejection()
-        if (!usePinMode) authenticateBiometric()
-    }
-    // Tick ONLY while a rejection window is actually counting down. Its own comment already claimed
-    // the conditional behaviour it did not have.
-    LaunchedEffect(rejected) {
-        while (rejected) {
-            delay(250)
-            nowTick = System.currentTimeMillis()
-            elapsedTick = android.os.SystemClock.elapsedRealtime()
-        }
-    }
-    // Pattern for "pick the PIN route": tapping "Use PIN" once; a failed biometric prompt stays on
-    // the biometric UI; PIN always returns here on the next lock anyway (fresh overlay remounts at
-    // the default mode).
-    val lockBg = MaterialTheme.colorScheme.background
-    val lockFg = MaterialTheme.colorScheme.onBackground
-    val haptics = LocalHaptics.current
-    val showBiometric = bioAvailable && !usePinMode
+    LaunchedEffect(Unit) { authenticateDevice() }
+
     // The backdrop animates between fully opaque (the first frames of a cold start, before the
     // content underneath has settled -- see LockBlurLayer's own note) and the 45% scrim.
     val backdropAlpha by animateFloatAsState(
@@ -206,137 +135,35 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             Modifier.align(Alignment.Center).widthIn(max = 420.dp).padding(horizontal = GapHero, vertical = GapBlock),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // The biometric card, the PIN card and the fallback cross-fade into each other (switching to
-            // "Use PIN" used to swap them with a hard cut).
-            Crossfade(
-                targetState = if (showBiometric) 0 else if (pinInstalled) 1 else 2,
-                animationSpec = androidx.compose.animation.core.tween(MotionMedium),
-                label = "lockCard",
-            ) { mode ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (mode == 0) {
-                // The same liquid glass as the rest of the app, over the force-blurred app behind
-                // it: the blur (LockBlurLayer) is what keeps data from leaking, the glass is what
-                // makes this one of us.
-                GlassSurface(
-                    shape = ExtraLargeShape,
-                    modifier = Modifier.fillMaxWidth(),
-                    hazeState = LocalBackdropHaze.current,
-                ) {
+            // The same liquid glass as the rest of the app, over the force-blurred app behind it: the blur
+            // (LockBlurLayer) is what keeps data from leaking, the glass is what makes this one of us.
+            GlassSurface(
+                shape = ExtraLargeShape,
+                modifier = Modifier.fillMaxWidth(),
+                hazeState = LocalBackdropHaze.current,
+            ) {
                 Column(
                     Modifier.padding(horizontal = GapBlock, vertical = GapBlock),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                // --- Classic biometric prompt ---------------------------------
-                LockMessage(
-                    Icons.Filled.Fingerprint,
-                    if (pinInstalled) "Confirm it's you, or use your PIN." else "Confirm it's you to reach your vehicles.",
-                    lockFg, GapPage,
-                )
-                Spacer(Modifier.height(28.dp))
-                val unlockSource = remember { MutableInteractionSource() }
-                MorphButton(
-                    onClick = { authenticateBiometric() },
-                    modifier = Modifier.heightIn(min = ControlHeight),
-                    interactionSource = unlockSource,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
-                    expressive = true, fillOnPress = true, groupWeight = GroupWeightProportional,
-                ) {
-                    // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays larger
-                    // (24dp) than the standard 18dp, an intentional emphasis for the screen's one
-                    // primary CTA.
-                    MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
-                }
-                }
-                }
-            } else if (mode == 1) {
-                // --- PIN prompt (device has no biometrics, or user chose PIN) --
-                // GlassSurface (GlassChrome.kt): the same fill/rim/shadow every other
-                // floating surface in the app shares, replacing this card's own
-                // one-off near-opaque fill and its own separately-hand-rolled flat
-                // BorderStroke rim (a THIRD, divergent rim treatment next to
-                // appGlassRim's shared gradient one and Ambient.kt's now-removed
-                // dialog override) -- no more per-site exceptions.
-                GlassSurface(
-                    shape = ExtraLargeShape,
-                    modifier = Modifier.fillMaxWidth(),
-                    hazeState = LocalBackdropHaze.current,
-                ) {
-                    Column(Modifier.padding(horizontal = GapBlock, vertical = GapPage)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapSection)) {
-                            IconBadge(
-                                icon = AppIcons.Lock, tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                containerColor = MaterialTheme.colorScheme.primaryContainer, size = 46.dp,
-                                iconSize = 24.dp,
-                            )
-                            Column {
-                                RevealText(
-                                    "Enter your PIN",
-                                    style = PrimaryTextStyle(),
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                                RevealText(
-                                    if (bioAvailable) "Your biometrics or your PIN unlock Bloo."
-                                    else "This device has no biometrics, so a PIN is required.",
-                                    style = SecondaryTextStyle(),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(GapSection))
-                        PinField(
-                            value = pin,
-                            onValueChange = { pin = it },
-                            placeholder = "4 to 8 digit PIN",
-                            onDone = { attemptPin() },
-                            supportingText = {
-                                when {
-                                    rejected -> RevealText(
-                                        "Too many attempts. Try again in ${formatLockoutSeconds(remainingMs)}",
-                                        color = MaterialTheme.colorScheme.error,
-                                    )
-                                    else -> RevealText(
-                                        lockout.attemptsRemainingInBatch(nowTick, elapsedTick)?.let { left ->
-                                            if (left <= 2) "Careful. $left ${if (left == 1) "attempt" else "attempts"} before a lockout"
-                                            else "${PinLockout.STRIKES_PER_BATCH} wrong attempts lock the app for 30 seconds. The wait doubles each time."
-                                        } ?: "",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Spacer(Modifier.height(GapGroup))
-                        val pinUnlockSource = remember { MutableInteractionSource() }
-                        MorphButton(
-                            onClick = { attemptPin() },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = ButtonTargetHeight),
-                            interactionSource = pinUnlockSource,
-                            enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
-                            expressive = true, fillOnPress = true, groupWeight = GroupWeightProportional,
-                        ) {
-                            MorphButtonLabel(Icons.Filled.LockOpen, "Unlock", pending = false)
-                        }
-                        if (bioAvailable) {
-                            Spacer(Modifier.height(GapRow))
-                            MorphTextButton(
-                                "Use biometrics",
-                                onClick = { haptics?.click(); authenticateBiometric() },
-                                modifier = Modifier.fillMaxWidth(),
-                                emphasis = ButtonEmphasis.Confirm,
-                            )
-                        }
+                    LockMessage(Icons.Filled.Fingerprint, "Confirm it's you to reach your vehicles.", lockFg, GapPage)
+                    Spacer(Modifier.height(28.dp))
+                    val unlockSource = remember { MutableInteractionSource() }
+                    MorphButton(
+                        onClick = { authenticateDevice() },
+                        modifier = Modifier.heightIn(min = ControlHeight),
+                        interactionSource = unlockSource,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+                        expressive = true, fillOnPress = true, groupWeight = GroupWeightProportional,
+                    ) {
+                        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays larger
+                        // (24dp) than the standard 18dp, an intentional emphasis for the screen's one
+                        // primary CTA.
+                        MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
                     }
                 }
-            } else {
-                // No mechanism at all -- should not be reachable (the lock gate refuses to engage
-                // without one); a calm fallback so the overlay never dead-ends silently.
-                LockMessage(AppIcons.Lock, "Open Bloo again.", lockFg, GapSection)
-            }
-            }
             }
         }
     }

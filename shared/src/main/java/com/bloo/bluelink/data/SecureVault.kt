@@ -29,9 +29,8 @@ interface VaultKeyWrapper {
 }
 
 /**
- * The one place the app keeps secrets at rest: sign-in credentials, car service PINs, session
- * tokens, the app-lock PIN record and its lockout counters all live in a single AES-256-GCM
- * encrypted file.
+ * The one place the app keeps secrets at rest: sign-in credentials, car service PINs and session
+ * tokens live in AES-256-GCM encrypted files, sealed by the Keystore keys below.
  *
  * One key: a random 256-bit data key (DEK), sealed by a hardware-backed Android Keystore key. It needs no
  * prompt, so background work (status refresh, notifications, AutoLock, the watch) can still read. There is no
@@ -162,7 +161,7 @@ class SecureVault(
     companion object {
         private val AAD = "bloo-vault-v1".toByteArray()
 
-        /** Keys that stay readable while sealed: the app-lock PIN record and its lockout counters. */
+        /** Keys that stay readable while sealed: only the old app-lock PIN keys, so the one-time cleanup in CredentialStore can run. */
         private const val OPEN_PREFIX = "app_pin"
 
         const val FILE_NAME = "bloo_vault.json"

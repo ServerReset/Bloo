@@ -114,12 +114,12 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     LaunchedEffect(inSwipe) { if (inSwipe) swipeUnlocked = true }
 
     // First run only: the setup card is BLOCKING. Notifications (API 33+) and a lock (biometrics
-    // when the device has them, else a PIN) are both required before Next unlocks.
+    // when the device has them enrolled) are both required before Next unlocks.
     val notificationsSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     // Per-car cards apply their answer the moment you pick it, so there is nothing to confirm: once
     // the card shows what is right, Next just works.
     val setupUnmetNow = firstRun &&
-        setupIsBlocked(true, notificationsSupported, notifGranted, canBio, appearance.biometricLock, state.appPinSet)
+        setupIsBlocked(true, notificationsSupported, notifGranted, canBio, appearance.biometricLock)
     fun blockReason(i: Int): String? {
         val step = steps.getOrNull(i) ?: return null
         return when {
@@ -217,7 +217,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     }
     // Every setup item that flips to done: notifications, the lock, Drive sync.
     val setupDone = (if (notifGranted) 1 else 0) +
-        (if (appearance.biometricLock || state.appPinSet) 1 else 0) +
+        (if (appearance.biometricLock) 1 else 0) +
         (if (state.syncUri != null) 1 else 0)
     var lastSetupDone by remember { mutableIntStateOf(-1) }
     LaunchedEffect(setupDone) {

@@ -12,7 +12,6 @@ import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
-import com.bloo.bluelink.data.PinLockout
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.Vehicle
@@ -35,25 +34,10 @@ data class UiState(
     // Loading, not Login: see Screen.Loading.
     val screen: Screen = Screen.Loading,
     /**
-     * Biometric app-lock overlay (real app renders blurred behind it). True when biometric lock is
-     * usable or an app PIN is installed ([appPinSet]).
+     * App-lock overlay (real app renders blurred behind it). True when the app lock is on and the phone's own lock is
+     * the unlock.
      */
     val locked: Boolean = false,
-    /** An app PIN is installed (4-8 digits), mirrored from CredentialStore. */
-    val appPinSet: Boolean = false,
-    /** Live mirror of the PIN wrong-attempt lockout policy (failures + rejection deadline). */
-    val pinLockout: PinLockout = PinLockout(),
-    /**
-     * A PIN verify just rejected the attempt; the overlay shows the error, then calls
-     * [AppViewModel.acknowledgePinRejection].
-     */
-    val pinAttemptRejected: Boolean = false,
-    /**
-     * Bumped every time a PIN verify SUCCEEDS (the settings dialogs listen for the tick to advance
-     * past the "enter your current PIN" stage -- success itself is otherwise silent, since the app
-     * may already be unlocked when it happens in Settings).
-     */
-    val pinAcceptedTick: Int = 0,
     val loading: Boolean = false,
     val refreshing: Boolean = false,
     val vehicles: List<Vehicle> = emptyList(),

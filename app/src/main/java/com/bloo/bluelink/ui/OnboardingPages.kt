@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.filled.Map
 import android.content.Context
@@ -82,7 +81,7 @@ internal fun OnboardingWelcomePage() {
 }
 
 /**
- * Step 2: set the app up to work. Notifications and a lock (biometrics if available, else a PIN)
+ * Step 2: set the app up to work. Notifications and the lock (the phone's own lock)
  * are required before Next unlocks; the lock card swaps to whichever the device supports.
  */
 @Composable
@@ -165,18 +164,15 @@ internal fun OnboardingSetupPage(
             )
         }
     } else {
+        // No screen lock on the phone: Bloo has nothing to unlock with, so this card says what to do
+        // and does not block Next.
         OnboardingSetupCard(
             icon = AppIcons.Lock,
-            title = "PIN lock",
-            body = "This device has no biometrics, so a 4-8 digit PIN locks the app.",
-            done = state.appPinSet,
-            required = true,
-        ) {
-            OnboardingPinForm(
-                existing = state.appPinSet,
-                onSet = { pin -> vm.setAppPin(pin) },
-            )
-        }
+            title = "Screen lock",
+            body = "Set a screen lock on your phone (fingerprint, face, PIN, pattern or password). Bloo then locks with it.",
+            done = false,
+            required = false,
+        ) {}
     }
     }
 

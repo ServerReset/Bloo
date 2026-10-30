@@ -11,15 +11,12 @@ data class Credentials(
 )
 
 /**
- * Credentials, car service PINs and the app-lock PIN record, kept in the app's single encrypted
- * [SecureVault] (AES-256-GCM, Keystore-backed) -- one set per brand, so multiple accounts can be
- * remembered and re-authenticated after a token expires.
+ * Sign-in credentials and car service PINs, kept in the encrypted [SecureVault.secrets] vault
+ * (AES-256-GCM, Keystore-backed, behind the phone's own unlock) -- one set per brand, so multiple
+ * accounts can be remembered and re-authenticated after a token expires.
  */
 class CredentialStore(context: Context) {
     private val appContext: Context = context.applicationContext
-
-    /** The device vault: the app-lock records only. */
-    private val vault: SecureVault get() = vaultFor(appContext)
 
     /** The sign-in secrets: behind the device unlock (see [SecureVault.secrets]). */
     private val secrets: SecureVault get() = secretsFor(appContext)
@@ -92,31 +89,6 @@ class CredentialStore(context: Context) {
         cachedAccounts = null
     }
 
-    // --- App PIN (device app-lock, unrelated to any car's service PIN) ----
-    //
-    // Same vault, its own flat keys so it cannot collide with the per-brand "%s_email" scheme.
-
-    /** The encoded [PinRecord] (or null when no PIN is set). */
-    fun getPinRecord(): String? = vault.getString(KEY_PIN_RECORD)
-
-    /**
-     * Sets (or, with null, clears) the stored PIN record. Clearing also wipes the failure counter
-     * -- there is nothing left to protect.
-     */
-    fun setPinRecord(record: String?) {
-        if (record == null) {
-            vault.edit {
-                remove(KEY_PIN_RECORD); remove(KEY_PIN_FAILURES)
-                remove(KEY_PIN_LOCKED_UNTIL); remove(KEY_PIN_LOCKED_UNTIL_ELAPSED)
-            }
-        } else {
-            vault.edit { put(KEY_PIN_RECORD, record) }
-        }
-    }
-
-    /** True when stored accounts exist but this device's key cannot open them. */
-    val vaultNeedsRecovery: Boolean get() = vault.needsRecovery
-
     /**
      * The sign-in step after a restart: whether [email] and [password] (and the service [pin]) match
      * a stored account of [brand]. Reads past the vault's post-restart seal, so it is the only way
@@ -135,35 +107,13 @@ class CredentialStore(context: Context) {
             same(secrets.getStringUnsealed("${b}_pin"), pin.trim())
     }
 
-    /** Consecutive PIN failures since the last successful unlock. */
-    fun getPinFailures(): Int = vault.getString(KEY_PIN_FAILURES)?.toIntOrNull() ?: 0
-
-    /**
-     * Whether the PIN is currently in its rejection window, and for how long -- wall-clock epoch ms
-     * until the next attempt may proceed.
-     */
-    fun getPinLockedUntil(): Long = vault.getString(KEY_PIN_LOCKED_UNTIL)?.toLongOrNull() ?: 0L
-
-    fun getPinLockedUntilElapsed(): Long = vault.getString(KEY_PIN_LOCKED_UNTIL_ELAPSED)?.toLongOrNull() ?: 0L
-
-    /** The whole stored [PinLockout] state: the counterpart of [setPinLockout]. */
-    fun pinLockout(): PinLockout = PinLockout(getPinFailures(), getPinLockedUntil(), getPinLockedUntilElapsed())
-
-    /** Persists the whole [PinLockout] state atomically. */
-    fun setPinLockout(lockout: PinLockout) {
-        vault.edit {
-            put(KEY_PIN_FAILURES, lockout.failures.toString())
-            put(KEY_PIN_LOCKED_UNTIL, lockout.lockedUntilEpochMs.toString())
-            put(KEY_PIN_LOCKED_UNTIL_ELAPSED, lockout.lockedUntilElapsedMs.toString())
-        }
-    }
-
     private fun brandSet(): Set<String> =
         secrets.getString(KEY_BRANDS)?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
     internal companion object {
         // Holds the comma-joined brand names ("HYUNDAI,KIA") that currently have credentials saved.
         const val KEY_BRANDS = "brands"
+        // The app's old PIN record, kept only so vaultFor can remove it from existing installs.
         const val KEY_PIN_RECORD = "app_pin_record"
         const val KEY_PIN_FAILURES = "app_pin_failures"
         const val KEY_PIN_LOCKED_UNTIL = "app_pin_locked_until"
@@ -186,7 +136,7 @@ class CredentialStore(context: Context) {
             if (vault.getString(KEY_IMPORTED) == null) synchronized(this) {
                 if (vault.getString(KEY_IMPORTED) == null) importLegacy(context, vault)
             }
-            // The app has no PIN any more: an old PIN record and its lockout counters are removed once, here.
+            // The app has no PIN of its own any more: an old PIN record and its lockout counters are removed once, here.
             if (vault.getString(KEY_PIN_RECORD) != null || vault.getString(KEY_PIN_FAILURES) != null) vault.edit {
                 remove(KEY_PIN_RECORD); remove(KEY_PIN_FAILURES)
                 remove(KEY_PIN_LOCKED_UNTIL); remove(KEY_PIN_LOCKED_UNTIL_ELAPSED)

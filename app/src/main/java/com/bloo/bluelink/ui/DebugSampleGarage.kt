@@ -63,32 +63,6 @@ internal object DebugSampleGarage {
 
     private fun prefs(context: Context) = context.privatePrefs(PREFS)
 
-    /**
-     * Make sure a PIN record exists, so the lock screen has a keypad to draw.
-     *
-     * The two state flags are not enough: with `appPinSet` true but nothing in the vault, the lock
-     * renders its dead end ("Bloo is locked / Please try opening Bloo again") instead of the PIN
-     * screen. This writes a real record through the app's own store, which is legitimate here
-     * because it runs inside the app - and the value is irrelevant, since a screenshot never needs
-     * to unlock anything. Debug builds only.
-     */
-    fun ensurePin(context: Context) {
-        if (!BuildConfig.DEBUG) return
-        runCatching {
-            val store = com.bloo.bluelink.data.CredentialStore(context.applicationContext)
-            if (store.getPinRecord() != null) return
-            val salt = com.bloo.bluelink.data.PinCrypto.newSalt()
-            val iterations = com.bloo.bluelink.data.PinCrypto.PIN_DEFAULT_ITERATIONS
-            val record = com.bloo.bluelink.data.PinRecord(
-                salt = salt,
-                iterations = iterations,
-                hash = com.bloo.bluelink.data.PinCrypto.hash(SAMPLE_PIN, salt, iterations),
-            )
-            store.setPinRecord(record.encode())
-            AppLog.log("DebugSampleGarage: wrote a sample PIN record so the lock screen can render")
-        }
-    }
-
     /** Irrelevant - only the presence of a record matters, and the lock is never unlocked. */
     private const val SAMPLE_PIN = "1234"
 
@@ -143,9 +117,6 @@ internal object DebugSampleGarage {
             vehicles = listOf(car),
             statuses = mapOf(car.vin to status),
             lastFetched = mapOf(car.vin to System.currentTimeMillis()),
-            // The lock screen renders the PIN keypad from these two flags alone; nothing in the
-            // vault is touched, because a screenshot never needs the PIN to be *correct*.
-            appPinSet = true,
             locked = locked,
             loading = false,
             refreshing = false,

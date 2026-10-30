@@ -1,13 +1,10 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.bluelink.data.PinLockout
 import androidx.biometric.BiometricManager
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.LockTiming
-import com.bloo.bluelink.data.PinCrypto
-import com.bloo.bluelink.data.PinRecord
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.setBiometricLock
@@ -21,7 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// --- App PIN, lock timing, and biometric lock (extracted from AppViewModel) --
+// --- Lock timing and the biometric lock (extracted from AppViewModel) --
 
 /** Fix a wrong/locked service PIN without re-entering the whole account. */
 fun AppViewModel.updatePin(brand: Brand, pin: String) {
@@ -34,12 +31,9 @@ fun AppViewModel.updatePin(brand: Brand, pin: String) {
     }
 }
 
-/**
- * A successful PIN verify routes through here too -- and resets the failure counter (see
- * [verifyAppPin]).
- */
+/** The phone's lock (or the lock screen's own credential) has been passed: the app opens. */
 fun AppViewModel.unlocked() {
-    _state.update { it.copy(locked = false, lockedToLogin = false, pinAttemptRejected = false) }
+    _state.update { it.copy(locked = false, lockedToLogin = false) }
     // A launcher shortcut that arrived while the lock was up waits for this moment (see tryRunPendingShortcut).
     tryRunPendingShortcut()
     if (pendingBootUnlock) {
@@ -128,99 +122,10 @@ fun AppViewModel.setBiometricLock(enabled: Boolean) {
     persist { setBiometricLock(enabled) }
 }
 
-/** Whether a PIN record currently exists in the credential store. */
-fun AppViewModel.appPinInstalled(): Boolean = credentialStore.getPinRecord() != null
-
-/**
- * Re-mirrors PIN presence + lockout state from the credential store into [UiState] (called on cold
- * start and after every mutation).
- */
-fun AppViewModel.refreshPinState() {
-    // Reads CredentialStore's lazy encrypted prefs (Tink/AndroidKeystore), so this runs on IO:
-    // every caller is a state refresh, none of them can observe the result synchronously, and doing
-    // it on Main.immediate put the first EncryptedSharedPreferences construction on the cold-start
-    // critical path.
-    viewModelScope.launch(Dispatchers.IO) {
-        val pinSet = credentialStore.getPinRecord() != null
-        val lockout = credentialStore.pinLockout()
-        _state.update { it.copy(appPinSet = pinSet, pinLockout = lockout) }
-    }
-}
-
-/**
- * Sets (or replaces) the app PIN. The PIN is never persisted: only its PBKDF2-stretched hash + salt
- * live in CredentialStore's encrypted storage (see [PinRecord]). The stretch runs off the main
- * thread.
- */
-fun AppViewModel.setAppPin(pin: String) {
-    viewModelScope.launch {
-        val record = withContext(Dispatchers.Default) {
-            val salt = PinCrypto.newSalt()
-            PinRecord(salt, PinCrypto.PIN_DEFAULT_ITERATIONS, PinCrypto.hash(pin, salt, PinCrypto.PIN_DEFAULT_ITERATIONS))
-        }
-        credentialStore.setPinRecord(record.encode())
-        refreshPinState()
-    }
-}
-
-/**
- * Removes the app PIN entirely (the caller must have already verified the current PIN -- see
- * [verifyAppPin] for the gate).
- */
-fun AppViewModel.removeAppPin() {
-    viewModelScope.launch {
-        credentialStore.setPinRecord(null)
-        refreshPinState()
-    }
-}
-
-/**
- * Verifies a PIN attempt against the stored record, enforcing the [PinLockout] policy: while the
- * rejection window is open the attempt is rejected outright (no work spent on it), otherwise a
- * wrong PIN records a failure and every fifth failure opens a window that doubles per batch (30s,
- * 1m, 2m, ...).
- */
-/** One PIN check at a time: concurrent ones all read the same failure count, so N guesses cost one strike. */
-private val pinVerifyMutex = kotlinx.coroutines.sync.Mutex()
-
-fun AppViewModel.verifyAppPin(pin: String) {
-    viewModelScope.launch {
-        // A second attempt while one is checking is dropped (the user taps again); it cannot be counted from a stale read.
-        if (!pinVerifyMutex.tryLock()) return@launch
-        try {
-        val record = PinRecord.decode(credentialStore.getPinRecord()) ?: return@launch
-        val now = System.currentTimeMillis()
-        val nowElapsed = android.os.SystemClock.elapsedRealtime()
-        var lockout = credentialStore.pinLockout()
-        if (lockout.isLocked(now, nowElapsed)) {
-            _state.update { it.copy(pinAttemptRejected = true) }
-            return@launch
-        }
-        val ok = withContext(Dispatchers.Default) { record.verify(pin) }
-        if (ok) {
-            credentialStore.setPinLockout(lockout.onSuccess())
-            refreshPinState()
-            _state.update { it.copy(pinAcceptedTick = it.pinAcceptedTick + 1) }
-            unlocked()
-        } else {
-            lockout = lockout.onFailure(now, nowElapsed)
-            credentialStore.setPinLockout(lockout)
-            _state.update { it.copy(pinLockout = lockout, pinAttemptRejected = true) }
-        }
-        } finally {
-            pinVerifyMutex.unlock()
-        }
-    }
-}
-
-fun AppViewModel.acknowledgePinRejection() {
-    _state.update { it.copy(pinAttemptRejected = false) }
-}
-
 /**
  * Step one after a phone restart: the account details typed on the sign-in form must match a stored
- * account (checked locally, nothing is sent anywhere). Then, if an app lock (fingerprint or PIN) is
- * set, it is step two; with none, the boot opens straight away.
+ * account (checked locally, nothing is sent anywhere). Then, if the app lock is on, the phone's lock is step two; with none, the
+ * boot opens straight away.
  */
 fun AppViewModel.reauthAfterRestart(username: String, password: String, pin: String, brand: Brand) {
     viewModelScope.launch {
@@ -231,7 +136,7 @@ fun AppViewModel.reauthAfterRestart(username: String, password: String, pin: Str
         }
         val armed = withContext(Dispatchers.IO) {
             val a = settingsStore.appearance.first()
-            (a.biometricLock && canUseBiometrics()) || appPinInstalled()
+            a.biometricLock && canUseBiometrics()
         }
         _state.update { it.copy(bootReauth = false) }
         if (armed) {
