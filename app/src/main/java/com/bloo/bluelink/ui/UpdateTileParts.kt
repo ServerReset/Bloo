@@ -164,7 +164,7 @@ internal fun UpdateStatusCard(
                     title,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = LocalContentColor.current),
                 )
-                if (subtitle != null) RevealMutedText(subtitle, style = SecondaryTextStyle())
+                if (subtitle != null) RevealMutedText(subtitle)
             }
         }
     }
