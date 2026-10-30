@@ -28,7 +28,7 @@
 
 <section class="doc-hero">
   <div class="wrap">
-    <span class="kicker">Last updated 29 October 2026</span>
+    <span class="kicker">Last updated 30 October 2026</span>
     <h1 class="display" style="font-size:clamp(64px,12vw,170px)">Privacy<br><em>policy.</em></h1>
     <p class="lede" style="margin-top:28px">Bloo opens your car from your phone. Everything sensitive it keeps is encrypted, and it keeps nothing about you on a server, because there isn't one. Here is the full detail, in order.</p>
     <div class="facts-grid" role="list">
@@ -60,16 +60,17 @@
 <p>Bloo is an independent app that talks to the Bluelink and Connected Car services of Hyundai, Genesis and Kia. It is not made by, endorsed by, or affiliated with Hyundai Motor Company, Genesis, Kia, or any of their subsidiaries. We have never met them. This is working out well for everyone.</p>
 
 <h2 id="what-bloo-stores-and-how-it-is-encrypted">2. What Bloo stores, and how it is encrypted</h2>
-<p class="simple">Your password and PIN are encrypted before they are saved, with the key kept in your phone’s security chip.</p>
+<p class="simple">Your password and service PIN are encrypted before they are saved, with the key kept in your phone’s security chip.</p>
 
 <p>Every sensitive thing Bloo keeps is encrypted <strong>before it is written to your phone</strong>:</p>
 <ul>
   <li><strong>Your Bluelink, Genesis or Kia password</strong>, and any service PIN, are sealed with <strong>AES-256-GCM</strong>.</li>
-  <li><strong>Your sign-in tokens and your app-lock PIN</strong> are sealed the same way, in the same vault.</li>
+  <li><strong>Your sign-in tokens</strong> are sealed the same way, in a separate vault. That vault is locked with a key that only your phone's own lock can open, so it needs your phone to be unlocked before the app can read it. The keys that background work uses (status, alerts, AutoLock and the watch) need no unlock, so those keep running.</li>
   <li><strong>The key for that vault</strong> is itself wrapped by a key that lives in the <strong>Android Keystore</strong>, the security chip inside your phone. On phones with a hardware-backed Keystore, the key stays inside the security chip. Bloo cannot read it out, and nobody who takes the phone apart with a screwdriver can either.</li>
   <li>Everything else Bloo keeps (your preferences, widget choices, the last car status it fetched) lives in the app's private storage, and <strong>Android encrypts that storage on the device</strong>. Nothing is kept in readable form on your phone.</li>
 </ul>
 <p>In plain words: your password is encrypted once by Bloo, and then the phone encrypts the whole app's storage as well. The password is never sitting around as text. Not on the phone, not on a server, not in a log.</p>
+<p>What that means in practice: if you change your phone's lock, or your phone resets its security key, your saved sign-ins may have to be entered again. Nothing can recover them without that key, so we cannot either.</p>
 
 <div class="callout warm">
   <p><strong>A note on the phrase "nothing unencrypted," which is doing a lot of work.</strong> It is accurate for your phone and for everything Bloo writes to it. It is not a claim about your car maker's servers, which have their own policy, or about what Google does with a file in your Google Drive if you turn sync on. Those are covered below, with fewer jazz hands.</p>
@@ -104,9 +105,9 @@
 <p>This is the part where policies start making promises, so we will stick to facts. Nobody can promise a determined criminal will never get into your car. What Bloo does is make sure the app is not the weak link, and that you always have a plan.</p>
 <p><strong>What protects you already:</strong></p>
 <ul>
-  <li>Your password and PIN are encrypted on the phone, with the key held in hardware. Someone who copies your phone's files gets an expensive paperweight.</li>
+  <li>Your password and service PIN are encrypted on the phone, with the key held in hardware. Someone who copies your phone's files gets an expensive paperweight.</li>
   <li>Your credentials go only to your car maker. Nothing goes to a Bloo server, because there is no Bloo server, so there is no Bloo database for a pirate to raid. We did mention that.</li>
-  <li>The app can lock itself behind your phone's own biometric or PIN lock. Turn that on. It is the pirate's least favourite setting.</li>
+  <li>The app can lock itself behind your phone's own lock: fingerprint, face, PIN, pattern or password. The app has no PIN of its own. Turn that on. It is the pirate's least favourite setting.</li>
 </ul>
 <p><strong>What to do if you think your car has been taken over:</strong></p>
 <ul>
@@ -164,6 +165,7 @@
 
 <p>When this policy changes, the date at the top changes too, and the change is written below in plain words, with the date. We do not make quiet edits in a drawer.</p>
 <ul>
+  <li><strong>30 October 2026.</strong> The app has no PIN of its own any more. It unlocks with your phone's own lock (fingerprint, face, PIN, pattern or password), and your sign-ins sit behind that lock in a vault of their own. Background work keeps its own key, so status, alerts and the watch still run. An app PIN from an older version is deleted the first time this version opens the vault.</li>
   <li><strong>29 October 2026.</strong> Rewritten. States plainly that sensitive data is encrypted before it is stored, and that the rest of the app's storage is encrypted on the device. Adds sections on transactions, on what to do if a pirate takes control of your car, and on the open source code. The policy is now also inside the app.</li>
   <li><strong>14 October 2026.</strong> First published.</li>
 </ul>

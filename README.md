@@ -79,9 +79,8 @@ Pick one route and stick with it. Moving between them means an uninstall, and an
 
 ## 🔐 Security, without the hand-waving
 
-- **One encrypted vault.** Sign-in credentials, car service PINs, session tokens and the app-lock PIN record live in a single AES-256-GCM encrypted file. Nothing sensitive is stored anywhere else.
-- **Two keys over one data key.** The vault's data key is sealed by a hardware-backed Android Keystore key, so background refresh, notifications and AutoLock keep working. If you set an app PIN, the same data key is also sealed under a key derived from your PIN (PBKDF2-HMAC-SHA256, 210,000 rounds), so entering the PIN recovers your accounts if the device key is ever lost.
-- **App lock.** Biometric unlock, with an optional 4 to 8 digit PIN backup, a lockout after repeated wrong PINs, and a choice of when to re-lock.
+- **Two vaults, two keys.** Sign-in credentials, car service PINs and session tokens live in a vault sealed by a hardware-backed Android Keystore key that needs the phone to be unlocked (for 30 days after each unlock). Background work (status, alerts, AutoLock, the watch) uses a second vault sealed by a key that needs no unlock, so it keeps running.
+- **App lock.** Unlocks with your phone's own lock: fingerprint, face, PIN, pattern or password. The app has no PIN of its own, and you choose when it re-locks.
 - **After a restart.** Bloo waits until you unlock it before its background work resumes.
 - **Nothing leaves the device** except requests to the car brand's own servers, and the update check. The app collects no data.
 
