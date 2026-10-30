@@ -324,7 +324,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                             Spacer(Modifier.height(GapRow))
                             MorphTextButton(
                                 "Use biometrics",
-                                onClick = { haptics?.click(); usePinMode = false; authenticateBiometric() },
+                                onClick = { haptics?.click(); authenticateBiometric() },
                                 modifier = Modifier.fillMaxWidth(),
                                 emphasis = ButtonEmphasis.Confirm,
                             )
