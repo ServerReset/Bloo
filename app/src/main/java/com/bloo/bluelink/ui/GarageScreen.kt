@@ -189,6 +189,12 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
     val expandedVin = expandedMap.vin
     val expandedVehicle = if (expandedVin != null) vehicles.firstOrNull { it.vin == expandedVin } else null
     val expandedLocation = expandedVehicle?.let { state.value.locations[it.vin] }
+    // A map that was asked for but has no car or no location to draw from is nothing on screen: say so in the log, rather than leave it silent.
+    LaunchedEffect(expandedVin, expandedVehicle == null, expandedLocation == null) {
+        if (expandedVin != null && (expandedVehicle == null || expandedLocation == null)) {
+            com.bloo.bluelink.data.AppLog.log("Map: $expandedVin not drawn (car found: ${expandedVehicle != null}, location: ${expandedLocation != null})")
+        }
+    }
     // Where the map grows from: the car's pebble, once it has been on screen. Until then (or after swiping to another car) a pebble-sized
     // box in the middle, so the map always opens.
     val windowSize = LocalWindowInfo.current.containerSize

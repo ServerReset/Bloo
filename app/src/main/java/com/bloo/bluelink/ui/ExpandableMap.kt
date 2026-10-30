@@ -182,6 +182,7 @@ internal fun ExpandableMapLayer(
         // with the opening (see MapInputs.panWeight), so the map opens off-centre and just gets bigger. Closing ramps it back out, which is
         // what carries the pin to the middle of the collapsed map.
         val root = rootPos ?: return@LaunchedEffect
+        com.bloo.bluelink.data.AppLog.log("Map: placed at ${root.x.toInt()},${root.y.toInt()}, opening")
         val o = originBounds.translate(-root.x, -root.y)
         val w = windowSize.width.toFloat()
         val h = windowSize.height.toFloat()

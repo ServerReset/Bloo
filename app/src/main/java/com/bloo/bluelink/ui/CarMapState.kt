@@ -213,6 +213,7 @@ internal class ExpandedMapState {
 
     /** Opens the full-screen map on [vin], with that car selected, so its bar is already on its line. */
     fun open(vin: String) {
+        com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin (open map was ${this.vin ?: "none"})")
         selectedVin = vin
         this.vin = vin
     }
