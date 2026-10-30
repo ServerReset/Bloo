@@ -5,6 +5,8 @@ package com.bloo.bluelink.ui
  * section and [ChargeLimitPill].
  */
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.graphicsLayer
 import com.bloo.bluelink.data.WheelHeatLevel
 import androidx.compose.foundation.layout.padding
@@ -17,17 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -48,11 +40,9 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -90,8 +80,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
-import com.bloo.uicommon.MotionShort
-import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.ButtonTargetHeight
 import com.bloo.uicommon.ButtonIconSize
 import com.bloo.uicommon.ButtonIconGap
@@ -100,7 +88,6 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.ButtonPaddingH
 import com.bloo.uicommon.ChipPaddingH
 import com.bloo.uicommon.LocalHaptics
-import com.bloo.uicommon.lowPowerAwareSpring
 import com.bloo.uicommon.content
 
 /**
