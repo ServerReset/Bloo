@@ -116,12 +116,11 @@ private fun privacyChoice(label: String, onClick: () -> Unit) = ClusterButton(
  * take the theme's colours. The site's stylesheet is left alone; this only overrides the colours, for this page in the app.
  */
 private fun themedPage(html: String, text: Color, link: Color): String {
-    val style = "<style>html,body{background:transparent!important;color:${text.cssHex()}!important}" +
-        "a{color:${link.cssHex()}!important}</style>"
+    val style = "<style>html,body{background:transparent!important;color:${text.hexCode()}!important}" +
+        "a{color:${link.hexCode()}!important}</style>"
     return if ("</head>" in html) html.replace("</head>", "$style</head>") else style + html
 }
 
-private fun Color.cssHex(): String = "#%06X".format(0xFFFFFF and toArgb())
 
 /**
  * Opens the privacy policy in a browser: the styled web page, or the plain HTML page. If the styled page cannot be opened (no browser

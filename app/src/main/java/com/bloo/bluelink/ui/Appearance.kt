@@ -173,12 +173,11 @@ internal fun ColorPickerCanvas(color: Color, onColorChange: (Color) -> Unit, mod
     // the hue itself changes, and hueBrush's gradient stops never change at all.
     val satValueBrush = remember(pureHue) { Brush.horizontalGradient(listOf(Color.White, pureHue)) }
     val hueBrush = remember(hueGradient) { Brush.horizontalGradient(hueGradient) }
-    fun hexOf(c: Color) = String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and c.toArgb())
     // A text field is the accessible alternative to the drag-only canvases (no TalkBack path).
     // Re-synced only when the canvas changes the colour, so it never fights an in-progress edit.
-    var hexInput by remember { mutableStateOf(hexOf(picked)) }
+    var hexInput by remember { mutableStateOf(picked.hexCode()) }
     var hexError by remember { mutableStateOf(false) }
-    LaunchedEffect(picked) { if (hexInput != hexOf(picked)) { hexInput = hexOf(picked); hexError = false } }
+    LaunchedEffect(picked) { if (hexInput != picked.hexCode()) { hexInput = picked.hexCode(); hexError = false } }
     fun commitHex() {
         val parsed = runCatching {
             (if (hexInput.startsWith("#")) hexInput else "#$hexInput").toColorInt()
@@ -302,3 +301,6 @@ private fun SelectedCheck() {
 @Composable
 private fun swatchLabelColor(selected: Boolean): Color =
     if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+
+/** A colour as its web hex, "#RRGGBB" (the alpha is dropped). */
+internal fun Color.hexCode(): String = String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and toArgb())

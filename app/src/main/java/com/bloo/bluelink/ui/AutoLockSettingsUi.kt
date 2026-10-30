@@ -113,8 +113,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel, gen5w: Boolean 
         }.getOrDefault(false)
     }
 
-    fun granted(permission: String) =
-        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    fun granted(permission: String) = context.hasPermission(permission)
 
     fun update(new: AutoLockConfig) {
         config = new

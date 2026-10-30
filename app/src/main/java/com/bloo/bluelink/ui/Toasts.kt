@@ -56,7 +56,6 @@ private const val StaleAfterMs = 3_000L
 private const val MaxLifetimeExtraMs = 8_000L
 
 /** The screen-edge inset the search element and the toast stack share. */
-private val ToastEdge = 16.dp
 
 /** The narrowest a toast beside the search may get before it lifts above instead. */
 private val MinBesideWidth = 220.dp
@@ -229,7 +228,7 @@ internal fun ToastHost(state: ToastState, hazeState: HazeState, onCopy: (String)
     val window = LocalWindowInfo.current.containerSize
     val imeBottomPx = WindowInsets.ime.getBottom(density).toFloat()
     val navBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
-    val edgePx = with(density) { ToastEdge.toPx() }
+    val edgePx = with(density) { SearchEdge.toPx() }
     val gapPx = with(density) { GapRow.toPx() }
     val minWidthPx = with(density) { MinBesideWidth.toPx() }
 
@@ -272,7 +271,7 @@ internal fun ToastHost(state: ToastState, hazeState: HazeState, onCopy: (String)
             }
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-            .padding(start = ToastEdge, end = ToastEdge, bottom = ToastEdge),
+            .padding(start = SearchEdge, end = SearchEdge, bottom = SearchEdge),
     ) {
         visible.forEachIndexed { i, toast ->
             key(toast.id) {

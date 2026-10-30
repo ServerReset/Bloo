@@ -24,7 +24,7 @@ internal val PopEnterSpec = floatingSpring<Float>()
 /** The exit's two beats: an anticipatory lift, then the retreat. Springs, not linear tweens, so the
  *  end of each eases in instead of stopping hard (the "stiff end"). */
 private val PopLiftSpec = floatingSpring<Float>()
-private val PopExitSpec = spring<Float>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)
+private val PopExitSpec = spring<Float>(dampingRatio = GentleDamping, stiffness = Spring.StiffnessMediumLow)
 
 /**
  * Pop progress for one surface: 0 = hidden at its origin, 1 = resting. Starts rising on first composition; once

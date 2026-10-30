@@ -60,7 +60,7 @@ import com.bloo.uicommon.LocalHaptics
 internal enum class SearchForm { BUBBLE, PILL, BAR }
 
 /** The screen-edge inset the search element rests at. */
-private val SearchEdge = 16.dp
+internal val SearchEdge = 16.dp
 
 /** The widest the open search bar gets. */
 private val MaxSearchBarWidth = 640.dp
