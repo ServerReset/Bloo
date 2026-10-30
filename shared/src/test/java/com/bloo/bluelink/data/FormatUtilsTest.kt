@@ -40,6 +40,11 @@ class FormatUtilsTest {
     }
 
     @Test
+    fun smartClimateHint_saysTargetThenOutsideInThePersonsUnit() {
+        assertEquals("Cool to ${degLabel("79", true)} · ${degLabel("89", true)} outside", smartClimateHint(89, fahrenheit = true))
+    }
+
+    @Test
     fun smartClimateTargetF_coolModerate_offsetsUpTenDegrees_clampedIntoRange() {
         // 41 + 10 = 51, below CLIMATE_TEMP_RANGE_F's floor of 62 -- clamped up.
         assertEquals(62, smartClimateTargetF(41))

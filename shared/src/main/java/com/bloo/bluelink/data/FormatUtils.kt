@@ -62,6 +62,10 @@ fun smartClimateLabel(ambientF: Int, fahrenheit: Boolean): String {
     return (if (smartClimateIsCooling(ambientF)) "Cool to " else "Heat to ") + target
 }
 
+/** The compact smart-climate hint the watch shows under its row: "Cool to 62° · 88° outside". */
+fun smartClimateHint(ambientF: Int, fahrenheit: Boolean): String =
+    smartClimateLabel(ambientF, fahrenheit) + " · " + degLabel(ambientF.toString(), fahrenheit) + " outside"
+
 /** The sentence under the smart-climate row on the phone: the ambient reading, then the target it will set. */
 fun smartClimateTargetLine(ambientF: Int, fahrenheit: Boolean): String {
     val ambient = degLabel(ambientF.toString(), fahrenheit)

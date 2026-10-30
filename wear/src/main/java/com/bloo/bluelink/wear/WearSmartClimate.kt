@@ -3,9 +3,8 @@ package com.bloo.bluelink.wear
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WeatherApi
 import com.bloo.bluelink.data.ambientFahrenheit
-import com.bloo.bluelink.data.degLabel
+import com.bloo.bluelink.data.smartClimateHint
 import com.bloo.bluelink.data.smartClimateIsCooling
-import com.bloo.bluelink.data.smartClimateLabel
 import com.bloo.bluelink.data.smartClimateTargetF
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,10 +43,7 @@ internal object WearSmartClimate {
     }
 
     /** "Cool to 62°" or "Heat to 78°", with the outside temperature, in the phone's unit (the phone words the first part the same way). */
-    fun describe(hint: Hint): String {
-        val fahrenheit = WearPresets.fahrenheit
-        return smartClimateLabel(hint.ambientF, fahrenheit) + " · " + degLabel(hint.ambientF.toString(), fahrenheit) + " outside"
-    }
+    fun describe(hint: Hint): String = smartClimateHint(hint.ambientF, WearPresets.fahrenheit)
 
     private val failedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
