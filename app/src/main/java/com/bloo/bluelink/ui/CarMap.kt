@@ -47,7 +47,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.AnimatedVisibility
 import com.bloo.uicommon.rememberDisplayedItems
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -81,6 +85,9 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.isActive
 import com.bloo.uicommon.LocalPowerPolicy
 
@@ -259,6 +266,8 @@ private fun CarMapBody(
         val span = MapTiles.span(zoom)
         val xTileF = MapTiles.tileX(location.longitude, zoom)
         val yTileF = MapTiles.tileY(location.latitude, zoom)
+        // The tiles on screen that have not arrived yet, by "zoom/x/y". Read by the ghost, which waits for them (see below).
+        val pendingTiles = remember { mutableStateMapOf<String, Boolean>() }
 
         // Zooms out (never in) to bring the device into view the first time both fixes are known
         // and the map is at rest; see CarMapState.fitBothLocations.
@@ -289,51 +298,33 @@ private fun CarMapBody(
             }
         }
 
-        // The previous level stays under the map for a moment after the zoom settles, so the new level's tiles have time to arrive.
+        // The level the map has just left stays underneath until this level's tiles have arrived, so a zoom never shows a blank map. A tile
+        // still loading is in [pendingTiles]; the ghost lets go once none of this level's are, and never later than GhostMaxHoldMs, so a tile
+        // that never comes cannot hold the map.
         LaunchedEffect(zoom) {
-            if (state.ghostZoom >= 0) {
-                delay(GhostHoldMs)
-                state.ghostZoom = -1
+            if (state.ghostZoom < 0) return@LaunchedEffect
+            // Let this level's first tiles register before waiting on them.
+            delay(GhostSettleMs)
+            withTimeoutOrNull(GhostMaxHoldMs) {
+                snapshotFlow { pendingTiles.keys.any { it.startsWith("$zoom/") } }.first { !it }
             }
+            state.ghostZoom = -1
         }
-        // Warms Coil's cache for the next zoom level in each direction once zoom settles.
-        // delay(300) debounces rapid zoom changes (enqueue() outlives this coroutine); the batch is
-        // disposed in `finally` once superseded so it stops competing with visible tiles.
+        // Warms Coil's cache around the map, so a pan or a zoom finds its tiles already there. The view's own level gets a ring one tile wide
+        // round the view, at once, for the next pan; the levels either side get the view's area after a short wait, so a pinch past several
+        // steps does not queue a burst for each. The batch is bounded, and is disposed in `finally` once superseded.
         val prefetchAllowed = LocalPowerPolicy.current.prefetchMapTiles
         LaunchedEffect(zoom, xTileF, yTileF, wPx, hPx, prefetchAllowed) {
             // A static map can never zoom, so there is no next level to warm: skipping saves a burst of
             // dozens of image requests right as a car page settles.
             if (!interactive || !prefetchAllowed || wPx <= 0f || hPx <= 0f) return@LaunchedEffect
-            delay(300)
             val loader = context.imageLoader
-            val halfTilesX = wPx / tilePx / 2f + 1f
-            val halfTilesY = hPx / tilePx / 2f + 1f
             val disposables = mutableListOf<coil.request.Disposable>()
             try {
-                for (targetZoom in intArrayOf(zoom - 1, zoom + 1)) {
-                    if (targetZoom < CarMapMinZoom || targetZoom > CarMapMaxZoom) continue
-                    val cx = MapTiles.tileX(location.longitude, targetZoom)
-                    val cy = MapTiles.tileY(location.latitude, targetZoom)
-                    val span = MapTiles.span(targetZoom)
-                    val firstX = floor(cx - halfTilesX).toInt()
-                    val lastX = floor(cx + halfTilesX).toInt()
-                    val firstY = floor(cy - halfTilesY).toInt().coerceAtLeast(0)
-                    val lastY = floor(cy + halfTilesY).toInt().coerceAtMost(span - 1)
-                    for (tx in firstX..lastX) {
-                        for (ty in firstY..lastY) {
-                            // enqueue() has no suspension point; check cancellation explicitly so a
-                            // superseded batch stops.
-                            currentCoroutineContext().ensureActive()
-                            val wrappedX = MapTiles.wrapX(tx, targetZoom)
-                            disposables += loader.enqueue(
-                                ImageRequest.Builder(context)
-                                    .data(MapTiles.tileUrl(targetZoom, wrappedX, ty))
-                                    .setHeader("User-Agent", MapTiles.userAgent("Android"))
-                                    .build(),
-                            )
-                        }
-                    }
-                }
+                prefetchWindow(loader, context, zoom, location, wPx, hPx, pad = 1, into = disposables)
+                delay(PrefetchNeighbourDelayMs)
+                prefetchWindow(loader, context, zoom - 1, location, wPx, hPx, pad = 0, into = disposables)
+                prefetchWindow(loader, context, zoom + 1, location, wPx, hPx, pad = 0, into = disposables)
             } finally {
                 if (!currentCoroutineContext().isActive) disposables.forEach { it.dispose() }
             }
@@ -420,12 +411,20 @@ private fun CarMapBody(
                     // already sitting in Coil's memory cache -- visible flicker across the whole
                     // map.
                     val request = remember(wrappedX, ty, zoom) { mapTileRequest(context, zoom, wrappedX, ty) }
+                    val tileKey = "$zoom/$wrappedX/$ty"
+                    // Pending from the moment the tile is on screen until it has arrived, or has left the screen.
+                    DisposableEffect(tileKey) {
+                        pendingTiles[tileKey] = true
+                        onDispose { pendingTiles.remove(tileKey) }
+                    }
                     AsyncImage(
                         model = request,
                         contentDescription = null,
                         colorFilter = darkMapFilter,
                         // Sized and placed by TileLayer, from the layout size of the moment.
                         modifier = Modifier.tileSlot(tx, ty, MapTiles.TILE_PX),
+                        onSuccess = { pendingTiles.remove(tileKey) },
+                        onError = { pendingTiles.remove(tileKey) },
                     )
                 }
             }
@@ -632,6 +631,21 @@ internal fun BoxScope.CarPinLayer(
         key(cluster.first().pin.vin) {
             val members = cluster.map { it.pin }.take(MaxClusterCars)
             val shown = rememberDisplayedItems(members, resetKey = cluster.first().pin.vin)
+            // Whether the cluster is off screen, read in composition only when that changes. Off screen the pin is invisible, so it must not
+            // take touches: an off-screen car is reached through its pointer at the edge (see OffScreenCarPointers).
+            val latest by rememberUpdatedState(cluster)
+            val hidden by remember(cluster.first().pin.vin) {
+                derivedStateOf {
+                    val c = latest
+                    val at = mapScreenOffset(
+                        c.sumOf { it.dx.toDouble() }.toFloat() / c.size,
+                        c.sumOf { it.dy.toDouble() }.toFloat() / c.size,
+                        state.panX, state.panY, panWeight(), state.scale,
+                    )
+                    val b = box.value
+                    markerOffVisible(at.x, at.y, b.width / 2f, b.height / 2f, marginPx, chromeInsets.topPx, chromeInsets.bottomPx)
+                }
+            }
             Box(
                 Modifier.align(Alignment.Center)
                     .offset { IntOffset(screenX().roundToInt(), screenY().roundToInt()) }
@@ -653,7 +667,7 @@ internal fun BoxScope.CarPinLayer(
                         tint = if (isOwn) tint else tint.copy(alpha = 0.7f),
                         selected = selectedVin == pin.vin,
                         contentDesc = if (isOwn) "Car location" else "${pin.name}, another car",
-                        onClick = { onPinTap(pin.vin) },
+                        onClick = if (hidden) null else ({ onPinTap(pin.vin) }),
                         // The bubble shows only with the car's photo, which the expanded map passes for its own car; the other cars are only on it.
                         bubble = !isOwn || pin.photo != null,
                         modifier = Modifier.align(Alignment.Center),
@@ -670,6 +684,7 @@ internal fun BoxScope.CarPinLayer(
                         current = members.map { it.vin }.toSet(),
                         selectedVin = selectedVin,
                         tint = tint,
+                        tappable = !hidden,
                         onPinTap = onPinTap,
                     )
                 }
@@ -691,6 +706,7 @@ private fun ClusterPill(
     current: Set<String>,
     selectedVin: String?,
     tint: Color,
+    tappable: Boolean,
     onPinTap: (String) -> Unit,
 ) {
     val shape = RoundedCornerShape(50)
@@ -714,7 +730,7 @@ private fun ClusterPill(
                         photo = pin.photo,
                         tint = tint,
                         contentDescription = "${pin.name}. Tap to select it",
-                        onClick = { onPinTap(pin.vin) },
+                        onClick = if (tappable) ({ onPinTap(pin.vin) }) else null,
                         size = DpSize(36.dp, 26.dp),
                         selected = pin.vin == selectedVin,
                         glyphSize = 14.dp,
@@ -725,8 +741,52 @@ private fun ClusterPill(
     }
 }
 
-/** How long the previous zoom level's tiles stay under the map after the zoom settles, while the new level's tiles load. */
-private const val GhostHoldMs = 1200L
+/** How long the previous zoom level stays under the map at most, while the new level's tiles load. */
+private const val GhostMaxHoldMs = 3000L
+
+/** The time a new level's first tiles get to register before the ghost waits on them. */
+private const val GhostSettleMs = 60L
+
+/** How long the levels either side of the view wait before their tiles are warmed, so a pinch past several steps warms only the last. */
+private const val PrefetchNeighbourDelayMs = 250L
+
+/** The most tiles one prefetch batch enqueues. A bulk fetch is not what the map needs, and the tile server asks clients not to do one. */
+private const val MaxPrefetchTiles = 120
+
+/**
+ * Enqueues the tiles of one zoom level that cover the view round [location], plus [pad] tiles all round. Each tile is 256 pixels at every
+ * zoom, so the view covers the same number of tiles whatever the level; only the area they cover changes.
+ */
+private suspend fun prefetchWindow(
+    loader: coil.ImageLoader,
+    context: android.content.Context,
+    zoom: Int,
+    location: GeoLocation,
+    wPx: Float,
+    hPx: Float,
+    pad: Int,
+    into: MutableList<coil.request.Disposable>,
+) {
+    if (zoom < CarMapMinZoom || zoom > CarMapMaxZoom) return
+    val tilePx = MapTiles.TILE_PX.toFloat()
+    val cx = MapTiles.tileX(location.longitude, zoom)
+    val cy = MapTiles.tileY(location.latitude, zoom)
+    val span = MapTiles.span(zoom)
+    val halfX = wPx / tilePx / 2f + pad
+    val halfY = hPx / tilePx / 2f + pad
+    val firstX = floor(cx - halfX).toInt()
+    val lastX = floor(cx + halfX).toInt()
+    val firstY = floor(cy - halfY).toInt().coerceAtLeast(0)
+    val lastY = floor(cy + halfY).toInt().coerceAtMost(span - 1)
+    for (tx in firstX..lastX) {
+        for (ty in firstY..lastY) {
+            // enqueue() has no suspension point; check cancellation explicitly so a superseded batch stops.
+            currentCoroutineContext().ensureActive()
+            if (into.size >= MaxPrefetchTiles) return
+            into += loader.enqueue(mapTileRequest(context, zoom, MapTiles.wrapX(tx, zoom), ty))
+        }
+    }
+}
 
 /** The request for one map tile: the same for both zoom levels, and never crossfaded (a tile that is already shown should not refade). */
 private fun mapTileRequest(context: android.content.Context, zoom: Int, x: Int, y: Int): ImageRequest =

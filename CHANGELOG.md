@@ -22,6 +22,8 @@ Dated, newest first. The privacy policy keeps its own dated log of the changes t
 - Map: a pinch across a zoom step keeps the previous zoom's tiles on screen, so the map does not go blank.
 - Watch: swipe up and down between cars, and left and right through each car's sections. The watch remembers where you were.
 - Watch: charging shows on the watch face and in Recents, as a live ongoing activity.
+- Map: a car that leaves the screen springs from its place to the edge, and fades; coming back reverses it. Off-screen pins take no taps, so a tap on a visible car reaches that car.
+- Map: the previous zoom level stays under the map until the new level's tiles have arrived, within 3 seconds at most. Tiles are kept for 256MB (up from 100MB) and kept past the server's expiry, so a map looked at recently draws offline.
 - Climate: a preset edits in place under its own name, with no pop-up, and saving a preset names it under the controls. While climate runs, the presets and controls fold away to a read-only summary, which folds back when climate stops. The seats are full-width sliders.
 - Smart climate: the target weighs humidity, wind, day or night, the next few hours, and your past settings, and says why it chose its target.
 

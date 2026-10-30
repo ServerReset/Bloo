@@ -57,21 +57,23 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
             StartupTrace.mark(StartupLabels.WORK_MANAGER_CONFIGURATION_REQUESTED)
         }
 
-    /** Caps Coil's in-memory bitmap cache explicitly (48MB), replacing the library default.
-     *  A fixed byte cap rather than a percentage: the map screen streams an unbounded series of 256x256 tiles
-     *  (~190 tiles at 48MB), and an earlier session heap grew to 220MB+ without an explicit bound. */
+    /** Caps Coil's in-memory bitmap cache (80MB) and its disk cache (256MB), replacing the library defaults. A fixed byte cap rather
+     *  than a percentage: the map screen streams an unbounded series of 256x256 tiles (~320 tiles at 80MB), and an earlier session
+     *  heap grew to 220MB+ without an explicit bound. The disk cache keeps tiles past the server's own expiry, so a map that was
+     *  looked at recently still draws without a connection; the byte cap is what bounds it. */
     override fun newImageLoader(): coil.ImageLoader = coil.ImageLoader.Builder(this)
         .memoryCache {
             coil.memory.MemoryCache.Builder(this)
-                .maxSizeBytes(48 * 1024 * 1024)
+                .maxSizeBytes(80 * 1024 * 1024)
                 .build()
         }
         .diskCache {
             coil.disk.DiskCache.Builder()
                 .directory(cacheDir.resolve("coil_disk_cache"))
-                .maxSizeBytes(100 * 1024 * 1024)
+                .maxSizeBytes(256 * 1024 * 1024)
                 .build()
         }
+        .respectCacheHeaders(false)
         .build()
 
     // Deliberately not chaining to the default handler: it owns the whole crash path (report, CrashActivity,
