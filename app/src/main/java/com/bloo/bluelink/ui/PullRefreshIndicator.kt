@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.PullRefreshState
+import com.bloo.uicommon.pullFingerPosition
 import com.bloo.uicommon.bounceSpring
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
@@ -59,9 +60,6 @@ private val SpinnerSize = 44.dp
 /** How far below the status bar's lower edge the indicator rests. */
 private val RestBelowStatusBar = 12.dp
 
-/** How much further (in disc-travel fractions) a pull past the arm point keeps going, resisted. */
-private const val OverPullTravel = 0.35f
-
 /** The single floating indicator. */
 @Composable
 internal fun PullRefreshIndicatorHost(state: RefreshIndicatorState, hazeState: HazeState?, modifier: Modifier = Modifier) {
@@ -73,7 +71,7 @@ internal fun PullRefreshIndicatorHost(state: RefreshIndicatorState, hazeState: H
     val pullRaw = state.pull
     val raw = pullRaw.coerceIn(0f, 1f)
     val over = (pullRaw - 1f).coerceAtLeast(0f)
-    val finger = raw + over / (1f + over) * OverPullTravel
+    val finger = pullFingerPosition(pullRaw)
     // The disc is driven DIRECTLY by the finger while pulling (1:1, no spring lag), and only
     // springs for the refreshing endpoint -- a pull that trails the finger on a spring reads as
     // disconnected.

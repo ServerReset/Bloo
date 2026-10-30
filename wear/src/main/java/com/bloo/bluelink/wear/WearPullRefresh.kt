@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.PullRefreshState
+import com.bloo.uicommon.pullFingerPosition
 
 /*
  * The watch's pull-to-refresh, in the phone's own mechanic: pull down from the top of the face and a disc drops
@@ -126,19 +127,15 @@ fun BoxScope.WearPullIndicator(state: PullRefreshState, refreshing: Boolean) {
             state.requested = false
         }
     }
-    fun fingerOf(p: Float): Float {
-        val over = (p - 1f).coerceAtLeast(0f)
-        return p.coerceIn(0f, 1f) + over / (1f + over) * 0.35f
-    }
     val raw = state.pull.coerceIn(0f, 1f)
     val over = (state.pull - 1f).coerceAtLeast(0f)
-    val finger = fingerOf(state.pull)
+    val finger = pullFingerPosition(state.pull)
     val dragging = state.pull > 0f
     val settle = remember { Animatable(0f) }
     LaunchedEffect(active) {
         if (active) {
             // From where the finger left it (it is already back to 0 by now), not from the top.
-            if (settle.value < 0.01f) settle.snapTo(fingerOf(state.lastPull))
+            if (settle.value < 0.01f) settle.snapTo(pullFingerPosition(state.lastPull))
             settle.animateTo(1f, ArmSpring)
         } else if (settle.value > 0.01f) {
             settle.animateTo(0f, ReturnSpring)
@@ -147,7 +144,7 @@ fun BoxScope.WearPullIndicator(state: PullRefreshState, refreshing: Boolean) {
     // A pull let go before the arm point springs back from where the finger left it.
     LaunchedEffect(dragging) {
         if (!dragging && !active && state.lastPull > 0.01f) {
-            settle.snapTo(fingerOf(state.lastPull))
+            settle.snapTo(pullFingerPosition(state.lastPull))
             settle.animateTo(0f, ReturnSpring)
         }
     }

@@ -22,3 +22,17 @@ open class PullRefreshState {
      */
     var requested by mutableStateOf(false)
 }
+
+/** How much a pull past the arm point keeps travelling, resisted, as a fraction of the disc's travel. */
+private const val OverPullTravel = 0.35f
+
+/**
+ * Where the disc sits for a pull of [pull]: 1:1 up to the arm point, then a resisted rubber band past it, so the disc can be pulled below
+ * its rest and springs back onto it on release. Shared by the phone's indicator and the watch's disc.
+ */
+fun pullFingerPosition(pull: Float): Float {
+    val raw = pull.coerceIn(0f, 1f)
+    val over = (pull - 1f).coerceAtLeast(0f)
+    return raw + over / (1f + over) * OverPullTravel
+}
+

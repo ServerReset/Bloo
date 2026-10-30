@@ -71,5 +71,5 @@ internal fun WearTheme(content: @Composable () -> Unit) {
 // secondary and tertiary when the phone sends them) comes from WearAccent; these are the fallbacks and the surfaces.
 private val WearSecondary = Color(0xFFCCC2DC)
 private val WearTertiary = Color(0xFFEFB8C8)
-private val WearSecondaryContainer = Color(0xFF2A2A33)
+private val WearSecondaryContainer = Color(TilePalette.BUTTON)
 private val WearSurfaceContainer = Color(0xFF1C1C22)
