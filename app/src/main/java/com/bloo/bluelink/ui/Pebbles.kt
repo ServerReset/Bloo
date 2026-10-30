@@ -42,6 +42,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.calmSpring
 import com.bloo.uicommon.ReorderableRows
+import com.bloo.uicommon.mergeShownOrder
 import com.bloo.uicommon.LocalHaptics
 
 /**
@@ -144,16 +145,9 @@ internal fun PebbleList(
         // grid/single column it reorders vertically only.
         allowHorizontalDrag = pinHotspot,
         onReorder = { newVisible ->
-            // Merge the reordered visible items back into the full section order so excluded ones
-            // (the pinned hot-spot pebbles, summary, hidden) keep their slots instead of being
-            // dropped.
-            val visibleSet = sections.toSet()
+            // Excluded pebbles (the pinned hot-spot ones, summary, hidden) keep their slots.
             val full = (allSections + com.bloo.bluelink.data.DEFAULT_SECTIONS).distinct()
-            val queue = ArrayDeque(newVisible.filter { it in visibleSet })
-            val merged = full.map { s ->
-                if (s in visibleSet && queue.isNotEmpty()) queue.removeFirst() else s
-            }
-            vm.setSectionOrder(v, merged)
+            vm.setSectionOrder(v, mergeShownOrder(full, sections, newVisible))
         },
         // In the dual-column view, dragging a pebble onto the hot-spot slot pins it.
         onDragMove = hotDrag?.let { d ->
