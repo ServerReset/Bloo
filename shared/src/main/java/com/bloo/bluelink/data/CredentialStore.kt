@@ -18,7 +18,14 @@ data class Credentials(
 class CredentialStore(context: Context) {
     private val appContext: Context = context.applicationContext
 
+    /** The device vault: the app-lock records only. */
     private val vault: SecureVault get() = vaultFor(appContext)
+
+    /** The sign-in secrets: behind the device unlock (see [SecureVault.secrets]). */
+    private val secrets: SecureVault get() = secretsFor(appContext)
+
+    /** True while the sign-in secrets are locked until the device is unlocked: no saved account can be read or written. */
+    val secretsLocked: Boolean get() = secrets.locked
 
     /**
      * Called from the startup warm-up thread in BlooApplication, which starts well over a second
@@ -27,14 +34,14 @@ class CredentialStore(context: Context) {
      */
     fun warmUp() {
         // Sealed after a restart (see BootGate): the list would come back empty and be cached as such.
-        if (!BootGate.isLocked(appContext)) runCatching { cachedAccounts = loadAllUncached() }
+        if (!BootGate.isLocked(appContext) && !secrets.locked) runCatching { cachedAccounts = loadAllUncached() }
     }
 
     /** Persists [credentials] under brand-prefixed keys (e.g. "HYUNDAI_email"). */
     fun save(credentials: Credentials) {
         val b = credentials.brand.name
         val brands = brandSet().toMutableSet().apply { add(b) }
-        vault.edit {
+        secrets.edit {
             put("${b}_email", credentials.email)
             put("${b}_password", credentials.password)
             put("${b}_pin", credentials.pin)
@@ -50,15 +57,16 @@ class CredentialStore(context: Context) {
      */
     fun load(brand: Brand): Credentials? {
         val b = brand.name
-        val email = vault.getString("${b}_email") ?: return null
-        val password = vault.getString("${b}_password") ?: return null
-        val pin = vault.getString("${b}_pin") ?: return null
+        val email = secrets.getString("${b}_email") ?: return null
+        val password = secrets.getString("${b}_password") ?: return null
+        val pin = secrets.getString("${b}_pin") ?: return null
         return Credentials(email, password, pin, brand)
     }
 
     /** Loads every brand that has an entry in [KEY_BRANDS]. */
     fun loadAll(): List<Credentials> = cachedAccounts ?: loadAllUncached().also {
-        if (!BootGate.isLocked(appContext)) cachedAccounts = it
+        // Not cached while the secrets are locked: an empty list then means "locked", not "signed out".
+        if (!BootGate.isLocked(appContext) && !secrets.locked) cachedAccounts = it
     }
 
     private fun loadAllUncached(): List<Credentials> {
@@ -69,7 +77,7 @@ class CredentialStore(context: Context) {
 
     /** Overwrites just the stored PIN for [brand], leaving email/password untouched. */
     fun updatePin(brand: Brand, pin: String) {
-        vault.edit { put("${brand.name}_pin", pin) }
+        secrets.edit { put("${brand.name}_pin", pin) }
         cachedAccounts = null
     }
 
@@ -77,7 +85,7 @@ class CredentialStore(context: Context) {
     fun clear(brand: Brand) {
         val b = brand.name
         val brands = brandSet().toMutableSet().apply { remove(b) }
-        vault.edit {
+        secrets.edit {
             remove("${b}_email"); remove("${b}_password"); remove("${b}_pin")
             put(KEY_BRANDS, brands.joinToString(","))
         }
@@ -122,9 +130,9 @@ class CredentialStore(context: Context) {
             if (ignoreCase) return a.equals(typed, ignoreCase = true)
             return java.security.MessageDigest.isEqual(x, y)
         }
-        return same(vault.getStringUnsealed("${b}_email"), email.trim(), ignoreCase = true) &&
-            same(vault.getStringUnsealed("${b}_password"), password) &&
-            same(vault.getStringUnsealed("${b}_pin"), pin.trim())
+        return same(secrets.getStringUnsealed("${b}_email"), email.trim(), ignoreCase = true) &&
+            same(secrets.getStringUnsealed("${b}_password"), password) &&
+            same(secrets.getStringUnsealed("${b}_pin"), pin.trim())
     }
 
     /** Consecutive PIN failures since the last successful unlock. */
@@ -151,7 +159,7 @@ class CredentialStore(context: Context) {
     }
 
     private fun brandSet(): Set<String> =
-        vault.getString(KEY_BRANDS)?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+        secrets.getString(KEY_BRANDS)?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
     internal companion object {
         // Holds the comma-joined brand names ("HYUNDAI,KIA") that currently have credentials saved.
@@ -161,6 +169,8 @@ class CredentialStore(context: Context) {
         const val KEY_PIN_LOCKED_UNTIL = "app_pin_locked_until"
         const val KEY_PIN_LOCKED_UNTIL_ELAPSED = "app_pin_locked_until_elapsed"
         private const val KEY_IMPORTED = "legacy_credentials_imported"
+        /** Set in the secrets vault once the sign-in secrets have been moved out of the device vault. */
+        private const val KEY_MOVED = "credentials_moved"
         private const val LEGACY_PREFS = "bloo_credentials"
 
         /**
@@ -177,6 +187,30 @@ class CredentialStore(context: Context) {
                 if (vault.getString(KEY_IMPORTED) == null) importLegacy(context, vault)
             }
             return vault
+        }
+
+        /**
+         * The sign-in secrets' vault, with the one-time move of the credentials out of the device vault done. The move waits for the
+         * device unlock, and reads past the seal, so a sealed or locked vault is never mistaken for an empty one.
+         */
+        fun secretsFor(context: Context): SecureVault {
+            val secrets = SecureVault.secrets(context)
+            if (secrets.getString(KEY_MOVED) == null && !secrets.locked) synchronized(this) {
+                if (secrets.getString(KEY_MOVED) == null && !secrets.locked) moveCredentials(vaultFor(context), secrets)
+            }
+            return secrets
+        }
+
+        /** Copies the sign-in entries from the device vault to the secrets vault, then removes them from the device vault. */
+        private fun moveCredentials(device: SecureVault, secrets: SecureVault) {
+            val brands = device.getStringUnsealed(KEY_BRANDS)?.split(",")?.filter { it.isNotBlank() }.orEmpty()
+            val keys = listOf(KEY_BRANDS) + brands.flatMap { b -> listOf("${b}_email", "${b}_password", "${b}_pin") }
+            val entries = keys.mapNotNull { k -> device.getStringUnsealed(k)?.let { k to it } }
+            val moved = secrets.edit {
+                entries.forEach { (k, v) -> put(k, v) }
+                put(KEY_MOVED, "1")
+            }
+            if (moved && entries.isNotEmpty()) device.edit { entries.forEach { (k, _) -> remove(k) } }
         }
 
         /**

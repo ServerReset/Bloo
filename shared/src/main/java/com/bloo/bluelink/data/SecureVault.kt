@@ -21,6 +21,11 @@ interface VaultKeyWrapper {
     fun wrap(dek: ByteArray): ByteArray
     /** Null when the wrapping key is gone or the blob does not authenticate. */
     fun unwrap(blob: ByteArray): ByteArray?
+    /**
+     * True when the key exists but the device must be unlocked before it can be used. The vault is then
+     * locked, not empty: nothing may be written over it until the device is unlocked.
+     */
+    val locked: Boolean get() = false
 }
 
 /**
@@ -48,8 +53,11 @@ class SecureVault(
     private var deviceSlot: String? = null
     private var loaded = false
 
-    /** True when a vault exists on disk but this device's key can no longer open it. */
-    val needsRecovery: Boolean get() = synchronized(lock) { ensureLoaded(); dek == null && file.exists() }
+    /** True when a vault exists on disk but this device's key can no longer open it (and is not merely locked). */
+    val needsRecovery: Boolean get() = synchronized(lock) { ensureLoaded(); dek == null && file.exists() && !wrapper.locked }
+
+    /** True while the vault exists but the device must be unlocked before it can be read or written. */
+    val locked: Boolean get() = synchronized(lock) { ensureLoaded(); dek == null && file.exists() && wrapper.locked }
 
     fun getString(key: String): String? = synchronized(lock) {
         ensureLoaded()
@@ -62,12 +70,22 @@ class SecureVault(
      */
     fun getStringUnsealed(key: String): String? = synchronized(lock) { ensureLoaded(); values[key] }
 
-    /** Applies every change in [block] and writes the vault once. */
-    fun edit(block: Editor.() -> Unit) = synchronized(lock) {
+    /**
+     * Applies every change in [block] and writes the vault once. Returns false, and changes nothing, when the write cannot be made
+     * (the vault is locked, or its key is unavailable), so a failed save never leaves a half-written vault behind.
+     */
+    fun edit(block: Editor.() -> Unit): Boolean = synchronized(lock) {
         ensureLoaded()
+        val before = values
         val ed = Editor(HashMap(values)).apply(block)
         values = ed.map
-        persist()
+        try {
+            persist()
+            true
+        } catch (e: Exception) {
+            values = before
+            false
+        }
     }
 
     class Editor internal constructor(internal val map: HashMap<String, String>) {
@@ -101,6 +119,8 @@ class SecureVault(
 
     private fun persist() {
         var key = dek
+        // A vault whose key needs the device unlock is not replaced by a new key: that would destroy what is stored.
+        if (key == null && wrapper.locked) throw IllegalStateException("vault is locked until the device is unlocked")
         if (key == null) {
             // About to write a vault this device could not open over the one on disk. Keep the old file once, beside
             // it, so it is not destroyed by this write.
@@ -148,6 +168,18 @@ class SecureVault(
         const val FILE_NAME = "bloo_vault.json"
 
         @Volatile private var instance: SecureVault? = null
+        @Volatile private var secretsInstance: SecureVault? = null
+
+        /** The file the sign-in secrets live in, sealed by [UserAuthKeystoreWrapper]. */
+        const val SECRETS_FILE_NAME = "bloo_secrets.json"
+
+        /** The vault for the sign-in secrets: the same format, behind the device unlock. Built on first use. */
+        fun secrets(context: Context): SecureVault =
+            secretsInstance ?: synchronized(this) {
+                val app = context.applicationContext
+                secretsInstance ?: SecureVault(File(app.filesDir, SECRETS_FILE_NAME), UserAuthKeystoreWrapper, sealed = { BootGate.isLocked(app) })
+                    .also { secretsInstance = it }
+            }
 
         /** The process-wide vault, built on first use. */
         fun of(context: Context): SecureVault =
@@ -156,6 +188,61 @@ class SecureVault(
                 instance ?: SecureVault(File(app.filesDir, FILE_NAME), KeystoreWrapper, sealed = { BootGate.isLocked(app) })
                     .also { instance = it }
             }
+    }
+}
+
+/**
+ * The key for the sign-in secrets: AES-256-GCM in the Android Keystore, usable only after the device has been unlocked with its own
+ * lock screen (PIN, pattern or password), and then for [WINDOW_SECONDS]. Background work that needs the stored sign-ins therefore
+ * keeps working for that window after each unlock, and a fingerprint enrolled later does not invalidate it.
+ */
+internal object UserAuthKeystoreWrapper : VaultKeyWrapper {
+    private const val ALIAS = "bloo_secrets_key_v1"
+    /** 30 days: long enough that background refresh works between unlocks, short enough that a stolen, long-idle phone is locked. */
+    internal const val WINDOW_SECONDS = 30 * 24 * 60 * 60
+    private val lockedFlag = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    override val locked: Boolean get() = lockedFlag.get()
+
+    private fun key(): SecretKey {
+        val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        (ks.getKey(ALIAS, null) as? SecretKey)?.let { return it }
+        val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        gen.init(
+            KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .setUserAuthenticationRequired(true)
+                .setUserAuthenticationValidityDurationSeconds(WINDOW_SECONDS)
+                .setInvalidatedByBiometricEnrollment(false)
+                .build(),
+        )
+        return gen.generateKey()
+    }
+
+    override fun wrap(dek: ByteArray): ByteArray {
+        val c = Cipher.getInstance("AES/GCM/NoPadding")
+        try {
+            c.init(Cipher.ENCRYPT_MODE, key())
+        } catch (e: android.security.keystore.UserNotAuthenticatedException) {
+            lockedFlag.set(true)
+            throw e
+        }
+        lockedFlag.set(false)
+        return c.iv + c.doFinal(dek)
+    }
+
+    override fun unwrap(blob: ByteArray): ByteArray? = try {
+        val c = Cipher.getInstance("AES/GCM/NoPadding")
+        c.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, blob.copyOfRange(0, 12)))
+        lockedFlag.set(false)
+        c.doFinal(blob, 12, blob.size - 12)
+    } catch (e: android.security.keystore.UserNotAuthenticatedException) {
+        lockedFlag.set(true)
+        null
+    } catch (e: Exception) {
+        null
     }
 }
 

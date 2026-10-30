@@ -14,13 +14,18 @@ import kotlin.test.assertTrue
 class SecureVaultTest {
     /** A stand-in for the Keystore key: a plain AES key held in memory (or "lost" on demand). */
     private class FakeWrapper(var key: ByteArray? = ByteArray(32) { it.toByte() }) : VaultKeyWrapper {
+        /** Simulates a device that is locked: the key is there, but cannot be used until the device is unlocked. */
+        var isLocked = false
+        override val locked: Boolean get() = isLocked
         override fun wrap(dek: ByteArray): ByteArray {
+            if (isLocked) throw IllegalStateException("locked")
             val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
             val c = Cipher.getInstance("AES/GCM/NoPadding")
             c.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key!!, "AES"), GCMParameterSpec(128, iv))
             return iv + c.doFinal(dek)
         }
         override fun unwrap(blob: ByteArray): ByteArray? = runCatching {
+            if (isLocked) return null
             val c = Cipher.getInstance("AES/GCM/NoPadding")
             c.init(Cipher.DECRYPT_MODE, SecretKeySpec(key!!, "AES"), GCMParameterSpec(128, blob.copyOfRange(0, 12)))
             c.doFinal(blob, 12, blob.size - 12)
@@ -82,5 +87,21 @@ class SecureVaultTest {
         v.edit { put("pw", "newer") }
         assertFalse("\"pin\"" in f.readText(), "the PIN slot is dropped on the next save")
         assertEquals("newer", SecureVault(f, w).getString("pw"))
+    }
+
+    @Test fun lockedVault_readsAsLocked_andRefusesWrites_withoutTouchingTheFile() {
+        val f = file(); val w = FakeWrapper()
+        SecureVault(f, w).edit { put("pw", "secret") }
+        val before = f.readText()
+        w.isLocked = true
+        val v = SecureVault(f, w)
+        assertNull(v.getString("pw"))
+        assertTrue(v.locked)
+        assertFalse(v.needsRecovery, "locked is not the same as lost")
+        assertFalse(v.edit { put("x", "y") }, "a write to a locked vault is refused")
+        assertEquals(before, f.readText(), "the file is left exactly as it was")
+        assertFalse(File(f.parentFile, f.name + ".lost").exists())
+        w.isLocked = false
+        assertEquals("secret", SecureVault(f, w).getString("pw"))
     }
 }
