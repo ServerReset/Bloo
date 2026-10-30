@@ -43,6 +43,7 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.calmSpring
 import com.bloo.uicommon.ReorderableRows
 import com.bloo.uicommon.mergeShownOrder
+import com.bloo.uicommon.rememberDisplayedItems
 import com.bloo.uicommon.LocalHaptics
 
 /**
@@ -117,23 +118,8 @@ internal fun PebbleList(
         }
     }
     val eager = remember(sections) { sections.take(eagerCount).toSet() }
-    // Pebbles that just left (advanced to simple mode) stay in the list while their row shrinks and
-    // fades, then drop out: removing them at once left their gap to close in a single frame.
-    var displayed by remember(v.vin) { mutableStateOf(sections) }
-    LaunchedEffect(sections) {
-        val leaving = displayed.filter { it !in sections }
-        if (leaving.isEmpty()) {
-            displayed = sections
-        } else {
-            val merged = sections.toMutableList()
-            displayed.forEachIndexed { i, s ->
-                if (s !in sections) merged.add(displayed.take(i).count { it in sections }.coerceAtMost(merged.size), s)
-            }
-            displayed = merged
-            delay(500)
-            displayed = sections
-        }
-    }
+    // Pebbles that just left (advanced to simple mode) stay in the list while their row shrinks and fades, then drop out.
+    val displayed = rememberDisplayedItems(sections, v.vin)
     // False until the column has composed once: rows that arrive after that (simple to advanced mode)
     // grow in, rows of the first composition simply are there.
     var columnSettled by remember(v.vin) { mutableStateOf(false) }
