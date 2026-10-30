@@ -63,6 +63,12 @@ internal class CarMapState {
     }
 
     /**
+     * The zoom level the map has just left, whose tiles stay on screen underneath the new level's until those arrive, so a pinch across a
+     * zoom step never shows a blank map. -1 when there is nothing to keep.
+     */
+    var ghostZoom by mutableIntStateOf(-1)
+
+    /**
      * One frame of a pinch gesture's multiplicative ratio, folded straight into [scale] -- see that
      * property's own doc.
      */
@@ -72,9 +78,11 @@ internal class CarMapState {
         userAdjusted = true
         scale *= ratio
         while (scale >= 2f && zoom < CarMapMaxZoom) {
+            ghostZoom = zoom
             zoom++; panX *= 2f; panY *= 2f; scale /= 2f
         }
         while (scale <= 0.5f && zoom > CarMapMinZoom) {
+            ghostZoom = zoom
             zoom--; panX /= 2f; panY /= 2f; scale *= 2f
         }
         // At the zoom ceiling/floor, clamp the continuous scale: CarMap's tile grid is sized for

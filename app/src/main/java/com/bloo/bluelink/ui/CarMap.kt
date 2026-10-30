@@ -76,6 +76,7 @@ import coil.request.ImageRequest
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.MapTiles
 import kotlin.math.floor
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -288,6 +289,13 @@ private fun CarMapBody(
             }
         }
 
+        // The previous level stays under the map for a moment after the zoom settles, so the new level's tiles have time to arrive.
+        LaunchedEffect(zoom) {
+            if (state.ghostZoom >= 0) {
+                delay(GhostHoldMs)
+                state.ghostZoom = -1
+            }
+        }
         // Warms Coil's cache for the next zoom level in each direction once zoom settles.
         // delay(300) debounces rapid zoom changes (enqueue() outlives this coroutine); the batch is
         // disposed in `finally` once superseded so it stops competing with visible tiles.
@@ -350,7 +358,49 @@ private fun CarMapBody(
                     scaleY = state.scale
                 },
         ) {
-        TileLayer(xTileF, yTileF) {
+        TileLayer(xTileF * MapTiles.TILE_PX, yTileF * MapTiles.TILE_PX) {
+        // The level the map has just left stays underneath, scaled into this one, until this level's tiles have arrived: a pinch across
+        // a zoom step shows the previous tiles stretched rather than a blank map. They are already in Coil's cache, so they cost no load.
+        val ghostZoom = state.ghostZoom
+        val ghostActive = interactive && ghostZoom in CarMapMinZoom..CarMapMaxZoom && ghostZoom != zoom
+        val ghostFactor = if (ghostActive) 2.0.pow(zoom - ghostZoom).toFloat() else 1f
+        val ghostRange by remember(ghostZoom, zoom, xTileF, yTileF, wPx, hPx) {
+            derivedStateOf {
+                if (!ghostActive) return@derivedStateOf TileRange(0, 0, -1, -1)
+                // The same over-fetch as the current level, in the previous level's own tile pixels.
+                val coverage = 1f / state.scale.coerceAtLeast(0.5f)
+                val fetchW = wPx * coverage / ghostFactor
+                val fetchH = hPx * coverage / ghostFactor
+                val w = weight().coerceIn(0f, 1f)
+                val originX = MapTiles.tileX(location.longitude, ghostZoom) * tilePx - fetchW / 2f - state.panX * w / ghostFactor
+                val originY = MapTiles.tileY(location.latitude, ghostZoom) * tilePx - fetchH / 2f - state.panY * w / ghostFactor
+                TileRange(
+                    firstX = floor(originX / tilePx).toInt(),
+                    firstY = floor(originY / tilePx).toInt(),
+                    lastX = floor((originX + fetchW) / tilePx).toInt(),
+                    lastY = floor((originY + fetchH) / tilePx).toInt(),
+                )
+            }
+        }
+        if (ghostActive) {
+            val ghostSpan = MapTiles.span(ghostZoom)
+            val ghostSize = (tilePx * ghostFactor).roundToInt().coerceAtLeast(1)
+            for (tx in ghostRange.firstX..ghostRange.lastX) {
+                for (ty in ghostRange.firstY..ghostRange.lastY) {
+                    if (ty < 0 || ty >= ghostSpan) continue
+                    val wrappedX = MapTiles.wrapX(tx, ghostZoom)
+                    key("ghost", wrappedX, ty) {
+                        val request = remember(ghostZoom, wrappedX, ty) { mapTileRequest(context, ghostZoom, wrappedX, ty) }
+                        AsyncImage(
+                            model = request,
+                            contentDescription = null,
+                            colorFilter = darkMapFilter,
+                            modifier = Modifier.tileSlot(tx, ty, ghostSize),
+                        )
+                    }
+                }
+            }
+        }
         for (tx in range.firstX..range.lastX) {
             for (ty in range.firstY..range.lastY) {
                 if (ty < 0 || ty >= span) continue
@@ -369,23 +419,13 @@ private fun CarMapBody(
                     // it "reloads") for every visible tile on every location update, even for tiles
                     // already sitting in Coil's memory cache -- visible flicker across the whole
                     // map.
-                    val request = remember(wrappedX, ty, zoom) {
-                        ImageRequest.Builder(context)
-                            .data(MapTiles.tileUrl(zoom, wrappedX, ty))
-                            // OSM blocks clients whose User-Agent does not identify the app.
-                            .setHeader("User-Agent", MapTiles.userAgent("Android"))
-                            // No crossfade: Coil skips it only for memory hits, and a fade on a tile that was
-                            // already shown (the map moving between the pebble and the full screen) would look
-                            // like a refresh.
-                            .crossfade(false)
-                            .build()
-                    }
+                    val request = remember(wrappedX, ty, zoom) { mapTileRequest(context, zoom, wrappedX, ty) }
                     AsyncImage(
                         model = request,
                         contentDescription = null,
                         colorFilter = darkMapFilter,
                         // Sized and placed by TileLayer, from the layout size of the moment.
-                        modifier = Modifier.tileSlot(tx, ty),
+                        modifier = Modifier.tileSlot(tx, ty, MapTiles.TILE_PX),
                     )
                 }
             }
@@ -684,12 +724,24 @@ private fun ClusterPill(
     }
 }
 
+/** How long the previous zoom level's tiles stay under the map after the zoom settles, while the new level's tiles load. */
+private const val GhostHoldMs = 1200L
+
+/** The request for one map tile: the same for both zoom levels, and never crossfaded (a tile that is already shown should not refade). */
+private fun mapTileRequest(context: android.content.Context, zoom: Int, x: Int, y: Int): ImageRequest =
+    ImageRequest.Builder(context)
+        .data(MapTiles.tileUrl(zoom, x, y))
+        // OSM blocks clients whose User-Agent does not identify the app.
+        .setHeader("User-Agent", MapTiles.userAgent("Android"))
+        .crossfade(false)
+        .build()
+
 /** A tile's own coordinates, read by [TileLayer] to place it. */
-private class TileSlot(val tx: Int, val ty: Int) : ParentDataModifier {
+private class TileSlot(val tx: Int, val ty: Int, val size: Int) : ParentDataModifier {
     override fun Density.modifyParentData(parentData: Any?): Any = this@TileSlot
 }
 
-private fun Modifier.tileSlot(tx: Int, ty: Int): Modifier = this.then(TileSlot(tx, ty))
+private fun Modifier.tileSlot(tx: Int, ty: Int, size: Int): Modifier = this.then(TileSlot(tx, ty, size))
 
 /**
  * The map's tiles, each one tile square, placed from the car's tile position so the car sits dead centre of whatever size the layer
@@ -697,17 +749,21 @@ private fun Modifier.tileSlot(tx: Int, ty: Int): Modifier = this.then(TileSlot(t
  * place frame by frame instead of lagging a frame behind a size held in state.
  */
 @Composable
-private fun TileLayer(xTileF: Double, yTileF: Double, content: @Composable () -> Unit) {
-    val tile = MapTiles.TILE_PX
+private fun TileLayer(centreX: Double, centreY: Double, content: @Composable () -> Unit) {
     Layout(content = content, modifier = Modifier.fillMaxSize()) { measurables, constraints ->
         val w = constraints.maxWidth
         val h = constraints.maxHeight
-        val fixed = Constraints.fixed(tile, tile)
-        val originX = xTileF * tile - w / 2.0
-        val originY = yTileF * tile - h / 2.0
-        val placed = measurables.map { it.measure(fixed) to (it.parentData as TileSlot) }
+        val originX = centreX - w / 2.0
+        val originY = centreY - h / 2.0
+        // Each tile is placed at its own size: the current level's tiles are the tile size, a previous level's are scaled to it.
+        val placed = measurables.map { m ->
+            val slot = m.parentData as TileSlot
+            m.measure(Constraints.fixed(slot.size, slot.size)) to slot
+        }
         layout(w, h) {
-            for ((p, slot) in placed) p.place((slot.tx * tile - originX).roundToInt(), (slot.ty * tile - originY).roundToInt())
+            for ((p, slot) in placed) {
+                p.place((slot.tx * slot.size - originX).roundToInt(), (slot.ty * slot.size - originY).roundToInt())
+            }
         }
     }
 }
