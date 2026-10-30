@@ -47,15 +47,14 @@ internal fun rememberWearUpdateState(): WearUpdateState {
 }
 
 /**
- * The car's details page, one swipe up from the face: a failed command's reason, its readings, its climate, its care and
- * freshness, any watch update, then the watch's own settings. A scrolling [WearListScreen].
+ * One of a car's sections, a swipe left from the face. Each is a page of its own, so it has the whole round display, and every one
+ * opens with a failed command's reason, the one thing the wearer came to read. A scrolling [WearListScreen].
  */
 @Composable
-internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState) {
+internal fun WearCarSection(ui: WearCarUi, update: WearUpdateState, section: CarSection) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     WearListScreen(contentPadding = PaddingValues(top = 34.dp, bottom = 22.dp)) {
-        // A failed command's reason first: it is what the wearer came here to read, not something to scroll down to find.
         ui.lastResult?.takeIf { it.vin == ui.car.vin && !it.ok }?.let { failure ->
             item {
                 WearCenteredText(
@@ -67,29 +66,35 @@ internal fun WearDetailsPage(ui: WearCarUi, update: WearUpdateState) {
                 )
             }
         }
-        // The climate first: smart climate and every preset from the phone are what the wearer swipes up for.
-        item { WearClimatePebble(ui.repo, ui.car, ui.pending, ui.send) }
-        item { WearStatusPebble(ui.car) }
-        item { WearCarCarePebble(ui.car, refreshing = ui.refreshing, canRefresh = ui.signedIn, onRefresh = { ui.repo.refresh() }) }
-        update.error?.let { message ->
-            item { WearPebble(title = "Watch update", icon = AppIcons.SystemUpdate) { WearCaption(message) } }
-        }
-        if (update.run != null) {
-            item {
-                WearPebble(title = "Update available", icon = AppIcons.SystemUpdate) {
-                    if (update.downloading) {
-                        WearCenteredText(downloadLabel(update.progress), style = MaterialTheme.typography.bodyMedium)
-                        WearWavyProgress(update.progress, Modifier.padding(horizontal = 12.dp))
-                    } else {
-                        WearActionRow("Update now", AppIcons.Download) {
-                            scope.launch { WearUpdateChecker.downloadAndInstall(context) }
+        when (section) {
+            // Smart climate and every preset from the phone are what the wearer swipes to first.
+            CarSection.CLIMATE -> item { WearClimatePebble(ui.repo, ui.car, ui.pending, ui.send) }
+            CarSection.STATUS -> item { WearStatusPebble(ui.car) }
+            CarSection.CARE -> item {
+                WearCarCarePebble(ui.car, refreshing = ui.refreshing, canRefresh = ui.signedIn, onRefresh = { ui.repo.refresh() })
+            }
+            CarSection.SETTINGS -> {
+                update.error?.let { message ->
+                    item { WearPebble(title = "Watch update", icon = AppIcons.SystemUpdate) { WearCaption(message) } }
+                }
+                if (update.run != null) {
+                    item {
+                        WearPebble(title = "Update available", icon = AppIcons.SystemUpdate) {
+                            if (update.downloading) {
+                                WearCenteredText(downloadLabel(update.progress), style = MaterialTheme.typography.bodyMedium)
+                                WearWavyProgress(update.progress, Modifier.padding(horizontal = 12.dp))
+                            } else {
+                                WearActionRow("Update now", AppIcons.Download) {
+                                    scope.launch { WearUpdateChecker.downloadAndInstall(context) }
+                                }
+                            }
                         }
                     }
                 }
+                // The watch's own settings, together in one pebble (the face's controls are changed from the face's centre).
+                item { WearSettingsPebble(ui.signedIn) }
             }
         }
-        // The watch's own settings, together in one pebble (the face's controls are changed from the face's centre).
-        item { WearSettingsPebble(ui.signedIn) }
     }
 }
 

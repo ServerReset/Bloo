@@ -19,7 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.wear.compose.foundation.pager.HorizontalPager
+import androidx.wear.compose.foundation.pager.VerticalPager
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
@@ -128,7 +128,7 @@ private fun SignInCode(code: String) {
     }
 }
 
-/** One page per car. Opens on the car last shown, which is the car the tile shows, so a tile button acts on its own car. */
+/** One page per car, swiped up and down. Opens on the car last shown, which is the car the tile shows, so a tile button acts on its own car. */
 @Composable
 private fun Cars(
     repo: WearSnapshotRepository,
@@ -150,7 +150,7 @@ private fun Cars(
         }
     }
     Box(Modifier.fillMaxSize()) {
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             vehicles.getOrNull(wrap.wrap.real(page))?.let { car ->
                 WearCarPage(
                     repo = repo,

@@ -16,7 +16,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.wear.compose.foundation.pager.VerticalPager
+import androidx.wear.compose.foundation.pager.HorizontalPager
+import androidx.wear.compose.foundation.pager.rememberPagerState
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.VehicleSnapshot
@@ -114,13 +115,13 @@ internal fun WearCarPage(
     // Above the screens that replace the page, so opening one and coming back keeps the page, its hub line and its place.
     val faceStatus = rememberFaceStatus(ui)
     val update = rememberWearUpdateState()
-    // Two pages, the face and the details, and they wrap: a swipe on from the details comes back to the face.
-    val wrap = rememberWearWrap(realCount = 2)
-    val pagerState = wrap.pager
-    // Back from the details page goes to the face (where the car opens), not out of the app.
+    // The face, then the car's sections, swiped left and right. The page it was left on is kept per car until the app closes.
+    val pagerState = rememberPagerState(initialPage = WearSectionMemory.page(car.vin), pageCount = { CarPageCount })
+    LaunchedEffect(pagerState.currentPage) { WearSectionMemory.remember(car.vin, pagerState.currentPage) }
+    // Back from a section goes to the face (where the car opens), not out of the app.
     val pageScope = rememberCoroutineScope()
-    BackHandler(enabled = wrap.wrap.real(pagerState.currentPage) != 0) {
-        pageScope.launch { wrap.wrap.animateToReal(0) }
+    BackHandler(enabled = pagerState.currentPage != 0) {
+        pageScope.launch { pagerState.animateScrollToPage(0) }
     }
 
     confirmAction?.let { action ->
@@ -180,9 +181,9 @@ internal fun WearCarPage(
         return
     }
 
-    // Page 0 is the face, full-bleed so its ring IS the display's edge; page 1 is the car's details.
-    VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-        if (wrap.wrap.real(page) == 0) {
+    // Page 0 is the face, full-bleed so its ring IS the display's edge; the rest are the car's sections, in CarSection order.
+    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        if (page == 0) {
             WearFacePage(
                 ui, slotKeys, faceStatus,
                 onConfirm = { confirmAction = it },
@@ -190,8 +191,28 @@ internal fun WearCarPage(
                 onEditFace = { editingFace = true },
             )
         } else {
-            WearDetailsPage(ui, update)
+            WearCarSection(ui, update, CarSection.entries[page - 1])
         }
+    }
+}
+
+/** A car's sections after its face, in the order a left swipe reaches them. */
+internal enum class CarSection { CLIMATE, STATUS, CARE, SETTINGS }
+
+/** The face plus every section. */
+private val CarPageCount get() = CarSection.entries.size + 1
+
+/**
+ * The page each car was last left on, for as long as the watch app runs. A process-wide memory rather than the page's own state, so it
+ * survives moving to another car and back, and a swipe to a section is kept when the wearer goes away and returns.
+ */
+internal object WearSectionMemory {
+    private val pages = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    fun page(vin: String): Int = pages[vin] ?: 0
+
+    fun remember(vin: String, page: Int) {
+        pages[vin] = page
     }
 }
 
