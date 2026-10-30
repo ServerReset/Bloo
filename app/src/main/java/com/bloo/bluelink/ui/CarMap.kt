@@ -450,8 +450,26 @@ private fun CarMapBody(
                 chromeInsets = chromeInsets,
                 carColor = pinColor,
                 onCenterCar = { state.recenter() },
+                carPhoto = ownPhoto,
             )
         }
+        // Other cars that are off screen: their photos at the edge of the visible strip, in the direction each lies.
+        OffScreenCarPointers(
+            cars = otherCars,
+            zoom = zoom,
+            xTileF = xTileF,
+            yTileF = yTileF,
+            tilePx = tilePx,
+            panX = state.panX,
+            panY = state.panY,
+            panWeight = { weight().coerceIn(0f, 1f) },
+            scale = state.scale,
+            box = boxSize,
+            marginPx = with(density) { 22.dp.toPx() },
+            tint = pinColor.copy(alpha = 0.7f),
+            chromeInsets = chromeInsets,
+            onPick = onPinTap,
+        )
         // Expand/Open-in-Maps render as a MapFeatureRow in the caller, not over the map.
     }
 }

@@ -1,7 +1,15 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import coil.compose.AsyncImage
+import com.bloo.uicommon.AppIcons
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.offset
@@ -65,6 +73,8 @@ internal fun BoxScope.DeviceMarker(
     chromeInsets: MapChromeInsets = MapChromeInsets(),
     carColor: Color = color,
     onCenterCar: () -> Unit = {},
+    /** The car's photo for its own off-screen pointer; null keeps the plain glyph. */
+    carPhoto: String? = null,
 ) {
     // Read here, in this composable's own scope: a map being resized recomposes this marker alone, not the map around it.
     val halfW = box.value.width / 2f
@@ -91,17 +101,13 @@ internal fun BoxScope.DeviceMarker(
     }
 
     if (carOff) {
-        Box(
-            Modifier.align(Alignment.Center)
-                .offset { IntOffset(carX.roundToInt(), carY.roundToInt()) }
-                .size(30.dp)
-                .background(carColor, CircleShape)
-                .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onCenterCar)
-                .semantics { contentDescription = "Your car is off screen. Tap to centre on it" },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Filled.MyLocation, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-        }
+        CarPointer(
+            photo = carPhoto,
+            tint = carColor,
+            contentDescription = "Your car is off screen. Tap to centre on it",
+            onClick = onCenterCar,
+            modifier = Modifier.align(Alignment.Center).offset { IntOffset(carX.roundToInt(), carY.roundToInt()) },
+        )
     }
 
     if (deviceOff) {
@@ -135,3 +141,82 @@ internal fun BoxScope.DeviceMarker(
 
 /** How far apart two off-screen pointers are kept, so neither hides the other. */
 private const val PointerSeparationPx = 36f
+
+/**
+ * A car's photo as a pointer, for a car that is off screen: a small rounded tile with the car's picture in it (its glyph when there is no
+ * photo). Tapping it selects the car, or centres on it for the car this map is on.
+ */
+@Composable
+internal fun CarPointer(
+    photo: String?,
+    tint: Color,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(8.dp)
+    Box(
+        modifier
+            .size(width = 44.dp, height = 32.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(1.dp, Color.White.copy(alpha = 0.85f), shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { this.contentDescription = contentDescription },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (photo != null) {
+            AsyncImage(
+                model = rememberPhotoModel(photo),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(AppIcons.DirectionsCar, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/**
+ * The cars that are off screen, each as its photo at the edge of the visible strip, in the direction the car lies. The strip is the map
+ * less the top bar and the bottom buttons ([chromeInsets]), so a pointer never sits under one of them.
+ */
+@Composable
+internal fun BoxScope.OffScreenCarPointers(
+    cars: List<CarPin>,
+    zoom: Int,
+    xTileF: Double,
+    yTileF: Double,
+    tilePx: Float,
+    panX: Float,
+    panY: Float,
+    panWeight: () -> Float,
+    scale: Float,
+    box: State<IntSize>,
+    marginPx: Float,
+    tint: Color,
+    chromeInsets: MapChromeInsets,
+    onPick: (String) -> Unit,
+) {
+    val halfW = box.value.width / 2f
+    val halfH = box.value.height / 2f
+    if (halfW <= 0f || halfH <= 0f || cars.isEmpty()) return
+    val weight = panWeight()
+    val topPx = chromeInsets.topPx
+    val bottomPx = chromeInsets.bottomPx
+    for (car in cars) {
+        // The same tile arithmetic as the phone's own pointer: the car's tile delta from the map centre, plus the pan, all times the scale.
+        val sx = (((MapTiles.tileX(car.location.longitude, zoom) - xTileF) * tilePx).toFloat() + panX * weight) * scale
+        val sy = (((MapTiles.tileY(car.location.latitude, zoom) - yTileF) * tilePx).toFloat() + panY * weight) * scale
+        if (!markerOffVisible(sx, sy, halfW, halfH, marginPx, topPx, bottomPx)) continue
+        val (x, y) = clampMarkerToVisible(sx, sy, halfW, halfH, marginPx, topPx, bottomPx)
+        CarPointer(
+            photo = car.photo,
+            tint = tint,
+            contentDescription = "${car.name} is off screen. Tap to select it",
+            onClick = { onPick(car.vin) },
+            modifier = Modifier.align(Alignment.Center).offset { IntOffset(x.roundToInt(), y.roundToInt()) },
+        )
+    }
+}
