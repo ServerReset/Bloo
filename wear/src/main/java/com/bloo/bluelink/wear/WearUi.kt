@@ -45,7 +45,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
@@ -401,7 +400,8 @@ fun WearListRow(
             title, subtitle, Modifier.weight(1f),
             titleStyle = MaterialTheme.typography.labelLarge, titleColor = tint, titleWeight = FontWeight.SemiBold,
             subtitleStyle = SecondaryTextStyle().copy(fontSize = MaterialTheme.typography.labelSmall.fontSize), subtitleColor = quiet,
-            maxLines = 1,
+            // Wraps onto more lines rather than cutting a word: the round face has the height, and a clipped name reads as a bug.
+            maxLines = 3,
         )
     }
 }
@@ -444,7 +444,7 @@ fun WearCenteredText(
     style: TextStyle = MaterialTheme.typography.titleMedium,
     color: Color = MaterialTheme.colorScheme.onBackground,
     fontWeight: FontWeight? = FontWeight.SemiBold,
-    maxLines: Int = 2,
+    maxLines: Int = 4,
 ) {
     RevealText(
         text,
@@ -454,7 +454,6 @@ fun WearCenteredText(
         color = color,
         fontWeight = fontWeight,
         maxLines = maxLines,
-        overflow = TextOverflow.Ellipsis,
     )
 }
 
