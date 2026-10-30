@@ -45,9 +45,6 @@ object WearDataLayerSync {
     private val _vehicles = MutableStateFlow<List<VehicleSnapshot>>(emptyList())
     val vehicles: StateFlow<List<VehicleSnapshot>> = _vehicles
 
-    private val _selectedVin = MutableStateFlow<String?>(null)
-    val selectedVin: StateFlow<String?> = _selectedVin
-
     /**
      * True once the phone has pushed a snapshot this session.
      *
@@ -144,7 +141,6 @@ object WearDataLayerSync {
         // A push that carries the cars already held (the phone re-sends on every snapshot write) need not rewrite the store.
         val carsUnchanged = payload.vehicles == _vehicles.value
         _vehicles.value = payload.vehicles
-        _selectedVin.value = payload.selectedVin
         _connected.value = true
         // Offer an update only when the phone advertises a NEWER watch build than this one.
         // Never on a Play copy: Play updates it, and a GitHub APK is signed with a different key, so installing

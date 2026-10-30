@@ -26,18 +26,6 @@ class WearSnapshotRepository(private val context: Context) {
     /** Every car the phone has pushed, live. */
     val vehicles: Flow<List<VehicleSnapshot>> = WearDataLayerSync.vehicles
 
-    /** Lock/unlock. */
-    fun lock(vin: String) = run(vin, CarAction.TOGGLE_LOCK)
-
-    /** Toggle climate. */
-    fun climate(vin: String) = run(vin, CarAction.TOGGLE_CLIMATE)
-
-    /** Start or stop charging. */
-    fun charge(vin: String) = run(vin, CarAction.TOGGLE_CHARGE)
-
-    /** Flash the hazards (Hyundai/Genesis). */
-    fun flashLights(vin: String) = run(vin, CarAction.FLASH_LIGHTS)
-
     /** Pull fresh status when the watch has its own session. */
     fun refresh() {
         if (_refreshing.value) return
