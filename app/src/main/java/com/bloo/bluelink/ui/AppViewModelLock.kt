@@ -123,18 +123,52 @@ fun AppViewModel.setBiometricLock(enabled: Boolean) {
 }
 
 /**
- * Step one after a phone restart: the account details typed on the sign-in form must match a stored
- * account (checked locally, nothing is sent anywhere). Then, if the app lock is on, the phone's lock is step two; with none, the
- * boot opens straight away.
+ * The sign-in step after a phone restart. The sign-in secrets sit behind the phone's lock, which a restart has
+ * re-armed, so while they are locked this asks for the phone's lock first. Then the account details typed on the
+ * form must match a stored account (checked locally, nothing is sent anywhere). A confirmed phone lock is this boot's
+ * lock; without one, the app lock is the step after the details.
  */
-fun AppViewModel.reauthAfterRestart(username: String, password: String, pin: String, brand: Brand) {
+fun AppViewModel.reauthAfterRestart(
+    username: String,
+    password: String,
+    pin: String,
+    brand: Brand,
+    activity: androidx.fragment.app.FragmentActivity?,
+) {
+    viewModelScope.launch {
+        val locked = withContext(Dispatchers.IO) { credentialStore.secretsLocked }
+        if (!locked) {
+            finishBootReauth(username, password, pin, brand, deviceLockProven = false)
+            return@launch
+        }
+        if (!canUseBiometrics()) {
+            reportError("Set a screen lock on your phone to sign in after a restart.")
+            return@launch
+        }
+        if (activity == null) {
+            reportError("Couldn't ask for your phone's lock. Try again.")
+            return@launch
+        }
+        showBiometricPrompt(
+            activity = activity,
+            title = "Unlock Bloo",
+            subtitle = "Confirm it's you to sign in",
+            onSuccess = { finishBootReauth(username, password, pin, brand, deviceLockProven = true) },
+            onError = { reportInfo("Sign in again once your phone's lock is confirmed.") },
+        )
+    }
+}
+
+/** Checks the typed details against the stored account, then opens the boot, or leaves the app lock to decide. */
+private fun AppViewModel.finishBootReauth(username: String, password: String, pin: String, brand: Brand, deviceLockProven: Boolean) {
     viewModelScope.launch {
         val ok = withContext(Dispatchers.IO) { credentialStore.matchesStoredAccount(brand, username, password, pin) }
         if (!ok) {
             reportError("Those details don't match the account saved on this phone.")
             return@launch
         }
-        val armed = withContext(Dispatchers.IO) {
+        // The phone's lock was just confirmed for this sign-in, so the app lock is not asked for again.
+        val armed = !deviceLockProven && withContext(Dispatchers.IO) {
             val a = settingsStore.appearance.first()
             a.biometricLock && canUseBiometrics()
         }

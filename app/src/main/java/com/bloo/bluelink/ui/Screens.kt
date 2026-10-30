@@ -312,7 +312,9 @@ fun BlooApp(vm: AppViewModel) {
                     val loginContext = LocalContext.current
                     LoginScreen(
                         loading = loading,
-                        onLogin = if (bootReauth) vm::reauthAfterRestart else vm::login,
+                        onLogin = if (bootReauth) ({ user, password, pin, brand ->
+                            vm.reauthAfterRestart(user, password, pin, brand, loginContext.findFragmentActivity())
+                        }) else vm::login,
                         onCancel = if (accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
                         // Logged-out users have no Settings, so Login offers its own forced update
                         // check.

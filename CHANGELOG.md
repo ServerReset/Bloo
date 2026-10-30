@@ -12,10 +12,8 @@ Dated, newest first. The privacy policy keeps its own dated log of the changes t
 - Sign-in credentials, car service PINs and session tokens are in a vault sealed by a key that needs the phone to be unlocked. That key stays usable for 30 days after each unlock, and it survives a new fingerprint being enrolled.
 - Background work (status, alerts, AutoLock, the watch) keeps using a second vault sealed by a key that needs no unlock.
 - An app PIN and its lockout counters from an older version are deleted the first time this version opens the vault.
+- After a restart, signing in asks for your phone's lock before it checks your details, because the sign-ins stay locked until then.
 - The sign-in vault is not replaced when it is locked. A save to a locked vault is refused, and the file is left as it was.
-
-**Known gaps**
-- The sign-in step still doesn't prompt for the device lock when the sign-ins are locked after a restart; until it does, the app looks signed out until the phone is unlocked.
 
 **Map and watch**
 - Map: each car's pin shows its photo, and tapping a pin selects that car. Cars that sit together share one pill of photos.
