@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Adjust
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable

@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.graphicsLayer
@@ -255,6 +256,8 @@ internal class PointerMotion(x: Float, y: Float, offscreen: Boolean) {
 internal fun rememberPointerMotion(key: Any, x: Float, y: Float, offscreen: Boolean): PointerMotion {
     val motion = remember(key) { PointerMotion(x, y, offscreen) }
     val reduceMotion = LocalReduceMotion.current
+    // Read here, in composition: lowPowerCalm is a composable, so it cannot be called from the coroutines below.
+    val positionSpring = lowPowerCalm<Float>(Spring.StiffnessMediumLow)
     val latestX by rememberUpdatedState(x)
     val latestY by rememberUpdatedState(y)
     LaunchedEffect(x, y) {
@@ -276,8 +279,8 @@ internal fun rememberPointerMotion(key: Any, x: Float, y: Float, offscreen: Bool
         motion.springing = true
         coroutineScope {
             launch { motion.show.animateTo(show, tween(PointerFadeMs)) }
-            launch { motion.x.animateTo(latestX, lowPowerCalm<Float>(Spring.StiffnessMediumLow)) }
-            launch { motion.y.animateTo(latestY, lowPowerCalm<Float>(Spring.StiffnessMediumLow)) }
+            launch { motion.x.animateTo(latestX, positionSpring) }
+            launch { motion.y.animateTo(latestY, positionSpring) }
         }
         motion.springing = false
     }
