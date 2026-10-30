@@ -91,8 +91,8 @@ internal fun AppViewModel.summarizeMissingOnForeground() {
 internal fun aiFailureMessage(e: Throwable, carName: String): String {
     val text = e.message.orEmpty()
     return when {
-        "code 30" in text -> "Open Bloo to use the AI."
-        "code 9" in text || "code 27" in text -> "The AI is busy. Try again in a minute."
+        "code 30" in text -> "The AI runs only while Bloo is on screen."
+        "code 9" in text || "code 27" in text -> "The AI is busy. Try $carName again in a minute."
         else -> "Couldn't summarize $carName right now."
     }
 }
