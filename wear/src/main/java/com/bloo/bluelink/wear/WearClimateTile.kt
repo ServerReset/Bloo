@@ -136,7 +136,7 @@ class BlooClimateTileService : TileService() {
         const val ROW_HEIGHT = 46f
         const val ROW_GAP = 6f
         const val ROW_WIDTH_FRACTION = 0.64f
-        /** The colour of what is on: the phone's accent once it has sent one, else the brand's (as the main tile). */
-        val ACTIVE: Int get() = WearAccent.accent.value?.primary ?: BlooColors.brandAccent
+        /** The colour of what is on or in motion (see [WearAccent.active]). */
+        val ACTIVE: Int get() = WearAccent.active
     }
 }

@@ -1,5 +1,8 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.uicommon.ButtonTargetHeight
+import com.bloo.uicommon.MorphedCornerPercent
+import com.bloo.uicommon.PillCornerPercent
 import com.bloo.uicommon.newCascade
 import com.bloo.uicommon.cascadeItem
 import com.bloo.uicommon.LocalCascade
@@ -291,8 +294,8 @@ fun WearActionRow(
  * delegates to [MorphButton], so the pill-to-rounded-square morph, the inert frost and the press
  * feedback are the ones every phone button uses.
  *
- * Two things are the watch's own, and both are about a 227dp round face: no minimum height
- * (ButtonTargetHeight is 56dp, most of the screen) and no press-grow, which widens a button into its
+ * Two things are the watch's own, and both are about a 227dp round face: the minimum height is the
+ * app's button target (ButtonTargetHeight, 56dp), not a larger one, and there is no press-grow, which widens a button into its
  * row -- on a watch that means into the bezel. The heavy haptic is passed explicitly because the app's
  * is provided through LocalHaptics, which the watch does not set up.
  */
@@ -320,8 +323,8 @@ internal fun WearButton(
         activeContentColor = scheme.primary,
         contentPadding = contentPadding,
         minHeight = RowMinHeight,
-        pillCornerPercent = PillCorner,
-        morphedCornerPercent = MorphedCorner,
+        pillCornerPercent = PillCornerPercent,
+        morphedCornerPercent = MorphedCornerPercent,
         expressive = false,
         onClickHaptic = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
         content = content,
@@ -355,12 +358,8 @@ fun WearRoundButton(
     }
 }
 
-/** A row's corners: a full pill at rest, the phone's rounded square (28%) while pressed. */
-private const val PillCorner = 50f
-private const val MorphedCorner = 28f
-
 /** A row's height and padding: taller than a line of text needs, so a row is a target and not a strip. */
-internal val RowMinHeight = 56.dp
+internal val RowMinHeight = ButtonTargetHeight
 internal val RowPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp)
 
 /**
@@ -523,8 +522,8 @@ private fun RoundChoice(icon: ImageVector, label: String, container: Color, cont
         contentColor = content,
         contentPadding = PaddingValues(0.dp),
         minHeight = 0.dp,
-        pillCornerPercent = 50f,
-        morphedCornerPercent = 50f,
+        pillCornerPercent = PillCornerPercent,
+        morphedCornerPercent = PillCornerPercent,
     ) {
         CompositionLocalProvider(LocalContentColor provides content) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

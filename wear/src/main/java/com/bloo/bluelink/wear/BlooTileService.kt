@@ -352,7 +352,7 @@ class BlooTileService : TileService() {
         const val STALE = 0xFFFF6B6B.toInt()
         const val HUB_ID = "refresh"
         const val QUIET = 0xFF1A1A20.toInt()
-        /** The colour of what is on or in motion: the phone's accent once it has sent one, else the brand's. */
-        val ACTIVE: Int get() = WearAccent.accent.value?.primary ?: BlooColors.brandAccent
+        /** The colour of what is on or in motion (see [WearAccent.active]). */
+        val ACTIVE: Int get() = WearAccent.active
     }
 }

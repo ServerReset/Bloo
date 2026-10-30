@@ -1,6 +1,7 @@
 package com.bloo.bluelink.wear
 
 import android.content.Context
+import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.WatchAccent
 import com.bloo.bluelink.data.privatePrefs
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +16,9 @@ internal object WearAccent {
     private const val PREFS = "bloo_wear_accent"
     private val _accent = MutableStateFlow<WatchAccent?>(null)
     val accent: StateFlow<WatchAccent?> = _accent
+
+    /** The colour of what is on or in motion on the watch's own surfaces: the phone's accent once it has sent one, else the brand's. */
+    val active: Int get() = _accent.value?.primary ?: BlooColors.brandAccent
 
     /** Reads what was stored last time, once; later calls change nothing. */
     fun load(context: Context) {
