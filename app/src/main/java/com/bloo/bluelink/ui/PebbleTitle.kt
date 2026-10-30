@@ -71,18 +71,31 @@ internal fun PebbleTitleRow(
     // Drawn at the larger size and scaled down (draw phase only): animating the font size would
     // relayout the text every frame (single-slot ParagraphLayoutCache). Scaling down keeps glyphs
     // crisp.
-    val titleStyle = if (largeTitle) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineSmall
+    // One style for every state: the size change to a floating card is a scale, animated with the rest of the header, never a swap
+    // of styles (which made the name jump).
+    val titleStyle = MaterialTheme.typography.headlineSmall
+    val largeT by animateFloatAsState(
+        targetValue = if (largeTitle) 1f else 0f,
+        animationSpec = lowPowerCalm(Spring.StiffnessLow),
+        label = "pebbleTitleLarge",
+    )
     // Ratio of the real type steps, so the collapsed size equals titleMedium exactly.
     val collapsedTitleScale = with(LocalDensity.current) {
         MaterialTheme.typography.titleMedium.fontSize.toPx() /
             titleStyle.fontSize.toPx()
     }
+    // How much bigger the floating size is than the standard one: headlineLarge over headlineSmall, animated in with largeT.
+    val largeStep = with(LocalDensity.current) {
+        MaterialTheme.typography.headlineLarge.fontSize.toPx() / titleStyle.fontSize.toPx()
+    }
     // Plain arithmetic: the Float `lerp` overload is not imported here. A lambda so each reader
     // pulls the current value in its own phase.
     val titleScale: () -> Float = if (!growTitleOnExpand) {
-        { collapsedTitleScale }
+        { collapsedTitleScale * (1f + (largeStep - 1f) * largeT.value) }
     } else {
-        { collapsedTitleScale + (1f - collapsedTitleScale) * headerTState.value }
+        {
+            (collapsedTitleScale + (1f - collapsedTitleScale) * headerTState.value) * (1f + (largeStep - 1f) * largeT.value)
+        }
     }
     // Only a genuinely LARGE display/font scale may wrap the title (and the summary below), so the
     // header grows instead of cutting. At normal zoom a long title ellipsizes cleanly on one line --
