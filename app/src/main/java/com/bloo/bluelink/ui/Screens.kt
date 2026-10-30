@@ -310,6 +310,10 @@ fun BlooApp(vm: AppViewModel) {
                     val loginUpdateChecking by remember { derivedStateOf { stateHolder.value.updateChecking } }
                     val bootReauth by remember { derivedStateOf { stateHolder.value.bootReauth } }
                     val loginContext = LocalContext.current
+                    // After a restart the phone's lock is asked for as the sign-in screen opens (see promptDeviceLockForBoot).
+                    LaunchedEffect(bootReauth) {
+                        if (bootReauth) vm.promptDeviceLockForBoot(loginContext.findFragmentActivity())
+                    }
                     LoginScreen(
                         loading = loading,
                         onLogin = if (bootReauth) ({ user, password, pin, brand ->

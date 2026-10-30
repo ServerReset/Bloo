@@ -157,6 +157,8 @@ data class UiState(
      * the re-auth, checking what is typed against the stored account instead of signing in.
      */
     val bootReauth: Boolean = false,
+    /** The phone's lock was confirmed on the sign-in screen after a restart, so Sign in does not ask for it again. */
+    val bootDeviceLockProven: Boolean = false,
     /** Kia sign-in only: a pending one-time-code challenge. */
     val kiaOtp: KiaOtpUi? = null,
     /** Canada sign-in only (Hyundai/Genesis/Kia): a pending one-time-code challenge. */
