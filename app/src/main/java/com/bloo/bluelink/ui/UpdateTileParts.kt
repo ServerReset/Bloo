@@ -76,18 +76,49 @@ internal fun UpdateReleaseNotes(info: UpdateInfo, hazeState: dev.chrisbanes.haze
     // SettingsHeroCard's expanded body (this composable's own doc), both of which already nest this
     // inside another elevated card/group; see glassEdge's own doc for why a nested panel skips the
     // second shadow.
-    NestedGlassPanel(hazeState) {
-        Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            // The footer's Releases link is the way out to GitHub, so the notes carry no link of their own.
-            RevealText("What's new", style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold)
-            RevealText(
-                notes,
-                style = SecondaryTextStyle(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth(),
-            )
+    val (patch, general) = splitReleaseNotes(notes)
+    // The footer's Releases link is the way out to GitHub, so the notes carry no link of their own.
+    // The patch notes come first, under What's new; the install help and the Play-or-APK note follow in their own panel.
+    if (patch.isNotBlank()) {
+        NestedGlassPanel(hazeState) {
+            Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                RevealText("What's new", style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold)
+                RevealText(
+                    patch,
+                    style = SecondaryTextStyle(),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
+    if (general.isNotBlank()) {
+        NestedGlassPanel(hazeState) {
+            Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                RevealText("Before you install", style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold)
+                RevealText(
+                    general,
+                    style = SecondaryTextStyle(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Splits a release body into its patch notes and everything else. The release page writes the commit list after a "What's changed"
+ * heading; everything before it is the general text (install help, Play or APK, the old-key note). With no heading, the whole body is
+ * general text and there are no patch notes to show first.
+ */
+internal fun splitReleaseNotes(body: String): Pair<String, String> {
+    val lines = body.lines()
+    val at = lines.indexOfFirst { line -> line.trim().trimStart('#').trim().equals("What's changed", ignoreCase = true) }
+    if (at < 0) return "" to body.trim()
+    val patch = lines.drop(at + 1).joinToString("\n").trim()
+    val general = lines.take(at).joinToString("\n").trim()
+    return patch to general
 }
 
 @Composable
