@@ -5,6 +5,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import com.bloo.uicommon.lowPowerSoft
+import com.bloo.uicommon.lowPowerCalm
 import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.LocalReduceMotion
@@ -169,7 +170,7 @@ internal fun ExpandableMapLayer(
     val handleWidthPx = with(density) { MapBarHandleWidth.toPx() }
     val barSelectedT by animateFloatAsState(
         targetValue = if (barSelected) 1f else 0f,
-        animationSpec = lowPowerSoft<Float>(Spring.StiffnessMediumLow),
+        animationSpec = lowPowerCalm<Float>(Spring.StiffnessMediumLow),
         label = "mapBarSelected",
     )
     val chromeInSpec: AnimationSpec<Float> = if (plainMotion) tween(120) else bounceSpring(stiffness = Spring.StiffnessLow)
@@ -349,6 +350,7 @@ internal fun ExpandableMapLayer(
                 MapTopBar(
                     carOnScreen = carOnScreen,
                     mode = barMode,
+                    lineProgress = { barSelectedT },
                     onDetailsOpenChange = { barDetailsOpen = it },
                     vehicleName = vehicleName,
                     photo = photo,

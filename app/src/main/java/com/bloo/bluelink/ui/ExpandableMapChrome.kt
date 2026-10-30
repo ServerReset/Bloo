@@ -1,6 +1,11 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.uicommon.RevealText
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.layout.layout
+import kotlin.math.max
+import kotlin.math.roundToInt
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -148,13 +153,15 @@ private class CornerBlendShape(private val detailsT: Float) : Shape {
 internal val MapBarHandleWidth = 64.dp
 
 /**
- * The bar over an expanded map sheet, in three states:
+ * The bar over an expanded map sheet, in three states (see [MapBarMode]):
  *  - no car selected: only the drag handle, a small floating pill;
- *  - a car selected (by a tap on its pin): one line, the car's photo and name at the start, its charge and range at the end;
+ *  - a car selected: one line, the car's photo and name at the start, its charge and range at the end;
  *  - that line tapped: the car's other details open below it.
- * [dragModifier] carries the drag-to-dismiss and pull-to-refresh gesture, built by the caller because each call site closes over its own
- * drag state. [selected] says which of the three; [onHeaderHeight] reports the header's height, without the details, for the off-screen
- * pointers' clear strip.
+ *
+ * The whole bar moves on one timeline. The grow from handle to line ([lineProgress], read in layout), the corners and the details all
+ * run on the same spring, and every size, offset and fade is computed from that progress in layout or draw, so the bar is never
+ * re-composed while it moves. [dragModifier] carries the drag-to-dismiss and pull-to-refresh gesture, built by the caller because each
+ * call site closes over its own drag state.
  */
 @Composable
 internal fun MapTopBar(
@@ -175,36 +182,34 @@ internal fun MapTopBar(
     mode: MapBarMode = MapBarMode.Handle,
     /** Asks for the details to open or fold; the caller holds the state, so a dismiss can fold them first. */
     onDetailsOpenChange: (Boolean) -> Unit = {},
-    onHeaderHeight: (Int) -> Unit = {},
+    /** How far the bar has grown from its handle to its line, 0 to 1. */
+    lineProgress: () -> Float = { 1f },
 ) {
-    // Tapping the single line opens it into the car's details; tapping again folds it back. Nothing selected closes it all the way.
     val selected = mode != MapBarMode.Handle
     val detailsOpen = mode == MapBarMode.Details
     LaunchedEffect(carOnScreen) { if (!carOnScreen) onDetailsOpenChange(false) }
     LaunchedEffect(selected) { if (!selected) onDetailsOpenChange(false) }
-    // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without
-    // consuming, so dragModifier and the tap still receive the touch.
+    // The same spring as the grow from the handle (see ExpandableMap), so the details, the corners and the grow land together.
+    val spring = lowPowerCalm<Float>(Spring.StiffnessMediumLow)
+    val detailsT by animateFloatAsState(targetValue = if (detailsOpen) 1f else 0f, animationSpec = spring, label = "mapBarDetails")
+    // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without consuming, so the drag and the tap still
+    // receive the touch.
     var pillPressed by remember { mutableStateOf(false) }
     val pillScale by animateFloatAsState(
         targetValue = if (pillPressed) 1.04f else 1f,
         animationSpec = bounceSpring(stiffness = Spring.StiffnessLow),
         label = "mapBarPop",
     )
-    // The corners ease between the pill the bar is as a handle or a line, and the rounded panel its details open into, on the same spring
-    // as the details themselves, so the shape never snaps.
-    val detailsT by animateFloatAsState(
-        targetValue = if (detailsOpen) 1f else 0f,
-        animationSpec = bounceSpring(stiffness = Spring.StiffnessMediumLow),
-        label = "mapBarDetails",
-    )
-    // The bar is liquid glass: the refraction and specular sheen of the app's floating glass, drawn over the map behind it.
-    val headerMinHeight by animateDpAsState(
-        targetValue = if (selected) 60.dp else 22.dp,
-        animationSpec = lowPowerCalm(Spring.StiffnessMediumLow),
-        label = "mapBarHeader",
-    )
+    val density = LocalDensity.current
+    val handleHeightPx = with(density) { 22.dp.toPx() }
+    val lineHeightPx = with(density) { 60.dp.toPx() }
+    val gutterPx = with(density) { GapPage.toPx() }
+    val slidePx = with(density) { 24.dp.toPx() }
+
     GlassSurface(
+        // The corners ease between the pill and the rounded details panel on the same spring.
         shape = CornerBlendShape(detailsT),
+        // The bar is liquid glass: the refraction and specular sheen of the app's floating glass, drawn over the map behind it.
         liquid = true,
         modifier = modifier.fillMaxWidth()
             .pointerInput(Unit) {
@@ -217,29 +222,43 @@ internal fun MapTopBar(
             }
             .graphicsLayer { scaleX = pillScale; scaleY = pillScale },
         hazeState = mapHazeState,
-        // No contentColor override: the map follows the app theme (dark filter only in dark mode),
-        // so a forced white glyph vanishes on a light map. GlassSurface's onSurface default tracks
-        // the theme and custom palettes.
+        // No contentColor override: the map follows the app theme (dark filter only in dark mode), so a forced white glyph vanishes on a
+        // light map. GlassSurface's onSurface default tracks the theme and custom palettes.
     ) {
-        // The bar's own size follows its content, on the same spring as the handle's growth, so the handle, the line and the details
-        // read as one motion.
-        Column(Modifier.animateContentSize(lowPowerCalm<IntSize>(Spring.StiffnessMediumLow))) {
-            // The header: the car at the start, the drag handle in the middle, its charge and range at the end. The car sides appear only
-            // with a selection, so with none the handle sits alone in the middle.
+        Column {
+            // The header: the car at the start, the drag handle in the middle, its charge and range at the end. Its height and gutters
+            // grow with the line, in layout, so the header never jumps between the handle and the line.
             Row(
                 Modifier
                     .then(dragModifier)
                     .then(if (selected) Modifier.clickable { onDetailsOpenChange(!detailsOpen) } else Modifier)
-                    .onSizeChanged { onHeaderHeight(it.height) }
-                    .heightIn(min = headerMinHeight)
-                    .padding(horizontal = if (selected) GapPage else 0.dp),
+                    .layout { measurable, constraints ->
+                        val p = lineProgress().coerceIn(0f, 1f)
+                        val minHeight = (handleHeightPx + (lineHeightPx - handleHeightPx) * p).roundToInt()
+                        val gutter = (gutterPx * p).roundToInt()
+                        val inner = measurable.measure(
+                            constraints.copy(
+                                minWidth = (constraints.minWidth - 2 * gutter).coerceAtLeast(0),
+                                maxWidth = (constraints.maxWidth - 2 * gutter).coerceAtLeast(0),
+                                minHeight = max(constraints.minHeight, minHeight),
+                            ),
+                        )
+                        val width = inner.width + 2 * gutter
+                        layout(width.coerceAtMost(constraints.maxWidth), inner.height) { inner.place(gutter, 0) }
+                    },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AnimatedVisibility(
-                    visible = selected,
-                    modifier = Modifier.weight(1f).clipToBounds(),
-                    enter = fadeIn(),
-                    exit = fadeOut(),
+                // The car's side: it fades and slides in from the start as the bar grows, and is silent while nothing is selected.
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clipToBounds()
+                        .graphicsLayer {
+                            val p = lineProgress()
+                            alpha = p
+                            translationX = -(1f - p) * slidePx
+                        }
+                        .then(if (selected) Modifier else Modifier.clearAndSetSemantics {}),
                 ) {
                     Row(
                         Modifier.fillMaxWidth(),
@@ -273,11 +292,17 @@ internal fun MapTopBar(
                             .background(LocalContentColor.current.copy(alpha = 0.55f), RoundedCornerShape(2.dp)),
                     )
                 }
-                AnimatedVisibility(
-                    visible = selected,
-                    modifier = Modifier.weight(1f).clipToBounds(),
-                    enter = fadeIn(),
-                    exit = fadeOut(),
+                // The charge and the range at the end: they fade and slide in from the end, as the car's side does from the start.
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clipToBounds()
+                        .graphicsLayer {
+                            val p = lineProgress()
+                            alpha = p
+                            translationX = (1f - p) * slidePx
+                        }
+                        .then(if (selected) Modifier else Modifier.clearAndSetSemantics {}),
                 ) {
                     // The charge and the range on one line at the end, so the car's figures read as a pair.
                     Row(
@@ -301,7 +326,18 @@ internal fun MapTopBar(
                     }
                 }
             }
-            AnimatedVisibility(visible = selected && detailsOpen, enter = expandEnterSized(), exit = expandExitSized()) {
+            // The details reveal from the header down, in layout: the panel is measured in full and shown as far as the spring has opened it,
+            // so the bar's height follows the same motion as its corners, with no size animation of its own.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clipToBounds()
+                    .layout { measurable, constraints ->
+                        val full = measurable.measure(constraints.copy(minHeight = 0))
+                        val shown = (full.height * detailsT).roundToInt()
+                        layout(full.width, shown) { full.place(0, 0) }
+                    },
+            ) {
                 Column(
                     Modifier.fillMaxWidth().padding(horizontal = GapPage).padding(bottom = GapGroup),
                     verticalArrangement = Arrangement.spacedBy(GapRow),
