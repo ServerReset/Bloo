@@ -169,6 +169,7 @@ internal class ExpandedMapState {
                 ownPhoto = if (this@ExpandedMapState.vin == vin) this@ExpandedMapState.expandedPhoto else null,
                 selectedVin = this@ExpandedMapState.selectedVin,
                 onPinTap = { tapped -> this@ExpandedMapState.tapPin(tapped) },
+                onSelectedOffScreen = { this@ExpandedMapState.selectedVin = null },
             )
         }
     }

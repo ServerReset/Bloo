@@ -64,6 +64,13 @@ import com.bloo.uicommon.Haptics
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.toRect
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -117,6 +124,19 @@ internal fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modi
 /** The top bar's corner when its details are open: a rounded panel, so the details' text is not cut by a pill's curve. */
 private val DetailsPanelCorner = 28.dp
 
+/**
+ * The bar's corner, between the pill it is as a handle or a line (radius half its height) and the rounded panel its details open into
+ * ([DetailsPanelCorner]). [detailsT] is 0 for the pill and 1 for the panel; the value is animated by the caller.
+ */
+private class CornerBlendShape(private val detailsT: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val pill = size.height / 2f
+        val panel = with(density) { DetailsPanelCorner.toPx() }
+        val radius = (pill + (panel - pill) * detailsT).coerceIn(0f, size.minDimension / 2f)
+        return Outline.Rounded(RoundRect(size.toRect(), CornerRadius(radius)))
+    }
+}
+
 /** The handle-only bar's width: the handle with a little glass around it. The bar grows from this to the single line when a car is selected. */
 internal val MapBarHandleWidth = 64.dp
 
@@ -160,9 +180,15 @@ internal fun MapTopBar(
         animationSpec = bounceSpring(stiffness = Spring.StiffnessLow),
         label = "mapBarPop",
     )
+    // The corners ease between the pill the bar is as a handle or a line, and the rounded panel its details open into, on the same spring
+    // as the details themselves, so the shape never snaps.
+    val detailsT by animateFloatAsState(
+        targetValue = if (detailsOpen) 1f else 0f,
+        animationSpec = bounceSpring(stiffness = Spring.StiffnessMediumLow),
+        label = "mapBarDetails",
+    )
     GlassSurface(
-        // A pill when it is one line or just the handle; a rounded panel when its details are open, so their text clears the curve.
-        shape = if (detailsOpen) RoundedCornerShape(DetailsPanelCorner) else CircleShape,
+        shape = CornerBlendShape(detailsT),
         modifier = modifier.fillMaxWidth()
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -220,13 +246,8 @@ internal fun MapTopBar(
                         )
                     }
                 }
-                // Frosted drag handle, centred. Purely visual: the pop and drag belong to the whole bar.
-                GlassSurface(
-                    shape = CircleShape,
-                    modifier = Modifier.size(width = 44.dp, height = 18.dp),
-                    hazeState = mapHazeState,
-                    shadow = false,
-                ) {
+                // The drag handle, centred: a short bar on the bar's own glass, with no glass of its own inside. Purely visual.
+                Box(Modifier.size(width = 36.dp, height = 18.dp), contentAlignment = Alignment.Center) {
                     Box(
                         Modifier
                             .size(width = 24.dp, height = 4.dp)

@@ -13,7 +13,16 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.runtime.State
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.semantics.Role
+import com.bloo.uicommon.lowPowerBounce
+import kotlin.math.hypot
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -99,6 +108,7 @@ internal fun CarMap(
     selectedVin: String? = null,
     /** A pin was tapped: called with that car's VIN. */
     onPinTap: (String) -> Unit = {},
+    onSelectedOffScreen: () -> Unit = {},
 ) {
     var started by remember { mutableStateOf(MapStartGate.open) }
     if (!started) {
@@ -112,7 +122,7 @@ internal fun CarMap(
     }
     CarMapBody(
         location, modifier, state, deviceLocation, interactive, tileArea, panWeight, otherCars, chromeInsets,
-        ownVin, ownPhoto, selectedVin, onPinTap,
+        ownVin, ownPhoto, selectedVin, onPinTap, onSelectedOffScreen,
     )
 }
 
@@ -151,6 +161,7 @@ private fun CarMapBody(
     ownPhoto: String? = null,
     selectedVin: String? = null,
     onPinTap: (String) -> Unit = {},
+    onSelectedOffScreen: () -> Unit = {},
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("CarMapBody")
     val context = LocalContext.current
@@ -373,59 +384,6 @@ private fun CarMapBody(
             }
         }
         }
-        // On-screen distance between car pin and device dot in tile pixels (pan cancels out);
-        // decides whether to merge them, accounting for zoom.
-        val devTileOffsetPx = deviceLocation?.let { dev ->
-            val dx = (MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx
-            val dy = (MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx
-            dx to dy
-        }
-        // Under this many px apart the pins overlap; merge them.
-        val mergeThresholdPx = with(density) { 36.dp.toPx() }
-        // Non-null only when the pins collide; carries the offset so the merged branch can use it
-        // directly.
-        val mergedOffsetPx = devTileOffsetPx?.takeIf { (dx, dy) ->
-            kotlin.math.hypot(dx, dy) < mergeThresholdPx
-        }
-        // The car's own pin: centred (the car is the map's pan origin, so the container's translation already puts it there). Tapping it
-        // selects the car for the top bar.
-        val ownTap: (() -> Unit)? = ownVin?.let { v -> { onPinTap(v) } }
-        val ownSelected = ownVin != null && selectedVin == ownVin
-        if (mergedOffsetPx != null) {
-            val (dx, dy) = mergedOffsetPx
-            // One pin at the midpoint, tinted with an even mix of the car and device colours.
-            CarPinMarker(
-                photo = ownPhoto,
-                tint = lerp(pinColor, deviceLocationColor, 0.5f),
-                selected = ownSelected,
-                contentDesc = "Car and your location",
-                onClick = ownTap,
-                modifier = Modifier.align(Alignment.Center)
-                    .offset { IntOffset((dx / 2f).roundToInt(), (dy / 2f).roundToInt()) },
-            )
-        } else {
-            CarPinMarker(
-                photo = ownPhoto,
-                tint = pinColor,
-                selected = ownSelected,
-                contentDesc = "Car location",
-                onClick = ownTap,
-                modifier = Modifier.align(Alignment.Center),
-            )
-        }
-        // Every other car on the map, at its own place. They ride with the map's pan, as the car's own pin does.
-        for (other in otherCars) {
-            val ox = ((MapTiles.tileX(other.location.longitude, zoom) - xTileF) * tilePx).toFloat()
-            val oy = ((MapTiles.tileY(other.location.latitude, zoom) - yTileF) * tilePx).toFloat()
-            CarPinMarker(
-                photo = other.photo,
-                tint = pinColor.copy(alpha = 0.7f),
-                selected = selectedVin == other.vin,
-                contentDesc = "${other.name}, another car",
-                onClick = { onPinTap(other.vin) },
-                modifier = Modifier.align(Alignment.Center).offset { IntOffset(ox.roundToInt(), oy.roundToInt()) },
-            )
-        }
         } // close the scaled layer
         // The phone's own position, drawn whenever a fix exists: a marker on the map when it is in
         // view, or one clamped to the box edge pointing toward it when it is farther than the map
@@ -468,7 +426,30 @@ private fun CarMapBody(
             marginPx = with(density) { 22.dp.toPx() },
             tint = pinColor.copy(alpha = 0.7f),
             chromeInsets = chromeInsets,
-            onPick = onPinTap,
+            // A pointer picks its car and brings it into view, so the car it selects is on screen.
+            onPick = { vin ->
+                onPinTap(vin)
+                otherCars.firstOrNull { it.vin == vin }?.let { car ->
+                    state.showDevice(location.latitude, location.longitude, car.location.latitude, car.location.longitude)
+                }
+            },
+        )
+        CarPinLayer(
+            state = state,
+            pins = listOfNotNull(ownVin?.let { CarPin(it, location, "Your car", ownPhoto) }) + otherCars,
+            ownVin = ownVin,
+            selectedVin = selectedVin,
+            zoom = zoom,
+            xTileF = xTileF,
+            yTileF = yTileF,
+            tilePx = tilePx,
+            panWeight = { weight().coerceIn(0f, 1f) },
+            box = boxSize,
+            marginPx = with(density) { 22.dp.toPx() },
+            chromeInsets = chromeInsets,
+            tint = pinColor,
+            onPinTap = onPinTap,
+            onSelectedOffScreen = onSelectedOffScreen,
         )
         // Expand/Open-in-Maps render as a MapFeatureRow in the caller, not over the map.
     }
@@ -492,8 +473,17 @@ private fun CarPinMarker(
     contentDesc: String,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    /** The photo bubble above the pin: shown on the expanded map, and off on the pebble's map, where the pin is just its glyph. */
+    bubble: Boolean = true,
 ) {
     val shape = RoundedCornerShape(8.dp)
+    // The bubble pops up above the pin with a spring when it appears, and folds back into it. Its space is kept either way, so the pin's
+    // tip stays on the car's place.
+    val bubbleT by animateFloatAsState(
+        targetValue = if (bubble) 1f else 0f,
+        animationSpec = lowPowerBounce(stiffness = Spring.StiffnessMediumLow),
+        label = "pinBubble",
+    )
     Column(
         modifier = modifier
             .offset(y = -PinStackHeight / 2)
@@ -503,6 +493,12 @@ private fun CarPinMarker(
     ) {
         Box(
             Modifier.size(width = PinPhotoWidth, height = PinPhotoHeight)
+                .graphicsLayer {
+                    alpha = bubbleT.coerceIn(0f, 1f)
+                    scaleX = 0.5f + 0.5f * bubbleT
+                    scaleY = 0.5f + 0.5f * bubbleT
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                }
                 .clip(shape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .border(if (selected) 2.dp else 1.dp, if (selected) tint else Color.White.copy(alpha = 0.8f), shape),
@@ -521,6 +517,148 @@ private fun CarPinMarker(
         }
         Spacer(Modifier.height(2.dp))
         Icon(Icons.Filled.LocationOn, contentDescription = null, tint = tint, modifier = Modifier.size(PinGlyphSize))
+    }
+}
+
+/** A car's place in tile pixels from the map's centre-car origin, before pan and scale. */
+private data class PinSpot(val pin: CarPin, val dx: Float, val dy: Float)
+
+/** Pins closer than this on screen (in dp) share one cluster, drawn as a row of photo chips the car's picker can choose from. */
+private val PinClusterDp = 36.dp
+
+/**
+ * Every car's pin, drawn at its own place on the screen rather than inside the map's scaled layer, so each keeps one size on any map: a
+ * pinch moves the pins apart, it does not make them bigger. Cars that sit on top of each other become one cluster, drawn as a row of photo
+ * chips the person can choose from; the chips grow with the pinch, so they are easier to pick as you get close.
+ */
+@Composable
+internal fun BoxScope.CarPinLayer(
+    state: CarMapState,
+    pins: List<CarPin>,
+    ownVin: String?,
+    selectedVin: String?,
+    zoom: Int,
+    xTileF: Double,
+    yTileF: Double,
+    tilePx: Float,
+    panWeight: () -> Float,
+    box: State<IntSize>,
+    marginPx: Float,
+    chromeInsets: MapChromeInsets,
+    tint: Color,
+    onPinTap: (String) -> Unit,
+    onSelectedOffScreen: () -> Unit,
+) {
+    val clusterPx = with(LocalDensity.current) { PinClusterDp.toPx() }
+    val spots = pins.map { pin ->
+        PinSpot(
+            pin,
+            ((MapTiles.tileX(pin.location.longitude, zoom) - xTileF) * tilePx).toFloat(),
+            ((MapTiles.tileY(pin.location.latitude, zoom) - yTileF) * tilePx).toFloat(),
+        )
+    }
+    // Grouped by where the cars are on screen. Only the scale matters here, and the result changes only when a group does, so a pinch
+    // recomposes this layer when cars join or leave a cluster, not on every frame.
+    val clusters by remember(spots, clusterPx) {
+        derivedStateOf {
+            val s = state.scale
+            val groups = mutableListOf<MutableList<PinSpot>>()
+            for (spot in spots) {
+                val group = groups.firstOrNull { g ->
+                    g.any { hypot((it.dx - spot.dx) * s, (it.dy - spot.dy) * s) < clusterPx }
+                }
+                if (group != null) group.add(spot) else groups.add(mutableListOf(spot))
+            }
+            groups.map { it.toList() }
+        }
+    }
+    // The selected car has left the screen: nothing is selected any more, so the top bar folds back to its handle.
+    val selectedOff by remember(spots, selectedVin) {
+        derivedStateOf {
+            val spot = spots.firstOrNull { it.pin.vin == selectedVin } ?: return@derivedStateOf false
+            val b = box.value
+            val w = panWeight()
+            markerOffVisible(
+                (spot.dx + state.panX * w) * state.scale,
+                (spot.dy + state.panY * w) * state.scale,
+                b.width / 2f, b.height / 2f, marginPx, chromeInsets.topPx, chromeInsets.bottomPx,
+            )
+        }
+    }
+    LaunchedEffect(selectedOff, selectedVin) {
+        if (selectedOff && selectedVin != null) onSelectedOffScreen()
+    }
+    for (cluster in clusters) {
+        val cx = cluster.sumOf { it.dx.toDouble() }.toFloat() / cluster.size
+        val cy = cluster.sumOf { it.dy.toDouble() }.toFloat() / cluster.size
+        // Where the cluster sits on screen: its place plus the pan, times the scale, from the map's centre.
+        fun screenX() = (cx + state.panX * panWeight()) * state.scale
+        fun screenY() = (cy + state.panY * panWeight()) * state.scale
+        Box(
+            Modifier.align(Alignment.Center)
+                .offset { IntOffset(screenX().roundToInt(), screenY().roundToInt()) }
+                .graphicsLayer {
+                    // Hidden while off screen: an off-screen car has its own pointer at the edge (see OffScreenCarPointers).
+                    val b = box.value
+                    val sx = screenX()
+                    val sy = screenY()
+                    val off = markerOffVisible(sx, sy, b.width / 2f, b.height / 2f, marginPx, chromeInsets.topPx, chromeInsets.bottomPx)
+                    alpha = if (off) 0f else 1f
+                },
+        ) {
+            if (cluster.size == 1) {
+                val pin = cluster.single().pin
+                val isOwn = pin.vin == ownVin
+                CarPinMarker(
+                    photo = pin.photo,
+                    tint = if (isOwn) tint else tint.copy(alpha = 0.7f),
+                    selected = selectedVin == pin.vin,
+                    contentDesc = if (isOwn) "Car location" else "${pin.name}, another car",
+                    onClick = { onPinTap(pin.vin) },
+                    // The bubble shows only with the car's photo, which the expanded map passes for its own car; the other cars are only on it.
+                    bubble = !isOwn || pin.photo != null,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            } else {
+                // Chips side by side, each its car's photo, growing with the pinch. Tapping one selects that car.
+                Row(Modifier.align(Alignment.Center), horizontalArrangement = Arrangement.spacedBy((-6).dp)) {
+                    for (spot in cluster) {
+                        val pin = spot.pin
+                        val selected = selectedVin == pin.vin
+                        Box(
+                            Modifier.size(width = 40.dp, height = 28.dp)
+                                .graphicsLayer {
+                                    val g = (state.scale).coerceIn(1f, 1.8f)
+                                    scaleX = g
+                                    scaleY = g
+                                    transformOrigin = TransformOrigin(0.5f, 1f)
+                                }
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .border(
+                                    if (selected) 2.dp else 1.dp,
+                                    if (selected) tint else Color.White.copy(alpha = 0.85f),
+                                    RoundedCornerShape(8.dp),
+                                )
+                                .clickable(role = Role.Button) { onPinTap(pin.vin) }
+                                .semantics { contentDescription = "${pin.name}. Tap to select it" },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (pin.photo != null) {
+                                AsyncImage(
+                                    model = rememberPhotoModel(pin.photo),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            } else {
+                                Icon(AppIcons.DirectionsCar, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

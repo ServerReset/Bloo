@@ -256,7 +256,8 @@ internal fun ExpandableMapLayer(
             if (!closing) onDismissDrag((drag / dismissFadeDp).coerceIn(0f, 1f))
         }
     }
-    DisposableEffect(Unit) { onDispose { onDismissDrag(0f) } }
+    // Reset when the map opens, not when it leaves: resetting on close brought the blur back at full strength while it was still fading out.
+    LaunchedEffect(isExpanded) { if (isExpanded) onDismissDrag(0f) }
 
     // Back handler for closing
     BackHandler(enabled = isExpanded) { close() }
