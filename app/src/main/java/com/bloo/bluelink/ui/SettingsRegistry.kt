@@ -79,16 +79,6 @@ internal val ChoiceSettings: List<SettingSpec> = listOf(
         phrases = "show distances in miles show kilometres",
     ) { a, _, _, vm -> DistanceUnitRow(a, vm) },
     SettingSpec(
-        key = PrefKeys.WATCH_LOCK_TIMING, kind = SettingKind.Choice,
-        phrases = "make my watch ask for the pin when i send a command",
-    ) { _, _, s, vm ->
-        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            com.bloo.bluelink.data.WatchLockTiming.entries.forEach { t ->
-                ChoiceRow(t.label, s.watchLockTiming == t) { vm.setWatchLockTiming(t) }
-            }
-        }
-    },
-    SettingSpec(
         key = PrefKeys.SETTINGS_MODE, kind = SettingKind.Choice,
         phrases = "show me more settings hide the advanced options keep it simple",
     ) { _, _, s, vm ->

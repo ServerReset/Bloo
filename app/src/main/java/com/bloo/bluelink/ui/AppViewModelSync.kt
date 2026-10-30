@@ -15,7 +15,6 @@ import com.bloo.bluelink.data.setPrimaryDevice
 import com.bloo.bluelink.data.setSyncDeviceName
 import com.bloo.bluelink.data.setSyncUri
 import com.bloo.bluelink.data.setSyncWifiOnly
-import com.bloo.bluelink.data.setWatchLockTiming
 import com.bloo.bluelink.data.syncFileFingerprint
 import com.bloo.bluelink.data.syncUri
 import com.bloo.bluelink.data.testSyncRoundTrip
@@ -160,15 +159,6 @@ fun AppViewModel.setSyncWifiOnly(wifiOnly: Boolean) = viewModelScope.launch {
     AppLog.log("Drive sync: ${if (wifiOnly) "Wi-Fi only" else "any network"}")
     settingsStore.setSyncWifiOnly(wifiOnly)
     _state.update { it.copy(syncWifiOnly = wifiOnly) }
-}
-
-/** Set when a paired watch should ask for the app PIN; pushed to the watch immediately. */
-fun AppViewModel.setWatchLockTiming(timing: com.bloo.bluelink.data.WatchLockTiming) {
-    viewModelScope.launch {
-        settingsStore.setWatchLockTiming(timing)
-        _state.update { it.copy(watchLockTiming = timing) }
-        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
-    }
 }
 
 /** Surfaces the outcome as a snackbar. */

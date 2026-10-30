@@ -96,7 +96,7 @@ internal fun AppViewModel.coldStartAutoLogin() {
         // (see repoFor above) so later calls just reuse it.
         try {
             // The LOCK decision first: it puts the lock screen up, and needs only the
-            // appearance and the PIN record, not repo construction or credentials (those run in
+            // appearance and the app lock, not repo construction or credentials (those run in
             // parallel below).
             val appearance = settingsStore.appearance.first()
             val lockMechanisms = withContext(Dispatchers.IO) { appearance.biometricLock && canUseBiometrics() }

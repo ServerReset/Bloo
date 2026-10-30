@@ -11,9 +11,6 @@ import kotlinx.serialization.Serializable
 data class WatchSyncPayload(
     val vehicles: List<VehicleSnapshot> = emptyList(),
     val selectedVin: String? = null,
-    /** The phone's WatchLockTiming wire value ("off"/"open"/"commands"/"both"). */
-    val lockTiming: String = "off",
-    val pinRecord: String? = null,
     val sentAtMs: Long = 0L,
     /**
      * The newest watch build the phone knows about, and the direct APK URL for it. Null when the

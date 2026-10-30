@@ -164,7 +164,7 @@
         <!-- The watch's own AutoLock (beta): the grace alarm after a significant-motion trigger. -->
         <receiver android:name=".WearAutoLockReceiver" android:exported="false" />
 
-        <!-- After a restart the watch is sealed until the PIN is entered; this posts the reminder. -->
+        <!-- After a restart the watch opens its vaults once its own device lock has been unlocked; see WearBootReceiver. -->
         <receiver android:name=".WearBootReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

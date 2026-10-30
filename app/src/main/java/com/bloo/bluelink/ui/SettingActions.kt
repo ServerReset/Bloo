@@ -147,14 +147,6 @@ internal val SettingActions: List<SettingAction> = buildList {
     )
     add(
         choice(
-            "c_watchlock", "watch_lock_timing", "",
-            com.bloo.bluelink.data.WatchLockTiming.entries.map { Option(it.wireKey, it.label) },
-            { it.state.watchLockTiming.wireKey },
-            { vm, v -> vm.setWatchLockTiming(com.bloo.bluelink.data.WatchLockTiming.fromWire(v)) },
-        ),
-    )
-    add(
-        choice(
             "c_mode", "settings_mode", "power user",
             listOf(Option("simple", "Simple"), Option("advanced", "Advanced")),
             { it.state.settingsMode },

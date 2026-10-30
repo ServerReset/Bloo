@@ -113,11 +113,16 @@ class CredentialStore(context: Context) {
     internal companion object {
         // Holds the comma-joined brand names ("HYUNDAI,KIA") that currently have credentials saved.
         const val KEY_BRANDS = "brands"
-        // The app's old PIN record, kept only so vaultFor can remove it from existing installs.
-        const val KEY_PIN_RECORD = "app_pin_record"
-        const val KEY_PIN_FAILURES = "app_pin_failures"
-        const val KEY_PIN_LOCKED_UNTIL = "app_pin_locked_until"
-        const val KEY_PIN_LOCKED_UNTIL_ELAPSED = "app_pin_locked_until_elapsed"
+        // The old PIN records (the phone's and the watch's) and their lockout counters: kept only so vaultFor can remove them.
+        private const val KEY_PIN_RECORD = "app_pin_record"
+        private const val KEY_PIN_FAILURES = "app_pin_failures"
+        private const val KEY_PIN_LOCKED_UNTIL = "app_pin_locked_until"
+        private const val KEY_PIN_LOCKED_UNTIL_ELAPSED = "app_pin_locked_until_elapsed"
+        private val OLD_PIN_KEYS = listOf(
+            KEY_PIN_RECORD, KEY_PIN_FAILURES, KEY_PIN_LOCKED_UNTIL, KEY_PIN_LOCKED_UNTIL_ELAPSED,
+            "app_pin_watch_timing", "app_pin_watch_record", "app_pin_watch_failures",
+            "app_pin_watch_locked_wall", "app_pin_watch_locked_elapsed",
+        )
         private const val KEY_IMPORTED = "legacy_credentials_imported"
         /** Set in the secrets vault once the sign-in secrets have been moved out of the device vault. */
         private const val KEY_MOVED = "credentials_moved"
@@ -136,11 +141,8 @@ class CredentialStore(context: Context) {
             if (vault.getString(KEY_IMPORTED) == null) synchronized(this) {
                 if (vault.getString(KEY_IMPORTED) == null) importLegacy(context, vault)
             }
-            // The app has no PIN of its own any more: an old PIN record and its lockout counters are removed once, here.
-            if (vault.getString(KEY_PIN_RECORD) != null || vault.getString(KEY_PIN_FAILURES) != null) vault.edit {
-                remove(KEY_PIN_RECORD); remove(KEY_PIN_FAILURES)
-                remove(KEY_PIN_LOCKED_UNTIL); remove(KEY_PIN_LOCKED_UNTIL_ELAPSED)
-            }
+            // Neither app has a PIN any more: the old PIN records and their lockout counters are removed once, here.
+            if (OLD_PIN_KEYS.any { vault.getString(it) != null }) vault.edit { OLD_PIN_KEYS.forEach { remove(it) } }
             return vault
         }
 

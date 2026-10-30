@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.uicommon.segmentsOf
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,13 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.bloo.bluelink.data.SyncMerge
-import com.bloo.bluelink.data.WatchLockTiming
 import com.bloo.bluelink.data.relativeLabel
 import com.bloo.bluelink.data.removeSyncedDevice
 import com.bloo.bluelink.data.setPrimaryDevice
-import com.bloo.bluelink.data.setWatchLockTiming
 import com.bloo.bluelink.data.syncDeviceName
-import com.bloo.bluelink.data.watchLockTiming
 import com.bloo.bluelink.wear.WatchPresence
 import com.bloo.bluelink.wear.WatchSignIn
 import com.bloo.uicommon.ReorderColumn
@@ -174,17 +170,6 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                     caption = "Connects to ${device.name.ifBlank { "this phone" }}",
                     modifier = Modifier.padding(start = CompanionIndent),
                     onClick = { showSetupWatch = true },
-                )
-            }
-            // The watch PIN gate: nothing to lock unless a watch is present.
-            if (isSelf && (live != null || registered.isNotEmpty())) {
-                SettingsSegmentedRow(
-                    label = "Get the PIN from your watch",
-                    options = segmentsOf(WatchLockTiming.OFF.wireKey to "Off", WatchLockTiming.OPEN.wireKey to "Opening", WatchLockTiming.COMMANDS.wireKey to "Commands", WatchLockTiming.BOTH.wireKey to "Both"),
-                    selectedKey = state.watchLockTiming.wireKey,
-                    description = "Uses your app PIN.",
-                    onSelect = { vm.setWatchLockTiming(WatchLockTiming.fromWire(it)) },
-                    modifier = Modifier.padding(start = CompanionIndent),
                 )
             }
         }

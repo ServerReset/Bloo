@@ -13,7 +13,7 @@ import com.bloo.uicommon.AppIcons
 /**
  * The car's climate on the watch, the phone's own, in ONE pebble: smart climate at the top, saying what it is going to set
  * ("Cool to 62° · 98° outside"), then every preset saved on the phone for this car as a row (the name over what it sets), and a
- * stop in their place while it runs. The page scrolls, so any number of presets fit. A start goes through the same PIN gate as a
+ * stop in their place while it runs. The page scrolls, so any number of presets fit. A start goes through the same path as a
  * tap on the face ([requestCommand]).
  */
 @Composable

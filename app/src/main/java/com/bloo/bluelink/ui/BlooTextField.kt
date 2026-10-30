@@ -62,7 +62,7 @@ internal fun PinField(
     placeholder: String? = null,
     label: String? = null,
     digitsOnly: Boolean = true,
-    maxDigits: Int = com.bloo.bluelink.data.PinCrypto.PIN_MAX_DIGITS,
+    maxDigits: Int = com.bloo.bluelink.data.ServicePin.MAX_DIGITS,
     revealed: Boolean = false,
     trailingIcon: @Composable (() -> Unit)? = null,
     isError: Boolean = false,

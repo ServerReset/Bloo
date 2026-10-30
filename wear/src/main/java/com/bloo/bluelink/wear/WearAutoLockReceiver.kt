@@ -21,8 +21,6 @@ import kotlinx.coroutines.launch
 class WearAutoLockReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (!WearAutoLock.isEnabled(context)) return
-        // Sealed after a restart: nothing runs until the PIN has been entered.
-        if (WearBootGate.isLocked(context)) return
         val app = context.applicationContext
         val result = goAsync()
         CoroutineScope(Dispatchers.Default).launch {

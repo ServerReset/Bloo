@@ -69,7 +69,6 @@ object SettingsCatalog {
         app(PrefKeys.GLASS_CLARITY, Kind.NUMBER, "Glass clarity", "liquid glass transparency frosted medium soft clear crystal ultra refraction edge blur backing everywhere"),
         app(PrefKeys.HAPTICS_ENABLED, Kind.TOGGLE, "Haptic feedback", "vibration vibrate buzz sound"),
         app(PrefKeys.LOCK_TIMING, Kind.CHOICE, "App lock timing", "biometric grace re-lock screen off immediate"),
-        app(PrefKeys.WATCH_LOCK_TIMING, Kind.CHOICE, "Watch lock timing", "watch wear pin lock ask passcode security open commands"),
         app(AlertKeys.AUTOLOCK, Kind.TOGGLE, "AutoLock alerts", "notification autolock locked dry run test"),
         app(AlertKeys.CHARGE_COMPLETE, Kind.TOGGLE, "Charge-complete alerts", "notification charging finished full done battery"),
         app(AlertKeys.CHARGING, Kind.TOGGLE, "Live charging updates", "notification charging live progress ongoing bar ev limit"),

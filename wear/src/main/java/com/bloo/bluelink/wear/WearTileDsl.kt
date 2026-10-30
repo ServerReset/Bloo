@@ -134,19 +134,13 @@ internal fun tileModifiers(
 
 /**
  * A tap that opens the watch app, on the face control [actionKey] (and, when a quarter was pressed, its [slot]) so the app runs
- * exactly what a press on the face would, through the same PIN gate. With neither, it just opens the app.
+ * exactly what a press on the face would. With neither, it just opens the app.
  */
-/** What a tile draws from: the phone's snapshot, or nothing while the watch is sealed after a restart. Every tile loads it this way. */
-internal data class TileSnapshot(val sealed: Boolean, val snapshot: com.bloo.bluelink.data.SnapshotStore.SnapshotData?)
-
 /** Reads the phone's accent and the tile's snapshot, in that order. Both tiles start here. */
-internal suspend fun loadTileSnapshot(context: Context): TileSnapshot {
+internal suspend fun loadTileSnapshot(context: Context): com.bloo.bluelink.data.SnapshotStore.SnapshotData? {
     // The phone's accent, read before anything is drawn (the tile has no Compose theme to carry it).
     WearAccent.load(context)
-    // Sealed after a restart: the tile shows nothing about the car until the PIN is entered.
-    val sealed = runCatching { WearBootGate.isLocked(context) }.getOrDefault(true)
-    val snapshot = if (sealed) null else runCatching { com.bloo.bluelink.data.SnapshotStore(context).current() }.getOrNull()
-    return TileSnapshot(sealed, snapshot)
+    return runCatching { com.bloo.bluelink.data.SnapshotStore(context).current() }.getOrNull()
 }
 
 internal fun Context.tileLaunch(actionKey: String? = null, slot: Int? = null): ActionBuilders.Action {

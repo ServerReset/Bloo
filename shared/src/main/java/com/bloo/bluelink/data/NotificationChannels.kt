@@ -50,7 +50,7 @@ fun ensureNotificationChannel(
 }
 
 /**
- * Posts the one notice allowed while a device is sealed after a restart (phone: sign in again; watch: enter the PIN), on its own
+ * Posts the one notice allowed while the phone is sealed after a restart (sign in again), on its own
  * high-importance channel. [bigText] and [category] are optional extras. Failure to post is swallowed: a missing permission or
  * a revoked one must never crash the boot path.
  */

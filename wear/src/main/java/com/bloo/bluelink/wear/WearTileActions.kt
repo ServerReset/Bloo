@@ -6,8 +6,8 @@ import com.bloo.bluelink.data.VehicleSnapshot
  * The watch Tile's action protocol, and the tile's only real decision.
  *
  * A Tile's click can only be an Action -- it cannot run code -- so a button on the tile launches the
- * app with one of these keys in its extras, and the app runs it through the same PIN gate and command
- * layer as a tap on the watch face. The key is the control's own key from [WearFaceControls], so the tile
+ * app with one of these keys in its extras, and the app runs it through the same command layer as a
+ * tap on the watch face. The key is the control's own key from [WearFaceControls], so the tile
  * and the face are one list and cannot disagree about what a button does.
  *
  * [forCar] is a pure function and deliberately not inside [BlooTileService]: a Service cannot be unit

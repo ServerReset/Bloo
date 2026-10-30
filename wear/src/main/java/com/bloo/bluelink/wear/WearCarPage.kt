@@ -29,7 +29,7 @@ import androidx.activity.compose.BackHandler
 
 /**
  * What a car's pages need to show and do, in one place: the car, whether the watch has its own sign-in, what is in flight,
- * the last result, and [send] (a command held behind the PIN gate when the wearer's policy asks for one).
+ * the last result, and [send] (runs a command as the wearer taps it).
  */
 @Stable
 internal class WearCarUi(
@@ -42,9 +42,9 @@ internal class WearCarUi(
     val send: (() -> Unit) -> Unit,
 ) {
     /**
-     * Runs [control] for this car through the PIN gate, carrying its climate settings when it has any.
+     * Runs [control] for this car, carrying its climate settings when it has any.
      *
-     * Two things are decided NOW, at the press, not when the PIN is answered or the phone gets to it: a toggle becomes the
+     * Two things are decided NOW, at the press, not when the phone gets to it: a toggle becomes the
      * direction the wearer was shown ([resolved]) -- so a stale screen can never turn "Lock" into an unlock the confirm never
      * covered -- and a preset's settings are read, so a preset deleted meanwhile cannot start climate on defaults.
      */
@@ -97,8 +97,8 @@ internal fun WearCarPage(
     // The climate list, and what a pick from it means: put in a quarter (and, when that quarter was pressed, run too).
     var climateAsk by remember { mutableStateOf<ClimateAsk?>(null) }
 
-    // An action chosen on the tile is one of the face's own controls and runs exactly as a tap on the face would: the PIN
-    // gate, the pending state and the haptic are the same -- the tile is a second door into the same room.
+    // An action chosen on the tile is one of the face's own controls and runs exactly as a tap on the face would: the
+    // pending state and the haptic are the same -- the tile is a second door into the same room.
     LaunchedEffect(tileRequest) {
         val key = tileRequest?.key ?: return@LaunchedEffect
         WearFaceControls.byKey(key)?.takeIf { it.available(car) }?.let { control ->

@@ -8,8 +8,7 @@ which runs it through its normal command path (`CarCommandRunner`) and reports b
 It reuses the phone's own shared modules so the two can never drift:
 
 - **`:shared`** - `SnapshotStore`/`VehicleSnapshot` for state, `CarCommand`/`CarAction` for the
-  command vocabulary, `PinRecord`/`PinCrypto`/`PinLockout` for the PIN, and the pure
-  `WatchPinPolicy` + `WatchSyncProtocol`/`WatchSyncPayload` that define the sync contract.
+  command vocabulary, and `WatchSyncProtocol`/`WatchSyncPayload`, which define the sync contract.
 - **`:uicommon`** - the foundation-only `MorphButtonCore`, so the watch's tap targets morph and
   press like every other Bloo button.
 
@@ -26,12 +25,11 @@ See `WearDataLayerSync` (watch) and `PhoneWatchSyncService`/`WatchPresence` (pho
 pushes a `WatchSyncPayload` on every snapshot write; the watch mirrors it. Commands go the other
 way and are run on the phone.
 
-## PIN gate
+## Device lock
 
-`WatchPinStore` verifies against the phone-sent `PinRecord` (PBKDF2; the watch never holds the
-PIN). When it asks is decided by the phone's Settings → **Ask the watch for my PIN** (Off /
-Opening / Commands / Both), which only appears when a watch is paired. The rules are pure and
-exhaustively unit-tested in `WatchPinPolicyTest`.
+The watch has no PIN of its own. Its own screen lock (fingerprint, face, PIN, pattern or password)
+holds it after a restart until the first unlock, and the watch then opens its sign-in vault and
+starts its work (`WearBootReceiver`). Commands run as they are tapped.
 
 ## Updates
 

@@ -11,7 +11,6 @@ import androidx.wear.protolayout.TimelineBuilders
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
-import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
@@ -27,7 +26,7 @@ internal data class ClimateTileRow(val key: String, val title: String, val subti
  * Which rows the climate tile shows, and the only decision on it. While the climate runs, a single "Stop climate" row (the
  * one thing worth doing). Otherwise smart climate, then the phone's presets for this car in the order the phone keeps them,
  * as many as fit on a round face. The keys are the face's own control keys, so a press runs exactly what a press on the face
- * would, through the same PIN gate.
+ * would.
  */
 internal object WearClimateTileRows {
     const val MAX_ROWS = 3
@@ -48,7 +47,7 @@ internal object WearClimateTileRows {
 /**
  * A second tile in the watch's carousel, for the one thing worth a tile of its own: starting the car's climate. Smart
  * climate and the phone's first presets are rows you press; while it runs, one row stops it. A tile's press can only launch
- * the app, so each row launches it with its control key, and the app runs it through the same PIN gate as the face.
+ * the app, so each row launches it with its control key, and the app runs it as the face does.
  */
 class BlooClimateTileService : TileService() {
     private val scope = ioScope()
@@ -57,9 +56,9 @@ class BlooClimateTileService : TileService() {
         answerTile(scope, "BlooClimateTile", fallback = { tileOf(messageLayout("Open Bloo")) }) { buildTile(requestParams) }
 
     private suspend fun buildTile(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
-        val (sealed, snapshot) = loadTileSnapshot(this)
+        val snapshot = loadTileSnapshot(this)
         val car = snapshot?.let { WearTileCar.pick(applicationContext, it.vehicles) ?: it.selected }
-            ?: return tileOf(messageLayout(if (sealed) "Enter your PIN in Bloo" else "Add a car in Bloo on your phone"))
+            ?: return tileOf(messageLayout("Add a car in Bloo on your phone"))
         WearPresets.ensureLoaded(applicationContext)
         val rows = WearClimateTileRows.rows(car, WearPresets.presets.value[car.vin].orEmpty(), WearPresets::detail)
         val device = requestParams.deviceConfiguration

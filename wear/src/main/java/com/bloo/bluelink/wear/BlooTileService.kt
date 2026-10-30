@@ -41,11 +41,8 @@ import kotlinx.coroutines.launch
  *    drawing it rather than a picture.
  *  - It carries up to three action buttons. A tile's button cannot run code -- a click can only be an
  *    Action -- so each one launches the app with the action in its extras, and the app runs it
- *    through the same PIN gate as a tap on the watch face. That is deliberate: there is exactly one
- *    place where a command is authorised, and the tile is not it.
- *  - It says what it means. A sealed watch used to read "Open to set up", which is the wrong sentence
- *    for someone who has already set it up and is merely locked.
- *
+ *    exactly as a tap on the watch face does.
+ * *
  * It also has a content description, so the glance is one spoken sentence instead of four fragments.
  */
 class BlooTileService : TileService() {
@@ -55,20 +52,20 @@ class BlooTileService : TileService() {
         answerTile(scope, "BlooTile", fallback = { tileOf(layoutFor(null)) }) { buildTile(requestParams) }
 
     private suspend fun buildTile(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
-        val (sealed, snapshot) = loadTileSnapshot(this)
+        val snapshot = loadTileSnapshot(this)
                 // The hub is the refresh button: a press reloads the tile with this id, and a refresh is asked for as it does.
                 // Not more than once in HUB_REFRESH_GAP_MS: the tile keeps reporting the last pressed id on later reloads (its own
                 // freshness updates, the redraw a refresh causes), and each would otherwise start another refresh.
-                if (!sealed && requestParams.currentState.lastClickableId == HUB_ID && hubRefreshDue()) startHubRefresh()
+                if (requestParams.currentState.lastClickableId == HUB_ID && hubRefreshDue()) startHubRefresh()
                 // While one runs the tile SAYS so (see [faceLayout]) and is asked for again soon, so the answer lands quickly.
-                val refreshing = !sealed && System.currentTimeMillis() < tilePrefs().getLong(REFRESHING_UNTIL, 0L)
+                val refreshing = System.currentTimeMillis() < tilePrefs().getLong(REFRESHING_UNTIL, 0L)
                 // The display's real size: the quarters are sized from it (not stretched to fill), so they are equal squares.
                 val device = requestParams.deviceConfiguration
                 val side = minOf(device.screenWidthDp, device.screenHeightDp).toFloat().takeIf { it > 0f } ?: REFERENCE_SIDE
                 val car = snapshot?.let { WearTileCar.pick(applicationContext, it.vehicles) ?: it.selected }
                 // Whatever goes wrong while drawing, the request is answered: an unset completer leaves the tile
                 // spinning for good, so a failure draws the plain "open Bloo" layout instead.
-                val layout = runCatching { layoutFor(car, sealed, refreshing, side) }.getOrElse { layoutFor(null, sealed) }
+                val layout = runCatching { layoutFor(car, refreshing, side) }.getOrElse { layoutFor(null) }
                 return tileOf(layout, refreshing)
     }
 
@@ -128,14 +125,14 @@ class BlooTileService : TileService() {
             "BlooTileResources"
         }
 
-    private fun layoutFor(car: VehicleSnapshot?, sealed: Boolean = false, refreshing: Boolean = false, side: Float = REFERENCE_SIDE): LayoutElement {
+    private fun layoutFor(car: VehicleSnapshot?, refreshing: Boolean = false, side: Float = REFERENCE_SIDE): LayoutElement {
         // The whole tile opens the app. The quarters and the hub are clickables of their own inside it, and the system
         // routes the innermost hit, so a tap on "Charge" charges and a tap anywhere else opens Bloo.
         val open = tileModifiers(clickableId = "open", onClick = tileLaunch(null))
         if (car != null) return faceLayout(car, open, refreshing, side)
 
-        // No car: say why. A sealed watch has been set up and is only waiting for its PIN; "add a car" read as not set up.
-        val line = if (sealed) "Enter your PIN in Bloo" else "Add a car in Bloo on your phone"
+        // No car: say why.
+        val line = "Add a car in Bloo on your phone"
         return tileBox(
             tileColumn(
                 tileText("Bloo", 22f, WHITE, bold = true),
@@ -149,8 +146,8 @@ class BlooTileService : TileService() {
 
     /**
      * The tile as the face in the app: the charge ring round the edge, the four chosen controls as quarters inside it,
-     * and the value in a hub where they meet. Pressing a quarter runs that control (through the app, so the PIN gate
-     * applies); pressing the hub refreshes. Each quarter is a disc quarter, from per-corner radii.
+     * and the value in a hub where they meet. Pressing a quarter runs that control (through the app, as a
+     * tap on the face does); pressing the hub refreshes. Each quarter is a disc quarter, from per-corner radii.
      */
     private fun faceLayout(car: VehicleSnapshot, open: ModifiersBuilders.Modifiers, refreshing: Boolean, side: Float): LayoutElement {
         // The presets a quarter may start live in prefs the app fills; the tile can run without the app having opened.

@@ -77,7 +77,6 @@ object PrefKeys {
     const val VIN = "vin"
     const val WATCH_AUTOLOCK = "watch_autolock"
     const val WATCH_FACE_SLOTS = "watch_face_slots"
-    const val WATCH_LOCK_TIMING = "watch_lock_timing"
     const val WATCH_REDUCE_EFFECTS = "watch_reduce_effects"
     const val WEATHER_FOLLOWS_DEVICE = "weather_follows_device"
     const val WEATHER_LABEL = "weather_label"

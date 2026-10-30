@@ -217,8 +217,6 @@ data class UiState(
     val thisDeviceId: String? = null,
     /** This device's friendly sync name (editable in Settings). */
     val syncDeviceName: String = "",
-    /** When a paired watch asks for the app PIN. Device-local; see WatchLockTiming. */
-    val watchLockTiming: com.bloo.bluelink.data.WatchLockTiming = com.bloo.bluelink.data.WatchLockTiming.OFF,
     /**
      * Short biometric of the Drive file this device syncs to; differing values mean different
      * files. Null if sync is off.

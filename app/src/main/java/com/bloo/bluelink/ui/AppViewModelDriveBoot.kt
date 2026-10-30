@@ -20,7 +20,6 @@ import com.bloo.bluelink.data.syncPrimaryDeviceId
 import com.bloo.bluelink.data.syncUri
 import com.bloo.bluelink.data.syncWifiOnly
 import com.bloo.bluelink.data.syncedDevices
-import com.bloo.bluelink.data.watchLockTiming
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -56,7 +55,6 @@ internal fun AppViewModel.bootstrapDriveSync() {
             }
         }
         val wifiOnly = settingsStore.syncWifiOnly(snap)
-        val watchLockTiming = settingsStore.watchLockTiming()
         val settingsMode = settingsStore.settingsMode(snap)
         // Restore the cached device registry + primary + this-device identity so Settings shows
         // "your devices" immediately on launch, before (and even without) the first live sync of
@@ -79,7 +77,6 @@ internal fun AppViewModel.bootstrapDriveSync() {
                 settingsMode = settingsMode,
                 syncDevices = cachedDevices, syncPrimaryId = cachedPrimary,
                 thisDeviceId = myDeviceId, syncDeviceName = myDeviceName,
-                watchLockTiming = watchLockTiming,
                 syncFileFingerprint = fileFingerprint,
             )
         }

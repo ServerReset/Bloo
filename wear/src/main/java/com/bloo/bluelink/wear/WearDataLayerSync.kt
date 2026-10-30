@@ -2,7 +2,6 @@ package com.bloo.bluelink.wear
 
 import android.content.Context
 import com.bloo.bluelink.data.BlooJson
-import com.bloo.bluelink.data.PinRecord
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WatchCommandRequest
@@ -21,16 +20,15 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 
 /**
- * The watch's window onto the phone: cars, lock timing and the PIN record are pushed from the
+ * The watch's window onto the phone: the cars are pushed from the
  * phone over the Wearable Data Layer and mirrored here in real time. Once the phone has signed the
  * watch in ([WearCredentialSync]) the watch also talks to the car's service itself, and uses the
  * phone only for what the phone owns.
  *
  * Two directions:
- *  - phone → watch: [WatchSyncProtocol.PATH_SNAPSHOT] carries vehicles + the watch lock
- *    timing + the stretched PIN record. Received here, mirrored into the local
- *    [SnapshotStore] (so the existing repository/UI read the same shape as the phone) and
- *    [WatchPinStore].
+ *  - phone → watch: [WatchSyncProtocol.PATH_SNAPSHOT] carries the vehicles. Received here and
+ *    mirrored into the local [SnapshotStore], so the existing repository/UI read the same shape
+ *    as the phone.
  *  - watch → phone: a command is SENT (see [sendCommand]) as a [WatchCommandRequest]; the
  *    phone runs it and pushes [WatchSyncProtocol.PATH_COMMAND_RESULT] back, which clears the
  *    pending state and surfaces a failure.
@@ -67,11 +65,6 @@ object WearDataLayerSync {
     data class UpdateAdvice(val runNumber: Int, val apkUrl: String, val notes: String?)
 
     private var started = false
-    // The Application context only -- never an Activity or Service context. WatchPinStore holds
-    // this context.applicationContext, so the static reference cannot leak a component.
-    // (Lint's StaticFieldLeak cannot see through the applicationContext call.)
-    @Suppress("StaticFieldLeak")
-    @Volatile private var pendingStore: WatchPinStore? = null
 
     /**
      * Begin listening. Registers a Data Layer listener (via a [WearableListenerService]
@@ -82,7 +75,6 @@ object WearDataLayerSync {
         if (started) return
         started = true
         val app = context.applicationContext
-        pendingStore = WatchPinStore(app)
         runCatching {
             // Deliberately empty, and NOT the delivery path: the manifest-registered
             // WatchDataListenerService receives everything, running or not. Kept rather than deleted
@@ -106,10 +98,10 @@ object WearDataLayerSync {
         }
     }
 
-    /** Apply a snapshot payload: mirror into SnapshotStore + WatchPinStore. */
+    /** Apply a snapshot payload: mirror it into SnapshotStore. */
     suspend fun mirrorSnapshot(context: Context, bytes: ByteArray?) {
         // One at a time and oldest-never-wins: two pushes in quick succession used to finish in either order, and the
-        // older could leave stale cars, a stale PIN timing (or a revoked PIN) behind the newer one.
+        // older could leave stale cars behind the newer one.
         if (bytes != null) mirrorLock.withLock { mirrorLocked(context, bytes) }
     }
 
@@ -118,9 +110,6 @@ object WearDataLayerSync {
 
     private suspend fun mirrorLocked(context: Context, bytes: ByteArray) {
         // The listener service can receive the first push before the Activity has ever opened.
-        // Initialise the PIN store here too, otherwise that first payload updates vehicles but
-        // silently drops the phone's lock timing/PIN and the watch opens unguarded until the
-        // user launches it once.
         if (!started) start(context)
         val payload = runCatching {
             json.decodeFromString(WatchSyncPayload.serializer(), bytes.decodeToString())
@@ -154,11 +143,6 @@ object WearDataLayerSync {
         if (!carsUnchanged) runCatching { SnapshotStore(app).saveVehicles(payload.vehicles) }
         // The tile and the complication read that store: have them redraw from it now rather than at their next poll.
         WearSurfaces.refresh(app)
-        // PIN + timing.
-        pendingStore?.let { store ->
-            store.timing = com.bloo.bluelink.data.WatchLockTiming.fromWire(payload.lockTiming)
-            store.record = payload.pinRecord?.let { PinRecord.decode(it) }
-        }
     }
 
     /**

@@ -20,8 +20,7 @@ import com.bloo.bluelink.data.updatedLabel
 /**
  * The car's charge (or fuel) on any watch face, in every shape a face offers: a ring-with-value, short text, a long line
  * (name, charge, range and lock), or the glyph alone. Every shape carries the bolt glyph, and the ring shows it while the car
- * is charging. Tapping it opens the watch app. A sealed watch (after a restart, before the PIN) shows nothing about the
- * car, exactly as the Tile does.
+ * is charging. Tapping it opens the watch app.
  */
 class BlooComplicationService : SuspendingComplicationDataSourceService() {
     override fun getPreviewData(type: ComplicationType): ComplicationData? = when (type) {
@@ -33,7 +32,6 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
     }
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
-        if (WearBootGate.isLocked(applicationContext)) return NoDataComplicationData()
         val snapshot = runCatching { SnapshotStore(applicationContext).current() }.getOrNull() ?: return NoDataComplicationData()
         val car: VehicleSnapshot = snapshot.selected ?: return NoDataComplicationData()
         // An old reading says so (aloud, and in the long line's title) instead of passing as current.
@@ -63,8 +61,8 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
 /**
  * One complication from the selected car: [text] returns what to show and how to say it aloud (null when the car has
  * nothing to report), [icon] the glyph that goes with it, and [tapKey] the face control a tap opens the app on (null just
- * opens the app). It answers as short text and as the glyph alone. A tap on a control goes through the same PIN gate and,
- * for an unlock, the same "are you sure" as the face.
+ * opens the app). It answers as short text and as the glyph alone. A tap on a control runs as it does on the face, and for an
+ * unlock asks the same "are you sure".
  */
 abstract class BlooTextComplication(
     private val preview: Pair<String, String>,
@@ -87,7 +85,6 @@ abstract class BlooTextComplication(
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         val glyphOnly = request.complicationType == ComplicationType.MONOCHROMATIC_IMAGE
         if (request.complicationType != ComplicationType.SHORT_TEXT && !glyphOnly) return NoDataComplicationData()
-        if (WearBootGate.isLocked(applicationContext)) return NoDataComplicationData()
         val car = runCatching { SnapshotStore(applicationContext).current().selected }.getOrNull() ?: return NoDataComplicationData()
         val reading = text(car)
         // The glyph alone needs only the car's state (a padlock shows with or without a word to go with it).

@@ -16,7 +16,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
-import com.bloo.bluelink.data.WatchPinPolicy
 import com.bloo.bluelink.data.ensureNotificationChannel
 import com.bloo.bluelink.data.privatePrefs
 import com.bloo.bluelink.ioScope
@@ -91,19 +90,12 @@ object WearNotifier {
         val prefs = WearNotificationPrefs(app)
         ensureChannels(app)
         val manager = app.getSystemService(NotificationManager::class.java)
-        // A notification's action button CANNOT ask for a PIN -- there is nowhere to ask, and the
-        // shade is reachable without opening the app. So when the user has asked for a PIN before
-        // commands, the button is not offered at all: tapping the notification opens the app, which
-        // does ask. Showing a button that quietly skips the gate would make the gate advisory, and
-        // the whole reason someone turns it on is that the watch may not be on their wrist.
-        val pin = WatchPinStore(app)
-        val showStopAction = !(pin.hasPin && WatchPinPolicy.locksOnCommand(pin.timing))
         new.forEach { now ->
             val before = old.firstOrNull { it.vin == now.vin }
             val plan = planWearAlerts(before, now, prefs.current())
             val pct = now.percent
             val cardId = idFor(now.vin, "charging")
-            if (plan.chargingCard) manager.notify(cardId, chargingCard(app, now, showStopAction)) else manager.cancel(cardId)
+            if (plan.chargingCard) manager.notify(cardId, chargingCard(app, now)) else manager.cancel(cardId)
             if (plan.chargeComplete) {
                 manager.notify(idFor(now.vin, "complete"), alert(app, "${now.name} is charged", "Battery at $pct%"))
             }
@@ -128,7 +120,7 @@ object WearNotifier {
      * Recents while it charges, not only in the shade. The activity's status carries the percentage, and the card is rebuilt (and so
      * re-applied) each time the car's state changes; stopping the charge cancels it.
      */
-    private fun chargingCard(app: Context, v: VehicleSnapshot, showStopAction: Boolean): Notification {
+    private fun chargingCard(app: Context, v: VehicleSnapshot): Notification {
         val touch = openApp(app)
         val builder = NotificationCompat.Builder(app, CHANNEL_CHARGING)
             .setSmallIcon(R.drawable.ic_stat_bloo)
@@ -140,8 +132,7 @@ object WearNotifier {
             .setContentIntent(touch)
             .apply {
                 v.percent?.let { setProgress(100, it.coerceIn(0, 100), false) }
-                // No button when the user asked for a PIN before commands -- see onVehicles.
-                if (showStopAction) addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CHARGE_OFF))
+                addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CHARGE_OFF))
             }
         val status = Status.Builder()
             .addTemplate("#what# #level#")
@@ -189,7 +180,7 @@ object WearNotifier {
             .build()
 
     private fun openApp(app: Context): PendingIntent = PendingIntent.getActivity(
-        // No activity flags: see WearBootGate's own note (WearRecents).
+        // No activity flags: the system launches a notification's content intent in the app's own task (WearRecents).
         app, 0, Intent(app, WearMainActivity::class.java),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
@@ -217,7 +208,6 @@ object WearNotifier {
  */
 class WearActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (WearBootGate.isLocked(context)) return
         val vin = intent.getStringExtra(EXTRA_VIN) ?: return
         val action = intent.getStringExtra(EXTRA_ACTION) ?: return
         val pending = goAsync()

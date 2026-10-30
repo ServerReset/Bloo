@@ -5,7 +5,6 @@ import androidx.compose.ui.graphics.toArgb
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlooJson
 import com.bloo.bluelink.data.CarCommandRunner
-import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WatchCommandRequest
@@ -24,7 +23,6 @@ import com.bloo.bluelink.data.setWatchLook
 import com.bloo.bluelink.data.watchLook
 import com.bloo.bluelink.data.climatePresets
 import kotlinx.coroutines.flow.first
-import com.bloo.bluelink.data.watchLockTiming
 import com.bloo.bluelink.ioScope
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -41,7 +39,7 @@ import kotlinx.serialization.json.Json
  * network or Drive -- everything it shows is pushed from here, and every command it wants run
  * is executed HERE through the normal [CarCommandRunner] and reported back. This service:
  *
- *  - PUSHES a [WatchSyncPayload] (vehicles + the watch lock timing + the stretched PIN record)
+ *  - PUSHES a [WatchSyncPayload] (the vehicles and the watch's settings)
  *    whenever anything the watch shows changes, so the watch mirrors the phone in real time.
  *  - RECEIVES [WatchCommandRequest] items and runs them, then pushes [WatchCommandResult].
  *
@@ -203,7 +201,6 @@ class PhoneWatchSyncService : WearableListenerService() {
             val app = context.applicationContext
             val job = ioScope().launch {
                 val snapshot = SnapshotStore(app).current()
-                val timing = SettingsStore(app).watchLockTiming()
                 if (watchUpdateRunNumber != null && watchUpdateApkUrl != null) {
                     lastAdvice = Triple(watchUpdateRunNumber, watchUpdateApkUrl, watchUpdateNotes)
                 }
@@ -212,7 +209,6 @@ class PhoneWatchSyncService : WearableListenerService() {
                 val payload = WatchSyncPayload(
                     vehicles = snapshot.vehicles,
                     selectedVin = snapshot.selectedVin,
-                    lockTiming = timing.wireKey,
                     sentAtMs = System.currentTimeMillis(),
                     watchUpdateRunNumber = advice?.first,
                     watchUpdateApkUrl = advice?.second,

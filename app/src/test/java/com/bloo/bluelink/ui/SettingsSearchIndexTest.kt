@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  * [SettingsSearchResults] which a user reads at a glance. Both were private to
  * SettingsScreen.kt for most of their lives -- documented by eye, never
  * pinned -- and both are pure string math with no Compose dependency, so they
- * test exactly like PinLock.kt's arithmetic does.
+ * test exactly like the lockout arithmetic did.
  */
 class SettingsSearchIndexTest {
 

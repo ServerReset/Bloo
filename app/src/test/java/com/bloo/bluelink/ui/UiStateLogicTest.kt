@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  * it is a user's car silently missing its charge readout, or a Canadian user
  * being offered the Gen5W connected store, or a Kia being shown a battery
  * it does not have. All are pure Kotlin over plain data -- the 150+ fields
- * construct with defaults -- so they pin exactly like PinLock arithmetic.
+ * construct with defaults -- so they pin exactly like the lockout arithmetic did.
  */
 class UiStateLogicTest {
 

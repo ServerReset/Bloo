@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
  *
  * It also receives the Tile's action buttons. A Tile click can only be an Action, so [BlooTileService]
  * launches this Activity with the chosen action in its extras and the screen runs it through the same
- * PIN gate and command layer as a tap on the face. That is the point: the watch keeps exactly one
+ * command layer as a tap on the face. That is the point: the watch keeps exactly one
  * place where a command can be authorised, and the tile is not it.
  */
 class WearMainActivity : ComponentActivity() {
@@ -42,9 +42,8 @@ class WearMainActivity : ComponentActivity() {
         com.bloo.bluelink.data.DeviceStatus.setManualLean(WearLook.reduceEffects(this))
         WearPresets.ensureLoaded(this)
         val repo = WearSnapshotRepository(this)
-        val pinStore = WatchPinStore(this)
-        // Sealed after a restart until the PIN is entered (see WearBootGate): nothing starts before that.
-        if (!WearBootGate.isLocked(this)) startWork()
+        // The watch's own device lock holds it until the first unlock after a restart, so its work starts here.
+        startWork()
         // Only on a fresh start: a recreated activity (a font or locale change) is handed the SAME intent again, and
         // would run the tile's action a second time.
         if (savedInstanceState == null) readTileRequest(intent)
@@ -55,8 +54,6 @@ class WearMainActivity : ComponentActivity() {
                     WearBackdrop(Modifier.fillMaxSize()) {
                         WearApp(
                             repo = repo,
-                            pinStore = pinStore,
-                            onBootUnlocked = { startWork() },
                             tileRequest = tileRequest,
                             onTileRequestHandled = {
                                 tileRequest = null
