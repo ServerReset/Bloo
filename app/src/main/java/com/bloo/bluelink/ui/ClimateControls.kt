@@ -5,6 +5,7 @@ package com.bloo.bluelink.ui
  * section and [ChargeLimitPill].
  */
 
+import androidx.compose.ui.graphics.graphicsLayer
 import com.bloo.bluelink.data.WheelHeatLevel
 import androidx.compose.foundation.layout.padding
 import androidx.compose.animation.animateColorAsState
@@ -170,22 +171,17 @@ internal fun ClimatePresetSection(
                 spacing = GapRow,
                 modifier = Modifier.fillMaxWidth(),
             ) { preset, itemDragHandle, _ ->
-                AnimatedVisibility(
-                    visible = preset.id !in deletingIds,
-                    enter = scaleIn(tween(MotionMedium, easing = LinearOutSlowInEasing), initialScale = 0.88f) +
-                        expandVertically(tween(MotionMedium)) + fadeIn(tween(MotionShort)),
-                    exit = scaleOut(tween(MotionShort, easing = FastOutLinearInEasing), targetScale = 0.88f) +
-                        shrinkVertically(tween(MotionShort)) + fadeOut(tween(MotionShort)),
-                ) {
-                    PresetPill(
-                        name = preset.name,
-                        temp = climatePresetTemp(preset.request, fahrenheit),
-                        active = preset.id == activeId,
-                        onStart = { onStart(preset) },
-                        onEdit = { editing = preset },
-                        modifier = itemDragHandle,
-                    )
-                }
+                // The row keeps its height for the whole drag, as a pebble does: a height animation here made the drop read differently
+                // from the pebbles. A deleted preset fades out in place, and the list closes up after it.
+                val gone = preset.id in deletingIds
+                PresetPill(
+                    name = preset.name,
+                    temp = climatePresetTemp(preset.request, fahrenheit),
+                    active = preset.id == activeId,
+                    onStart = { onStart(preset) },
+                    onEdit = { editing = preset },
+                    modifier = itemDragHandle.graphicsLayer { alpha = if (gone) 0f else 1f },
+                )
             }
             Spacer(Modifier.height(GapHairline))
         }
