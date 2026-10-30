@@ -36,7 +36,7 @@ internal fun Refreshable(
     LaunchedEffect(ptrState) {
         snapshotFlow { ptrState.distanceFraction }.collect {
             pullFractionState.value = it
-            indicator?.pull?.value = it
+            indicator?.pull = it
         }
     }
     // One stable key per Refreshable instance, so this page's own in-flight flag contributes to the

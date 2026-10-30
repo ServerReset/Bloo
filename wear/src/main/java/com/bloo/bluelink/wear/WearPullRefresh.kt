@@ -23,8 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,6 +39,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.PullRefreshState
 
 /*
  * The watch's pull-to-refresh, in the phone's own mechanic: pull down from the top of the face and a disc drops
@@ -60,21 +59,12 @@ private val ReturnSpring = spring<Float>(dampingRatio = 0.85f, stiffness = Sprin
 /** Where the disc rests, measured from the top of the display (clear of the clock). */
 private val RestTop = 30.dp
 
-/** The pull's progress: 0..1 up to the arm point, past 1 beyond it (resisted below). */
-class WearPullState {
-    var pull by mutableFloatStateOf(0f)
-    /** Where the pull was when the finger lifted, so the disc can carry on from there instead of restarting. */
-    var lastPull by mutableFloatStateOf(0f)
-    /** Set the instant a release arms a refresh, before the repository's own flag flips, so the disc stays put. */
-    var requested by mutableStateOf(false)
-}
-
 /**
  * Watches a downward drag on this element without taking it (tiles, the pager and the crown all still work),
  * writes its progress to [state], and calls [onRefresh] when the finger lifts past the arm point.
  */
 @Composable
-fun Modifier.wearPullToRefresh(state: WearPullState, onRefresh: () -> Unit): Modifier {
+fun Modifier.wearPullToRefresh(state: PullRefreshState, onRefresh: () -> Unit): Modifier {
     val haptics = LocalHapticFeedback.current
     val distancePx = with(LocalDensity.current) { PullDistance.toPx() }
     // The gesture loop starts once; it must call the CURRENT refresh, not the one from the composition that began it.
@@ -117,7 +107,7 @@ fun Modifier.wearPullToRefresh(state: WearPullState, onRefresh: () -> Unit): Mod
 
 /** The disc itself, drawn over the face. Call inside a Box that fills the display. */
 @Composable
-fun BoxScope.WearPullIndicator(state: WearPullState, refreshing: Boolean) {
+fun BoxScope.WearPullIndicator(state: PullRefreshState, refreshing: Boolean) {
     val active = refreshing || state.requested
     // The real flag takes over from the request; and a refresh that never reports one must not hold the disc.
     val refreshingNow = androidx.compose.runtime.rememberUpdatedState(refreshing)

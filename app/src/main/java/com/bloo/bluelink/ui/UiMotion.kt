@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.uicommon.cascadeOvershoot
+import com.bloo.uicommon.lowPowerCalm
 import com.bloo.uicommon.lowPowerFloating
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContent
@@ -162,10 +163,11 @@ internal fun PopVisible(
                 lowPowerFloating(),
                 initialScale = 0.9f,
             ) +
-            (if (sizeAnimated) expandVertically(lowPowerFloating()) else EnterTransition.None),
+            // The height never overshoots: a bouncy size spring stopped short, swung back, and dropped onto the rows below.
+            (if (sizeAnimated) expandVertically(lowPowerCalm<IntSize>(Spring.StiffnessMediumLow)) else EnterTransition.None),
         exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
             scaleOut(MaterialTheme.motionScheme.defaultSpatialSpec<Float>(), targetScale = 0.8f) +
-            (if (sizeAnimated) shrinkVertically(lowPowerFloating()) else ExitTransition.None),
+            (if (sizeAnimated) shrinkVertically(lowPowerCalm<IntSize>(Spring.StiffnessMediumLow)) else ExitTransition.None),
         content = content,
     )
 }

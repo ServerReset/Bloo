@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import com.bloo.uicommon.PullRefreshState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -33,7 +34,7 @@ internal fun WearFacePage(
 ) {
     val v = ui.car
     ScreenScaffold(timeText = { TimeText() }) {
-        val pullState = remember { WearPullState() }
+        val pullState = remember { PullRefreshState() }
         Box(Modifier.fillMaxSize().wearPullToRefresh(pullState) { ui.repo.refresh() }) {
             // The four quarters are rebuilt only when what they show changes (the slots, the car, a command in flight), not on every
             // redraw of the page; a tap reads the latest state when it happens, so nothing it does is stale.

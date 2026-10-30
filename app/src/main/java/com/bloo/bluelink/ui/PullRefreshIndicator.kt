@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.PullRefreshState
 import com.bloo.uicommon.bounceSpring
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
@@ -36,14 +35,7 @@ import com.bloo.uicommon.LocalHaptics
  * The app's ONE pull-to-refresh indicator, drawn as a single floating overlay at the app root
  * rather than per screen.
  */
-internal class RefreshIndicatorState {
-    /**
-     * How far the visible page has been pulled, 0..1+ (the raw M3 distanceFraction). Written by
-     * whichever page is being pulled; only the pulled page ever has a non-zero fraction, so this
-     * needs no per-page bookkeeping.
-     */
-    val pull: MutableState<Float> = mutableFloatStateOf(0f)
-
+internal class RefreshIndicatorState : PullRefreshState() {
     // Several Refreshables are alive at once (the pager keeps neighbour car pages composed), so "is
     // a refresh in flight" is an OR across them, tracked by identity rather than a single bool one
     // page could clear while another is still working.
@@ -55,14 +47,6 @@ internal class RefreshIndicatorState {
     fun setRefreshing(key: Any, on: Boolean) {
         if (on) { if (key !in refreshingKeys) refreshingKeys.add(key) } else refreshingKeys.remove(key)
     }
-
-    /**
-     * Set the instant the pull is released past the threshold (from Refreshable's own onRefresh),
-     * BEFORE the caller's async refresh flag flips. Without it the disc slid back up during that gap
-     * and then dropped down again once [refreshing] finally turned true -- reported as the indicator
-     * "going away then pulling down from the top again". Holds the disc at the rest position instead.
-     */
-    var requested by mutableStateOf(false)
 }
 
 /** The one app-wide [RefreshIndicatorState]. Null only if no host is mounted (a preview). */
@@ -86,7 +70,7 @@ internal fun PullRefreshIndicatorHost(state: RefreshIndicatorState, hazeState: H
     val active = state.refreshing || state.requested
     // Past the arm point the pull keeps travelling further, but resisted (a rubber band), so the disc
     // can be pulled BELOW its resting spot and then springs back up onto it on release.
-    val pullRaw = state.pull.value
+    val pullRaw = state.pull
     val raw = pullRaw.coerceIn(0f, 1f)
     val over = (pullRaw - 1f).coerceAtLeast(0f)
     val finger = raw + over / (1f + over) * OverPullTravel
@@ -126,7 +110,7 @@ internal fun PullRefreshIndicatorHost(state: RefreshIndicatorState, hazeState: H
     val haptics = LocalHaptics.current
     var armed by remember { mutableStateOf(false) }
     LaunchedEffect(state) {
-        snapshotFlow { state.pull.value }.collect { p ->
+        snapshotFlow { state.pull }.collect { p ->
             val nowArmed = p >= 1f
             if (nowArmed && !armed) haptics?.tick()
             armed = nowArmed
