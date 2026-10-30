@@ -68,7 +68,7 @@ import com.bloo.uicommon.lowPowerCalm
 import com.bloo.uicommon.BlooSlider
 import com.bloo.uicommon.ButtonIcon
 import com.bloo.uicommon.PrimaryTextStyle
-import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.ReorderableRows
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.MorphIconButton
@@ -151,12 +151,10 @@ internal fun ClimatePresetSection(
             SectionLabel("Presets")
             Spacer(Modifier.height(GapHairline))
             // Full-width reorderable rows: drag handle to re-rank, tap to apply.
-            ReorderColumn(
+            ReorderableRows(
                 items = presets,
                 keyOf = { it.id },
                 onReorder = onReorder,
-                spacing = GapRow,
-                modifier = Modifier.fillMaxWidth(),
             ) { preset, itemDragHandle, _ ->
                 // The row keeps its height for the whole drag, as a pebble does: a height animation here made the drop read differently
                 // from the pebbles. A deleted preset fades out in place, and the list closes up after it.
