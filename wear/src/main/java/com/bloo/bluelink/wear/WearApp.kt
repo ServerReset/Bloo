@@ -1,6 +1,7 @@
 package com.bloo.bluelink.wear
 
 import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.PageDots
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -164,6 +165,6 @@ private fun Cars(
                 )
             }
         }
-        if (vehicles.size > 1) CarPageDots(count = vehicles.size, current = wrap.wrap.real(pagerState.currentPage))
+        if (vehicles.size > 1) PageDots(count = vehicles.size, current = wrap.wrap.real(pagerState.currentPage))
     }
 }
