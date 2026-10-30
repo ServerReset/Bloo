@@ -4,9 +4,6 @@ import androidx.wear.compose.foundation.CurvedTextStyle
 import androidx.wear.compose.foundation.basicCurvedText
 import androidx.wear.compose.foundation.CurvedDirection
 import androidx.wear.compose.foundation.CurvedLayout
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.material3.Text
 import com.bloo.uicommon.LocalPowerPolicy
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background

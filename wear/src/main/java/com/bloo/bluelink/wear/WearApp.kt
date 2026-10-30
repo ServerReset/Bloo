@@ -20,7 +20,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.material3.AppScaffold
-import androidx.wear.compose.material3.HorizontalPageIndicator
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
 import com.bloo.bluelink.data.WatchPinPolicy
