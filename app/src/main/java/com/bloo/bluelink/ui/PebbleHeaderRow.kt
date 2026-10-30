@@ -6,12 +6,15 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.Role
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -43,6 +48,7 @@ import com.bloo.uicommon.ButtonIconGap
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.LocalHaptics
+import com.bloo.uicommon.lowPowerCalm
 
 /**
  * Minimum width the header leaves for the title before the action button may take the rest. Zero on
@@ -119,17 +125,23 @@ internal fun PebbleHeaderRow(
         // Tinted with [titleColor] so the icon matches the title (the hero draws over a scrimmed
         // photo). takeOrElse: titleColor is Unspecified for other pebbles, which Icon would treat
         // as an untinted raw vector.
-        // A floating card has no icon: its name stands on the page by itself.
-        if (!largeHeader) {
+        // A floating card has no icon: its name stands on the page by itself. The icon and its gap ease out with the title's own
+        // size change (the same calm spring), so the name moves across as they go, rather than jumping when the header flips.
+        val iconT by animateFloatAsState(
+            targetValue = if (largeHeader) 0f else 1f,
+            animationSpec = lowPowerCalm(Spring.StiffnessLow),
+            label = "pebbleHeaderIcon",
+        )
+        Box(Modifier.width(20.dp * iconT).height(20.dp).clipToBounds(), contentAlignment = Alignment.Center) {
             Icon(
                 icon,
                 contentDescription = null,
                 tint = titleColor.takeOrElse { LocalContentColor.current },
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(20.dp).graphicsLayer { alpha = iconT },
             )
-            // ButtonIconGap: the standard icon-then-label gap.
-            Spacer(Modifier.width(ButtonIconGap))
         }
+        // ButtonIconGap: the standard icon-then-label gap, eased with the icon.
+        Spacer(Modifier.width(ButtonIconGap * iconT))
         Column(Modifier.weight(1f)) {
             PebbleTitleRow(
                 title = title, expanded = expanded, growTitleOnExpand = growTitleOnExpand, titleColor = titleColor,
