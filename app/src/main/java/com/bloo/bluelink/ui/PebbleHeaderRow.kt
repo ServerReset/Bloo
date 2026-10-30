@@ -119,14 +119,17 @@ internal fun PebbleHeaderRow(
         // Tinted with [titleColor] so the icon matches the title (the hero draws over a scrimmed
         // photo). takeOrElse: titleColor is Unspecified for other pebbles, which Icon would treat
         // as an untinted raw vector.
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = titleColor.takeOrElse { LocalContentColor.current },
-            modifier = Modifier.size(if (largeHeader) ControlHeight else 20.dp),
-        )
-        // ButtonIconGap: the standard icon-then-label gap.
-        Spacer(Modifier.width(ButtonIconGap))
+        // A floating card has no icon: its name stands on the page by itself.
+        if (!largeHeader) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = titleColor.takeOrElse { LocalContentColor.current },
+                modifier = Modifier.size(20.dp),
+            )
+            // ButtonIconGap: the standard icon-then-label gap.
+            Spacer(Modifier.width(ButtonIconGap))
+        }
         Column(Modifier.weight(1f)) {
             PebbleTitleRow(
                 title = title, expanded = expanded, growTitleOnExpand = growTitleOnExpand, titleColor = titleColor,
