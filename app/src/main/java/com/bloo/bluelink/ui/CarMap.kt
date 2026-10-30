@@ -9,6 +9,8 @@ import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -36,6 +38,14 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedVisibility
+import com.bloo.uicommon.rememberDisplayedItems
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -576,53 +586,97 @@ internal fun BoxScope.CarPinLayer(
         // Where the cluster sits on screen: its place plus the pan, times the scale, from the map's centre.
         fun screenX() = (cx + state.panX * panWeight()) * state.scale
         fun screenY() = (cy + state.panY * panWeight()) * state.scale
-        Box(
-            Modifier.align(Alignment.Center)
-                .offset { IntOffset(screenX().roundToInt(), screenY().roundToInt()) }
-                .graphicsLayer {
-                    // Hidden while off screen: an off-screen car has its own pointer at the edge (see OffScreenCarPointers).
-                    val b = box.value
-                    val sx = screenX()
-                    val sy = screenY()
-                    val off = markerOffVisible(sx, sy, b.width / 2f, b.height / 2f, marginPx, chromeInsets.topPx, chromeInsets.bottomPx)
-                    alpha = if (off) 0f else 1f
-                },
-        ) {
-            if (cluster.size == 1) {
-                val pin = cluster.single().pin
-                val isOwn = pin.vin == ownVin
-                CarPinMarker(
-                    photo = pin.photo,
-                    tint = if (isOwn) tint else tint.copy(alpha = 0.7f),
-                    selected = selectedVin == pin.vin,
-                    contentDesc = if (isOwn) "Car location" else "${pin.name}, another car",
-                    onClick = { onPinTap(pin.vin) },
-                    // The bubble shows only with the car's photo, which the expanded map passes for its own car; the other cars are only on it.
-                    bubble = !isOwn || pin.photo != null,
+        // A cluster keeps its identity by its first car, so a car joining or leaving morphs the same pill rather than starting a new one.
+        key(cluster.first().pin.vin) {
+            val members = cluster.map { it.pin }.take(MaxClusterCars)
+            val shown = rememberDisplayedItems(members, resetKey = cluster.first().pin.vin)
+            Box(
+                Modifier.align(Alignment.Center)
+                    .offset { IntOffset(screenX().roundToInt(), screenY().roundToInt()) }
+                    .graphicsLayer {
+                        // Hidden while off screen: an off-screen car has its own pointer at the edge (see OffScreenCarPointers).
+                        val b = box.value
+                        val sx = screenX()
+                        val sy = screenY()
+                        val off = markerOffVisible(sx, sy, b.width / 2f, b.height / 2f, marginPx, chromeInsets.topPx, chromeInsets.bottomPx)
+                        alpha = if (off) 0f else 1f
+                    },
+            ) {
+                // One car: its own pin. Two or more: one shared pill holding their photos. Each swaps for the other as cars join or leave.
+                AnimatedVisibility(visible = members.size == 1, enter = fadeIn(), exit = fadeOut()) {
+                    val pin = members.first()
+                    val isOwn = pin.vin == ownVin
+                    CarPinMarker(
+                        photo = pin.photo,
+                        tint = if (isOwn) tint else tint.copy(alpha = 0.7f),
+                        selected = selectedVin == pin.vin,
+                        contentDesc = if (isOwn) "Car location" else "${pin.name}, another car",
+                        onClick = { onPinTap(pin.vin) },
+                        // The bubble shows only with the car's photo, which the expanded map passes for its own car; the other cars are only on it.
+                        bubble = !isOwn || pin.photo != null,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+                AnimatedVisibility(
+                    visible = members.size > 1,
                     modifier = Modifier.align(Alignment.Center),
-                )
-            } else {
-                // Chips side by side, each its car's photo, growing with the pinch. Tapping one selects that car.
-                Row(Modifier.align(Alignment.Center), horizontalArrangement = Arrangement.spacedBy((-6).dp)) {
-                    for (spot in cluster) {
-                        val pin = spot.pin
-                        val selected = selectedVin == pin.vin
-                        CarPhotoTile(
-                            photo = pin.photo,
-                            tint = tint,
-                            contentDescription = "${pin.name}. Tap to select it",
-                            onClick = { onPinTap(pin.vin) },
-                            size = DpSize(40.dp, 28.dp),
-                            selected = selected,
-                            glyphSize = 16.dp,
-                            modifier = Modifier.graphicsLayer {
-                                val g = (state.scale).coerceIn(1f, 1.8f)
-                                scaleX = g
-                                scaleY = g
-                                transformOrigin = TransformOrigin(0.5f, 1f)
-                            },
-                        )
-                    }
+                    enter = fadeIn() + scaleIn(initialScale = 0.8f),
+                    exit = fadeOut() + scaleOut(targetScale = 0.8f),
+                ) {
+                    ClusterPill(
+                        displayed = shown,
+                        current = members.map { it.vin }.toSet(),
+                        selectedVin = selectedVin,
+                        tint = tint,
+                        onPinTap = onPinTap,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The most cars one shared pill holds. A cluster beyond this shows its first cars. */
+private const val MaxClusterCars = 10
+
+/**
+ * Cars that sit together, as one shared rounded pill holding their photos side by side. A car joining or leaving grows or shrinks the pill
+ * on its own, and the photo of a car that is leaving stays until it has finished going.
+ */
+@Composable
+private fun ClusterPill(
+    displayed: List<CarPin>,
+    current: Set<String>,
+    selectedVin: String?,
+    tint: Color,
+    onPinTap: (String) -> Unit,
+) {
+    val shape = RoundedCornerShape(50)
+    Row(
+        Modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(1.dp, Color.White.copy(alpha = 0.85f), shape)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        displayed.forEach { pin ->
+            key(pin.vin) {
+                AnimatedVisibility(
+                    visible = pin.vin in current,
+                    enter = fadeIn() + expandHorizontally(),
+                    exit = fadeOut() + shrinkHorizontally(),
+                ) {
+                    CarPhotoTile(
+                        photo = pin.photo,
+                        tint = tint,
+                        contentDescription = "${pin.name}. Tap to select it",
+                        onClick = { onPinTap(pin.vin) },
+                        size = DpSize(36.dp, 26.dp),
+                        selected = pin.vin == selectedVin,
+                        glyphSize = 14.dp,
+                    )
                 }
             }
         }
