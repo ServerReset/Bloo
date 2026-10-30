@@ -9,6 +9,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -187,9 +188,13 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
     val expandedVin = expandedMap.vin
     val expandedVehicle = if (expandedVin != null) vehicles.firstOrNull { it.vin == expandedVin } else null
     val expandedLocation = expandedVehicle?.let { state.value.locations[it.vin] }
+    // Where the map grows from: the car's pebble, once it has been on screen. Until then (or after swiping to another car) a pebble-sized
+    // box in the middle, so the map always opens.
+    val windowSize = LocalWindowInfo.current.containerSize
     val originBounds = expandedVehicle?.vin?.let { expandedMap.originBoundsFor(it).value }
+        ?: Rect(windowSize.width * 0.05f, windowSize.height * 0.35f, windowSize.width * 0.95f, windowSize.height * 0.6f)
 
-    if (expandedVehicle != null && expandedLocation != null && originBounds != null) {
+    if (expandedVehicle != null && expandedLocation != null) {
         val locateExpandedVehicle = rememberLocateAction(vm, expandedVehicle)
         // The bar describes the selected car: the one this map is on, or another whose pin was tapped. The map itself stays on the first.
         val barVehicle = expandedMap.selectedVin?.let { vin -> vehicles.firstOrNull { it.vin == vin } } ?: expandedVehicle

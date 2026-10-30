@@ -3,7 +3,6 @@ package com.bloo.bluelink.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.Modifier
-import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -149,17 +148,14 @@ internal fun rememberCarMapState(): CarMapState = remember { CarMapState() }
  * expanded view starting over at a fresh state with a fresh tile fetch.
  */
 internal class ExpandedMapState {
-    private val perVinMap = mutableMapOf<String, @Composable (Modifier, MapInputs) -> Unit>()
-
     /**
-     * The ONE map composable for this car, as movable content. Call it where the map should be drawn: the pebble's slot while the
-     * map is collapsed, the full-screen layer while it is open. Moving the call from one to the other moves the composed map itself
-     * (its state, its loaded tiles, its place in the pan and zoom), it does not build a second one, so the map that opens is the map
-     * that was in the pebble. Call it from one place at a time.
+     * The map for this car, drawn wherever it is called: the pebble's slot while the map is collapsed, the full-screen layer while it is
+     * open. Each car's pan and zoom live in its [CarMapState], so the map that opens shows the same view it was left on. Nothing moves
+     * between places, so there is no second copy to fall out of step with the first.
      */
-    fun mapFor(vin: String): @Composable (Modifier, MapInputs) -> Unit = perVinMap.getOrPut(vin) {
+    fun mapFor(vin: String): @Composable (Modifier, MapInputs) -> Unit {
         val state = mapStateFor(vin)
-        movableContentOf { modifier: Modifier, inputs: MapInputs ->
+        val content: @Composable (Modifier, MapInputs) -> Unit = { modifier, inputs ->
             CarMap(
                 inputs.location, modifier, state, inputs.deviceLocation, inputs.interactive, inputs.tileArea, inputs.panWeight,
                 // Only the full-screen map shows the other cars: the pebble's own map is this car alone.
@@ -172,6 +168,7 @@ internal class ExpandedMapState {
                 onSelectedOffScreen = { this@ExpandedMapState.selectedVin = null },
             )
         }
+        return content
     }
 
     /** The other cars, drawn as photo pins on the expanded map: every car but the one it is open on. */
