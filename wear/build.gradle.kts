@@ -186,6 +186,8 @@ dependencies {
     implementation("androidx.wear.tiles:tiles:1.4.1")
     implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
     implementation("androidx.wear.protolayout:protolayout:1.2.1")
+    // Ongoing activities: a charging car shows on the watch face and in Recents, not only in the shade.
+    implementation("androidx.wear:wear-ongoing:1.1.0")
     implementation("androidx.concurrent:concurrent-futures:1.2.0")
     // Raised to the version the phone app uses: a dependency above (the Wearable and Wear libraries) pulls in an old
     // androidx.fragment (1.1.0), which Google Play flags as an outdated SDK. Gradle takes the highest version asked for.

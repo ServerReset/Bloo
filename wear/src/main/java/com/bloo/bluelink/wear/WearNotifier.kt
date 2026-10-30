@@ -8,7 +8,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.app.Notification
 import androidx.core.app.NotificationCompat
+import androidx.wear.ongoing.OngoingActivity
+import androidx.wear.ongoing.Status
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.bloo.bluelink.data.CarAction
@@ -120,21 +123,39 @@ object WearNotifier {
      */
     private fun idFor(vin: String, kind: String): Int = (vin + kind).hashCode()
 
-    private fun chargingCard(app: Context, v: VehicleSnapshot, showStopAction: Boolean) =
-        NotificationCompat.Builder(app, CHANNEL_CHARGING)
+    /**
+     * The live charging card: an ongoing notification paired with an ongoing activity, so the car's charge shows on the watch face and in
+     * Recents while it charges, not only in the shade. The activity's status carries the percentage, and the card is rebuilt (and so
+     * re-applied) each time the car's state changes; stopping the charge cancels it.
+     */
+    private fun chargingCard(app: Context, v: VehicleSnapshot, showStopAction: Boolean): Notification {
+        val touch = openApp(app)
+        val builder = NotificationCompat.Builder(app, CHANNEL_CHARGING)
             .setSmallIcon(R.drawable.ic_stat_bloo)
             .setContentTitle("${v.name} charging")
             .setContentText(listOfNotNull(v.percent?.let { "$it%" }, v.rangeMi?.let { "$it mi" }).joinToString(" · "))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-            .setContentIntent(openApp(app))
+            .setContentIntent(touch)
             .apply {
                 v.percent?.let { setProgress(100, it.coerceIn(0, 100), false) }
                 // No button when the user asked for a PIN before commands -- see onVehicles.
                 if (showStopAction) addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CHARGE_OFF))
             }
+        val status = Status.Builder()
+            .addTemplate("#what# #level#")
+            .addPart("what", Status.TextPart("Charging"))
+            .addPart("level", Status.TextPart(v.percent?.let { "$it%" } ?: ""))
             .build()
+        OngoingActivity.Builder(app, idFor(v.vin, "charging"), builder)
+            .setStaticIcon(R.drawable.ic_stat_bloo)
+            .setTouchIntent(touch)
+            .setStatus(status)
+            .build()
+            .apply(app)
+        return builder.build()
+    }
 
     /**
      * A one-shot alert. It takes no action button, and no longer takes an unused `action` parameter
