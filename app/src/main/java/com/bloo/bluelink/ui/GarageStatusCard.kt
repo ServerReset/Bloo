@@ -76,12 +76,12 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
         accounts.isEmpty() -> Triple(
             Icons.Filled.CloudOff,
             "Not signed in",
-            "Sign in to your Hyundai, Kia, or Genesis account. Swipe right for Settings.",
+            "Sign in to your Hyundai, Kia or Genesis account.",
         )
         offline -> Triple(
             Icons.Filled.WifiOff,
             "No connection",
-            "No internet. You're still signed in. Check your connection and pull to retry.",
+            "No internet. You're still signed in.",
         )
         loadFailed -> Triple(
             Icons.Filled.WifiOff,

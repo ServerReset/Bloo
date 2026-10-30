@@ -16,7 +16,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.platform.LocalContext
@@ -65,9 +64,7 @@ internal fun CredentialsPrivacyNote(brandLabel: String?, modifier: Modifier = Mo
             )
         }
         RevealText(
-            "Your password and service PIN are encrypted on this phone with AES-256-GCM, a widely trusted standard. The key is sealed inside the Android Keystore, the phone's hardware security chip, so the app can read the " +
-                "secrets back but nobody else can. Bloo has no server, so no copy of your data is kept anywhere but this phone. " +
-                "They go only to ${brandLabel ?: "your manufacturer"}, to sign in and send commands.",
+            "Your password and service PIN are encrypted on this phone. Only ${brandLabel ?: "your manufacturer"} gets them, to sign in and send commands.",
             style = SecondaryTextStyle(),
             color = scheme.onSurfaceVariant,
         )

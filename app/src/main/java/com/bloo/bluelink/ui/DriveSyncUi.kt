@@ -182,7 +182,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             title = "Remove ${r.name.ifBlank { if (r.watch) "this watch" else "this phone" }}?",
             text = {
                 BodyMediumText(
-                    "It leaves the list on every synced device. If it syncs again it comes back: Bloo never locks a device out of your sync.",
+                    "Removed everywhere. It returns if it syncs again.",
                 )
             },
             buttons = {

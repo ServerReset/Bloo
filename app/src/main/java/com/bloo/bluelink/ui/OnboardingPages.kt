@@ -70,12 +70,12 @@ import com.bloo.uicommon.content
 internal fun OnboardingWelcomePage() {
     OnboardingTipListPage(
         tips = listOf(
-            Triple(AppIcons.Bolt, "Live status", "Charge or fuel, range, lock state, tyre pressure and trips, straight from your car's own service"),
-            Triple(Icons.Filled.Thermostat, "Remote climate", "Start the cabin with a preset, or let smart climate pick a temperature for the weather where the car is parked"),
-            Triple(Icons.Filled.Lock, "Lock and unlock", "Lock, unlock and check that the doors really are shut, from anywhere with a signal"),
-            Triple(Icons.Filled.Map, "Find your car", "A map with the car on it, and your phone's position beside it if you allow it"),
-            Triple(Icons.Filled.Widgets, "Widgets and a watch", "Home-screen widgets with lock, climate and charge buttons, and a Wear OS face with quick controls"),
-            Triple(Icons.Filled.SwapHoriz, "Several cars", "Sign in to more than one account and swipe between every car you own"),
+            Triple(AppIcons.Bolt, "Live status", "Charge, range, locks and trips, from the car."),
+            Triple(Icons.Filled.Thermostat, "Remote climate", "Start climate with a preset or smart climate."),
+            Triple(Icons.Filled.Lock, "Lock and unlock", "Lock, unlock and check doors from anywhere."),
+            Triple(Icons.Filled.Map, "Find your car", "A map with your car and your phone."),
+            Triple(Icons.Filled.Widgets, "Widgets and a watch", "Home-screen widgets and a Wear OS watch."),
+            Triple(Icons.Filled.SwapHoriz, "Several cars", "Several accounts, every car in one place."),
         ),
     )
 }
@@ -169,7 +169,7 @@ internal fun OnboardingSetupPage(
         OnboardingSetupCard(
             icon = AppIcons.Lock,
             title = "Screen lock",
-            body = "Set a screen lock on your phone (fingerprint, face, PIN, pattern or password). Bloo then locks with it.",
+            body = "Set a screen lock on your phone. Bloo uses it.",
             done = false,
             required = false,
         ) {}
@@ -197,9 +197,9 @@ internal fun OnboardingSetupPage(
         icon = Icons.Filled.CloudSync,
         title = "Sync across devices",
         body = if (syncEnabled) {
-            "Your settings and car photos back up to Google Drive automatically."
+            "Settings and photos back up to Google Drive."
         } else {
-            "Keep your settings, layout and car photos the same on every device."
+            "Keep settings and photos the same on every device."
         },
         done = syncEnabled,
     ) {
@@ -231,7 +231,7 @@ internal fun OnboardingRestorePage(vm: AppViewModel) {
     OnboardingSetupCard(
         icon = Icons.Filled.CloudSync,
         title = "Restore from sync",
-        body = "Coming from another device? Pick the file it syncs to, and its settings and car setup come with it.",
+        body = "From another device? Pick its sync file.",
         done = false,
     ) {
         MorphActionButton(
@@ -290,9 +290,9 @@ internal fun OnboardingAlertsPage(notif: SettingsStore.NotificationPrefs, vm: Ap
 @Composable
 internal fun OnboardingWatchPage() {
     var show by remember { mutableStateOf(false) }
-    BodySmallText("Got a Wear OS watch? Bloo has a watch app with quick actions, a Tile and its own notifications. On the Play version it installs from Google Play; on this copy it installs straight from this phone.")
+    BodySmallText("Got a Wear OS watch? Bloo has a watch app with quick actions and a Tile.")
     MorphTextButton("Set up my watch", onClick = { show = true }, icon = Icons.Filled.Watch, emphasis = ButtonEmphasis.Confirm)
-    MutedText("No watch? Swipe on. You can set one up later from Settings → Backup & sync.")
+    MutedText("No watch? Swipe on. Set one up later in Settings.")
     if (show) SetupWatchDialog(phoneName = "this phone", onDismiss = { show = false })
 }
 
@@ -332,7 +332,7 @@ internal fun OnboardingPebbleDemo() {
             }
             AnimatedVisibility(visible = open) {
                 RevealText(
-                    "That is a pebble. Tap it for details, hold to reorder, and swipe its top row to change cars.",
+                    "Tap a pebble for details. Hold to reorder.",
                     style = SecondaryTextStyle(),
                     color = scheme.onSurfaceVariant,
                 )

@@ -21,10 +21,7 @@ internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppVie
         value = (if (appearance.ultraGlass) GlassStops.lastIndex else nearestGlassStop(appearance.glassClarity)).toFloat(),
         valueRange = 0f..GlassStops.lastIndex.toFloat(),
         steps = GlassStops.size - 2,
-        readout = {
-            val stop = GlassStops[it.roundToInt().coerceIn(0, GlassStops.lastIndex)]
-            if (stop.ultra) "Ultra · everything turned up past maximum" else "${stop.name} · ${(stop.transparency * 100).roundToInt()}% transparent"
-        },
+        readout = { GlassStops[it.roundToInt().coerceIn(0, GlassStops.lastIndex)].name },
         snap = { it.roundToInt().coerceIn(0, GlassStops.lastIndex).toFloat() },
         onValueSettled = {
             val picked = GlassStops[it.roundToInt()]
@@ -32,7 +29,7 @@ internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppVie
             vm.setUltraGlass(picked.ultra)
         },
     )
-    BodySmallText("How see-through floating glass is, from solid to nothing but the bending edge. Ultra puts glass on every card and cranks the edge refraction, colour fringe and shine as far as they go. Heavy on older devices.")
+    BodySmallText("Ultra puts glass on every card. Heavy on older phones.")
 }
 
 internal class GlassStop(val name: String, val transparency: Float, val ultra: Boolean = false)

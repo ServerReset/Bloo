@@ -64,7 +64,7 @@ internal class WeatherController(
     fun useDeviceLocationForWeather() = scope.launch {
         val ok = withContext(Dispatchers.IO) { settingsStore.setWeatherFromDeviceLocation() }
         if (!ok) {
-            state.update { it.copy(message = "No device location available. Try setting a place instead.") }
+            state.update { it.copy(message = "No device location. Set a place instead.") }
             return@launch
         }
         loadHomeWeather(force = true)

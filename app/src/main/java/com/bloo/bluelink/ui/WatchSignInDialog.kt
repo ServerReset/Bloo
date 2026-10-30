@@ -37,10 +37,10 @@ internal fun WatchSignInDialog() {
                 is WatchSignIn.State.Confirm -> {
                     BodyMediumText("Does the watch show this code?")
                     RevealText(current.code, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
-                    BodyMediumText("Your accounts are encrypted so only that watch can read them, then sent. It will work without this phone afterwards.")
+                    BodyMediumText("Accounts are encrypted for that watch only. It then works without this phone.")
                 }
                 WatchSignIn.State.Sending -> BodyMediumText("Sending securely…")
-                WatchSignIn.State.Done -> BodyMediumText("The watch is signed in and can run your car on its own.")
+                WatchSignIn.State.Done -> BodyMediumText("The watch is signed in.")
                 is WatchSignIn.State.Failed -> BodyMediumText(current.message, color = MaterialTheme.colorScheme.error)
                 WatchSignIn.State.Idle -> Unit
             }

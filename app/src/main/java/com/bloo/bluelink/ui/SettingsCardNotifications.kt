@@ -165,8 +165,7 @@ internal fun NotificationsCardContent(
                     PopVisible(visible = autoLockOn) {
                         Column {
                             SettingsCaption(
-                                "AutoLock runs a quiet background watcher. You can hide its notification from " +
-                                    "Android's notification settings.",
+                                "AutoLock's watcher notification can be hidden in Android's settings.",
                                 bottomGap = GapHairline,
                             )
                             MorphTextButton(

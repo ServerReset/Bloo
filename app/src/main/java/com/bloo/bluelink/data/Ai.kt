@@ -131,7 +131,7 @@ class Ai(context: Context) {
             val result = kotlinx.coroutines.withTimeout(INFERENCE_TIMEOUT_MS) { summarizer.runInference(request).await() }
             result.summary
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            throw IllegalStateException("The on-device AI didn't answer in time. Try again in a moment.")
+            throw IllegalStateException("The AI didn't answer. Try again.")
         }
     }
 

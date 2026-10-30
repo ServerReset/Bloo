@@ -38,7 +38,7 @@ internal fun SecurityCardContent(
                     AppLockRow(appearance, vm, context)
                 } else {
                     // No screen lock on the phone: there is nothing for the app to unlock with, so say so plainly.
-                    BodySmallText("Bloo locks with your phone's own lock. Set a screen lock (fingerprint, face, PIN, pattern or password) to turn it on.")
+                    BodySmallText("Bloo uses your phone's lock. Set one to turn this on.")
                 }
             }
             SettingsGroup {
@@ -46,7 +46,7 @@ internal fun SecurityCardContent(
                 ToggleRow(
                     "Sign in after a restart",
                     requireAuth,
-                    description = "after your phone restarts, Bloo stays sealed (no alerts, AutoLock or refreshes) until you sign in and unlock. A notification reminds you.",
+                    description = "After a restart, Bloo waits for sign-in. Alerts and AutoLock pause until then.",
                 ) {
                     requireAuth = it
                     com.bloo.bluelink.data.BootGate.setEnabled(context, it)

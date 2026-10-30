@@ -277,7 +277,7 @@ class CrashActivity : ComponentActivity() {
         val clipboard = LocalClipboard.current
         val clipboardScope = rememberCoroutineScope()
         SettingsGroup("Crash report") {
-            com.bloo.bluelink.ui.MutedText("Copy this and send it back: the crash, your device, and what the app was doing.")
+            com.bloo.bluelink.ui.MutedText("Copy this and send it back.")
             MorphTextButton(
                 "Copy",
                 icon = Icons.Filled.ContentCopy,

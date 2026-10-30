@@ -139,7 +139,7 @@ internal fun SyncDeviceRow(
             }
             if (health == DeviceHealth.STALE) {
                 RevealText(
-                    "Hasn't synced in a while. It may be on a different Drive file.",
+                    "Hasn't synced in a while.",
                     style = SecondaryTextStyle(),
                     color = scheme.onSurfaceVariant,
                 )

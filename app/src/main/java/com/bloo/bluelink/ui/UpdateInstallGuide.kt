@@ -31,9 +31,9 @@ internal fun UpdateInstallGuideDialog(onDismiss: () -> Unit, onContinue: () -> U
         icon = Icons.Filled.SystemUpdate,
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                RevealText("Android will hand off to its installer. Two things to expect:", style = SecondaryTextStyle())
+                RevealText("Android opens its installer.", style = SecondaryTextStyle())
                 RevealMutedText("1. Tap \"Install\" on the system sheet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                RevealMutedText("2. If it says \"Blocked by Play Protect\" (this copy was installed from a file, not from Google Play), tap \"More details\", then \"Install anyway\".", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                RevealMutedText("2. If Play Protect blocks it, tap \"More details\", then \"Install anyway\".", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 RevealMutedText("3. Confirm with your PIN, password or biometrics.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },

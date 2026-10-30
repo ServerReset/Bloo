@@ -70,7 +70,7 @@ object WatchSignIn {
             if (!sent) return@launch fail("No watch is connected")
             // The watch answers within a moment or not at all (the app may be closed on it).
             delay(WAIT_MS)
-            if (_state.value == State.WaitingForWatch) fail("The watch didn't answer. Open Bloo on it and try again.")
+            if (_state.value == State.WaitingForWatch) fail("The watch didn't answer. Try again.")
         }
     }
 

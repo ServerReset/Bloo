@@ -3,12 +3,10 @@ package com.bloo.bluelink.ui
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Fingerprint
 import com.bloo.uicommon.PrimaryTextStyle
-import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.segmentsOf
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -69,7 +67,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -103,8 +100,6 @@ import com.bloo.uicommon.MotionLong
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
-import com.bloo.uicommon.GapPage
-import com.bloo.uicommon.GapBlock
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphSegmented
@@ -208,7 +203,7 @@ internal fun LoginScreen(
         } catch (e: CancellationException) {
             throw e
         } catch (e: NoCredentialException) {
-            if (!quiet) savedNote = "No saved sign-in yet. Sign in once and your password manager can save it."
+            if (!quiet) savedNote = "No saved sign-in yet."
             return
         } catch (e: Exception) {
             return
@@ -362,7 +357,7 @@ internal fun LoginScreen(
                                         onDone = { submit() },
                                     )
                                     if (!brand.pinRequiredToSignIn) {
-                                        BodySmallText("Only needed to run remote commands. Leave it blank if you never set one; you can add it later in Settings.")
+                                        BodySmallText("Only needed for remote commands. Leave blank if unsure.")
                                     }
                                 }
                             }

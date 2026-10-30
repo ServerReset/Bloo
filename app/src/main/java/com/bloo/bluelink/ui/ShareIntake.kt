@@ -152,7 +152,7 @@ private fun SharedCarChooser(vehicles: List<Vehicle>, onPick: (Vehicle) -> Unit,
         icon = AppIcons.DirectionsCar,
         title = "Use this photo for",
         text = {
-            SecondaryText("Pick the car this photo is for. You can change it later in that car's settings.")
+            SecondaryText("Pick the car for this photo.")
             vehicles.forEach { v ->
                 ListButton(
                     title = v.name.ifBlank { v.model },

@@ -105,7 +105,7 @@ internal fun DriveSyncSetupDialog(
         icon = Icons.Filled.Cloud,
         title = "Google Drive sync",
         text = {
-            BodyMediumText("Keep settings in sync across devices with one Drive file.", color = scheme.onSurfaceVariant)
+            BodyMediumText("Sync settings through one Drive file.", color = scheme.onSurfaceVariant)
             // Join first - it's the correct choice when another device already set sync up, and
             // making it the emphasized (active) card steers people away from accidentally creating
             // a second file.
@@ -121,7 +121,7 @@ internal fun DriveSyncSetupDialog(
                     verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
                     RevealText(
-                        "Your other devices stop sharing settings with this one.",
+                        "Other devices stop syncing with this one.",
                         style = SecondaryTextStyle(),
                         color = scheme.onErrorContainer,
                     )

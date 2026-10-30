@@ -102,7 +102,7 @@ private fun CarOrderControl(state: UiState, vm: AppViewModel) {
 private fun CustomPaletteControl(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         if (appearance.customPalettes.isEmpty()) {
-            BodySmallText("No custom palettes saved yet. Make one under Settings, Visuals.")
+            BodySmallText("No custom palettes yet.")
         } else {
             ChoiceRow("Built-in palette", appearance.activeCustomPaletteId == null) { vm.setActiveCustomPaletteId(null) }
             appearance.customPalettes.forEach { p ->
@@ -116,7 +116,7 @@ private fun CustomPaletteControl(appearance: SettingsStore.Appearance, vm: AppVi
 private fun PinnedPebbleControl(v: Vehicle, state: UiState, vm: AppViewModel) {
     val pinned = state.hotspotSections[v.vin]
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        BodySmallText("The pebble kept beside the controls in the full-screen view.")
+        BodySmallText("Shown beside the controls full screen.")
         ChoiceRow("None", pinned == null) { pinned?.let { vm.setHotspot(v, it) } }
         pinnablePebbles(v, state).forEach { section ->
             // setHotspot toggles, so choosing the pebble that is already pinned must do nothing.

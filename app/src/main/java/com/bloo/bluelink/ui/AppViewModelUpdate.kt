@@ -38,7 +38,7 @@ fun AppViewModel.snoozeUpdate() {
 fun AppViewModel.downloadUpdateInBackground() {
     val url = _state.value.updateAvailable?.run?.phoneApkUrl
     if (url == null) {
-        _state.update { it.copy(message = "No direct download for this build. Use the browser link.") }
+        _state.update { it.copy(message = "Use the browser link to update.") }
         return
     }
     if (_state.value.updateDownloading || _state.value.updateApkReady) return
@@ -150,7 +150,7 @@ private fun AppViewModel.fallbackInstall(dest: java.io.File) {
         // False also means "sent to the unknown-sources page": then it is that permission, not the installer.
         val needsPermission = !getApplication<Application>().packageManager.canRequestPackageInstalls()
         _state.update {
-            it.copy(message = if (needsPermission) "Allow installing apps for Bloo, then tap Install again." else "Couldn't open the installer. Find Bloo.apk in Downloads.")
+            it.copy(message = if (needsPermission) "Allow installs for Bloo, then tap Install again." else "Couldn't open the installer. Find Bloo.apk in Downloads.")
         }
     }
 }
@@ -176,7 +176,7 @@ fun AppViewModel.onShizukuPermissionResult(requestCode: Int, grantResult: Int) {
     if (grantResult != android.content.pm.PackageManager.PERMISSION_GRANTED) {
         // Info, not error: the user made a choice and the normal installer still works, so nothing
         // is actually broken to report in red.
-        _state.update { it.copy(message = "Shizuku access denied. Updates will use the normal installer.", messageType = ToastKind.INFO) }
+        _state.update { it.copy(message = "Shizuku denied. Using the normal installer.", messageType = ToastKind.INFO) }
         return
     }
     val dest = com.bloo.bluelink.update.UpdateCleanup.stagedApkFile(getApplication())

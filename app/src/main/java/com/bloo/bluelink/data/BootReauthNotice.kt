@@ -18,8 +18,8 @@ object BootReauthNotice {
         id = ID,
         smallIcon = com.bloo.bluelink.R.drawable.ic_stat_bloo,
         title = "Sign in to Bloo",
-        text = "Your phone restarted. Open Bloo and sign in so alerts and AutoLock can run.",
-        bigText = "Your phone restarted. Open Bloo and sign in with your account and your fingerprint or PIN so alerts and AutoLock can run again.",
+        text = "Your phone restarted. Open Bloo to sign in.",
+        bigText = "Your phone restarted. Open Bloo to sign in.",
         category = NotificationCompat.CATEGORY_STATUS,
         contentIntent = com.bloo.bluelink.Shortcuts.openCardPendingIntent(context.applicationContext, vin = null),
     )

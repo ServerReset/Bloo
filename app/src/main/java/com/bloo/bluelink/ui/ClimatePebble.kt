@@ -102,7 +102,7 @@ internal fun ClimatePebble(
     // start went out. Until the car reports what was sent (or a minute passes), the slider keeps what was sent.
     var lastSent by remember(v.vin) { mutableStateOf<Pair<ClimateRequest, Long>?>(null) }
     val startClimateWithEngineCheck: (ClimateRequest) -> Unit = { req ->
-        if (status?.engine == true) vm.reportInfo("Climate changes may be rejected while the car is running")
+        if (status?.engine == true) vm.reportInfo("Changes may be rejected while the car runs.")
         lastSent = req to System.currentTimeMillis()
         vm.startClimate(v, req)
     }
@@ -356,7 +356,7 @@ private fun SmartClimateSection(
             enabled = enabled,
         )
         // Every factor that moved the target, one per line, so the number is never a mystery.
-        RevealMutedText(plan?.reasons?.joinToString("\n") ?: "Sets the temperature for the weather where your car is parked.")
+        RevealMutedText(plan?.reasons?.joinToString("\n") ?: "Sets the temperature for the car's weather.")
     }
 }
 
@@ -412,7 +412,7 @@ private fun ClimateRunningSummary(status: VehicleStatus?, presetName: String?, f
         }
         highlights.forEach { (label, value) -> ClimateHighlight(label, value) }
         if (highlights.isEmpty()) RevealMutedText("Nothing else is on.")
-        RevealMutedText("Read-only while climate runs. Stop it to change settings.")
+        RevealMutedText("Read-only while climate runs.")
     }
 }
 

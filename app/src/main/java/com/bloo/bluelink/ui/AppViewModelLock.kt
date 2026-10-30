@@ -161,7 +161,7 @@ fun AppViewModel.reauthAfterRestart(
             return@launch
         }
         if (!canUseBiometrics()) {
-            reportError("Set a screen lock on your phone to sign in after a restart.")
+            reportError("Set a screen lock to sign in.")
             return@launch
         }
         if (activity == null) {
@@ -183,7 +183,7 @@ private fun AppViewModel.finishBootReauth(username: String, password: String, pi
     viewModelScope.launch {
         val ok = withContext(Dispatchers.IO) { credentialStore.matchesStoredAccount(brand, username, password, pin) }
         if (!ok) {
-            reportError("Those details don't match the account saved on this phone.")
+            reportError("Those details don't match.")
             return@launch
         }
         // The phone's lock was just confirmed for this sign-in, so the app lock is not asked for again.

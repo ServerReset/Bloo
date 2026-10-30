@@ -138,10 +138,10 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, CarCommandIds.LOCATE, "L
             persistSnapshots()
         }
         hadCached -> _state.update {
-            it.copy(message = "Showing last-known location. Today's live-locate limit is used up.", messageType = ToastKind.INFO)
+            it.copy(message = "Showing last known location.", messageType = ToastKind.INFO)
         }
         else -> throw BlueLinkException(
-            "Couldn't get the car's location. It may be asleep, out of coverage, or over today's limit.",
+            "Couldn't get the car's location.",
         )
     }
 }
@@ -256,7 +256,7 @@ fun AppViewModel.startSmartClimate(v: Vehicle, onResolved: (ClimateRequest) -> U
     viewModelScope.launch {
         val request = com.bloo.bluelink.data.smartClimateRequestFor(getApplication(), v.vin)
         if (request == null) {
-            _state.update { it.copy(message = "Smart climate needs your car's location and the weather there.", messageType = ToastKind.ERROR) }
+            _state.update { it.copy(message = "Smart climate needs the car's location.", messageType = ToastKind.ERROR) }
             return@launch
         }
         // Told before the start goes out, so the sliders can bounce to what it sets.

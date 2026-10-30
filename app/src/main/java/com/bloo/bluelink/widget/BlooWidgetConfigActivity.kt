@@ -253,8 +253,8 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
             }
 
             when {
-                loaded.sealed -> NoteGroup("Open Bloo and sign in to see your car. The widget can still be added and fills in once you do.")
-                loaded.cars.isEmpty() -> NoteGroup("No cars yet. Add one in Bloo and the widget picks it up by itself.")
+                loaded.sealed -> NoteGroup("Sign in to see your car.")
+                loaded.cars.isEmpty() -> NoteGroup("No cars yet. Add one in Bloo.")
                 else -> SettingsGroup("Car") {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(GapGroup)) {
                         items(loaded.cars, key = { it.vin }) { c ->
@@ -284,7 +284,7 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
 
             SettingsGroup("Controls") {
                 if (loaded.strip) {
-                    SettingsCaption("Tap to add or remove. The strip keeps the first ones you picked when it is narrow, and drops the rest. Unlock always asks for a second tap.", bottomGap = 0.dp)
+                    SettingsCaption("Tap to add or remove. Unlock asks twice.", bottomGap = 0.dp)
                     ActionRow {
                         StripControl.entries.forEach { c ->
                             val index = choice.stripControls.indexOf(c)
@@ -301,7 +301,7 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
                         }
                     }
                 } else {
-                    SettingsCaption("Tap to choose what the widget can do. Unlock always asks for a second tap.", bottomGap = 0.dp)
+                    SettingsCaption("Tap to choose actions. Unlock asks twice.", bottomGap = 0.dp)
                     ActionRow {
                         MorphTextButton("Lock", onClick = {}, icon = Icons.Filled.Lock, active = true, enabled = false)
                         MorphTextButton("Climate", onClick = { choice = choice.copy(climate = !choice.climate) }, icon = Icons.Filled.AcUnit, active = choice.climate)

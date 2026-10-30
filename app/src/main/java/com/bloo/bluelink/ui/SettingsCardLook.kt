@@ -68,7 +68,7 @@ internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: 
             }
             AccessibilityGroup(appearance, vm)
             SettingsGroup("Keyboard") {
-                BodySmallText("Shortcuts for a hardware keyboard: switch cars, refresh, lock, search and more. Press F1 anywhere.")
+                BodySmallText("Keyboard shortcuts. Press F1 to see them.")
                 MorphTextButton("Show keyboard shortcuts", onClick = { vm.shortcutEvents.tryEmit(Shortcut.Help) }, icon = Icons.Filled.Keyboard)
             }
         }
@@ -96,7 +96,7 @@ private fun FontGroup(appearance: SettingsStore.Appearance, vm: AppViewModel) {
         ToggleRow(
             "Classic headings",
             appearance.classicHeadings,
-            description = "Titles and big headings in a classical serif. Everything else stays in the font you chose above.",
+            description = "Serif titles and headings.",
         ) { vm.setClassicHeadings(it) }
     }
 }
@@ -128,7 +128,7 @@ private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean,
                         ToggleRow(
                             "Aurora background",
                             appearance.auroraBackground,
-                            description = "a gradient aurora drifts behind the content instead of a solid surface.",
+                            description = "A gradient aurora behind the content.",
                         ) { vm.persist { setAuroraBackground(it) } }
                     }
                     SettingsGroup {

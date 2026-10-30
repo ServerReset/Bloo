@@ -9,7 +9,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
-import kotlin.math.min
 import dev.chrisbanes.haze.ExperimentalHazeApi
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
@@ -25,9 +24,6 @@ import dev.chrisbanes.haze.glass.hazeGlass
  * behind the element is displaced and split into its colours along the edge, with a specular rim on
  * top.
  */
-/** The clearest a frosted floating surface may be: above this it reads as a window, below it as frost. */
-private const val FrostedMaxClarity = 0.4f
-
 @OptIn(ExperimentalHazeApi::class)
 @Composable
 internal fun Modifier.appGlassEffect(
@@ -45,12 +41,11 @@ internal fun Modifier.appGlassEffect(
     // Ultra glass: no backing at all (pure refraction) and the clearest possible blur, so the
     // material reads as bare glass over whatever is behind it.
     val ultra = appearance.ultraGlass
-    // Frosted: a floating surface never gets clearer than FrostedMaxClarity, so it always reads as frosted glass rather than a window.
-    val clarity = if (ultra || clear) 1f else min(appearance.glassClarity, FrostedMaxClarity)
+    val clarity = if (ultra || clear) 1f else appearance.glassClarity
     // `surface` matches the app's own base tone, so the backing only ever lifts or matches, never
     // darkens. Its alpha still falls to ~0 at high clarity, so clear glass has no tint at all.
     val backing = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f * (1f - clarity))
-    val blur = if (ultra || clear) (18f - 16.5f * clarity).dp else (24f - 10f * clarity).dp
+    val blur = (18f - 16.5f * clarity).dp
     val style = remember(shape, backing, blur, ultra) { glassStyle(shape, backing, blur, ultra) }
     // A fixed middle quality rather than Adaptive, so the resolution cannot change mid-gesture.
     return this.hazeGlass(input = HazeInput.Sources(state), style = style, performanceMode = HazePerformanceMode.Balanced)

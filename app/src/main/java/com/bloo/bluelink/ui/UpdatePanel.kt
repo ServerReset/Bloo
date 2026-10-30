@@ -4,23 +4,14 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,8 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.UpdateApi
 import com.bloo.bluelink.update.UpdateInfo
@@ -43,7 +32,6 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
-import com.bloo.uicommon.IconBadgeContainer
 import com.bloo.uicommon.MorphButton
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.MorphTextButton
@@ -185,7 +173,7 @@ private fun InstallHelp(state: UiState, info: UpdateInfo, hazeState: HazeState?)
         Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
             if (!state.shizukuAvailable || !LocalAppearance.current.seamlessInstallShizuku) {
                 RevealMutedText(
-                    "Shizuku is off, so Android asks you to confirm each update. On the next screen tap \"More details\" to expand it, then \"Install anyway\".",
+                    "Without Shizuku, tap \"More details\", then \"Install anyway\".",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -208,7 +196,7 @@ private fun ShizukuSetting(state: UiState, vm: AppViewModel) {
             if (available) {
                 ToggleRow("Install seamlessly (Shizuku)", LocalAppearance.current.seamlessInstallShizuku) { vm.setSeamlessInstallShizuku(it) }
             } else {
-                BodySmallText("Update without tapping through Android's installer. No root needed.")
+                BodySmallText("Update without Android's installer. No root.")
                 MorphTextButton(
                     "Get Shizuku",
                     onClick = { openUrl(context, "https://shizuku.rikka.app/") },

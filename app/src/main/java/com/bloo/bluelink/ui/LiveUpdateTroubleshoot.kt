@@ -47,8 +47,8 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
             Spacer(Modifier.height(GapGroup))
             TroubleshootStep(
                 1,
-                "Not reliable, especially after charging starts? Tap \"Tap to fix\" above to allow background updates." +
-                    if (isSamsung) " On Samsung, also allow Bloo under Settings → Battery → Background usage limits." else "",
+                "Not reliable after charging starts? Tap \"Tap to fix\" above." +
+                    if (isSamsung) " Samsung: also allow Bloo under Settings → Battery." else "",
             )
             TroubleshootStep(2, "Check \"Live charging updates\" is on and the car is charging.")
             TroubleshootStep(3, "Below Android 16 only the shade progress bar shows.")
@@ -56,10 +56,7 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
             if (isSamsung) {
                 TroubleshootStep(
                     5,
-                    "Samsung phones have a SECOND, separate switch this app can't see or set: " +
-                        "Settings → Developer options → a \"Live notifications\" toggle " +
-                        "(exact wording varies by One UI version). If Developer options aren't " +
-                        "enabled yet: Settings → About phone → tap \"Build number\" 7 times.",
+                    "Samsung also has a separate \"Live notifications\" switch in Settings → Developer options.",
                 )
             }
         },

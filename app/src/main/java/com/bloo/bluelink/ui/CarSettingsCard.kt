@@ -83,7 +83,7 @@ internal fun CarSettingsCard(
             ToggleRow(
                 "Floating photo",
                 textClear,
-                description = "The name and charge sit above and below the photo, on the page. The card drops its edge and glass, and grows to fit.",
+                description = "The name and charge sit around the photo.",
             ) { vm.setTextClearPhoto(v, it) }
         }
 
@@ -95,13 +95,13 @@ internal fun CarSettingsCard(
             // a picker there would be a control with no effect.
             if (v.platformOverridable) {
                 SecondaryText("Head unit")
-                BodySmallText("Confirm this car's head unit. The service can't always tell, and some features only appear when supported.")
+                BodySmallText("Confirm this car's head unit.")
                 PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
             }
         }
 
         SettingsGroup("Climate") {
-            BodySmallText("Which seats your car has, and whether each can heat, cool, or both.")
+            BodySmallText("Which seats heat or cool.")
             SeatPositions.forEach { pos ->
                 SeatConfigRow(pos.label, pos.heat(seats), pos.cool(seats),
                     { vm.setSeatFlag(v, pos.heatKey, it) }, { vm.setSeatFlag(v, pos.coolKey, it) })
@@ -112,7 +112,7 @@ internal fun CarSettingsCard(
                     SectionDivider()
                     Spacer(Modifier.height(GapRow))
                     SecondaryText("Default start")
-                    BodySmallText("What the Start button runs: smart climate, or one of your presets.")
+                    BodySmallText("What Start runs: smart climate or a preset.")
                     val carPresets = state.climatePresets[v.vin].orEmpty()
                     MorphSegmented(
                         options = buildList {
@@ -139,7 +139,7 @@ internal fun CarSettingsCard(
                     vm.setServiceIntervalMiles(v.vin, it)
                 }
             }
-            BodySmallText("When the car was last serviced, and how often it is due.")
+            BodySmallText("When it was last serviced.")
             if (advanced) {
                 SectionDivider()
                 SelectionContainer { StatusRow("VIN", v.vin) }

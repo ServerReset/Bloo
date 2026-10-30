@@ -49,7 +49,7 @@ internal data class OnboardingCardSpec(val icon: ImageVector, val title: String,
 internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newCar: Boolean = false): OnboardingCardSpec = when (kind) {
     OnboardingStepKind.WELCOME -> OnboardingCardSpec(
         Icons.Filled.WavingHand, "Welcome to Bloo",
-        "Lock, climate, charge and more for your Hyundai, Genesis or Kia.",
+        "Lock, climate and charge for your car.",
     )
     OnboardingStepKind.RESTORE -> OnboardingCardSpec(
         Icons.Filled.CloudSync, "Restore a setup",
@@ -76,7 +76,7 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
         // be the only card in the deck whose TITLE changed form ("Meet Ioniq 5"). The friendliness
         // lives in the summary instead, where it does not break the pattern the other two follow.
         AppIcons.DirectionsCar, "${carName ?: "Your car"}: what powers it",
-        if (newCar) "A new car joined your garage. Gas, hybrid, plug-in or electric?" else "Gas, hybrid, plug-in or electric?",
+        if (newCar) "A new car. Gas, hybrid, plug-in or electric?" else "Gas, hybrid, plug-in or electric?",
     )
     OnboardingStepKind.CAR_PLATFORM -> OnboardingCardSpec(
         Icons.Filled.Memory, "${carName ?: "Your car"}: head unit",

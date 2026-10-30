@@ -208,15 +208,14 @@ private fun AutoLockSetup(
 ) {
     val permissionsOk = bluetoothOk && notificationsOk
     SettingsGroup("AutoLock") {
-        BodySmallText("Locks $carName when you walk away, using the car's Bluetooth to tell you've left.")
+        BodySmallText("Locks $carName when you walk away.")
         BodySmallText(
-            "Four things first. AutoLock does nothing at all until they are done, so none of its " +
-                "settings are here yet.",
+            "Finish these four steps to turn it on.",
         )
         SectionDivider()
 
         StepRow("1. Bluetooth permission", if (bluetoothOk) "Granted" else "Not granted")
-        BodySmallText("Lets Bloo recognise your car's head unit. Without it, a disconnect cannot be matched to a car.")
+        BodySmallText("Lets Bloo see the car disconnect.")
         MorphTextButton(
             if (bluetoothOk) "Granted" else "Allow Bluetooth",
             enabled = !bluetoothOk,
@@ -224,7 +223,7 @@ private fun AutoLockSetup(
         )
 
         StepRow("2. Notifications", if (notificationsOk) "Allowed" else "Not allowed")
-        BodySmallText("Carries the progress and the result. AutoLock still locks the car without it, silently.")
+        BodySmallText("Shows progress. Optional.")
         MorphTextButton(
             if (notificationsOk) "Allowed" else "Allow notifications",
             enabled = !notificationsOk,
@@ -232,11 +231,11 @@ private fun AutoLockSetup(
         )
 
         StepRow("3. Background activity", if (backgroundOk) "Unrestricted" else "Restricted")
-        BodySmallText("A battery-restricted app is asleep when you walk away, so it never sees the disconnect.")
+        BodySmallText("Stops Android pausing AutoLock.")
         MorphTextButton("Allow background activity", enabled = !backgroundOk, onClick = onAllowBackground)
 
         StepRow("4. Car Bluetooth device", deviceName ?: "Not set")
-        BodySmallText("The one device Bloo watches. Pick the car's head unit, not your phone or earbuds.")
+        BodySmallText("Pick the car's head unit, not your phone.")
         MorphTextButton(
             if (deviceName == null) "Choose device" else "Change device",
             enabled = permissionsOk && backgroundOk,
@@ -249,7 +248,7 @@ private fun AutoLockSetup(
         // sign AutoLock is running), so hiding it is the user's call, not a prerequisite. Hiding it
         // leaves the "your car was locked" notice alone -- different channel.
         StepRow("Watcher notification", if (watcherHidden) "Hidden" else "Showing")
-        BodySmallText("AutoLock keeps a quiet notification while it is on. Hide it if you would rather not see it.")
+        BodySmallText("A quiet notification while AutoLock runs.")
         MorphTextButton(
             "Hide watcher notification",
             enabled = !watcherHidden,
@@ -286,9 +285,9 @@ private fun AutoLockSettings(
             "Enabled",
             current.enabled,
             description = if (current.enabled) {
-                "On: Bloo locks ${v.name} when you walk away (Bluetooth disconnect + motion)."
+                "On: locks ${v.name} when you walk away."
             } else {
-                "Off: Bloo never locks ${v.name} by itself. Turn on to set it up."
+                "Off: never locks ${v.name} by itself."
             },
             onChange = { update(current.copy(enabled = it)) },
         )
@@ -308,8 +307,7 @@ private fun AutoLockSettings(
             // a missing notification permission makes every step silent.
             if (!backgroundOk) {
                 BodySmallText(
-                    "AutoLock has to keep running while Bloo is in the background, or it can't lock " +
-                        "the car after you walk away. Allow background activity next.",
+                    "Needed so it can lock after you walk away.",
                 )
                 MorphTextButton(
                     "Allow background activity",
@@ -317,8 +315,7 @@ private fun AutoLockSettings(
                 )
             } else if (!notificationsOk) {
                 BodySmallText(
-                    "Without the notification permission AutoLock still locks the car, but you get " +
-                        "no progress and no result, so it happens silently.",
+                    "Without it, locking happens silently.",
                 )
             }
 
@@ -327,8 +324,7 @@ private fun AutoLockSettings(
             // usually 10 to 15 seconds and up to 20 -- and the grace period below is ADDITIONAL time
             // on top of it. "Waits 15s" read as the whole delay when it was only half of it.
             BodySmallText(
-                "First Bloo waits for Android to confirm you have actually walked away from the car. " +
-                    "That usually takes 10 to 15 seconds, and up to 20.",
+                "Android confirms you've left first: usually 10 to 15 seconds.",
             )
             BlooSlider(
                 label = "Grace period",
@@ -343,17 +339,14 @@ private fun AutoLockSettings(
             val graceNow = grace.roundToInt()
             BodySmallText(
                 if (graceNow == 0) {
-                    "Then it locks as soon as that confirmation lands - no extra wait."
+                    "Locks right after that."
                 } else {
-                    "Then it waits ${graceNow}s more before locking, on top of the confirmation. " +
-                        "\"Lock now\" skips this part."
+                    "Then it waits ${graceNow}s more."
                 },
             )
             if (gen5w) {
                 BodySmallText(
-                    "This car's Gen5W head unit is older and slower to lock once Bloo asks, so the " +
-                        "car adds its own delay on top of this. Keep the grace period low to start; " +
-                        "raise it only if it locks before you're away.",
+                    "This head unit is slow to lock, so keep the grace period low.",
                 )
             }
 
@@ -361,9 +354,9 @@ private fun AutoLockSettings(
                 "Dry run (testing mode)",
                 current.dryRun,
                 description = if (current.dryRun) {
-                    "On: AutoLock runs the whole flow but never locks the car. Turn off once you trust it."
+                    "On: runs everything, never locks."
                 } else {
-                    "Off: AutoLock sends the real lock command."
+                    "Off: locks for real."
                 },
             ) { update(current.copy(dryRun = it)) }
 
@@ -419,7 +412,7 @@ private fun BluetoothDevicePicker(vm: AppViewModel, onPick: (PairedDevice) -> Un
         text = {
             if (devices.isEmpty()) {
                 RevealText(
-                    "No paired Bluetooth devices. Pair your car in Android's Bluetooth settings first.",
+                    "No paired Bluetooth devices. Pair your car first.",
                     style = SecondaryTextStyle(),
                 )
             } else {
