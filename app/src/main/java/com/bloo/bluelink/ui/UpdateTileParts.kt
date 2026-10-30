@@ -56,6 +56,7 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.content
+import com.bloo.uicommon.StatusCard
 
 /**
  * A full-width glass panel nested inside an already-elevated card: `shadow = false` so it does not
@@ -138,10 +139,7 @@ internal fun UpdateDismissRow(state: UiState, vm: AppViewModel, modifier: Modifi
     }
 }
 
-/**
- * The update surfaces' one status card, the same on both tracks (GitHub and Google Play): a tonal icon badge, a bold title, and an
- * optional muted line under it saying what that means.
- */
+/** The update surfaces' one status card, the same on both tracks: the shared [StatusCard] on the app's glass panel. */
 @Composable
 internal fun UpdateStatusCard(
     icon: ImageVector,
@@ -150,24 +148,7 @@ internal fun UpdateStatusCard(
     subtitle: String?,
     hazeState: dev.chrisbanes.haze.HazeState?,
 ) {
-    NestedGlassPanel(hazeState) {
-        Row(
-            Modifier.padding(GapGroup),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(GapRow),
-        ) {
-            IconBadgeContainer(containerColor = tint.copy(alpha = 0.15f), size = 36.dp) {
-                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-                RevealText(
-                    title,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = LocalContentColor.current),
-                )
-                if (subtitle != null) RevealMutedText(subtitle)
-            }
-        }
-    }
+    StatusCard(icon, tint, title, subtitle, panel = { content -> NestedGlassPanel(hazeState, content) })
 }
 
 /**
