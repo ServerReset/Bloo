@@ -242,9 +242,12 @@ object CarCommandRunner {
     }
 }
 
-/** The smart-climate request for a given weather reading: the temperature [smartClimateTargetF] picks, no defrost. */
-fun smartClimateRequest(w: Weather): ClimateRequest = ClimateRequest(
-    tempF = smartClimateTargetF(ambientFahrenheit(w.tempC)),
+/**
+ * The smart-climate request for a given weather reading: the target [smartClimatePlan] picks from the weather and the person's own past
+ * choices, no defrost.
+ */
+fun smartClimateRequest(w: Weather, choices: List<ClimateChoice> = emptyList()): ClimateRequest = ClimateRequest(
+    tempF = smartClimatePlan(w, choices).targetF,
     defrost = false,
     durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
 )
@@ -258,5 +261,6 @@ suspend fun smartClimateRequestFor(context: Context, vin: String): ClimateReques
     if (snap.climateOn == true) return null
     val lat = snap.lat ?: return null
     val lon = snap.lon ?: return null
-    return WeatherApi.fetch(lat, lon)?.let(::smartClimateRequest)
+    val choices = ClimateChoices.list(context, vin)
+    return WeatherApi.fetch(lat, lon)?.let { smartClimateRequest(it, choices) }
 }

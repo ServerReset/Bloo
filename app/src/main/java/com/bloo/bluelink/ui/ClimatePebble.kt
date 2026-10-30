@@ -31,9 +31,11 @@ import com.bloo.bluelink.data.degLabel
 import com.bloo.bluelink.data.deleteClimatePreset
 import com.bloo.bluelink.data.saveClimatePreset
 import com.bloo.bluelink.data.settingsMode
-import com.bloo.bluelink.data.smartClimateLabel
+import com.bloo.bluelink.data.ClimateChoices
+import com.bloo.bluelink.data.SmartClimatePlan
+import com.bloo.bluelink.data.smartClimatePlan
+import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.smartClimateTargetF
-import com.bloo.bluelink.data.smartClimateTargetLine
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.GapRow
@@ -133,6 +135,9 @@ internal fun ClimatePebble(
     // instead of editable inputs.
     val running = state.isRunning(v)
     val weather = state.carWeather[v.vin] ?: state.homeWeather
+    val climateContext = LocalContext.current
+    // What smart climate would set right now: the weather, and the temperatures this person has chosen by hand before.
+    val smartPlan = weather?.let { smartClimatePlan(it, ClimateChoices.list(climateContext, v.vin), fahrenheit) }
     val simpleMode = state.settingsMode != "advanced"
     // Mirrors Pebble()'s own expanded computation so this and the header Start button agree.
     val expanded = LocalForceExpanded.current || state.isPebbleExpanded(v.vin, "climate")
@@ -204,10 +209,11 @@ internal fun ClimatePebble(
                     vm.stopClimate(v); activePresetId = null
                 } else if (expanded) {
                     // The sliders are live, so Start sends exactly what they show, not the
-                    // smart/preset logic.
+                    // smart/preset logic. A hand-set start is kept, so smart climate learns what this person picks.
+                    weather?.let { ClimateChoices.record(climateContext, v.vin, ambientFahrenheit(it.tempC), currentReq.tempF) }
                     startClimateWithEngineCheck(currentReq)
                 } else if (simpleMode && weather != null) {
-                    startAtTarget(smartClimateTargetF(ambientFahrenheit(weather.tempC)), currentReq)
+                    startAtTarget(smartPlan?.targetF ?: smartClimateTargetF(ambientFahrenheit(weather.tempC)), currentReq)
                 } else {
                     val defaultId = state.defaultClimatePresets[v.vin]
                     val matchingPreset = defaultId?.let { id -> presets.firstOrNull { it.id == id } }
@@ -216,7 +222,7 @@ internal fun ClimatePebble(
                         startClimateWithEngineCheck(matchingPreset.request)
                         activePresetId = matchingPreset.id
                     } else if (weather != null) {
-                        startAtTarget(smartClimateTargetF(ambientFahrenheit(weather.tempC)), currentReq)
+                        startAtTarget(smartPlan?.targetF ?: smartClimateTargetF(ambientFahrenheit(weather.tempC)), currentReq)
                     } else startClimateWithEngineCheck(currentReq)
                 }
             },
@@ -266,6 +272,7 @@ internal fun ClimatePebble(
 
         SmartClimateSection(
             ambientF = weather?.let { ambientFahrenheit(it.tempC) },
+            plan = smartPlan,
             fahrenheit = fahrenheit,
             enabled = !pending && !climateOn,
             onStartAtTarget = { target -> startAtTarget(target, currentReq) },
@@ -305,6 +312,7 @@ internal fun ClimatePebble(
 @Composable
 private fun SmartClimateSection(
     ambientF: Int?,
+    plan: SmartClimatePlan?,
     fahrenheit: Boolean,
     enabled: Boolean,
     onStartAtTarget: (Int) -> Unit,
@@ -313,14 +321,19 @@ private fun SmartClimateSection(
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         SectionLabel(CarLabels.SMART_CLIMATE)
         MorphActionButton(
-            label = ambientF?.let { smartClimateLabel(it, fahrenheit) } ?: CarLabels.SMART_CLIMATE,
+            label = if (ambientF != null && plan != null) smartLabel(plan, ambientF, fahrenheit) else CarLabels.SMART_CLIMATE,
             icon = Icons.Filled.AcUnit,
-            onClick = { if (ambientF != null) onStartAtTarget(smartClimateTargetF(ambientF)) else onStartUnread() },
+            onClick = { if (plan != null) onStartAtTarget(plan.targetF) else onStartUnread() },
             enabled = enabled,
         )
-        RevealMutedText(ambientF?.let { smartClimateTargetLine(it, fahrenheit) } ?: "Sets the temperature for the weather where your car is parked.")
+        // Every factor that moved the target, one per line, so the number is never a mystery.
+        RevealMutedText(plan?.reasons?.joinToString("\n") ?: "Sets the temperature for the weather where your car is parked.")
     }
 }
+
+/** "Cool to 72°" or "Heat to 78°": which way the plan goes, from the outside temperature it answers. */
+private fun smartLabel(plan: SmartClimatePlan, ambientF: Int, fahrenheit: Boolean): String =
+    (if (plan.targetF < ambientF) "Cool to " else "Heat to ") + degLabel(plan.targetF.toString(), fahrenheit)
 
 /** Names and saves the climate settings on screen as a preset. */
 @Composable

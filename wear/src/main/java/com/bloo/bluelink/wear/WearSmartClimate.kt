@@ -3,9 +3,9 @@ package com.bloo.bluelink.wear
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WeatherApi
 import com.bloo.bluelink.data.ambientFahrenheit
-import com.bloo.bluelink.data.smartClimateHint
+import com.bloo.bluelink.data.degLabel
 import com.bloo.bluelink.data.smartClimateIsCooling
-import com.bloo.bluelink.data.smartClimateTargetF
+import com.bloo.bluelink.data.smartClimatePlan
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -38,12 +38,17 @@ internal object WearSmartClimate {
             return
         }
         val ambient = ambientFahrenheit(weather.tempC)
-        val hint = Hint(smartClimateTargetF(ambient), ambient, smartClimateIsCooling(ambient), System.currentTimeMillis())
+        val hint = Hint(smartClimatePlan(weather).targetF, ambient, smartClimateIsCooling(ambient), System.currentTimeMillis())
         _hints.update { it + (car.vin to hint) }
     }
 
     /** "Cool to 62°" or "Heat to 78°", with the outside temperature, in the phone's unit (the phone words the first part the same way). */
-    fun describe(hint: Hint): String = smartClimateHint(hint.ambientF, WearPresets.fahrenheit)
+    fun describe(hint: Hint): String {
+        val fahrenheit = WearPresets.fahrenheit
+        // The target is the plan's, so the hint shows the number that is actually sent.
+        val verb = if (hint.cooling) "Cool to " else "Heat to "
+        return verb + degLabel(hint.targetF.toString(), fahrenheit) + " · " + degLabel(hint.ambientF.toString(), fahrenheit) + " outside"
+    }
 
     private val failedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
 

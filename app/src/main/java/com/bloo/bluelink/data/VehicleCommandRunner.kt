@@ -81,7 +81,7 @@ object VehicleCommandRunner {
         if (snap.isDriving) error("Can't start climate while driving")
         val v = snap.toVehicle()
         return when {
-            target == "smart" -> smartRequest(snap)
+            target == "smart" -> smartRequest(ctx, snap)
             target.startsWith(TEMP_PREFIX) -> {
                 // "temp:64" or "temp:82:defrost". Suffix rather than a second prefix so the two can be asked for together, which is what
                 // "defrost the windscreen" actually wants: heat AND defrost.
@@ -103,11 +103,11 @@ object VehicleCommandRunner {
     }
 
     /** The smart target: the weather where the car is parked, through the same request the watch's smart climate builds. */
-    private suspend fun smartRequest(snap: VehicleSnapshot): ClimateRequest {
+    private suspend fun smartRequest(ctx: Context, snap: VehicleSnapshot): ClimateRequest {
         val lat = snap.lat ?: error("No location for smart climate")
         val lon = snap.lon ?: error("No location for smart climate")
         val w = WeatherApi.fetch(lat, lon) ?: error("No weather for smart climate")
-        return smartClimateRequest(w)
+        return smartClimateRequest(w, ClimateChoices.list(ctx, snap.vin))
     }
 
     /** The success wording the phone's toasts have always used, from the state the command started in. */
