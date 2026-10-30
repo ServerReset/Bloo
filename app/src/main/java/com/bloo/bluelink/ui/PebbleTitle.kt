@@ -91,10 +91,10 @@ internal fun PebbleTitleRow(
     // Plain arithmetic: the Float `lerp` overload is not imported here. A lambda so each reader
     // pulls the current value in its own phase.
     val titleScale: () -> Float = if (!growTitleOnExpand) {
-        { collapsedTitleScale * (1f + (largeStep - 1f) * largeT.value) }
+        { collapsedTitleScale * (1f + (largeStep - 1f) * largeT) }
     } else {
         {
-            (collapsedTitleScale + (1f - collapsedTitleScale) * headerTState.value) * (1f + (largeStep - 1f) * largeT.value)
+            (collapsedTitleScale + (1f - collapsedTitleScale) * headerTState.value) * (1f + (largeStep - 1f) * largeT)
         }
     }
     // Only a genuinely LARGE display/font scale may wrap the title (and the summary below), so the
