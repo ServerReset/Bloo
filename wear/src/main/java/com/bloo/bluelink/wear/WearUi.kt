@@ -364,9 +364,8 @@ internal val RowMinHeight = 56.dp
 internal val RowPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp)
 
 /**
- * A list row with two lines: the [title] and, under it, the [subtitle] (a preset's name and what it sets, a choice and what it
- * does). The same button as [WearActionRow], so it looks, morphs and presses like every other row; a [trailing] glyph marks
- * what a tap does.
+ * A row that picks something: its name, the detail under it, and a glyph. The same row as [WearActionRow], which it delegates to, so a
+ * list row and an action row look and press the same.
  */
 @Composable
 fun WearListRow(
@@ -378,33 +377,16 @@ fun WearListRow(
     active: Boolean = false,
     pending: Boolean = false,
     onClick: () -> Unit,
-) {
-    val scheme = MaterialTheme.colorScheme
-    val tint = if (active) scheme.primary else scheme.onSurface
-    val quiet = secondaryTextColor()
-    WearButton(
-        active = active,
-        enabled = enabled && !pending,
-        modifier = modifier.cascadeItem().fillMaxWidth().fitRound(),
-        contentPadding = RowPadding,
-        onClick = onClick,
-    ) {
-        if (icon != null) {
-            CompositionLocalProvider(LocalContentColor provides tint) {
-                MorphButtonLabel(icon = icon, label = "", pending = pending, iconSize = 20.dp)
-            }
-            Spacer(Modifier.width(12.dp))
-        }
-        // The phone's name-and-detail column (:uicommon), one line each for the round face.
-        TitleSubtitle(
-            title, subtitle, Modifier.weight(1f),
-            titleStyle = MaterialTheme.typography.labelLarge, titleColor = tint, titleWeight = FontWeight.SemiBold,
-            subtitleStyle = SecondaryTextStyle().copy(fontSize = MaterialTheme.typography.labelSmall.fontSize), subtitleColor = quiet,
-            // Wraps onto more lines rather than cutting a word: the round face has the height, and a clipped name reads as a bug.
-            maxLines = 3,
-        )
-    }
-}
+) = WearActionRow(
+    label = title,
+    icon = icon,
+    modifier = modifier,
+    enabled = enabled,
+    active = active,
+    pending = pending,
+    description = subtitle,
+    onClick = onClick,
+)
 
 /** An on/off row: a [WearActionRow] drawn as a switch. Stateless; the caller owns [checked] and what [onChange] does. */
 @Composable
