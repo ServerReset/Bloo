@@ -121,17 +121,14 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     val appearance by vm.appearance.collectAsStateWithLifecycle()
     // Start on the biometric prompt when there's one to show; the user can switch to PIN; devices
     // without biometrics land straight on PIN.
-    var usePinMode by remember { mutableStateOf(!bioAvailable) }
+    // There is no app PIN any more: the device's own lock is the unlock, so the overlay never offers the PIN route.
+    val usePinMode = false
     // Whether the app has a PIN installed, read from the VAULT -- the SAME check the lock gate uses.
     // `appState.appPinSet` is only a mirror refreshed on IO, and trusting it alone left a device with
     // NO biometrics staring at "Bloo is locked / Please try opening Bloo again" instead of its PIN
     // pad: the gate had armed off the vault, the mirror had not caught up. With no biometrics the PIN
     // is the only mechanism there is, so read it directly (and nudge the mirror along too).
-    var pinInstalled by remember { mutableStateOf(appState.appPinSet) }
-    LaunchedEffect(Unit) {
-        vm.refreshPinState()
-        pinInstalled = withContext(Dispatchers.IO) { vm.appPinInstalled() }
-    }
+    val pinInstalled = false
     var pin by remember { mutableStateOf("") }
     // A wall-clock ticker that only runs while a rejection window is open -- the countdown line
     // needs a fresh "seconds left" each second, and nothing else here wants a 1s recomposition
@@ -251,15 +248,6 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     // (24dp) than the standard 18dp, an intentional emphasis for the screen's one
                     // primary CTA.
                     MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
-                }
-                if (pinInstalled) {
-                    Spacer(Modifier.height(GapGroup))
-                    MorphTextButton(
-                        "Use PIN",
-                        onClick = { haptics?.click(); usePinMode = true },
-                        containerColor = lockFg.copy(alpha = 0.10f),
-                        contentColor = lockFg,
-                    )
                 }
                 }
                 }

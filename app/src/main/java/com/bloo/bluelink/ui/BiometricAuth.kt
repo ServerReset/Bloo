@@ -42,8 +42,9 @@ fun showBiometricPrompt(
     val info = BiometricPrompt.PromptInfo.Builder()
         .setTitle(title)
         .setSubtitle(subtitle)
-        .setNegativeButtonText("Cancel")
-        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+        // The device's own lock (fingerprint, face, or the lock screen's PIN, pattern or password). The device lock is a
+        // fallback the prompt offers itself, so there is no negative button: DEVICE_CREDENTIAL does not allow one.
+        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
         .build()
     prompt.authenticate(info)
 }

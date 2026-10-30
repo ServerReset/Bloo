@@ -186,6 +186,11 @@ class CredentialStore(context: Context) {
             if (vault.getString(KEY_IMPORTED) == null) synchronized(this) {
                 if (vault.getString(KEY_IMPORTED) == null) importLegacy(context, vault)
             }
+            // The app has no PIN any more: an old PIN record and its lockout counters are removed once, here.
+            if (vault.getString(KEY_PIN_RECORD) != null || vault.getString(KEY_PIN_FAILURES) != null) vault.edit {
+                remove(KEY_PIN_RECORD); remove(KEY_PIN_FAILURES)
+                remove(KEY_PIN_LOCKED_UNTIL); remove(KEY_PIN_LOCKED_UNTIL_ELAPSED)
+            }
             return vault
         }
 

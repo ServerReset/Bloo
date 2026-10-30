@@ -89,10 +89,9 @@ fun AppViewModel.setLockTiming(value: LockTiming) {
 internal suspend fun AppViewModel.relockIfDue(backgroundedAtMs: Long, screenTurnedOff: Boolean) {
     if (_state.value.locked) return
     val a = settingsStore.appearance.first()
-    // Either mechanism re-arms the lock: the biometric lock when the device has usable
-    // biometrics, or the app PIN when one is set. The PIN half reads the encrypted prefs, so
-    // the whole check is taken on IO.
-    val armed = withContext(Dispatchers.IO) { (a.biometricLock && canUseBiometrics()) || appPinInstalled() }
+    // The app lock re-arms when it is on and the device has a lock to unlock with: the device's own lock is the
+    // only unlock now (there is no app PIN).
+    val armed = withContext(Dispatchers.IO) { a.biometricLock && canUseBiometrics() }
     if (!armed) return
     val elapsed = System.currentTimeMillis() - backgroundedAtMs
     // See LockTiming.wireKey (exhaustive, so a new enum value must be mapped) and
@@ -117,7 +116,7 @@ fun AppViewModel.maybeRelock(backgroundedAtMs: Long, screenTurnedOff: Boolean = 
  */
 fun AppViewModel.canUseBiometrics(): Boolean =
     BiometricManager.from(getApplication())
-        .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
+        .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL) ==
         BiometricManager.BIOMETRIC_SUCCESS
 
 /**
