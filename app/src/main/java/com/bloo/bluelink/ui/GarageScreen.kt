@@ -139,7 +139,7 @@ internal fun GarageScreen(
         expandedMap.otherCars = state.value.vehicles.mapNotNull { v ->
             if (v.vin == open) null else state.value.locations[v.vin]?.let { CarPin(v.vin, it, v.name, state.value.imageUrls[v.vin]) }
         }
-        expandedMap.expandedPhoto = open?.let { state.value.imageUrls[it] }
+        expandedMap.photoUrls = state.value.imageUrls
     }
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
     BackdropHost {

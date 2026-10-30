@@ -186,7 +186,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 }
                 MapFeatureRow(
                     features = listOfNotNull(
-                        expandedMap?.let { host -> MapFeature(Icons.Filled.Fullscreen, "Expand") { host.vin = v.vin } },
+                        expandedMap?.let { host -> MapFeature(Icons.Filled.Fullscreen, "Expand") { host.open(v.vin) } },
                         MapFeature(Icons.Filled.Map, "Open in Maps") { openInExternalMaps(context, loc, v.name) },
                     ),
                 )

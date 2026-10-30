@@ -166,7 +166,7 @@ internal class ExpandedMapState {
                 otherCars = if (this@ExpandedMapState.vin == vin) this@ExpandedMapState.otherCars else emptyList(),
                 chromeInsets = this@ExpandedMapState.chromeInsets,
                 ownVin = vin,
-                ownPhoto = if (this@ExpandedMapState.vin == vin) this@ExpandedMapState.expandedPhoto else null,
+                ownPhoto = this@ExpandedMapState.photoUrls[vin],
                 selectedVin = this@ExpandedMapState.selectedVin,
                 onPinTap = { tapped -> this@ExpandedMapState.tapPin(tapped) },
                 onSelectedOffScreen = { this@ExpandedMapState.selectedVin = null },
@@ -177,8 +177,8 @@ internal class ExpandedMapState {
     /** The other cars, drawn as photo pins on the expanded map: every car but the one it is open on. */
     var otherCars by mutableStateOf<List<CarPin>>(emptyList())
 
-    /** The expanded car's photo, for its own pin. */
-    var expandedPhoto by mutableStateOf<String?>(null)
+    /** Each car's photo, for its own pin on the pebble's map and on the expanded one. */
+    var photoUrls by mutableStateOf<Map<String, String>>(emptyMap())
 
     /**
      * The car the top bar is showing, by a tap on its pin. Null is no selection: the bar is just its handle. Tapping the selected pin
@@ -186,8 +186,15 @@ internal class ExpandedMapState {
      */
     var selectedVin by mutableStateOf<String?>(null)
 
+    /** Selects a car's pin. Tapping the selected pin again keeps it selected: the bar stays on its line; only leaving the screen clears it. */
     fun tapPin(vin: String) {
-        selectedVin = if (selectedVin == vin) null else vin
+        selectedVin = vin
+    }
+
+    /** Opens the full-screen map on [vin], with that car selected, so its bar is already on its line. */
+    fun open(vin: String) {
+        selectedVin = vin
+        this.vin = vin
     }
 
     /**
