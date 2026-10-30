@@ -30,8 +30,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Delete
@@ -131,8 +129,8 @@ internal fun ClimatePresetSection(
 ) {
     // Track IDs mid-exit so the item stays visible until its shrink animation ends.
     var deletingIds by remember { mutableStateOf(setOf<String>()) }
-    // The preset being edited (the pencil), until it is saved, deleted or the popup is closed.
-    var editing by remember { mutableStateOf<ClimatePreset?>(null) }
+    // The preset being edited: its row turns into the editor in place, until it is saved, deleted or cancelled.
+    var editingId by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     // Delete with the row's shrink: the id is held mid-exit until the animation ends, then the preset goes.
     val removePreset: (String) -> Unit = { id ->
@@ -156,67 +154,86 @@ internal fun ClimatePresetSection(
                 keyOf = { it.id },
                 onReorder = onReorder,
             ) { preset, itemDragHandle, _ ->
-                // The row keeps its height for the whole drag, as a pebble does: a height animation here made the drop read differently
-                // from the pebbles. A deleted preset fades out in place, and the list closes up after it.
+                // A preset's row is its pill, or its editor while it is open: the editor replaces the pill in place, so editing
+                // never opens a pop-up. The pill is the drag handle; an open editor is not, so its sliders take the touch.
+                // A deleted preset fades out in place, and the list closes up after it.
                 val gone = preset.id in deletingIds
-                PresetPill(
-                    name = preset.name,
-                    temp = climatePresetTemp(preset.request, fahrenheit),
-                    active = preset.id == activeId,
-                    onStart = { onStart(preset) },
-                    onEdit = { editing = preset },
-                    modifier = itemDragHandle.graphicsLayer { alpha = if (gone) 0f else 1f },
-                )
+                Column(Modifier.fillMaxWidth()) {
+                    ExpandVisibility(editingId != preset.id) {
+                        PresetPill(
+                            name = preset.name,
+                            temp = climatePresetTemp(preset.request, fahrenheit),
+                            active = preset.id == activeId,
+                            onStart = { onStart(preset) },
+                            onEdit = { editingId = preset.id },
+                            modifier = itemDragHandle.graphicsLayer { alpha = if (gone) 0f else 1f },
+                        )
+                    }
+                    ExpandVisibility(editingId == preset.id) {
+                        PresetEditor(
+                            preset = preset,
+                            fahrenheit = fahrenheit,
+                            seats = seats,
+                            showSeats = showSeats,
+                            steeringLevels = steeringLevels,
+                            onSave = { name, request ->
+                                onUpdate(preset.id, name, request)
+                                editingId = null
+                            },
+                            onCancel = { editingId = null },
+                            onDelete = {
+                                editingId = null
+                                removePreset(preset.id)
+                            },
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(GapHairline))
         }
     }
-    editing?.let { preset ->
-        var name by remember(preset.id) { mutableStateOf(preset.name) }
-        val form = rememberClimateForm(preset.id, preset.request)
-        GlassAlertDialog(
-            onDismissRequest = { editing = null },
-            icon = Icons.Filled.Edit,
-            title = "Edit preset",
-            // Delete is the popup's red action, in its title row. The popup is itself the deliberate step, so it does not arm.
-            titleTrailing = {
-                MorphIconButton(
-                    onClick = {
-                        editing = null
-                        removePreset(preset.id)
-                    },
-                    description = "Delete ${preset.name}",
-                    emphasis = ButtonEmphasis.Deny,
-                ) {
-                    ButtonIcon(Icons.Filled.Delete, "Delete ${preset.name}")
-                }
-            },
-            text = {
-                Column(
-                    Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(GapRow),
-                ) {
-                    LabeledField(name, { name = it }, "Name")
-                    // What the preset does: the same controls the climate section uses, with its save button left out.
-                    ClimateControlsSection(
-                        form = form, locked = false, fahrenheit = fahrenheit, seats = seats, showSeats = showSeats,
-                        onSaveAsPreset = null, steeringLevels = steeringLevels,
-                    )
-                }
-            },
-            buttons = {
-                ConfirmCancelButtons(
-                    "Save",
-                    onConfirm = {
-                        if (name.isNotBlank()) {
-                            onUpdate(preset.id, name.trim(), form.toRequest())
-                            editing = null
-                        }
-                    },
-                    onCancel = { editing = null },
-                    enabled = name.isNotBlank(),
-                )
-            },
+}
+
+/**
+ * A saved preset open for editing, in place of its pill: its name, what it sets (the same controls the climate section uses, without a
+ * save of their own), and Save, Cancel and Delete.
+ */
+@Composable
+private fun PresetEditor(
+    preset: ClimatePreset,
+    fahrenheit: Boolean,
+    seats: SeatConfig,
+    showSeats: Boolean,
+    steeringLevels: List<WheelHeatLevel>,
+    onSave: (String, ClimateRequest) -> Unit,
+    onCancel: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var name by remember(preset.id) { mutableStateOf(preset.name) }
+    val form = rememberClimateForm(preset.id, preset.request)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            RevealText("Edit preset", style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            // Delete sits in the editor's own header, as the popup's did. Opening the editor is the deliberate step, so it does not arm.
+            MorphIconButton(
+                onClick = onDelete,
+                description = "Delete ${preset.name}",
+                emphasis = ButtonEmphasis.Deny,
+            ) {
+                ButtonIcon(Icons.Filled.Delete, "Delete ${preset.name}")
+            }
+        }
+        LabeledField(name, { name = it }, "Name")
+        // What the preset does: the same controls the climate section uses, with its save button left out.
+        ClimateControlsSection(
+            form = form, fahrenheit = fahrenheit, seats = seats, showSeats = showSeats,
+            onSaveAsPreset = null, steeringLevels = steeringLevels,
+        )
+        ConfirmCancelButtons(
+            "Save",
+            onConfirm = { if (name.isNotBlank()) onSave(name.trim(), form.toRequest()) },
+            onCancel = onCancel,
+            enabled = name.isNotBlank(),
         )
     }
 }

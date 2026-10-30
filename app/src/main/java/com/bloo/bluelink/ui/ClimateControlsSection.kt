@@ -7,9 +7,7 @@ import androidx.compose.material.icons.filled.Adjust
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -21,7 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.text.font.FontWeight
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
@@ -33,11 +30,9 @@ import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.degLabel
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
-import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
-import com.bloo.uicommon.AnimatedValue
 import com.bloo.uicommon.tempColor
 
 /**
@@ -92,14 +87,12 @@ internal val Gen5WSteeringLevels: List<WheelHeatLevel> = listOf(WheelHeatLevel.O
 @Composable
 internal fun ClimateControlsSection(
     form: ClimateFormState,
-    locked: Boolean,
     fahrenheit: Boolean,
     seats: SeatConfig,
     showSeats: Boolean,
     onSaveAsPreset: (() -> Unit)?,
     steeringLevels: List<WheelHeatLevel> = WheelHeatLevel.entries,
 ) = ClimateControlsSection(
-    locked = locked,
     fahrenheit = fahrenheit,
     tempF = form.tempF, onTempF = { form.tempF = it },
     duration = form.duration, onDuration = { form.duration = it },
@@ -121,7 +114,6 @@ internal fun ClimateControlsSection(
  */
 @Composable
 internal fun ClimateControlsSection(
-    locked: Boolean,
     fahrenheit: Boolean,
     tempF: Int,
     onTempF: (Int) -> Unit,
@@ -145,29 +137,9 @@ internal fun ClimateControlsSection(
     onRearRight: (SeatLevel) -> Unit,
     onSaveAsPreset: (() -> Unit)?,
 ) {
-    LockedControls(locked = locked, message = "Stop climate to change settings.") {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
         // No "Controls" heading: the pebble is already called Climate, so a heading that repeats it
         // was a word with no meaning.
-
-        // Show the set temperature when climate is running, with an animated entrance.
-        ExpandVisibility(locked) {
-            Row(Modifier.fillMaxWidth().padding(bottom = GapRow), horizontalArrangement = Arrangement.SpaceBetween) {
-                BodySmallText("Set temperature")
-                // color resolved explicitly to onSurface -- same fix, same reason as the update
-                // pebble's own AnimatedValue calls: BasicText (which this renders through) doesn't
-                // fall back to LocalContentColor the way a plain Text() does, so this rendered
-                // unreadably dark instead of standing out against the muted label beside it -- the
-                // value, not the label, is the important half of this row.
-                com.bloo.uicommon.AnimatedValue(
-                    degLabel(tempF.toString(), fahrenheit),
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    ),
-                    reduceMotion = LocalReduceMotion.current,
-                )
-            }
-        }
 
         // The reference layout: a big temperature and a duration, each with its own −/+, then the feature tiles, then the seats
         // they open into. Every control writes the same form the presets save, so a preset carries exactly what is shown here.
@@ -214,20 +186,18 @@ internal fun ClimateControlsSection(
 
         if (hasSeats) {
             ExpandVisibility(seatsOpen, from = Alignment.Top) {
-                // Each seat is a quadrant of the car, with its own slider. A seat the car does not have is not drawn.
-                val front = buildList {
-                    if (seats.driverHeat || seats.driverCool) add(SeatQuadrant("Driver", driver, seats.driverHeat, seats.driverCool, onDriver))
-                    if (seats.passHeat || seats.passCool) add(SeatQuadrant("Passenger", passenger, seats.passHeat, seats.passCool, onPassenger))
-                }
-                val rear = buildList {
+                // Each seat has its own full-width slider, in the car's seat order. A seat the car does not have is not drawn.
+                val rows = buildList {
+                    if (seats.driverHeat || seats.driverCool) add(SeatSlider("Driver", driver, seats.driverHeat, seats.driverCool, onDriver))
+                    if (seats.passHeat || seats.passCool) add(SeatSlider("Passenger", passenger, seats.passHeat, seats.passCool, onPassenger))
                     if (seats.rearLeftHeat || seats.rearLeftCool) {
-                        add(SeatQuadrant("Rear left", rearLeft, seats.rearLeftHeat, seats.rearLeftCool, onRearLeft))
+                        add(SeatSlider("Rear left", rearLeft, seats.rearLeftHeat, seats.rearLeftCool, onRearLeft))
                     }
                     if (seats.rearRightHeat || seats.rearRightCool) {
-                        add(SeatQuadrant("Rear right", rearRight, seats.rearRightHeat, seats.rearRightCool, onRearRight))
+                        add(SeatSlider("Rear right", rearRight, seats.rearRightHeat, seats.rearRightCool, onRearRight))
                     }
                 }
-                SeatQuadrants(front = front, rear = rear)
+                SeatSliders(rows)
             }
         }
 

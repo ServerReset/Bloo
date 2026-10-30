@@ -3,10 +3,23 @@ package com.bloo.bluelink.ui
 /** The Climate pebble: [ClimatePebble]. */
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import com.bloo.uicommon.AnimatedValue
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.LocalReduceMotion
+import com.bloo.uicommon.PrimaryTextStyle
+import com.bloo.uicommon.SecondaryTextStyle
+import com.bloo.uicommon.RevealText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
-import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -254,51 +267,65 @@ internal fun ClimatePebble(
             return@Pebble
         }
 
-        ClimatePresetSection(
-            presets = presets,
-            activeId = activePresetId,
-            fahrenheit = fahrenheit,
-            onStart = startPreset,
-            onDelete = { id ->
-                if (activePresetId == id) activePresetId = null
-                vm.deleteClimatePreset(v, id)
-            },
-            onReorder = { vm.reorderClimatePresets(v, it) },
-            onUpdate = { id, name, request -> vm.updateClimatePreset(v, id, name, request) },
-            steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries,
-            seats = seats,
-            showSeats = showSeatControls,
-        )
+        // While climate runs, its presets, smart climate and controls go away, and what is running reads back in their place.
+        ExpandVisibility(!climateOn) {
+            ClimatePresetSection(
+                presets = presets,
+                activeId = activePresetId,
+                fahrenheit = fahrenheit,
+                onStart = startPreset,
+                onDelete = { id ->
+                    if (activePresetId == id) activePresetId = null
+                    vm.deleteClimatePreset(v, id)
+                },
+                onReorder = { vm.reorderClimatePresets(v, it) },
+                onUpdate = { id, name, request -> vm.updateClimatePreset(v, id, name, request) },
+                steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries,
+                seats = seats,
+                showSeats = showSeatControls,
+            )
+        }
 
-        SmartClimateSection(
-            ambientF = weather?.let { ambientFahrenheit(it.tempC) },
-            plan = smartPlan,
-            fahrenheit = fahrenheit,
-            enabled = !pending && !climateOn,
-            onStartAtTarget = { target -> startAtTarget(target, currentReq) },
-            onStartUnread = {
-                if (!pending) vm.startSmartClimate(v) { req ->
-                    form.load(req); activePresetId = null; lastSent = req to System.currentTimeMillis()
-                }
-            },
-        )
+        ExpandVisibility(!climateOn) {
+            SmartClimateSection(
+                ambientF = weather?.let { ambientFahrenheit(it.tempC) },
+                plan = smartPlan,
+                fahrenheit = fahrenheit,
+                enabled = !pending && !climateOn,
+                onStartAtTarget = { target -> startAtTarget(target, currentReq) },
+                onStartUnread = {
+                    if (!pending) vm.startSmartClimate(v) { req ->
+                        form.load(req); activePresetId = null; lastSent = req to System.currentTimeMillis()
+                    }
+                },
+            )
+        }
 
-        ClimateControlsSection(
-            form = form,
-            locked = climateOn,
-            fahrenheit = fahrenheit,
-            seats = seats,
-            // state.powertrainOf, not the raw v.isEv: a user's powertrain override is honoured here
-            // too.
-            showSeats = showSeatControls,
-            onSaveAsPreset = { showAddPreset = true },
-            steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries,
-        )
+        ExpandVisibility(!climateOn) {
+            ClimateControlsSection(
+                form = form,
+                fahrenheit = fahrenheit,
+                seats = seats,
+                // state.powertrainOf, not the raw v.isEv: a user's powertrain override is honoured here
+                // too.
+                showSeats = showSeatControls,
+                onSaveAsPreset = { showAddPreset = true },
+                steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries,
+            )
+        }
 
-        if (showAddPreset) {
-            SavePresetDialog(
+        ExpandVisibility(showAddPreset && !climateOn) {
+            SavePresetForm(
                 onSave = { name -> vm.saveClimatePreset(v, name, currentReq); showAddPreset = false },
-                onDismiss = { showAddPreset = false },
+                onCancel = { showAddPreset = false },
+            )
+        }
+
+        ExpandVisibility(climateOn) {
+            ClimateRunningSummary(
+                status = status,
+                presetName = presets.firstOrNull { it.id == activePresetId }?.name,
+                fahrenheit = fahrenheit,
             )
         }
     }
@@ -335,21 +362,77 @@ private fun SmartClimateSection(
 private fun smartLabel(plan: SmartClimatePlan, ambientF: Int, fahrenheit: Boolean): String =
     (if (plan.targetF < ambientF) "Cool to " else "Heat to ") + degLabel(plan.targetF.toString(), fahrenheit)
 
-/** Names and saves the climate settings on screen as a preset. */
+/** Names the climate settings on screen as a new preset, in place under the controls: no pop-up. */
 @Composable
-private fun SavePresetDialog(onSave: (String) -> Unit, onDismiss: () -> Unit) {
+private fun SavePresetForm(onSave: (String) -> Unit, onCancel: () -> Unit) {
     var name by remember { mutableStateOf("") }
-    GlassAlertDialog(
-        onDismissRequest = onDismiss,
-        icon = Icons.Filled.Thermostat,
-        title = "Save preset",
-        text = {
-            LabeledField(name, { name = it }, "Name")
-        },
-        buttons = {
-            ConfirmCancelButtons("Save", onConfirm = { if (name.isNotBlank()) onSave(name.trim()) }, onCancel = onDismiss, enabled = name.isNotBlank())
-        },
-    )
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        LabeledField(name, { name = it }, "Name")
+        ConfirmCancelButtons("Save", onConfirm = { if (name.isNotBlank()) onSave(name.trim()) }, onCancel = onCancel, enabled = name.isNotBlank())
+    }
+}
+
+/**
+ * What a running climate shows in place of its controls: the temperature it is set to, and what is on, each as a highlight. The car
+ * reports these, so the summary is what is actually running. It goes away with the controls when climate stops.
+ */
+@Composable
+private fun ClimateRunningSummary(status: VehicleStatus?, presetName: String?, fahrenheit: Boolean) {
+    val setTo = status?.airTemp?.let { t -> t.value?.let { degLabel(it, fahrenheit, t.unit) } }
+    val highlights = buildList {
+        presetName?.let { add("Preset" to it) }
+        if (status?.defrost == true) add("Defrost" to "On")
+        if (status?.steerWheelHeat?.let { it != 0 } == true) add("Steering wheel" to "On")
+        status?.seatHeaterVentState?.let { seatState ->
+            listOf(
+                "Driver" to seatState.flSeatHeatState,
+                "Passenger" to seatState.frSeatHeatState,
+                "Rear left" to seatState.rlSeatHeatState,
+                "Rear right" to seatState.rrSeatHeatState,
+            ).forEach { (label, state) ->
+                if (state != null && state != 0) add(label to (SeatLevel.fromApi(state).takeIf { it != SeatLevel.OFF }?.label ?: "On"))
+            }
+        }
+    }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        setTo?.let {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                RevealText("Set to", style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                AnimatedValue(
+                    it,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    reduceMotion = LocalReduceMotion.current,
+                )
+            }
+        }
+        highlights.forEach { (label, value) -> ClimateHighlight(label, value) }
+        if (highlights.isEmpty()) RevealMutedText("Nothing else is on.")
+        RevealMutedText("Read-only while climate runs. Stop it to change settings.")
+    }
+}
+
+@Composable
+private fun ClimateHighlight(label: String, value: String) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .padding(horizontal = GapGroup, vertical = GapRow),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RevealText(
+            label, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer, maxLines = 1, modifier = Modifier.weight(1f),
+        )
+        RevealText(
+            value, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer, maxLines = 1,
+        )
+    }
 }
 
 private fun TempValue.asFahrenheit(): Int? {

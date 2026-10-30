@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -52,10 +53,10 @@ internal object SeatScale {
 }
 
 /**
- * One seat in the quadrant grid. [canHeat] and [canCool] come from the car's own seat configuration, so a seat that can only heat (or
- * only cool) gets a slider that only goes one way.
+ * One seat in the list. [canHeat] and [canCool] come from the car's own seat configuration, so a seat that can only heat (or only cool)
+ * gets a slider that only goes one way.
  */
-internal class SeatQuadrant(
+internal class SeatSlider(
     val label: String,
     val level: SeatLevel,
     val canHeat: Boolean,
@@ -64,40 +65,39 @@ internal class SeatQuadrant(
 )
 
 /**
- * The car's seats as quadrants: the front row over the rear row, each seat its own card with a mini slider. A row with no seats in it is
- * not drawn, and a single seat takes the full row, so a two-seat car, a front-only car and a heat-only car all lay out the same way.
+ * The car's seats, one full-width slider each, in the car's seat order. Each row carries its own name and level, so a seat is read and
+ * set in one place rather than squeezed into a grid cell.
  */
 @Composable
-internal fun SeatQuadrants(front: List<SeatQuadrant>, rear: List<SeatQuadrant>) {
+internal fun SeatSliders(seats: List<SeatSlider>) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        // Says how to use the grid before anyone has to guess: the slider is the whole control.
+        // Says how to use the sliders before anyone has to guess: the slider is the whole control.
         RevealText(
             "Drag a seat's slider left to cool it, right to warm it. Off sits in the middle.",
             style = SecondaryTextStyle(),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        listOf(front, rear).filter { it.isNotEmpty() }.forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(GapRow)) {
-                row.forEach { seat -> SeatQuadrantCard(seat, Modifier.weight(1f)) }
-            }
-        }
+        seats.forEach { seat -> SeatSliderRow(seat) }
     }
 }
 
 @Composable
-private fun SeatQuadrantCard(seat: SeatQuadrant, modifier: Modifier) {
+private fun SeatSliderRow(seat: SeatSlider) {
     val low = if (seat.canCool) -SeatScale.MAX else 0
     val high = if (seat.canHeat) SeatScale.MAX else 0
     val step = SeatScale.stepOf(seat.level).coerceIn(low, high)
     val readout = if (seat.level == SeatLevel.OFF) "Off" else seat.level.label
     Column(
-        modifier
+        Modifier
+            .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             .padding(GapGroup),
     ) {
-        RevealText(seat.label, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
-        RevealText(readout, style = SecondaryTextStyle(), fontWeight = FontWeight.Bold, color = seatTint(seat.level), maxLines = 1)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            RevealText(seat.label, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
+            RevealText(readout, style = SecondaryTextStyle(), fontWeight = FontWeight.Bold, color = seatTint(seat.level), maxLines = 1)
+        }
         Spacer(Modifier.height(GapHairline))
         BlooSlider(
             value = step.toFloat(),
