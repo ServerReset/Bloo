@@ -10,9 +10,7 @@ import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
-import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
@@ -30,20 +28,17 @@ interface VaultKeyWrapper {
  * tokens, the app-lock PIN record and its lockout counters all live in a single AES-256-GCM
  * encrypted file.
  *
- * Keys, two layers over one random 256-bit data key (DEK):
- *  - **device slot**: the DEK sealed by a hardware-backed Android Keystore key. It needs no prompt,
- *    so background work (status refresh, notifications, AutoLock, the watch) can still read.
- *  - **PIN slot** (when an app PIN is set): the DEK sealed again under a key stretched from the PIN
- *    (PBKDF2-HMAC-SHA256). If the device key is ever lost (restore, Keystore reset), entering the
- *    PIN recovers the vault instead of losing every account.
- *
+ * One key: a random 256-bit data key (DEK), sealed by a hardware-backed Android Keystore key. It needs no
+ * prompt, so background work (status refresh, notifications, AutoLock, the watch) can still read. There is no
+ * app PIN: the device's own lock protects the app, and a vault from the old PIN layout opens with the device key and
+ * drops its PIN slot the next time it is saved.
+
  * AES comes in 128, 192 and 256-bit keys only; 256 is the strongest, and it is what is used here.
  */
 class SecureVault(
     private val file: File,
     private val wrapper: VaultKeyWrapper,
     private val random: SecureRandom = SecureRandom(),
-    private val pinIterations: Int = PIN_ITERATIONS,
     /** True while the vault is sealed (see [BootGate]): only the app-lock records may be read. */
     private val sealed: () -> Boolean = { false },
 ) {
@@ -51,7 +46,6 @@ class SecureVault(
     private var values = HashMap<String, String>()
     private var dek: ByteArray? = null
     private var deviceSlot: String? = null
-    private var pinSlot: JSONObject? = null
     private var loaded = false
 
     /** True when a vault exists on disk but this device's key can no longer open it. */
@@ -81,33 +75,6 @@ class SecureVault(
         fun remove(key: String) { map.remove(key) }
     }
 
-    /** Seals the data key under [pin] as well, so the PIN can recover the vault. */
-    fun bindPin(pin: String) = synchronized(lock) {
-        ensureLoaded()
-        if (dek == null) { dek = newKey(); values = HashMap() }
-        pinSlot = sealPin(dek!!, pin)
-        persist()
-    }
-
-    /** Drops the PIN slot (the app PIN was removed). */
-    fun unbindPin() = synchronized(lock) {
-        ensureLoaded()
-        if (pinSlot != null) { pinSlot = null; if (dek != null) persist() }
-    }
-
-    /** Opens a vault the device key cannot, using the PIN slot, and re-seals it to the device. */
-    fun recoverWithPin(pin: String): Boolean = synchronized(lock) {
-        ensureLoaded()
-        if (dek != null) return true
-        val slot = pinSlot ?: return false
-        val key = openPin(slot, pin) ?: return false
-        val text = runCatching { decryptData(key) }.getOrNull() ?: return false
-        dek = key
-        values = text
-        persist()
-        true
-    }
-
     // --- internals ---
 
     private fun ensureLoaded() {
@@ -115,7 +82,6 @@ class SecureVault(
         if (!file.exists()) { loaded = true; return }
         val root = runCatching { JSONObject(file.readText()) }.getOrNull() ?: return
         deviceSlot = root.optString("device").takeIf { it.isNotEmpty() }
-        pinSlot = root.optJSONObject("pin")
         val key = deviceSlot?.let { wrapper.unwrap(b64d(it)) }
         if (key != null) {
             val text = runCatching { decryptData(key, root) }.getOrNull()
@@ -137,7 +103,7 @@ class SecureVault(
         var key = dek
         if (key == null) {
             // About to write a vault this device could not open over the one on disk. Keep the old file once, beside
-            // it, so what the PIN slot could still recover is not destroyed by this write.
+            // it, so it is not destroyed by this write.
             if (file.exists()) runCatching { file.copyTo(File(file.parentFile, file.name + ".lost"), overwrite = false) }
             key = newKey(); dek = key
         }
@@ -147,7 +113,6 @@ class SecureVault(
             .put("v", 1)
             .put("device", b64(wrapper.wrap(key)))
             .put("data", b64(seal(key, obj.toString().toByteArray(Charsets.UTF_8))))
-        pinSlot?.let { root.put("pin", it) }
         val tmp = File(file.parentFile, file.name + ".tmp")
         tmp.writeText(root.toString())
         if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
@@ -171,22 +136,6 @@ class SecureVault(
         c.doFinal(blob, 12, blob.size - 12)
     }.getOrNull()
 
-    private fun pinKey(pin: String, salt: ByteArray, iterations: Int): ByteArray =
-        SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-            .generateSecret(PBEKeySpec(pin.toCharArray(), salt, iterations, 256)).encoded
-
-    private fun sealPin(dek: ByteArray, pin: String): JSONObject {
-        val salt = ByteArray(16).also { random.nextBytes(it) }
-        return JSONObject()
-            .put("salt", b64(salt))
-            .put("iter", pinIterations)
-            .put("ct", b64(seal(pinKey(pin, salt, pinIterations), dek)))
-    }
-
-    private fun openPin(slot: JSONObject, pin: String): ByteArray? = runCatching {
-        open(pinKey(pin, b64d(slot.getString("salt")), slot.getInt("iter")), b64d(slot.getString("ct")))
-    }.getOrNull()
-
     private fun b64(b: ByteArray): String = java.util.Base64.getEncoder().encodeToString(b)
     private fun b64d(s: String): ByteArray = java.util.Base64.getDecoder().decode(s)
 
@@ -196,7 +145,6 @@ class SecureVault(
         /** Keys that stay readable while sealed: the app-lock PIN record and its lockout counters. */
         private const val OPEN_PREFIX = "app_pin"
 
-        const val PIN_ITERATIONS = 210_000
         const val FILE_NAME = "bloo_vault.json"
 
         @Volatile private var instance: SecureVault? = null

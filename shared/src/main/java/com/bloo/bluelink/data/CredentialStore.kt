@@ -101,22 +101,10 @@ class CredentialStore(context: Context) {
                 remove(KEY_PIN_RECORD); remove(KEY_PIN_FAILURES)
                 remove(KEY_PIN_LOCKED_UNTIL); remove(KEY_PIN_LOCKED_UNTIL_ELAPSED)
             }
-            vault.unbindPin()
         } else {
             vault.edit { put(KEY_PIN_RECORD, record) }
         }
     }
-
-    /**
-     * Seals the vault's data key under the app PIN too, so entering the PIN can recover every
-     * account if this device's key is ever lost. The PIN is stretched (PBKDF2, 210k rounds): call
-     * off the main thread.
-     */
-    fun bindVaultToPin(pin: String) = vault.bindPin(pin)
-
-    /** Opens a vault this device's key cannot, with the app PIN. True when it is open (or already was). */
-    fun recoverVaultWithPin(pin: String): Boolean =
-        vault.recoverWithPin(pin).also { if (it) cachedAccounts = null }
 
     /** True when stored accounts exist but this device's key cannot open them. */
     val vaultNeedsRecovery: Boolean get() = vault.needsRecovery

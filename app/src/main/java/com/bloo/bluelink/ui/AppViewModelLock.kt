@@ -160,8 +160,6 @@ fun AppViewModel.setAppPin(pin: String) {
             PinRecord(salt, PinCrypto.PIN_DEFAULT_ITERATIONS, PinCrypto.hash(pin, salt, PinCrypto.PIN_DEFAULT_ITERATIONS))
         }
         credentialStore.setPinRecord(record.encode())
-        // The vault's data key is sealed under the PIN as well (a recovery path if this device's key is lost).
-        withContext(Dispatchers.Default) { runCatching { credentialStore.bindVaultToPin(pin) } }
         refreshPinState()
     }
 }
@@ -201,10 +199,6 @@ fun AppViewModel.verifyAppPin(pin: String) {
         }
         val ok = withContext(Dispatchers.Default) { record.verify(pin) }
         if (ok) {
-            // A restored phone can lose the Keystore key: the PIN reopens the encrypted accounts.
-            withContext(Dispatchers.Default) {
-                if (credentialStore.vaultNeedsRecovery) runCatching { credentialStore.recoverVaultWithPin(pin) }
-            }
             credentialStore.setPinLockout(lockout.onSuccess())
             refreshPinState()
             _state.update { it.copy(pinAcceptedTick = it.pinAcceptedTick + 1) }

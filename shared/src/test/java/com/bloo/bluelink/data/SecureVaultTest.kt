@@ -31,47 +31,25 @@ class SecureVaultTest {
 
     @Test fun valuesSurviveReopen_andFileHoldsNoPlaintext() {
         val f = file(); val w = FakeWrapper()
-        SecureVault(f, w, pinIterations = 10).edit { put("pw", "hunter2-secret"); put("pin", "4321") }
+        SecureVault(f, w).edit { put("pw", "hunter2-secret"); put("pin", "4321") }
         val text = f.readText()
         assertFalse("hunter2-secret" in text); assertFalse("4321" in text)
-        val again = SecureVault(f, w, pinIterations = 10)
+        val again = SecureVault(f, w)
         assertEquals("hunter2-secret", again.getString("pw"))
         assertEquals("4321", again.getString("pin"))
     }
 
     @Test fun tamperedFileIsRejected() {
         val f = file(); val w = FakeWrapper()
-        SecureVault(f, w, pinIterations = 10).edit { put("pw", "secret") }
+        SecureVault(f, w).edit { put("pw", "secret") }
         f.writeText(f.readText().replace("\"data\":\"", "\"data\":\"AAAA"))
-        assertNull(SecureVault(f, w, pinIterations = 10).getString("pw"))
-    }
-
-    @Test fun lostDeviceKey_isRecoveredByThePin() {
-        val f = file(); val w = FakeWrapper()
-        val v = SecureVault(f, w, pinIterations = 10)
-        v.edit { put("pw", "secret") }
-        v.bindPin("246810")
-        w.key = ByteArray(32) { 7 } // the device key is gone
-        val lost = SecureVault(f, w, pinIterations = 10)
-        assertNull(lost.getString("pw")); assertTrue(lost.needsRecovery)
-        assertFalse(lost.recoverWithPin("000000"))
-        assertTrue(lost.recoverWithPin("246810"))
-        assertEquals("secret", lost.getString("pw"))
-        assertEquals("secret", SecureVault(f, w, pinIterations = 10).getString("pw")) // re-sealed to the new key
-    }
-
-    @Test fun removingThePin_dropsTheSlot() {
-        val f = file(); val w = FakeWrapper()
-        val v = SecureVault(f, w, pinIterations = 10)
-        v.edit { put("a", "b") }; v.bindPin("1234"); v.unbindPin()
-        w.key = ByteArray(32) { 9 }
-        assertFalse(SecureVault(f, w, pinIterations = 10).recoverWithPin("1234"))
+        assertNull(SecureVault(f, w).getString("pw"))
     }
 
     @Test fun sealedVault_hidesEverythingButTheAppLockRecords() {
         val f = file(); val w = FakeWrapper()
         var sealed = false
-        val v = SecureVault(f, w, pinIterations = 10, sealed = { sealed })
+        val v = SecureVault(f, w, sealed = { sealed })
         v.edit { put("HYUNDAI_password", "secret"); put("app_pin_record", "rec") }
         sealed = true
         assertNull(v.getString("HYUNDAI_password"))
@@ -83,22 +61,26 @@ class SecureVaultTest {
 
     @Test fun aKeystoreHiccup_isRetriedRatherThanFrozenForTheProcess() {
         val f = file(); val w = FakeWrapper()
-        SecureVault(f, w, pinIterations = 10).edit { put("pw", "secret") }
+        SecureVault(f, w).edit { put("pw", "secret") }
         val good = w.key
         w.key = ByteArray(32) { 5 } // the key is briefly unavailable
-        val v = SecureVault(f, w, pinIterations = 10)
+        val v = SecureVault(f, w)
         assertNull(v.getString("pw"))
         w.key = good // and comes back
         assertEquals("secret", v.getString("pw"))
     }
 
-    @Test fun writingOverAVaultTheDeviceCannotOpen_keepsTheOldFile() {
+    @Test fun aVaultFromThePinLayout_opensWithTheDeviceKey_andDropsThePinSlot() {
         val f = file(); val w = FakeWrapper()
-        val first = SecureVault(f, w, pinIterations = 10)
-        first.edit { put("pw", "secret") }
-        first.bindPin("246810")
-        w.key = ByteArray(32) { 7 } // the device key is gone for good
-        SecureVault(f, w, pinIterations = 10).edit { put("new", "value") }
-        assertTrue(File(f.parentFile, f.name + ".lost").exists(), "the unopenable vault was kept, not destroyed")
+        SecureVault(f, w).edit { put("pw", "secret") }
+        // An old vault also carries a PIN slot. It is ignored, and it is gone once the vault is saved again.
+        val root = org.json.JSONObject(f.readText()).put("pin", org.json.JSONObject().put("salt", "AA==").put("iter", 10).put("ct", "AA=="))
+        f.writeText(root.toString())
+        val v = SecureVault(f, w)
+        assertEquals("secret", v.getString("pw"))
+        assertFalse(v.needsRecovery)
+        v.edit { put("pw", "newer") }
+        assertFalse("\"pin\"" in f.readText(), "the PIN slot is dropped on the next save")
+        assertEquals("newer", SecureVault(f, w).getString("pw"))
     }
 }
