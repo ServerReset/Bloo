@@ -1,10 +1,12 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** One climate start the person set by hand: the outside temperature when they set it, and the target they chose. */
+@Serializable
 data class ClimateChoice(val ambientF: Int, val targetF: Int)
 
 /** The target smart climate sets, and the things that moved it, in words, so the person can see why it chose what it did. */

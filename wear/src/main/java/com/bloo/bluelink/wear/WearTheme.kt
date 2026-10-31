@@ -21,7 +21,7 @@ import com.bloo.uicommon.reduceMotionCached
 internal fun WearTheme(content: @Composable () -> Unit) {
     // The phone's palette when it has sent one (a chosen palette, or Material You's from its wallpaper), else the brand's.
     val appContext = LocalContext.current
-    remember(appContext) { WearAccent.load(appContext); WearGlass.load(appContext); WearType.load(appContext) }
+    remember(appContext) { WearAccent.load(appContext); WearGlass.load(appContext); WearType.load(appContext); WearClimateChoices.load(appContext) }
     val type by WearType.type.collectAsStateWithLifecycle()
     // The phone's typeface, with its classical headings: the same typography the phone sets its text with.
     val typography = remember(type) { com.bloo.uicommon.blooTypography(type.font, type.classicHeadings) }

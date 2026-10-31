@@ -39,6 +39,8 @@ data class WatchSyncPayload(
     val glass: WatchGlass? = null,
     /** The phone's typeface and classical headings, so the watch sets its text in the phone's font (null from an older phone). */
     val type: WatchType? = null,
+    /** The person's own past climate starts for each car (by VIN), so the watch's smart climate weighs them as the phone's does. */
+    val climateChoices: Map<String, List<ClimateChoice>> = emptyMap(),
 )
 
 /**

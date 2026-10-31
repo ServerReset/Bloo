@@ -1,14 +1,18 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.SmartClimateMode
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.WeatherApi
 import com.bloo.bluelink.data.ambientFahrenheit
+import com.bloo.bluelink.data.cToF
 import com.bloo.bluelink.data.degLabel
-import com.bloo.bluelink.data.smartClimateIsCooling
+import com.bloo.bluelink.data.smartClimateMode
 import com.bloo.bluelink.data.smartClimatePlan
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlin.math.roundToInt
 
 /**
  * What smart climate WILL set for a car, so its row can say so before it is pressed: the weather where the car is parked, run
@@ -17,8 +21,11 @@ import kotlinx.coroutines.flow.update
  * the row says only "Smart climate".
  */
 internal object WearSmartClimate {
-    /** The target for a car: [targetF] is what it will set, [ambientF] the outside temperature it is answering. */
-    data class Hint(val targetF: Int, val ambientF: Int, val cooling: Boolean, val fetchedAt: Long)
+    /** The target for a car: [targetF] is what it will set, [ambientF] the outside temperature it is answering, [mode] which way it moves. */
+    data class Hint(val targetF: Int, val ambientF: Int, val mode: SmartClimateMode, val fetchedAt: Long)
+
+    /** The last reading each car was planned from, so the plan can be made again when the person's own history arrives. */
+    private val readings = java.util.concurrent.ConcurrentHashMap<String, Weather>()
 
     private val _hints = MutableStateFlow<Map<String, Hint>>(emptyMap())
     val hints: StateFlow<Map<String, Hint>> = _hints
@@ -37,16 +44,31 @@ internal object WearSmartClimate {
             failedAt[car.vin] = now
             return
         }
-        val ambient = ambientFahrenheit(weather.tempC)
-        val hint = Hint(smartClimatePlan(weather).targetF, ambient, smartClimateIsCooling(ambient), System.currentTimeMillis())
-        _hints.update { it + (car.vin to hint) }
+        readings[car.vin] = weather
+        _hints.update { it + (car.vin to hintFor(car.vin, weather)) }
+    }
+
+    /** Plans every car held again, with the person's current history: called when the phone's history arrives. */
+    fun replan() {
+        _hints.update { held -> held.mapValues { (vin, old) -> readings[vin]?.let { hintFor(vin, it) } ?: old } }
+    }
+
+    /** The plan for one car, weighing the person's own past starts for it. */
+    private fun hintFor(vin: String, weather: Weather): Hint {
+        val plan = smartClimatePlan(weather, WearClimateChoices.choicesFor(vin))
+        val feelsF = cToF(weather.feelsLikeC).roundToInt()
+        return Hint(plan.targetF, ambientFahrenheit(weather.tempC), smartClimateMode(feelsF), System.currentTimeMillis())
     }
 
     /** "Cool to 62°" or "Heat to 78°", with the outside temperature, in the phone's unit (the phone words the first part the same way). */
     fun describe(hint: Hint): String {
         val fahrenheit = WearPresets.fahrenheit
         // The target is the plan's, so the hint shows the number that is actually sent.
-        val verb = if (hint.cooling) "Cool to " else "Heat to "
+        val verb = when (hint.mode) {
+            SmartClimateMode.HEAT -> "Heat to "
+            SmartClimateMode.COOL -> "Cool to "
+            SmartClimateMode.HOLD -> "Hold at "
+        }
         return verb + degLabel(hint.targetF.toString(), fahrenheit) + " · " + degLabel(hint.ambientF.toString(), fahrenheit) + " outside"
     }
 
