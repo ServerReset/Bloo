@@ -24,6 +24,34 @@ import kotlin.math.cos
 /** One car's place on the watch's map: [x] and [y] run from -1 to 1 from the middle, north up. */
 internal data class CarSpot(val vin: String, val name: String, val x: Float, val y: Float, val selected: Boolean)
 
+/** A label's box in the map's own dp, before it is placed: [index] is its car's place in the list it came from. */
+internal data class LabelBox(val index: Int, val x: Float, val y: Float, val w: Float, val h: Float)
+
+/**
+ * Moves labels down until none overlaps an earlier one, so names of cars that sit close together stay readable. A label that cannot find a
+ * clear place within [maxSteps] moves stays where its last step put it. Pure, so it can be tested.
+ */
+internal fun spreadLabels(boxes: List<LabelBox>, maxSteps: Int = 8): List<LabelBox> {
+    val placed = mutableListOf<LabelBox>()
+    for (box in boxes.sortedBy { it.y }) {
+        var current = box
+        var steps = 0
+        while (steps < maxSteps && placed.any { overlaps(it, current) }) {
+            current = current.copy(y = current.y + box.h)
+            steps++
+        }
+        placed += current
+    }
+    return placed.sortedBy { it.index }
+}
+
+private fun overlaps(a: LabelBox, b: LabelBox): Boolean =
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+
+/** Rough label metrics on the watch, in dp, for placing names before they are drawn. */
+private const val LabelCharDp = 5.6f
+private const val LabelLineDp = 14f
+
 /** The least the map spans, in degrees (about 400 m), so one car does not blow up to the edge of the display. */
 private const val MinSpanDeg = 0.004
 
@@ -79,9 +107,16 @@ internal fun WearCarMap(cars: List<VehicleSnapshot>, selectedVin: String) {
                 }
             }
         }
-        spots.forEach { s ->
+        // Each name sits just right of its dot; names that would collide are moved down (see [spreadLabels]).
+        val rDp = radius.value
+        val boxes = spots.mapIndexed { i, s ->
+            val name = s.name
+            LabelBox(index = i, x = rDp * s.x + 8f, y = rDp * s.y - 8f, w = name.length * LabelCharDp + 4f, h = LabelLineDp)
+        }
+        spreadLabels(boxes).forEach { box ->
+            val s = spots[box.index]
             Box(
-                Modifier.align(Alignment.Center).offset(x = radius * s.x + 8.dp, y = radius * s.y - 8.dp).size(width = 80.dp, height = 40.dp),
+                Modifier.align(Alignment.Center).offset(x = box.x.dp, y = box.y.dp).size(width = box.w.dp, height = box.h.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 RevealText(
@@ -92,5 +127,13 @@ internal fun WearCarMap(cars: List<VehicleSnapshot>, selectedVin: String) {
                 )
             }
         }
+        // North, at the top of the ring, so the layout reads at a glance.
+        RevealText(
+            "N",
+            modifier = Modifier.align(Alignment.TopCenter),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = scheme.onSurfaceVariant,
+        )
     }
 }
