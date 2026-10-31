@@ -499,7 +499,7 @@ private val ChipWidth = 58.dp
 private val ChipHeight = 40.dp
 private val StackPad = 6.dp
 private val PinGlyphSize = 26.dp
-private val PinStackHeight = ChipHeight + 2 * StackPad + 2.dp + PinGlyphSize
+private val PinStackHeight = ChipHeight + StackPad * 2f + 2.dp + PinGlyphSize
 
 /**
  * One car, or several sitting together, drawn as one shape: a rounded stack of their photos, with the pin's glyph under it. A car joining

@@ -6,7 +6,6 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.bloo.bluelink.ui.ColorPalette
 import com.bloo.bluelink.ui.CustomPaletteData
-import com.bloo.bluelink.ui.FontChoice
 import com.bloo.bluelink.ui.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow

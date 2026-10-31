@@ -350,8 +350,8 @@ fun WearRoundButton(
         contentColor = MaterialTheme.colorScheme.onSurface,
         contentPadding = PaddingValues(0.dp),
         minHeight = size,
-        pillCornerPercent = 50,
-        morphedCornerPercent = 50,
+        pillCornerPercent = 50f,
+        morphedCornerPercent = 50f,
         expressive = false,
         onClickHaptic = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
     ) {
