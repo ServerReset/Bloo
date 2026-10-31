@@ -40,6 +40,8 @@ data class VehicleSnapshot(
     val engineOn: Boolean? = null,
     val lat: Double? = null,
     val lon: Double? = null,
+    /** The short name of the place the car is at, from the phone's lookup of its position (null until one is made). */
+    val place: String? = null,
     /** The car's raw reported speed VALUE from the API's `{value, unit}` pair, unit discarded at capture,
      *  so the actual unit is unestablished. Only safe for "above zero" checks ([isDriving]); resolve the
      *  unit (and rename) before displaying it. */

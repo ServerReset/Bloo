@@ -34,7 +34,7 @@ internal fun WearCarCarePebble(
     WearPebble(title = "Care", icon = AppIcons.Build) {
         WearCarFacts.care(v).forEach { (label, value) -> WearStatRow(label, value) }
         val where = v.lat?.let { lat -> v.lon?.let { lon -> coordString(lat, lon, decimals = 4) } }
-        WearStatRow("Location", where ?: "Unknown")
+        WearStatRow("Location", v.place ?: where ?: "Unknown")
         // Live: the phone's own label (:uicommon), so "5 min ago" moves on while the page stays open.
         val updated = rememberRelativeTime(v.fetchedAt)?.takeIf { it.isNotBlank() }
         if (refreshing || updated != null) {

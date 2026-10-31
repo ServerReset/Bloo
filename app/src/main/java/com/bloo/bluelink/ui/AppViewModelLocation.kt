@@ -51,6 +51,11 @@ internal suspend fun AppViewModel.applyPlace(v: Vehicle, loc: GeoLocation): Bool
     _state.update {
         it.copy(placeNames = it.placeNames.withCar(v.vin, place.full), placeZips = it.placeZips.withCar(v.vin, place.compact))
     }
+    // The watch shows the same short name, so the car's snapshot keeps it and the watch is sent the change.
+    val app = getApplication<android.app.Application>()
+    val store = com.bloo.bluelink.data.SnapshotStore(app)
+    store.current().vehicles.firstOrNull { it.vin == v.vin }?.let { store.updateVehicle(it.copy(place = place.compact)) }
+    com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(app)
     return true
 }
 
