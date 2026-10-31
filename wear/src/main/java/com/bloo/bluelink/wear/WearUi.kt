@@ -198,7 +198,7 @@ fun WearSubheading(text: String, modifier: Modifier = Modifier) {
  * Side margin of the lists, and the gaps that keep their rows and sections apart -- the phone's own spacing tokens (a row gap
  * between rows, a block gap between sections), so the watch breathes in the same units the phone does.
  */
-internal val ListInset = 26.dp
+internal val ListInset = 18.dp
 internal val RowGap: Dp @Composable get() = com.bloo.uicommon.GapRow
 internal val SectionGap: Dp @Composable get() = com.bloo.uicommon.GapBlock
 
@@ -542,7 +542,7 @@ internal fun WearStatRow(label: String, value: String, valueColor: Color? = null
     Row(
         Modifier.fillMaxWidth().fitRound().cascadeItem().clip(CircleShape)
             .background(scheme.surfaceContainerHigh.copy(alpha = 0.5f))
-            .padding(horizontal = 16.dp, vertical = 9.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LabelValueRow(
