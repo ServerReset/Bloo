@@ -1,24 +1,16 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.filled.Fingerprint
-import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.segmentsOf
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -54,24 +46,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.credentials.CredentialManager
@@ -79,7 +64,6 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetPasswordOption
 import androidx.credentials.PasswordCredential
 import androidx.credentials.exceptions.NoCredentialException
-import com.bloo.uicommon.LocalPowerPolicy
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.DisposableEffect
@@ -94,8 +78,6 @@ import kotlin.math.max
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
-import com.bloo.uicommon.MotionShort
-import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.MotionLong
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
@@ -104,14 +86,11 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphSegmented
 import com.bloo.uicommon.SegmentOption
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.coroutines.CancellationException
 
 /**
  * Sign-in form for every brand (US, Canada, Europe) on one screen. Field state is local until
- * [onLogin] fires, so switching brands keeps typed values. Brand copy cross-fades via
- * [AnimatedContent].
+ * [onLogin] fires, so switching brands keeps typed values.
  *
  * Laid out as a short story, top to bottom: who we are (the hero), which account (region and brand), your login (the fields,
  * the saved-login shortcut and the button), and the quiet things last (forgot password, privacy, updates). Each block eases
@@ -223,15 +202,6 @@ internal fun LoginScreen(
     }
 
     // Brand-specific copy
-    val brandSubtitle = when (brand) {
-        Brand.HYUNDAI -> "A better Bluelink · US"
-        Brand.GENESIS -> "A better Genesis · US"
-        Brand.KIA     -> "A better Kia Connect · US"
-        Brand.HYUNDAI_CA -> "A better Bluelink · Canada"
-        Brand.GENESIS_CA -> "A better Genesis Connect · Canada"
-        Brand.KIA_CA -> "A better Kia Connect · Canada"
-        Brand.HYUNDAI_EU -> "A better Bluelink · Europe"
-    }
     val emailLabel = when (brand) {
         Brand.HYUNDAI, Brand.HYUNDAI_CA, Brand.HYUNDAI_EU -> "Bluelink email"
         Brand.GENESIS, Brand.GENESIS_CA -> "Genesis account email"
@@ -271,8 +241,8 @@ internal fun LoginScreen(
                     Modifier.fillMaxWidth().widthIn(max = 480.dp),
                     verticalArrangement = Arrangement.spacedBy(GapGroup),
                 ) {
-                    // The app tile and the brand, on one row to keep the height for the form.
-                    LoginHero(subtitle = brandSubtitle, compact = true, modifier = Modifier.fillMaxWidth())
+                    // The app's logo and name, centred: the only decoration on the screen.
+                    LoginHero(modifier = Modifier.fillMaxWidth())
 
                     // Where the account lives, and which brand: two rows of segments.
                     GlassSurface(shape = ExtraLargeShape, hazeState = hazeState, modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopStart) {
@@ -296,17 +266,12 @@ internal fun LoginScreen(
                     // Your login: the fields, the PIN when the brand wants one, the button, and the saved-login shortcut.
                     GlassSurface(shape = ExtraLargeShape, hazeState = hazeState, modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopStart) {
                         Column(Modifier.fillMaxWidth().padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                LoginSectionLabel(Icons.Filled.VpnKey, "${brand.label} sign-in")
-                                Spacer(Modifier.weight(1f))
-                                onFingerprint?.let { unlock ->
-                                    MorphTextButton(text = "Fingerprint", onClick = unlock, icon = Icons.Filled.Fingerprint)
-                                    Spacer(Modifier.width(GapRow))
-                                }
+                            onFingerprint?.let { unlock ->
                                 MorphTextButton(
-                                    text = "Saved sign-in",
-                                    onClick = { scope.launch { fillFromManager(quiet = false) } },
-                                    icon = Icons.Filled.VpnKey,
+                                    text = "Unlock with fingerprint",
+                                    onClick = unlock,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    icon = Icons.Filled.Fingerprint,
                                 )
                             }
                             AnimatedVisibility(visible = savedNote != null) {
@@ -381,6 +346,11 @@ internal fun LoginScreen(
                     // The quiet things last, on one row.
                     ActionRow {
                         MorphTextButton(text = "Forgot password?", onClick = { openUrl(context, brand.forgotPasswordUrl) })
+                        MorphTextButton(
+                            text = "Saved sign-in",
+                            onClick = { scope.launch { fillFromManager(quiet = false) } },
+                            icon = Icons.Filled.VpnKey,
+                        )
                         if (onCancel != null) MorphTextButton(text = "Cancel", onClick = onCancel)
                         MorphTextButton(
                             text = when {
@@ -407,83 +377,27 @@ internal fun LoginScreen(
 }
 
 /**
- * The hero: the app tile with a soft, slowly breathing glow behind it (still under Battery Saver), the wordmark, and the
- * brand line that crossfades as the brand changes. Centred on a tall screen; tile and words side by side on a short one.
+ * The hero: the app's logo, a plain tile, over the app's name in the classic serif. Nothing animates here, so the screen
+ * stays quiet and the form is what the eye lands on.
  */
 @Composable
-private fun LoginHero(subtitle: String, compact: Boolean, modifier: Modifier = Modifier) {
+internal fun LoginHero(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val moving = LocalPowerPolicy.current.ambientMotion
-    // Read inside graphicsLayer, so the breathing redraws the glow and does not recompose the hero each frame.
-    val breath = if (moving) {
-        rememberInfiniteTransition(label = "heroBreath").animateFloat(
-            0.9f, 1.08f,
-            infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-            label = "heroBreathScale",
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        Box(
+            Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(AppIcons.DirectionsCar, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(34.dp))
+        }
+        RevealText(
+            "Bloo",
+            style = MaterialTheme.typography.displaySmall.copy(fontFamily = FontFamily.Serif),
+            color = scheme.onSurface,
         )
-    } else null
-    val tileSize = if (compact) 52.dp else 76.dp
-    val tile: @Composable () -> Unit = {
-        Box(contentAlignment = Alignment.Center) {
-            // The glow: a radial wash of the accent behind the tile, larger than it and breathing.
-            Box(
-                Modifier.size(tileSize * 1.9f)
-                    .graphicsLayer { val b = breath?.value ?: 1f; scaleX = b; scaleY = b }
-                    .background(
-                        Brush.radialGradient(listOf(scheme.primary.copy(alpha = 0.32f), Color.Transparent)),
-                        CircleShape,
-                    ),
-            )
-            Box(
-                Modifier
-                    .size(tileSize)
-                    .clip(RoundedCornerShape(tileSize * 0.32f))
-                    .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary))),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(AppIcons.DirectionsCar, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(tileSize * 0.52f))
-            }
-        }
-    }
-    val words: @Composable (Alignment.Horizontal) -> Unit = { align ->
-        Column(horizontalAlignment = align) {
-            RevealText(
-                "Bloo",
-                style = if (compact) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Black,
-                color = scheme.onSurface,
-            )
-            AnimatedContent(
-                targetState = subtitle,
-                transitionSpec = {
-                    (fadeIn(tween(MotionMedium)) + slideInVertically(tween(MotionMedium)) { it / 3 }) togetherWith
-                        (fadeOut(tween(MotionShort)) + slideOutVertically(tween(MotionShort)) { -it / 3 })
-                },
-                label = "loginSubtitle",
-            ) { text ->
-                RevealText(text, style = PrimaryTextStyle(), color = scheme.onSurfaceVariant)
-            }
-        }
-    }
-    if (compact) {
-        Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapGroup)) {
-            tile()
-            words(Alignment.Start)
-        }
-    } else {
-        Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-            tile()
-            words(Alignment.CenterHorizontally)
-        }
-    }
-}
-
-/** A small heading for a block of the form: a tinted icon and the words. */
-@Composable
-private fun LoginSectionLabel(icon: ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-        RevealText(text, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 

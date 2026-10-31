@@ -8,19 +8,15 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,20 +29,12 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.PrimaryTextStyle
-import com.bloo.uicommon.SecondaryTextStyle
 import kotlin.math.max
-import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.MotionLong
 import com.bloo.uicommon.MorphButtonLabel
-import com.bloo.uicommon.GapHairline
-import com.bloo.uicommon.GapPage
-import com.bloo.uicommon.GapBlock
 import com.bloo.uicommon.GapHero
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.GroupWeightProportional
@@ -86,8 +74,8 @@ internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel, opaqueBackdrop:
 
 /**
  * The app lock, drawn as an overlay on top of the blurred app. The phone's own lock is the unlock
- * (fingerprint, face, PIN, pattern or password), so this screen is one card with one button. High-contrast
- * white-on-scrim text reads over any wallpaper of cars behind it; a floating back arrow returns to the login screen.
+ * (fingerprint, face, PIN, pattern or password), so this screen is the name, the logo and one button. A floating back arrow
+ * returns to the login screen.
  */
 @Composable
 internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
@@ -131,50 +119,25 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             modifier = Modifier.align(Alignment.TopStart).statusBarsPadding(),
         )
 
+        // The app's name and logo, then one button: the lock screen is only a way back in.
         Column(
-            Modifier.align(Alignment.Center).widthIn(max = 420.dp).padding(horizontal = GapHero, vertical = GapBlock),
+            Modifier.align(Alignment.Center).widthIn(max = 420.dp).padding(horizontal = GapHero),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(GapHero),
         ) {
-            // The same liquid glass as the rest of the app, over the force-blurred app behind it: the blur
-            // (LockBlurLayer) is what keeps data from leaking, the glass is what makes this one of us.
-            GlassSurface(
-                shape = ExtraLargeShape,
-                modifier = Modifier.fillMaxWidth(),
-                hazeState = LocalBackdropHaze.current,
+            LoginHero()
+            val unlockSource = remember { MutableInteractionSource() }
+            MorphButton(
+                onClick = { authenticateDevice() },
+                modifier = Modifier.fillMaxWidth().heightIn(min = ControlHeight),
+                interactionSource = unlockSource,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+                expressive = true, fillOnPress = true, groupWeight = GroupWeightProportional,
             ) {
-                Column(
-                    Modifier.padding(horizontal = GapBlock, vertical = GapBlock),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    LockMessage(Icons.Filled.Fingerprint, "Confirm it's you to reach your vehicles.", lockFg, GapPage)
-                    Spacer(Modifier.height(28.dp))
-                    val unlockSource = remember { MutableInteractionSource() }
-                    MorphButton(
-                        onClick = { authenticateDevice() },
-                        modifier = Modifier.heightIn(min = ControlHeight),
-                        interactionSource = unlockSource,
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
-                        expressive = true, fillOnPress = true, groupWeight = GroupWeightProportional,
-                    ) {
-                        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays larger
-                        // (24dp) than the standard 18dp, an intentional emphasis for the screen's one
-                        // primary CTA.
-                        MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
-                    }
-                }
+                MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
             }
         }
     }
-}
-
-/** The lock screen's icon, "Bloo is locked" and a line under it, in [fg]; [iconGap] sits between the icon and the title. */
-@Composable
-private fun LockMessage(icon: androidx.compose.ui.graphics.vector.ImageVector, subtitle: String, fg: androidx.compose.ui.graphics.Color, iconGap: androidx.compose.ui.unit.Dp) {
-    Icon(icon, contentDescription = null, modifier = Modifier.size(72.dp), tint = fg)
-    Spacer(Modifier.height(iconGap))
-    RevealText("Bloo is locked", style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, color = fg)
-    Spacer(Modifier.height(GapHairline))
-    RevealText(subtitle, style = SecondaryTextStyle(), color = fg.copy(alpha = 0.85f))
 }
