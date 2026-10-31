@@ -3,7 +3,6 @@ package com.bloo.bluelink.wear
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -13,32 +12,25 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
 import androidx.compose.animation.core.Spring
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 
 /**
- * The centre of the face: the value where the four quarters meet (the charge or fuel, or the lock state), what the car is doing
- * under it ([state]: running, parked, locked), and the car's name -- or, for a moment, what just happened ([status]). Holding it
- * (a long press, with a buzz) changes the four quarters.
+ * The centre of the face: the value where the quarters meet (the charge or fuel, or the lock state), what the car is doing under it
+ * ([state]: running, parked, locked), and the car's name -- or, for a moment, what just happened ([status]). It gives a little under a
+ * finger ([pressed]); holding it is handled by the quarters' grid.
  */
 @Composable
 fun WearFaceHub(
@@ -48,12 +40,9 @@ fun WearFaceHub(
     size: Dp,
     state: String = "",
     status: FaceStatus? = null,
-    onHold: (() -> Unit)? = null,
+    pressed: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val haptics = LocalHapticFeedback.current
-    val interaction = androidx.compose.runtime.remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     // The hub gives a little under a finger and springs back: less than it did, so the centre reads as steady.
     val press by animateFloatAsState(if (pressed) 0.98f else 1f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium), label = "hubPress")
     Box(
@@ -61,23 +50,6 @@ fun WearFaceHub(
             .graphicsLayer { scaleX = press; scaleY = press }
             .clip(CircleShape)
             .background(scheme.background)
-            .then(
-                if (onHold != null) {
-                    Modifier
-                        .semantics { contentDescription = "Hold to change the four controls" }
-                        .combinedClickable(
-                            interactionSource = interaction,
-                            indication = null,
-                            onClick = {},
-                            onLongClick = {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onHold()
-                            },
-                        )
-                } else {
-                    Modifier
-                },
-            )
             // The text keeps clear of the circle's curve: the value and its lines sit inside the middle of the hub.
             .padding(horizontal = size * 0.12f, vertical = 4.dp),
         contentAlignment = Alignment.Center,
