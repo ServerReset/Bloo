@@ -1,5 +1,8 @@
 package com.bloo.bluelink.wear
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Modifier
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -73,3 +76,9 @@ private val WearSecondary = Color(0xFFCCC2DC)
 private val WearTertiary = Color(0xFFEFB8C8)
 private val WearSecondaryContainer = Color(TilePalette.BUTTON)
 private val WearSurfaceContainer = Color(0xFF1C1C22)
+
+/** The background behind every watch screen: plain, so the face's own colours carry the screen. */
+@Composable
+internal fun WearBackdrop(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(modifier.background(MaterialTheme.colorScheme.background)) { content() }
+}

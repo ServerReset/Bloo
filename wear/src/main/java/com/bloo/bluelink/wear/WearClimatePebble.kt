@@ -74,7 +74,7 @@ internal fun WearClimateRows(
         ) { onPreset(preset) }
     }
     if (saved.isEmpty()) {
-        val text = "Presets you save in Bloo on your phone show up here."
+        val text = "Presets from your phone show here."
         if (smallCaption) WearCaption(text, small = true) else WearCaption(text)
     }
 }

@@ -171,7 +171,6 @@ fun BoxScope.WearPullIndicator(state: PullRefreshState, refreshing: Boolean) {
                 scaleY = 1f + 0.4f * stretch
             }
             .background(scheme.surfaceContainerHigh.copy(alpha = 0.92f), CircleShape)
-            .wearGlassRim(CircleShape)
             .padding(8.dp),
     ) {
         Canvas(Modifier.fillMaxSize()) {

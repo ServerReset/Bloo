@@ -40,7 +40,7 @@ import com.bloo.uicommon.standardButtonIcon
  * for the label (see [standardButtonIcon]).
  */
 /** The corner radius of every quarter tile, in the face's own units (see [LocalFaceUnit]). */
-private val TileCorner = 22.dp
+private val TileCorner = 10.dp
 
 data class WearQuickAction(
     val label: String,

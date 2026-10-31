@@ -350,7 +350,6 @@ fun WearRoundButton(
         color = color,
         modifier = modifier
             .size(size)
-            .wearGlassRim(CircleShape)
             .semantics { contentDescription = description },
     ) {
         Box(contentAlignment = Alignment.Center, content = content)
@@ -512,7 +511,7 @@ fun WearConfirmScreen(
 private fun RoundChoice(icon: ImageVector, label: String, container: Color, content: Color, onClick: () -> Unit) {
     MorphButton(
         onClick = onClick,
-        modifier = Modifier.size(52.dp).semantics { contentDescription = label }.wearGlassRim(CircleShape),
+        modifier = Modifier.size(52.dp).semantics { contentDescription = label },
         containerColor = container,
         contentColor = content,
         contentPadding = PaddingValues(0.dp),
@@ -532,7 +531,7 @@ private fun RoundChoice(icon: ImageVector, label: String, container: Color, cont
 @Composable
 private fun ScreenBadge(icon: ImageVector, tint: Color) {
     // The phone's badge (:uicommon), sized for the watch and rimmed like its glass.
-    IconBadge(icon, tint, modifier = Modifier.wearGlassRim(CircleShape), containerColor = tint.copy(alpha = 0.2f), size = 44.dp, iconSize = 24.dp)
+    IconBadge(icon, tint, modifier = Modifier, containerColor = tint.copy(alpha = 0.2f), size = 44.dp, iconSize = 24.dp)
 }
 
 /** One label/value line in a pebble: the label muted on the start, the value on the end. */

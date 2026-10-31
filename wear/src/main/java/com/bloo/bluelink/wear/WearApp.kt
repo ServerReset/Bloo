@@ -45,7 +45,7 @@ fun WearApp(
             vehicles.isEmpty() -> WearMessageScreen(
                 icon = if (connected) AppIcons.DirectionsCar else AppIcons.PhoneAndroid,
                 title = if (connected) "No cars yet" else "Waiting for your phone",
-                detail = if (connected) "Add a car in Bloo on your phone." else "Open Bloo on your phone and keep it near the watch.",
+                detail = if (connected) "Add a car in Bloo on your phone." else "Open Bloo on your phone.",
             )
             else -> Cars(repo, vehicles, CarPageActions(send, tileRequest, onTileRequestHandled))
         }
@@ -55,7 +55,7 @@ fun WearApp(
 /** The phone is signing this watch in: the code to match, and the way out (the ✕ beside it) if the phone's end is gone. */
 @Composable
 private fun SignInCode(code: String) {
-    WearMessageScreen(icon = AppIcons.Watch, title = "Sign in from your phone", detail = "Check this code matches the phone.") {
+    WearMessageScreen(icon = AppIcons.Watch, title = "Sign in from your phone", detail = "Check the code matches.") {
         RevealText(
             code,
             style = MaterialTheme.typography.displaySmall,

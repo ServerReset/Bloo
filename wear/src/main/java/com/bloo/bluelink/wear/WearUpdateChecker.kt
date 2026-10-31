@@ -80,7 +80,7 @@ object WearUpdateChecker {
             // "install unknown apps" toggle (or the installer didn't launch at all) -- report
             // that instead of silently doing nothing, which is how a watch with the toggle off
             // saw "nothing happen" on tap.
-            if (!installDownloadedApk(context, dest)) _error.value = "Allow installing apps, then tap again"
+            if (!installDownloadedApk(context, dest)) _error.value = "Allow installs, then tap again."
         } catch (t: Throwable) {
             _error.value = t.message ?: "Update failed"
         } finally {

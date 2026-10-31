@@ -41,13 +41,13 @@ internal fun WearSettingsPebble(signedIn: Boolean) {
         WearToggleRow("Auto lock", AppIcons.Lock, autoLockAlert) {
             autoLockAlert = it; alerts.autoLock = it; alerts.sendToPhone(context)
         }
-        WearCaption("Each switch decides whether the watch tells you about it.", small = true)
+        WearCaption("Choose what the watch tells you.", small = true)
 
         // --- Effects: blur, springs and text animation off, as under Battery Saver ---
         WearSubheading("Effects")
         WearToggleRow(
             "Reduce effects", AppIcons.AutoAwesome, reduced,
-            description = if (reduced) "No blur or animation, to save battery" else "Off by itself in Battery Saver",
+            description = if (reduced) "Less motion, to save battery." else "Off by itself in Battery Saver",
         ) {
             reduced = it
             WearLook.setReduceEffects(context, it)
@@ -63,12 +63,12 @@ internal fun WearSettingsPebble(signedIn: Boolean) {
                 WearLook.sendToPhone(context)
             }
             WearCaption(
-                if (autoLock) "On. The watch locks the car about a minute after it feels you walk away."
-                else "Uses the watch's motion sensor. To lock by the car's Bluetooth, set up AutoLock in Bloo on your phone.",
+                if (autoLock) "On. Locks about a minute after you walk away."
+                else "Uses the watch's motion. Set up Bluetooth in Bloo on your phone.",
                 small = true,
             )
         } else {
-            WearCaption("Auto lock needs your car's sign-in. In Bloo on the phone, open Settings and set up the watch.", small = true, maxLines = 5)
+            WearCaption("Auto lock needs the car's sign-in. Set it up on your phone.", small = true, maxLines = 5)
         }
     }
 }
