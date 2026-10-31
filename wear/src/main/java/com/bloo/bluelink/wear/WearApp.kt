@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.wear.compose.foundation.pager.VerticalPager
+import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.material3.AppScaffold
 import com.bloo.uicommon.RevealText
 
@@ -68,7 +68,7 @@ private fun SignInCode(code: String) {
     }
 }
 
-/** One page per car, swiped up and down. Opens on the car last shown, which is the car the tile shows, so a tile button acts on its own car. */
+/** One page per car, swiped left and right. Opens on the car last shown, which is the car the tile shows, so a tile button acts on its own car. */
 @Composable
 private fun Cars(
     repo: WearSnapshotRepository,
@@ -90,11 +90,12 @@ private fun Cars(
         }
     }
     Box(Modifier.fillMaxSize()) {
-        VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             vehicles.getOrNull(wrap.wrap.real(page))?.let { car ->
                 WearCarPage(
                     repo = repo,
                     car = car,
+                    current = page == pagerState.currentPage,
                     // A tile action belongs to the car the tile showed, so only the page on screen takes it: the pager
                     // composes its neighbours, and they would run it too.
                     actions = CarPageActions(

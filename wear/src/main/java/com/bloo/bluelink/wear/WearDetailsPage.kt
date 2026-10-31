@@ -47,6 +47,8 @@ internal fun WearCarSection(ui: WearCarUi, update: WearUpdateState, section: Car
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     WearListScreen(contentPadding = PaddingValues(top = 34.dp, bottom = 22.dp)) {
+        // The car's name in the middle of its page, so a section always says which car it is.
+        item { WearCenteredText(ui.car.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1) }
         ui.lastResult?.takeIf { it.vin == ui.car.vin && !it.ok }?.let { failure ->
             item {
                 WearCenteredText(
