@@ -94,6 +94,7 @@ private fun Cars(
                 WearCarPage(
                     repo = repo,
                     car = car,
+                    cars = vehicles,
                     current = page == pagerState.currentPage,
                     // A tile action belongs to the car the tile showed, so only the page on screen takes it: the pager
                     // composes its neighbours, and they would run it too.

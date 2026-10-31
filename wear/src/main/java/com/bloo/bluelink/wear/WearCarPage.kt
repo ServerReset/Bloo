@@ -35,6 +35,8 @@ import androidx.activity.compose.BackHandler
 internal class WearCarUi(
     val repo: WearSnapshotRepository,
     val car: VehicleSnapshot,
+    /** Every car on the account, for the map. */
+    val cars: List<VehicleSnapshot>,
     val signedIn: Boolean,
     val refreshing: Boolean,
     val pending: Set<String>,
@@ -79,6 +81,7 @@ internal data class CarPageActions(
 internal fun WearCarPage(
     repo: WearSnapshotRepository,
     car: VehicleSnapshot,
+    cars: List<VehicleSnapshot>,
     /** Whether this is the car on screen: only it moves the shared page, and the others follow it. */
     current: Boolean,
     actions: CarPageActions,
@@ -90,7 +93,7 @@ internal fun WearCarPage(
     val lastResult by repo.lastCommandResult.collectAsStateWithLifecycle(initialValue = null)
     val refreshing by repo.refreshing.collectAsStateWithLifecycle(initialValue = false)
     val slotKeys by WearFacePrefs.flow(context).collectAsStateWithLifecycle()
-    val ui = WearCarUi(repo, car, signedIn, refreshing, pending, lastResult, send)
+    val ui = WearCarUi(repo, car, cars, signedIn, refreshing, pending, lastResult, send)
 
     // The command waiting on an "are you sure" (anything that opens the car), the quarter being chosen, and the editor.
     var confirmAction by remember { mutableStateOf<String?>(null) }
@@ -215,7 +218,7 @@ private fun wrapStep(step: Int): Int {
 }
 
 /** A car's sections after its face, in the order a left swipe reaches them. */
-internal enum class CarSection { CLIMATE, STATUS, CARE, SETTINGS }
+internal enum class CarSection { CLIMATE, STATUS, CARE, LOCATION, SETTINGS }
 
 /** The face plus every section. */
 private val CarPageCount get() = CarSection.entries.size + 1
