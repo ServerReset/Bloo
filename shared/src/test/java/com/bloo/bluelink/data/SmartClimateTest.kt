@@ -60,12 +60,12 @@ class SmartClimateTest {
     @Test
     fun pastChoicesAtASimilarTemperaturePullTheTarget() {
         val base = smartClimatePlan(weather(tempF = 88.0, humidity = 30))
-        // The person has always set 66 when it is about this warm: the plan moves toward that, and says so.
+        // The person has always set 74 when it is about this warm, warmer than the model's 65: the plan moves toward that, and says so.
         val learned = smartClimatePlan(
             weather(tempF = 88.0, humidity = 30),
-            listOf(ClimateChoice(87, 66), ClimateChoice(89, 66), ClimateChoice(88, 66)),
+            listOf(ClimateChoice(87, 74), ClimateChoice(89, 74), ClimateChoice(88, 74)),
         )
-        assertTrue(learned.targetF < base.targetF)
+        assertTrue(learned.targetF > base.targetF)
         assertTrue(learned.reasons.any { it.startsWith("You usually set") })
     }
 

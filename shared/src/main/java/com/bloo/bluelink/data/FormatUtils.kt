@@ -37,29 +37,51 @@ fun ambientFahrenheit(tempC: Double): Int = cToF(tempC).roundToInt()
 /** The Fahrenheit range every supported car's climate target can be set to. */
 val CLIMATE_TEMP_RANGE_F = 62..82
 
-/**
- * A one-tap "smart" target for the outside [ambientF], clamped into [CLIMATE_TEMP_RANGE_F].
- * Moderate weather runs 10F off ambient; extreme weather goes to the range's most aggressive end.
- */
-fun smartClimateTargetF(ambientF: Int): Int {
-    val min = CLIMATE_TEMP_RANGE_F.first
-    val max = CLIMATE_TEMP_RANGE_F.last
-    // Branches run from most to least extreme so a hot/cold reading short-circuits.
-    return when {
-        ambientF >= 90 -> min // Really hot: max cold.
-        ambientF >= 70 -> (ambientF - 10).coerceIn(min, max)
-        ambientF <= 40 -> max // Really cold: max hot.
-        else -> (ambientF + 10).coerceIn(min, max)
-    }
+/** The cabin temperature a person is comfortable at: the middle of the band smart climate holds without a change. */
+const val COMFORT_F = 70
+
+/** Which way smart climate moves the cabin for an outside temperature: heat it, cool it, or hold it at [COMFORT_F]. */
+enum class SmartClimateMode { HEAT, HOLD, COOL }
+
+/** Below this (feels-like °F) the car heats; above [COOL_ABOVE_F] it cools; between them it holds the comfortable temperature. */
+private const val HEAT_BELOW_F = 64
+private const val COOL_ABOVE_F = 75
+
+fun smartClimateMode(ambientF: Int): SmartClimateMode = when {
+    ambientF < HEAT_BELOW_F -> SmartClimateMode.HEAT
+    ambientF > COOL_ABOVE_F -> SmartClimateMode.COOL
+    else -> SmartClimateMode.HOLD
 }
 
-/** Whether [smartClimateTargetF] cools (70F and up) rather than heats for [ambientF]. */
-fun smartClimateIsCooling(ambientF: Int): Boolean = ambientF >= 70
+/**
+ * The cabin temperature smart climate aims for, from the feels-like outside temperature, clamped into [CLIMATE_TEMP_RANGE_F].
+ *
+ * The target is a comfortable cabin, not a copy of the weather. In the comfortable band it holds [COMFORT_F]. Colder, it heats further the
+ * colder it gets, because the cabin has further to go. Hotter, it cools further, since a parked car in heat gains warmth quickly from the
+ * sun and needs a cooler setpoint to get back to comfort.
+ */
+fun smartClimateTargetF(ambientF: Int): Int {
+    val target = when {
+        ambientF >= 96 -> 64.0
+        ambientF > COOL_ABOVE_F -> COMFORT_F - (ambientF - COOL_ABOVE_F) * 6.0 / 21
+        ambientF >= HEAT_BELOW_F -> COMFORT_F.toDouble()
+        ambientF > 40 -> COMFORT_F + (HEAT_BELOW_F - ambientF) * 8.0 / 24
+        else -> 78 + (40 - ambientF).coerceAtMost(20) * 0.2
+    }
+    return target.roundToInt().coerceIn(CLIMATE_TEMP_RANGE_F)
+}
 
-/** What smart climate says it will do for [ambientF], in the person's unit: "Cool to 62°" or "Heat to 78°". The phone and the watch both show it. */
+/** Whether [smartClimateTargetF] cools for [ambientF] (above the comfortable band), as opposed to heating or holding. */
+fun smartClimateIsCooling(ambientF: Int): Boolean = smartClimateMode(ambientF) == SmartClimateMode.COOL
+
+/** What smart climate says it will do for [ambientF], in the person's unit: "Cool to 69°", "Heat to 75°" or "Hold at 70°". */
 fun smartClimateLabel(ambientF: Int, fahrenheit: Boolean): String {
     val target = degLabel(smartClimateTargetF(ambientF).toString(), fahrenheit)
-    return (if (smartClimateIsCooling(ambientF)) "Cool to " else "Heat to ") + target
+    return when (smartClimateMode(ambientF)) {
+        SmartClimateMode.HEAT -> "Heat to "
+        SmartClimateMode.COOL -> "Cool to "
+        SmartClimateMode.HOLD -> "Hold at "
+    } + target
 }
 
 /** The compact smart-climate hint the watch shows under its row: "Cool to 62° · 88° outside". */

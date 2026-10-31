@@ -22,39 +22,52 @@ class FormatUtilsTest {
     // ---- smartClimateTargetF / smartClimateIsCooling ----
 
     @Test
-    fun smartClimateTargetF_extremeHeat_goesToColdestEnd() {
-        assertEquals(62, smartClimateTargetF(100))
-        assertEquals(62, smartClimateTargetF(90))
+    fun smartClimateTargetF_hotOutside_coolsFurtherTheHotterItIs() {
+        // A car in the heat gains warmth fast, so the setpoint drops as the feels-like rises, to the range's cool end.
+        assertEquals(66, smartClimateTargetF(90))
+        assertEquals(66, smartClimateTargetF(89))
+        assertEquals(64, smartClimateTargetF(100))
     }
 
     @Test
-    fun smartClimateTargetF_extremeCold_goesToWarmestEnd() {
-        assertEquals(82, smartClimateTargetF(40))
+    fun smartClimateTargetF_coldOutside_heatsFurtherTheColderItIs() {
+        // The cabin has further to go as it gets colder, so the setpoint rises, to the range's warm end.
+        assertEquals(78, smartClimateTargetF(40))
+        assertEquals(80, smartClimateTargetF(30))
         assertEquals(82, smartClimateTargetF(0))
     }
 
     @Test
-    fun smartClimateTargetF_warmModerate_offsetsDownTenDegrees() {
-        assertEquals(79, smartClimateTargetF(89))
-        assertEquals(65, smartClimateTargetF(75))
+    fun smartClimateTargetF_comfortableOutside_holdsComfort() {
+        assertEquals(70, smartClimateTargetF(75))
+        assertEquals(70, smartClimateTargetF(70))
+        assertEquals(70, smartClimateTargetF(64))
+    }
+
+    @Test
+    fun smartClimateTargetF_coldDay_isNotTheLowestSetpoint() {
+        // The bug this guards: a 48F day used to heat only to 62F, the car's coldest setting.
+        assertEquals(75, smartClimateTargetF(48))
+        assertEquals(78, smartClimateTargetF(41))
     }
 
     @Test
     fun smartClimateHint_saysTargetThenOutsideInThePersonsUnit() {
-        assertEquals("Cool to ${degLabel("79", true)} · ${degLabel("89", true)} outside", smartClimateHint(89, fahrenheit = true))
+        assertEquals("Cool to ${degLabel("66", true)} · ${degLabel("89", true)} outside", smartClimateHint(89, fahrenheit = true))
     }
 
     @Test
-    fun smartClimateTargetF_coolModerate_offsetsUpTenDegrees_clampedIntoRange() {
-        // 41 + 10 = 51, below CLIMATE_TEMP_RANGE_F's floor of 62 -- clamped up.
-        assertEquals(62, smartClimateTargetF(41))
-        // 70 - 10 = 60, same clamp from the other branch's boundary.
-        assertEquals(62, smartClimateTargetF(70))
+    fun smartClimateMode_heatsBelowTheBand_coolsAboveIt_holdsBetween() {
+        assertEquals(SmartClimateMode.HEAT, smartClimateMode(63))
+        assertEquals(SmartClimateMode.HOLD, smartClimateMode(64))
+        assertEquals(SmartClimateMode.HOLD, smartClimateMode(75))
+        assertEquals(SmartClimateMode.COOL, smartClimateMode(76))
     }
 
     @Test
-    fun smartClimateIsCooling_matchesTargetF_coolCutoff() {
-        assertTrue(smartClimateIsCooling(70))
+    fun smartClimateIsCooling_onlyAboveTheComfortableBand() {
+        assertTrue(smartClimateIsCooling(76))
+        assertFalse(smartClimateIsCooling(75))
         assertFalse(smartClimateIsCooling(69))
     }
 

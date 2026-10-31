@@ -26,43 +26,50 @@ private const val WINDY_KPH = 25.0
 private const val TREND_F = 5
 
 /**
- * Smart climate's target from the weather where the car is parked, weighed the way a person would: the feels-like temperature is the
- * base, the same rule as [smartClimateTargetF]. Humidity, wind, day or night and the next few hours' trend each nudge it, and the
- * person's own past choices at a similar outside temperature pull it toward what they usually set. Every nudge is named in
+ * Smart climate's target from the weather where the car is parked. The base is the comfortable cabin temperature for the feels-like
+ * outside ([smartClimateTargetF]); the weather then nudges it the way a person would adjust: a humid hot day wants a little more cooling,
+ * wind takes warmth away on a cold day, night on a hot day wants a little cooler for sleep, and the next few hours get ahead of a rise or a
+ * fall. The person's own past choices at a similar outside temperature pull it toward what they usually set. Every nudge is named in
  * [SmartClimatePlan.reasons], so the target is never a mystery.
  */
 fun smartClimatePlan(w: Weather, choices: List<ClimateChoice> = emptyList(), fahrenheit: Boolean = true): SmartClimatePlan {
     val reasons = mutableListOf<String>()
     val feelsF = cToF(w.feelsLikeC).roundToInt()
     val nowF = cToF(w.tempC)
-    val cooling = smartClimateIsCooling(feelsF)
+    val mode = smartClimateMode(feelsF)
     var model = smartClimateTargetF(feelsF)
-    reasons += "Feels like ${degLabel(feelsF.toString(), fahrenheit)}, so ${if (cooling) "cool" else "heat"} toward ${degLabel(model.toString(), fahrenheit)}"
+    val feels = degLabel(feelsF.toString(), fahrenheit)
+    val toward = degLabel(model.toString(), fahrenheit)
+    reasons += when (mode) {
+        SmartClimateMode.HEAT -> "Feels like $feels, so heat toward $toward to make up the cold"
+        SmartClimateMode.COOL -> "Feels like $feels, so cool toward $toward: a car in the heat gains warmth quickly"
+        SmartClimateMode.HOLD -> "Feels like $feels, so hold a comfortable $toward"
+    }
 
     val humidity = w.humidity ?: 0
-    if (cooling && humidity >= HUMID_PERCENT) {
+    if (mode == SmartClimateMode.COOL && humidity >= HUMID_PERCENT) {
         model -= 2
         reasons += "Humid ($humidity%): 2° cooler"
     }
-    if (!cooling && w.windKph >= WINDY_KPH) {
+    if (mode == SmartClimateMode.HEAT && w.windKph >= WINDY_KPH) {
         model += 2
         reasons += "Windy: 2° warmer, the wind takes warmth"
     }
-    if (!w.isDay && cooling) {
+    if (mode == SmartClimateMode.COOL && !w.isDay) {
         model -= 1
         reasons += "Night: 1° cooler for sleep"
     }
 
-    // The next three hours: get ahead of a rise on a cooling day, or of a fall on a heating day.
+    // The next three hours: get ahead of a rise on a hot day, or of a fall on a cold one.
     val next = w.hourly.take(3).map { cToF(it.tempC) }
     if (next.isNotEmpty()) {
         val peak = next.max()
         val low = next.min()
-        if (cooling && peak - nowF >= TREND_F) {
+        if (mode == SmartClimateMode.COOL && peak - nowF >= TREND_F) {
             model -= 2
             reasons += "Warming to ${degLabel(peak.roundToInt().toString(), fahrenheit)} soon: starting cooler"
         }
-        if (!cooling && nowF - low >= TREND_F) {
+        if (mode == SmartClimateMode.HEAT && nowF - low >= TREND_F) {
             model += 2
             reasons += "Cooling to ${degLabel(low.roundToInt().toString(), fahrenheit)} soon: starting warmer"
         }

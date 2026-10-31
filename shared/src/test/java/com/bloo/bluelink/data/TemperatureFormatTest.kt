@@ -287,11 +287,11 @@ class Battery12VTest {
 
     @Test
     fun smartClimateLabelSaysWhichWayAndToWhatInThePersonsUnit() {
-        // 80F outside cools to 70F; 50F outside would heat to 60F, but the car's range floor is 62F, so it heats to 62F;
-        // extremes go to the end of the range.
-        assertEquals("Cool to ${degLabel("70", true)}", smartClimateLabel(80, fahrenheit = true))
-        assertEquals("Heat to ${degLabel("62", true)}", smartClimateLabel(50, fahrenheit = true))
-        assertEquals("Cool to ${degLabel("62", false)}", smartClimateLabel(95, fahrenheit = false))
-        assertEquals("Heat to ${degLabel("82", true)}", smartClimateLabel(30, fahrenheit = true))
+        // Hot outside cools to a comfortable setpoint, cold heats to one, and the middle holds 70F.
+        assertEquals("Cool to ${degLabel("69", true)}", smartClimateLabel(80, fahrenheit = true))
+        assertEquals("Heat to ${degLabel("75", true)}", smartClimateLabel(50, fahrenheit = true))
+        assertEquals("Hold at ${degLabel("70", true)}", smartClimateLabel(70, fahrenheit = true))
+        assertEquals("Cool to ${degLabel("64", false)}", smartClimateLabel(95, fahrenheit = false))
+        assertEquals("Heat to ${degLabel("80", true)}", smartClimateLabel(30, fahrenheit = true))
     }
 }
