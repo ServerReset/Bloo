@@ -11,6 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 
 /*
  * The watch face for one car: the charge (or fuel) as a thin ring round the display's edge, the car's four actions as the quarters of the
@@ -46,6 +50,8 @@ fun WearCarFace(
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val unit = minOf(maxWidth, maxHeight) / ReferenceFace
         val press = rememberQuadrantPress()
+        val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
+        val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
         CompositionLocalProvider(LocalFaceUnit provides unit) {
             WearEdgeRing(
                 progress = progress,
@@ -61,7 +67,14 @@ fun WearCarFace(
                 press = press,
                 onHold = onHubHold,
             )
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // The hub moves with the quarters when one is pressed (see [quadrantHubOffset]).
+            Box(
+                Modifier.fillMaxSize().offset {
+                    val o = quadrantHubOffset(press, widthPx, heightPx, unit.dp.toPx())
+                    IntOffset(o.x.roundToInt(), o.y.roundToInt())
+                },
+                contentAlignment = Alignment.Center,
+            ) {
                 WearFaceHub(
                     value = value, caption = caption, tint = tint,
                     size = (2f * HubRadius * unit).dp,

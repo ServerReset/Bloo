@@ -22,7 +22,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeJoin
@@ -48,7 +47,9 @@ import androidx.compose.ui.graphics.lerp
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.standardButtonIcon
+import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -71,14 +72,20 @@ private const val InnerGap = 4f
 private const val QuarterGap = 3f
 
 /** How round each quarter's corners are. */
-private const val CornerRadius = 5f
+private const val CornerRadius = 8f
 
-/** How far a pressed quarter grows outward, and how far the others are pushed in while it is held. */
-private const val PressOutward = 3f
-private const val PressPushIn = 1.5f
+/** The squash and stretch of a press, in face units: the hub moves away from the pressed quarter, which stretches outward while the others squash. */
+private const val PushCentre = 5f
+private const val PressStretch = 4f
+private const val PressSquash = 1.5f
+
+/** The quarters' sides, by quadrant: x and y sign from the hub, so top-left is (-1, -1). */
+private val QuarterSignX = floatArrayOf(-1f, 1f, -1f, 1f)
+private val QuarterSignY = floatArrayOf(-1f, -1f, 1f, 1f)
+
 
 /** The name's distance in from the quarter's outer edge, and the name's size, in face units. */
-private const val NameInset = 4f
+private const val NameInset = 3f
 private const val NameSize = 10.5f
 
 /** Where a quarter's glyph sits, in face units, inside the middle of the quarter. */
@@ -175,7 +182,7 @@ internal fun WearQuadrantGrid(
             for (q in 0 until 4) {
                 val path = quarterPath(geometry, q)
                 val fill = if (geometry.pressed == q) lerp(fills[q].value, scheme.surfaceContainerHighest, 0.5f) else fills[q].value
-                // A rounded quarter: the shrunk sector filled, and a round-joined stroke of the same colour grows its corners back out.
+                // The polygon's corners are rounded by a round-joined stroke of the same colour.
                 drawPath(path, fill)
                 drawPath(path, fill, style = Stroke(width = 2 * CornerRadius * pxU, join = StrokeJoin.Round))
                 slots[q]?.label?.takeIf { it.isNotBlank() }?.let { name ->
@@ -207,54 +214,97 @@ internal fun WearQuadrantGrid(
 }
 
 /**
- * The face's geometry for one frame: the ring's radius, where each quarter's edges sit, and the press's push. Shared by the drawing, the
- * glyphs and the touch, so they always agree on where a quarter is.
+ * The face's geometry for one frame. The face's centre is fixed, and the hub moves with a press: it shifts away from the pressed quarter,
+ * which stretches outward while the other three squash, so the press reads as the face pushing back. Shared by the drawing, the glyphs,
+ * the hub and the touch.
  */
-private class FaceGeometry(width: Float, height: Float, private val pxU: Float, press: QuadrantPress?) {
+private class FaceGeometry(width: Float, height: Float, val pxU: Float, press: QuadrantPress?) {
     val centre = Offset(width / 2f, height / 2f)
     private val radius = min(width, height) / 2f
     val pressed: Int = press?.pressed ?: QuadrantPress.NONE
     private val grow: Float = press?.grow?.value ?: 0f
 
+    /** Where the hub sits: the middle, pushed away from the pressed quarter. */
+    val hub: Offset = if (pressed in 0..3) {
+        val push = grow * PushCentre * pxU / kotlin.math.sqrt(2f)
+        Offset(centre.x - QuarterSignX[pressed] * push, centre.y - QuarterSignY[pressed] * push)
+    } else centre
+
+    /** The hub's inner edge: the gap the quarters keep from the hub. */
     val inner: Float get() = (HubRadius + InnerGap) * pxU
 
-    /** The outer edge of quarter [q] (its visible edge, corners included). */
+    /** The outer edge of quarter [q], measured from the face's centre: the pressed quarter stretches, the others squash. */
     fun outer(q: Int): Float = radius - OuterInset * pxU + when {
-        q == pressed -> grow * PressOutward * pxU
-        pressed in 0..3 -> -grow * PressPushIn * pxU
+        q == pressed -> grow * PressStretch * pxU
+        pressed in 0..3 -> -grow * PressSquash * pxU
         else -> 0f
     }
 
-    /** Where the glyph of quarter [q] sits: the middle of its band, on the quarter's diagonal. */
+    /** Where the glyph of quarter [q] sits: the middle of its band, on the quarter's diagonal from the hub. */
     fun glyphCentre(q: Int): Offset {
-        val mid = Math.toRadians((QuarterStart[q] + 45f).toDouble())
-        val r = (inner + outer(q)) / 2f - NameInset * pxU * 0.5f
-        return Offset(centre.x + r * cos(mid).toFloat(), centre.y + r * sin(mid).toFloat())
-    }
-}
-
-/** The shrunk sector for quarter [q]: its corners are rounded by the stroke that grows it back to the visible shape. */
-private fun quarterPath(g: FaceGeometry, q: Int): Path {
-    val corner = CornerRadius * g.pxU
-    val rIn = g.inner + corner
-    val rOut = g.outer(q) - corner
-    val midRadius = (rIn + rOut) / 2f
-    // The gap between quarters, widened by the corners so it stays QuarterGap once they are grown back.
-    val halfGapDeg = Math.toDegrees(((QuarterGap * g.pxU / 2f + corner) / midRadius).toDouble()).toFloat()
-    val start = QuarterStart[q] + halfGapDeg
-    val sweep = 90f - 2f * halfGapDeg
-    val outerRect = Rect(g.centre.x - rOut, g.centre.y - rOut, g.centre.x + rOut, g.centre.y + rOut)
-    val innerRect = Rect(g.centre.x - rIn, g.centre.y - rIn, g.centre.x + rIn, g.centre.y + rIn)
-    return Path().apply {
-        arcTo(outerRect, start, sweep, forceMoveTo = true)
-        arcTo(innerRect, start + sweep, -sweep, forceMoveTo = false)
-        close()
+        val r = (inner + outer(q)) / 2f
+        val k = r / kotlin.math.sqrt(2f)
+        return Offset(hub.x + QuarterSignX[q] * k, hub.y + QuarterSignY[q] * k)
     }
 }
 
 /**
+ * The rounded quarter [q]: the region between the hub's gap and the face's edge, bounded by the two lines from the hub that divide the
+ * quarters. Built as a polygon whose four corners are then rounded by a round-joined stroke of the same colour, so the corners are round.
+ */
+private fun quarterPath(g: FaceGeometry, q: Int): Path {
+    val sx = QuarterSignX[q]
+    val sy = QuarterSignY[q]
+    val round = CornerRadius * g.pxU
+    // The lines sit half a gap in from the hub's cross, and the arcs are pulled in by the round, so the grown shape keeps the gap.
+    val gap = QuarterGap * g.pxU / 2f + round
+    val c = g.hub
+    val f = g.centre
+    val ro = g.outer(q) - round
+    val ri = g.inner + round
+    val xL = c.x + sx * gap
+    val yL = c.y + sy * gap
+    // Where the outer edge meets each line, on the quarter's side.
+    val l1 = Offset(xL, f.y + sy * kotlin.math.sqrt(max(0f, ro * ro - (xL - f.x) * (xL - f.x))))
+    val l2 = Offset(f.x + sx * kotlin.math.sqrt(max(0f, ro * ro - (yL - f.y) * (yL - f.y))), yL)
+    // Where the hub's edge meets each line.
+    val i1 = Offset(xL, c.y + sy * kotlin.math.sqrt(max(0f, ri * ri - (xL - c.x) * (xL - c.x))))
+    val i2 = Offset(c.x + sx * kotlin.math.sqrt(max(0f, ri * ri - (yL - c.y) * (yL - c.y))), yL)
+    return Path().apply {
+        moveTo(l1.x, l1.y)
+        arcSamples(f, ro, l1, l2)
+        lineTo(i2.x, i2.y)
+        arcSamples(c, ri, i2, i1)
+        close()
+    }
+}
+
+private const val HalfTurn = 3.1415927f
+private const val FullTurn = 6.2831855f
+
+/** Adds the short arc of a circle from [from] to [to] (both on it), as straight segments. */
+private fun Path.arcSamples(centre: Offset, radius: Float, from: Offset, to: Offset) {
+    val a0 = atan2(from.y - centre.y, from.x - centre.x)
+    var sweep = atan2(to.y - centre.y, to.x - centre.x) - a0
+    // The short way round: the quarter's corner is never more than a half turn.
+    if (sweep > HalfTurn) sweep -= FullTurn
+    if (sweep < -HalfTurn) sweep += FullTurn
+    val steps = 16
+    for (i in 1..steps) {
+        val a = a0 + sweep * i / steps
+        lineTo(centre.x + radius * cos(a), centre.y + radius * sin(a))
+    }
+}
+
+/** The hub's offset for the current press, in pixels: where [WearCarFace] draws the hub so it moves with the quarters. */
+internal fun quadrantHubOffset(press: QuadrantPress?, width: Float, height: Float, pxU: Float): Offset {
+    val g = FaceGeometry(width, height, pxU, press)
+    return Offset(g.hub.x - g.centre.x, g.hub.y - g.centre.y)
+}
+
+/**
  * The quarter's name, along its outer edge, reading upright: along the top it runs left to right with its tops outward; along the bottom it
- * runs left to right with its tops toward the middle, so it is never upside down.
+ * runs left to right with its tops toward the middle, so it is never upside down. It sits inside the quarter's edge, clear of the ring.
  */
 private fun DrawScope.drawNameOnEdge(name: String, g: FaceGeometry, q: Int, ink: Color, paint: Paint) {
     val top = q < 2
@@ -266,10 +316,11 @@ private fun DrawScope.drawNameOnEdge(name: String, g: FaceGeometry, q: Int, ink:
     // inward from it, so it sits at the edge.
     val baseline = if (top) g.outer(q) - inset - size * 0.72f else g.outer(q) - inset
     val halfGapDeg = Math.toDegrees(((QuarterGap * g.pxU / 2f) / baseline).toDouble()).toFloat()
+    val centreAngle = QuarterStart[q]
     val rect = RectF(g.centre.x - baseline, g.centre.y - baseline, g.centre.x + baseline, g.centre.y + baseline)
     val path = android.graphics.Path().apply {
-        if (top) arcTo(rect, QuarterStart[q] + halfGapDeg, 90f - 2f * halfGapDeg, true)
-        else arcTo(rect, QuarterStart[q] + 90f - halfGapDeg, -(90f - 2f * halfGapDeg), true)
+        if (top) arcTo(rect, centreAngle + halfGapDeg, 90f - 2f * halfGapDeg, true)
+        else arcTo(rect, centreAngle + 90f - halfGapDeg, -(90f - 2f * halfGapDeg), true)
     }
     val length = PathMeasure(path, false).length
     val width = paint.measureText(name)
