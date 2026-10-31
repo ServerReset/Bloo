@@ -450,7 +450,7 @@ fun WearMessageScreen(
     extra: (@Composable () -> Unit)? = null,
 ) {
     ScreenScaffold(timeText = { TimeText() }) {
-        Box(Modifier.fillMaxSize().wearAuroraWash(tint).padding(horizontal = 22.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().padding(horizontal = 22.dp), contentAlignment = Alignment.Center) {
             // Scrolls: at a large font setting the badge, the words and the round buttons are taller than a small display.
             Column(
                 Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),

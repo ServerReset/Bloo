@@ -43,7 +43,7 @@ internal fun WearSettingsPebble(signedIn: Boolean) {
         }
         WearCaption("Each switch decides whether the watch tells you about it.", small = true)
 
-        // --- Effects: blur, the drifting aurora, springs and text animation off, as under Battery Saver ---
+        // --- Effects: blur, springs and text animation off, as under Battery Saver ---
         WearSubheading("Effects")
         WearToggleRow(
             "Reduce effects", AppIcons.AutoAwesome, reduced,

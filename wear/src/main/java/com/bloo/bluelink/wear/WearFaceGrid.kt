@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +27,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bloo.uicommon.MorphButtonLabel
@@ -41,6 +39,9 @@ import com.bloo.uicommon.standardButtonIcon
  * The label is shown under the glyph and is the button's spoken description; with no [icon] the glyph comes from the app's own vocabulary
  * for the label (see [standardButtonIcon]).
  */
+/** The corner radius of every quarter tile, in the face's own units (see [LocalFaceUnit]). */
+private val TileCorner = 22.dp
+
 data class WearQuickAction(
     val label: String,
     /** Null asks the app's own vocabulary for the glyph this label uses (see [standardButtonIcon]). */
@@ -62,7 +63,7 @@ internal fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifie
     val unit = LocalFaceUnit.current
     val gap = TileGap * unit
     Layout(
-        content = { for (q in 0 until 4) QuarterTile(q, slots[q], Modifier.fillMaxSize()) },
+        content = { for (q in 0 until 4) QuarterTile(slots[q], Modifier.fillMaxSize()) },
         modifier = modifier.clip(CircleShape),
     ) { measurables, constraints ->
         val w = constraints.maxWidth
@@ -84,12 +85,12 @@ internal fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifie
     }
 }
 
-/** One quarter of the face. [quadrant]: 0 top-left, 1 top-right, 2 bottom-left, 3 bottom-right. */
+/** One quarter of the face: a tile with all four corners rounded. */
 @Composable
-private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modifier) {
+private fun QuarterTile(action: WearQuickAction?, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
     val unit = LocalFaceUnit.current
-    val shape = quarterShape(quadrant, innerCorner = 20.dp * unit)
+    val shape = RoundedCornerShape(TileCorner * unit)
     if (action == null) {
         Box(modifier.clip(shape).background(scheme.surfaceContainer))
         return
@@ -121,21 +122,5 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
             color = ink,
             textAlign = TextAlign.Center,
         )
-    }
-}
-
-/**
- * A quarter's own shape: a plain rectangle whose only rounded corner is the inner one, at the hub. The OUTER edge is not
- * the tile's business -- the grid is clipped to a circle -- which is what keeps it on the display's curve while the
- * tile grows and shrinks under a press.
- */
-private fun quarterShape(quadrant: Int, innerCorner: Dp): RoundedCornerShape {
-    val inner = CornerSize(innerCorner)
-    val none = CornerSize(0.dp)
-    return when (quadrant) {
-        0 -> RoundedCornerShape(topStart = none, topEnd = none, bottomEnd = inner, bottomStart = none)
-        1 -> RoundedCornerShape(topStart = none, topEnd = none, bottomEnd = none, bottomStart = inner)
-        2 -> RoundedCornerShape(topStart = none, topEnd = inner, bottomEnd = none, bottomStart = none)
-        else -> RoundedCornerShape(topStart = inner, topEnd = none, bottomEnd = none, bottomStart = none)
     }
 }

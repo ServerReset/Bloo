@@ -14,6 +14,9 @@ internal val RingGap = 5.dp
 /** The gap between the four quarter tiles. */
 internal val TileGap = 3.dp
 
+/** The background-coloured halo round the hub, which the tiles curve round. */
+internal val HubHalo = 5.dp
+
 /** The hub's share of the inner circle's diameter. */
 internal const val HubFraction = 0.34f
 

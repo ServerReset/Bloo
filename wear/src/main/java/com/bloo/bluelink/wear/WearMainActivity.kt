@@ -50,7 +50,7 @@ class WearMainActivity : ComponentActivity() {
         setContent {
             WearTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    // The aurora behind every screen, which the glass in front of it blurs.
+                    // The plain background behind every screen.
                     WearBackdrop(Modifier.fillMaxSize()) {
                         WearApp(
                             repo = repo,
