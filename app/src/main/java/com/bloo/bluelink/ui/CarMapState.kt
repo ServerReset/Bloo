@@ -203,8 +203,10 @@ internal class ExpandedMapState {
             mapStateFor(own).recenter()
             return
         }
-        val origin = expandedLocation ?: return
-        val target = otherCars.firstOrNull { it.vin == vin }?.location ?: return
+        // Both ends are the cars' last known positions, so a tap centres the map even when the list of other cars does not carry the one
+        // tapped (the pins are drawn from that list, but its location is kept per car as well).
+        val origin = locationFor(own).value ?: expandedLocation ?: return
+        val target = locationFor(vin).value ?: otherCars.firstOrNull { it.vin == vin }?.location ?: return
         mapStateFor(own).showDevice(origin.latitude, origin.longitude, target.latitude, target.longitude)
     }
 
