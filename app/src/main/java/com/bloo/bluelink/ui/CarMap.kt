@@ -13,7 +13,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
@@ -30,7 +29,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.offset
@@ -41,8 +39,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeOut
@@ -498,57 +494,79 @@ private fun CarMapBody(
     }
 }
 
-/** The photo's size above a car's pin, and the pin glyph below it. The pin's tip is the car's place, so the stack is lifted by half its height. */
-private val PinPhotoWidth = 60.dp
-private val PinPhotoHeight = 40.dp
+/** One car's chip in the stack: the photo, its size, and the glyph under the stack that marks the place. */
+private val ChipWidth = 58.dp
+private val ChipHeight = 40.dp
+private val StackPad = 6.dp
 private val PinGlyphSize = 26.dp
-private val PinStackHeight = PinPhotoHeight + 2.dp + PinGlyphSize
+private val PinStackHeight = ChipHeight + 2 * StackPad + 2.dp + PinGlyphSize
 
 /**
- * A car's pin on the map: the car's photo as a rectangle above the pin, so it is clear which car each pin is. With no photo it shows the car
- * glyph in the same rectangle. [selected] outlines the rectangle in the pin's colour.
+ * One car, or several sitting together, drawn as one shape: a rounded stack of their photos, with the pin's glyph under it. A car joining
+ * or leaving only changes the stack's width, so a single car and a cluster are the same component, not two that swap.
  */
 @Composable
-private fun CarPinMarker(
-    photo: String?,
+private fun CarStack(
+    displayed: List<CarPin>,
+    current: Set<String>,
+    ownVin: String?,
+    selectedVin: String?,
     tint: Color,
-    selected: Boolean,
-    contentDesc: String,
-    onClick: (() -> Unit)?,
-    modifier: Modifier = Modifier,
+    tappable: Boolean,
     /** The photo bubble above the pin: shown on the expanded map, and off on the pebble's map, where the pin is just its glyph. */
-    bubble: Boolean = true,
+    bubble: Boolean,
+    onPinTap: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(8.dp)
-    // The bubble pops up above the pin with a spring when it appears, and folds back into it. Its space is kept either way, so the pin's
-    // tip stays on the car's place.
     val bubbleT by animateFloatAsState(
         targetValue = if (bubble) 1f else 0f,
         animationSpec = lowPowerBounce(stiffness = Spring.StiffnessMediumLow),
         label = "pinBubble",
     )
+    val shape = RoundedCornerShape(50)
     Column(
-        modifier = modifier
-            .offset(y = -PinStackHeight / 2)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .semantics { contentDescription = contentDesc },
+        // The stack's tip is the car's place, so it is lifted by half its height.
+        modifier.offset(y = -PinStackHeight / 2),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CarPhotoTile(
-            photo = photo,
-            tint = tint,
-            contentDescription = null,
-            onClick = null,
-            size = DpSize(PinPhotoWidth, PinPhotoHeight),
-            selected = selected,
-            glyphSize = 20.dp,
-            modifier = Modifier.graphicsLayer {
-                alpha = bubbleT.coerceIn(0f, 1f)
-                scaleX = 0.5f + 0.5f * bubbleT
-                scaleY = 0.5f + 0.5f * bubbleT
-                transformOrigin = TransformOrigin(0.5f, 1f)
-            },
-        )
+        Row(
+            Modifier
+                .graphicsLayer {
+                    alpha = bubbleT.coerceIn(0f, 1f)
+                    scaleX = 0.5f + 0.5f * bubbleT
+                    scaleY = 0.5f + 0.5f * bubbleT
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                }
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
+                .padding(StackPad)
+                // A car joining or leaving glides the stack to its new width, instead of jumping to it.
+                .animateContentSize(lowPowerCalm<IntSize>(Spring.StiffnessMediumLow)),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            displayed.forEach { pin ->
+                key(pin.vin) {
+                    val isOwn = pin.vin == ownVin
+                    AnimatedVisibility(
+                        visible = pin.vin in current,
+                        enter = fadeIn() + expandHorizontally(),
+                        exit = fadeOut() + shrinkHorizontally(),
+                    ) {
+                        CarPhotoTile(
+                            photo = pin.photo,
+                            tint = if (isOwn) tint else tint.copy(alpha = 0.7f),
+                            contentDescription = if (isOwn) "Car location" else "${pin.name}, another car",
+                            onClick = if (tappable) ({ onPinTap(pin.vin) }) else null,
+                            size = DpSize(ChipWidth, ChipHeight),
+                            selected = pin.vin == selectedVin,
+                            glyphSize = 20.dp,
+                        )
+                    }
+                }
+            }
+        }
         Spacer(Modifier.height(2.dp))
         Icon(Icons.Filled.LocationOn, contentDescription = null, tint = tint, modifier = Modifier.size(PinGlyphSize))
     }
@@ -660,36 +678,18 @@ internal fun BoxScope.CarPinLayer(
                         alpha = if (off) 0f else 1f
                     },
             ) {
-                // One car: its own pin. Two or more: one shared pill holding their photos. Each swaps for the other as cars join or leave.
-                AnimatedVisibility(visible = members.size == 1, enter = fadeIn(), exit = fadeOut()) {
-                    val pin = members.first()
-                    val isOwn = pin.vin == ownVin
-                    CarPinMarker(
-                        photo = pin.photo,
-                        tint = if (isOwn) tint else tint.copy(alpha = 0.7f),
-                        selected = selectedVin == pin.vin,
-                        contentDesc = if (isOwn) "Car location" else "${pin.name}, another car",
-                        onClick = if (hidden) null else ({ onPinTap(pin.vin) }),
-                        // The bubble shows only with the car's photo, which the expanded map passes for its own car; the other cars are only on it.
-                        bubble = !isOwn || pin.photo != null,
-                        modifier = Modifier.align(Alignment.Center),
-                    )
-                }
-                AnimatedVisibility(
-                    visible = members.size > 1,
+                CarStack(
+                    displayed = shown,
+                    current = members.map { it.vin }.toSet(),
+                    ownVin = ownVin,
+                    selectedVin = selectedVin,
+                    tint = tint,
+                    tappable = !hidden,
+                    // The bubble shows only with the car's photo, which the expanded map passes for its own car; the other cars are only on it.
+                    bubble = members.any { it.vin != ownVin || it.photo != null },
+                    onPinTap = onPinTap,
                     modifier = Modifier.align(Alignment.Center),
-                    enter = fadeIn() + scaleIn(initialScale = 0.8f),
-                    exit = fadeOut() + scaleOut(targetScale = 0.8f),
-                ) {
-                    ClusterPill(
-                        displayed = shown,
-                        current = members.map { it.vin }.toSet(),
-                        selectedVin = selectedVin,
-                        tint = tint,
-                        tappable = !hidden,
-                        onPinTap = onPinTap,
-                    )
-                }
+                )
             }
         }
     }
@@ -697,53 +697,6 @@ internal fun BoxScope.CarPinLayer(
 
 /** The most cars one shared pill holds. A cluster beyond this shows its first cars. */
 private const val MaxClusterCars = 10
-
-/**
- * Cars that sit together, as one shared rounded pill holding their photos side by side. A car joining or leaving grows or shrinks the pill
- * on its own, and the photo of a car that is leaving stays until it has finished going.
- */
-@Composable
-private fun ClusterPill(
-    displayed: List<CarPin>,
-    current: Set<String>,
-    selectedVin: String?,
-    tint: Color,
-    tappable: Boolean,
-    onPinTap: (String) -> Unit,
-) {
-    val shape = RoundedCornerShape(50)
-    Row(
-        Modifier
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
-            .padding(6.dp)
-            // A car joining or leaving glides the pill to its new width, instead of jumping to it.
-            .animateContentSize(lowPowerCalm<IntSize>(Spring.StiffnessMediumLow)),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        displayed.forEach { pin ->
-            key(pin.vin) {
-                AnimatedVisibility(
-                    visible = pin.vin in current,
-                    enter = fadeIn() + expandHorizontally(),
-                    exit = fadeOut() + shrinkHorizontally(),
-                ) {
-                    CarPhotoTile(
-                        photo = pin.photo,
-                        tint = tint,
-                        contentDescription = "${pin.name}. Tap to select it",
-                        onClick = if (tappable) ({ onPinTap(pin.vin) }) else null,
-                        size = DpSize(54.dp, 38.dp),
-                        selected = pin.vin == selectedVin,
-                        glyphSize = 18.dp,
-                    )
-                }
-            }
-        }
-    }
-}
 
 /** How long the previous zoom level stays under the map at most, while the new level's tiles load. */
 private const val GhostMaxHoldMs = 3000L
