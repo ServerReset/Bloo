@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -50,20 +51,24 @@ internal fun WearFacePage(
                 }
             }
         }
-        WearCarFace(
-            modifier = Modifier.fillMaxSize(),
-            value = v.bigValue(),
-            caption = "",
-            name = v.name,
-            progress = v.percent?.let { it / 100f },
-            limitPct = v.chargeLimitPct,
-            tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
-            actions = actions,
-            stale = v.isStale(),
-            status = faceStatus,
-            carState = carStateLine(v),
-            onHubHold = onEditFace,
-        )
+        Box(Modifier.fillMaxSize()) {
+            WearCarFace(
+                modifier = Modifier.fillMaxSize(),
+                value = v.bigValue(),
+                caption = "",
+                name = v.name,
+                progress = v.percent?.let { it / 100f },
+                limitPct = v.chargeLimitPct,
+                tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
+                actions = actions,
+                stale = v.isStale(),
+                status = faceStatus,
+                carState = carStateLine(v),
+                onHubHold = onEditFace,
+            )
+            // While the car is being asked, the face sits under the phone's glass, inside its ring.
+            WearRefreshGloss(refreshing = ui.refreshing)
+        }
     }
 }
 
