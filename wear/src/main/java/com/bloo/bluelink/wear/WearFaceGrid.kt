@@ -2,6 +2,8 @@ package com.bloo.bluelink.wear
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,9 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +37,10 @@ import androidx.compose.ui.unit.sp
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.standardButtonIcon
+import kotlin.math.roundToInt
+
+/** The corner radius of every quarter tile, in the face's own units (see [LocalFaceUnit]). */
+private val TileCorner = 10.dp
 
 /**
  * One of the car's actions on the watch face: one quarter of the face.
@@ -39,9 +48,6 @@ import com.bloo.uicommon.standardButtonIcon
  * The label is shown under the glyph and is the button's spoken description; with no [icon] the glyph comes from the app's own vocabulary
  * for the label (see [standardButtonIcon]).
  */
-/** The corner radius of every quarter tile, in the face's own units (see [LocalFaceUnit]). */
-private val TileCorner = 10.dp
-
 data class WearQuickAction(
     val label: String,
     /** Null asks the app's own vocabulary for the glyph this label uses (see [standardButtonIcon]). */
@@ -53,26 +59,30 @@ data class WearQuickAction(
 )
 
 /**
- * Up to four actions as the four quarters of the face: flat tiles that meet at the middle, the circle clipping their outer corners. Each
- * shows its glyph and its name, and a name wraps onto another line rather than being cut short. A missing action leaves a quiet quarter, so
- * the circle stays whole. Order: top-left, top-right, bottom-left, bottom-right.
+ * Up to four actions as the four quarters of the face: rounded tiles that meet at the middle, the circle clipping their outer corners. Each
+ * shows its glyph and its name, and a name wraps onto another line rather than being cut short. Pressing one makes it grow and gives the
+ * others room (see [QuadrantPress]). A missing action leaves a quiet quarter, so the circle stays whole. Order: top-left, top-right,
+ * bottom-left, bottom-right.
  */
 @Composable
-internal fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifier = Modifier) {
+internal fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifier = Modifier, press: QuadrantPress? = null) {
     val slots = (0 until 4).map { actions.getOrNull(it) }
     val unit = LocalFaceUnit.current
     val gap = TileGap * unit
     Layout(
-        content = { for (q in 0 until 4) QuarterTile(slots[q], Modifier.fillMaxSize()) },
+        content = { for (q in 0 until 4) QuarterTile(q, slots[q], Modifier.fillMaxSize(), press) },
         modifier = modifier.clip(CircleShape),
     ) { measurables, constraints ->
         val w = constraints.maxWidth
         val h = constraints.maxHeight
         val g = gap.roundToPx()
-        val leftW = ((w - g) / 2).coerceAtLeast(1)
-        val rightW = (w - g - leftW).coerceAtLeast(1)
-        val topH = ((h - g) / 2).coerceAtLeast(1)
-        val bottomH = (h - g - topH).coerceAtLeast(1)
+        // The cross: the middle, moved by the press. Each quarter spans from the edge to half a gap short of the cross.
+        val cx = (w / 2f + w * (press?.dx ?: 0f)).roundToInt()
+        val cy = (h / 2f + h * (press?.dy ?: 0f)).roundToInt()
+        val leftW = (cx - g / 2).coerceAtLeast(1)
+        val rightW = (w - cx - g / 2).coerceAtLeast(1)
+        val topH = (cy - g / 2).coerceAtLeast(1)
+        val bottomH = (h - cy - g / 2).coerceAtLeast(1)
         val placeables = measurables.mapIndexed { q, m ->
             m.measure(Constraints.fixed(if (q % 2 == 0) leftW else rightW, if (q < 2) topH else bottomH))
         }
@@ -85,12 +95,17 @@ internal fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifie
     }
 }
 
-/** One quarter of the face: a tile with all four corners rounded. */
+/** One quarter of the face. [quadrant]: 0 top-left, 1 top-right, 2 bottom-left, 3 bottom-right. */
 @Composable
-private fun QuarterTile(action: WearQuickAction?, modifier: Modifier) {
+private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modifier, press: QuadrantPress?) {
     val scheme = MaterialTheme.colorScheme
     val unit = LocalFaceUnit.current
     val shape = RoundedCornerShape(TileCorner * unit)
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    // A press is shown by the tile growing and the others giving way, so the press is reported to the grid as it goes down and up.
+    LaunchedEffect(pressed) { press?.press(quadrant, pressed) }
+    DisposableEffect(Unit) { onDispose { press?.press(quadrant, false) } }
     if (action == null) {
         Box(modifier.clip(shape).background(scheme.surfaceContainer))
         return
@@ -103,7 +118,13 @@ private fun QuarterTile(action: WearQuickAction?, modifier: Modifier) {
         modifier
             .clip(shape)
             .background(fill)
-            .clickable(enabled = !action.pending, role = Role.Button, onClickLabel = action.label) {
+            .clickable(
+                interactionSource = source,
+                indication = null,
+                enabled = !action.pending,
+                role = Role.Button,
+                onClickLabel = action.label,
+            ) {
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 action.onClick()
             }

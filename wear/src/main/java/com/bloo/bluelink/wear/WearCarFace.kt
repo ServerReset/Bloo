@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -47,6 +50,7 @@ fun WearCarFace(
 ) {
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val unit = minOf(maxWidth, maxHeight) / ReferenceFace
+        val press = rememberQuadrantPress()
         CompositionLocalProvider(LocalFaceUnit provides unit) {
             WearEdgeRing(
                 progress = progress,
@@ -56,18 +60,23 @@ fun WearCarFace(
                 modifier = Modifier.fillMaxSize().alpha(if (stale) 0.5f else 1f),
             )
             Box(Modifier.fillMaxSize().padding((RingStroke + RingGap) * unit)) {
-                WearQuadrantGrid(actions = actions, modifier = Modifier.fillMaxSize())
+                WearQuadrantGrid(actions = actions, modifier = Modifier.fillMaxSize(), press = press)
                 BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     val hub = maxWidth * HubFraction
-                    // The hub is its own piece: a halo of the background colour lets the tiles curve round it rather than run into it.
-                    Box(
-                        Modifier.size(hub + HubHalo * unit * 2f).clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.background),
-                    )
-                    WearFaceHub(
-                        value = value, caption = caption, tint = tint, size = hub,
-                        state = carState, status = status, onHold = onHubHold,
-                    )
+                    // The hub sits where the cross is, so it moves with the quarter that was pressed. Its halo of the background colour
+                    // lets the tiles curve round it rather than run into it.
+                    val w = constraints.maxWidth
+                    val h = constraints.maxHeight
+                    Box(Modifier.offset { IntOffset((press.dx * w).roundToInt(), (press.dy * h).roundToInt()) }) {
+                        Box(
+                            Modifier.size(hub + HubHalo * unit * 2f).clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.background),
+                        )
+                        WearFaceHub(
+                            value = value, caption = caption, tint = tint, size = hub,
+                            state = carState, status = status, onHold = onHubHold,
+                        )
+                    }
                 }
             }
         }
