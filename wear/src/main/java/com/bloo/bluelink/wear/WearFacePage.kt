@@ -1,10 +1,6 @@
 package com.bloo.bluelink.wear
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -54,24 +50,20 @@ internal fun WearFacePage(
                 }
             }
         }
-        Box(Modifier.fillMaxSize()) {
-            WearCarFace(
-                modifier = Modifier.fillMaxSize(),
-                value = v.bigValue(),
-                caption = "",
-                name = v.name,
-                progress = v.percent?.let { it / 100f },
-                limitPct = v.chargeLimitPct,
-                tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
-                actions = actions,
-                stale = v.isStale(),
-                status = faceStatus,
-                carState = carStateLine(v),
-                onHubHold = onEditFace,
-            )
-            // The refresh shows as the glass blob at the top of the face while the car is being asked, and not otherwise.
-            if (ui.refreshing) WearRefreshIndicator(Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
-        }
+        WearCarFace(
+            modifier = Modifier.fillMaxSize(),
+            value = v.bigValue(),
+            caption = "",
+            name = v.name,
+            progress = v.percent?.let { it / 100f },
+            limitPct = v.chargeLimitPct,
+            tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
+            actions = actions,
+            stale = v.isStale(),
+            status = faceStatus,
+            carState = carStateLine(v),
+            onHubHold = onEditFace,
+        )
     }
 }
 
