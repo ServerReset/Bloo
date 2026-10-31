@@ -9,42 +9,17 @@ import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.background
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.border
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.runtime.State
-import androidx.compose.ui.graphics.TransformOrigin
-import com.bloo.uicommon.lowPowerCalm
-import com.bloo.uicommon.lowPowerBounce
-import kotlin.math.hypot
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.AnimatedVisibility
-import com.bloo.uicommon.rememberDisplayedItems
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
@@ -111,17 +86,15 @@ internal fun CarMap(
     interactive: Boolean = true,
     tileArea: IntSize = IntSize.Zero,
     panWeight: () -> Float = { 1f },
-    /** The other cars on this map, each drawn at its own place. */
+    /** The other cars on this map, each drawn as its own icon at its place. */
     otherCars: List<CarPin> = emptyList(),
-    chromeInsets: MapChromeInsets = MapChromeInsets(),
-    /** The car this map is centred on, and its photo for its pin; null leaves its pin a plain glyph. */
+    /** The car this map is centred on, and its photo for its icon; null leaves its icon the plain glyph. */
     ownVin: String? = null,
     ownPhoto: String? = null,
-    /** The car the top bar is showing: its pin is outlined, so the one the bar describes is easy to find. */
+    /** The car the top bar is showing: its icon is outlined, so the one the bar describes is easy to find. */
     selectedVin: String? = null,
-    /** A pin was tapped: called with that car's VIN. */
-    onPinTap: (String) -> Unit = {},
-    onSelectedOffScreen: () -> Unit = {},
+    /** An icon was tapped: called with that car's VIN. */
+    onCarTap: (String) -> Unit = {},
 ) {
     var started by remember { mutableStateOf(MapStartGate.open) }
     if (!started) {
@@ -133,10 +106,7 @@ internal fun CarMap(
         Box(modifier)
         return
     }
-    CarMapBody(
-        location, modifier, state, deviceLocation, interactive, tileArea, panWeight, otherCars, chromeInsets,
-        ownVin, ownPhoto, selectedVin, onPinTap, onSelectedOffScreen,
-    )
+    CarMapBody(location, modifier, state, deviceLocation, interactive, tileArea, panWeight, otherCars, ownVin, ownPhoto, selectedVin, onCarTap)
 }
 
 /**
@@ -169,12 +139,10 @@ private fun CarMapBody(
     /** How much of [state]'s pan shows right now (0 to 1); read in the draw phase, so ramping it recomposes nothing. */
     panWeight: () -> Float = { 1f },
     otherCars: List<CarPin> = emptyList(),
-    chromeInsets: MapChromeInsets = MapChromeInsets(),
     ownVin: String? = null,
     ownPhoto: String? = null,
     selectedVin: String? = null,
-    onPinTap: (String) -> Unit = {},
-    onSelectedOffScreen: () -> Unit = {},
+    onCarTap: (String) -> Unit = {},
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("CarMapBody")
     val context = LocalContext.current
@@ -441,270 +409,70 @@ private fun CarMapBody(
                 xTileF = xTileF,
                 yTileF = yTileF,
                 tilePx = tilePx,
-                panX = state.panX,
-                panY = state.panY,
+                state = state,
                 panWeight = { weight().coerceIn(0f, 1f) },
-                scale = state.scale,
-                box = boxSize,
-                marginPx = with(density) { 22.dp.toPx() },
                 color = deviceLocationColor,
-                onCenter = { state.showDevice(location.latitude, location.longitude, dev.latitude, dev.longitude) },
-                chromeInsets = chromeInsets,
-                carColor = pinColor,
-                onCenterCar = { state.recenter() },
-                carPhoto = ownPhoto,
             )
         }
-        // Other cars that are off screen: their photos at the edge of the visible strip, in the direction each lies.
-        OffScreenCarPointers(
-            cars = otherCars,
-            zoom = zoom,
-            xTileF = xTileF,
-            yTileF = yTileF,
-            tilePx = tilePx,
-            panX = state.panX,
-            panY = state.panY,
-            panWeight = { weight().coerceIn(0f, 1f) },
-            scale = state.scale,
-            box = boxSize,
-            marginPx = with(density) { 22.dp.toPx() },
-            tint = pinColor.copy(alpha = 0.7f),
-            chromeInsets = chromeInsets,
-            // A pointer picks its car and brings it into view, so the car it selects is on screen.
-            onPick = onPinTap,
-        )
-        CarPinLayer(
+        CarIconLayer(
             state = state,
-            pins = listOfNotNull(ownVin?.let { CarPin(it, location, "Your car", ownPhoto) }) + otherCars,
-            ownVin = ownVin,
+            cars = listOfNotNull(ownVin?.let { CarPin(it, location, "Your car", ownPhoto) }) + otherCars,
             selectedVin = selectedVin,
             zoom = zoom,
             xTileF = xTileF,
             yTileF = yTileF,
             tilePx = tilePx,
             panWeight = { weight().coerceIn(0f, 1f) },
-            box = boxSize,
-            marginPx = with(density) { 22.dp.toPx() },
-            chromeInsets = chromeInsets,
             tint = pinColor,
-            onPinTap = onPinTap,
-            onSelectedOffScreen = onSelectedOffScreen,
+            onCarTap = onCarTap,
         )
         // Expand/Open-in-Maps render as a MapFeatureRow in the caller, not over the map.
     }
 }
 
-/** One car's chip in the stack: the photo, its size, and the glyph under the stack that marks the place. */
-private val ChipWidth = 58.dp
-private val ChipHeight = 40.dp
-private val StackPad = 6.dp
-private val PinGlyphSize = 26.dp
-private val PinStackHeight = ChipHeight + StackPad * 2f + 2.dp + PinGlyphSize
+/** A car's icon on the map: the size of its photo tile. */
+private val CarIconWidth = 56.dp
+private val CarIconHeight = 38.dp
 
 /**
- * One car, or several sitting together, drawn as one shape: a rounded stack of their photos, with the pin's glyph under it. A car joining
- * or leaving only changes the stack's width, so a single car and a cluster are the same component, not two that swap.
+ * Every car on the map as its own icon (its photo, or the car glyph), at the place the car is. Nothing is drawn for a car that is off the
+ * map: the map clips it, and there is no pointer at the edge. Tapping an icon selects that car.
  */
 @Composable
-private fun CarStack(
-    displayed: List<CarPin>,
-    current: Set<String>,
-    ownVin: String?,
-    selectedVin: String?,
-    tint: Color,
-    tappable: Boolean,
-    /** The photo bubble above the pin: shown on the expanded map, and off on the pebble's map, where the pin is just its glyph. */
-    bubble: Boolean,
-    onPinTap: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val bubbleT by animateFloatAsState(
-        targetValue = if (bubble) 1f else 0f,
-        animationSpec = lowPowerBounce(stiffness = Spring.StiffnessMediumLow),
-        label = "pinBubble",
-    )
-    val shape = RoundedCornerShape(50)
-    Column(
-        // The stack's tip is the car's place, so it is lifted by half its height.
-        modifier.offset(y = -PinStackHeight / 2),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(
-            Modifier
-                .graphicsLayer {
-                    alpha = bubbleT.coerceIn(0f, 1f)
-                    scaleX = 0.5f + 0.5f * bubbleT
-                    scaleY = 0.5f + 0.5f * bubbleT
-                    transformOrigin = TransformOrigin(0.5f, 1f)
-                }
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
-                .padding(StackPad)
-                // A car joining or leaving glides the stack to its new width, instead of jumping to it.
-                .animateContentSize(lowPowerCalm<IntSize>(Spring.StiffnessMediumLow)),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            displayed.forEach { pin ->
-                key(pin.vin) {
-                    val isOwn = pin.vin == ownVin
-                    AnimatedVisibility(
-                        visible = pin.vin in current,
-                        enter = fadeIn() + expandHorizontally(),
-                        exit = fadeOut() + shrinkHorizontally(),
-                    ) {
-                        CarPhotoTile(
-                            photo = pin.photo,
-                            tint = if (isOwn) tint else tint.copy(alpha = 0.7f),
-                            contentDescription = if (isOwn) "Car location" else "${pin.name}, another car",
-                            onClick = if (tappable) ({ onPinTap(pin.vin) }) else null,
-                            size = DpSize(ChipWidth, ChipHeight),
-                            selected = pin.vin == selectedVin,
-                            glyphSize = 20.dp,
-                        )
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(2.dp))
-        Icon(Icons.Filled.LocationOn, contentDescription = null, tint = tint, modifier = Modifier.size(PinGlyphSize))
-    }
-}
-
-/** A car's place in tile pixels from the map's centre-car origin, before pan and scale. */
-private data class PinSpot(val pin: CarPin, val dx: Float, val dy: Float)
-
-/** Pins closer than this on screen (in dp) share one cluster, drawn as a row of photo chips the car's picker can choose from. */
-private val PinClusterDp = 60.dp
-
-/**
- * Every car's pin, drawn at its own place on the screen rather than inside the map's scaled layer, so each keeps one size on any map: a
- * pinch moves the pins apart, it does not make them bigger. Cars that sit on top of each other become one cluster, drawn as a row of photo
- * chips the person can choose from; the chips grow with the pinch, so they are easier to pick as you get close.
- */
-@Composable
-internal fun BoxScope.CarPinLayer(
+internal fun BoxScope.CarIconLayer(
     state: CarMapState,
-    pins: List<CarPin>,
-    ownVin: String?,
+    cars: List<CarPin>,
     selectedVin: String?,
     zoom: Int,
     xTileF: Double,
     yTileF: Double,
     tilePx: Float,
     panWeight: () -> Float,
-    box: State<IntSize>,
-    marginPx: Float,
-    chromeInsets: MapChromeInsets,
     tint: Color,
-    onPinTap: (String) -> Unit,
-    onSelectedOffScreen: () -> Unit,
+    onCarTap: (String) -> Unit,
 ) {
-    val clusterPx = with(LocalDensity.current) { PinClusterDp.toPx() }
-    val spots = pins.map { pin ->
-        PinSpot(
-            pin,
-            ((MapTiles.tileX(pin.location.longitude, zoom) - xTileF) * tilePx).toFloat(),
-            ((MapTiles.tileY(pin.location.latitude, zoom) - yTileF) * tilePx).toFloat(),
-        )
-    }
-    // Grouped by where the cars are on screen. Only the scale matters here, and the result changes only when a group does, so a pinch
-    // recomposes this layer when cars join or leave a cluster, not on every frame.
-    val clusters by remember(spots, clusterPx) {
-        derivedStateOf {
-            val s = state.scale
-            val groups = mutableListOf<MutableList<PinSpot>>()
-            for (spot in spots) {
-                val group = groups.firstOrNull { g ->
-                    g.any { hypot((it.dx - spot.dx) * s, (it.dy - spot.dy) * s) < clusterPx }
-                }
-                if (group != null) group.add(spot) else groups.add(mutableListOf(spot))
-            }
-            groups.map { it.toList() }
-        }
-    }
-    // The selected car has left the screen: nothing is selected any more, so the top bar folds back to its handle.
-    val selectedOff by remember(spots, selectedVin) {
-        derivedStateOf {
-            val spot = spots.firstOrNull { it.pin.vin == selectedVin } ?: return@derivedStateOf false
-            val b = box.value
-            val w = panWeight()
-            val at = mapScreenOffset(spot.dx, spot.dy, state.panX, state.panY, w, state.scale)
-            markerOffVisible(
-                at.x,
-                at.y,
-                b.width / 2f, b.height / 2f, marginPx, chromeInsets.topPx, chromeInsets.bottomPx,
+    for (car in cars) {
+        val place = tilePlace(car.location.latitude, car.location.longitude, zoom, xTileF, yTileF, tilePx)
+        key(car.vin) {
+            CarPhotoTile(
+                photo = car.photo,
+                tint = tint,
+                contentDescription = "${car.name}. Tap to select it",
+                onClick = { onCarTap(car.vin) },
+                size = DpSize(CarIconWidth, CarIconHeight),
+                selected = car.vin == selectedVin,
+                glyphSize = 20.dp,
+                modifier = Modifier.align(Alignment.Center).offset {
+                    val at = mapScreenOffset(place.x, place.y, state.panX, state.panY, panWeight(), state.scale)
+                    IntOffset(
+                        (at.x - CarIconWidth.toPx() / 2f).roundToInt(),
+                        (at.y - CarIconHeight.toPx() / 2f).roundToInt(),
+                    )
+                },
             )
         }
     }
-    // A car that is off screen deselects after a moment, not at once: while the map is opening its box is still small, so the car can read as
-    // off screen for a few frames. A car that stays off screen is deselected.
-    LaunchedEffect(selectedOff, selectedVin) {
-        if (selectedOff && selectedVin != null) {
-            delay(OffScreenGraceMs)
-            if (selectedOff) onSelectedOffScreen()
-        }
-    }
-    for (cluster in clusters) {
-        val cx = cluster.sumOf { it.dx.toDouble() }.toFloat() / cluster.size
-        val cy = cluster.sumOf { it.dy.toDouble() }.toFloat() / cluster.size
-        // Where the cluster sits on screen: its place plus the pan, times the scale, from the map's centre.
-        fun screenX() = mapScreenOffset(cx, cy, state.panX, state.panY, panWeight(), state.scale).x
-        fun screenY() = mapScreenOffset(cx, cy, state.panX, state.panY, panWeight(), state.scale).y
-        // A cluster keeps its identity by its first car, so a car joining or leaving morphs the same pill rather than starting a new one.
-        key(cluster.first().pin.vin) {
-            val members = cluster.map { it.pin }.take(MaxClusterCars)
-            val shown = rememberDisplayedItems(members, resetKey = cluster.first().pin.vin)
-            // Whether the cluster is off screen, read in composition only when that changes. Off screen the pin is invisible, so it must not
-            // take touches: an off-screen car is reached through its pointer at the edge (see OffScreenCarPointers).
-            val latest by rememberUpdatedState(cluster)
-            val hidden by remember(cluster.first().pin.vin) {
-                derivedStateOf {
-                    val c = latest
-                    val at = mapScreenOffset(
-                        c.sumOf { it.dx.toDouble() }.toFloat() / c.size,
-                        c.sumOf { it.dy.toDouble() }.toFloat() / c.size,
-                        state.panX, state.panY, panWeight(), state.scale,
-                    )
-                    val b = box.value
-                    markerOffVisible(at.x, at.y, b.width / 2f, b.height / 2f, marginPx, chromeInsets.topPx, chromeInsets.bottomPx)
-                }
-            }
-            Box(
-                Modifier.align(Alignment.Center)
-                    .offset { IntOffset(screenX().roundToInt(), screenY().roundToInt()) }
-                    .graphicsLayer {
-                        // Hidden while off screen: an off-screen car has its own pointer at the edge (see OffScreenCarPointers).
-                        val b = box.value
-                        val sx = screenX()
-                        val sy = screenY()
-                        val off = markerOffVisible(sx, sy, b.width / 2f, b.height / 2f, marginPx, chromeInsets.topPx, chromeInsets.bottomPx)
-                        alpha = if (off) 0f else 1f
-                    },
-            ) {
-                CarStack(
-                    displayed = shown,
-                    current = members.map { it.vin }.toSet(),
-                    ownVin = ownVin,
-                    selectedVin = selectedVin,
-                    tint = tint,
-                    tappable = !hidden,
-                    // The bubble shows only with the car's photo, which the expanded map passes for its own car; the other cars are only on it.
-                    bubble = members.any { it.vin != ownVin || it.photo != null },
-                    onPinTap = onPinTap,
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
-        }
-    }
 }
-
-/** How long a selected car may read as off screen before the bar deselects it: the map's opening time, with a margin. */
-private const val OffScreenGraceMs = 800L
-
-/** The most cars one shared pill holds. A cluster beyond this shows its first cars. */
-private const val MaxClusterCars = 10
 
 /** How long the previous zoom level stays under the map at most, while the new level's tiles load. */
 private const val GhostMaxHoldMs = 3000L

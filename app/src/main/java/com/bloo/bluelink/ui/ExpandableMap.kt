@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -57,6 +56,9 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.awaitPointerEvent
+import androidx.compose.ui.input.pointer.awaitPointerEventScope
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalContext
@@ -71,7 +73,6 @@ import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.lowPowerAwareSpring
-import com.bloo.uicommon.SoftDamping
 
 /**
  * One entry in the full-screen map's bottom toolbar -- an icon, a label and an action, nothing
@@ -105,8 +106,6 @@ internal fun ExpandableMapLayer(
     chargeRange: String? = null,
     /** The car's other details (year, trim and so on), shown when the bar is opened. */
     details: List<Pair<String, String>> = emptyList(),
-    /** Where the bar and the bottom buttons sit, measured as they lay out, for the off-screen pointers. */
-    chromeInsets: MapChromeInsets? = null,
     /** The car's stored photo, at the bar's start in place of the car glyph. */
     photo: String? = null,
     deviceLocation: GeoLocation?,
@@ -275,7 +274,18 @@ internal fun ExpandableMapLayer(
     // Back handler for closing
     BackHandler(enabled = isExpanded) { close() }
 
-    Box(Modifier.fillMaxSize().onGloballyPositioned { rootPos = it.positionOnScreen() }) {
+    // The overlay takes every touch that reaches it. A map open over the cards must not pass a tap down to the card behind it: that tap
+    // would open the card's own map.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { rootPos = it.positionOnScreen() }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) awaitPointerEvent().changes.forEach { it.consume() }
+                }
+            },
+    ) {
         // Clear, not blurred: the app behind the map is not dimmed or blurred. Only the strip above the sheet closes it on a tap. A
         // full-screen catcher here would also get every tap on the map, since pointer events reach each node they land on, so a pin
         // tap or a pan could close the map.
@@ -396,7 +406,6 @@ internal fun ExpandableMapLayer(
                             }
                         }
                         // The strip the off-screen pointers keep to starts under the bar's real bottom edge, so it follows the bar as it grows.
-                        .onSizeChanged { chromeInsets?.topPx = windowSize.height * 0.15f + it.height }
                         .graphicsLayer {
                             // 0 is off the top of the screen, 1 its place; the bounce takes it a little past 1 either way. It stays solid as it goes.
                             translationY = -(1f - chrome.value) * (windowSize.height * 0.15f + size.height + barGapPx)
@@ -409,7 +418,6 @@ internal fun ExpandableMapLayer(
                 Column(
                     modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
                         .imePadding()
-                        .onSizeChanged { chromeInsets?.bottomPx = it.height.toFloat() }
                         .graphicsLayer {
                             // 0 is off the bottom of the screen, 1 its place; the bounce takes it a little past 1 either way. It stays solid as it goes.
                             translationY = (1f - chrome.value) * (size.height + 120.dp.toPx())

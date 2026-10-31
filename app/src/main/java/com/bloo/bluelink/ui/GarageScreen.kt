@@ -221,7 +221,6 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
             chargePercent = chargePercent,
             chargeRange = chargeRange,
             details = carDetails,
-            chromeInsets = expandedMap.chromeInsets,
             photo = state.value.imageUrls[barVehicle.vin],
             barSelected = expandedMap.selectedVin != null,
             selectedIsExpanded = expandedMap.selectedVin == null || expandedMap.selectedVin == expandedVehicle.vin,

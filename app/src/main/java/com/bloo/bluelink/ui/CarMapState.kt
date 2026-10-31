@@ -168,12 +168,10 @@ internal class ExpandedMapState {
                 inputs.location, modifier, state, inputs.deviceLocation, inputs.interactive, inputs.tileArea, inputs.panWeight,
                 // Only the full-screen map shows the other cars: the pebble's own map is this car alone.
                 otherCars = if (this@ExpandedMapState.vin == vin) this@ExpandedMapState.otherCars else emptyList(),
-                chromeInsets = this@ExpandedMapState.chromeInsets,
                 ownVin = vin,
                 ownPhoto = this@ExpandedMapState.photoUrls[vin],
                 selectedVin = this@ExpandedMapState.selectedVin,
-                onPinTap = { tapped -> this@ExpandedMapState.tapPin(tapped) },
-                onSelectedOffScreen = { this@ExpandedMapState.selectedVin = null },
+                onCarTap = { tapped -> this@ExpandedMapState.tapPin(tapped) },
             )
         }
         return content
@@ -215,7 +213,9 @@ internal class ExpandedMapState {
 
     /** Opens the full-screen map on [vin], with that car selected, so its bar is already on its line. */
     fun open(vin: String) {
-        com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin (open map was ${this.vin ?: "none"})")
+        // A map is already open: its overlay covers the cards behind it, so a second open would only switch the map under the person.
+        if (this.vin != null) return
+        com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin")
         selectedVin = vin
         this.vin = vin
     }
@@ -225,9 +225,6 @@ internal class ExpandedMapState {
      * seen clearly as it starts to close, and the blur comes back if the drag is let go before it closes.
      */
     var dismissFade by mutableFloatStateOf(0f)
-
-    /** The space the expanded map's top bar and bottom buttons take, so the off-screen pointers keep clear of them. */
-    val chromeInsets = MapChromeInsets()
 
     /** VIN of the car whose map is currently expanded, or null. */
     var vin by mutableStateOf<String?>(null)
