@@ -238,7 +238,7 @@ internal fun LoginScreen(
                 verticalArrangement = Arrangement.spacedBy(GapGroup),
             ) {
                 Column(
-                    Modifier.fillMaxWidth().widthIn(max = 480.dp),
+                    Modifier.fillMaxWidth().widthIn(max = 420.dp),
                     verticalArrangement = Arrangement.spacedBy(GapGroup),
                 ) {
                     // The app's logo and name, centred: the only decoration on the screen.

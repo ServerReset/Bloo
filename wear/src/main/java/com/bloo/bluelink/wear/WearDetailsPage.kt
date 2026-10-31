@@ -6,7 +6,6 @@ import com.bloo.bluelink.data.downloadLabel
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.ProgressBar
 import androidx.compose.foundation.layout.PaddingValues
-import com.bloo.bluelink.data.CarAction
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,16 +63,12 @@ internal fun WearCarSection(ui: WearCarUi, update: WearUpdateState, section: Car
             // Smart climate and every preset from the phone are what the wearer swipes to first.
             CarSection.CLIMATE -> item { WearClimatePebble(ui.repo, ui.car, ui.pending, ui.send) }
             CarSection.STATUS -> item { WearStatusPebble(ui.car) }
-            // The map is a page of its own (WearCarMapPage), so the list never draws it.
-            CarSection.LOCATION -> Unit
             CarSection.CARE -> item {
                 WearCarCarePebble(
                     ui.car,
                     refreshing = ui.refreshing,
                     canRefresh = ui.signedIn,
-                    locating = ui.isPending(CarAction.LOCATE),
                     onRefresh = { ui.repo.refresh() },
-                    onLocate = { ui.send { ui.repo.command(ui.car.vin, CarAction.LOCATE) } },
                 )
             }
             CarSection.SETTINGS -> {

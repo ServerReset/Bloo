@@ -230,9 +230,7 @@ internal fun WearCarPage(
                             onEditFace = { editingFace = true },
                         )
                     } else {
-                        val section = CarSection.entries[real - 1]
-                        // The map is a page of its own, filling the display, rather than a card in a list.
-                        if (section == CarSection.LOCATION) WearCarMapPage(ui.cars, ui.car.vin) else WearCarSection(ui, update, section)
+                        WearCarSection(ui, update, CarSection.entries[real - 1])
                     }
                 }
             }
@@ -251,7 +249,7 @@ private fun wrapStep(step: Int): Int {
 }
 
 /** A car's sections after its face, in the order a left swipe reaches them. */
-internal enum class CarSection { CLIMATE, STATUS, CARE, LOCATION, SETTINGS }
+internal enum class CarSection { CLIMATE, STATUS, CARE, SETTINGS }
 
 /** The face plus every section. */
 private val CarPageCount get() = CarSection.entries.size + 1

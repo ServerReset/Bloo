@@ -638,8 +638,13 @@ internal fun BoxScope.CarPinLayer(
             )
         }
     }
+    // A car that is off screen deselects after a moment, not at once: while the map is opening its box is still small, so the car can read as
+    // off screen for a few frames. A car that stays off screen is deselected.
     LaunchedEffect(selectedOff, selectedVin) {
-        if (selectedOff && selectedVin != null) onSelectedOffScreen()
+        if (selectedOff && selectedVin != null) {
+            delay(OffScreenGraceMs)
+            if (selectedOff) onSelectedOffScreen()
+        }
     }
     for (cluster in clusters) {
         val cx = cluster.sumOf { it.dx.toDouble() }.toFloat() / cluster.size
@@ -694,6 +699,9 @@ internal fun BoxScope.CarPinLayer(
         }
     }
 }
+
+/** How long a selected car may read as off screen before the bar deselects it: the map's opening time, with a margin. */
+private const val OffScreenGraceMs = 800L
 
 /** The most cars one shared pill holds. A cluster beyond this shows its first cars. */
 private const val MaxClusterCars = 10

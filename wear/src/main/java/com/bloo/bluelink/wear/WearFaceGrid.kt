@@ -1,18 +1,14 @@
 package com.bloo.bluelink.wear
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import android.graphics.Paint
+import android.graphics.PathMeasure
+import android.graphics.RectF
+import android.graphics.Typeface
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -22,33 +18,35 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.lerp
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.MotionMedium
-import com.bloo.uicommon.MotionShort
-import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.standardButtonIcon
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -57,16 +55,13 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /*
- * The four actions on the face, as four quarters of the circle. Each quarter is an annular sector that follows the display's edge, so the
- * corners a rectangle would waste are used. The quarters' inner edge is the hub's gap; the bottom two stop short of the curved name's band.
- * All sizes are in face units (see [LocalFaceUnit]).
+ * The four actions on the face, as four quarters of the circle. Each quarter is a rounded annular sector that follows the display's edge.
+ * The name of each action runs along the quarter's outer edge, and its glyph sits in the middle of the quarter. Pressing a quarter grows it
+ * outward and pushes the other three in, so they give way. All sizes are in face units (see [LocalFaceUnit]).
  */
 
-/** The top quarters reach this far in from the face's edge: past the ring and its gap. */
-private const val TopOuterInset = 13f
-
-/** The bottom quarters stop this far in, clear of the curved name, which runs round the bottom just inside the ring. */
-private const val BottomOuterInset = 22f
+/** How far every quarter's outer edge is kept in from the face's edge: past the ring and its gap. */
+private const val OuterInset = 13f
 
 /** The hub's radius, and the gap between the hub and the quarters. */
 internal const val HubRadius = 38f
@@ -75,11 +70,19 @@ private const val InnerGap = 4f
 /** The gap between two neighbouring quarters, measured along the arc. */
 private const val QuarterGap = 3f
 
-/** How far a pressed quarter grows outward. */
-private const val PressOutward = 2.5f
+/** How round each quarter's corners are. */
+private const val CornerRadius = 5f
 
-/** How far a quarter's label sits out from the middle of its band. */
-private const val LabelOutward = 3f
+/** How far a pressed quarter grows outward, and how far the others are pushed in while it is held. */
+private const val PressOutward = 3f
+private const val PressPushIn = 1.5f
+
+/** The name's distance in from the quarter's outer edge, and the name's size, in face units. */
+private const val NameInset = 4f
+private const val NameSize = 10.5f
+
+/** Where a quarter's glyph sits, in face units, inside the middle of the quarter. */
+private const val GlyphSize = 26f
 
 /** The quarters' first angle, by quadrant: top-left, top-right, bottom-left, bottom-right. Each quarter sweeps 90 degrees. */
 private val QuarterStart = floatArrayOf(180f, -90f, 90f, 0f)
@@ -100,10 +103,11 @@ data class WearQuickAction(
     val onClick: () -> Unit,
 )
 
+
 /**
- * Up to four actions as the four quarters of the circle, with the hub in the middle. Each shows its glyph and its name, and a name wraps
- * rather than being cut short. Pressing a quarter makes it grow (see [QuadrantPress]). A long press on the hub calls [onHold]. Order:
- * top-left, top-right, bottom-left, bottom-right.
+ * Up to four actions as the four quarters of the circle, with the hub in the middle. Each quarter's name runs along its outer edge and its
+ * glyph sits in its middle. Pressing a quarter makes it grow and the others give way (see [QuadrantPress]). A long press on the hub calls
+ * [onHold]. Order: top-left, top-right, bottom-left, bottom-right.
  */
 @Composable
 internal fun WearQuadrantGrid(
@@ -120,8 +124,8 @@ internal fun WearQuadrantGrid(
     val latestHold by rememberUpdatedState(onHold)
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
     val slots = (0 until 4).map { actions.getOrNull(it) }
-    // Each quarter eases to its colour when its control changes (lit when on, quiet when empty), and is read in the draw phase, so the
-    // change animates without recomposing the grid.
+    // Each quarter eases to its colour when its control changes (lit when on, quiet when empty). Read in the draw phase, so the change
+    // animates without recomposing the grid.
     val fills = (0 until 4).map { q ->
         val target = when {
             slots[q] == null -> scheme.surfaceContainer
@@ -130,6 +134,8 @@ internal fun WearQuadrantGrid(
         }
         animateColorAsState(target, tween(MotionMedium), label = "quarterFill")
     }
+    val inks = (0 until 4).map { q -> if (slots[q]?.active == true) scheme.onPrimary else scheme.onSurface }
+    val namePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.DEFAULT_BOLD } }
     Box(
         modifier
             .onSizeChanged { boxSize = it }
@@ -163,66 +169,135 @@ internal fun WearQuadrantGrid(
                 )
             },
     ) {
-        // The quarters are drawn in the face's own colours; a pressed quarter grows outward (read in the draw phase, so a press redraws
-        // without recomposing).
+        // The quarters and their names, drawn in the draw phase: a press reads the grow amount there, so it redraws without recomposing.
         Canvas(Modifier.fillMaxSize()) {
-            val r = min(this.size.width, this.size.height) / 2f
-            val centre = Offset(this.size.width / 2f, this.size.height / 2f)
+            val geometry = FaceGeometry(size.width, size.height, pxU, press)
             for (q in 0 until 4) {
-                val action = slots[q]
-                val grow = growOf(press, q, pxU)
-                val rIn = (HubRadius + InnerGap) * pxU
-                val rOut = r - outerInset(q) * pxU + grow
-                val fill = if (press?.pressed == q) lerp(fills[q].value, scheme.surfaceContainerHighest, 0.5f) else fills[q].value
-                drawPath(sectorPath(centre, rIn, rOut, q), fill)
+                val path = quarterPath(geometry, q)
+                val fill = if (geometry.pressed == q) lerp(fills[q].value, scheme.surfaceContainerHighest, 0.5f) else fills[q].value
+                // A rounded quarter: the shrunk sector filled, and a round-joined stroke of the same colour grows its corners back out.
+                drawPath(path, fill)
+                drawPath(path, fill, style = Stroke(width = 2 * CornerRadius * pxU, join = StrokeJoin.Round))
+                slots[q]?.label?.takeIf { it.isNotBlank() }?.let { name ->
+                    drawNameOnEdge(name, geometry, q, inks[q], namePaint)
+                }
             }
         }
-        // The labels, each at the middle of its quarter, moved out with the press.
+        // The glyphs, each in the middle of its quarter, moving with the quarter as it is pressed.
         Layout(
             content = {
                 for (q in 0 until 4) {
                     val action = slots[q]
-                    if (action != null) {
-                        val ink = if (action.active) scheme.onPrimary else scheme.onSurface
-                        QuarterLabel(action, ink, unit)
-                    } else {
-                        Box {}
-                    }
+                    if (action != null) QuarterGlyph(action, inks[q], unit) else Box {}
                 }
             },
             modifier = Modifier.fillMaxSize(),
         ) { measurables, constraints ->
-            val w = constraints.maxWidth
-            val h = constraints.maxHeight
-            val cx = w / 2f
-            val cy = h / 2f
-            val r = min(w, h) / 2f
+            val geometry = FaceGeometry(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat(), pxU, press)
             val placed = measurables.mapIndexed { q, m ->
-                val rIn = (HubRadius + InnerGap) * pxU
-                val rOut = r - outerInset(q) * pxU
-                val grow = growOf(press, q, pxU)
-                val mid = Math.toRadians((QuarterStart[q] + 45f).toDouble())
-                // Clear of the hub's gap on the diagonal: the label is no wider than the band it sits in, and wraps onto another line first.
-                val radius = (rIn + rOut) / 2f + LabelOutward * pxU + grow
-                val boxW = ((rOut - rIn) * 0.9f).roundToInt().coerceAtLeast(1)
-                val p = m.measure(Constraints(maxWidth = boxW, maxHeight = h))
-                val x = cx + radius * cos(mid).toFloat() - p.width / 2f
-                val y = cy + radius * sin(mid).toFloat() - p.height / 2f
-                p to (x.roundToInt() to y.roundToInt())
+                val p = m.measure(Constraints())
+                val at = geometry.glyphCentre(q)
+                p to ((at.x - p.width / 2f).roundToInt() to (at.y - p.height / 2f).roundToInt())
             }
-            layout(w, h) {
+            layout(constraints.maxWidth, constraints.maxHeight) {
                 placed.forEach { (p, at) -> p.place(at.first, at.second) }
             }
         }
     }
 }
 
-/** How far quarter [q] has grown outward: the press's amount while it is the one held, nothing otherwise. */
-private fun growOf(press: QuadrantPress?, q: Int, pxU: Float): Float =
-    if (press != null && press.pressed == q) press.grow.value * PressOutward * pxU else 0f
+/**
+ * The face's geometry for one frame: the ring's radius, where each quarter's edges sit, and the press's push. Shared by the drawing, the
+ * glyphs and the touch, so they always agree on where a quarter is.
+ */
+private class FaceGeometry(width: Float, height: Float, private val pxU: Float, press: QuadrantPress?) {
+    val centre = Offset(width / 2f, height / 2f)
+    private val radius = min(width, height) / 2f
+    val pressed: Int = press?.pressed ?: QuadrantPress.NONE
+    private val grow: Float = press?.grow?.value ?: 0f
 
-/** How far a quarter's outer edge is kept in from the face's edge, in face units. */
-private fun outerInset(quadrant: Int): Float = if (quadrant >= 2) BottomOuterInset else TopOuterInset
+    val inner: Float get() = (HubRadius + InnerGap) * pxU
+
+    /** The outer edge of quarter [q] (its visible edge, corners included). */
+    fun outer(q: Int): Float = radius - OuterInset * pxU + when {
+        q == pressed -> grow * PressOutward * pxU
+        pressed in 0..3 -> -grow * PressPushIn * pxU
+        else -> 0f
+    }
+
+    /** Where the glyph of quarter [q] sits: the middle of its band, on the quarter's diagonal. */
+    fun glyphCentre(q: Int): Offset {
+        val mid = Math.toRadians((QuarterStart[q] + 45f).toDouble())
+        val r = (inner + outer(q)) / 2f - NameInset * pxU * 0.5f
+        return Offset(centre.x + r * cos(mid).toFloat(), centre.y + r * sin(mid).toFloat())
+    }
+}
+
+/** The shrunk sector for quarter [q]: its corners are rounded by the stroke that grows it back to the visible shape. */
+private fun quarterPath(g: FaceGeometry, q: Int): Path {
+    val corner = CornerRadius * g.pxU
+    val rIn = g.inner + corner
+    val rOut = g.outer(q) - corner
+    val midRadius = (rIn + rOut) / 2f
+    // The gap between quarters, widened by the corners so it stays QuarterGap once they are grown back.
+    val halfGapDeg = Math.toDegrees(((QuarterGap * g.pxU / 2f + corner) / midRadius).toDouble()).toFloat()
+    val start = QuarterStart[q] + halfGapDeg
+    val sweep = 90f - 2f * halfGapDeg
+    val outerRect = Rect(g.centre.x - rOut, g.centre.y - rOut, g.centre.x + rOut, g.centre.y + rOut)
+    val innerRect = Rect(g.centre.x - rIn, g.centre.y - rIn, g.centre.x + rIn, g.centre.y + rIn)
+    return Path().apply {
+        arcTo(outerRect, start, sweep, forceMoveTo = true)
+        arcTo(innerRect, start + sweep, -sweep, forceMoveTo = false)
+        close()
+    }
+}
+
+/**
+ * The quarter's name, along its outer edge, reading upright: along the top it runs left to right with its tops outward; along the bottom it
+ * runs left to right with its tops toward the middle, so it is never upside down.
+ */
+private fun DrawScope.drawNameOnEdge(name: String, g: FaceGeometry, q: Int, ink: Color, paint: Paint) {
+    val top = q < 2
+    val inset = NameInset * g.pxU
+    val size = NameSize * g.pxU
+    paint.color = ink.toArgb()
+    paint.textSize = size
+    // The baseline: for the top, the letters rise outward from it, so it sits inside the edge by their height; for the bottom, they rise
+    // inward from it, so it sits at the edge.
+    val baseline = if (top) g.outer(q) - inset - size * 0.72f else g.outer(q) - inset
+    val halfGapDeg = Math.toDegrees(((QuarterGap * g.pxU / 2f) / baseline).toDouble()).toFloat()
+    val rect = RectF(g.centre.x - baseline, g.centre.y - baseline, g.centre.x + baseline, g.centre.y + baseline)
+    val path = android.graphics.Path().apply {
+        if (top) arcTo(rect, QuarterStart[q] + halfGapDeg, 90f - 2f * halfGapDeg, true)
+        else arcTo(rect, QuarterStart[q] + 90f - halfGapDeg, -(90f - 2f * halfGapDeg), true)
+    }
+    val length = PathMeasure(path, false).length
+    val width = paint.measureText(name)
+    // A name too long for its quarter shrinks to fit, rather than running off the edge.
+    if (width > length * 0.9f) paint.textSize = size * (length * 0.9f / width)
+    val offset = (length - paint.measureText(name)) / 2f
+    drawIntoCanvas { it.nativeCanvas.drawTextOnPath(name, path, offset, 0f, paint) }
+}
+
+/** The glyph of one quarter, with the action's spoken name and tap. Its name is drawn on the edge by the grid, so this is glyph only. */
+@Composable
+private fun QuarterGlyph(action: WearQuickAction, ink: Color, unit: Float) {
+    val glyph = action.icon ?: standardButtonIcon(action.label)
+    Box(
+        Modifier.semantics {
+            contentDescription = action.label
+            onClick(action.label) {
+                if (!action.pending) action.onClick()
+                true
+            }
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        CompositionLocalProvider(LocalContentColor provides ink) {
+            glyph?.let { MorphButtonLabel(icon = it, label = "", pending = action.pending, iconSize = GlyphSize.dp * unit) }
+        }
+    }
+}
 
 /** The quarter under [at], [QuadrantPress.HUB] for the hub, or [QuadrantPress.NONE] for the gaps and the ring. */
 private fun quarterAt(at: Offset, size: IntSize, pxU: Float): Int {
@@ -233,57 +308,6 @@ private fun quarterAt(at: Offset, size: IntSize, pxU: Float): Int {
     if (d < HubRadius * pxU) return QuadrantPress.HUB
     if (d < (HubRadius + InnerGap) * pxU) return QuadrantPress.NONE
     val q = (if (dy < 0) 0 else 2) + (if (dx < 0) 0 else 1)
-    val outer = min(size.width, size.height) / 2f - outerInset(q) * pxU
+    val outer = min(size.width, size.height) / 2f - OuterInset * pxU
     return if (d > outer) QuadrantPress.NONE else q
-}
-
-/** The annular sector for quadrant [q], with a gap on each side of it so neighbouring quarters stay apart along the arc. */
-private fun sectorPath(centre: Offset, rIn: Float, rOut: Float, q: Int): Path {
-    val midRadius = (rIn + rOut) / 2f
-    // Half the gap, as an angle at the sector's middle radius.
-    val gapDeg = Math.toDegrees(((QuarterGap * 0.5f) / midRadius).toDouble()).toFloat()
-    val start = QuarterStart[q] + gapDeg
-    val sweep = 90f - 2f * gapDeg
-    val outer = Rect(centre.x - rOut, centre.y - rOut, centre.x + rOut, centre.y + rOut)
-    val inner = Rect(centre.x - rIn, centre.y - rIn, centre.x + rIn, centre.y + rIn)
-    return Path().apply {
-        arcTo(outer, start, sweep, forceMoveTo = true)
-        arcTo(inner, start + sweep, -sweep, forceMoveTo = false)
-        close()
-    }
-}
-
-/** One quarter's glyph and name, centred in the quarter. Its touch is the grid's; this only carries the spoken name and action. */
-@Composable
-private fun QuarterLabel(action: WearQuickAction, ink: Color, unit: Float) {
-    val glyph = action.icon ?: standardButtonIcon(action.label)
-    Column(
-        Modifier.semantics {
-            contentDescription = action.label
-            onClick(action.label) {
-                if (!action.pending) action.onClick()
-                true
-            }
-        },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        CompositionLocalProvider(LocalContentColor provides ink) {
-            glyph?.let { MorphButtonLabel(icon = it, label = "", pending = action.pending, iconSize = 26.dp * unit) }
-        }
-        // A changed control crossfades its name, so the new one arrives rather than replacing the old in a frame.
-        AnimatedContent(
-            targetState = action.label,
-            transitionSpec = { fadeIn(tween(MotionMedium)) togetherWith fadeOut(tween(MotionShort)) },
-            label = "quarterName",
-        ) { label ->
-            RevealText(
-                label,
-                style = TextStyle(fontSize = (12f * unit).sp),
-                fontWeight = FontWeight.SemiBold,
-                color = ink,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
 }

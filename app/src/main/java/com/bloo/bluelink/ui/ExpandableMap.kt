@@ -224,8 +224,8 @@ internal fun ExpandableMapLayer(
     }
     var closing by remember { mutableStateOf(false) }
     // The bar's details, held here: a dismiss folds them back to the car's single line first.
-    // Opening the map on a car opens its details, so the bar already shows that car's details when the map arrives.
-    var barDetailsOpen by remember { mutableStateOf(barSelected) }
+    // Opening the map on a car shows that car's line, half expanded, and the bar comes down with the map. The details open on a tap.
+    var barDetailsOpen by remember { mutableStateOf(false) }
     // The bar's one state, from what is selected and whether its details are open. Nothing selected is always the handle.
     val barMode = when {
         !barSelected -> MapBarMode.Handle
@@ -324,10 +324,13 @@ internal fun ExpandableMapLayer(
 
         // Whether the car itself is still on screen: its details fold away once the map has scrolled it out of view.
         val carMargin = with(LocalDensity.current) { 40.dp.toPx() }
+        // The car's place is read with the same pan the map is drawn with (panWeight), so while the map is still opening its pan is only
+        // partway there, and the car is not judged off screen by its final position.
         val carOnScreen by remember {
             derivedStateOf {
-                kotlin.math.abs(mapState.panX * mapState.scale) < windowSize.width / 2f - carMargin &&
-                    kotlin.math.abs(mapState.panY * mapState.scale) < windowSize.height / 2f - carMargin
+                val w = progress().coerceIn(0f, 1f)
+                kotlin.math.abs(mapState.panX * w * mapState.scale) < windowSize.width / 2f - carMargin &&
+                    kotlin.math.abs(mapState.panY * w * mapState.scale) < windowSize.height / 2f - carMargin
             }
         }
         // The car the bar describes is off screen: nothing is selected any more, so the bar folds back to its handle.
