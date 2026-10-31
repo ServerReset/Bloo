@@ -2,11 +2,8 @@ package com.bloo.bluelink.wear
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +15,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.material3.ScreenScaffold
+import androidx.wear.compose.material3.TimeText
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.uicommon.RevealText
 import kotlin.math.abs
@@ -116,69 +115,75 @@ private const val SameSpotMetres = 15.0
 internal fun scaleLabel(metres: Double): String =
     if (metres < 1000.0) "${(metres / 10).roundToInt() * 10} m" else "${"%.1f".format(metres / 1000.0)} km"
 
+/** The ring's radius as a share of the display's half-width: inside the round edge, so the names and the scale line stay on the face. */
+private const val MapRingShare = 0.78f
+
 /**
- * The cars on a flat round map: each car a dot, the one on screen brighter and larger, each named beside its dot. It is only the positions
- * the cars last reported, drawn with no tiles, so it costs nothing to draw.
+ * The Cars page: the cars on a flat map that fills the round display. Each car is a dot, the one on screen brighter and larger, and its
+ * name sits beside the dot. It is only the positions the cars last reported, drawn with no tiles, so it costs nothing to draw.
  */
 @Composable
-internal fun WearCarMap(cars: List<VehicleSnapshot>, selectedVin: String) {
-    val spots = carSpots(cars, selectedVin)
-    if (spots.isEmpty()) {
-        WearCaption("No positions yet. Locate a car to see it here.")
-        return
-    }
-    val scheme = MaterialTheme.colorScheme
-    val (ringMetres, sameSpot) = mapScale(cars, selectedVin) ?: return
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(1f)) {
-            val radius = minOf(maxWidth, maxHeight) / 2f * 0.86f
-            Canvas(Modifier.fillMaxSize()) {
-                val r = radius.toPx()
-                drawCircle(scheme.onSurface.copy(alpha = 0.12f), radius = r, style = Stroke(1.dp.toPx()))
-                spots.forEach { s ->
-                    val c = Offset(size.width / 2f + s.x * r, size.height / 2f + s.y * r)
-                    if (s.selected) {
-                        drawCircle(scheme.primary, radius = 6.dp.toPx(), center = c)
-                    } else {
-                        drawCircle(scheme.onSurfaceVariant.copy(alpha = 0.7f), radius = 4.dp.toPx(), center = c)
+internal fun WearCarMapPage(cars: List<VehicleSnapshot>, selectedVin: String) {
+    ScreenScaffold(timeText = { TimeText() }) {
+        val spots = carSpots(cars, selectedVin)
+        val scale = mapScale(cars, selectedVin)
+        if (spots.isEmpty() || scale == null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                WearCaption("No positions yet. Locate a car to see it here.")
+            }
+        } else {
+            val (ringMetres, sameSpot) = scale
+            val scheme = MaterialTheme.colorScheme
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val radius = minOf(maxWidth, maxHeight) / 2f * MapRingShare
+                Canvas(Modifier.fillMaxSize()) {
+                    val r = radius.toPx()
+                    drawCircle(scheme.onSurface.copy(alpha = 0.12f), radius = r, style = Stroke(1.dp.toPx()))
+                    spots.forEach { s ->
+                        val c = Offset(size.width / 2f + s.x * r, size.height / 2f + s.y * r)
+                        if (s.selected) {
+                            drawCircle(scheme.primary, radius = 6.dp.toPx(), center = c)
+                        } else {
+                            drawCircle(scheme.onSurfaceVariant.copy(alpha = 0.7f), radius = 4.dp.toPx(), center = c)
+                        }
                     }
                 }
-            }
-            // Each name sits just right of its dot; names that would collide are moved down (see [spreadLabels]).
-            val rDp = radius.value
-            val boxes = spots.mapIndexed { i, s ->
-                val name = s.name
-                LabelBox(index = i, x = rDp * s.x + 8f, y = rDp * s.y - 8f, w = name.length * LabelCharDp + 4f, h = LabelLineDp)
-            }
-            spreadLabels(boxes).forEach { box ->
-                val s = spots[box.index]
-                Box(
-                    Modifier.align(Alignment.Center).offset(x = box.x.dp, y = box.y.dp).size(width = box.w.dp, height = box.h.dp),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    RevealText(
-                        s.name,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (s.selected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (s.selected) scheme.primary else scheme.onSurface,
-                    )
+                // Each name sits just right of its dot; names that would collide are moved down (see [spreadLabels]).
+                val rDp = radius.value
+                val boxes = spots.mapIndexed { i, s ->
+                    LabelBox(index = i, x = rDp * s.x + 8f, y = rDp * s.y - 8f, w = s.name.length * LabelCharDp + 4f, h = LabelLineDp)
                 }
+                spreadLabels(boxes).forEach { box ->
+                    val s = spots[box.index]
+                    Box(
+                        Modifier.align(Alignment.Center).offset(x = box.x.dp, y = box.y.dp).size(width = box.w.dp, height = box.h.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        RevealText(
+                            s.name,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (s.selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (s.selected) scheme.primary else scheme.onSurface,
+                        )
+                    }
+                }
+                // North, just inside the top of the ring, so the layout reads at a glance.
+                RevealText(
+                    "N",
+                    modifier = Modifier.align(Alignment.Center).offset(y = (-rDp + 10f).dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = scheme.onSurfaceVariant,
+                )
+                // The scale, just inside the bottom of the ring: the outer ring's distance, or that the cars are at one spot.
+                RevealText(
+                    if (sameSpot) "All at one spot" else "Outer ring about ${scaleLabel(ringMetres)}",
+                    modifier = Modifier.align(Alignment.Center).offset(y = (rDp - 16f).dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
             }
-            // North, at the top of the ring, so the layout reads at a glance.
-            RevealText(
-                "N",
-                modifier = Modifier.align(Alignment.TopCenter),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = scheme.onSurfaceVariant,
-            )
         }
-        // The scale, under the map: the outer ring's distance, or that the cars are at one spot.
-        RevealText(
-            if (sameSpot) "The cars are at the same spot. Outer ring about ${scaleLabel(ringMetres)}" else "Outer ring about ${scaleLabel(ringMetres)}",
-            style = MaterialTheme.typography.labelSmall,
-            color = scheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
     }
 }

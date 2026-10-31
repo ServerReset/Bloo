@@ -44,6 +44,10 @@ import kotlin.math.roundToInt
 /** The corner radius of every quarter tile, in the face's own units (see [LocalFaceUnit]). */
 private val TileCorner = 10.dp
 
+/** A quarter's content keeps this much from its outer sides, where the display's curve cuts in, and this little from the middle. */
+private val OuterInset = 22.dp
+private val InnerInset = 6.dp
+
 /**
  * One of the car's actions on the watch face: one quarter of the face.
  *
@@ -124,6 +128,8 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
     val fill = if (action.active) scheme.primary else scheme.surfaceContainerHigh
     val ink = if (action.active) scheme.onPrimary else scheme.onSurface
     val glyph = action.icon ?: standardButtonIcon(action.label)
+    val leftHalf = quadrant % 2 == 0
+    val topHalf = quadrant < 2
     Column(
         modifier
             .clip(shape)
@@ -139,8 +145,14 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
                 action.onClick()
             }
             .semantics { contentDescription = action.label }
-            // The label stays well inside the round edge: the quarter's outer corner is cut by the circle.
-            .padding(start = 14.dp * unit, end = 14.dp * unit, top = 10.dp * unit, bottom = (10.dp + bottomInset) * unit),
+            // The label stays inside the round edge: the quarter's outer corner is cut by the circle, so its outer sides keep more room and
+            // the content leans toward the middle of the face.
+            .padding(
+                start = (if (leftHalf) OuterInset else InnerInset) * unit,
+                end = (if (leftHalf) InnerInset else OuterInset) * unit,
+                top = (if (topHalf) OuterInset else InnerInset) * unit,
+                bottom = (if (topHalf) InnerInset else OuterInset + bottomInset) * unit,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

@@ -205,7 +205,9 @@ internal fun WearCarPage(
                 onEditFace = { editingFace = true },
             )
         } else {
-            WearCarSection(ui, update, CarSection.entries[real - 1])
+            val section = CarSection.entries[real - 1]
+            // The map is a page of its own, filling the display, rather than a card in a list.
+            if (section == CarSection.LOCATION) WearCarMapPage(ui.cars, ui.car.vin) else WearCarSection(ui, update, section)
         }
     }
 }

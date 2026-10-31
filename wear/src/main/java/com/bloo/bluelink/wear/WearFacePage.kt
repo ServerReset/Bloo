@@ -1,11 +1,9 @@
 package com.bloo.bluelink.wear
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import com.bloo.uicommon.PullRefreshState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -18,8 +16,7 @@ import com.bloo.bluelink.data.engineLabel
 import com.bloo.bluelink.data.isStale
 
 /**
- * The car's face page: the charge ring and the four chosen controls ([WearCarFace]) with the phone's pull-down refresh over
- * it (pull from the top, a disc drops in and arms at a tick, release refreshes). Pressing the centre opens the face
+ * The car's face page: the charge ring and the four chosen controls ([WearCarFace]). Pressing the centre opens the face
  * editor. A control that opens the car is not sent from here: it goes to [onConfirm] so the page can ask first.
  */
 @Composable
@@ -34,43 +31,39 @@ internal fun WearFacePage(
 ) {
     val v = ui.car
     ScreenScaffold(timeText = { TimeText() }) {
-        val pullState = remember { PullRefreshState() }
-        Box(Modifier.fillMaxSize().wearPullToRefresh(pullState) { ui.repo.refresh() }) {
-            // The four quarters are rebuilt only when what they show changes (the slots, the car, a command in flight), not on every
-            // redraw of the page; a tap reads the latest state when it happens, so nothing it does is stale.
-            val latest by rememberUpdatedState(ui)
-            val actions = remember(slotKeys, v, ui.pending, onChooseClimate, onConfirm) {
-                slotKeys.mapIndexed { slot, key ->
-                    val control = WearFaceControls.byKey(key)?.takeIf { it.available(v) } ?: return@mapIndexed null
-                    WearQuickAction(
-                        control.label(v), control.icon(v),
-                        active = control.active(v),
-                        pending = ui.isPending(control.action),
-                    ) {
-                        when {
-                            control.needsChoice(v) -> onChooseClimate(slot)
-                            control.confirm(v) -> onConfirm(control.action)
-                            else -> latest.run(control)
-                        }
+        // The four quarters are rebuilt only when what they show changes (the slots, the car, a command in flight), not on every
+        // redraw of the page; a tap reads the latest state when it happens, so nothing it does is stale.
+        val latest by rememberUpdatedState(ui)
+        val actions = remember(slotKeys, v, ui.pending, onChooseClimate, onConfirm) {
+            slotKeys.mapIndexed { slot, key ->
+                val control = WearFaceControls.byKey(key)?.takeIf { it.available(v) } ?: return@mapIndexed null
+                WearQuickAction(
+                    control.label(v), control.icon(v),
+                    active = control.active(v),
+                    pending = ui.isPending(control.action),
+                ) {
+                    when {
+                        control.needsChoice(v) -> onChooseClimate(slot)
+                        control.confirm(v) -> onConfirm(control.action)
+                        else -> latest.run(control)
                     }
                 }
             }
-            WearCarFace(
-                modifier = Modifier.fillMaxSize(),
-                value = v.bigValue(),
-                caption = "",
-                name = v.name,
-                progress = v.percent?.let { it / 100f },
-                limitPct = v.chargeLimitPct,
-                tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
-                actions = actions,
-                stale = v.isStale(),
-                status = if (ui.refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
-                carState = carStateLine(v),
-                onHubHold = onEditFace,
-            )
-            WearPullIndicator(pullState, ui.refreshing)
         }
+        WearCarFace(
+            modifier = Modifier.fillMaxSize(),
+            value = v.bigValue(),
+            caption = "",
+            name = v.name,
+            progress = v.percent?.let { it / 100f },
+            limitPct = v.chargeLimitPct,
+            tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
+            actions = actions,
+            stale = v.isStale(),
+            status = if (ui.refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
+            carState = carStateLine(v),
+            onHubHold = onEditFace,
+        )
     }
 }
 
