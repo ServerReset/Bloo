@@ -176,14 +176,22 @@ internal fun BoxScope.OffScreenCarPointers(
     val weight = panWeight()
     val topPx = chromeInsets.topPx
     val bottomPx = chromeInsets.bottomPx
-    for (car in cars) {
+    // Where each car is on screen. An off-screen car lands on the edge of the strip, and the pointers that share an edge are spread
+    // along it, so two cars on one side never cover each other.
+    val at = cars.map { car ->
         // The same tile arithmetic as the phone's own pointer: the car's tile delta from the map centre, plus the pan, all times the scale.
         val carPlace = tilePlace(car.location.latitude, car.location.longitude, zoom, xTileF, yTileF, tilePx)
         val carScreen = mapScreenOffset(carPlace.x, carPlace.y, panX, panY, weight, scale)
-        val sx = carScreen.x
-        val sy = carScreen.y
-        val off = markerOffVisible(sx, sy, halfW, halfH, marginPx, topPx, bottomPx)
-        val (x, y) = if (off) clampMarkerToVisible(sx, sy, halfW, halfH, marginPx, topPx, bottomPx) else sx to sy
+        carScreen.x to carScreen.y
+    }
+    val offs = at.map { (sx, sy) -> markerOffVisible(sx, sy, halfW, halfH, marginPx, topPx, bottomPx) }
+    val clamped = at.mapIndexed { i, (sx, sy) ->
+        if (offs[i]) clampMarkerToVisible(sx, sy, halfW, halfH, marginPx, topPx, bottomPx) else sx to sy
+    }
+    val spread = spreadPointersAlongEdges(clamped, offs, halfW, halfH, marginPx, topPx, bottomPx, PointerSeparationPx)
+    for ((i, car) in cars.withIndex()) {
+        val off = offs[i]
+        val (x, y) = spread[i]
         // Every car keeps its pointer composed, so one that leaves the screen can animate out to the edge, and one that comes back in.
         key(car.vin) {
             OffScreenPointer(

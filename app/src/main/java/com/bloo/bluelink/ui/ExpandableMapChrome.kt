@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -73,13 +74,7 @@ import com.bloo.uicommon.Haptics
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.toRect
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Shape
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -139,13 +134,15 @@ internal enum class MapBarMode { Handle, Line, Details }
 /**
  * The bar's corner, between the pill it is as a handle or a line (radius half its height) and the rounded panel its details open into
  * ([DetailsPanelCorner]). [detailsT] is 0 for the pill and 1 for the panel; the value is animated by the caller.
+ *
+ * It is a [RoundedCornerShape] rather than a plain [Shape]: the glass only refracts a rounded corner, and any other shape falls back to
+ * the flat frosted blur whatever the glass setting says.
  */
-private class CornerBlendShape(private val detailsT: Float) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val pill = size.height / 2f
+private class BlendCornerSize(private val detailsT: Float) : CornerSize {
+    override fun toPx(shapeSize: Size, density: Density): Float {
+        val pill = shapeSize.height / 2f
         val panel = with(density) { DetailsPanelCorner.toPx() }
-        val radius = (pill + (panel - pill) * detailsT).coerceIn(0f, size.minDimension / 2f)
-        return Outline.Rounded(RoundRect(size.toRect(), CornerRadius(radius)))
+        return (pill + (panel - pill) * detailsT).coerceIn(0f, shapeSize.minDimension / 2f)
     }
 }
 
@@ -208,7 +205,7 @@ internal fun MapTopBar(
 
     GlassSurface(
         // The corners ease between the pill and the rounded details panel on the same spring.
-        shape = CornerBlendShape(detailsT),
+        shape = RoundedCornerShape(BlendCornerSize(detailsT)),
         // The bar is liquid glass: the refraction and specular sheen of the app's floating glass, drawn over the map behind it.
         liquid = true,
         modifier = modifier.fillMaxWidth()
