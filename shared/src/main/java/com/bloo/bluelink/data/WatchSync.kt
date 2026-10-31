@@ -35,6 +35,18 @@ data class WatchSyncPayload(
     val fahrenheit: Boolean = true,
     /** The colours of the phone's palette, so the watch wears the same ones (null from an older phone: the watch keeps the brand's). */
     val accent: WatchAccent? = null,
+    /** The phone's Glass setting, so the watch's glass reads as glassy as the phone's (null from an older phone: the watch keeps its own). */
+    val glass: WatchGlass? = null,
+)
+
+/**
+ * The phone's Glass setting: how clear the glass is, from 0 (frosted, a thick soft pane) to 1 (clear), and whether Ultra glass is on (no
+ * backing at all, the strongest refraction). The watch's glass follows these, so it reads as glassy as the phone's.
+ */
+@Serializable
+data class WatchGlass(
+    val clarity: Float = 0.8f,
+    val ultra: Boolean = false,
 )
 
 /**

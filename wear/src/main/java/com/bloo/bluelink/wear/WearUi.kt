@@ -70,7 +70,6 @@ import com.bloo.uicommon.standardButtonIcon
 import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.secondaryTextColor
 import androidx.activity.compose.BackHandler
-import androidx.compose.material3.Surface
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
@@ -331,9 +330,8 @@ internal fun WearButton(
 }
 
 /**
- * The watch's round key: a glass circle of a given [size] with the hairline rim, for a keypad's keys and any single-glyph
- * control. Its [description] is what a screen reader says, because its content is a glyph or a digit. Rows and wide buttons are
- * [WearButton]; this is the same glass for a shape that must stay a circle.
+ * The watch's round key: the phone's own [MorphButton] held to a circle of [size], so a keypad's keys press and frost like every other
+ * Bloo button. Its [description] is what a screen reader says, because its content is a glyph or a digit.
  */
 @Composable
 fun WearRoundButton(
@@ -344,15 +342,20 @@ fun WearRoundButton(
     onClick: () -> Unit,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    Surface(
+    val haptics = LocalHapticFeedback.current
+    MorphButton(
         onClick = onClick,
-        shape = CircleShape,
-        color = color,
-        modifier = modifier
-            .size(size)
-            .semantics { contentDescription = description },
+        modifier = modifier.size(size).semantics { contentDescription = description },
+        containerColor = color,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        contentPadding = PaddingValues(0.dp),
+        minHeight = size,
+        pillCornerPercent = 50,
+        morphedCornerPercent = 50,
+        expressive = false,
+        onClickHaptic = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
     ) {
-        Box(contentAlignment = Alignment.Center, content = content)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
     }
 }
 

@@ -21,7 +21,7 @@ import com.bloo.uicommon.reduceMotionCached
 internal fun WearTheme(content: @Composable () -> Unit) {
     // The phone's palette when it has sent one (a chosen palette, or Material You's from its wallpaper), else the brand's.
     val appContext = LocalContext.current
-    remember(appContext) { WearAccent.load(appContext) }
+    remember(appContext) { WearAccent.load(appContext); WearGlass.load(appContext) }
     val accent by WearAccent.accent.collectAsStateWithLifecycle()
     val primary = accent?.let { Color(it.primary) } ?: Color(com.bloo.bluelink.data.BlooColors.brandAccent)
     val onPrimary = accent?.let { Color(it.onPrimary) } ?: Color.White

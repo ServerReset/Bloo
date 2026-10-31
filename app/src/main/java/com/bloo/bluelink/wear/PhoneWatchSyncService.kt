@@ -10,6 +10,7 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WatchCommandRequest
 import com.bloo.bluelink.data.WatchCommandResult
 import com.bloo.bluelink.data.WatchAccent
+import com.bloo.bluelink.data.WatchGlass
 import com.bloo.bluelink.data.WatchLookPrefs
 import com.bloo.bluelink.data.WatchNotifyPrefs
 import com.bloo.bluelink.data.WatchSyncPayload
@@ -219,6 +220,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                         .filterValues { it.isNotEmpty() },
                     fahrenheit = appearance.useFahrenheit,
                     accent = watchAccentOf(app, appearance),
+                    glass = WatchGlass(appearance.glassClarity, appearance.ultraGlass),
                 )
                 val jsonString = Json.encodeToString(WatchSyncPayload.serializer(), payload)
                 val req = dataItem(WatchSyncProtocol.PATH_SNAPSHOT) { putByteArray(KEY_PAYLOAD, jsonString.encodeToByteArray()) }
