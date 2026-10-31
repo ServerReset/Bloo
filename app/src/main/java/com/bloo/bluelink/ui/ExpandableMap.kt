@@ -108,7 +108,7 @@ internal fun ExpandableMapLayer(
     photo: String? = null,
     deviceLocation: GeoLocation?,
     mapState: CarMapState,
-    /** The car's one map ([ExpandedMapState.mapFor]), moved here from its pebble. */
+    /** The garage's one map ([ExpandedMapState.Content]), hosted here while it is open. */
     map: @Composable (Modifier, MapInputs) -> Unit,
     onRefreshLocation: () -> Unit,
     /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */

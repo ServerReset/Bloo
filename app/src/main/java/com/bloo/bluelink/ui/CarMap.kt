@@ -79,6 +79,7 @@ private object MapStartGate {
  */
 @Composable
 internal fun CarMap(
+    /** The map's anchor: it is centred on this place, and every other car is drawn from it. */
     location: GeoLocation,
     modifier: Modifier = Modifier,
     state: CarMapState = rememberCarMapState(),
@@ -86,11 +87,10 @@ internal fun CarMap(
     interactive: Boolean = true,
     tileArea: IntSize = IntSize.Zero,
     panWeight: () -> Float = { 1f },
-    /** The other cars on this map, each drawn as its own icon at its place. */
-    otherCars: List<CarPin> = emptyList(),
-    /** The car this map is centred on, and its photo for its icon; null leaves its icon the plain glyph. */
-    ownVin: String? = null,
-    ownPhoto: String? = null,
+    /** Every car on the map, each drawn as its own icon at its place. */
+    cars: List<CarPin> = emptyList(),
+    /** The car the map is anchored on, whose icon is tinted as the map's own. */
+    anchorVin: String? = null,
     /** The car the top bar is showing: its icon is outlined, so the one the bar describes is easy to find. */
     selectedVin: String? = null,
     /** An icon was tapped: called with that car's VIN. */
@@ -106,7 +106,7 @@ internal fun CarMap(
         Box(modifier)
         return
     }
-    CarMapBody(location, modifier, state, deviceLocation, interactive, tileArea, panWeight, otherCars, ownVin, ownPhoto, selectedVin, onCarTap)
+    CarMapBody(location, modifier, state, deviceLocation, interactive, tileArea, panWeight, cars, anchorVin, selectedVin, onCarTap)
 }
 
 /**
@@ -119,28 +119,16 @@ private fun CarMapBody(
     location: GeoLocation,
     modifier: Modifier = Modifier,
     state: CarMapState = rememberCarMapState(),
-    /**
-     * The DEVICE's own last-known position (not the car's) -- [UiState.deviceLocation], refreshed
-     * on app open/refresh and by "Locate", NOT fetched by CarMap itself. Null (never fetched yet,
-     * or no permission/fix) simply omits the marker.
-     */
+    /** The DEVICE's own last-known position; null (never fetched, or no permission) omits the dot. */
     deviceLocation: GeoLocation? = null,
-    /**
-     * False freezes the map: no pan and no zoom. The compact garage map is static so a horizontal
-     * swipe over it still turns the car page; only the full-screen map is draggable.
-     */
+    /** False freezes the map: no pan and no zoom. */
     interactive: Boolean = true,
-    /**
-     * The area, in px, to keep tiles loaded for when it is larger than the box itself: a map that is about to be (or is being)
-     * resized, as it grows from the pebble to the full screen, asks for the largest size it will reach, so the grid does not
-     * change on every frame of the resize. Zero means the box's own size.
-     */
+    /** The area, in px, to keep tiles loaded for while the map is resized (zero means the box's own size). */
     tileArea: IntSize = IntSize.Zero,
     /** How much of [state]'s pan shows right now (0 to 1); read in the draw phase, so ramping it recomposes nothing. */
     panWeight: () -> Float = { 1f },
-    otherCars: List<CarPin> = emptyList(),
-    ownVin: String? = null,
-    ownPhoto: String? = null,
+    cars: List<CarPin> = emptyList(),
+    anchorVin: String? = null,
     selectedVin: String? = null,
     onCarTap: (String) -> Unit = {},
 ) {
@@ -416,7 +404,8 @@ private fun CarMapBody(
         }
         CarIconLayer(
             state = state,
-            cars = listOfNotNull(ownVin?.let { CarPin(it, location, "Your car", ownPhoto) }) + otherCars,
+            cars = cars,
+            anchorVin = anchorVin,
             selectedVin = selectedVin,
             zoom = zoom,
             xTileF = xTileF,
@@ -442,6 +431,7 @@ private val CarIconHeight = 38.dp
 internal fun BoxScope.CarIconLayer(
     state: CarMapState,
     cars: List<CarPin>,
+    anchorVin: String?,
     selectedVin: String?,
     zoom: Int,
     xTileF: Double,
@@ -456,7 +446,7 @@ internal fun BoxScope.CarIconLayer(
         key(car.vin) {
             CarPhotoTile(
                 photo = car.photo,
-                tint = tint,
+                tint = if (car.vin == anchorVin) tint else tint.copy(alpha = 0.7f),
                 contentDescription = "${car.name}. Tap to select it",
                 onClick = { onCarTap(car.vin) },
                 size = DpSize(CarIconWidth, CarIconHeight),

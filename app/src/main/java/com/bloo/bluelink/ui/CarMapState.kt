@@ -149,111 +149,82 @@ internal class CarMapState {
 internal fun rememberCarMapState(): CarMapState = remember { CarMapState() }
 
 /**
- * Cross-composable state for expanding a Location pebble's own compact map "in place" -- when a
- * host (currently only [GarageScreen]) provides one via [LocalExpandedMap], the SAME [CarMapState]
- * (so the same pan, zoom and already- loaded tiles) and the compact map's own last on-screen rect
- * carry across into a full-screen overlay drawn elsewhere in that host's own tree, instead of the
- * expanded view starting over at a fresh state with a fresh tile fetch.
+ * The garage's one map. A single [mapState] and a single map instance serve every car: the map is anchored on the car it was opened for
+ * ([vin]), and every other car is an icon at its own place relative to that anchor. While the map is closed it lives in the Location card of
+ * the car it was last opened for ([homeVin]); while it is open it lives in the full-screen layer. The other Location cards show a placeholder.
  */
 internal class ExpandedMapState {
-    /**
-     * The map for this car, drawn wherever it is called: the pebble's slot while the map is collapsed, the full-screen layer while it is
-     * open. Each car's pan and zoom live in its [CarMapState], so the map that opens shows the same view it was left on. Nothing moves
-     * between places, so there is no second copy to fall out of step with the first.
-     */
-    fun mapFor(vin: String): @Composable (Modifier, MapInputs) -> Unit {
-        val state = mapStateFor(vin)
-        val content: @Composable (Modifier, MapInputs) -> Unit = { modifier, inputs ->
-            CarMap(
-                inputs.location, modifier, state, inputs.deviceLocation, inputs.interactive, inputs.tileArea, inputs.panWeight,
-                // Only the full-screen map shows the other cars: the pebble's own map is this car alone.
-                otherCars = if (this@ExpandedMapState.vin == vin) this@ExpandedMapState.otherCars else emptyList(),
-                ownVin = vin,
-                ownPhoto = this@ExpandedMapState.photoUrls[vin],
-                selectedVin = this@ExpandedMapState.selectedVin,
-                onCarTap = { tapped -> this@ExpandedMapState.tapPin(tapped) },
-            )
-        }
-        return content
-    }
+    /** The map's pan and zoom: the one state every view of the map uses. */
+    val mapState = CarMapState()
 
-    /** The other cars, drawn as photo pins on the expanded map: every car but the one it is open on. */
-    var otherCars by mutableStateOf<List<CarPin>>(emptyList())
+    /** Every car that has a location, each drawn as its own icon. */
+    var cars by mutableStateOf<List<CarPin>>(emptyList())
 
-    /** Each car's photo, for its own pin on the pebble's map and on the expanded one. */
-    var photoUrls by mutableStateOf<Map<String, String>>(emptyMap())
+    /** The car the map is anchored on: the one it was opened for, or null while it is closed. */
+    var vin by mutableStateOf<String?>(null)
 
-    /**
-     * The car the top bar is showing, by a tap on its pin. Null is no selection: the bar is just its handle. Tapping the selected pin
-     * again clears it.
-     */
+    /** The car whose Location card shows the map while it is closed. */
+    var homeVin by mutableStateOf<String?>(null)
+
+    /** The car the top bar is showing, by a tap on its icon. Null is no selection: the bar is just its handle. */
     var selectedVin by mutableStateOf<String?>(null)
 
-    /** Selects a car's pin. Tapping the selected pin again keeps it selected: the bar stays on its line; only leaving the screen clears it. */
-    /**
-     * A single tap on a car switches to it: it becomes the selection, and the map centres on it. The car the map is on is centred from
-     * where it was given (see [expandedLocation]).
-     */
-    fun tapPin(vin: String) {
-        selectedVin = vin
-        val own = this.vin ?: return
-        if (vin == own) {
-            mapStateFor(own).recenter()
-            return
-        }
-        // Both ends are the cars' last known positions, so a tap centres the map even when the list of other cars does not carry the one
-        // tapped (the pins are drawn from that list, but its location is kept per car as well).
-        val origin = locationFor(own).value ?: expandedLocation ?: return
-        val target = locationFor(vin).value ?: otherCars.firstOrNull { it.vin == vin }?.location ?: return
-        mapStateFor(own).showDevice(origin.latitude, origin.longitude, target.latitude, target.longitude)
-    }
-
-    /** Where the car the full-screen map is on is, so a tap on another car can centre the map from it. */
+    /** The anchor's location, so the full-screen map knows where it is centred. */
     var expandedLocation: GeoLocation? = null
 
-    /** Opens the full-screen map on [vin], with that car selected, so its bar is already on its line. */
-    fun open(vin: String) {
-        // A map is already open: its overlay covers the cards behind it, so a second open would only switch the map under the person.
-        if (this.vin != null) return
-        com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin")
-        selectedVin = vin
-        this.vin = vin
-    }
-
-    /**
-     * How far the bar is being dragged toward closing, 0 (not at all) to 1: the garage behind the map blur fades with it, so the map is
-     * seen clearly as it starts to close, and the blur comes back if the drag is let go before it closes.
-     */
+    /** How far the bar is being dragged toward closing, 0 (not at all) to 1: the garage behind the map fades with it. */
     var dismissFade by mutableFloatStateOf(0f)
 
-    /** VIN of the car whose map is currently expanded, or null. */
-    var vin by mutableStateOf<String?>(null)
-    private val perVinMapState = mutableMapOf<String, CarMapState>()
-    private val perVinOrigin = mutableMapOf<String, MutableState<Rect?>>()
-    private val perVinLocation = mutableMapOf<String, MutableState<GeoLocation?>>()
+    /** Each Location card's own on-screen rectangle, so the full-screen map grows from the card it was opened from. */
+    private val origins = mutableMapOf<String, MutableState<Rect?>>()
 
-    /**
-     * The one [CarMapState] a car's compact map and expanded overlay share, created per VIN on
-     * first use.
-     */
-    fun mapStateFor(vin: String): CarMapState = perVinMapState.getOrPut(vin) { CarMapState() }
+    fun originBoundsFor(vin: String): MutableState<Rect?> = origins.getOrPut(vin) { mutableStateOf(null) }
 
-    /**
-     * The compact map's own last-measured on-screen rect for this VIN, kept live (via the compact
-     * map's own `onGloballyPositioned`) whether or not it's the currently-expanded one, so the
-     * moment it IS expanded there's already a real, current origin to grow from -- not a stale one
-     * from whenever this was last measured, or none at all.
-     */
-    fun originBoundsFor(vin: String): MutableState<Rect?> = perVinOrigin.getOrPut(vin) { mutableStateOf(null) }
+    /** Opens the map on [vin], with that car selected. A map already open is not switched under the person. */
+    fun open(vin: String) {
+        if (this.vin != null) return
+        com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin")
+        this.vin = vin
+        homeVin = vin
+        selectedVin = vin
+    }
 
-    /** The location for this VIN's map, kept live for the screen-level map layer. */
-    fun locationFor(vin: String): MutableState<GeoLocation?> = perVinLocation.getOrPut(vin) { mutableStateOf(null) }
+    /** A tap on a car's icon: the bar shows that car, and the map pans to centre it from the anchor. */
+    fun tapPin(tapped: String) {
+        selectedVin = tapped
+        val anchor = vin ?: return
+        if (tapped == anchor) {
+            mapState.recenter()
+            return
+        }
+        val from = cars.firstOrNull { it.vin == anchor }?.location ?: return
+        val to = cars.firstOrNull { it.vin == tapped }?.location ?: return
+        mapState.showDevice(from.latitude, from.longitude, to.latitude, to.longitude)
+    }
+
+    /** The map, as it is drawn wherever it is hosted: the one instance, anchored on the car it was opened for. */
+    @Composable
+    fun Content(modifier: Modifier, inputs: MapInputs) {
+        CarMap(
+            location = inputs.location,
+            modifier = modifier,
+            state = mapState,
+            deviceLocation = inputs.deviceLocation,
+            interactive = inputs.interactive,
+            tileArea = inputs.tileArea,
+            panWeight = inputs.panWeight,
+            cars = cars,
+            anchorVin = vin,
+            selectedVin = selectedVin,
+            onCarTap = { tapPin(it) },
+        )
+    }
 }
 
-/** What the shared map is drawn from at the place it is hosted: where the car is, where the phone is, whether it takes touches, and the area to keep tiles for. */
-/** One car drawn as a pin on the expanded map: where it is, and what its pin shows (its photo above the pin, its name for a11y). */
+/** One car on the map: where it is, and its photo for its icon (its name for a11y). */
 internal data class CarPin(val vin: String, val location: GeoLocation, val name: String, val photo: String?)
 
+/** What the shared map is drawn from at the place it is hosted: where the car is, where the phone is, whether it takes touches, and the area to keep tiles for. */
 internal data class MapInputs(
     val location: GeoLocation,
     val deviceLocation: GeoLocation?,

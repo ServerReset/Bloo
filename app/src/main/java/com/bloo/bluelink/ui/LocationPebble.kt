@@ -162,31 +162,27 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 Column(
                     verticalArrangement = Arrangement.spacedBy(GapGroup)
                 ) {
-                // A live CarMap; inside the garage it shares pan/zoom/tiles with the full-screen map and can expand into it.
-                val expandedMap = LocalExpandedMap.current
-                val isExpanded = expandedMap?.vin == v.vin
-                val ownMapState = remember { CarMapState() }
+                // The garage's one map lives in the Location card of the car it was last opened for, and moves to the full-screen layer
+                // while it is open. The other cards show a placeholder that opens the map on their car.
+                val host = LocalExpandedMap.current
                 val slot = Modifier.fillMaxWidth().height(if (glance) 130.dp else 220.dp).clip(StandardShape)
                     .semantics { contentDescription = "Map showing where ${v.name} is" }
                     .then(
-                        if (expandedMap == null) Modifier else Modifier.onGloballyPositioned {
-                            expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
-                            expandedMap.locationFor(v.vin).value = loc
+                        if (host == null) Modifier else Modifier.onGloballyPositioned {
+                            host.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
                         },
                     )
-                if (expandedMap == null) {
-                    // Static in the garage: a horizontal swipe over it turns the car page.
-                    CarMap(loc, slot, state = ownMapState, deviceLocation = state.deviceLocation, interactive = false)
-                } else {
-                    // The slot keeps its size and its place whether or not the map is in it; while the map is open it is in the
-                    // full-screen layer instead (the same composed map, moved, not a copy), and comes back here when it closes.
-                    Box(slot) {
-                        if (!isExpanded) expandedMap.mapFor(v.vin)(Modifier.fillMaxSize(), MapInputs(loc, state.deviceLocation, interactive = false))
+                Box(slot) {
+                    if (host != null && host.homeVin == v.vin && host.vin == null) {
+                        // Static in the garage: a horizontal swipe over it turns the car page.
+                        host.Content(Modifier.fillMaxSize(), MapInputs(loc, state.deviceLocation, interactive = false))
+                    } else {
+                        MapPlaceholder(v.name) { host?.open(v.vin) }
                     }
                 }
                 MapFeatureRow(
                     features = listOfNotNull(
-                        expandedMap?.let { host -> MapFeature(Icons.Filled.Fullscreen, "Expand") { host.open(v.vin) } },
+                        host?.let { h -> MapFeature(Icons.Filled.Fullscreen, "Expand") { h.open(v.vin) } },
                         MapFeature(Icons.Filled.Map, "Open in Maps") { openInExternalMaps(context, loc, v.name) },
                     ),
                 )
@@ -241,3 +237,18 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
 }
 
 // --- Weather inside the Location pebble -----------------------------------
+
+/** A Location card's stand-in while the garage's one map is elsewhere: the car, and a tap that opens the map on it. */
+@Composable
+private fun MapPlaceholder(name: String, onOpen: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        Modifier.fillMaxSize().background(scheme.surfaceContainer).clickable(role = Role.Button, onClick = onOpen),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(AppIcons.DirectionsCar, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(28.dp))
+            RevealText("Show $name on the map", style = SecondaryTextStyle(), color = scheme.onSurfaceVariant)
+        }
+    }
+}

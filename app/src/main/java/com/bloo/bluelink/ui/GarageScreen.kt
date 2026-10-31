@@ -135,13 +135,17 @@ internal fun GarageScreen(
     }
 
     // The other cars, drawn as pins on the expanded map. The car that is expanded is the map's own pin, so it is left out.
+    // The garage's one map is told every car's place: each car with a location is an icon on it, and the anchor's place is its centre.
     SideEffect {
         val open = expandedMap.vin
-        expandedMap.otherCars = state.value.vehicles.mapNotNull { v ->
-            if (v.vin == open) null else state.value.locations[v.vin]?.let { CarPin(v.vin, it, v.name, state.value.imageUrls[v.vin]) }
+        expandedMap.cars = state.value.vehicles.mapNotNull { v ->
+            state.value.locations[v.vin]?.let { CarPin(v.vin, it, v.name, state.value.imageUrls[v.vin]) }
         }
-        expandedMap.photoUrls = state.value.imageUrls
         expandedMap.expandedLocation = open?.let { state.value.locations[it] }
+    }
+    // The map starts in the first car's Location card, until it is opened on another car.
+    LaunchedEffect(state.value.vehicles.firstOrNull()?.vin) {
+        if (expandedMap.homeVin == null) expandedMap.homeVin = state.value.vehicles.firstOrNull()?.vin
     }
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
     BackdropHost {
@@ -227,8 +231,8 @@ internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedM
             onDeselect = { expandedMap.selectedVin = null },
             onDismissDrag = { expandedMap.dismissFade = it },
             deviceLocation = deviceLocation,
-            mapState = expandedMap.mapStateFor(expandedVehicle.vin),
-            map = expandedMap.mapFor(expandedVehicle.vin),
+            mapState = expandedMap.mapState,
+            map = { m, i -> expandedMap.Content(m, i) },
             onRefreshLocation = locateExpandedVehicle,
             deviceRequest = rememberDeviceLocationRequest(vm),
             // The real command-pending flag, not a guessed timer -- see MapTopBar's own doc -- so the refresh icon's spin genuinely
