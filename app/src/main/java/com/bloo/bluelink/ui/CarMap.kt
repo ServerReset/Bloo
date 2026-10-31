@@ -9,6 +9,7 @@ import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -22,6 +23,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.State
 import androidx.compose.ui.graphics.TransformOrigin
+import com.bloo.uicommon.lowPowerCalm
 import com.bloo.uicommon.lowPowerBounce
 import kotlin.math.hypot
 import androidx.compose.foundation.layout.Spacer
@@ -497,9 +499,9 @@ private fun CarMapBody(
 }
 
 /** The photo's size above a car's pin, and the pin glyph below it. The pin's tip is the car's place, so the stack is lifted by half its height. */
-private val PinPhotoWidth = 44.dp
-private val PinPhotoHeight = 30.dp
-private val PinGlyphSize = 24.dp
+private val PinPhotoWidth = 60.dp
+private val PinPhotoHeight = 40.dp
+private val PinGlyphSize = 26.dp
 private val PinStackHeight = PinPhotoHeight + 2.dp + PinGlyphSize
 
 /**
@@ -556,7 +558,7 @@ private fun CarPinMarker(
 private data class PinSpot(val pin: CarPin, val dx: Float, val dy: Float)
 
 /** Pins closer than this on screen (in dp) share one cluster, drawn as a row of photo chips the car's picker can choose from. */
-private val PinClusterDp = 36.dp
+private val PinClusterDp = 60.dp
 
 /**
  * Every car's pin, drawn at its own place on the screen rather than inside the map's scaled layer, so each keeps one size on any map: a
@@ -714,9 +716,11 @@ private fun ClusterPill(
         Modifier
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .border(1.dp, Color.White.copy(alpha = 0.85f), shape)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
+            .padding(6.dp)
+            // A car joining or leaving glides the pill to its new width, instead of jumping to it.
+            .animateContentSize(lowPowerCalm<IntSize>(Spring.StiffnessMediumLow)),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         displayed.forEach { pin ->
@@ -731,9 +735,9 @@ private fun ClusterPill(
                         tint = tint,
                         contentDescription = "${pin.name}. Tap to select it",
                         onClick = if (tappable) ({ onPinTap(pin.vin) }) else null,
-                        size = DpSize(36.dp, 26.dp),
+                        size = DpSize(54.dp, 38.dp),
                         selected = pin.vin == selectedVin,
-                        glyphSize = 14.dp,
+                        glyphSize = 18.dp,
                     )
                 }
             }

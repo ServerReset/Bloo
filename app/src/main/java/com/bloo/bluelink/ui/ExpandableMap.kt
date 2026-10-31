@@ -25,6 +25,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -223,7 +224,8 @@ internal fun ExpandableMapLayer(
     }
     var closing by remember { mutableStateOf(false) }
     // The bar's details, held here: a dismiss folds them back to the car's single line first.
-    var barDetailsOpen by remember { mutableStateOf(false) }
+    // Opening the map on a car opens its details, so the bar already shows that car's details when the map arrives.
+    var barDetailsOpen by remember { mutableStateOf(barSelected) }
     // The bar's one state, from what is selected and whether its details are open. Nothing selected is always the handle.
     val barMode = when {
         !barSelected -> MapBarMode.Handle
@@ -274,10 +276,11 @@ internal fun ExpandableMapLayer(
     BackHandler(enabled = isExpanded) { close() }
 
     Box(Modifier.fillMaxSize().onGloballyPositioned { rootPos = it.positionOnScreen() }) {
-        // Clear, not blurred: the app behind the map is not dimmed or blurred. This covers the whole screen, so a tap in the strip
-        // above the sheet closes it too.
+        // Clear, not blurred: the app behind the map is not dimmed or blurred. Only the strip above the sheet closes it on a tap. A
+        // full-screen catcher here would also get every tap on the map, since pointer events reach each node they land on, so a pin
+        // tap or a pan could close the map.
         if (isExpanded) {
-            Box(Modifier.fillMaxSize().noRippleClickable { close() })
+            Box(Modifier.fillMaxWidth().fillMaxHeight(0.15f).noRippleClickable { close() })
         }
 
         // THE MAP. The very element that was in the pebble, moved here, and sized by hand every frame from the pebble's rectangle to

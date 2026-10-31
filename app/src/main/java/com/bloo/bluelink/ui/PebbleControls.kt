@@ -53,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.doorLockLabel
 import com.bloo.bluelink.data.supportsHornLights
-import com.bloo.uicommon.awaitingCarBlur
 import com.bloo.uicommon.lowPowerBounce
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText
@@ -279,9 +278,8 @@ internal fun PrimaryActions(
                     ClusterButton(
                         onClick = { haptics?.heavy(); if (locked == true) vm.unlock(v) else vm.lock(v) },
                         onClickHaptic = { haptics?.heavy() },
-                        // Blurred until the car confirms the lock or unlock, not just until the request left the phone.
-                        modifier = Modifier.awaitingCarBlur(state.isAwaitingCar(v.vin, "doors")),
-                        enabled = !pending,
+                        // Frosted, like every disabled control, until the car confirms the lock or unlock, not just until the request left the phone.
+                        enabled = !pending && !state.isAwaitingCar(v.vin, "doors"),
                         active = highlighted,
                         activeContainerColor = scheme.primary,
                         activeContentColor = scheme.onPrimary,
