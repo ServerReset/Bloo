@@ -33,7 +33,9 @@ fun AppViewModel.updatePin(brand: Brand, pin: String) {
 
 /** The phone's lock (or the lock screen's own credential) has been passed: the app opens. */
 fun AppViewModel.unlocked() {
-    _state.update { it.copy(locked = false, lockedToLogin = false) }
+    // Passing the lock from the sign-in screen (lockToLogin set addingAccount) must also leave that screen: Screens
+    // shows Login while addingAccount is set, so without clearing it the fingerprint unlocked and stayed on Login.
+    _state.update { it.copy(locked = false, lockedToLogin = false, addingAccount = if (it.lockedToLogin) false else it.addingAccount) }
     // A launcher shortcut that arrived while the lock was up waits for this moment (see tryRunPendingShortcut).
     tryRunPendingShortcut()
     if (pendingBootUnlock) {
