@@ -26,6 +26,11 @@ import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
 import kotlinx.coroutines.delay
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.graphicsLayer
+import com.bloo.uicommon.lowPowerCalm
 
 /**
  * What a car's pages need to show and do, in one place: the car, whether the watch has its own sign-in, what is in flight,
@@ -189,28 +194,54 @@ internal fun WearCarPage(
         )
         return
     }
-    if (editingFace) {
-        WearFaceEditor(car = car, slots = slotKeys, onPickSlot = { choosingSlot = it }, onDone = { editingFace = false })
-        return
-    }
-
-    // Page 0 is the face, full-bleed so its ring IS the display's edge; the rest are the car's sections, in CarSection order.
-    VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { virtual ->
-        val real = wrap.wrap.real(virtual)
-        if (real == 0) {
-            WearFacePage(
-                ui, slotKeys, faceStatus,
-                onConfirm = { confirmAction = it },
-                onChooseClimate = { climateAsk = ClimateAsk(it, run = true) },
-                onEditFace = { editingFace = true },
-            )
-        } else {
-            val section = CarSection.entries[real - 1]
-            // The map is a page of its own, filling the display, rather than a card in a list.
-            if (section == CarSection.LOCATION) WearCarMapPage(ui.cars, ui.car.vin) else WearCarSection(ui, update, section)
+    // Holding the face zooms it out to two thirds, and the quarters' editor zooms in from the same size, so changing the quarters reads as
+    // the face opening up rather than a new screen. The pager is taken out once it has faded, so it is not drawn or touched behind the editor.
+    val editT by animateFloatAsState(
+        targetValue = if (editingFace) 1f else 0f,
+        animationSpec = lowPowerCalm<Float>(Spring.StiffnessMediumLow),
+        label = "faceEdit",
+    )
+    Box(Modifier.fillMaxSize()) {
+        if (editT > 0.001f) {
+            Box(Modifier.fillMaxSize().graphicsLayer {
+                val s = FaceEditFrom + (1f - FaceEditFrom) * editT
+                scaleX = s
+                scaleY = s
+                alpha = editT
+            }) {
+                WearFaceEditor(car = car, slots = slotKeys, onPickSlot = { choosingSlot = it }, onDone = { editingFace = false })
+            }
+        }
+        if (!editingFace || editT < 0.999f) {
+            // Page 0 is the face, full-bleed so its ring IS the display's edge; the rest are the car's sections, in CarSection order.
+            Box(Modifier.fillMaxSize().graphicsLayer {
+                val s = 1f - (1f - FaceEditFrom) * editT
+                scaleX = s
+                scaleY = s
+                alpha = 1f - editT
+            }) {
+                VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { virtual ->
+                    val real = wrap.wrap.real(virtual)
+                    if (real == 0) {
+                        WearFacePage(
+                            ui, slotKeys, faceStatus,
+                            onConfirm = { confirmAction = it },
+                            onChooseClimate = { climateAsk = ClimateAsk(it, run = true) },
+                            onEditFace = { editingFace = true },
+                        )
+                    } else {
+                        val section = CarSection.entries[real - 1]
+                        // The map is a page of its own, filling the display, rather than a card in a list.
+                        if (section == CarSection.LOCATION) WearCarMapPage(ui.cars, ui.car.vin) else WearCarSection(ui, update, section)
+                    }
+                }
+            }
         }
     }
 }
+
+/** How small the face gets when its quarters are opened: the editor starts from this size and the face shrinks to it. */
+private const val FaceEditFrom = 0.6f
 
 /** The smallest step, forwards or back, that moves a wrapping pager of [CarPageCount] pages by [step]. */
 private fun wrapStep(step: Int): Int {

@@ -20,10 +20,12 @@ fun SettingRow(
     label: @Composable (Modifier) -> Unit,
     trailing: (@Composable () -> Unit)? = null,
 ) {
+    // A round face keeps the label and the switch closer together, since its width is the row's whole room.
+    val gapHere = if (LocalSurfaceProfile.current == SurfaceProfile.ROUND) gap * 0.6f else gap
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         label(Modifier.weight(1f))
         if (trailing != null) {
-            Spacer(Modifier.width(gap))
+            Spacer(Modifier.width(gapHere))
             trailing()
         }
     }

@@ -21,7 +21,10 @@ import com.bloo.uicommon.reduceMotionCached
 internal fun WearTheme(content: @Composable () -> Unit) {
     // The phone's palette when it has sent one (a chosen palette, or Material You's from its wallpaper), else the brand's.
     val appContext = LocalContext.current
-    remember(appContext) { WearAccent.load(appContext); WearGlass.load(appContext) }
+    remember(appContext) { WearAccent.load(appContext); WearGlass.load(appContext); WearType.load(appContext) }
+    val type by WearType.type.collectAsStateWithLifecycle()
+    // The phone's typeface, with its classical headings: the same typography the phone sets its text with.
+    val typography = remember(type) { com.bloo.uicommon.blooTypography(type.font, type.classicHeadings) }
     val accent by WearAccent.accent.collectAsStateWithLifecycle()
     val primary = accent?.let { Color(it.primary) } ?: Color(com.bloo.bluelink.data.BlooColors.brandAccent)
     val onPrimary = accent?.let { Color(it.onPrimary) } ?: Color.White
@@ -49,6 +52,8 @@ internal fun WearTheme(content: @Composable () -> Unit) {
         LocalReduceMotion provides (reduceMotion || policy.lean),
         // The watch theme is dark, and the shared tones need to know that.
         com.bloo.uicommon.LocalIsDarkTheme provides true,
+        // The shared components lay themselves out for a round face: smaller switches, tighter rows, two lines of detail.
+        com.bloo.uicommon.LocalSurfaceProfile provides com.bloo.uicommon.SurfaceProfile.ROUND,
         LocalPowerPolicy provides policy,
         // RevealText draws with the PHONE Material3's Text, which resolves an unspecified colour from
         // ITS LocalContentColor -- black by default, and therefore invisible on this theme. Setting it
@@ -65,7 +70,7 @@ internal fun WearTheme(content: @Composable () -> Unit) {
                 onBackground = Color.White,
             ),
         ) {
-            MaterialTheme(colorScheme = scheme, content = content)
+            MaterialTheme(colorScheme = scheme, typography = typography, content = content)
         }
     }
 }

@@ -43,11 +43,13 @@ fun SwitchTrack(
     val spec = lowPowerCalm<Color>(Spring.StiffnessMediumLow)
     val trackColor by animateColorAsState(if (checked) trackOn else trackOff, animationSpec = spec, label = "toggleTrackBg")
     val thumbColor by animateColorAsState(if (checked) thumbOn else thumbOff, animationSpec = spec, label = "toggleThumbFg")
-    val trackWidth = 44.dp
-    val trackHeight = 26.dp
-    val inset = 3.dp
+    // A round face gets a smaller switch: the same pill, drawn to the room a watch row has.
+    val round = LocalSurfaceProfile.current == SurfaceProfile.ROUND
+    val trackWidth = if (round) 36.dp else 44.dp
+    val trackHeight = if (round) 22.dp else 26.dp
+    val inset = if (round) 2.dp else 3.dp
     val thumbSize by animateDpAsState(
-        if (checked) 20.dp else 16.dp,
+        if (checked) (if (round) 16.dp else 20.dp) else (if (round) 13.dp else 16.dp),
         animationSpec = lowPowerSoft(Spring.StiffnessMediumLow),
         label = "toggleThumbSize",
     )

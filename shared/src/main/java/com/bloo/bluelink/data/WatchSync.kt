@@ -37,6 +37,18 @@ data class WatchSyncPayload(
     val accent: WatchAccent? = null,
     /** The phone's Glass setting, so the watch's glass reads as glassy as the phone's (null from an older phone: the watch keeps its own). */
     val glass: WatchGlass? = null,
+    /** The phone's typeface and classical headings, so the watch sets its text in the phone's font (null from an older phone). */
+    val type: WatchType? = null,
+)
+
+/**
+ * The phone's typeface: the font it chose and whether its headings are the classical serif. The watch builds its text from the same
+ * [com.bloo.uicommon.blooTypography], so the two read as one app.
+ */
+@Serializable
+data class WatchType(
+    val font: FontChoice = FontChoice.SYSTEM,
+    val classicHeadings: Boolean = false,
 )
 
 /**

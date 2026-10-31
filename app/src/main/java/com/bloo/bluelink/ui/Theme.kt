@@ -2,13 +2,11 @@ package com.bloo.bluelink.ui
 
 import android.content.Context
 import android.os.Build
-import android.provider.Settings
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
-import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -17,25 +15,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.isSpecified
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.R
+import com.bloo.bluelink.data.FontChoice
 import kotlinx.serialization.Serializable
 
 /** User-selectable appearance. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-/**
- * User-selectable typeface. GOOGLE_SANS uses Google Sans Flex - Google's officially open-sourced
- * (OFL) sibling of the proprietary Product Sans - so it ships legitimately as the geometric option.
- */
-enum class FontChoice { SYSTEM, ATKINSON, GOOGLE_SANS }
 
 /** The human label for each [FontChoice], shared by the Visuals card and the settings search. */
 val FontChoice.label: String
@@ -199,73 +185,6 @@ val ExpressiveShapes = Shapes(
     extraSmall = CutCornerShape(6.dp), small = RoundedCornerShape(16.dp), medium = RoundedCornerShape(24.dp),
     large = RoundedCornerShape(32.dp), extraLarge = RoundedCornerShape(40.dp),
 )
-
-/** Map each weight of a variable font via fontVariationSettings (wght axis). */
-private fun variableFont(resId: Int, weight: FontWeight, axis: Int) = Font(
-    resId,
-    weight,
-    variationSettings = FontVariation.Settings(FontVariation.weight(axis)),
-)
-
-private fun fontFamilyFor(choice: FontChoice): FontFamily = when (choice) {
-    FontChoice.SYSTEM -> FontFamily.Default
-    FontChoice.ATKINSON -> FontFamily(
-        variableFont(R.font.atkinson_next, FontWeight.Normal, 400),
-        variableFont(R.font.atkinson_next, FontWeight.Medium, 500),
-        variableFont(R.font.atkinson_next, FontWeight.SemiBold, 600),
-        variableFont(R.font.atkinson_next, FontWeight.Bold, 700),
-        variableFont(R.font.atkinson_next, FontWeight.ExtraBold, 800),
-    )
-    FontChoice.GOOGLE_SANS -> FontFamily(
-        variableFont(R.font.google_sans_flex, FontWeight.Normal, 400),
-        variableFont(R.font.google_sans_flex, FontWeight.Medium, 500),
-        variableFont(R.font.google_sans_flex, FontWeight.SemiBold, 600),
-        variableFont(R.font.google_sans_flex, FontWeight.Bold, 700),
-        variableFont(R.font.google_sans_flex, FontWeight.ExtraBold, 800),
-    )
-}
-
-/**
- * Apply the chosen typeface across the type scale, with the app's own defaults: every body, label and
- * title step is a notch bigger than Material's and carries at least Medium weight, so text stands out
- * instead of receding. One place decides this, so the whole app moves together.
- */
-fun expressiveTypography(choice: FontChoice, classicHeadings: Boolean = false): Typography {
-    val family = fontFamilyFor(choice)
-    // Headings and titles take a classical serif when asked; body text keeps the chosen font.
-    val heading = if (classicHeadings) FontFamily.Serif else family
-    val base = Typography()
-    // Headings in the classic serif sit a little tighter: the serif reads as a deliberate, modern-classic setting rather than a default.
-    fun TextStyle.heading(weight: FontWeight? = null): TextStyle = copy(
-        fontFamily = heading,
-        fontWeight = weight ?: fontWeight,
-        // In sp, like the default: a TextStyle that mixes em and sp cannot be animated, and the hero blends its styles.
-        letterSpacing = if (classicHeadings && fontSize.isSpecified) (-0.02f * fontSize.value).sp else letterSpacing,
-    )
-    fun TextStyle.bigger(scale: Float, weight: FontWeight? = null): TextStyle = copy(
-        fontFamily = family,
-        fontWeight = weight ?: fontWeight,
-        fontSize = fontSize * scale,
-        lineHeight = lineHeight * scale,
-    )
-    return base.copy(
-        displayLarge = base.displayLarge.heading(FontWeight.Black),
-        displayMedium = base.displayMedium.heading(FontWeight.Black),
-        displaySmall = base.displaySmall.heading(FontWeight.ExtraBold),
-        headlineLarge = base.headlineLarge.heading(FontWeight.ExtraBold),
-        headlineMedium = base.headlineMedium.heading(FontWeight.Bold),
-        headlineSmall = base.headlineSmall.heading(FontWeight.Bold),
-        titleLarge = base.titleLarge.bigger(1.0f, FontWeight.SemiBold).heading(),
-        titleMedium = base.titleMedium.bigger(1.06f, FontWeight.SemiBold),
-        titleSmall = base.titleSmall.bigger(1.08f, FontWeight.SemiBold),
-        bodyLarge = base.bodyLarge.bigger(1.06f, FontWeight.Medium),
-        bodyMedium = base.bodyMedium.bigger(1.08f, FontWeight.Medium),
-        bodySmall = base.bodySmall.bigger(1.12f, FontWeight.Medium),
-        labelLarge = base.labelLarge.bigger(1.08f, FontWeight.SemiBold),
-        labelMedium = base.labelMedium.bigger(1.1f, FontWeight.Medium),
-        labelSmall = base.labelSmall.bigger(1.1f, FontWeight.Medium),
-    )
-}
 
 /**
  * A flat, no-outline button fill, pushed away from the background -- lighter in dark themes, a

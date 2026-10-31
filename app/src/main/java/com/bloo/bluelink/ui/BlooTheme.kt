@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.FontChoice
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.LocalContentColor
@@ -103,7 +104,7 @@ fun BlooTheme(
     // applied on every screen -- so the answer is cached for the process instead.
     val reduceMotion = remember(context.contentResolver) { reduceMotionCached(context) }
     // Memoize typography and motion to avoid recomputing on every recomposition.
-    val typography = remember(fontChoice, classicHeadings) { expressiveTypography(fontChoice, classicHeadings) }
+    val typography = remember(fontChoice, classicHeadings) { com.bloo.uicommon.blooTypography(fontChoice, classicHeadings) }
     val motionScheme = remember { MotionScheme.expressive() }
     MaterialExpressiveTheme(
         colorScheme = scheme,

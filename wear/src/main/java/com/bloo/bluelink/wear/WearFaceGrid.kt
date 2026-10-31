@@ -1,5 +1,11 @@
 package com.bloo.bluelink.wear
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -39,6 +46,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bloo.uicommon.MorphButtonLabel
+import com.bloo.uicommon.MotionMedium
+import com.bloo.uicommon.MotionShort
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.standardButtonIcon
 import kotlin.math.cos
@@ -111,6 +120,16 @@ internal fun WearQuadrantGrid(
     val latestHold by rememberUpdatedState(onHold)
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
     val slots = (0 until 4).map { actions.getOrNull(it) }
+    // Each quarter eases to its colour when its control changes (lit when on, quiet when empty), and is read in the draw phase, so the
+    // change animates without recomposing the grid.
+    val fills = (0 until 4).map { q ->
+        val target = when {
+            slots[q] == null -> scheme.surfaceContainer
+            slots[q]!!.active -> scheme.primary
+            else -> scheme.surfaceContainerHigh
+        }
+        animateColorAsState(target, tween(MotionMedium), label = "quarterFill")
+    }
     Box(
         modifier
             .onSizeChanged { boxSize = it }
@@ -154,12 +173,7 @@ internal fun WearQuadrantGrid(
                 val grow = growOf(press, q, pxU)
                 val rIn = (HubRadius + InnerGap) * pxU
                 val rOut = r - outerInset(q) * pxU + grow
-                val fill = when {
-                    action == null -> scheme.surfaceContainer
-                    action.active -> scheme.primary
-                    press?.pressed == q -> scheme.surfaceContainerHighest
-                    else -> scheme.surfaceContainerHigh
-                }
+                val fill = if (press?.pressed == q) lerp(fills[q].value, scheme.surfaceContainerHighest, 0.5f) else fills[q].value
                 drawPath(sectorPath(centre, rIn, rOut, q), fill)
             }
         }
@@ -257,12 +271,19 @@ private fun QuarterLabel(action: WearQuickAction, ink: Color, unit: Float) {
         CompositionLocalProvider(LocalContentColor provides ink) {
             glyph?.let { MorphButtonLabel(icon = it, label = "", pending = action.pending, iconSize = 26.dp * unit) }
         }
-        RevealText(
-            action.label,
-            style = TextStyle(fontSize = (12f * unit).sp),
-            fontWeight = FontWeight.SemiBold,
-            color = ink,
-            textAlign = TextAlign.Center,
-        )
+        // A changed control crossfades its name, so the new one arrives rather than replacing the old in a frame.
+        AnimatedContent(
+            targetState = action.label,
+            transitionSpec = { fadeIn(tween(MotionMedium)) togetherWith fadeOut(tween(MotionShort)) },
+            label = "quarterName",
+        ) { label ->
+            RevealText(
+                label,
+                style = TextStyle(fontSize = (12f * unit).sp),
+                fontWeight = FontWeight.SemiBold,
+                color = ink,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }

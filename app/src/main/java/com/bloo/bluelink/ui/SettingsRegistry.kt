@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.FontChoice
 import com.bloo.bluelink.data.AlertKeys
 import com.bloo.bluelink.data.PrefKeys
 import com.bloo.bluelink.data.setDoorOpenMinutes
