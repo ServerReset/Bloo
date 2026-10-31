@@ -19,7 +19,9 @@ import kotlin.math.sin
  */
 @Composable
 fun WearEdgeRing(progress: Float?, limitPct: Int?, tint: Color, stroke: Dp, modifier: Modifier = Modifier) {
-    val track = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f)
+    val scheme = MaterialTheme.colorScheme
+    val track = scheme.onSurface.copy(alpha = 0.16f)
+    val mark = scheme.onSurface
     Canvas(modifier) {
         val s = stroke.toPx()
         val inset = s / 2f
@@ -38,7 +40,7 @@ fun WearEdgeRing(progress: Float?, limitPct: Int?, tint: Color, stroke: Dp, modi
             val dx = cos(angle).toFloat()
             val dy = sin(angle).toFloat()
             drawLine(
-                MaterialTheme.colorScheme.onSurface,
+                mark,
                 start = Offset(c.x + (r - reach) * dx, c.y + (r - reach) * dy),
                 end = Offset(c.x + (r + reach) * dx, c.y + (r + reach) * dy),
                 strokeWidth = s * 0.35f,
