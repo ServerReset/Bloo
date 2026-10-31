@@ -23,6 +23,7 @@ object CarAction {
     const val TOGGLE_LOCK = "toggle_lock"
     const val LOCK = CarCommandIds.LOCK
     const val UNLOCK = CarCommandIds.UNLOCK
+    const val LOCATE = CarCommandIds.LOCATE
     const val TOGGLE_CLIMATE = "toggle_climate"
     const val CLIMATE_ON = CarCommandIds.CLIMATE_ON
     const val CLIMATE_OFF = CarCommandIds.CLIMATE_OFF

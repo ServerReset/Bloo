@@ -6,6 +6,7 @@ import com.bloo.bluelink.data.downloadLabel
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.ProgressBar
 import androidx.compose.foundation.layout.PaddingValues
+import com.bloo.bluelink.data.CarAction
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,7 +65,14 @@ internal fun WearCarSection(ui: WearCarUi, update: WearUpdateState, section: Car
             CarSection.CLIMATE -> item { WearClimatePebble(ui.repo, ui.car, ui.pending, ui.send) }
             CarSection.STATUS -> item { WearStatusPebble(ui.car) }
             CarSection.CARE -> item {
-                WearCarCarePebble(ui.car, refreshing = ui.refreshing, canRefresh = ui.signedIn, onRefresh = { ui.repo.refresh() })
+                WearCarCarePebble(
+                    ui.car,
+                    refreshing = ui.refreshing,
+                    canRefresh = ui.signedIn,
+                    locating = ui.isPending(CarAction.LOCATE),
+                    onRefresh = { ui.repo.refresh() },
+                    onLocate = { ui.send { ui.repo.command(ui.car.vin, CarAction.LOCATE) } },
+                )
             }
             CarSection.SETTINGS -> {
                 update.error?.let { message ->

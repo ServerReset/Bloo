@@ -3,7 +3,10 @@ package com.bloo.bluelink.wear
 import com.bloo.uicommon.AppIcons
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.isStale
 import com.bloo.uicommon.rememberRelativeTime
 
@@ -15,11 +18,23 @@ internal fun WearStatusPebble(v: VehicleSnapshot) {
     }
 }
 
-/** Odometer, service, plate, how fresh the reading is, and the refresh button where the freshness is. */
+/**
+ * Odometer, service, plate, where the car is, how fresh the reading is, and the Locate and Refresh buttons. The position is the car's own,
+ * shown with the phone's coordinates.
+ */
 @Composable
-internal fun WearCarCarePebble(v: VehicleSnapshot, refreshing: Boolean, canRefresh: Boolean, onRefresh: () -> Unit) {
+internal fun WearCarCarePebble(
+    v: VehicleSnapshot,
+    refreshing: Boolean,
+    canRefresh: Boolean,
+    locating: Boolean,
+    onRefresh: () -> Unit,
+    onLocate: () -> Unit,
+) {
     WearPebble(title = "Care", icon = AppIcons.Build) {
         WearCarFacts.care(v).forEach { (label, value) -> WearStatRow(label, value) }
+        val where = v.lat?.let { lat -> v.lon?.let { lon -> coordString(lat, lon, decimals = 4) } }
+        WearStatRow("Location", where ?: "Unknown")
         // Live: the phone's own label (:uicommon), so "5 min ago" moves on while the page stays open.
         val updated = rememberRelativeTime(v.fetchedAt)?.takeIf { it.isNotBlank() }
         if (refreshing || updated != null) {
@@ -29,6 +44,7 @@ internal fun WearCarCarePebble(v: VehicleSnapshot, refreshing: Boolean, canRefre
                 valueColor = if (v.isStale() && !refreshing) MaterialTheme.colorScheme.error else null,
             )
         }
+        WearActionRow("Locate", Icons.Filled.MyLocation, pending = locating, onClick = onLocate)
         if (canRefresh) WearActionRow("Refresh", AppIcons.Refresh, pending = refreshing, onClick = onRefresh)
     }
 }

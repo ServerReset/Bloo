@@ -134,6 +134,11 @@ object CarCommandRunner {
                     // branches).
                     CarAction.FLASH_LIGHTS -> { repo.flashLights(v); snap }
                     CarAction.HORN_AND_LIGHTS -> { repo.hornAndLights(v); snap }
+                    // Where the car is now: the position the car reports, stored with the rest of its snapshot.
+                    CarAction.LOCATE -> {
+                        val loc = repo.location(v) ?: error("Couldn't get the car's location")
+                        snap.copy(lat = loc.latitude, lon = loc.longitude)
+                    }
                     else -> return@withLock CarCommandResult(command.vin, command.action, ok = false, message = "Unknown action")
                 }
                 store.updateVehicle(updated)
