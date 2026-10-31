@@ -77,6 +77,7 @@ class WearNotificationPrefs(context: Context) {
 object WearNotifier {
     private const val CHANNEL_CHARGING = "watch_charging"
     private const val CHANNEL_ALERTS = "watch_alerts"
+    private const val CHANNEL_LIVE = "watch_live"
 
     /**
      * Compare [old] with [new] and raise/clear whatever changed. [old] empty means first sight: no
@@ -96,6 +97,9 @@ object WearNotifier {
             val pct = now.percent
             val cardId = idFor(now.vin, "charging")
             if (plan.chargingCard) manager.notify(cardId, chargingCard(app, now)) else manager.cancel(cardId)
+            // Climate running is a live activity too, with its own Stop, so the car's climate is visible and can be ended from the watch.
+            val climateId = idFor(now.vin, "climate")
+            if (now.climateOn == true) manager.notify(climateId, climateCard(app, now)) else manager.cancel(climateId)
             if (plan.chargeComplete) {
                 manager.notify(idFor(now.vin, "complete"), alert(app, "${now.name} is charged", "Battery at $pct%"))
             }
@@ -149,6 +153,32 @@ object WearNotifier {
     }
 
     /**
+     * The live climate card: an ongoing notification and activity while the car's climate runs, with a Stop. Same shape as the charging card.
+     */
+    private fun climateCard(app: Context, v: VehicleSnapshot): Notification {
+        val touch = openApp(app)
+        val builder = NotificationCompat.Builder(app, CHANNEL_LIVE)
+            .setSmallIcon(R.drawable.ic_stat_bloo)
+            .setContentTitle("${v.name} climate on")
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setContentIntent(touch)
+            .addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CLIMATE_OFF))
+        val status = Status.Builder()
+            .addTemplate("#what#")
+            .addPart("what", Status.TextPart("Climate on"))
+            .build()
+        OngoingActivity.Builder(app, idFor(v.vin, "climate"), builder)
+            .setStaticIcon(R.drawable.ic_stat_bloo)
+            .setTouchIntent(touch)
+            .setStatus(status)
+            .build()
+            .apply(app)
+        return builder.build()
+    }
+
+    /**
      * A one-shot alert. It takes no action button, and no longer takes an unused `action` parameter
      * either: both call sites passed null, so the button it could have drawn never appeared.
      */
@@ -193,6 +223,7 @@ object WearNotifier {
 
     private fun ensureChannels(app: Context) {
         ensureNotificationChannel(app, CHANNEL_CHARGING, "Charging", NotificationManager.IMPORTANCE_LOW, "Live charge progress", showBadge = false)
+        ensureNotificationChannel(app, CHANNEL_LIVE, "Live car status", NotificationManager.IMPORTANCE_LOW, "Climate and other running states", showBadge = false)
         ensureNotificationChannel(app, CHANNEL_ALERTS, "Car alerts", NotificationManager.IMPORTANCE_DEFAULT, "Charge complete, low battery and Auto lock")
     }
 

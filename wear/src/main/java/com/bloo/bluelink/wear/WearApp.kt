@@ -62,7 +62,6 @@ private fun SignInCode(code: String) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center,
-            maxLines = 1,
         )
         WearActionRow("Cancel", AppIcons.Close) { WearCredentialSync.cancel() }
     }

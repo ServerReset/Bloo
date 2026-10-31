@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -23,10 +22,8 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.uicommon.RevealText
-import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.unit.IntOffset
 
 /**
  * The face in miniature -- the same four quarters the main screen draws -- opened by pressing the face's centre.
@@ -40,10 +37,9 @@ internal fun WearFaceEditor(car: VehicleSnapshot, slots: List<String>, onPickSlo
     val haptics = LocalHapticFeedback.current
     WearBackable(onDone) {
         ScreenScaffold(timeText = { TimeText() }) {
-            BoxWithConstraints(Modifier.fillMaxSize().wearAuroraWash(scheme.primary), contentAlignment = Alignment.Center) {
+            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 // The face, at two thirds of the display; its fixed sizes scale with it as they do on the main screen.
                 val face = minOf(maxWidth, maxHeight) * 0.6f
-                val press = rememberQuadrantPress()
                 CompositionLocalProvider(LocalFaceUnit provides face / 201.dp) {
                     // Clear of the clock above, and of the bezel below at a large font setting.
                     Column(Modifier.padding(top = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -58,14 +54,12 @@ internal fun WearFaceEditor(car: VehicleSnapshot, slots: List<String>, onPickSlo
                                     onPickSlot(i)
                                 }
                             }
-                            WearQuadrantGrid(actions, Modifier.fillMaxSize(), press)
-                            WearRingLabels(actions)
+                            WearQuadrantGrid(actions, Modifier.fillMaxSize())
                             WearRoundButton(
                                 size = face * 0.27f,
                                 description = "Done",
                                 color = scheme.background,
-                                modifier = Modifier.align(Alignment.Center)
-                                    .offset { IntOffset((press.dx * face.roundToPx()).roundToInt(), (press.dy * face.roundToPx()).roundToInt()) },
+                                modifier = Modifier.align(Alignment.Center),
                                 onClick = {
                                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                                     onDone()
@@ -81,7 +75,6 @@ internal fun WearFaceEditor(car: VehicleSnapshot, slots: List<String>, onPickSlo
                             fontWeight = FontWeight.SemiBold,
                             color = scheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
-                            maxLines = 1,
                         )
                     }
                 }

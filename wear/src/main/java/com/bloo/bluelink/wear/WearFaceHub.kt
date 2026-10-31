@@ -25,7 +25,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
@@ -96,11 +95,10 @@ fun WearFaceHub(
                         (if (value.length > 4) (base * 4.5f / value.length).coerceAtLeast(12f) else base).dp.toSp()
                     },
                 ),
-                maxLines = 1,
                 reduceMotion = false,
             )
             // The car's state can run to two lines ("Parked · Locked · Climate on"); cut to one it read as "Parked · L…".
-            if (state.isNotBlank() && status == null) HubLine(state, scheme.onSurface, size, maxLines = 2)
+            if (state.isNotBlank() && status == null) HubLine(state, scheme.onSurface, size)
             HubLine(
                 status?.text ?: caption,
                 when {
@@ -116,7 +114,7 @@ fun WearFaceHub(
 
 /** One small line under the hub's value: a fixed share of the hub's size (never the font setting), one line, within 80% of its width. */
 @Composable
-private fun HubLine(text: String, color: Color, hubSize: Dp, maxLines: Int = 1) {
+private fun HubLine(text: String, color: Color, hubSize: Dp) {
     RevealText(
         text,
         style = MaterialTheme.typography.labelSmall.copy(
@@ -124,8 +122,6 @@ private fun HubLine(text: String, color: Color, hubSize: Dp, maxLines: Int = 1) 
         ),
         color = color,
         textAlign = TextAlign.Center,
-        maxLines = maxLines,
-        overflow = TextOverflow.Ellipsis,
         modifier = Modifier.width(hubSize * 0.8f),
     )
 }

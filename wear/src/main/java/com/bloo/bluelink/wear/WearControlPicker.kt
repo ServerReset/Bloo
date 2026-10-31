@@ -28,7 +28,7 @@ internal fun WearControlPicker(
             item(key = "title") {
                 WearCenteredText(position, style = MaterialTheme.typography.titleMedium)
             }
-            item(key = "hint") { WearCaption("What should this quarter do?", small = true, maxLines = 2) }
+            item(key = "hint") { WearCaption("What should this quarter do?", small = true) }
             FaceGroup.entries.forEach { group ->
                 val controls = groups[group].orEmpty()
                 if (controls.isEmpty()) return@forEach

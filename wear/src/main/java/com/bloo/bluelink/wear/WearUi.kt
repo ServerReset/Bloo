@@ -280,7 +280,6 @@ fun WearActionRow(
                         subtitleStyle = MaterialTheme.typography.labelSmall,
                         subtitleColor = scheme.onSurfaceVariant,
                         // A switch row's caption is a sentence ("Off by itself in Battery Saver"): give it room to finish.
-                        maxLines = if (switch) 3 else 2,
                     )
                 }
             },
@@ -401,7 +400,7 @@ fun WearToggleRow(
 
 /** The quiet words under a row or a group: what it does, why, what is wrong. [small] is the finer print under a caption. */
 @Composable
-fun WearCaption(text: String, modifier: Modifier = Modifier, small: Boolean = false, maxLines: Int = 4) =
+fun WearCaption(text: String, modifier: Modifier = Modifier, small: Boolean = false, maxLines: Int = Int.MAX_VALUE) =
     WearCenteredText(
         text,
         modifier = modifier,
@@ -411,7 +410,6 @@ fun WearCaption(text: String, modifier: Modifier = Modifier, small: Boolean = fa
         ),
         color = secondaryTextColor(),
         fontWeight = FontWeight.Normal,
-        maxLines = maxLines,
     )
 
 /**
@@ -425,7 +423,7 @@ fun WearCenteredText(
     style: TextStyle = MaterialTheme.typography.titleMedium,
     color: Color = MaterialTheme.colorScheme.onBackground,
     fontWeight: FontWeight? = FontWeight.SemiBold,
-    maxLines: Int = 4,
+    maxLines: Int = Int.MAX_VALUE,
 ) {
     RevealText(
         text,
@@ -434,7 +432,6 @@ fun WearCenteredText(
         style = style,
         color = color,
         fontWeight = fontWeight,
-        maxLines = maxLines,
     )
 }
 
@@ -467,7 +464,6 @@ fun WearMessageScreen(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center,
-                    maxLines = 2,
                 )
                 detail?.let {
                     RevealText(
@@ -475,7 +471,6 @@ fun WearMessageScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
-                        maxLines = 3,
                     )
                 }
                 extra?.invoke()

@@ -1,31 +1,17 @@
 package com.bloo.bluelink.wear
 
-import com.bloo.uicommon.LocalPowerPolicy
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.Spring
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
 
 /*
- * The face's sizes and its press-and-give: the numbers every piece of the face shares, scaled to the display, and the state of
- * which quarter is held down.
+ * The face's sizes: the numbers every piece of the face shares, scaled to the display.
  */
 
 /** The ring's stroke and the gap between it and the tiles inside it. */
 internal val RingStroke = 8.dp
 internal val RingGap = 5.dp
 
-/** The gap between the four quarter tiles (the cross through the middle of the face). */
+/** The gap between the four quarter tiles. */
 internal val TileGap = 3.dp
 
 /** The hub's share of the inner circle's diameter. */
@@ -34,59 +20,8 @@ internal const val HubFraction = 0.34f
 /** The display the face's fixed sizes (ring, gaps, glyphs) were drawn for; every size scales by (real display / this). */
 internal val ReferenceFace = 227.dp
 
-/** How far the cross through the face moves, as a share of the face, when a quarter is pressed (the quarter grows). */
-private const val PressGrow = 0.06f
-
 /**
- * The face's size relative to the 227dp it was designed on, so a 192dp watch and a 240dp watch (and any display
- * size setting, which changes the dp the display has) get the same face, proportionally.
+ * The face's size relative to the 227dp it was designed on, so a 192dp watch and a 240dp watch (and any display size setting, which changes
+ * the dp the display has) get the same face, proportionally.
  */
-internal val LocalFaceUnit = androidx.compose.runtime.compositionLocalOf { 1f }
-
-/**
- * Which quarter is held down, and the cross through the middle of the face that moves because of it: pressing a
- * quarter makes it grow and the other three give way, and the hub (which sits on the cross) moves with it -- the
- * same push-and-give of a row of buttons on the phone. The cross is two springs, one per axis; they are read where
- * the face is laid out, so a press re-lays-out the tiles without recomposing them.
- */
-@Stable
-internal class QuadrantPress(
-    internal val x: Animatable<Float, AnimationVector1D>,
-    internal val y: Animatable<Float, AnimationVector1D>,
-) {
-    var pressed by androidx.compose.runtime.mutableIntStateOf(NONE)
-        private set
-
-    /** The cross's offset from the middle, as a share of the face's width and height. */
-    val dx: Float get() = x.value
-    val dy: Float get() = y.value
-
-    fun press(quadrant: Int, down: Boolean) {
-        if (down) pressed = quadrant else if (pressed == quadrant) pressed = NONE
-    }
-
-    companion object { const val NONE = -1 }
-}
-
-@Composable
-internal fun rememberQuadrantPress(): QuadrantPress {
-    val policy = LocalPowerPolicy.current
-    val state = androidx.compose.runtime.remember { QuadrantPress(Animatable(0f), Animatable(0f)) }
-    val bouncy = androidx.compose.runtime.rememberUpdatedState(policy.bouncySprings)
-    // `pressed` is read here, in a flow, and not in composition: a press then moves the cross (a layout) without recomposing
-    // the face and its four tiles around it.
-    LaunchedEffect(state) {
-        androidx.compose.runtime.snapshotFlow { state.pressed }.collectLatest { q ->
-            // The pressed quarter's own corner stays put; the cross moves AWAY from it, which is what makes it bigger.
-            val tx = when (q) { 0, 2 -> PressGrow; 1, 3 -> -PressGrow; else -> 0f }
-            val ty = when (q) { 0, 1 -> PressGrow; 2, 3 -> -PressGrow; else -> 0f }
-            val spec: AnimationSpec<Float> =
-                if (bouncy.value) spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow) else snap()
-            kotlinx.coroutines.coroutineScope {
-                launch { state.x.animateTo(tx, spec) }
-                launch { state.y.animateTo(ty, spec) }
-            }
-        }
-    }
-    return state
-}
+internal val LocalFaceUnit = compositionLocalOf { 1f }

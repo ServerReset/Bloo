@@ -65,7 +65,7 @@ internal fun WearSettingsPebble(signedIn: Boolean) {
             WearCaption(
                 if (autoLock) "On. The watch locks the car about a minute after it feels you walk away."
                 else "Uses the watch's motion sensor. To lock by the car's Bluetooth, set up AutoLock in Bloo on your phone.",
-                small = true, maxLines = 5,
+                small = true,
             )
         } else {
             WearCaption("Auto lock needs your car's sign-in. In Bloo on the phone, open Settings and set up the watch.", small = true, maxLines = 5)

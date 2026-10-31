@@ -63,10 +63,8 @@ internal fun WearFacePage(
                 limitPct = v.chargeLimitPct,
                 tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
                 actions = actions,
-                charging = v.charging == true,
                 stale = v.isStale(),
                 status = if (ui.refreshing && faceStatus == null) FaceStatus("Updating…") else faceStatus,
-                refreshing = ui.refreshing,
                 carState = carStateLine(v),
                 onHubHold = onEditFace,
             )
