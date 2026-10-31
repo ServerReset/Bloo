@@ -78,7 +78,8 @@ fun WearFaceHub(
                     Modifier
                 },
             )
-            .padding(4.dp),
+            // The text keeps clear of the circle's curve: the value and its lines sit inside the middle of the hub.
+            .padding(horizontal = size * 0.12f, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -99,15 +100,18 @@ fun WearFaceHub(
             )
             // The car's state can run to two lines ("Parked · Locked · Climate on"); cut to one it read as "Parked · L…".
             if (state.isNotBlank() && status == null) HubLine(state, scheme.onSurface, size)
-            HubLine(
-                status?.text ?: caption,
-                when {
-                    status == null -> scheme.onSurfaceVariant
-                    status.error -> scheme.error
-                    else -> scheme.primary
-                },
-                size,
-            )
+            val line = status?.text ?: caption
+            if (line.isNotBlank()) {
+                HubLine(
+                    line,
+                    when {
+                        status == null -> scheme.onSurfaceVariant
+                        status.error -> scheme.error
+                        else -> scheme.primary
+                    },
+                    size,
+                )
+            }
         }
     }
 }

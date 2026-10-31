@@ -33,6 +33,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bloo.uicommon.MorphButtonLabel
@@ -66,12 +67,20 @@ data class WearQuickAction(
  * bottom-left, bottom-right.
  */
 @Composable
-internal fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifier = Modifier, press: QuadrantPress? = null) {
+internal fun WearQuadrantGrid(
+    actions: List<WearQuickAction?>,
+    modifier: Modifier = Modifier,
+    press: QuadrantPress? = null,
+    /** Room the bottom quarters keep clear of their labels (the curved name runs there), in face units. */
+    bottomInset: Dp = 0.dp,
+) {
     val slots = (0 until 4).map { actions.getOrNull(it) }
     val unit = LocalFaceUnit.current
     val gap = TileGap * unit
     Layout(
-        content = { for (q in 0 until 4) QuarterTile(q, slots[q], Modifier.fillMaxSize(), press) },
+        content = {
+            for (q in 0 until 4) QuarterTile(q, slots[q], Modifier.fillMaxSize(), press, if (q >= 2) bottomInset else 0.dp)
+        },
         modifier = modifier.clip(CircleShape),
     ) { measurables, constraints ->
         val w = constraints.maxWidth
@@ -98,7 +107,7 @@ internal fun WearQuadrantGrid(actions: List<WearQuickAction?>, modifier: Modifie
 
 /** One quarter of the face. [quadrant]: 0 top-left, 1 top-right, 2 bottom-left, 3 bottom-right. */
 @Composable
-private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modifier, press: QuadrantPress?) {
+private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modifier, press: QuadrantPress?, bottomInset: Dp) {
     val scheme = MaterialTheme.colorScheme
     val unit = LocalFaceUnit.current
     val shape = RoundedCornerShape(TileCorner * unit)
@@ -130,7 +139,8 @@ private fun QuarterTile(quadrant: Int, action: WearQuickAction?, modifier: Modif
                 action.onClick()
             }
             .semantics { contentDescription = action.label }
-            .padding(8.dp * unit),
+            // The label stays well inside the round edge: the quarter's outer corner is cut by the circle.
+            .padding(start = 14.dp * unit, end = 14.dp * unit, top = 10.dp * unit, bottom = (10.dp + bottomInset) * unit),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,9 @@ import androidx.compose.ui.graphics.Color
  * The watch face for one car: the charge (or fuel) as a thin ring round the display's edge, the car's four actions as the quarters inside it,
  * and the value in a hub where they meet. Flat throughout, so the edge carries nothing but the ring.
  */
+
+/** The band at the bottom of the face the curved name takes, which the bottom quarters keep clear of. */
+private val NameBand = 18.dp
 
 /**
  * The whole face. Fills its square (on a round watch, the display); everything inside is sized from it, so the same face works on a 192dp
@@ -47,6 +51,8 @@ fun WearCarFace(
     carState: String = "",
     /** Holding the centre (a long press, with a buzz) changes the four quarters. */
     onHubHold: (() -> Unit)? = null,
+    /** The car's name, curved round the bottom of the face for as long as it is shown. */
+    name: String = "",
 ) {
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val unit = minOf(maxWidth, maxHeight) / ReferenceFace
@@ -60,14 +66,22 @@ fun WearCarFace(
                 modifier = Modifier.fillMaxSize().alpha(if (stale) 0.5f else 1f),
             )
             Box(Modifier.fillMaxSize().padding((RingStroke + RingGap) * unit)) {
-                WearQuadrantGrid(actions = actions, modifier = Modifier.fillMaxSize(), press = press)
+                WearQuadrantGrid(
+                    actions = actions,
+                    modifier = Modifier.fillMaxSize(),
+                    press = press,
+                    bottomInset = if (name.isBlank()) 0.dp else NameBand,
+                )
                 BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     val hub = maxWidth * HubFraction
                     // The hub sits where the cross is, so it moves with the quarter that was pressed. Its halo of the background colour
                     // lets the tiles curve round it rather than run into it.
                     val w = constraints.maxWidth
                     val h = constraints.maxHeight
-                    Box(Modifier.offset { IntOffset((press.dx * w).roundToInt(), (press.dy * h).roundToInt()) }) {
+                    Box(
+                        Modifier.offset { IntOffset((press.dx * w).roundToInt(), (press.dy * h).roundToInt()) },
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Box(
                             Modifier.size(hub + HubHalo * unit * 2f).clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.background),
@@ -79,6 +93,8 @@ fun WearCarFace(
                     }
                 }
             }
+            // Outside the inset, so its arc sits on the ring's edge, not the tiles' padded edge.
+            CurvedName(name, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.fillMaxSize())
         }
     }
 }

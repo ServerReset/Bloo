@@ -58,7 +58,8 @@ internal fun WearFacePage(
             WearCarFace(
                 modifier = Modifier.fillMaxSize(),
                 value = v.bigValue(),
-                caption = v.name,
+                caption = "",
+                name = v.name,
                 progress = v.percent?.let { it / 100f },
                 limitPct = v.chargeLimitPct,
                 tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
