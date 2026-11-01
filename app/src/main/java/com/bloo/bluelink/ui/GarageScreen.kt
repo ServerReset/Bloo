@@ -4,13 +4,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Box
-import com.bloo.bluelink.data.CarCommandIds
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -38,8 +35,8 @@ import com.bloo.uicommon.LocalHaptics
 internal fun GarageScreen(
     state: State<UiState>,
     vm: AppViewModel,
-    /** The one expanded-map holder, shared with [GarageMapOverlay] which the screen draws above the status bar's blur. */
-    expandedMap: ExpandedMapState,
+    /** The one expanded-map holder, shared with [CentralMapHost] which the screen draws above the status bar's blur. */
+    centralMap: CentralMap,
     /** Defaults to a fresh one for every existing caller's exact prior behavior. */
     hazeState: HazeState = remember { HazeState() },
 ) {
@@ -99,11 +96,6 @@ internal fun GarageScreen(
     val windowInfo = LocalWindowInfo.current
     val widthDp = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
     // See StatusBarScrim's doc for why plain Modifier.blur never worked here.
-    // Mirrors expandedMap.vin into shared UiState -- see UiState.mapExpanded's own doc -- so
-    // Screens.kt (a sibling of this screen, not a descendant, and so unable to read
-    // expandedMap/LocalExpandedMap directly) can hide the floating search bubble while the map
-    // sheet covers the same corner its own bottom action row occupies.
-    LaunchedEffect(expandedMap.vin) { vm.setMapExpanded(expandedMap.vin != null) }
     DisposableEffect(Unit) { onDispose { vm.setMapExpanded(false) } }
     // As many whole two-column cars as fit side by side; capped at the number of items.
     val naturalColumns = carColumnsFor(widthDp.value).coerceIn(1, slots)
@@ -135,24 +127,12 @@ internal fun GarageScreen(
     }
 
     // The other cars, drawn as pins on the expanded map. The car that is expanded is the map's own pin, so it is left out.
-    // The garage's one map is told every car's place: each car with a location is an icon on it, and the anchor's place is its centre.
-    SideEffect {
-        val open = expandedMap.vin
-        expandedMap.cars = state.value.vehicles.mapNotNull { v ->
-            state.value.locations[v.vin]?.let { CarPin(v.vin, it, v.name, state.value.imageUrls[v.vin]) }
-        }
-        expandedMap.expandedLocation = open?.let { state.value.locations[it] }
-    }
-    // The map starts in the first car's Location card, until it is opened on another car.
-    LaunchedEffect(state.value.vehicles.firstOrNull()?.vin) {
-        if (expandedMap.homeVin == null) expandedMap.homeVin = state.value.vehicles.firstOrNull()?.vin
-    }
-    CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
+    CompositionLocalProvider(LocalPullFraction provides pullFractionState) {
     BackdropHost {
         // ONE page, ALWAYS the pager: a car's own layout scales with the device width, so there is no
         // expand or collapse to reconcile -- the pebbles slide from under the hero to beside it purely
         // as the page grows wide enough.
-        BlurredBehindMap(expandedMap) {
+        BlurredBehindMap(centralMap) {
         CollapsedGaragePager(
             vehicles, count, slots, perPage, naturalColumns, perPageAnim.asState(), vm.currentIndex,
             windowInfo.containerSize.width, state, vm, hazeState,
@@ -180,73 +160,6 @@ internal fun GarageScreen(
     }
 }
 
-/**
- * The expanded car's map, over the whole screen. It is drawn by the screen under the status bar's frost, not inside the garage, so the
- * floating bar it brings in comes down behind that frost. [frostHaze] is the frost's source; the bar is part of it. The map itself is the
- * same composed instance the pebble hands over (see [ExpandedMapState]).
- */
-@Composable
-internal fun GarageMapOverlay(state: State<UiState>, vm: AppViewModel, expandedMap: ExpandedMapState, frostHaze: HazeState) {
-    val vehicles by remember { derivedStateOf { state.value.vehicles } }
-    val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
-    val appearance = LocalAppearance.current
-    val expandedVin = expandedMap.vin
-    val expandedVehicle = if (expandedVin != null) vehicles.firstOrNull { it.vin == expandedVin } else null
-    val expandedLocation = expandedVehicle?.let { state.value.locations[it.vin] }
-    // A map that was asked for but has no car or no location to draw from is nothing on screen: say so in the log, rather than leave it silent.
-    LaunchedEffect(expandedVin, expandedVehicle == null, expandedLocation == null) {
-        if (expandedVin != null && (expandedVehicle == null || expandedLocation == null)) {
-            com.bloo.bluelink.data.AppLog.log("Map: $expandedVin not drawn (car found: ${expandedVehicle != null}, location: ${expandedLocation != null})")
-        }
-    }
-    // Where the map grows from: the car's pebble, once it has been on screen. Until then (or after swiping to another car) a pebble-sized
-    // box in the middle, so the map always opens.
-    val windowSize = LocalWindowInfo.current.containerSize
-    val originBounds = expandedVehicle?.vin?.let { expandedMap.originBoundsFor(it).value }
-        ?: Rect(windowSize.width * 0.05f, windowSize.height * 0.35f, windowSize.width * 0.95f, windowSize.height * 0.6f)
-
-    if (expandedVehicle != null && expandedLocation != null) {
-        val locateExpandedVehicle = rememberLocateAction(vm, expandedVehicle)
-        // The bar describes the selected car: the one this map is on, or another whose pin was tapped. The map itself stays on the first.
-        val barVehicle = expandedMap.selectedVin?.let { vin -> vehicles.firstOrNull { it.vin == vin } } ?: expandedVehicle
-        val (chargePercent, chargeRange) = mapChargeStats(state.value, barVehicle, appearance.metricDistance)
-        val carDetails = buildList {
-            barVehicle.modelYear?.let { add("Year" to it) }
-            barVehicle.trim?.let { add("Trim" to it) }
-            add("Model" to barVehicle.model)
-            chargePercent?.let { add("Charge" to it) }
-            chargeRange?.let { add("Range" to it) }
-        }
-        ExpandableMapLayer(
-            isExpanded = true,
-            originBounds = originBounds,
-            location = expandedLocation,
-            vehicleName = barVehicle.name,
-            chargePercent = chargePercent,
-            chargeRange = chargeRange,
-            details = carDetails,
-            photo = state.value.imageUrls[barVehicle.vin],
-            barSelected = expandedMap.selectedVin != null,
-            selectedIsExpanded = expandedMap.selectedVin == null || expandedMap.selectedVin == expandedVehicle.vin,
-            onDeselect = { expandedMap.selectedVin = null },
-            onDismissDrag = { expandedMap.dismissFade = it },
-            deviceLocation = deviceLocation,
-            mapState = expandedMap.mapState,
-            map = { m, i -> expandedMap.Content(m, i) },
-            onRefreshLocation = locateExpandedVehicle,
-            deviceRequest = rememberDeviceLocationRequest(vm),
-            // The real command-pending flag, not a guessed timer -- see MapTopBar's own doc -- so the refresh icon's spin genuinely
-            // tracks the in-flight fetch this same button just kicked off.
-            refreshing = state.value.isPending(expandedVehicle.vin, CarCommandIds.LOCATE),
-            frostHaze = frostHaze,
-            onDismiss = {
-                expandedMap.selectedVin = null
-                expandedMap.vin = null
-            },
-        )
-    }
-}
-
 /** Milliseconds the garage takes to blur or clear behind an open map. */
 private const val MapBlurMs = 320
 
@@ -255,8 +168,8 @@ private const val MapBlurDp = 14f
 
 /** The garage behind an open full-screen map: softly blurred while it is open, and clear again once the map closes. */
 @Composable
-private fun BlurredBehindMap(expandedMap: ExpandedMapState, content: @Composable () -> Unit) {
-    val target = if (expandedMap.vin != null) 1f else 0f
+private fun BlurredBehindMap(centralMap: CentralMap, content: @Composable () -> Unit) {
+    val target = if (centralMap.vin != null) 1f else 0f
     val amount by androidx.compose.animation.core.animateFloatAsState(
         targetValue = target,
         animationSpec = androidx.compose.animation.core.tween(MapBlurMs),
@@ -264,8 +177,8 @@ private fun BlurredBehindMap(expandedMap: ExpandedMapState, content: @Composable
     )
     Box(
         Modifier.fillMaxSize().graphicsLayer {
-            // The drag toward closing fades the blur out (see ExpandedMapState.dismissFade), and the release brings it back.
-            val px = MapBlurDp * density * amount * (1f - expandedMap.dismissFade)
+            // The drag toward closing fades the blur out (see CentralMap.dismissFade), and the release brings it back.
+            val px = MapBlurDp * density * amount * (1f - centralMap.dismissFade)
             renderEffect = if (amount > 0.01f) androidx.compose.ui.graphics.BlurEffect(px, px) else null
         },
     ) {

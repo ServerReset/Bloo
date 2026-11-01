@@ -22,8 +22,8 @@ internal const val CarMapDefaultZoom = 15
  */
 data class TileRange(val firstX: Int, val firstY: Int, val lastX: Int, val lastY: Int)
 
-/** Null (the default) when no host has set one up. See [ExpandedMapState]'s own doc. */
-internal val LocalExpandedMap = staticCompositionLocalOf<ExpandedMapState?> { null }
+/** Null (the default) when no host has set one up. See [CentralMap]'s own doc. */
+internal val LocalCentralMap = staticCompositionLocalOf<CentralMap?> { null }
 
 /**
  * Where a map point sits on screen from the map's centre. [placeX]/[placeY] are its place in tile pixels from the car (the map's origin),

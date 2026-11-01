@@ -171,7 +171,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 ) {
                 // The garage's one map lives in the Location card of the car it was last opened for, and moves to the full-screen layer
                 // while it is open. The other cards show a placeholder that opens the map on their car.
-                val host = LocalExpandedMap.current
+                val host = LocalCentralMap.current
                 val slot = Modifier.fillMaxWidth().height(if (glance) 130.dp else 220.dp).clip(StandardShape)
                     .semantics { contentDescription = "Map showing where ${v.name} is" }
                     .then(

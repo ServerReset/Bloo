@@ -75,6 +75,15 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
  */
 @Composable
 fun BlooApp(vm: AppViewModel) {
+    // The app's one map, referenced by every screen through LocalCentralMap; drawn once, by CentralMapHost, below.
+    val centralMap = remember { CentralMap() }
+    CompositionLocalProvider(LocalCentralMap provides centralMap) {
+        BlooAppContent(vm, centralMap)
+    }
+}
+
+@Composable
+private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
     // Cold-start instrumentation: "first composition" is the moment Compose starts running this
     // root, and the withFrameNanos below is the moment a frame is actually produced -- the pair
     // separates "compose is slow" from "the frame clock is late", which the frame monitor's own
@@ -142,8 +151,6 @@ fun BlooApp(vm: AppViewModel) {
     // One blur source shared by GarageScreen, SettingsScreen and SearchLayer, which floats over
     // either.
     val searchHazeState = remember { HazeState() }
-    // The expanded car's map. Held here, not in the garage, so the map can be drawn above the status bar's blur (see GarageMapOverlay).
-    val expandedMap = remember { ExpandedMapState() }
     val backdropHaze = remember { HazeState() }
     // The one "is the user touching anything" clock the aurora reads; observed at the root below.
     val ambientActivity = remember { AmbientActivity() }
@@ -382,7 +389,7 @@ fun BlooApp(vm: AppViewModel) {
                         }
                         // Cold-start lock: don't compose (and blur) the full garage behind a lock
                         // the user hasn't passed; it composes once `locked` flips.
-                        if (!(locked && !unlockedThisSession)) GarageScreen(stateHolder, vm, expandedMap, hazeState = searchHazeState)
+                        if (!(locked && !unlockedThisSession)) GarageScreen(stateHolder, vm, centralMap, hazeState = searchHazeState)
                         }
                     }
                 }
@@ -427,7 +434,7 @@ fun BlooApp(vm: AppViewModel) {
     }
     // The expanded car's map sits over the app and under the status bar's blur, so the part of it that goes behind the status bar is
     // blurred rather than cut off at the content's edge. The map is drawn here, at screen level, for that reason.
-    if (target == Screen.Garage && !(locked && !unlockedThisSession)) GarageMapOverlay(stateHolder, vm, expandedMap, searchHazeState)
+    if (target == Screen.Garage && !(locked && !unlockedThisSession)) CentralMapHost(stateHolder, vm, centralMap, searchHazeState)
     // The status bar's own strip: a blur of what is behind it, strongest at the top and nearly gone
     // by the bottom of the strip. It is the ONLY edge treatment in the app.
     StatusBarScrim(searchHazeState)

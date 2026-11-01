@@ -6,11 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Speed
@@ -32,6 +29,7 @@ import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText
 import dev.chrisbanes.haze.HazeState
+import androidx.compose.material.icons.filled.Map
 
 /*
  * Search answers with PIECES OF THE APP: the charge bar the hero draws, the lock and horn buttons, the climate switch, the map, the
@@ -134,7 +132,9 @@ private fun ClimatePiece(v: Vehicle, status: VehicleStatus, state: UiState, vm: 
 private fun LocationPiece(v: Vehicle, state: UiState) {
     val loc = state.locations[v.vin]
     if (loc != null) {
-        CarMap(loc, Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(18.dp)), deviceLocation = state.deviceLocation, interactive = false)
+        // The map is the app's one map: this opens it on the car, rather than drawing another.
+        val central = LocalCentralMap.current
+        MorphActionButton("Show on map", Icons.Filled.Map, { central?.open(v.vin) }, Modifier.fillMaxWidth())
     }
     (state.placeNames[v.vin] ?: loc?.coordString(4))?.let { StackedRow("Parked at", it) }
 }

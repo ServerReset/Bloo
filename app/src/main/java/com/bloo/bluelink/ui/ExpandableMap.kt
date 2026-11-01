@@ -108,7 +108,7 @@ internal fun ExpandableMapLayer(
     photo: String? = null,
     deviceLocation: GeoLocation?,
     mapState: CarMapState,
-    /** The garage's one map ([ExpandedMapState.Content]), hosted here while it is open. */
+    /** The garage's one map ([CentralMap.Content]), hosted here while it is open. */
     map: @Composable (Modifier, MapInputs) -> Unit,
     onRefreshLocation: () -> Unit,
     /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
@@ -125,7 +125,7 @@ internal fun ExpandableMapLayer(
     /** True when the selected car is the one this map is on: its leaving the screen clears the selection. */
     selectedIsExpanded: Boolean = true,
     onDeselect: () -> Unit = {},
-    /** How far the bar is being dragged toward closing, 0 to 1 (see [ExpandedMapState.dismissFade]). */
+    /** How far the bar is being dragged toward closing, 0 to 1 (see [CentralMap.dismissFade]). */
     onDismissDrag: (Float) -> Unit = {},
     onDismiss: () -> Unit,
 ) {

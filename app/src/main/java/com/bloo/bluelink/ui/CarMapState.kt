@@ -2,15 +2,11 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.Modifier
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Rect
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.MapTiles
 
@@ -147,79 +143,6 @@ internal class CarMapState {
 
 @Composable
 internal fun rememberCarMapState(): CarMapState = remember { CarMapState() }
-
-/**
- * The garage's one map. A single [mapState] and a single map instance serve every car: the map is anchored on the car it was opened for
- * ([vin]), and every other car is an icon at its own place relative to that anchor. While the map is closed it lives in the Location card of
- * the car it was last opened for ([homeVin]); while it is open it lives in the full-screen layer. The other Location cards show a placeholder.
- */
-internal class ExpandedMapState {
-    /** The map's pan and zoom: the one state every view of the map uses. */
-    val mapState = CarMapState()
-
-    /** Every car that has a location, each drawn as its own icon. */
-    var cars by mutableStateOf<List<CarPin>>(emptyList())
-
-    /** The car the map is anchored on: the one it was opened for, or null while it is closed. */
-    var vin by mutableStateOf<String?>(null)
-
-    /** The car whose Location card shows the map while it is closed. */
-    var homeVin by mutableStateOf<String?>(null)
-
-    /** The car the top bar is showing, by a tap on its icon. Null is no selection: the bar is just its handle. */
-    var selectedVin by mutableStateOf<String?>(null)
-
-    /** The anchor's location, so the full-screen map knows where it is centred. */
-    var expandedLocation: GeoLocation? = null
-
-    /** How far the bar is being dragged toward closing, 0 (not at all) to 1: the garage behind the map fades with it. */
-    var dismissFade by mutableFloatStateOf(0f)
-
-    /** Each Location card's own on-screen rectangle, so the full-screen map grows from the card it was opened from. */
-    private val origins = mutableMapOf<String, MutableState<Rect?>>()
-
-    fun originBoundsFor(vin: String): MutableState<Rect?> = origins.getOrPut(vin) { mutableStateOf(null) }
-
-    /** Opens the map on [vin], with that car selected. A map already open is not switched under the person. */
-    fun open(vin: String) {
-        if (this.vin != null) return
-        com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin")
-        this.vin = vin
-        homeVin = vin
-        selectedVin = vin
-    }
-
-    /** A tap on a car's icon: the bar shows that car, and the map pans to centre it from the anchor. */
-    fun tapPin(tapped: String) {
-        selectedVin = tapped
-        val anchor = vin ?: return
-        if (tapped == anchor) {
-            mapState.recenter()
-            return
-        }
-        val from = cars.firstOrNull { it.vin == anchor }?.location ?: return
-        val to = cars.firstOrNull { it.vin == tapped }?.location ?: return
-        mapState.showDevice(from.latitude, from.longitude, to.latitude, to.longitude)
-    }
-
-    /** The map, as it is drawn wherever it is hosted: the one instance, anchored on the car it was opened for. */
-    @Composable
-    fun Content(modifier: Modifier, inputs: MapInputs) {
-        CarMap(
-            location = inputs.location,
-            modifier = modifier,
-            state = mapState,
-            deviceLocation = inputs.deviceLocation,
-            interactive = inputs.interactive,
-            tileArea = inputs.tileArea,
-            panWeight = inputs.panWeight,
-            cars = cars,
-            anchorVin = vin,
-            selectedVin = selectedVin,
-            onCarTap = { tapPin(it) },
-        )
-    }
-}
 
 /** One car on the map: where it is, and its photo for its icon (its name for a11y). */
 internal data class CarPin(val vin: String, val location: GeoLocation, val name: String, val photo: String?)
