@@ -42,6 +42,16 @@ class MapScreenshotTest {
     )
 
     private fun render(name: String, widthDp: Int, heightDp: Int) {
+        try {
+            draw(name, widthDp, heightDp)
+        } catch (e: Throwable) {
+            // Gradle's log shows only the exception's class, so put the cause chain in the message where it is seen.
+            val chain = generateSequence<Throwable>(e) { it.cause }.joinToString(" <- ") { "${it::class.java.name}: ${it.message}" }
+            throw AssertionError("screenshot $name failed: $chain", e)
+        }
+    }
+
+    private fun draw(name: String, widthDp: Int, heightDp: Int) {
         rule.setContent {
             MaterialTheme {
                 Box(Modifier.size(widthDp.dp, heightDp.dp)) {
