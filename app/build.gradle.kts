@@ -379,8 +379,6 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
     // Map screenshots (MapScreenshotTest): Compose rendered on the JVM by Robolectric, captured to a PNG the test logs. No device needed.
     testImplementation("org.robolectric:robolectric:4.17")
-    // The native graphics NATIVE mode draws with (Skia), which Robolectric does not bundle into the test classpath.
-    testImplementation("org.robolectric:nativeruntime:4.17")
     testImplementation("androidx.compose.ui:ui-test-junit4:$composeUi")
     debugImplementation("androidx.compose.ui:ui-test-manifest:$composeUi")
 
