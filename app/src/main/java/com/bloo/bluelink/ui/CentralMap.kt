@@ -17,8 +17,9 @@ import com.bloo.bluelink.data.GeoLocation
 
 /**
  * The garage's one map. A single [mapState] and a single map instance serve every car: the map is anchored on the car it was opened for
- * ([vin]), and every other car is an icon at its own place relative to that anchor. While the map is closed it lives in the Location card of
- * the car it was last opened for ([homeVin]); while it is open it lives in the full-screen layer. The other Location cards show a placeholder.
+ * ([vin]), and every other car is an icon at its own place relative to that anchor. It is drawn only by [CentralMapHost]: closed, at the
+ * Location card of the car it was last opened for ([homeVin]); open, grown to the full screen. Every other part of the app calls [open] and
+ * [dismiss]; none of them draws it.
  */
 internal class CentralMap {
     /** The map's pan and zoom: the one state every view of the map uses. */

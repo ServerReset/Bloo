@@ -278,11 +278,18 @@ internal fun ExpandableMapLayer(
         Modifier
             .fillMaxSize()
             .onGloballyPositioned { rootPos = it.positionOnScreen() }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) awaitPointerEvent().changes.forEach { it.consume() }
-                }
-            },
+            // Only while it is open: closed, the map is in its card and the card's swipes and taps must reach it.
+            .then(
+                if (isExpanded) {
+                    Modifier.pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) awaitPointerEvent().changes.forEach { it.consume() }
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         // Clear, not blurred: the app behind the map is not dimmed or blurred. Only the strip above the sheet closes it on a tap. A
         // full-screen catcher here would also get every tap on the map, since pointer events reach each node they land on, so a pin
