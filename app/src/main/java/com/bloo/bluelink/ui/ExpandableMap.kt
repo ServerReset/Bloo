@@ -25,8 +25,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -88,8 +88,17 @@ internal data class MapFeature(
 )
 
 /** How long the map takes to open and to close, and the curve: a ramp up and a slowing down, with no overshoot: the map does not bounce. */
-/** How far past the map's own edges the closed map's cut-off is drawn, so only the bars' edges are cut, never the map's sides. */
-private const val CLIP_MARGIN_PX = 10_000f
+/**
+ * The part of the layer's space the map may show, top and bottom, in the layer's own coordinates: between the status bar and the search bar
+ * when closed, and the whole layer as the map opens (by [t], 0 closed to 1 open). [root] is the layer's place on screen, or null before it
+ * is known, when the whole layer is taken.
+ */
+private fun visibleBand(root: Offset?, windowH: Float, statusTop: Float, searchClear: Float, t: Float): Pair<Float, Float> {
+    val ry = root?.y ?: 0f
+    val top = lerp(statusTop - ry, 0f, t)
+    val bottom = lerp(windowH - searchClear - ry, windowH - ry, t)
+    return top to bottom
+}
 
 private const val MapOpenMs = 520
 private const val MapCloseMs = 440
@@ -315,14 +324,24 @@ internal fun ExpandableMapLayer(
         val statusTopPx = WindowInsets.statusBars.getTop(density).toFloat()
         val searchClearPx = with(density) { searchBarClearance(fallback = 132.dp).toPx() }
         val windowH = windowSize.height.toFloat()
-        // Where the map was placed in this layer's own coordinates, written by the layout and read by the draw.
-        val placed = remember { FloatArray(2) }
         val mapInputs = MapInputs(location, deviceLocation, interactive = isExpanded, tileArea = windowSize, panWeight = { progress().coerceIn(0f, 1f) })
+        // The cut, in layout: the map sits in a box that clips to the band it may show (see [visibleBand]), so the cut hides its taps as well.
+        Box(
+            Modifier
+                .layout { measurable, constraints ->
+                    val (bandTop, bandBottom) = visibleBand(rootPos, windowH, statusTopPx, searchClearPx, progress().coerceIn(0f, 1f))
+                    val bandH = (bandBottom - bandTop).roundToInt().coerceAtLeast(0)
+                    val p = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(constraints.maxWidth, bandH))
+                    layout(constraints.maxWidth, constraints.maxHeight) { p.place(0, bandTop.roundToInt()) }
+                }
+                .clipToBounds(),
+        ) {
         map(
             Modifier
                 .layout { measurable, constraints ->
                     val w = constraints.maxWidth.toFloat()
-                    val h = constraints.maxHeight.toFloat()
+                    // The sheet is measured against the whole layer, not the band the map is cut to.
+                    val h = windowH
                     val sheetH = (h * 0.85f + pull.up.value).coerceIn(h * 0.85f, h)
                     val sheet = Rect(0f, h - sheetH + dragPx.value, w, h + dragPx.value)
                     val root = rootPos
@@ -331,9 +350,9 @@ internal fun ExpandableMapLayer(
                     val placeable = measurable.measure(
                         androidx.compose.ui.unit.Constraints.fixed(r.width.roundToInt().coerceAtLeast(1), r.height.roundToInt().coerceAtLeast(1)),
                     )
-                    placed[0] = r.left
-                    placed[1] = r.top
-                    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(r.left.roundToInt(), r.top.roundToInt()) }
+                    // Placed inside the band's box, so its origin is the band's top.
+                    val (bandTop, _) = visibleBand(rootPos, windowH, statusTopPx, searchClearPx, progress().coerceIn(0f, 1f))
+                    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(r.left.roundToInt(), (r.top - bandTop).roundToInt()) }
                 }
                 .graphicsLayer {
                     // Not drawn until it knows where the overlay is, rather than for a frame in the wrong place.
@@ -349,26 +368,10 @@ internal fun ExpandableMapLayer(
                     )
                     clip = true
                 }
-                .hazeSource(mapHazeState)
-                .drawWithContent {
-                    val root = rootPos
-                    if (root == null) {
-                        drawContent()
-                        return@drawWithContent
-                    }
-                    val t = progress().coerceIn(0f, 1f)
-                    // Between the status bar and the search bar, and the whole screen once open.
-                    val topRoot = lerp(statusTopPx - root.y, 0f, t)
-                    val bottomRoot = lerp(windowH - searchClearPx - root.y, windowH - root.y, t)
-                    clipRect(
-                        left = -CLIP_MARGIN_PX,
-                        top = topRoot - placed[1],
-                        right = size.width + CLIP_MARGIN_PX,
-                        bottom = bottomRoot - placed[1],
-                    ) { this@drawWithContent.drawContent() }
-                },
+                .hazeSource(mapHazeState),
             mapInputs,
         )
+        }
 
         // Whether the car itself is still on screen: its details fold away once the map has scrolled it out of view.
         val carMargin = with(LocalDensity.current) { 40.dp.toPx() }
