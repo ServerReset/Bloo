@@ -264,7 +264,7 @@ internal fun WearCarPage(
                             WearCarSection(ui, update, CarSection.entries[real - 1])
                         }
                     }
-                    WearPullIndicator(pull, refreshing = ui.refreshing)
+                    WearPullDisc(pull, refreshing = ui.refreshing)
                 }
             }
         }

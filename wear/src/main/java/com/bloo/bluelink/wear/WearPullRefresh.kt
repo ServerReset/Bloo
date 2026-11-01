@@ -1,19 +1,10 @@
 package com.bloo.bluelink.wear
 
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -22,17 +13,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.PullRefreshDisc
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 
 /**
  * The watch's one-way scroll and its pull to refresh.
@@ -110,40 +106,34 @@ internal class WearPullRefresh(
 }
 
 /**
- * The refresh indicator: an arc at the top of the screen that fills as the face is pulled, and stretches with it, so it squashes wide and
- * tall as the pull grows. While the car is being asked it spins and pulses. It is drawn in layers that read the pull directly, so a pull
- * moves it without recomposing the page.
+ * The watch's pull-to-refresh indicator: the shared disc (see [PullRefreshDisc]), drawn as a translucent disc. It shows only on the face. It
+ * sits in its own composable, so a drag moves it without recomposing the page around it.
  */
 @Composable
-internal fun BoxScope.WearPullIndicator(pull: WearPullRefresh, refreshing: Boolean, size: Dp = 26.dp) {
-    val colour = MaterialTheme.colorScheme.primary
-    if (refreshing) {
-        val spin = androidx.compose.animation.core.rememberInfiniteTransition(label = "refreshSpin")
-        val turn by spin.animateFloat(
-            0f, 360f,
-            androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing)),
-            label = "refreshTurn",
-        )
-        val beat by spin.animateFloat(
-            0.9f, 1.1f,
-            androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(450), androidx.compose.animation.core.RepeatMode.Reverse),
-            label = "refreshBeat",
-        )
-        Canvas(Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(size).graphicsLayer { rotationZ = turn; scaleX = beat; scaleY = 1f / beat; alpha = if (pull.onFace()) 1f else 0f }) {
-            drawArc(colour, startAngle = -90f, sweepAngle = 270f, useCenter = false, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
-        }
-    } else {
-        Canvas(
-            Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(size).graphicsLayer {
-                val p = pull.progress().coerceIn(0f, 1.25f)
-                // Squash and stretch: it widens as it is pulled out and narrows as it is pulled tall.
-                scaleX = 1f - 0.15f * p
-                scaleY = 1f + 0.2f * p
-                alpha = (pull.pulledPx / 12.dp.toPx()).coerceIn(0f, 1f) * if (pull.onFace()) 1f else 0f
-            },
-        ) {
-            val sweep = 360f * pull.progress().coerceIn(0f, 1f)
-            if (sweep > 0f) drawArc(colour, startAngle = -90f, sweepAngle = sweep, useCenter = false, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+internal fun BoxScope.WearPullDisc(pull: WearPullRefresh, refreshing: Boolean) {
+    val density = LocalDensity.current
+    val restPx = with(density) { DiscRestDp.toPx() }
+    Box(
+        Modifier.align(Alignment.TopCenter).graphicsLayer { alpha = if (pull.onFace()) 1f else 0f },
+    ) {
+        PullRefreshDisc(pull = pull.progress(), active = refreshing, restPx = restPx, size = DiscDp) { discModifier, content ->
+            WearGlassDisc(discModifier, content)
         }
     }
+}
+
+/** The disc's size, and where it rests below the top of the display, clear of the time. */
+private val DiscDp = 26.dp
+private val DiscRestDp = 30.dp
+
+/** The watch's disc: a translucent glass pane with a light rim, since the watch has no blur to draw with. */
+@Composable
+private fun WearGlassDisc(modifier: Modifier, content: @Composable () -> Unit) {
+    Box(
+        modifier
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.14f))
+            .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) { content() }
 }
