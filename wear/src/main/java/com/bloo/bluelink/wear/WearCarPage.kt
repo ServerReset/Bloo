@@ -142,7 +142,7 @@ internal fun WearCarPage(
         WearPullRefresh(
             scope = pullScope,
             thresholdPx = pullThreshold,
-            canPull = { wrap.wrap.real(pagerState.currentPage) == 0 && pagerState.currentPageOffsetFraction == 0f && !editingNow },
+            canPull = { wrap.wrap.real(wrap.pager.currentPage) == 0 && wrap.pager.currentPageOffsetFraction == 0f && !editingNow },
             onRefresh = { if (latestUi.signedIn) latestUi.repo.refresh() },
         )
     }
