@@ -121,9 +121,14 @@ internal fun GarageScreen(
     val carSpring = lowPowerBounce<Float>(stiffness = Spring.StiffnessMediumLow)
     val perPageAnim = remember { androidx.compose.animation.core.Animatable(perPageTarget.toFloat()) }
     LaunchedEffect(perPageTarget) { perPageAnim.animateTo(perPageTarget.toFloat(), carSpring) }
+    // The count the layout reads: the bounce is clamped to the real range. An overshoot past one car (or past the grid's count) would
+    // widen every column for a beat and then snap back, so the car's photo swelled and shrank; clamped, the column only ever eases.
+    val shownColumns = remember(naturalColumns) {
+        androidx.compose.runtime.derivedStateOf { perPageAnim.value.coerceIn(1f, naturalColumns.toFloat()) }
+    }
     val density = LocalDensity.current
-    val expandedT = remember(density) {
-        ColumnReflow(perPageAnim.asState(), widthDp = { windowInfo.containerSize.width / density.density })
+    val expandedT = remember(density, shownColumns) {
+        ColumnReflow(shownColumns, widthDp = { windowInfo.containerSize.width / density.density })
     }
 
     // The other cars, drawn as pins on the expanded map. The car that is expanded is the map's own pin, so it is left out.
@@ -134,7 +139,7 @@ internal fun GarageScreen(
         // as the page grows wide enough.
         BlurredBehindMap(centralMap) {
         CollapsedGaragePager(
-            vehicles, count, slots, perPage, naturalColumns, perPageAnim.asState(), vm.currentIndex,
+            vehicles, count, slots, perPage, naturalColumns, shownColumns, vm.currentIndex,
             windowInfo.containerSize.width, state, vm, hazeState,
             expandedT = expandedT,
             multiColumn = multiColumn,
