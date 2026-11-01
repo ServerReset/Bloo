@@ -36,6 +36,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.MaterialTheme
+import kotlin.math.abs
 
 /**
  * What a car's pages need to show and do, in one place: the car, whether the watch has its own sign-in, what is in flight,
@@ -142,7 +146,10 @@ internal fun WearCarPage(
         WearPullRefresh(
             scope = pullScope,
             thresholdPx = pullThreshold,
-            canPull = { wrap.wrap.real(wrap.pager.currentPage) == 0 && wrap.pager.currentPageOffsetFraction == 0f && !editingNow },
+            // "At rest" tolerates the sliver a settle can leave, so the face still takes the pull just after a wrap from the last section.
+            canPull = {
+                wrap.wrap.real(wrap.pager.currentPage) == 0 && abs(wrap.pager.currentPageOffsetFraction) < RestFraction && !editingNow
+            },
             onRefresh = { if (latestUi.signedIn) latestUi.repo.refresh() },
         )
     }
@@ -238,34 +245,40 @@ internal fun WearCarPage(
                 scaleY = s
                 alpha = 1f - editT
             }) {
-                // The pull-to-refresh is taken from the pager's own drags while the face is on screen (see WearPullRefresh).
+                // The pull-to-refresh is taken from the pager's own drags on every page (see WearPullRefresh). The pages stretch under it,
+                // gently; the refresh disc sits outside that stretch, so it stays pulled down for as long as the refresh runs.
                 Box(
                     Modifier.fillMaxSize()
                         .nestedScroll(pull.connection)
-                        // The face stretches down under the pull and squashes across it, from its top edge.
                         .graphicsLayer {
-                            val p = pull.progress().coerceIn(0f, 1.25f)
+                            val p = pull.progress().coerceIn(0f, 1f)
                             translationY = pull.offsetPx()
                             transformOrigin = TransformOrigin(0.5f, 0f)
-                            scaleY = 1f + 0.12f * p
-                            scaleX = 1f - 0.05f * p
+                            scaleY = 1f + 0.04f * p
+                            scaleX = 1f - 0.02f * p
                         },
                 ) {
                     VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { virtual ->
                         val real = wrap.wrap.real(virtual)
-                        if (real == 0) {
-                            WearFacePage(
-                                ui, slotKeys, faceStatus,
-                                onConfirm = { confirmAction = it },
-                                onChooseClimate = { climateAsk = ClimateAsk(it, run = true) },
-                                onEditFace = { editingFace = true },
-                            )
-                        } else {
-                            WearCarSection(ui, update, CarSection.entries[real - 1])
+                        // Each page carries the car's name at the bottom, so the name travels with the pages as they swipe.
+                        BoxWithConstraints(Modifier.fillMaxSize()) {
+                            CompositionLocalProvider(LocalFaceUnit provides minOf(maxWidth, maxHeight) / ReferenceFace) {
+                                if (real == 0) {
+                                    WearFacePage(
+                                        ui, slotKeys, faceStatus,
+                                        onConfirm = { confirmAction = it },
+                                        onChooseClimate = { climateAsk = ClimateAsk(it, run = true) },
+                                        onEditFace = { editingFace = true },
+                                    )
+                                } else {
+                                    WearCarSection(ui, update, CarSection.entries[real - 1])
+                                }
+                                CurvedName(car.name, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.fillMaxSize())
+                            }
                         }
                     }
-                    WearPullDisc(pull, refreshing = ui.refreshing)
                 }
+                WearPullDisc(pull, refreshing = ui.refreshing)
             }
         }
     }
@@ -273,6 +286,9 @@ internal fun WearCarPage(
 
 /** How far the face must be pulled down to refresh the car. */
 private val PullRefreshDistance = 56.dp
+
+/** How close to a whole page the pager must be for the face to count as at rest: a settle can leave a sliver short of exact. */
+private const val RestFraction = 0.001f
 
 /** How small the face gets when its quarters are opened: the editor starts from this size and the face shrinks to it. */
 private const val FaceEditFrom = 0.6f

@@ -56,7 +56,6 @@ internal fun WearFacePage(
                 modifier = Modifier.fillMaxSize(),
                 value = v.bigValue(),
                 caption = "",
-                name = v.name,
                 progress = v.percent?.let { it / 100f },
                 limitPct = v.chargeLimitPct,
                 tint = faceTint(v.percent, v.charging == true, MaterialTheme.colorScheme.onBackground),
@@ -66,8 +65,6 @@ internal fun WearFacePage(
                 carState = carStateLine(v),
                 onHubHold = onEditFace,
             )
-            // While the car is being asked, the face sits under the phone's glass, inside its ring.
-            WearRefreshGloss(refreshing = ui.refreshing)
         }
     }
 }

@@ -3,7 +3,6 @@ package com.bloo.bluelink.wear
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -44,8 +43,6 @@ fun WearCarFace(
     carState: String = "",
     /** Holding the centre (a long press, with a buzz) changes the four quarters. */
     onHubHold: (() -> Unit)? = null,
-    /** The car's name, curved round the bottom of the face for as long as it is shown. */
-    name: String = "",
 ) {
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val unit = minOf(maxWidth, maxHeight) / ReferenceFace
@@ -82,8 +79,6 @@ fun WearCarFace(
                     pressed = press.pressed == QuadrantPress.HUB,
                 )
             }
-            // Outside the quarters, so its arc sits on the ring's edge.
-            CurvedName(name, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.fillMaxSize())
         }
     }
 }

@@ -57,8 +57,9 @@ import kotlin.math.sin
 
 /*
  * The four actions on the face, as four quarters of the circle. Each quarter is a rounded annular sector that follows the display's edge.
- * The name of each action runs along the quarter's outer edge, and its glyph sits in the middle of the quarter. Pressing a quarter grows it
- * outward and pushes the other three in, so they give way. All sizes are in face units (see [LocalFaceUnit]).
+ * The name of each action runs along the quarter's outer edge, and its glyph sits in the middle of the quarter. The outer edges never move:
+ * pressing a quarter pushes the hub away from it, so the pressed quarter takes more of the middle and the others give up their inner sides.
+ * All sizes are in face units (see [LocalFaceUnit]).
  */
 
 /** How far every quarter's outer edge is kept in from the face's edge: past the ring and its gap. */
@@ -74,10 +75,11 @@ private const val QuarterGap = 3f
 /** How round each quarter's corners are. */
 private const val CornerRadius = 8f
 
-/** The squash and stretch of a press, in face units: the hub moves away from the pressed quarter, which stretches outward while the others squash. */
+/**
+ * How far a press pushes the hub away from the pressed quarter, in face units. Only the hub moves: every quarter keeps its outer edge, so the
+ * pressed quarter takes more of the middle and the others give up their inner sides.
+ */
 private const val PushCentre = 5f
-private const val PressStretch = 4f
-private const val PressSquash = 1.5f
 
 /** The quarters' sides, by quadrant: x and y sign from the hub, so top-left is (-1, -1). */
 private val QuarterSignX = floatArrayOf(-1f, 1f, -1f, 1f)
@@ -214,9 +216,8 @@ internal fun WearQuadrantGrid(
 }
 
 /**
- * The face's geometry for one frame. The face's centre is fixed, and the hub moves with a press: it shifts away from the pressed quarter,
- * which stretches outward while the other three squash, so the press reads as the face pushing back. Shared by the drawing, the glyphs,
- * the hub and the touch.
+ * The face's geometry for one frame. The face's centre and every outer edge are fixed; the hub moves with a press, away from the pressed
+ * quarter, so the inner sides give way. Shared by the drawing, the glyphs, the hub and the touch.
  */
 private class FaceGeometry(width: Float, height: Float, val pxU: Float, press: QuadrantPress?) {
     val centre = Offset(width / 2f, height / 2f)
@@ -233,16 +234,12 @@ private class FaceGeometry(width: Float, height: Float, val pxU: Float, press: Q
     /** The hub's inner edge: the gap the quarters keep from the hub. */
     val inner: Float get() = (HubRadius + InnerGap) * pxU
 
-    /** The outer edge of quarter [q], measured from the face's centre: the pressed quarter stretches, the others squash. */
-    fun outer(q: Int): Float = radius - OuterInset * pxU + when {
-        q == pressed -> grow * PressStretch * pxU
-        pressed in 0..3 -> -grow * PressSquash * pxU
-        else -> 0f
-    }
+    /** The outer edge of every quarter, measured from the face's centre. It never moves, so the rim stays consistent through a press. */
+    val outer: Float = radius - OuterInset * pxU
 
     /** Where the glyph of quarter [q] sits: the middle of its band, on the quarter's diagonal from the hub. */
     fun glyphCentre(q: Int): Offset {
-        val r = (inner + outer(q)) / 2f
+        val r = (inner + outer) / 2f
         val k = r / kotlin.math.sqrt(2f)
         return Offset(hub.x + QuarterSignX[q] * k, hub.y + QuarterSignY[q] * k)
     }
@@ -260,7 +257,7 @@ private fun quarterPath(g: FaceGeometry, q: Int): Path {
     val gap = QuarterGap * g.pxU / 2f + round
     val c = g.hub
     val f = g.centre
-    val ro = g.outer(q) - round
+    val ro = g.outer - round
     val ri = g.inner + round
     val xL = c.x + sx * gap
     val yL = c.y + sy * gap
@@ -314,7 +311,7 @@ private fun DrawScope.drawNameOnEdge(name: String, g: FaceGeometry, q: Int, ink:
     paint.textSize = size
     // The baseline: for the top, the letters rise outward from it, so it sits inside the edge by their height; for the bottom, they rise
     // inward from it, so it sits at the edge.
-    val baseline = if (top) g.outer(q) - inset - size * 0.72f else g.outer(q) - inset
+    val baseline = if (top) g.outer - inset - size * 0.72f else g.outer - inset
     val halfGapDeg = Math.toDegrees(((QuarterGap * g.pxU / 2f) / baseline).toDouble()).toFloat()
     val centreAngle = QuarterStart[q]
     val rect = RectF(g.centre.x - baseline, g.centre.y - baseline, g.centre.x + baseline, g.centre.y + baseline)

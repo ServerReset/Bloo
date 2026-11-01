@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 
 /** The curved name's text size, in face units (see [LocalFaceUnit]). */
-private const val CurvedNameDp = 12f
+private const val CurvedNameDp = 14.5f
 
 /** How far the name's baseline sits in from the outer edge, in face units: the name sits on the ring's own band at the bottom. */
 private const val CurvedNameInsetDp = 2.5f
@@ -24,9 +24,12 @@ private const val CurvedNameInsetDp = 2.5f
 /** The longest the name may run round the bottom, as a share of the half circle, before it shrinks to fit. */
 private const val CurvedNameMaxSpan = 0.9f
 
+/** The dark blur behind the name, in face units, so it reads over whatever is under it on any page. */
+private const val CurvedNameHaloDp = 4f
+
 /**
- * The car's name, curved round the bottom of the face just inside the ring, reading left to right and upright. It shrinks if the name is
- * too long for the half circle. Blank draws nothing.
+ * The car's name, curved round the bottom of the display just inside the ring, reading left to right and upright. It sits on every page,
+ * so it travels with the pages. It shrinks if the name is too long for the half circle. Blank draws nothing.
  */
 @Composable
 internal fun CurvedName(text: String, color: Color, modifier: Modifier = Modifier) {
@@ -42,6 +45,8 @@ private fun DrawScope.drawCurvedName(text: String, color: Color, unit: Float, se
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = color.toArgb()
         textSize = (CurvedNameDp * unit).dp.toPx()
+        // A soft dark halo under the letters: the watch has no backdrop blur, so the shadow does its job for contrast.
+        setShadowLayer((CurvedNameHaloDp * unit).dp.toPx(), 0f, 0f, android.graphics.Color.argb(220, 0, 0, 0))
         // The car's name is the face's hero text: in the classical serif when the phone's Classic headings are on.
         typeface = if (serif) Typeface.create(Typeface.SERIF, Typeface.BOLD) else Typeface.DEFAULT_BOLD
     }

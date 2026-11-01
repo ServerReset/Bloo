@@ -58,7 +58,7 @@ internal class WearPullRefresh(
     fun onFace(): Boolean = canPull()
 
     /** The face's drop under the finger: pulls get harder the further they go, so it stretches rather than following one to one. */
-    fun offsetPx(): Float = pulledPx * 0.5f
+    fun offsetPx(): Float = pulledPx * 0.35f
 
     val connection = object : NestedScrollConnection {
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
