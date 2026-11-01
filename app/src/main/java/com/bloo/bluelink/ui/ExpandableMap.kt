@@ -23,6 +23,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -84,6 +86,9 @@ internal data class MapFeature(
 )
 
 /** How long the map takes to open and to close, and the curve: a ramp up and a slowing down, with no overshoot: the map does not bounce. */
+/** How far past the map's own edges the closed map's cut-off is drawn, so only the bars' edges are cut, never the map's sides. */
+private const val CLIP_MARGIN_PX = 10_000f
+
 private const val MapOpenMs = 520
 private const val MapCloseMs = 440
 private val MapOpenEasing = CubicBezierEasing(0.32f, 0f, 0.2f, 1f)
@@ -303,6 +308,13 @@ internal fun ExpandableMapLayer(
         // of it. Closing runs the same rectangle back down to the pebble's, where the map is put back.
         val sheetCornerPx = with(density) { SheetCorner.toPx() }
         val pebbleCornerPx = with(density) { PebbleMapCorner.toPx() }
+        // Closed, the map sits in its card, which can scroll under the status bar or the search bar. Its visible part is cut to the area
+        // between them; opening lifts the cut, so the full-screen map is not cut at all.
+        val statusTopPx = WindowInsets.statusBars.getTop(density).toFloat()
+        val searchClearPx = with(density) { searchBarClearance(fallback = 132.dp).toPx() }
+        val windowH = windowSize.height.toFloat()
+        // Where the map was placed in this layer's own coordinates, written by the layout and read by the draw.
+        val placed = remember { FloatArray(2) }
         val mapInputs = MapInputs(location, deviceLocation, interactive = isExpanded, tileArea = windowSize, panWeight = { progress().coerceIn(0f, 1f) })
         map(
             Modifier
@@ -317,6 +329,8 @@ internal fun ExpandableMapLayer(
                     val placeable = measurable.measure(
                         androidx.compose.ui.unit.Constraints.fixed(r.width.roundToInt().coerceAtLeast(1), r.height.roundToInt().coerceAtLeast(1)),
                     )
+                    placed[0] = r.left
+                    placed[1] = r.top
                     layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(r.left.roundToInt(), r.top.roundToInt()) }
                 }
                 .graphicsLayer {
@@ -333,7 +347,24 @@ internal fun ExpandableMapLayer(
                     )
                     clip = true
                 }
-                .hazeSource(mapHazeState),
+                .hazeSource(mapHazeState)
+                .drawWithContent {
+                    val root = rootPos
+                    if (root == null) {
+                        drawContent()
+                        return@drawWithContent
+                    }
+                    val t = progress().coerceIn(0f, 1f)
+                    // Between the status bar and the search bar, and the whole screen once open.
+                    val topRoot = lerp(statusTopPx - root.y, 0f, t)
+                    val bottomRoot = lerp(windowH - searchClearPx - root.y, windowH - root.y, t)
+                    clipRect(
+                        left = -CLIP_MARGIN_PX,
+                        top = topRoot - placed[1],
+                        right = size.width + CLIP_MARGIN_PX,
+                        bottom = bottomRoot - placed[1],
+                    ) { this@drawWithContent.drawContent() }
+                },
             mapInputs,
         )
 
