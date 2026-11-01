@@ -58,14 +58,15 @@ internal class WearPullRefresh(
     /** How far the pull has got, as a share of the threshold (1 is the refresh). */
     fun progress(): Float = pulledPx / thresholdPx
 
+    /** True while the face is the page on screen and at rest: the only place a pull refreshes and shows the refresh indicator. */
+    fun onFace(): Boolean = canPull()
+
     /** The face's drop under the finger: pulls get harder the further they go, so it stretches rather than following one to one. */
     fun offsetPx(): Float = pulledPx * 0.5f
 
     val connection = object : NestedScrollConnection {
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            if (source != NestedScrollSource.UserInput) return Offset.Zero
-            // Not on the face: a downward drag goes nowhere. The pager is one-way, so it never goes back a page.
-            if (!canPull()) return if (available.y > 0f) Offset(0f, available.y) else Offset.Zero
+            if (source != NestedScrollSource.UserInput || !canPull()) return Offset.Zero
             // On the face at rest: nothing pulled and not pulling down is the pager's own scroll (upward).
             if (pulledPx <= 0f && available.y <= 0f) return Offset.Zero
             val next = (pulledPx + available.y).coerceAtLeast(0f)
@@ -75,10 +76,29 @@ internal class WearPullRefresh(
             return Offset(0f, used)
         }
 
+        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+            if (source != NestedScrollSource.UserInput) return Offset.Zero
+            // Every page: what its own content could not take is the stretch. A downward drag the list leaves over stretches the page, so
+            // the pager never sees it and never goes back a page; an upward drag takes a stretch back first.
+            val left = available.y - consumed.y
+            if (left > 0f) {
+                release?.cancel()
+                pulledPx += left
+                return Offset(0f, left)
+            }
+            if (left < 0f && pulledPx > 0f) {
+                val back = minOf(-left, pulledPx)
+                release?.cancel()
+                pulledPx -= back
+                return Offset(0f, -back)
+            }
+            return Offset.Zero
+        }
+
         override suspend fun onPreFling(available: Velocity): Velocity {
-            // A downward fling is never the pager's: it is the pull's, or nothing.
+            // A downward fling is never the pager's: it is the stretch's, or nothing.
             val pulling = pulledPx > 0f
-            if (pulling && pulledPx >= thresholdPx) onRefresh()
+            if (pulling && onFace() && pulledPx >= thresholdPx) onRefresh()
             release = scope.launch {
                 animate(pulledPx, 0f, initialVelocity = 0f, animationSpec = spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium)) { value, _ ->
                     pulledPx = value
@@ -109,7 +129,7 @@ internal fun BoxScope.WearPullIndicator(pull: WearPullRefresh, refreshing: Boole
             androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(450), androidx.compose.animation.core.RepeatMode.Reverse),
             label = "refreshBeat",
         )
-        Canvas(Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(size).graphicsLayer { rotationZ = turn; scaleX = beat; scaleY = 1f / beat }) {
+        Canvas(Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(size).graphicsLayer { rotationZ = turn; scaleX = beat; scaleY = 1f / beat; alpha = if (pull.onFace()) 1f else 0f }) {
             drawArc(colour, startAngle = -90f, sweepAngle = 270f, useCenter = false, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
         }
     } else {
@@ -119,7 +139,7 @@ internal fun BoxScope.WearPullIndicator(pull: WearPullRefresh, refreshing: Boole
                 // Squash and stretch: it widens as it is pulled out and narrows as it is pulled tall.
                 scaleX = 1f - 0.15f * p
                 scaleY = 1f + 0.2f * p
-                alpha = (pull.pulledPx / 12.dp.toPx()).coerceIn(0f, 1f)
+                alpha = (pull.pulledPx / 12.dp.toPx()).coerceIn(0f, 1f) * if (pull.onFace()) 1f else 0f
             },
         ) {
             val sweep = 360f * pull.progress().coerceIn(0f, 1f)
