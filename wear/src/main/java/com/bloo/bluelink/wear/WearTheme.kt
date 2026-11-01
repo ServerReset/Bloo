@@ -52,6 +52,8 @@ internal fun WearTheme(content: @Composable () -> Unit) {
         LocalReduceMotion provides (reduceMotion || policy.lean),
         // The watch theme is dark, and the shared tones need to know that.
         com.bloo.uicommon.LocalIsDarkTheme provides true,
+        // The phone's Classic headings decide the classical serif, for the hero text as for the headings.
+        LocalHeroSerif provides type.classicHeadings,
         // The shared components lay themselves out for a round face: smaller switches, tighter rows, two lines of detail.
         com.bloo.uicommon.LocalSurfaceProfile provides com.bloo.uicommon.SurfaceProfile.ROUND,
         LocalPowerPolicy provides policy,

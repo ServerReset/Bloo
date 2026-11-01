@@ -32,16 +32,18 @@ private const val CurvedNameMaxSpan = 0.9f
 internal fun CurvedName(text: String, color: Color, modifier: Modifier = Modifier) {
     if (text.isBlank()) return
     val unit = LocalFaceUnit.current
-    Canvas(modifier) { drawCurvedName(text, color, unit) }
+    val serif = LocalHeroSerif.current
+    Canvas(modifier) { drawCurvedName(text, color, unit, serif) }
 }
 
-private fun DrawScope.drawCurvedName(text: String, color: Color, unit: Float) {
+private fun DrawScope.drawCurvedName(text: String, color: Color, unit: Float, serif: Boolean) {
     val outer = size.minDimension / 2f
     val baseline = outer - (CurvedNameInsetDp * unit).dp.toPx()
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = color.toArgb()
         textSize = (CurvedNameDp * unit).dp.toPx()
-        typeface = Typeface.DEFAULT_BOLD
+        // The car's name is the face's hero text: in the classical serif when the phone's Classic headings are on.
+        typeface = if (serif) Typeface.create(Typeface.SERIF, Typeface.BOLD) else Typeface.DEFAULT_BOLD
     }
     // Left, round the bottom, to the right: text on this path runs left to right with its tops toward the middle.
     val rect = RectF(center.x - baseline, center.y - baseline, center.x + baseline, center.y + baseline)

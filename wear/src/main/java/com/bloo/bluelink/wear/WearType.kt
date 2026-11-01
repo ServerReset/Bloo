@@ -6,6 +6,10 @@ import com.bloo.bluelink.data.WatchType
 import com.bloo.bluelink.data.privatePrefs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import androidx.compose.runtime.compositionLocalOf
+
+/** Whether the big hero text (the charge in the middle of the face, the car's name on its ring) is set in the classical serif: the phone's Classic headings. */
+internal val LocalHeroSerif = compositionLocalOf { false }
 
 /**
  * The phone's typeface, as the watch sets its text. The phone sends its choice with every sync ([WatchType]); it is kept here and on disk,
