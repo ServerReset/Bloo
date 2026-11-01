@@ -31,6 +31,10 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.graphics.graphicsLayer
 import com.bloo.uicommon.lowPowerCalm
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 
 /**
  * What a car's pages need to show and do, in one place: the car, whether the watch has its own sign-in, what is in flight,
@@ -128,6 +132,17 @@ internal fun WearCarPage(
     // The face, then the car's sections, swiped up and down; the last section swipes on to the face. The page is one memory for every car,
     // so a swipe left or right to another car keeps the wearer on the same page of it.
     val wrap = rememberWearWrap(realCount = CarPageCount, initialRealIndex = WearPageMemory.page)
+    // A pull down on the face refreshes the car once it is pulled past the threshold (see WearPullRefresh).
+    val latestUi by rememberUpdatedState(ui)
+    val editingNow by rememberUpdatedState(editingFace)
+    val pullThreshold = with(LocalDensity.current) { PullRefreshDistance.toPx() }
+    val pull = remember(pullThreshold) {
+        WearPullRefresh(
+            thresholdPx = pullThreshold,
+            canPull = { wrap.wrap.real(pagerState.currentPage) == 0 && pagerState.currentPageOffsetFraction == 0f && !editingNow },
+            onRefresh = { if (latestUi.signedIn) latestUi.repo.refresh() },
+        )
+    }
     val pagerState = wrap.pager
     val page = wrap.wrap.real(pagerState.currentPage)
     LaunchedEffect(page, current) { if (current) WearPageMemory.page = page }
@@ -220,23 +235,33 @@ internal fun WearCarPage(
                 scaleY = s
                 alpha = 1f - editT
             }) {
-                VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { virtual ->
-                    val real = wrap.wrap.real(virtual)
-                    if (real == 0) {
-                        WearFacePage(
-                            ui, slotKeys, faceStatus,
-                            onConfirm = { confirmAction = it },
-                            onChooseClimate = { climateAsk = ClimateAsk(it, run = true) },
-                            onEditFace = { editingFace = true },
-                        )
-                    } else {
-                        WearCarSection(ui, update, CarSection.entries[real - 1])
+                // The pull-to-refresh is taken from the pager's own drags while the face is on screen (see WearPullRefresh).
+                Box(
+                    Modifier.fillMaxSize()
+                        .nestedScroll(pull.connection)
+                        .graphicsLayer { translationY = pull.offsetPx },
+                ) {
+                    VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { virtual ->
+                        val real = wrap.wrap.real(virtual)
+                        if (real == 0) {
+                            WearFacePage(
+                                ui, slotKeys, faceStatus,
+                                onConfirm = { confirmAction = it },
+                                onChooseClimate = { climateAsk = ClimateAsk(it, run = true) },
+                                onEditFace = { editingFace = true },
+                            )
+                        } else {
+                            WearCarSection(ui, update, CarSection.entries[real - 1])
+                        }
                     }
                 }
             }
         }
     }
 }
+
+/** How far the face must be pulled down to refresh the car. */
+private val PullRefreshDistance = 56.dp
 
 /** How small the face gets when its quarters are opened: the editor starts from this size and the face shrinks to it. */
 private const val FaceEditFrom = 0.6f
