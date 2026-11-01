@@ -40,6 +40,13 @@ import com.bloo.bluelink.data.formatDistance
 import kotlinx.coroutines.launch
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapGroup
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.background
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.Icon
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.SecondaryTextStyle
+import androidx.compose.foundation.clickable
 
 /**
  * Asks for the phone's position so the map can draw "you are here". [ask] always asks; [askOnce]

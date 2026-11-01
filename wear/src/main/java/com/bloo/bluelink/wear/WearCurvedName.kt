@@ -16,10 +16,10 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 
 /** The curved name's text size, in face units (see [LocalFaceUnit]). */
-private const val CurvedNameDp = 9f
+private const val CurvedNameDp = 12f
 
 /** How far the name's baseline sits in from the outer edge, in face units: the name sits on the ring's own band at the bottom. */
-private const val CurvedNameInsetDp = 1f
+private const val CurvedNameInsetDp = 2.5f
 
 /** The longest the name may run round the bottom, as a share of the half circle, before it shrinks to fit. */
 private const val CurvedNameMaxSpan = 0.9f

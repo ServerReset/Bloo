@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -44,20 +45,23 @@ internal fun WearHero(value: String, caption: String?, modifier: Modifier = Modi
 @Composable
 internal fun WearStatusPebble(v: VehicleSnapshot) {
     val facts = WearCarFacts.status(v).toMap()
-    val battery = facts["Battery"]
-    if (battery != null) {
-        WearHero(battery, facts["Range"]?.let { range -> "$range range" })
-    } else facts["Engine"]?.let { engine -> WearHero(engine, null) }
-    val now = listOf("Doors", "Climate", "Moving").mapNotNull { label -> facts[label]?.let { label to it } }
-    if (now.isNotEmpty()) {
-        WearPebble(title = "Now", icon = AppIcons.DirectionsCar) {
-            now.forEach { (label, value) -> WearStatRow(label, value) }
+    // The parts stack top to bottom: a single item on the page holds them all, so they are laid out in a column, not over each other.
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(SectionGap)) {
+        val battery = facts["Battery"]
+        if (battery != null) {
+            WearHero(battery, facts["Range"]?.let { range -> "$range range" })
+        } else facts["Engine"]?.let { engine -> WearHero(engine, null) }
+        val now = listOf("Doors", "Climate", "Moving").mapNotNull { label -> facts[label]?.let { label to it } }
+        if (now.isNotEmpty()) {
+            WearPebble(title = "Now", icon = AppIcons.DirectionsCar) {
+                now.forEach { (label, value) -> WearStatRow(label, value) }
+            }
         }
-    }
-    val charging = listOf("Charging", "Charge limit").mapNotNull { label -> facts[label]?.let { label to it } }
-    if (charging.isNotEmpty()) {
-        WearPebble(title = "Charging", icon = AppIcons.BatteryFull) {
-            charging.forEach { (label, value) -> WearStatRow(label, value) }
+        val charging = listOf("Charging", "Charge limit").mapNotNull { label -> facts[label]?.let { label to it } }
+        if (charging.isNotEmpty()) {
+            WearPebble(title = "Charging", icon = AppIcons.BatteryFull) {
+                charging.forEach { (label, value) -> WearStatRow(label, value) }
+            }
         }
     }
 }
@@ -75,6 +79,7 @@ internal fun WearCarCarePebble(
 ) {
     val care = WearCarFacts.care(v).toMap()
     val service = care["Service"]
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(SectionGap)) {
     WearHero(service ?: care["Odometer"].orEmpty(), caption = if (service != null) "service" else "odometer")
     val car = listOf("Odometer", "Plate").mapNotNull { label -> care[label]?.let { label to it } }
     if (car.isNotEmpty()) {
@@ -93,5 +98,6 @@ internal fun WearCarCarePebble(
             )
         }
         if (canRefresh) WearActionRow("Refresh", AppIcons.Refresh, pending = refreshing, onClick = onRefresh)
+    }
     }
 }
