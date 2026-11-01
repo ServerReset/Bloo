@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 /** The spinner's size inside the disc. */
 private val SpinnerDp = 44.dp
@@ -34,6 +36,7 @@ private val SpinnerDp = 44.dp
  *
  * @param pull 0 at rest, 1 at the point a release arms a refresh, past 1 while the pull is resisted (see [pullFingerPosition]).
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PullRefreshDisc(
     pull: Float,
