@@ -52,7 +52,10 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.MapTiles
+import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.hypot
+import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlinx.coroutines.currentCoroutineContext
@@ -423,9 +426,45 @@ private fun CarMapBody(
 private val CarIconWidth = 56.dp
 private val CarIconHeight = 38.dp
 
+/** The size of a car that has gone off the edge, as a share of its icon: it shrinks into a pin as it reaches the edge. */
+private const val EdgePinScale = 0.6f
+
+/** How far past the edge a car travels while it morphs from its icon into its edge pin, in dp. */
+private val EdgeMorphDp = 72.dp
+
+/** Where a car's icon is kept clear of the map's edges, in dp: the top and bottom carry the bar and the buttons. */
+private val EdgeInsetSidesDp = 28.dp
+private val EdgeInsetTopDp = 64.dp
+private val EdgeInsetBottomDp = 96.dp
+
 /**
- * Every car on the map as its own icon (its photo, or the car glyph), at the place the car is. Nothing is drawn for a car that is off the
- * map: the map clips it, and there is no pointer at the edge. Tapping an icon selects that car.
+ * Where a car shows, for its place [x], [y] from the map's centre in pixels, and a window of [halfW] by [halfH] round that centre. Inside the
+ * window it is its icon, at its place. Past the window it slides to the window's edge on the line from the centre to it, and shrinks into a
+ * pin there. The change is continuous: it starts the moment the car crosses the edge, and the pin keeps the car's direction.
+ */
+internal data class EdgePin(val x: Float, val y: Float, val scale: Float)
+
+internal fun edgePin(x: Float, y: Float, halfW: Float, halfTop: Float, halfBottom: Float, morphPx: Float): EdgePin {
+    // Before the map has a size there is no window to keep a car in: it stays where it is.
+    if (halfW <= 0f || halfTop <= 0f || halfBottom <= 0f) return EdgePin(x, y, 1f)
+    val ax = abs(x)
+    val ay = abs(y)
+    // The window is not symmetric (the bottom carries the buttons): each vertical side has its own half-height.
+    val halfH = if (y > 0f) halfBottom else halfTop
+    // How far along its own direction the window's edge is: 1 or more means the car is inside.
+    val t = min(if (ax > 0f) halfW / ax else Float.MAX_VALUE, if (ay > 0f) halfH / ay else Float.MAX_VALUE)
+    if (t >= 1f) return EdgePin(x, y, 1f)
+    val edgeX = x * t
+    val edgeY = y * t
+    // How far past the edge the car is, in pixels, and how far through the morph it has got.
+    val beyond = hypot(x, y) - hypot(edgeX, edgeY)
+    val f = if (morphPx > 0f) (beyond / morphPx).coerceIn(0f, 1f) else 1f
+    return EdgePin(x + (edgeX - x) * f, y + (edgeY - y) * f, 1f - (1f - EdgePinScale) * f)
+}
+
+/**
+ * Every car on the map as its own icon (its photo, or the car glyph), at the place the car is. A car that goes past the edge of the map
+ * morphs into a small pin on that edge, pointing the way it is, and comes back into its icon as it returns. Tapping an icon selects that car.
  */
 @Composable
 internal fun BoxScope.CarIconLayer(
@@ -441,6 +480,17 @@ internal fun BoxScope.CarIconLayer(
     tint: Color,
     onCarTap: (String) -> Unit,
 ) {
+    // The map's own size, read in the layout and draw phases only, so a resize or a move never recomposes the markers.
+    var viewport by remember { mutableStateOf(IntSize.Zero) }
+    val density = LocalDensity.current
+    val sides = with(density) { EdgeInsetSidesDp.toPx() }
+    val top = with(density) { EdgeInsetTopDp.toPx() }
+    val bottom = with(density) { EdgeInsetBottomDp.toPx() }
+    val morph = with(density) { EdgeMorphDp.toPx() }
+    // The window the icons stay inside: the map less its insets, measured from the map's centre (a car at the centre is the anchor).
+    fun window(): Triple<Float, Float, Float> =
+        Triple(viewport.width / 2f - sides, viewport.height / 2f - top, viewport.height / 2f - bottom)
+    Box(Modifier.matchParentSize().onSizeChanged { viewport = it })
     for (car in cars) {
         val place = tilePlace(car.location.latitude, car.location.longitude, zoom, xTileF, yTileF, tilePx)
         key(car.vin) {
@@ -452,13 +502,23 @@ internal fun BoxScope.CarIconLayer(
                 size = DpSize(CarIconWidth, CarIconHeight),
                 selected = car.vin == selectedVin,
                 glyphSize = 20.dp,
-                modifier = Modifier.align(Alignment.Center).offset {
-                    val at = mapScreenOffset(place.x, place.y, state.panX, state.panY, panWeight(), state.scale)
-                    IntOffset(
-                        (at.x - CarIconWidth.toPx() / 2f).roundToInt(),
-                        (at.y - CarIconHeight.toPx() / 2f).roundToInt(),
-                    )
-                },
+                modifier = Modifier.align(Alignment.Center)
+                    .offset {
+                        val at = mapScreenOffset(place.x, place.y, state.panX, state.panY, panWeight(), state.scale)
+                        val (halfW, halfTop, halfBottom) = window()
+                        val pin = edgePin(at.x, at.y, halfW, halfTop, halfBottom, morph)
+                        IntOffset(
+                            (pin.x - CarIconWidth.toPx() / 2f).roundToInt(),
+                            (pin.y - CarIconHeight.toPx() / 2f).roundToInt(),
+                        )
+                    }
+                    .graphicsLayer {
+                        val at = mapScreenOffset(place.x, place.y, state.panX, state.panY, panWeight(), state.scale)
+                        val (halfW, halfTop, halfBottom) = window()
+                        val s = edgePin(at.x, at.y, halfW, halfTop, halfBottom, morph).scale
+                        scaleX = s
+                        scaleY = s
+                    },
             )
         }
     }
