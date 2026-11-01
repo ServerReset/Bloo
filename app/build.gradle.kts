@@ -159,6 +159,10 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    testOptions {
+        // Robolectric renders Compose from the merged resources (MapScreenshotTest).
+        unitTests.isIncludeAndroidResources = true
+    }
     lint {
         // Two deliberate, non-actionable warnings, silenced by id (not a blanket baseline) so
         // any NEW finding still fails/prints:
@@ -373,6 +377,10 @@ dependencies {
     // and pulls JUnit transitively, so the Android unit-test task actually
     // discovers them. Version = project Kotlin 2.2.20.
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
+    // Map screenshots (MapScreenshotTest): Compose rendered on the JVM by Robolectric, captured to a PNG the test logs. No device needed.
+    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("androidx.compose.ui:ui-test-junit4:$composeUi")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:$composeUi")
 
     implementation("androidx.concurrent:concurrent-futures:1.2.0")
     implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
