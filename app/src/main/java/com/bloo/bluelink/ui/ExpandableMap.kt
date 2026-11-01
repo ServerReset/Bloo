@@ -61,6 +61,7 @@ import androidx.compose.ui.util.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalContext
@@ -144,6 +145,8 @@ internal fun ExpandableMapLayer(
     /** How far the bar is being dragged toward closing, 0 to 1 (see [CentralMap.dismissFade]). */
     onDismissDrag: (Float) -> Unit = {},
     onDismiss: () -> Unit,
+    /** The map's measured chrome, written here so the markers' edge window follows the real bars (see [MapChromeInsets]). */
+    chromeInsets: MapChromeInsets? = null,
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("ExpandableMapLayer")
     val context = LocalContext.current
@@ -248,6 +251,8 @@ internal fun ExpandableMapLayer(
     // The top bar and bottom buttons exist only once the chrome's own track has left zero. A derived
     // boolean, so the sheet recomposes when it FLIPS, not on every frame of the springs.
     val chromeShown by remember { derivedStateOf { chrome.value > 0.01f } }
+    // The markers' edge window only takes the bars into account while they are shown (see MapChromeInsets).
+    SideEffect { chromeInsets?.chromeOn = isExpanded && chromeShown }
     fun close() {
         if (closing) return
         closing = true
@@ -368,7 +373,13 @@ internal fun ExpandableMapLayer(
                     )
                     clip = true
                 }
-                .hazeSource(mapHazeState),
+                .hazeSource(mapHazeState)
+                .onGloballyPositioned { c ->
+                    chromeInsets?.let {
+                        it.mapTop = c.positionOnScreen().y
+                        it.mapBottom = c.positionOnScreen().y + c.size.height
+                    }
+                },
             mapInputs,
         )
         }
@@ -450,7 +461,8 @@ internal fun ExpandableMapLayer(
                         .graphicsLayer {
                             // 0 is off the top of the screen, 1 its place; the bounce takes it a little past 1 either way. It stays solid as it goes.
                             translationY = -(1f - chrome.value) * (windowSize.height * 0.15f + size.height + barGapPx)
-                        },
+                        }
+                        .onGloballyPositioned { c -> chromeInsets?.barBottom = c.positionOnScreen().y + c.size.height },
                 )
             }
 
@@ -462,7 +474,8 @@ internal fun ExpandableMapLayer(
                         .graphicsLayer {
                             // 0 is off the bottom of the screen, 1 its place; the bounce takes it a little past 1 either way. It stays solid as it goes.
                             translationY = (1f - chrome.value) * (size.height + 120.dp.toPx())
-                        },
+                        }
+                        .onGloballyPositioned { c -> chromeInsets?.rowTop = c.positionOnScreen().y },
                 ) {
                     MapFeatureRow(
                         features = listOf(

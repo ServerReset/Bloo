@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.geometry.Offset
 import com.bloo.bluelink.data.MapTiles
@@ -37,3 +39,26 @@ internal fun mapScreenOffset(placeX: Float, placeY: Float, panX: Float, panY: Fl
 internal fun tilePlace(lat: Double, lon: Double, zoom: Int, xTileF: Double, yTileF: Double, tilePx: Float): Offset =
     Offset(((MapTiles.tileX(lon, zoom) - xTileF) * tilePx).toFloat(), ((MapTiles.tileY(lat, zoom) - yTileF) * tilePx).toFloat())
 
+
+/**
+ * The map's chrome in window coordinates, measured by the layer: where the map is, and where its top bar and bottom buttons sit. The map's
+ * markers read it, so their edge window follows the real bars on any screen rather than fixed insets. Closed, there are no bars, so the
+ * insets are zero.
+ */
+internal class MapChromeInsets {
+    /** True while the map's top bar and bottom buttons are shown (open, and their own track has come in). */
+    var chromeOn by androidx.compose.runtime.mutableStateOf(false)
+    var mapTop by androidx.compose.runtime.mutableFloatStateOf(0f)
+    var mapBottom by androidx.compose.runtime.mutableFloatStateOf(0f)
+    var barBottom by androidx.compose.runtime.mutableFloatStateOf(0f)
+    var rowTop by androidx.compose.runtime.mutableFloatStateOf(0f)
+
+    /** How far the top bar comes down into the map, in pixels from the map's top. */
+    fun topPx(): Float = if (chromeOn) (barBottom - mapTop).coerceAtLeast(0f) else 0f
+
+    /** How far the bottom buttons come up into the map, in pixels from the map's bottom. */
+    fun bottomPx(): Float = if (chromeOn) (mapBottom - rowTop).coerceAtLeast(0f) else 0f
+}
+
+/** The map's [MapChromeInsets], provided by [CentralMap] around its map. Null where no map is drawn. */
+internal val LocalMapChrome = staticCompositionLocalOf<MapChromeInsets?> { null }

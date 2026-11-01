@@ -91,6 +91,7 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         // tracks the in-flight fetch this same button just kicked off.
         refreshing = state.value.isPending(hostVehicle.vin, CarCommandIds.LOCATE),
         frostHaze = frostHaze,
+        chromeInsets = centralMap.chromeInsets,
         onDismiss = {
             centralMap.selectedVin = null
             centralMap.vin = null

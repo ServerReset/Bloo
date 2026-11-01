@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -24,6 +25,9 @@ import com.bloo.bluelink.data.GeoLocation
 internal class CentralMap {
     /** The map's pan and zoom: the one state every view of the map uses. */
     val mapState = CarMapState()
+
+    /** The map's measured chrome (its bars' places), written by the host and read by the markers (see [MapChromeInsets]). */
+    val chromeInsets = MapChromeInsets()
 
     /** Every car that has a location, each drawn as its own icon. */
     var cars by mutableStateOf<List<CarPin>>(emptyList())
@@ -79,18 +83,20 @@ internal class CentralMap {
     /** The map, as it is drawn wherever it is hosted: the one instance, anchored on the car it was opened for. */
     @Composable
     fun Content(modifier: Modifier, inputs: MapInputs) {
-        CarMap(
-            location = inputs.location,
-            modifier = modifier,
-            state = mapState,
-            deviceLocation = inputs.deviceLocation,
-            interactive = inputs.interactive,
-            tileArea = inputs.tileArea,
-            panWeight = inputs.panWeight,
-            cars = cars,
-            anchorVin = vin,
-            selectedVin = selectedVin,
-            onCarTap = { tapPin(it) },
-        )
+        CompositionLocalProvider(LocalMapChrome provides chromeInsets) {
+            CarMap(
+                location = inputs.location,
+                modifier = modifier,
+                state = mapState,
+                deviceLocation = inputs.deviceLocation,
+                interactive = inputs.interactive,
+                tileArea = inputs.tileArea,
+                panWeight = inputs.panWeight,
+                cars = cars,
+                anchorVin = vin,
+                selectedVin = selectedVin,
+                onCarTap = { tapPin(it) },
+            )
+        }
     }
 }

@@ -434,8 +434,9 @@ private val EdgeMorphDp = 72.dp
 
 /** Where a car's icon is kept clear of the map's edges, in dp: the top and bottom carry the bar and the buttons. */
 private val EdgeInsetSidesDp = 28.dp
-private val EdgeInsetTopDp = 64.dp
-private val EdgeInsetBottomDp = 96.dp
+
+/** The gap an off-edge marker keeps from the map's edge, past the bars where the map has them. */
+private val EdgeMarginDp = 8.dp
 
 /**
  * Where a car shows, for its place [x], [y] from the map's centre in pixels, and a window of [halfW] by [halfH] round that centre. Inside the
@@ -466,17 +467,27 @@ internal fun edgePin(x: Float, y: Float, halfW: Float, halfTop: Float, halfBotto
  * The window the map's off-edge markers stay inside, and how a marker past it morphs into its pin: the map less its insets, measured from the
  * map's centre (a marker at the centre is the anchor). Shared by every marker, so the car icons and the phone's dot follow one rule.
  */
-internal class EdgeWindow(private val sides: Float, private val top: Float, private val bottom: Float, private val morph: Float) {
-    fun pin(x: Float, y: Float, viewport: IntSize): EdgePin =
-        edgePin(x, y, viewport.width / 2f - sides, viewport.height / 2f - top, viewport.height / 2f - bottom, morph)
+internal class EdgeWindow(
+    private val sides: Float,
+    private val margin: Float,
+    /** The map's measured chrome, read at each placement: the window follows the real top bar and bottom buttons. */
+    private val chrome: MapChromeInsets?,
+    private val morph: Float,
+) {
+    fun pin(x: Float, y: Float, viewport: IntSize): EdgePin {
+        val top = margin + (chrome?.topPx() ?: 0f)
+        val bottom = margin + (chrome?.bottomPx() ?: 0f)
+        return edgePin(x, y, viewport.width / 2f - sides, viewport.height / 2f - top, viewport.height / 2f - bottom, morph)
+    }
 }
 
 @Composable
 internal fun rememberEdgeWindow(): EdgeWindow {
     val density = LocalDensity.current
-    return remember(density) {
+    val chrome = LocalMapChrome.current
+    return remember(density, chrome) {
         with(density) {
-            EdgeWindow(EdgeInsetSidesDp.toPx(), EdgeInsetTopDp.toPx(), EdgeInsetBottomDp.toPx(), EdgeMorphDp.toPx())
+            EdgeWindow(EdgeInsetSidesDp.toPx(), EdgeMarginDp.toPx(), chrome, EdgeMorphDp.toPx())
         }
     }
 }
