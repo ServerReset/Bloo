@@ -1,54 +1,129 @@
 package com.bloo.bluelink.wear
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
- * Pull down on the face to ask the car for a fresh reading. While the face is the page on screen and at rest, a downward drag is taken
- * before the pager sees it: the face gives under the finger, so the pager does not wrap to another page. Letting go past [thresholdPx]
- * refreshes; letting go before it springs back. Pushing back up takes the pull back first, before the pager can scroll.
+ * The watch's one-way scroll and its pull to refresh.
+ *
+ * The pager only moves forward: a downward drag is taken on every page, so swiping down never goes back a page. On the face, at rest, that
+ * downward drag is a pull: the face stretches under the finger, and letting go past [thresholdPx] asks the car for a fresh reading. Letting
+ * go before that springs the face back with a little overshoot, which is the squash and stretch.
  */
 @Stable
 internal class WearPullRefresh(
+    private val scope: CoroutineScope,
     private val thresholdPx: Float,
-    /** True when the face is the page on screen and is at rest, so a pull is the face's and not the pager's. */
+    /** True when the face is the page on screen and is at rest, so a downward drag is the face's pull. */
     private val canPull: () -> Boolean,
     private val onRefresh: () -> Unit,
 ) {
-    /** How far the face has been pulled down, in pixels, with resistance: the face's own offset while it is pulled. */
-    var offsetPx by mutableFloatStateOf(0f)
+    /** How far the face has been pulled, in pixels, before resistance. Read in draw and layer code, so a pull redraws without recomposing. */
+    var pulledPx by mutableFloatStateOf(0f)
         private set
 
-    private var pulled = 0f
+    private var release: Job? = null
+
+    /** How far the pull has got, as a share of the threshold (1 is the refresh). */
+    fun progress(): Float = pulledPx / thresholdPx
+
+    /** The face's drop under the finger: pulls get harder the further they go, so it stretches rather than following one to one. */
+    fun offsetPx(): Float = pulledPx * 0.5f
 
     val connection = object : NestedScrollConnection {
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            if (source != NestedScrollSource.UserInput || !canPull()) return Offset.Zero
-            // Nothing pulled, and not pulling down: the pager's own scroll.
-            if (pulled <= 0f && available.y <= 0f) return Offset.Zero
-            val next = (pulled + available.y).coerceAtLeast(0f)
-            val used = next - pulled
-            pulled = next
-            offsetPx = resist(pulled)
+            if (source != NestedScrollSource.UserInput) return Offset.Zero
+            // Not on the face: a downward drag goes nowhere. The pager is one-way, so it never goes back a page.
+            if (!canPull()) return if (available.y > 0f) Offset(0f, available.y) else Offset.Zero
+            // On the face at rest: nothing pulled and not pulling down is the pager's own scroll (upward).
+            if (pulledPx <= 0f && available.y <= 0f) return Offset.Zero
+            val next = (pulledPx + available.y).coerceAtLeast(0f)
+            val used = next - pulledPx
+            release?.cancel()
+            pulledPx = next
             return Offset(0f, used)
         }
 
         override suspend fun onPreFling(available: Velocity): Velocity {
-            val wasPulled = pulled > 0f
-            if (wasPulled && pulled >= thresholdPx) onRefresh()
-            pulled = 0f
-            offsetPx = 0f
-            // A fling that ended a pull belongs to the pull, not the pager.
-            return if (wasPulled) available else Velocity.Zero
+            // A downward fling is never the pager's: it is the pull's, or nothing.
+            val pulling = pulledPx > 0f
+            if (pulling && pulledPx >= thresholdPx) onRefresh()
+            release = scope.launch {
+                animate(pulledPx, 0f, initialVelocity = 0f, animationSpec = spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium)) { value, _ ->
+                    pulledPx = value
+                }
+            }
+            return if (pulling || available.y > 0f) Velocity(available.x, 0f) else Velocity.Zero
         }
     }
+}
 
-    /** Pulls get harder the further they go, so the face stretches under the finger rather than following it one to one. */
-    private fun resist(p: Float): Float = p * 0.5f
+/**
+ * The refresh indicator: an arc at the top of the screen that fills as the face is pulled, and stretches with it, so it squashes wide and
+ * tall as the pull grows. While the car is being asked it spins and pulses. It is drawn in layers that read the pull directly, so a pull
+ * moves it without recomposing the page.
+ */
+@Composable
+internal fun BoxScope.WearPullIndicator(pull: WearPullRefresh, refreshing: Boolean, size: Dp = 26.dp) {
+    val colour = MaterialTheme.colorScheme.primary
+    if (refreshing) {
+        val spin = androidx.compose.animation.core.rememberInfiniteTransition(label = "refreshSpin")
+        val turn by spin.animateFloat(
+            0f, 360f,
+            androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing)),
+            label = "refreshTurn",
+        )
+        val beat by spin.animateFloat(
+            0.9f, 1.1f,
+            androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(450), androidx.compose.animation.core.RepeatMode.Reverse),
+            label = "refreshBeat",
+        )
+        Canvas(Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(size).graphicsLayer { rotationZ = turn; scaleX = beat; scaleY = 1f / beat }) {
+            drawArc(colour, startAngle = -90f, sweepAngle = 270f, useCenter = false, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+        }
+    } else {
+        Canvas(
+            Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(size).graphicsLayer {
+                val p = pull.progress().coerceIn(0f, 1.25f)
+                // Squash and stretch: it widens as it is pulled out and narrows as it is pulled tall.
+                scaleX = 1f - 0.15f * p
+                scaleY = 1f + 0.2f * p
+                alpha = (pull.pulledPx / 12.dp.toPx()).coerceIn(0f, 1f)
+            },
+        ) {
+            val sweep = 360f * pull.progress().coerceIn(0f, 1f)
+            if (sweep > 0f) drawArc(colour, startAngle = -90f, sweepAngle = sweep, useCenter = false, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+        }
+    }
 }

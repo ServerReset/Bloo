@@ -35,6 +35,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.TransformOrigin
 
 /**
  * What a car's pages need to show and do, in one place: the car, whether the watch has its own sign-in, what is in flight,
@@ -136,8 +137,10 @@ internal fun WearCarPage(
     val latestUi by rememberUpdatedState(ui)
     val editingNow by rememberUpdatedState(editingFace)
     val pullThreshold = with(LocalDensity.current) { PullRefreshDistance.toPx() }
+    val pullScope = rememberCoroutineScope()
     val pull = remember(pullThreshold) {
         WearPullRefresh(
+            scope = pullScope,
             thresholdPx = pullThreshold,
             canPull = { wrap.wrap.real(pagerState.currentPage) == 0 && pagerState.currentPageOffsetFraction == 0f && !editingNow },
             onRefresh = { if (latestUi.signedIn) latestUi.repo.refresh() },
@@ -239,7 +242,14 @@ internal fun WearCarPage(
                 Box(
                     Modifier.fillMaxSize()
                         .nestedScroll(pull.connection)
-                        .graphicsLayer { translationY = pull.offsetPx },
+                        // The face stretches down under the pull and squashes across it, from its top edge.
+                        .graphicsLayer {
+                            val p = pull.progress().coerceIn(0f, 1.25f)
+                            translationY = pull.offsetPx()
+                            transformOrigin = TransformOrigin(0.5f, 0f)
+                            scaleY = 1f + 0.12f * p
+                            scaleX = 1f - 0.05f * p
+                        },
                 ) {
                     VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { virtual ->
                         val real = wrap.wrap.real(virtual)
@@ -254,6 +264,7 @@ internal fun WearCarPage(
                             WearCarSection(ui, update, CarSection.entries[real - 1])
                         }
                     }
+                    WearPullIndicator(pull, refreshing = ui.refreshing)
                 }
             }
         }
