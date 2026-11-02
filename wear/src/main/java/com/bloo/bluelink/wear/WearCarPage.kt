@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Alignment
 
 import com.bloo.uicommon.AppIcons
