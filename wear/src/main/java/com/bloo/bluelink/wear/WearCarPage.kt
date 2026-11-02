@@ -1,3 +1,5 @@
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
 package com.bloo.bluelink.wear
 
 import com.bloo.uicommon.AppIcons
@@ -36,6 +38,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +64,8 @@ internal class WearCarUi(
     val pending: Set<String>,
     val lastResult: WatchCommandResult?,
     val send: (() -> Unit) -> Unit,
+    /** The phone just refused a command as still pending: every command is held off until the hold lapses. */
+    val busy: Boolean = false,
 ) {
     /**
      * Runs [control] for this car, carrying its climate settings when it has any.
@@ -74,7 +84,7 @@ internal class WearCarUi(
     fun resolved(action: String): String =
         if (action in TOGGLES) CarCommandRunner.resolveToggle(car, action) else action
 
-    fun isPending(action: String) = WearCommands.key(car.vin, action) in pending
+    fun isPending(action: String) = busy || WearCommands.key(car.vin, action) in pending
 }
 
 /**
@@ -105,9 +115,20 @@ internal fun WearCarPage(
     val signedIn by WearCredentialSync.signedIn.collectAsStateWithLifecycle()
     val pending by WearCommands.pending.collectAsStateWithLifecycle()
     val lastResult by repo.lastCommandResult.collectAsStateWithLifecycle(initialValue = null)
+    // The phone turned a command away because the car still had another request in hand: its buttons are held off for a while, so the
+    // wearer is not sent into the same refusal by tapping again.
+    val busy by produceState(false, lastResult, car.vin) {
+        val r = lastResult
+        val refused = r != null && r.vin == car.vin && !r.ok && r.message?.contains("previous request is pending", ignoreCase = true) == true
+        value = refused
+        if (refused) {
+            delay(BusyHoldMs)
+            value = false
+        }
+    }
     val refreshing by repo.refreshing.collectAsStateWithLifecycle(initialValue = false)
     val slotKeys by WearFacePrefs.flow(context).collectAsStateWithLifecycle()
-    val ui = WearCarUi(repo, car, cars, signedIn, refreshing, pending, lastResult, send)
+    val ui = WearCarUi(repo, car, cars, signedIn, refreshing, pending, lastResult, send, busy)
 
     // The command waiting on an "are you sure" (anything that opens the car), the quarter being chosen, and the editor.
     var confirmAction by remember { mutableStateOf<String?>(null) }
@@ -131,6 +152,16 @@ internal fun WearCarPage(
         onTileRequestHandled()
     }
     ResultHaptics(lastResult, car.vin)
+    // The outcome of a command, in a toast over the bottom third for a few seconds: the same words the face's hub uses.
+    val toastBaseline = remember { lastResult }
+    var toast by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(lastResult) {
+        val r = lastResult ?: return@LaunchedEffect
+        if (r === toastBaseline || r.vin != car.vin) return@LaunchedEffect
+        toast = if (r.ok) "Done" else (r.message ?: "Didn't go through")
+        delay(ToastMs)
+        toast = null
+    }
     // Above the screens that replace the page, so opening one and coming back keeps the page, its hub line and its place.
     val faceStatus = rememberFaceStatus(ui)
     val update = rememberWearUpdateState()
@@ -251,11 +282,12 @@ internal fun WearCarPage(
                     Modifier.fillMaxSize()
                         .nestedScroll(pull.connection)
                         .graphicsLayer {
-                            val p = pull.progress().coerceIn(0f, 1f)
-                            translationY = pull.offsetPx()
+                            // A refresh holds the page still: only a pull under the finger takes a little squash and stretch.
+                            val p = if (ui.refreshing) 0f else pull.progress().coerceIn(0f, 1f)
+                            translationY = if (ui.refreshing) 0f else pull.offsetPx()
                             transformOrigin = TransformOrigin(0.5f, 0f)
-                            scaleY = 1f + 0.04f * p
-                            scaleX = 1f - 0.02f * p
+                            scaleY = 1f + 0.02f * p
+                            scaleX = 1f - 0.01f * p
                         },
                 ) {
                     VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { virtual ->
@@ -273,13 +305,42 @@ internal fun WearCarPage(
                                 } else {
                                     WearCarSection(ui, update, CarSection.entries[real - 1])
                                 }
-                                CurvedName(car.name, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.fillMaxSize())
                             }
                         }
                     }
                 }
                 WearPullDisc(pull, refreshing = ui.refreshing)
+                if (current) {
+                    // The car's name floats over every page of the car on screen: one element, not one per page.
+                    CurvedName(car.name, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.fillMaxSize())
+                }
+                toast?.let { WearToast(it) }
             }
+        }
+    }
+}
+
+/** How long a refused command holds the car's buttons off, and how long a result toast stays up. */
+private const val BusyHoldMs = 12_000L
+private const val ToastMs = 3_000L
+
+/**
+ * A toast over the bottom third of the round display: the outcome of a command, on a translucent dark panel so the words read over the
+ * page behind (the watch has no backdrop blur to draw with).
+ */
+@Composable
+private fun WearToast(text: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        Box(
+            Modifier
+                .padding(bottom = 22.dp)
+                .fillMaxWidth(0.78f)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color.Black.copy(alpha = 0.72f))
+                .padding(horizontal = 14.dp, vertical = 9.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            WearCenteredText(text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
         }
     }
 }
