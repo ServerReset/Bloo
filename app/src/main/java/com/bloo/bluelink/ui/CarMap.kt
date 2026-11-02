@@ -43,6 +43,15 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.DpSize
@@ -496,6 +505,43 @@ internal fun rememberEdgeWindow(): EdgeWindow {
  * Every car on the map as its own icon (its photo, or the car glyph), at the place the car is. A car that goes past the edge of the map
  * morphs into a small pin on that edge, pointing the way it is, and comes back into its icon as it returns. Tapping an icon selects that car.
  */
+/** Off-edge markers this close on screen, in dp, share one pill: the first of them in list order leads it. */
+private val PillGroupRadiusDp = 28.dp
+
+/** The most photos one pill shows; a larger group shows the first of them and a count of the rest. */
+private const val PillMaxPhotos = 10
+
+/** A small photo in a pill. */
+private val PillPhotoSize = DpSize(26.dp, 18.dp)
+
+/** One car's marker this frame: where its icon's centre sits, the pin scale, and whether it is past the edge (moved off its own place). */
+private class CarMarker(val vin: String, val x: Float, val y: Float, val scale: Float, val offEdge: Boolean)
+
+/**
+ * The leader of each car's pill, by index: a car that is past the edge and lands within the radius of an earlier leader joins that
+ * leader's pill; anything else leads (or stands) alone. Computed in list order, so every car agrees on the same groups.
+ */
+private fun pillLeaders(markers: List<CarMarker>, radiusPx: Float): IntArray {
+    val leader = IntArray(markers.size) { it }
+    for (i in markers.indices) {
+        val m = markers[i]
+        if (!m.offEdge) continue
+        for (j in 0 until i) {
+            val other = markers[j]
+            if (other.offEdge && leader[j] == j && hypot(m.x - other.x, m.y - other.y) < radiusPx) {
+                leader[i] = j
+                break
+            }
+        }
+    }
+    return leader
+}
+
+/**
+ * Every car on the map as its own icon (its photo, or the car glyph), at the place the car is. A car that goes past the edge of the map
+ * morphs into a small pin on that edge, and cars whose pins land together share one pill of their photos (up to [PillMaxPhotos], then a
+ * count). Tapping an icon or the pill selects that car, or the pill's first car.
+ */
 @Composable
 internal fun BoxScope.CarIconLayer(
     state: CarMapState,
@@ -513,34 +559,100 @@ internal fun BoxScope.CarIconLayer(
     // The map's own size, read in the layout and draw phases only, so a resize or a move never recomposes the markers.
     var viewport by remember { mutableStateOf(IntSize.Zero) }
     val edge = rememberEdgeWindow()
-    Box(Modifier.matchParentSize().onSizeChanged { viewport = it })
-    for (car in cars) {
+    val radiusPx = with(LocalDensity.current) { PillGroupRadiusDp.toPx() }
+    // Every car's marker this frame. Read by each car's layout and draw, so a pan or a pinch moves the whole set together.
+    fun markers(): List<CarMarker> = cars.map { car ->
         val place = tilePlace(car.location.latitude, car.location.longitude, zoom, xTileF, yTileF, tilePx)
+        val at = mapScreenOffset(place.x, place.y, state.panX, state.panY, panWeight(), state.scale)
+        val pin = edge.pin(at.x, at.y, viewport)
+        CarMarker(car.vin, pin.x, pin.y, pin.scale, abs(pin.x - at.x) > 0.5f || abs(pin.y - at.y) > 0.5f)
+    }
+    Box(Modifier.matchParentSize().onSizeChanged { viewport = it })
+    for ((index, car) in cars.withIndex()) {
         key(car.vin) {
-            CarPhotoTile(
-                photo = car.photo,
-                tint = if (car.vin == anchorVin) tint else tint.copy(alpha = 0.7f),
-                contentDescription = "${car.name}. Tap to select it",
-                onClick = { onCarTap(car.vin) },
-                size = DpSize(CarIconWidth, CarIconHeight),
-                selected = car.vin == selectedVin,
-                glyphSize = 20.dp,
-                modifier = Modifier.align(Alignment.Center)
-                    .offset {
-                        val at = mapScreenOffset(place.x, place.y, state.panX, state.panY, panWeight(), state.scale)
-                        val pin = edge.pin(at.x, at.y, viewport)
-                        IntOffset(
-                            (pin.x - CarIconWidth.toPx() / 2f).roundToInt(),
-                            (pin.y - CarIconHeight.toPx() / 2f).roundToInt(),
-                        )
-                    }
-                    .graphicsLayer {
-                        val at = mapScreenOffset(place.x, place.y, state.panX, state.panY, panWeight(), state.scale)
-                        val s = edge.pin(at.x, at.y, viewport).scale
-                        scaleX = s
-                        scaleY = s
-                    },
-            )
+            val leaderOf = { pillLeaders(markers(), radiusPx) }
+            val isFollower = { val l = leaderOf(); l[index] != index }
+            val isPillLeader = { val l = leaderOf(); l[index] == index && l.count { it == index } > 1 }
+            val tileModifier = Modifier.align(Alignment.Center)
+                .offset {
+                    val m = markers()[index]
+                    IntOffset(
+                        (m.x - CarIconWidth.toPx() / 2f).roundToInt(),
+                        (m.y - CarIconHeight.toPx() / 2f).roundToInt(),
+                    )
+                }
+                .graphicsLayer {
+                    // A follower in a pill is hidden: its photo is in the leader's pill instead.
+                    val hidden = isFollower()
+                    val s = if (hidden) 0f else markers()[index].scale
+                    scaleX = s
+                    scaleY = s
+                    alpha = if (hidden) 0f else 1f
+                }
+            if (isPillLeader()) {
+                CarPillCluster(
+                    photos = (cars.indices).filter { leaderOf()[it] == index }.map { cars[it].photo },
+                    tint = tint,
+                    onClick = { onCarTap(car.vin) },
+                    anchor = { markers()[index].let { Offset(it.x, it.y) } },
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            } else {
+                CarPhotoTile(
+                    photo = car.photo,
+                    tint = if (car.vin == anchorVin) tint else tint.copy(alpha = 0.7f),
+                    contentDescription = "${car.name}. Tap to select it",
+                    onClick = { onCarTap(car.vin) },
+                    size = DpSize(CarIconWidth, CarIconHeight),
+                    selected = car.vin == selectedVin,
+                    glyphSize = 20.dp,
+                    modifier = tileModifier,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A pill of several cars' photos, overlapping, centred on [modifier]'s place: the cars that share one edge spot. Shows up to
+ * [PillMaxPhotos] photos and a count for any more. Its centre is its anchor, so it reads as a single marker on the edge.
+ */
+@Composable
+private fun CarPillCluster(
+    photos: List<String?>,
+    tint: Color,
+    onClick: () -> Unit,
+    /** Where the pill's centre sits on the map, in pixels from the map's centre, read in layout. */
+    anchor: () -> Offset,
+    modifier: Modifier = Modifier,
+) {
+    val shown = photos.take(PillMaxPhotos)
+    val extra = photos.size - shown.size
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier.layout { measurable, constraints ->
+            val p = measurable.measure(Constraints())
+            val at = anchor()
+            layout(constraints.maxWidth, constraints.maxHeight) {
+                p.place((at.x - p.width / 2f).roundToInt(), (at.y - p.height / 2f).roundToInt())
+            }
+        },
+    ) {
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(scheme.surfaceContainerHigh)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 4.dp, vertical = 3.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy((-6).dp), verticalAlignment = Alignment.CenterVertically) {
+                for (photo in shown) {
+                    CarPhotoTile(photo = photo, tint = tint, contentDescription = null, onClick = null, size = PillPhotoSize, glyphSize = 12.dp)
+                }
+                if (extra > 0) {
+                    Text("+$extra", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
+                }
+            }
         }
     }
 }
