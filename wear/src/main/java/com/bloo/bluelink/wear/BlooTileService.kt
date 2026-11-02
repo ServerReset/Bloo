@@ -1,9 +1,5 @@
 package com.bloo.bluelink.wear
 
-import com.bloo.bluelink.wear.TilePalette.WHITE
-import com.bloo.bluelink.wear.TilePalette.MUTED
-import com.bloo.bluelink.wear.TilePalette.RIM
-import com.bloo.bluelink.wear.TilePalette.BUTTON
 import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DimensionBuilders.degrees
@@ -21,7 +17,6 @@ import androidx.wear.tiles.TileService
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
-import com.bloo.bluelink.data.chargeLeftLabel
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.ioScope
@@ -49,6 +44,8 @@ class BlooTileService : TileService() {
         answerTile(scope, "BlooTile", fallback = { tileOf(layoutFor(null)) }) { buildTile(requestParams) }
 
     private suspend fun buildTile(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
+        // The phone's accent, as the face has it (the tile runs without the face having opened).
+        WearAccent.load(applicationContext)
         val snapshot = loadTileSnapshot(this)
                 // The display's real size: the quarters are sized from it (not stretched to fill), so they are equal squares.
                 val device = requestParams.deviceConfiguration
@@ -98,8 +95,8 @@ class BlooTileService : TileService() {
         val line = "Add a car in Bloo on your phone"
         return tileBox(
             tileColumn(
-                tileText("Bloo", 22f, WHITE, bold = true),
-                tileText(line, 13f, MUTED),
+                tileText("Bloo", 22f, INK, bold = true),
+                tileText(line, 13f, NAME),
                 width = expand(),
                 modifiers = tileModifiers(description = "Bloo. $line."),
             ),
@@ -137,7 +134,8 @@ class BlooTileService : TileService() {
             width = dp(grid),
             height = dp(grid),
         )
-        val hubSize = side * HUB_FRACTION
+        // The hub is the face's own: the same radius the quarters meet at.
+        val hubSize = side * (2f * HubRadius / REFERENCE_SIDE)
         // The hub's place: down to the middle of the grid, and across the middle of the display.
         val hubPlace = tileColumn(
             tileSpace(height = inset + grid / 2f - hubSize / 2f),
@@ -149,13 +147,13 @@ class BlooTileService : TileService() {
         val face = tileColumn(
             tileSpace(height = inset),
             tileBox(gridColumn, width = expand(), height = dp(grid)),
-            tileBox(tileText(car.name, 11f, MUTED, bold = true), width = expand(), height = dp(nameBand)),
+            tileBox(tileText(car.name, 11f, NAME, bold = true), width = expand(), height = dp(nameBand)),
             width = expand(),
             height = expand(),
         )
         return tileBox(
             *listOfNotNull(
-                if (car.percent != null) edgeRing(car) else null,
+                if (car.percent != null) edgeRing(car, side, scale) else null,
                 face,
                 hubPlace,
             ).toTypedArray(),
@@ -179,26 +177,28 @@ class BlooTileService : TileService() {
             2 -> tileCorners(flat, inner, flat, outer)
             else -> tileCorners(inner, flat, outer, flat)
         }
+        // The face's fills: the quiet surface for an empty quarter, the accent for a lit one, the raised surface for the rest.
         val fill = when {
-            action == null -> QUIET
+            action == null -> SURFACE
             action.active -> ACTIVE
-            else -> BUTTON
+            else -> SURFACE_HIGH
         }
-        if (action == null) return tileBox(width = dp(size), height = dp(size), modifiers = tileModifiers(background = fill, corner = corner, border = RIM))
+        val ink = if (action?.active == true) ACTIVE_INK else INK
+        if (action == null) return tileBox(width = dp(size), height = dp(size), modifiers = tileModifiers(background = fill, corner = corner))
         // The glyph over its word, as on the face (where the word runs along the outer edge): white on the lit fill.
         val content = buildList {
             if (action.glyph in GLYPHS) {
-                add(tileImage(action.glyph, 26f, WHITE))
+                add(tileImage(action.glyph, 26f, ink))
                 add(tileSpace(height = 2f))
             }
-            add(tileText(action.label, 11f, WHITE, bold = true))
+            add(tileText(action.label, 11f, ink, bold = true))
         }
         return tileBox(
             tileColumn(*content.toTypedArray()),
             width = dp(size),
             height = dp(size),
             modifiers = tileModifiers(
-                background = fill, corner = corner, border = RIM,
+                background = fill, corner = corner,
                 clickableId = "act_$index", onClick = tileLaunch(action.key, index), description = action.label,
             ),
         )
@@ -208,12 +208,13 @@ class BlooTileService : TileService() {
     private fun hub(car: VehicleSnapshot, size: Float): LayoutElement {
         val stale = if (car.isStale()) car.updatedLabel() else null
         // An old reading says so (in red, as the face does) instead of passing as current; a car that is charging says how long is left.
+        val state = carStateLine(car)
         val line = if (stale != null) tileText(stale, 10f, STALE, bold = true)
-        else car.chargeLeftLabel()?.let { tileText("$it left", 12f, tint(car), bold = true) }
+        else state.takeIf { it.isNotBlank() }?.let { tileText(it, 10f, INK) }
         return tileBox(
             tileColumn(
                 // 24sp fits a percentage; a word ("Unlocked") would be cut off in the hub, so it is smaller.
-                tileText(car.bigValue(), if (car.bigValue().length > 4) 16f else 28f, if (car.percent != null) tint(car) else WHITE, bold = true),
+                tileText(car.bigValue(), if (car.bigValue().length > 4) 16f else 28f, if (car.percent != null) tint(car) else INK, bold = true),
                 *listOfNotNull(line).toTypedArray(),
             ),
             width = dp(size),
@@ -227,51 +228,57 @@ class BlooTileService : TileService() {
     }
 
     private fun tint(car: VehicleSnapshot): Int =
-        com.bloo.bluelink.data.BlooColors.levelColor(car.percent, car.charging == true, WHITE)
+        com.bloo.bluelink.data.BlooColors.levelColor(car.percent, car.charging == true, INK)
 
     /**
-     * The car's charge as a ring round the display's edge, split as the phone's charge bar is: the fill (green, blue once it has
-     * reached its limit), a track up to the charge limit and a dimmer one past it, with a gap between each -- or one track
-     * for a car without a limit. A car with no battery gets no ring, because a ring with nothing to say is a decoration.
+     * The car's charge as the face draws it: a thin track round the display's edge, the charge in the car's colour from the top, and a short
+     * mark where the car's charge limit sits. A car with no battery gets no ring.
      */
-    private fun edgeRing(car: VehicleSnapshot): LayoutElement {
+    private fun edgeRing(car: VehicleSnapshot, side: Float, scale: Float): LayoutElement {
         val pct = (car.percent ?: 0).coerceIn(0, 100)
+        val stroke = RingStroke.value * scale
         val limit = car.chargeLimitPct?.takeIf { it in 1..99 }
-        val stuck = limit != null && pct >= limit
-        val fill = if (stuck) BlooColors.chargeBlue else BlooColors.chargeGreen
-        val filledEnd = if (pct > 0) maxOf(360f * pct / 100f, 2 * RING_GAP) else 0f
-        val ring = LayoutElementBuilders.Arc.Builder()
-            .setAnchorAngle(degrees(0f))
-            .setAnchorType(LayoutElementBuilders.ARC_ANCHOR_START)
-            .setArcDirection(LayoutElementBuilders.ARC_DIRECTION_CLOCKWISE)
-        // Each segment runs from one boundary to the next, less the gap; the spacer after it is that gap.
-        fun segment(from: Float, to: Float, color: Int) {
-            val length = to - from - RING_GAP
-            if (length <= 0f) return
-            ring.addContent(arcLine(length, color))
-            ring.addContent(arcLine(RING_GAP, CLEAR))
+        val arcs = buildList {
+            add(ringArc(0f, 360f, RING_TRACK, stroke, round = false))
+            if (pct > 0) add(ringArc(0f, 360f * pct / 100f, tint(car), stroke, round = true))
+            limit?.let { add(ringArc(360f * it / 100f - LIMIT_MARK_DEG / 2f, LIMIT_MARK_DEG, RING_MARK, stroke, round = false)) }
         }
-        segment(0f, filledEnd, fill)
-        if (limit == null || stuck) {
-            segment(filledEnd, 360f, if (limit != null) RING_DIM else RING_TRACK)
-        } else {
-            val limitAt = (360f * limit / 100f).coerceIn(filledEnd, 360f)
-            segment(filledEnd, limitAt, RING_TRACK)
-            segment(limitAt, 360f, RING_DIM)
-        }
-        return ring.build()
+        // Inset by half the stroke, so the whole ring sits inside the display's edge, as on the face.
+        return tileBox(
+            *arcs.toTypedArray(),
+            width = dp(side - stroke),
+            height = dp(side - stroke),
+        )
     }
 
-    private fun arcLine(sweepDegrees: Float, color: Int): LayoutElementBuilders.ArcLine =
-        LayoutElementBuilders.ArcLine.Builder()
-            .setLength(degrees(sweepDegrees))
-            .setThickness(dp(8f))
-            .setColor(argb(color))
-            .setStrokeCap(LayoutElementBuilders.STROKE_CAP_ROUND)
+    /** One arc of the ring, from [startDeg] (0 at the top, clockwise) over [sweepDeg]. */
+    private fun ringArc(startDeg: Float, sweepDeg: Float, color: Int, thickness: Float, round: Boolean): LayoutElementBuilders.Arc =
+        LayoutElementBuilders.Arc.Builder()
+            .setAnchorAngle(degrees(startDeg))
+            .setAnchorType(LayoutElementBuilders.ARC_ANCHOR_START)
+            .setArcDirection(LayoutElementBuilders.ARC_DIRECTION_CLOCKWISE)
+            .addContent(
+                LayoutElementBuilders.ArcLine.Builder()
+                    .setLength(degrees(sweepDeg))
+                    .setThickness(dp(thickness))
+                    .setColor(argb(color))
+                    .setStrokeCap(if (round) LayoutElementBuilders.STROKE_CAP_ROUND else LayoutElementBuilders.STROKE_CAP_BUTT)
+                    .build(),
+            )
             .build()
 
     private companion object {
         const val RESOURCES_VERSION = "3"
+        /** The face's own colours: its surfaces (the watch's surface container and the raised one above it), its ink and its name's tone. */
+        const val SURFACE = 0xFF1C1C22.toInt()
+        const val SURFACE_HIGH = 0xFF2B2930.toInt()
+        const val INK = 0xFFE6E1E5.toInt()
+        const val NAME = 0xFFCAC4D0.toInt()
+        const val RING_MARK = 0xFFE6E1E5.toInt()
+        /** The limit mark's width, in degrees of the ring. */
+        const val LIMIT_MARK_DEG = 2.5f
+        /** The face's lit ink: the accent's own on-colour, once the phone has sent it. */
+        val ACTIVE_INK: Int get() = WearAccent.accent.value?.onPrimary ?: 0xFFFFFFFF.toInt()
         val GLYPHS = mapOf(
             "lock" to R.drawable.tile_lock, "unlock" to R.drawable.tile_unlock, "climate" to R.drawable.tile_climate,
             "bolt" to R.drawable.tile_bolt, "flash" to R.drawable.tile_flash, "refresh" to R.drawable.tile_refresh,
@@ -284,18 +291,16 @@ class BlooTileService : TileService() {
         const val RING_GAP = 7f
         /** A gap in the ring is an arc nothing is drawn in. */
         const val CLEAR = 0x00000000
-        const val RING_TRACK = 0x38FFFFFF
-        const val RING_DIM = 0x17FFFFFF
+        /** The face's track: its ink at 16%. */
+        const val RING_TRACK = 0x29E6E1E5
         const val TILE_GAP = 6f
         /** The band at the bottom the car's name sits in, in dp at 227dp; the quarters keep clear of it. */
         const val NAME_BAND = 16f
         /** The size the tile was drawn for (dp); every size scales by the display's real one over this. */
         val REFERENCE_SIDE = ReferenceFace.value
         /** The hub's share of the display: larger than the face's, so the value reads at a glance. */
-        const val HUB_FRACTION = 0.44f
         const val STALE = 0xFFFF6B6B.toInt()
         const val HUB_ID = "refresh"
-        const val QUIET = 0xFF1A1A20.toInt()
         /** The colour of what is on or in motion (see [WearAccent.active]). */
         val ACTIVE: Int get() = WearAccent.active
     }
