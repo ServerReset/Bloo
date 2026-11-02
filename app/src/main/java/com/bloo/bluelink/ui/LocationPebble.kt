@@ -181,7 +181,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                     )
                 Box(slot) {
                     // Home car: the map covers this, and a tap that reaches it opens the map. Other cars: the same tap, with a label.
-                    MapPlaceholder(name = v.name, showLabel = host?.homeVin != v.vin) { host?.open(v.vin) }
+                    MapPlaceholder(name = v.name, showLabel = false) { host?.open(v.vin) }
                 }
                 MapFeatureRow(
                     features = listOfNotNull(

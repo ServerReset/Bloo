@@ -138,16 +138,17 @@ class BlooTileService : TileService() {
         val hubSize = side * (2f * HubRadius / REFERENCE_SIDE)
         // The hub's place: down to the middle of the grid, and across the middle of the display.
         val hubPlace = tileColumn(
-            tileSpace(height = inset + grid / 2f - hubSize / 2f),
+            tileSpace(height = inset + nameBand + grid / 2f - hubSize / 2f),
             tileRow(tileSpace(width = side / 2f - hubSize / 2f), hub(car, hubSize), width = expand(), height = wrap()),
             width = expand(),
             height = expand(),
         )
-        // The grid, then the car's name in the band under it, on the face's own centre line.
+        // The name header, then the grid of quarters under it, and the hub where they meet.
+        // The name is a header across the top, inside the ring, centred like the rest of the tile's text.
         val face = tileColumn(
             tileSpace(height = inset),
+            tileBox(tileText(car.name, 12f, NAME, bold = true), width = expand(), height = dp(nameBand)),
             tileBox(gridColumn, width = expand(), height = dp(grid)),
-            tileBox(tileText(car.name, 11f, NAME, bold = true), width = expand(), height = dp(nameBand)),
             width = expand(),
             height = expand(),
         )

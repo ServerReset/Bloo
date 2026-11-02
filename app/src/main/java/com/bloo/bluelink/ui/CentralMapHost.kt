@@ -1,6 +1,19 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.key
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toDp
+import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -58,6 +71,33 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     }
     // Closed, the map sits on its home card, so it needs that card's place on screen. Until the card has been placed, nothing is drawn.
     val closedAt: Rect? = if (openVin == null && homeVin != null) centralMap.originBoundsFor(homeVin).value else null
+    // Closed, every car's card shows the map too, with all the cars on it: one map drawn here, in each card's place. The home card's map is
+    // the layer's own (below), so it is not drawn twice; each card's is clipped to the part between the status bar and the search bar.
+    if (openVin == null) {
+        val screen = LocalWindowInfo.current.containerSize
+        val density = LocalDensity.current
+        val statusTop = WindowInsets.statusBars.getTop(density).toFloat()
+        val searchClear = with(density) { searchBarClearance(fallback = 132.dp).toPx() }
+        val deviceNow = state.value.deviceLocation
+        for (v in vehicles) {
+            if (v.vin == homeVin) continue
+            val loc = state.value.locations[v.vin] ?: continue
+            val rect = centralMap.originBoundsFor(v.vin).value ?: continue
+            val top = maxOf(rect.top, statusTop)
+            val bottom = minOf(rect.bottom, screen.height - searchClear)
+            if (bottom <= top) continue
+            key(v.vin) {
+                Box(
+                    Modifier
+                        .offset { IntOffset(rect.left.roundToInt(), top.roundToInt()) }
+                        .size(with(density) { rect.width.toDp() }, with(density) { (bottom - top).toDp() })
+                        .clipToBounds(),
+                ) {
+                    centralMap.Content(Modifier.fillMaxSize(), MapInputs(loc, deviceNow, interactive = false, tileArea = screen, panWeight = { 1f }))
+                }
+            }
+        }
+    }
     if (hostVehicle == null || hostLocation == null) return
     val windowSize = LocalWindowInfo.current.containerSize
     // Open, the map grows from the car's own card; until that card has been on screen, from a box in the middle, so the map always opens.
