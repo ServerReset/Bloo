@@ -260,8 +260,14 @@ internal fun ClimatePebble(
                 status.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
                 status.steerWheelHeat?.let { StatusRow("Steering wheel heat", onOff(it)) }
                 status.seatHeaterVentState?.let { s ->
-                    s.flSeatHeatState?.takeIf { it != 0 }?.let { StatusRow("Driver seat", onOff(it)) }
-                    s.frSeatHeatState?.takeIf { it != 0 }?.let { StatusRow("Passenger seat", onOff(it)) }
+                    listOf(
+                        "Driver seat" to s.flSeatHeatState,
+                        "Passenger seat" to s.frSeatHeatState,
+                        "Rear left seat" to s.rlSeatHeatState,
+                        "Rear right seat" to s.rrSeatHeatState,
+                    ).forEach { (label, level) ->
+                        if (level != null) StatusRow(label, seatLevelLabel(level))
+                    }
                 }
             } else {
                 RevealMutedText("Climate can't be started while the car is running.")
@@ -386,13 +392,14 @@ private fun ClimateRunningSummary(status: VehicleStatus?, presetName: String?, f
         if (status?.defrost == true) add("Defrost" to "On")
         if (status?.steerWheelHeat?.let { it != 0 } == true) add("Steering wheel" to "On")
         status?.seatHeaterVentState?.let { seatState ->
+            // Every seat, always: an off seat reads "Off" rather than dropping out of the list.
             listOf(
                 "Driver" to seatState.flSeatHeatState,
                 "Passenger" to seatState.frSeatHeatState,
                 "Rear left" to seatState.rlSeatHeatState,
                 "Rear right" to seatState.rrSeatHeatState,
             ).forEach { (label, state) ->
-                if (state != null && state != 0) add(label to (SeatLevel.fromApi(state).takeIf { it != SeatLevel.OFF }?.label ?: "On"))
+                if (state != null) add(label to seatLevelLabel(state))
             }
         }
     }
@@ -414,6 +421,12 @@ private fun ClimateRunningSummary(status: VehicleStatus?, presetName: String?, f
         if (highlights.isEmpty()) RevealMutedText("Nothing else is on.")
         RevealMutedText("Read-only while climate runs.")
     }
+}
+
+/** A seat's heat or vent level as the card shows it: its label, or "Off" for a seat that is off. */
+private fun seatLevelLabel(state: Int): String {
+    val level = SeatLevel.fromApi(state)
+    return if (level == SeatLevel.OFF) "Off" else level.label
 }
 
 @Composable
