@@ -125,6 +125,7 @@ internal fun WearCarPage(
         val refused = r != null && r.vin == car.vin && !r.ok && r.message?.contains("previous request is pending", ignoreCase = true) == true
         value = refused
         if (refused) {
+            WearLog.log("buttons held: the phone said a request is pending")
             delay(BusyHoldMs)
             value = false
         }
@@ -161,6 +162,7 @@ internal fun WearCarPage(
     LaunchedEffect(lastResult) {
         val r = lastResult ?: return@LaunchedEffect
         if (r === toastBaseline || r.vin != car.vin) return@LaunchedEffect
+        WearLog.log("command ${r.action} ${if (r.ok) "ok" else "failed: ${r.message}"}")
         toast = if (r.ok) "Done" else (r.message ?: "Didn't go through")
         delay(ToastMs)
         toast = null
@@ -186,12 +188,20 @@ internal fun WearCarPage(
             canPull = {
                 wrap.wrap.real(wrap.pager.currentPage) == 0 && abs(wrap.pager.currentPageOffsetFraction) < RestFraction && !editingNow
             },
-            onRefresh = { if (latestUi.signedIn) latestUi.repo.refresh() },
+            onRefresh = {
+                WearLog.log("pull: refresh ${car.name}")
+                if (latestUi.signedIn) latestUi.repo.refresh()
+            },
         )
     }
     val pagerState = wrap.pager
     val page = wrap.wrap.real(pagerState.currentPage)
-    LaunchedEffect(page, current) { if (current) WearPageMemory.page = page }
+    LaunchedEffect(page, current) {
+        if (current) {
+            WearPageMemory.page = page
+            WearLog.log("page $page")
+        }
+    }
     // The other cars follow the shared page, so they are on it when a swipe brings them up.
     LaunchedEffect(WearPageMemory.page) {
         val step = WearPageMemory.page - page

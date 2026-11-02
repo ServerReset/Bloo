@@ -108,6 +108,8 @@ class MainActivity : FragmentActivity() {
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
         // Per-frame cost, main-thread stalls and the rest of the app's own performance numbers, for the activity log and the Debug card's report.
+        // The logging switches first: everything after this logs, and the monitor starts only if advanced logging was left on.
+        com.bloo.bluelink.data.DiagSettings.load(this)
         com.bloo.bluelink.perf.PerfMonitor.install(this)
         // Seed com.bloo.bluelink.ui.inMultiWindowMode from the Activity's actual starting state --
         // onMultiWindowModeChanged (below) only fires on a TRANSITION, so a cold start directly

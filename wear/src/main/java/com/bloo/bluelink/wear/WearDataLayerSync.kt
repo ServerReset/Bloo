@@ -119,6 +119,9 @@ object WearDataLayerSync {
             lastSentAtMs = payload.sentAtMs
         }
         val app = context.applicationContext
+        // Advanced logging follows the phone: on, the watch keeps its log and sends it back; off, it keeps nothing.
+        WearLog.enabled = payload.advancedLogging
+        WearLog.log("sync: ${payload.vehicles.size} car(s)")
         WearNotificationPrefs(app).apply(payload.notify)
         WearLook.applyOrSeed(app, payload.look)
         WearPresets.update(app, payload.climatePresets, payload.fahrenheit)

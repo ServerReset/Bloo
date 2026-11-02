@@ -98,6 +98,12 @@ class PhoneWatchSyncService : WearableListenerService() {
         when (messageEvent.path) {
             WatchSyncProtocol.PATH_CRED_KEY -> WatchSignIn.onKey(messageEvent.sourceNodeId, messageEvent.data)
             WatchSyncProtocol.PATH_CRED_ACK -> WatchSignIn.onAck()
+            // The watch's own log lines (advanced logging only), kept in the phone's activity log, marked as the watch's.
+            WatchSyncProtocol.PATH_WATCH_LOG -> {
+                val lines = messageEvent.data.decodeToString().lines().filter { it.isNotBlank() }
+                if (lines.isNotEmpty()) com.bloo.bluelink.data.AppLog.log("watch: ${lines.size} line(s)")
+                lines.forEach { com.bloo.bluelink.data.AppLog.log("  watch ${it.take(400)}") }
+            }
             WatchSyncProtocol.PATH_LOOK_PREFS -> scope.launch {
                 runCatching { json.decodeFromString(WatchLookPrefs.serializer(), messageEvent.data.decodeToString()) }
                     .getOrNull()?.let { look ->
@@ -213,6 +219,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                     vehicles = snapshot.vehicles,
                     selectedVin = snapshot.selectedVin,
                     sentAtMs = System.currentTimeMillis(),
+                    advancedLogging = com.bloo.bluelink.data.DiagSettings.advanced,
                     watchUpdateRunNumber = advice?.first,
                     watchUpdateApkUrl = advice?.second,
                     watchUpdateNotes = advice?.third,

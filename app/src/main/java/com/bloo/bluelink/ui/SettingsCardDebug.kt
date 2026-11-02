@@ -105,8 +105,33 @@ internal fun DebugCardContent(
                 StatusRow("On-device AI (Gemini Nano)", aiAvailability?.describe() ?: "Checking…")
                 MorphTextButton("Check again", onClick = { vm.reprobeAi() })
             }
+            SettingsGroup("Logging") {
+                // Normal logging is the activity log. Advanced logging is slower, and turns on the performance numbers below and the watch's log.
+                var logOn by remember { mutableStateOf(com.bloo.bluelink.data.DiagSettings.logging) }
+                var advancedOn by remember { mutableStateOf(com.bloo.bluelink.data.DiagSettings.advanced) }
+                ToggleRow(
+                    label = "Logging",
+                    checked = logOn,
+                    description = "Keeps the activity log below and in its saved file. Off, nothing is logged.",
+                    onChange = { on ->
+                        vm.setLoggingOn(on)
+                        logOn = com.bloo.bluelink.data.DiagSettings.logging
+                        advancedOn = com.bloo.bluelink.data.DiagSettings.advanced
+                    },
+                )
+                ToggleRow(
+                    label = "Advanced logging",
+                    checked = advancedOn,
+                    enabled = logOn,
+                    description = "Slows the app while it is on. Adds detailed timing for every frame, the performance numbers below, and a log from the watch. Use it only to diagnose a problem.",
+                    onChange = { on ->
+                        vm.setAdvancedLoggingOn(on)
+                        advancedOn = com.bloo.bluelink.data.DiagSettings.advanced
+                    },
+                )
+            }
             SettingsGroup("Performance") {
-                BodySmallText("The cost of every frame (composition, layout, draw, GPU), main-thread stalls with the code that was running, recompositions, garbage collection, CPU and memory, filed under what you were doing. Reset, use the app for a minute, then save the file and upload it. The whole timeline is in the file, not only the summary.")
+                BodySmallText("Needs Advanced logging on. The cost of every frame (composition, layout, draw, GPU), main-thread stalls with the code that was running, recompositions, garbage collection, CPU and memory, filed under what you were doing. Reset, use the app for a minute, then save the file and upload it. The whole timeline is in the file, not only the summary.")
                 ActionRow {
                     MorphTextButton(
                         "Save file",

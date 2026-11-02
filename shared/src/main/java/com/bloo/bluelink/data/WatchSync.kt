@@ -17,6 +17,8 @@ data class WatchSyncPayload(
      * phone has not seen a newer watch build than the one the watch runs.
      */
     val watchUpdateRunNumber: Int? = null,
+    /** Advanced logging is on at the phone, so the watch keeps its own log and sends it back (see [WatchSyncProtocol.PATH_WATCH_LOG]). */
+    val advancedLogging: Boolean = false,
     val watchUpdateApkUrl: String? = null,
     val watchUpdateNotes: String? = null,
     /**
@@ -116,6 +118,8 @@ object WatchSyncProtocol {
     const val PATH_WATCH_APK = "/bloo/watch_apk"
     /** Phone → watch: a command the watch wants run (see [WatchCommandRequest]). */
     const val PATH_COMMAND = "/bloo/command"
+    /** Watch → phone: a batch of the watch's own log lines, newline-separated, while advanced logging is on. */
+    const val PATH_WATCH_LOG = "/bloo/watch_log"
 
     /**
      * Each command travels on a path of its own ([PATH_COMMAND], a slash and the request id). One shared path made a new command

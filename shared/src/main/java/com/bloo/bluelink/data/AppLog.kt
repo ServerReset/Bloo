@@ -34,6 +34,8 @@ object AppLog {
      * value instances to notify collectors.
      */
     fun log(message: String) {
+        // Normal logging switched off: nothing is kept or written (see DiagSettings).
+        if (!DiagSettings.logging) return
         val line = synchronized(this) {
             val stamped = "${timestamp.format(Date())}  $message"
             buffer.addLast(stamped)

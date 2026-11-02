@@ -223,8 +223,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * Write the current live status/location maps to disk (survives restart). One write at a time, and the state is read
      * once the write's turn comes: a save started earlier can no longer land after (and overwrite) a newer one.
      */
+    /** Normal logging (the activity log) on or off. Off also turns advanced logging off, since it is built on it. */
+    fun setLoggingOn(on: Boolean) {
+        com.bloo.bluelink.data.DiagSettings.setLogging(getApplication(), on)
+        if (!on) setAdvancedLoggingOn(false)
+    }
+
+    /**
+     * Advanced logging on or off: the perf monitor's detailed timing and the watch's own log. The watch learns of it with the next sync,
+     * which is pushed straight away so its log starts at once.
+     */
+    fun setAdvancedLoggingOn(on: Boolean) {
+        com.bloo.bluelink.data.DiagSettings.setAdvanced(getApplication(), on)
+        com.bloo.bluelink.perf.PerfMonitor.setAdvanced(com.bloo.bluelink.data.DiagSettings.advanced)
+        com.bloo.bluelink.data.AppLog.log("Advanced logging ${if (com.bloo.bluelink.data.DiagSettings.advanced) "on" else "off"}")
+        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+    }
+
     internal fun persistCache() {
-        com.bloo.bluelink.perf.PerfMonitor.count("persistCache")
         viewModelScope.launch {
             cacheWrite.withLock {
                 val s = _state.value
@@ -238,13 +254,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         logStartup("AppViewModel constructed")
-        // How often the whole UI state changes is the first thing to know about a screen that feels busy: each emission can recompose
-        // everything reading it.
-        viewModelScope.launch { _state.collect { com.bloo.bluelink.perf.PerfMonitor.count("UiState emissions") } }
-        // Advanced mode (the Settings mode) turns the perf monitor's detailed logging on and off.
-        viewModelScope.launch {
-            _state.map { it.settingsMode }.collect { mode -> com.bloo.bluelink.perf.PerfMonitor.setVerbose(mode == "advanced") }
-        }
+        // The advanced logging switch is read by the monitor itself (see DiagSettings); nothing here watches the UI state for it.
         mirrorPlayUpdates()
         bootstrapColdStart()
         startChargingPoll()

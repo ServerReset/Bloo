@@ -36,6 +36,7 @@ class WearMainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WearLog.attach(this)
         // The watch's own power state (Battery Saver, thermal): see PowerPolicy.
         com.bloo.bluelink.data.DeviceStatus.ensureInitialized(this)
         // The wearer's own reduce-effects switch joins Battery Saver in the policy before anything draws.

@@ -83,17 +83,21 @@ object PerfMonitor {
 
     private var budgetMs = 16.7f
 
-    /**
-     * Advanced mode: the monitor writes far more to the perf file -- every frame over its budget with its phases, every main-thread span
-     * from [ADVANCED_SPAN_MS], every stall and every event. Switched by the Settings mode (see AppViewModel).
-     */
-    @Volatile var verbose = false
-        private set
+    /** The activity this monitor watches, kept so advanced logging can start and stop it while the app runs. Not held for frames. */
+    private var host: java.lang.ref.WeakReference<Activity>? = null
+    private var onScreen = false
 
-    fun setVerbose(on: Boolean) {
-        if (verbose == on) return
-        verbose = on
-        event("verbose", if (on) "advanced logging on" else "advanced logging off")
+    /** Whether the monitor does any work at all: only while advanced logging is on (see DiagSettings). */
+    val active: Boolean get() = com.bloo.bluelink.data.DiagSettings.advanced
+
+    /** Turns the monitor on or off with advanced logging. Turning it on starts it on the activity it last saw. */
+    @Synchronized fun setAdvanced(on: Boolean) {
+        if (on) {
+            host?.get()?.let { install(it) }
+            if (onScreen && attachedTo != null) startWatchdog()
+        } else {
+            uninstall()
+        }
     }
     private var startedAt = SystemClock.uptimeMillis()
     private var windowDropped = 0
@@ -113,7 +117,8 @@ object PerfMonitor {
 
     /** Starts watching [activity]'s window. Idempotent; undone by [uninstall]. */
     @Synchronized fun install(activity: Activity) {
-        if (attachedTo != null) return
+        host = java.lang.ref.WeakReference(activity)
+        if (!active || attachedTo != null) return
         @Suppress("DEPRECATION")
         val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) activity.display else activity.windowManager.defaultDisplay
         budgetMs = 1000f / (display?.refreshRate ?: 60f).coerceAtLeast(30f)
@@ -210,6 +215,7 @@ object PerfMonitor {
 
     /** The watchdog wakes twenty times a second, so it runs only while the app is on screen. */
     @Synchronized fun foreground(on: Boolean) {
+        onScreen = on
         if (attachedTo == null) return
         event(if (on) "foreground" else "background")
         if (on) {
@@ -248,7 +254,7 @@ object PerfMonitor {
 
     /** The screen now showing; frames with no [scope] running are filed under it. */
     fun screen(name: String) {
-        if (name == lastScreen) return
+        if (!active || name == lastScreen) return
         lastScreen = name
         clock.screen = name
         event("screen", name)
@@ -256,6 +262,7 @@ object PerfMonitor {
 
     /** For the next [durationMs], frames are filed under [label] (on top of the screen): "map-open", "garage-swipe". */
     fun scope(label: String, durationMs: Long = 1_000L) {
+        if (!active) return
         clock.begin(label, durationMs, System.nanoTime())
         event("scope", "$label for ${durationMs} ms")
     }
@@ -265,6 +272,7 @@ object PerfMonitor {
      * Use it for a discrete moment (a screen, a toggle, a request starting) so the frames that follow can be read against it.
      */
     fun event(name: String, detail: String = "") {
+        if (!active) return
         val line = "${uptime()} EVENT $name${if (detail.isEmpty()) "" else " $detail"}"
         synchronized(recentEvents) { recentEvents.addLast(line); while (recentEvents.size > RECENT_EVENTS) recentEvents.removeFirst() }
         PerfFile.append(line)
@@ -273,13 +281,14 @@ object PerfMonitor {
     // --- Counting -------------------------------------------------------------------------------------------
 
     /** A composable recomposed; called by [TrackRecompositions]. */
-    fun recomposed(name: String) { recompositions.getOrPut(name) { AtomicLong() }.incrementAndGet() }
+    fun recomposed(name: String) { if (!active) return; recompositions.getOrPut(name) { AtomicLong() }.incrementAndGet() }
 
     /** An event happened [n] times (a state emission, a cache miss, a decode). */
-    fun count(name: String, n: Long = 1) { counters.getOrPut(name) { AtomicLong() }.addAndGet(n) }
+    fun count(name: String, n: Long = 1) { if (!active) return; counters.getOrPut(name) { AtomicLong() }.addAndGet(n) }
 
     /** Runs [block] and records how long it took under [name]; a run over [thresholdMs] on the main thread is logged as it happens. */
     inline fun <T> span(name: String, thresholdMs: Long = 8, block: () -> T): T {
+        if (!active) return block()
         val t0 = SystemClock.elapsedRealtimeNanos()
         try {
             return block()
@@ -291,7 +300,7 @@ object PerfMonitor {
     @PublishedApi internal fun spanDone(name: String, ms: Float, thresholdMs: Long) {
         spans.getOrPut(name) { SpanStats() }.add(ms)
         // Advanced mode logs every main-thread span from 2 ms, not only the ones that are already slow.
-        val limit = if (verbose) minOf(thresholdMs, ADVANCED_SPAN_MS) else thresholdMs
+        val limit = minOf(thresholdMs, ADVANCED_SPAN_MS)
         if (ms >= limit && Looper.myLooper() == Looper.getMainLooper()) {
             val line = "${uptime()} SPAN $name ${fmt(ms)} ms on main"
             PerfFile.append(line)
@@ -324,7 +333,7 @@ object PerfMonitor {
         window.add(cost, budgetMs)
         windowDropped += dropped
         // Advanced mode: every frame that misses its budget, with where its time went, so a pattern across the frames is visible.
-        if (verbose && cost.totalMs >= budgetMs) PerfFile.append("${uptime()} FRAME [$label] ${fmt(cost.totalMs)} ms ${cost.phases()}")
+        if (cost.totalMs >= budgetMs) PerfFile.append("${uptime()} FRAME [$label] ${fmt(cost.totalMs)} ms ${cost.phases()}")
         if (cost.totalMs >= SLOW_FRAME_LOG_MS) {
             val line = "${uptime()} [$label] ${fmt(cost.totalMs)} ms, mostly ${cost.worstPhase()}: ${cost.phases()}"
             synchronized(worstFrames) { worstFrames.addLast(line); while (worstFrames.size > KEEP) worstFrames.removeFirst() }
@@ -560,8 +569,11 @@ object PerfMonitor {
     }
 }
 
-/** Counts this composable's recompositions under [name]: put it at the top of a composable whose cost is in question. */
+/**
+ * Counts this composable's recompositions under [name]: put it at the top of a composable whose cost is in question. Adds nothing to a
+ * composable at all while advanced logging is off.
+ */
 @Composable
 fun TrackRecompositions(name: String) {
-    SideEffect { PerfMonitor.recomposed(name) }
+    if (PerfMonitor.active) SideEffect { PerfMonitor.recomposed(name) }
 }
