@@ -5,6 +5,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -144,7 +146,15 @@ class BlueLinkApi(override val brand: Brand = Brand.HYUNDAI) : BrandEndpoints {
                 .get()
                 .header("REFRESH", refresh.toString())
                 .build()
-            json.decodeFromString(VehicleStatusResponse.serializer(), call(request)).vehicleStatus
+            val body = call(request)
+            // Diagnostic (see ChargingPowerProbe): while the car reports it is charging, log its EV fields that look like power. Never fails the read.
+            runCatching {
+                val ev = json.parseToJsonElement(body).jsonObject["vehicleStatus"]?.jsonObject?.get("evStatus")
+                if ((ev as? JsonObject)?.get("batteryCharge")?.jsonPrimitive?.booleanOrNull == true) {
+                    logChargingPowerFieldsOnce("Blue Link US", ev)
+                }
+            }
+            json.decodeFromString(VehicleStatusResponse.serializer(), body).vehicleStatus
         }
 
     /** Fetch the car's last-known GPS fix via the dedicated (rate-limited) findMyCar endpoint. */
