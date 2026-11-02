@@ -254,7 +254,13 @@ internal fun ExpandableMapLayer(
     // boolean, so the sheet recomposes when it FLIPS, not on every frame of the springs.
     val chromeShown by remember { derivedStateOf { chrome.value > 0.01f } }
     // The markers' edge window only takes the bars into account while they are shown (see MapChromeInsets).
-    SideEffect { chromeInsets?.chromeOn = isExpanded && chromeShown }
+    // The bar shows while the map is open, and also while it is closed in its card once a car is selected by a tap on its icon.
+    val barVisible = isExpanded || barSelected
+    SideEffect { chromeInsets?.chromeOn = barVisible && chromeShown }
+    // Closed, the bar comes in on a selection and goes again when it is cleared (opening and closing run their own motion).
+    LaunchedEffect(barSelected) {
+        if (!isExpanded) chrome.animateTo(if (barSelected) 1f else 0f, tween(MapOpenMs))
+    }
     fun close() {
         if (closing) return
         closing = true
@@ -423,7 +429,7 @@ internal fun ExpandableMapLayer(
             // One consolidated top bar -- name, drag handle, and refresh, all inside one shared
             // floating pill background instead of three separate glass pieces (see MapTopBar's own
             // doc).
-            if (isExpanded && chromeShown) {
+            if (barVisible && chromeShown) {
                 MapTopBar(
                     carOnScreen = carOnScreen,
                     mode = barMode,
@@ -451,7 +457,8 @@ internal fun ExpandableMapLayer(
                         // and back again on close, from the first frame of either.
                         .then(if (frostHaze != null) Modifier.hazeSource(frostHaze) else Modifier)
                         .layout { measurable, constraints ->
-                            val p = progress().coerceIn(0f, 1f)
+                            // Closed, the bar is full width at the top of the screen, not the card's width.
+                            val p = if (isExpanded) progress().coerceIn(0f, 1f) else 1f
                             val root = rootPos ?: androidx.compose.ui.geometry.Offset.Zero
                             val o = originBounds.translate(-root.x, -root.y)
                             // With no car selected the bar is only its handle, centred; it widens to the single line as a car is selected.

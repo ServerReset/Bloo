@@ -70,4 +70,4 @@ internal fun BoxScope.DeviceMarker(
     }
 }
 
-private val DotSize = 30.dp
+private val DotSize = 40.dp

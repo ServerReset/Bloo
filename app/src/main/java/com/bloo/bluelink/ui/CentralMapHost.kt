@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
@@ -31,6 +32,11 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         }
     }
     LaunchedEffect(centralMap.vin) { vm.setMapExpanded(centralMap.vin != null) }
+    // Closed, the map sits in the Location card of the car being looked at, so a swipe to another car brings it along.
+    val currentIndex by vm.currentIndex.collectAsStateWithLifecycle()
+    LaunchedEffect(currentIndex, state.value.vehicles) {
+        if (centralMap.vin == null) state.value.vehicles.getOrNull(currentIndex)?.vin?.let { centralMap.homeVin = it }
+    }
     // The map starts in the first car's Location card, until it is opened on another car.
     LaunchedEffect(state.value.vehicles.firstOrNull()?.vin) {
         if (centralMap.homeVin == null) centralMap.homeVin = state.value.vehicles.firstOrNull()?.vin

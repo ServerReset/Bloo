@@ -432,11 +432,11 @@ private fun CarMapBody(
 }
 
 /** A car's icon on the map: the size of its photo tile. */
-private val CarIconWidth = 56.dp
-private val CarIconHeight = 38.dp
+private val CarIconWidth = 72.dp
+private val CarIconHeight = 48.dp
 
 /** The size of a car that has gone off the edge, as a share of its icon: it shrinks into a pin as it reaches the edge. */
-private const val EdgePinScale = 0.6f
+private const val EdgePinScale = 0.75f
 
 /** How far past the edge a car travels while it morphs from its icon into its edge pin, in dp. */
 private val EdgeMorphDp = 72.dp
@@ -512,7 +512,7 @@ private val PillGroupRadiusDp = 28.dp
 private const val PillMaxPhotos = 10
 
 /** A small photo in a pill. */
-private val PillPhotoSize = DpSize(26.dp, 18.dp)
+private val PillPhotoSize = DpSize(34.dp, 24.dp)
 
 /** One car's marker this frame: where its icon's centre sits, the pin scale, and whether it is past the edge (moved off its own place). */
 private class CarMarker(val vin: String, val x: Float, val y: Float, val scale: Float, val offEdge: Boolean)
