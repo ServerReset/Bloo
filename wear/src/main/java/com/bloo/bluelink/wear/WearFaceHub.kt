@@ -74,7 +74,10 @@ fun WearFaceHub(
                 reduceMotion = false,
             )
             // The car's state can run to two lines ("Parked · Locked · Climate on"); cut to one it read as "Parked · L…".
-            if (state.isNotBlank() && status == null) HubLine(state, scheme.onSurface, size)
+            // One short line per part of the state ("Parked", then "Locked"), so no line is wider than the hub and nothing is cut off.
+            if (state.isNotBlank() && status == null) {
+                state.split(" · ").filter { it.isNotBlank() }.forEach { HubLine(it, scheme.onSurface, size) }
+            }
             val line = status?.text ?: caption
             if (line.isNotBlank()) {
                 HubLine(

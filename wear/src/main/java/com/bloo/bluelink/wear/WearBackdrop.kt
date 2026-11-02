@@ -50,7 +50,7 @@ internal fun WearNameOverlay(name: String, color: Color, backdrop: HazeState) {
                     .clip(bottomBandShape(unit))
                     .wearBlur(backdrop)
                     // Below Android 12 the blur falls back to a flat look, so the band is darker there to keep the name legible.
-                    .background(MaterialTheme.colorScheme.background.copy(alpha = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 0.35f else 0.6f)),
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 0.5f else 0.7f)),
             )
             CurvedName(name, color, Modifier.fillMaxSize())
         }
