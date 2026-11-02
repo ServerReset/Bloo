@@ -64,6 +64,7 @@ internal fun KiaUsaApi.parseStatus(info: JsonObject): VehicleStatus {
     fun window(key: String, evKey: String): Int? =
         vs.path("windowOpen", key).int() ?: ev.path("windowStatus", evKey).int()
 
+    if (ev.path("batteryCharge").flag() == true) logChargingPowerFieldsOnce("Kia USA", ev)
     val evStatus = if (ev == null) null else EvStatus(
         batteryCharge = ev.path("batteryCharge").flag(),
         batteryStatus = ev.path("batteryStatus").int(),

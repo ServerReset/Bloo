@@ -24,6 +24,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
  */
 internal fun CanadaApi.parseStatus(vs: JsonObject, modelYear: Int?): VehicleStatus {
     val ev = vs["evStatus"] as? JsonObject
+    if (ev != null && ev["batteryCharge"].flag() == true) logChargingPowerFieldsOnce("Canada", ev)
     val evStatus = if (ev == null) null else EvStatus(
         batteryCharge = ev["batteryCharge"].flag(),
         batteryStatus = ev["batteryStatus"].int(),
