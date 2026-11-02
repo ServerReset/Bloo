@@ -228,7 +228,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             cacheWrite.withLock {
                 val s = _state.value
-                statusCache.save(s.statuses, s.locations, s.placeNames, s.lastFetched)
+                // File I/O: off the main thread.
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    statusCache.save(s.statuses, s.locations, s.placeNames, s.lastFetched)
+                }
             }
         }
     }
@@ -238,6 +241,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // How often the whole UI state changes is the first thing to know about a screen that feels busy: each emission can recompose
         // everything reading it.
         viewModelScope.launch { _state.collect { com.bloo.bluelink.perf.PerfMonitor.count("UiState emissions") } }
+        // Advanced mode (the Settings mode) turns the perf monitor's detailed logging on and off.
+        viewModelScope.launch {
+            _state.map { it.settingsMode }.collect { mode -> com.bloo.bluelink.perf.PerfMonitor.setVerbose(mode == "advanced") }
+        }
         mirrorPlayUpdates()
         bootstrapColdStart()
         startChargingPoll()
@@ -270,8 +277,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal val pendingPublishes = mutableMapOf<String, Job>()
 
     internal suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
-        com.bloo.bluelink.perf.PerfMonitor.span("snapshot.save", thresholdMs = 8) {
-            snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) })
+        val snapshots = vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) }
+        // The write is file I/O: off the main thread, so a swipe is not held up by a save (it used to take up to 68 ms there).
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.bloo.bluelink.perf.PerfMonitor.span("snapshot.save", thresholdMs = 8) {
+                snapshotStore.saveVehicles(snapshots)
+            }
         }
         refreshLiveChargeBar(vehicles)
     }

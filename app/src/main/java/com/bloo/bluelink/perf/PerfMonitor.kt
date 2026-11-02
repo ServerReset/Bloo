@@ -51,6 +51,7 @@ object PerfMonitor {
     private const val KEEP = 30
     private const val RECENT_EVENTS = 200
     private const val PROBE_MS = 2_000L
+    private const val ADVANCED_SPAN_MS = 2L
 
     private val clock = ScopeClock()
     private val stats = ConcurrentHashMap<String, ScopeStats>()
@@ -81,6 +82,19 @@ object PerfMonitor {
     private var lastScreen = "start"
 
     private var budgetMs = 16.7f
+
+    /**
+     * Advanced mode: the monitor writes far more to the perf file -- every frame over its budget with its phases, every main-thread span
+     * from [ADVANCED_SPAN_MS], every stall and every event. Switched by the Settings mode (see AppViewModel).
+     */
+    @Volatile var verbose = false
+        private set
+
+    fun setVerbose(on: Boolean) {
+        if (verbose == on) return
+        verbose = on
+        event("verbose", if (on) "advanced logging on" else "advanced logging off")
+    }
     private var startedAt = SystemClock.uptimeMillis()
     private var windowDropped = 0
     private var windowStalls = 0
@@ -276,7 +290,9 @@ object PerfMonitor {
 
     @PublishedApi internal fun spanDone(name: String, ms: Float, thresholdMs: Long) {
         spans.getOrPut(name) { SpanStats() }.add(ms)
-        if (ms >= thresholdMs && Looper.myLooper() == Looper.getMainLooper()) {
+        // Advanced mode logs every main-thread span from 2 ms, not only the ones that are already slow.
+        val limit = if (verbose) minOf(thresholdMs, ADVANCED_SPAN_MS) else thresholdMs
+        if (ms >= limit && Looper.myLooper() == Looper.getMainLooper()) {
             val line = "${uptime()} SPAN $name ${fmt(ms)} ms on main"
             PerfFile.append(line)
             AppLog.log("perf span $name ${fmt(ms)} ms on main")
@@ -307,6 +323,8 @@ object PerfMonitor {
         stats.getOrPut(label) { ScopeStats() }.add(cost, budgetMs)
         window.add(cost, budgetMs)
         windowDropped += dropped
+        // Advanced mode: every frame that misses its budget, with where its time went, so a pattern across the frames is visible.
+        if (verbose && cost.totalMs >= budgetMs) PerfFile.append("${uptime()} FRAME [$label] ${fmt(cost.totalMs)} ms ${cost.phases()}")
         if (cost.totalMs >= SLOW_FRAME_LOG_MS) {
             val line = "${uptime()} [$label] ${fmt(cost.totalMs)} ms, mostly ${cost.worstPhase()}: ${cost.phases()}"
             synchronized(worstFrames) { worstFrames.addLast(line); while (worstFrames.size > KEEP) worstFrames.removeFirst() }
