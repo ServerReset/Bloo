@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -48,7 +49,8 @@ internal fun WearNameOverlay(name: String, color: Color, backdrop: HazeState) {
                     .fillMaxSize()
                     .clip(bottomBandShape(unit))
                     .wearBlur(backdrop)
-                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.35f)),
+                    // Below Android 12 the blur falls back to a flat look, so the band is darker there to keep the name legible.
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 0.35f else 0.6f)),
             )
             CurvedName(name, color, Modifier.fillMaxSize())
         }
