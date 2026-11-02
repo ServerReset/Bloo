@@ -120,6 +120,8 @@ internal fun CollapsedGaragePager(
                 // Settings or the zero-car status slot is not a car selection; currentIndex keeps
                 // its car.
                 if (real < count) vm.selectIndex(real)
+                // A car that is charging is read again as its page settles, so its charge bar is current when it is looked at.
+                vm.refreshSelectedIfCharging()
                 // Settings counts as "on screen" if it sits in ANY of the visible columns, not just
                 // the first: on a multi-column layout the search bar expands whenever Settings is
                 // showing.

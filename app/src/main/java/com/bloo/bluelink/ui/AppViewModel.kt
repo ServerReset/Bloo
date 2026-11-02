@@ -240,6 +240,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { _state.collect { com.bloo.bluelink.perf.PerfMonitor.count("UiState emissions") } }
         mirrorPlayUpdates()
         bootstrapColdStart()
+        startChargingPoll()
     }
 
     // --- Auth ------------------------------------------------------------
