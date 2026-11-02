@@ -193,8 +193,10 @@ internal fun ExpandableMapLayer(
     val chromeInSpec: AnimationSpec<Float> = if (plainMotion) tween(120) else bounceSpring(stiffness = Spring.StiffnessLow)
 
     val placed = rootPos != null
-    LaunchedEffect(placed) {
-        if (!placed) return@LaunchedEffect
+    // Runs on every opening, not once: the layer stays composed while the map is closed, so keyed on placement alone it would never run
+    // again after its first time, and the map would sit at its pebble size with nothing able to close it.
+    LaunchedEffect(isExpanded, placed) {
+        if (!isExpanded || !placed) return@LaunchedEffect
         // The pin stays where it was on screen: the map is panned by how far the pebble's middle is from the sheet's, and that pan ramps in
         // with the opening (see MapInputs.panWeight), so the map opens off-centre and just gets bigger. Closing ramps it back out, which is
         // what carries the pin to the middle of the collapsed map.
@@ -288,7 +290,13 @@ internal fun ExpandableMapLayer(
         }
     }
     // Reset when the map opens, not when it leaves: resetting on close brought the blur back at full strength while it was still fading out.
-    LaunchedEffect(isExpanded) { if (isExpanded) onDismissDrag(0f) }
+    LaunchedEffect(isExpanded) {
+        if (isExpanded) {
+            // A new opening starts a new close: the last close's guard must not block this one.
+            closing = false
+            onDismissDrag(0f)
+        }
+    }
 
     // Back handler for closing
     BackHandler(enabled = isExpanded) { close() }
