@@ -39,6 +39,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.TransformOrigin
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
@@ -174,6 +176,8 @@ internal fun WearCarPage(
     val editingNow by rememberUpdatedState(editingFace)
     val pullThreshold = with(LocalDensity.current) { PullRefreshDistance.toPx() }
     val pullScope = rememberCoroutineScope()
+    // The pages are the backdrop the floating glass blurs (see WearBackdrop).
+    val backdrop = remember { HazeState() }
     val pull = remember(pullThreshold) {
         WearPullRefresh(
             scope = pullScope,
@@ -282,6 +286,7 @@ internal fun WearCarPage(
                 Box(
                     Modifier.fillMaxSize()
                         .nestedScroll(pull.connection)
+                        .hazeSource(backdrop)
                         .graphicsLayer {
                             // A refresh holds the page still: only a pull under the finger takes a little squash and stretch.
                             val p = if (ui.refreshing) 0f else pull.progress().coerceIn(0f, 1f)
@@ -310,12 +315,12 @@ internal fun WearCarPage(
                         }
                     }
                 }
-                WearPullDisc(pull, refreshing = ui.refreshing)
+                WearPullDisc(pull, refreshing = ui.refreshing, backdrop = backdrop)
                 if (current) {
                     // The car's name floats over every page of the car on screen: one element, not one per page.
-                    CurvedName(car.name, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.fillMaxSize())
+                    WearNameOverlay(car.name, MaterialTheme.colorScheme.onSurfaceVariant, backdrop)
                 }
-                toast?.let { WearToast(it) }
+                toast?.let { WearToast(it, backdrop) }
             }
         }
     }
@@ -330,14 +335,15 @@ private const val ToastMs = 3_000L
  * page behind (the watch has no backdrop blur to draw with).
  */
 @Composable
-private fun WearToast(text: String) {
+private fun WearToast(text: String, backdrop: HazeState) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         Box(
             Modifier
                 .padding(bottom = 22.dp)
                 .fillMaxWidth(0.78f)
                 .clip(RoundedCornerShape(18.dp))
-                .background(Color.Black.copy(alpha = 0.72f))
+                .wearBlur(backdrop)
+                .background(Color.Black.copy(alpha = 0.35f))
                 .padding(horizontal = 14.dp, vertical = 9.dp),
             contentAlignment = Alignment.Center,
         ) {

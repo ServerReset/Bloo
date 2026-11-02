@@ -19,6 +19,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.PullRefreshDisc
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -110,14 +111,14 @@ internal class WearPullRefresh(
  * sits in its own composable, so a drag moves it without recomposing the page around it.
  */
 @Composable
-internal fun BoxScope.WearPullDisc(pull: WearPullRefresh, refreshing: Boolean) {
+internal fun BoxScope.WearPullDisc(pull: WearPullRefresh, refreshing: Boolean, backdrop: HazeState) {
     val density = LocalDensity.current
     val restPx = with(density) { DiscRestDp.toPx() }
     Box(
         Modifier.align(Alignment.TopCenter).graphicsLayer { alpha = if (pull.onFace()) 1f else 0f },
     ) {
         PullRefreshDisc(pull = pull.progress(), active = refreshing, restPx = restPx, size = DiscDp) { discModifier, content ->
-            WearGlassDisc(discModifier, content)
+            WearGlassDisc(discModifier, content, backdrop)
         }
     }
 }
@@ -128,11 +129,12 @@ private val DiscRestDp = 30.dp
 
 /** The watch's disc: a translucent glass pane with a light rim, since the watch has no blur to draw with. */
 @Composable
-private fun WearGlassDisc(modifier: Modifier, content: @Composable () -> Unit) {
+private fun WearGlassDisc(modifier: Modifier, content: @Composable () -> Unit, backdrop: HazeState) {
     Box(
         modifier
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.14f))
+            .wearBlur(backdrop)
+            .background(Color.White.copy(alpha = 0.10f))
             .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape),
         contentAlignment = Alignment.Center,
     ) { content() }
