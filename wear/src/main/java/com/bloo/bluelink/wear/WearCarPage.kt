@@ -297,13 +297,11 @@ internal fun WearCarPage(
                     Modifier.fillMaxSize()
                         .nestedScroll(pull.connection)
                         .hazeSource(backdrop)
+                        // The face never moves under a pull: the refresh disc alone shows the pull (see WearPullRefresh).
                         .graphicsLayer {
-                            // A refresh holds the page still: only a pull under the finger takes a little squash and stretch.
-                            val p = if (ui.refreshing) 0f else pull.progress().coerceIn(0f, 1f)
-                            translationY = if (ui.refreshing) 0f else pull.offsetPx()
-                            transformOrigin = TransformOrigin(0.5f, 0f)
-                            scaleY = 1f + 0.02f * p
-                            scaleX = 1f - 0.01f * p
+                            translationY = 0f
+                            scaleX = 1f
+                            scaleY = 1f
                         },
                 ) {
                     VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { virtual ->
@@ -328,7 +326,11 @@ internal fun WearCarPage(
                 WearPullDisc(pull, refreshing = ui.refreshing, backdrop = backdrop)
                 if (current) {
                     // The car's name floats over every page of the car on screen: one element, not one per page.
-                    WearNameOverlay(car.name, MaterialTheme.colorScheme.onSurfaceVariant, backdrop)
+                    WearNameOverlay(
+                    name = car.percent?.let { "${car.name} · $it%" } ?: car.name,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    backdrop = backdrop,
+                )
                 }
                 toast?.let { WearToast(it, backdrop) }
             }

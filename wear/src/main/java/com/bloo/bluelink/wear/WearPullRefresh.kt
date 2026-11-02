@@ -124,8 +124,8 @@ internal fun BoxScope.WearPullDisc(pull: WearPullRefresh, refreshing: Boolean, b
 }
 
 /** The disc's size, and where it rests below the top of the display, clear of the time. */
-private val DiscDp = 26.dp
-private val DiscRestDp = 30.dp
+private val DiscDp = 46.dp
+private val DiscRestDp = 40.dp
 
 /** The watch's disc: a translucent glass pane with a light rim, since the watch has no blur to draw with. */
 @Composable

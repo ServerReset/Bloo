@@ -67,7 +67,7 @@ fun WearFaceHub(
                     // In dp-sized text: the hub is a fixed circle, so the value must not grow with the font setting.
                     // A long value ("Unlocked" for a car with no charge to show) shrinks to fit the hub instead of breaking mid-word.
                     fontSize = with(LocalDensity.current) {
-                        val base = (size.value * 0.30f).coerceIn(16f, 32f)
+                        val base = (size.value * 0.36f).coerceIn(18f, 40f)
                         (if (value.length > 4) (base * 4.5f / value.length).coerceAtLeast(12f) else base).dp.toSp()
                     },
                 ),
@@ -91,17 +91,26 @@ fun WearFaceHub(
     }
 }
 
-/** One small line under the hub's value: a fixed share of the hub's size (never the font setting), one line, within 80% of its width. */
+/**
+ * One line under the hub's value, on one line only: its size is a share of the hub and shrinks further for a long line, so "Parked · Locked"
+ * reads whole rather than wrapping.
+ */
 @Composable
 private fun HubLine(text: String, color: Color, hubSize: Dp) {
-    RevealText(
+    val base = (hubSize.value * 0.15f).coerceIn(10f, 14f)
+    val fit = if (text.length > 14) base * 14f / text.length else base
+    androidx.compose.material3.Text(
         text,
         style = MaterialTheme.typography.labelSmall.copy(
-            fontSize = with(LocalDensity.current) { (hubSize.value * 0.13f).coerceIn(9f, 12f).dp.toSp() },
+            fontSize = with(LocalDensity.current) { fit.coerceAtLeast(8f).dp.toSp() },
+            fontWeight = FontWeight.Medium,
         ),
         color = color,
         textAlign = TextAlign.Center,
-        modifier = Modifier.width(hubSize * 0.8f),
+        maxLines = 1,
+        softWrap = false,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
+        modifier = Modifier.width(hubSize * 0.84f),
     )
 }
 
