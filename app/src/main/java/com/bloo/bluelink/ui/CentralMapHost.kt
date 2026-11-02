@@ -71,33 +71,6 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     }
     // Closed, the map sits on its home card, so it needs that card's place on screen. Until the card has been placed, nothing is drawn.
     val closedAt: Rect? = if (openVin == null && homeVin != null) centralMap.originBoundsFor(homeVin).value else null
-    // Closed, every car's card shows the map too, with all the cars on it: one map drawn here, in each card's place. The home card's map is
-    // the layer's own (below), so it is not drawn twice; each card's is clipped to the part between the status bar and the search bar.
-    if (openVin == null) {
-        val screen = LocalWindowInfo.current.containerSize
-        val density = LocalDensity.current
-        val statusTop = WindowInsets.statusBars.getTop(density).toFloat()
-        val searchClear = with(density) { searchBarClearance(fallback = 132.dp).toPx() }
-        val deviceNow = state.value.deviceLocation
-        for (v in vehicles) {
-            if (v.vin == homeVin) continue
-            val loc = state.value.locations[v.vin] ?: continue
-            val rect = centralMap.originBoundsFor(v.vin).value ?: continue
-            val top = maxOf(rect.top, statusTop)
-            val bottom = minOf(rect.bottom, screen.height - searchClear)
-            if (bottom <= top) continue
-            key(v.vin) {
-                Box(
-                    Modifier
-                        .offset { IntOffset(rect.left.roundToInt(), top.roundToInt()) }
-                        .size(with(density) { rect.width.toDp() }, with(density) { (bottom - top).toDp() })
-                        .clipToBounds(),
-                ) {
-                    centralMap.Content(Modifier.fillMaxSize(), MapInputs(loc, deviceNow, interactive = false, tileArea = screen, panWeight = { 1f }))
-                }
-            }
-        }
-    }
     if (hostVehicle == null || hostLocation == null) return
     val windowSize = LocalWindowInfo.current.containerSize
     // Open, the map grows from the car's own card; until that card has been on screen, from a box in the middle, so the map always opens.
