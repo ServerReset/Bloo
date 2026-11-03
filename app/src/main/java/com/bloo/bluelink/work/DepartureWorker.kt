@@ -29,6 +29,9 @@ import java.util.concurrent.TimeUnit
  * Starts each car's departures on time: every [DEPARTURE_CHECK_MIN] minutes it looks for a departure whose warm-up window has come, and
  * starts the car for it, unless the car is already running or being driven. Runs through the same command path as every other start.
  */
+/** Notification ids for departure starts start here, clear of the other notifications. */
+private const val DEPARTURE_NOTICE_BASE = 300_000
+
 class DepartureWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val now = LocalDateTime.now()
@@ -44,9 +47,24 @@ class DepartureWorker(context: Context, params: WorkerParameters) : CoroutineWor
             val result = runCatching {
                 CarCommandRunner.execute(applicationContext, CarCommand(snap.vin, CarAction.CLIMATE_ON).withClimate(request))
             }.getOrNull()
-            if (result?.ok == true) store.setDepartureLastRun(snap.vin, due, epochDay)
+            if (result?.ok == true) {
+                store.setDepartureLastRun(snap.vin, due, epochDay)
+                announce(snap, due, schedule.slots[due].minuteOfDay)
+            }
         }
         return Result.success()
+    }
+
+    /** Says the car is warming up, and when it should be ready, so the person knows it has started without opening the app. */
+    private fun announce(snap: VehicleSnapshot, slot: Int, readyMinute: Int) {
+        val ready = String.format(java.util.Locale.US, "%02d:%02d", readyMinute / 60, readyMinute % 60)
+        com.bloo.bluelink.data.Notifications.post(
+            applicationContext,
+            id = DEPARTURE_NOTICE_BASE + (snap.vin.hashCode() and 0x7FFF) * 2 + slot,
+            title = "Warming up ${snap.name}",
+            text = "Ready by $ready",
+            channelId = com.bloo.bluelink.data.Notifications.CHANNEL_EVENTS,
+        )
     }
 
     /** The start for a departure: smart climate's request for the weather when it is smart, else the target as set, with the comfort chosen. */
