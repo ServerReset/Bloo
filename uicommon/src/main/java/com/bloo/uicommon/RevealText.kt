@@ -61,6 +61,12 @@ import kotlinx.coroutines.launch
  * the watch's reduce-effects switch), and for text too long to animate cheaply.
  */
 
+/**
+ * Set on a screen whose text must be readable the moment it appears, so the line-by-line entrance is off for every text under it. Used
+ * for the credentials and privacy screens, where a reveal half-played would read as missing text.
+ */
+val LocalInstantText = androidx.compose.runtime.staticCompositionLocalOf { false }
+
 /** Whether the text entrance may play right now: off under reduce-motion or power saving. */
 @Composable
 private fun textRevealAllowed(): Boolean =
@@ -172,7 +178,7 @@ fun RevealText(
     // Draw settled -- no reveal machinery at all (the layout capture, the draw node, the chained
     // callback) -- when the entrance is off, or the text is too long to animate cheaply. Both cases
     // want it gone entirely.
-    if (!textRevealAllowed() || text.length > MaxRevealChars) {
+    if (LocalInstantText.current || !textRevealAllowed() || text.length > MaxRevealChars) {
         Text(
             text = text,
             modifier = modifier,
