@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 /** The curved name's text size, in face units (see [LocalFaceUnit]). */
 private const val CurvedNameDp = 14.5f
@@ -33,13 +34,15 @@ private const val CurvedNameHaloDp = 4f
  */
 @Composable
 internal fun CurvedName(text: String, color: Color, modifier: Modifier = Modifier) {
+    // Called before the blank check, so the fade's state is kept whatever the text is.
+    val fade = rememberCanvasTextFade(text)
     if (text.isBlank()) return
     val unit = LocalFaceUnit.current
     val serif = LocalHeroSerif.current
-    Canvas(modifier) { drawCurvedName(text, color, unit, serif) }
+    Canvas(modifier) { fade.draw(text) { shown, a -> drawCurvedName(shown, color, unit, serif, a) } }
 }
 
-private fun DrawScope.drawCurvedName(text: String, color: Color, unit: Float, serif: Boolean) {
+private fun DrawScope.drawCurvedName(text: String, color: Color, unit: Float, serif: Boolean, alpha: Float) {
     val outer = size.minDimension / 2f
     val baseline = outer - (CurvedNameInsetDp * unit).dp.toPx()
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -49,6 +52,7 @@ private fun DrawScope.drawCurvedName(text: String, color: Color, unit: Float, se
         setShadowLayer((CurvedNameHaloDp * unit).dp.toPx(), 0f, 0f, android.graphics.Color.argb(220, 0, 0, 0))
         // The car's name is the face's hero text: in the classical serif when the phone's Classic headings are on.
         typeface = if (serif) Typeface.create(Typeface.SERIF, Typeface.BOLD) else Typeface.DEFAULT_BOLD
+        this.alpha = (alpha.coerceIn(0f, 1f) * 255f).roundToInt()
     }
     // Left, round the bottom, to the right: text on this path runs left to right with its tops toward the middle.
     val rect = RectF(center.x - baseline, center.y - baseline, center.x + baseline, center.y + baseline)

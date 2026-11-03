@@ -145,6 +145,8 @@ internal fun WearQuadrantGrid(
     }
     val inks = (0 until 4).map { q -> if (slots[q]?.active == true) scheme.onPrimary else scheme.onSurface }
     val namePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.DEFAULT_BOLD } }
+    // Each quarter's name cross-fades when it changes, as the Compose text does.
+    val nameFades = (0 until 4).map { q -> rememberCanvasTextFade(slots[q]?.label.orEmpty()) }
     Box(
         modifier
             .onSizeChanged { boxSize = it }
@@ -188,7 +190,7 @@ internal fun WearQuadrantGrid(
                 drawPath(path, fill)
                 drawPath(path, fill, style = Stroke(width = 2 * CornerRadius * pxU, join = StrokeJoin.Round))
                 slots[q]?.label?.takeIf { it.isNotBlank() }?.let { name ->
-                    drawNameOnEdge(name, geometry, q, inks[q], namePaint)
+                    nameFades[q].draw(name) { shown, a -> drawNameOnEdge(shown, geometry, q, inks[q], namePaint, a) }
                 }
             }
         }
@@ -303,12 +305,13 @@ internal fun quadrantHubOffset(press: QuadrantPress?, width: Float, height: Floa
  * The quarter's name, along its outer edge, reading upright: along the top it runs left to right with its tops outward; along the bottom it
  * runs left to right with its tops toward the middle, so it is never upside down. It sits inside the quarter's edge, clear of the ring.
  */
-private fun DrawScope.drawNameOnEdge(name: String, g: FaceGeometry, q: Int, ink: Color, paint: Paint) {
+private fun DrawScope.drawNameOnEdge(name: String, g: FaceGeometry, q: Int, ink: Color, paint: Paint, alpha: Float) {
     val top = q < 2
     val inset = NameInset * g.pxU
     val size = NameSize * g.pxU
     paint.color = ink.toArgb()
     paint.textSize = size
+    paint.alpha = (alpha.coerceIn(0f, 1f) * 255f).roundToInt()
     // The baseline: for the top, the letters rise outward from it, so it sits inside the edge by their height; for the bottom, they rise
     // inward from it, so it sits at the edge.
     val baseline = if (top) g.outer - inset - size * 0.72f else g.outer - inset
