@@ -8,6 +8,7 @@ import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.climateModelNow
 import com.bloo.bluelink.data.comfortModelNow
+import com.bloo.bluelink.data.seatConfig
 import com.bloo.bluelink.data.encodeClimateModel
 import com.bloo.bluelink.data.learnClimate
 import com.bloo.bluelink.data.SnapshotStore
