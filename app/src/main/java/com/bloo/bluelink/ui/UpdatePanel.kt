@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -91,60 +92,58 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
     // Keyed on the build, so a new one opens with its details closed.
     var showDetails by rememberSaveable(info?.run?.runNumber) { mutableStateOf(false) }
 
-    // 1. The version jump, when this surface needs it (the tile does; Settings shows it in its header).
-    // 2. What is happening now, in one line with its progress.
-    // 3. The one thing to do, and the way out of it.
-    if (info != null) {
-        val newLabel = buildLabel(info.run.runNumber)
-        // Build delta ("build 812 → build 828") when the installed build is known, else just the target.
-        val deltaLabel = if (current > 0) "${buildLabel(current)} → $newLabel" else newLabel
-        if (showHeadline) EnterOnce(expandFrom = Alignment.Top) { UpdateDeltaHero(current, info.run.runNumber) }
-        EnterOnce(expandFrom = Alignment.Top) {
-            NestedGlassPanel(hazeState) {
-                Column(Modifier.padding(GapGroup)) {
-                    // The version is already above, so the status line says what is happening, not the version again.
-                    UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = false)
-                }
-            }
-        }
-        if (primaryInBody) {
-            val act = updateAction(state, info, seamless)
-            MorphButton(
-                onClick = { runUpdateAction(state, vm, info, context) },
-                modifier = Modifier.fillMaxWidth(),
-                active = act.ready,
-                activeContainerColor = confirmTone().container,
-                activeContentColor = confirmTone().content,
-                enabled = !state.updateInstalling && !state.updateDownloading,
-                expressive = true,
-            ) {
-                MorphButtonLabel(act.icon, act.label, pending = false)
-            }
-        }
-        EnterOnce(expandFrom = Alignment.Top) { UpdateDismissRow(state, vm) }
-    }
+    // The version jump, on the tile only (Settings shows it in its header). It sits above the card, as its headline.
+    if (info != null && showHeadline) EnterOnce(expandFrom = Alignment.Top) { UpdateDeltaHero(current, info.run.runNumber) }
 
-    // 4. Everything secondary sits behind one disclosure: what is new, how to install, and Shizuku.
-    MorphTextButton(
-        if (showDetails) "Hide details" else "Details",
-        onClick = { showDetails = !showDetails },
-        modifier = Modifier.fillMaxWidth(),
-    )
-    PopVisible(visible = showDetails, sizeAnimated = true) {
-        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+    // One card holds the whole update: the status, the one action, dismiss, and the details. One glass surface, and one size animation
+    // (the details' own), instead of a stack of panels that each animate on their own.
+    NestedGlassPanel(hazeState) {
+        Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             if (info != null) {
-                EnterOnce(expandFrom = Alignment.Top) { UpdateReleaseNotes(info, hazeState = hazeState) }
-                if (!seamless) EnterOnce(expandFrom = Alignment.Top) { InstallHelp(state, info, hazeState) }
+                val newLabel = buildLabel(info.run.runNumber)
+                // Build delta ("build 812 → build 828") when the installed build is known, else just the target.
+                val deltaLabel = if (current > 0) "${buildLabel(current)} → $newLabel" else newLabel
+                // The version is already above, so the status line says what is happening, not the version again.
+                UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = false)
+                if (primaryInBody) {
+                    val act = updateAction(state, info, seamless)
+                    MorphButton(
+                        onClick = { runUpdateAction(state, vm, info, context) },
+                        modifier = Modifier.fillMaxWidth(),
+                        active = act.ready,
+                        activeContainerColor = confirmTone().container,
+                        activeContentColor = confirmTone().content,
+                        enabled = !state.updateInstalling && !state.updateDownloading,
+                        expressive = true,
+                    ) {
+                        MorphButtonLabel(act.icon, act.label, pending = false)
+                    }
+                }
+                UpdateDismissRow(state, vm)
             }
-            EnterOnce(expandFrom = Alignment.Top) {
-                NestedGlassPanel(hazeState) {
-                    Column(Modifier.padding(GapGroup)) { ShizukuSetting(state, vm) }
+            // Everything secondary sits behind this one disclosure: what is new, how to install, and Shizuku.
+            MorphTextButton(
+                if (showDetails) "Hide details" else "Details",
+                onClick = { showDetails = !showDetails },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            AnimatedVisibility(
+                visible = showDetails,
+                enter = expandEnterSized(Alignment.Top),
+                exit = expandExitSized(),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                    if (info != null) {
+                        UpdateReleaseNotes(info, hazeState = hazeState, flat = true)
+                        if (!seamless) InstallHelp(state, info)
+                    }
+                    ShizukuSetting(state, vm)
                 }
             }
         }
     }
 
-    // 5. The two ways to look for this yourself, always at the foot.
+    // The two ways to look for this yourself, always at the foot.
     EnterOnce(expandFrom = Alignment.Top) { ActionRow {
         MorphTextButton(
             "Check",
@@ -168,9 +167,9 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
  * sheet is folded shut by default, so an update looks like it failed when the real answer is "expand it, then tap Install anyway".
  */
 @Composable
-private fun InstallHelp(state: UiState, info: UpdateInfo, hazeState: HazeState?) {
-    NestedGlassPanel(hazeState) {
-        Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
+private fun InstallHelp(state: UiState, info: UpdateInfo) {
+    run {
+        Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
             if (!state.shizukuAvailable || !LocalAppearance.current.seamlessInstallShizuku) {
                 RevealMutedText(
                     "Without Shizuku, tap \"More details\", then \"Install anyway\".",

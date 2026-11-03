@@ -73,7 +73,7 @@ internal fun NestedGlassPanel(hazeState: dev.chrisbanes.haze.HazeState?, content
 
 /** The release notes, in full, under a "What's new" heading. */
 @Composable
-internal fun UpdateReleaseNotes(info: UpdateInfo, hazeState: dev.chrisbanes.haze.HazeState? = null) {
+internal fun UpdateReleaseNotes(info: UpdateInfo, hazeState: dev.chrisbanes.haze.HazeState? = null, flat: Boolean = false) {
     val notes = info.run.releaseNotes?.trim().orEmpty()
     if (notes.isBlank()) return
     // Glass surface with unified blur styling. shadow = false -- shared by the pebble body AND
@@ -84,7 +84,7 @@ internal fun UpdateReleaseNotes(info: UpdateInfo, hazeState: dev.chrisbanes.haze
     // The footer's Releases link is the way out to GitHub, so the notes carry no link of their own.
     // The patch notes come first, under What's new; the install help and the Play-or-APK note follow in their own panel.
     if (patch.isNotBlank()) {
-        NestedGlassPanel(hazeState) {
+        NotesBlock(flat, hazeState) {
             Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 RevealText("What's new", style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold)
                 RevealText(
@@ -97,7 +97,7 @@ internal fun UpdateReleaseNotes(info: UpdateInfo, hazeState: dev.chrisbanes.haze
         }
     }
     if (general.isNotBlank()) {
-        NestedGlassPanel(hazeState) {
+        NotesBlock(flat, hazeState) {
             Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 RevealText("Before you install", style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold)
                 RevealText(
@@ -109,6 +109,12 @@ internal fun UpdateReleaseNotes(info: UpdateInfo, hazeState: dev.chrisbanes.haze
             }
         }
     }
+}
+
+/** A block of notes: its own glass panel, or, inside an update card, just its content (one surface for the whole card). */
+@Composable
+private fun NotesBlock(flat: Boolean, hazeState: dev.chrisbanes.haze.HazeState?, content: @Composable () -> Unit) {
+    if (flat) content() else NestedGlassPanel(hazeState, content)
 }
 
 /**
