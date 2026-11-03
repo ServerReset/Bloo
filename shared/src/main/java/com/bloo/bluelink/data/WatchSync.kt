@@ -19,6 +19,8 @@ data class WatchSyncPayload(
     val watchUpdateRunNumber: Int? = null,
     /** Advanced logging is on at the phone, so the watch keeps its own log and sends it back (see [WatchSyncProtocol.PATH_WATCH_LOG]). */
     val advancedLogging: Boolean = false,
+    /** The phone's feel answers for each car, so the watch's smart climate plans from the same history. */
+    val climateFeedback: Map<String, List<ClimateFeedback>> = emptyMap(),
     val watchUpdateApkUrl: String? = null,
     val watchUpdateNotes: String? = null,
     /**
@@ -118,6 +120,8 @@ object WatchSyncProtocol {
     const val PATH_WATCH_APK = "/bloo/watch_apk"
     /** Phone → watch: a command the watch wants run (see [WatchCommandRequest]). */
     const val PATH_COMMAND = "/bloo/command"
+    /** Watch → phone: how the person felt about a smart climate plan on the watch (a [WatchClimateFeedback], JSON). */
+    const val PATH_CLIMATE_FEEDBACK = "/bloo/climate_feedback"
     /** Watch → phone: a batch of the watch's own log lines, newline-separated, while advanced logging is on. */
     const val PATH_WATCH_LOG = "/bloo/watch_log"
 
@@ -180,3 +184,7 @@ data class WatchCommandResult(
     val ok: Boolean,
     val message: String? = null,
 )
+
+/** A feel answer sent from the watch: [deltaF] degrees warmer (positive) or cooler (negative) than the plan at [ambientF]. */
+@Serializable
+data class WatchClimateFeedback(val vin: String, val ambientF: Int, val deltaF: Int)

@@ -98,6 +98,13 @@ class PhoneWatchSyncService : WearableListenerService() {
         when (messageEvent.path) {
             WatchSyncProtocol.PATH_CRED_KEY -> WatchSignIn.onKey(messageEvent.sourceNodeId, messageEvent.data)
             WatchSyncProtocol.PATH_CRED_ACK -> WatchSignIn.onAck()
+            // A feel answer from the watch's smart climate: kept with the phone's, and the plan is sent back so both agree.
+            WatchSyncProtocol.PATH_CLIMATE_FEEDBACK -> runCatching {
+                json.decodeFromString(com.bloo.bluelink.data.WatchClimateFeedback.serializer(), messageEvent.data.decodeToString())
+            }.getOrNull()?.let { f ->
+                ClimateChoices.recordFeedback(applicationContext, f.vin, f.ambientF, f.deltaF)
+                pushNow(applicationContext)
+            }
             // The watch's own log lines (advanced logging only), kept in the phone's activity log, marked as the watch's.
             WatchSyncProtocol.PATH_WATCH_LOG -> {
                 val lines = messageEvent.data.decodeToString().lines().filter { it.isNotBlank() }
@@ -231,6 +238,8 @@ class PhoneWatchSyncService : WearableListenerService() {
                     accent = watchAccentOf(app, appearance),
                     glass = WatchGlass(appearance.glassClarity, appearance.ultraGlass),
                     type = WatchType(appearance.fontChoice, appearance.classicHeadings),
+                    climateFeedback = snapshot.vehicles.associate { it.vin to ClimateChoices.feedback(app, it.vin) }
+                        .filterValues { it.isNotEmpty() },
                     climateChoices = snapshot.vehicles.associate { it.vin to ClimateChoices.list(app, it.vin) }
                         .filterValues { it.isNotEmpty() },
                 )

@@ -1,6 +1,17 @@
 package com.bloo.bluelink.wear
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.degLabel
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,6 +55,28 @@ internal fun WearClimatePebble(
             onSmart = { requestCommand { repo.command(v.vin, CarAction.CLIMATE_SMART) } },
             onPreset = { preset -> requestCommand { repo.command(v.vin, CarAction.CLIMATE_ON, preset.request) } },
         )
+        // How hot or cold they want it, against the smart plan: − and + move it, Set starts the car there and tells smart climate how it felt.
+        hints[v.vin]?.let { hint ->
+            val context = LocalContext.current
+            var feel by remember(hint.targetF) { mutableIntStateOf(0) }
+            val fahrenheit = WearPresets.fahrenheit
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                WearRoundButton(size = 40.dp, description = "Cooler", onClick = { feel = (feel - 1).coerceAtLeast(-4) }) { WearCenteredText("−") }
+                WearCenteredText(degLabel((hint.targetF + feel).toString(), fahrenheit))
+                WearRoundButton(size = 40.dp, description = "Warmer", onClick = { feel = (feel + 1).coerceAtMost(4) }) { WearCenteredText("+") }
+            }
+            WearActionRow(
+                label = "Set",
+                icon = AppIcons.SmartClimate,
+                enabled = !busy(CarAction.CLIMATE_ON),
+                onClick = {
+                    WearClimateChoices.recordFeedback(context, v.vin, hint.ambientF, feel)
+                    val base = presets[v.vin].orEmpty().firstOrNull()?.request
+                    val request = base?.copy(tempF = hint.targetF + feel) ?: ClimateRequest(tempF = hint.targetF + feel, defrost = false, durationMinutes = 10)
+                    requestCommand { repo.command(v.vin, CarAction.CLIMATE_ON, request) }
+                },
+            )
+        }
     }
 }
 
