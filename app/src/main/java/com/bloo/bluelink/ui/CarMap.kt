@@ -442,7 +442,7 @@ private const val EdgePinScale = 0.75f
 private val EdgeMorphDp = 72.dp
 
 /** Where a car's icon is kept clear of the map's edges, in dp: the top and bottom carry the bar and the buttons. */
-private val EdgeInsetSidesDp = 28.dp
+private val EdgeInsetSidesDp = 44.dp
 
 /** The gap an off-edge marker keeps from the map's edge, past the bars where the map has them. */
 private val EdgeMarginDp = 8.dp

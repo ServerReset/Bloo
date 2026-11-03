@@ -91,8 +91,26 @@ internal class CentralMap {
         }
         val from = cars.firstOrNull { it.vin == anchor }?.location ?: return
         val to = cars.firstOrNull { it.vin == tapped }?.location ?: return
-        mapState.showDevice(from.latitude, from.longitude, to.latitude, to.longitude)
+        // The map glides to the other car rather than jumping: the pan is worked out as showDevice does, and eased to over a short time.
+        val z = mapState.zoom
+        val tx = (-(com.bloo.bluelink.data.MapTiles.tileX(to.longitude, z) - com.bloo.bluelink.data.MapTiles.tileX(from.longitude, z)) *
+            com.bloo.bluelink.data.MapTiles.TILE_PX).toFloat()
+        val ty = (-(com.bloo.bluelink.data.MapTiles.tileY(to.latitude, z) - com.bloo.bluelink.data.MapTiles.tileY(from.latitude, z)) *
+            com.bloo.bluelink.data.MapTiles.TILE_PX).toFloat()
+        moveJob?.cancel()
+        val sx = mapState.panX
+        val sy = mapState.panY
+        moveJob = mapScope.launch {
+            androidx.compose.animation.core.animate(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.tween(GlideMs, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            ) { t, _ -> mapState.panTo(sx + (tx - sx) * t, sy + (ty - sy) * t) }
+        }
     }
+
+    private val mapScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
+    private var moveJob: kotlinx.coroutines.Job? = null
 
     /**
      * A car card's own copy of the map: it keeps its own pan and zoom, so it stays put while the big map opens and closes. It is centred on
@@ -138,3 +156,6 @@ internal class CentralMap {
         }
     }
 }
+
+/** How long the map takes to glide to a car chosen on it. */
+private const val GlideMs = 420

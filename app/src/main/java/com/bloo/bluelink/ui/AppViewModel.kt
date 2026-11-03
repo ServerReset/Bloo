@@ -223,6 +223,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * Write the current live status/location maps to disk (survives restart). One write at a time, and the state is read
      * once the write's turn comes: a save started earlier can no longer land after (and overwrite) a newer one.
      */
+    /** The logging choice: Off, Simple (the activity log) or Advanced (plus the performance and watch detail). */
+    fun setLogLevel(level: com.bloo.bluelink.data.LogLevel) {
+        com.bloo.bluelink.data.DiagSettings.setLevel(getApplication(), level)
+        com.bloo.bluelink.perf.PerfMonitor.setAdvanced(com.bloo.bluelink.data.DiagSettings.advanced)
+        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+    }
+
     /** Normal logging (the activity log) on or off. Off also turns advanced logging off, since it is built on it. */
     fun setLoggingOn(on: Boolean) {
         com.bloo.bluelink.data.DiagSettings.setLogging(getApplication(), on)

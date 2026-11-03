@@ -108,28 +108,14 @@ internal fun DebugCardContent(
                 MorphTextButton("Check again", onClick = { vm.reprobeAi() })
             }
             SettingsGroup("Logging") {
-                // Normal logging is the activity log. Advanced logging is slower, and turns on the performance numbers below and the watch's log.
-                var logOn by remember { mutableStateOf(com.bloo.bluelink.data.DiagSettings.logging) }
-                var advancedOn by remember { mutableStateOf(com.bloo.bluelink.data.DiagSettings.advanced) }
-                ToggleRow(
-                    label = "Logging",
-                    checked = logOn,
-                    description = "Keeps the activity log below and in its saved file. Off, nothing is logged.",
-                    onChange = { on ->
-                        vm.setLoggingOn(on)
-                        logOn = com.bloo.bluelink.data.DiagSettings.logging
-                        advancedOn = com.bloo.bluelink.data.DiagSettings.advanced
-                    },
-                )
-                ToggleRow(
-                    label = "Advanced logging",
-                    checked = advancedOn,
-                    enabled = logOn,
-                    description = "Slows the app while it is on. Adds detailed timing for every frame, the performance numbers below, and a log from the watch. Use it only to diagnose a problem.",
-                    onChange = { on ->
-                        vm.setAdvancedLoggingOn(on)
-                        advancedOn = com.bloo.bluelink.data.DiagSettings.advanced
-                    },
+                // Off logs nothing (the default). Simple keeps the activity log. Advanced adds detailed timing and the watch's log, and slows the app.
+                var level by remember { mutableStateOf(com.bloo.bluelink.data.DiagSettings.level) }
+                BodySmallText("Off logs nothing. Simple keeps the activity log. Advanced also keeps detailed timing and the watch's log, and slows the app while it runs.")
+                EnumSegmented(
+                    entries = com.bloo.bluelink.data.LogLevel.entries,
+                    selected = level,
+                    label = { when (it) { com.bloo.bluelink.data.LogLevel.OFF -> "Off"; com.bloo.bluelink.data.LogLevel.SIMPLE -> "Simple"; com.bloo.bluelink.data.LogLevel.ADVANCED -> "Advanced" } },
+                    onSelect = { choice -> vm.setLogLevel(choice); level = choice },
                 )
             }
             SettingsGroup("Performance") {
