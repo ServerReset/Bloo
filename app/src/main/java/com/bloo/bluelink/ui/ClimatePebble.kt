@@ -397,7 +397,7 @@ private fun SmartClimateSection(
             }
         }
         // Every factor that moved the target, one per line, so the number is never a mystery.
-        RevealMutedText(plan?.reasons?.joinToString("\n") ?: "Sets the temperature for the car's weather.")
+        plan?.reasons?.joinToString("\n")?.let { RevealMutedText(it) }
     }
 }
 
