@@ -53,13 +53,13 @@ internal class CentralMap {
 
     fun originBoundsFor(vin: String): MutableState<Rect?> = origins.getOrPut(vin) { mutableStateOf(null) }
 
-    /** Opens the map on [vin], with that car selected. A map already open is not switched under the person. */
     /** The car the person last chose on the map (opened on, or tapped): the car the map and the app return to when it closes. */
     var chosenVin: String? = null
 
     /** While the map is collapsing, the car whose card it collapses onto (its own card, once the car page has moved there). */
     var closingTo by mutableStateOf<String?>(null)
 
+    /** Opens the map on [vin], with that car selected. A map already open is not switched under the person. */
     fun open(vin: String) {
         if (this.vin != null) return
         com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin")
@@ -75,10 +75,10 @@ internal class CentralMap {
         vin = null
     }
 
-    /** A tap on a car's icon: the bar shows that car, and the map pans to centre it from the anchor. */
     /** Set by the host: the app's car page moves to a car that was chosen on the map (see [tapPin]). */
     var onCarChosen: ((String) -> Unit)? = null
 
+    /** A tap on a car's icon: the bar shows that car, and the map glides to centre it from the anchor. */
     fun tapPin(tapped: String) {
         selectedVin = tapped
         // The car tapped is the one the map returns to when it closes, and the car page moves to it behind the map.
