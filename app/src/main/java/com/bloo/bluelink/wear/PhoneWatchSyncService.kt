@@ -9,6 +9,7 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.climateModelNow
 import com.bloo.bluelink.data.comfortModelNow
 import com.bloo.bluelink.data.seatConfig
+import com.bloo.bluelink.data.learnComfort
 import com.bloo.bluelink.data.encodeClimateModel
 import com.bloo.bluelink.data.learnClimate
 import com.bloo.bluelink.data.SnapshotStore
@@ -111,6 +112,16 @@ class PhoneWatchSyncService : WearableListenerService() {
                 // The learned model takes the answer too, then the plan goes back with the learned numbers, so both devices agree.
                 scope.launch {
                     SettingsStore(applicationContext).learnClimate(f.vin, f.ambientF, f.deltaF)
+                    pushNow(applicationContext)
+                }
+            }
+            // A comfort choice made on the watch: the learned model takes it, then the plan goes back with the learned numbers.
+            WatchSyncProtocol.PATH_COMFORT_CHOICE -> runCatching {
+                json.decodeFromString(com.bloo.bluelink.data.WatchComfortChoice.serializer(), messageEvent.data.decodeToString())
+            }.getOrNull()?.let { c ->
+                scope.launch {
+                    val mode = runCatching { com.bloo.bluelink.data.SmartClimateMode.valueOf(c.mode) }.getOrNull() ?: return@launch
+                    SettingsStore(applicationContext).learnComfort(c.vin, mode, c.levels.toIntArray())
                     pushNow(applicationContext)
                 }
             }

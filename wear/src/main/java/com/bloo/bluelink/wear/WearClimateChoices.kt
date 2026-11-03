@@ -4,6 +4,8 @@ import android.content.Context
 import com.bloo.bluelink.data.ClimateChoice
 import com.bloo.bluelink.data.ComfortCaps
 import com.bloo.bluelink.data.ComfortModel
+import com.bloo.bluelink.data.SmartClimateMode
+import com.bloo.bluelink.data.WatchComfortChoice
 import com.bloo.bluelink.data.ClimateFeedback
 import com.bloo.bluelink.data.ClimateModel
 import com.bloo.bluelink.data.decodeClimateModel
@@ -59,6 +61,25 @@ internal object WearClimateChoices {
 
     /** What smart comfort has learned for [vin], as the phone has it. */
     fun comfortModelFor(vin: String): ComfortModel? = _comfortModels.value[vin]
+
+    /**
+     * The person chose seats, wheel or defrost on the watch, against the smart choice: the watch learns it at once, so its plan moves, and
+     * sends it to the phone, which keeps it with the synced settings.
+     */
+    fun recordComfortChoice(context: Context, vin: String, mode: SmartClimateMode, levels: IntArray) {
+        if (mode == SmartClimateMode.HOLD) return
+        _comfortModels.value = _comfortModels.value + (vin to (comfortModelFor(vin) ?: ComfortModel()).learn(mode, levels))
+        WearSmartClimate.replan()
+        val bytes = Json.encodeToString(WatchComfortChoice.serializer(), WatchComfortChoice(vin, mode.name, levels.toList())).encodeToByteArray()
+        val app = context.applicationContext
+        ioScope().launch {
+            runCatching {
+                Wearable.getNodeClient(app).connectedNodes.await().forEach {
+                    Wearable.getMessageClient(app).sendMessage(it.id, WatchSyncProtocol.PATH_COMFORT_CHOICE, bytes).await()
+                }
+            }
+        }
+    }
 
     /** The phone's comfort setup and learned comfort arrived: kept, and any plan made from older ones is made again. */
     fun applyComfort(caps: Map<String, String>, models: Map<String, String>) {

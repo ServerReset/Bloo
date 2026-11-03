@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material3.MaterialTheme
 import com.bloo.bluelink.data.FEEL_STEP_F
 import com.bloo.bluelink.data.feelLabel
@@ -17,6 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.WatchComfortChoice
+import com.bloo.bluelink.data.comfortLevelsOf
+import com.bloo.bluelink.data.SmartClimateMode
+import com.bloo.bluelink.data.WheelHeatLevel
+import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.degLabel
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -88,6 +94,19 @@ internal fun WearClimatePebble(
                 onSettle = {},
                 enabled = !busy(CarAction.CLIMATE_ON),
             )
+            // Seats, wheel and defrost, switched on or off from the smart choice, for what the car has. Only what the car has is shown.
+            val c = hint.comfort
+            val caps = WearClimateChoices.comfortCapsFor(v.vin)
+            val seatsCap = caps.driverHeat || caps.driverCool || caps.passHeat || caps.passCool ||
+                caps.rearLeftHeat || caps.rearLeftCool || caps.rearRightHeat || caps.rearRightCool
+            val seatsAuto = c?.let { listOf(it.seatDriver, it.seatPassenger, it.seatRearLeft, it.seatRearRight).any { l -> l != SeatLevel.OFF } } ?: false
+            var seatsOn by remember(hint.targetF, hint.mode, c) { mutableStateOf(seatsAuto) }
+            var wheelOn by remember(hint.targetF, hint.mode, c) { mutableStateOf(c?.wheel?.isOn == true) }
+            var defrostOn by remember(hint.targetF, hint.mode, c) { mutableStateOf(c?.defrost == true) }
+            if (seatsCap) WearToggleRow("Seats", icon = null, checked = seatsOn, description = "Heat or cool the seats") { seatsOn = it }
+            if (caps.wheel) WearToggleRow("Wheel", icon = null, checked = wheelOn, description = "Warm the steering wheel") { wheelOn = it }
+            WearToggleRow("Defrost", icon = null, checked = defrostOn, description = "Clear the glass") { defrostOn = it }
+
             WearActionRow(
                 label = "Set",
                 icon = AppIcons.SmartClimate,
@@ -95,18 +114,39 @@ internal fun WearClimatePebble(
                 onClick = {
                     WearClimateChoices.recordFeedback(context, v.vin, hint.ambientF, step * FEEL_STEP_F)
                     val base = presets[v.vin].orEmpty().firstOrNull()?.request
-                    // The seats, wheel and defrost smart comfort chose for this weather, for what the car has.
-                    val c = hint.comfort
                     val start = base ?: ClimateRequest(tempF = target, defrost = false, durationMinutes = 10)
+                    // What the switches say, as the car is to be set. Where a switch matches the smart choice, the choice stands.
+                    val seatDriver = manualSeat(seatsOn, c?.seatDriver, hint.mode, caps.driverHeat, caps.driverCool)
+                    val seatPass = manualSeat(seatsOn, c?.seatPassenger, hint.mode, caps.passHeat, caps.passCool)
+                    val seatRl = manualSeat(seatsOn, c?.seatRearLeft, hint.mode, caps.rearLeftHeat, caps.rearLeftCool)
+                    val seatRr = manualSeat(seatsOn, c?.seatRearRight, hint.mode, caps.rearRightHeat, caps.rearRightCool)
+                    val autoWheel = c?.wheel
+                    val wheel = when {
+                        !wheelOn -> WheelHeatLevel.OFF
+                        autoWheel != null && autoWheel.isOn -> autoWheel
+                        caps.wheel -> WheelHeatLevel.HIGH
+                        else -> WheelHeatLevel.OFF
+                    }
                     val request = start.copy(
                         tempF = target,
-                        defrost = c?.defrost ?: start.defrost,
-                        steeringWheelHeat = c?.wheel ?: start.steeringWheelHeat,
-                        seatFrontLeft = c?.seatDriver ?: start.seatFrontLeft,
-                        seatFrontRight = c?.seatPassenger ?: start.seatFrontRight,
-                        seatRearLeft = c?.seatRearLeft ?: start.seatRearLeft,
-                        seatRearRight = c?.seatRearRight ?: start.seatRearRight,
+                        defrost = defrostOn,
+                        steeringWheelHeat = wheel,
+                        seatFrontLeft = seatDriver,
+                        seatFrontRight = seatPass,
+                        seatRearLeft = seatRl,
+                        seatRearRight = seatRr,
                     )
+                    // A start that differs from the smart choice teaches the watch what the person wanted, and the phone too.
+                    if (c != null) {
+                        val auto = ClimateRequest(
+                            tempF = target, defrost = c.defrost, durationMinutes = request.durationMinutes,
+                            steeringWheelHeat = c.wheel, seatFrontLeft = c.seatDriver, seatFrontRight = c.seatPassenger,
+                            seatRearLeft = c.seatRearLeft, seatRearRight = c.seatRearRight,
+                        )
+                        if (!comfortLevelsOf(auto, hint.mode).contentEquals(comfortLevelsOf(request, hint.mode))) {
+                            WearClimateChoices.recordComfortChoice(context, v.vin, hint.mode, comfortLevelsOf(request, hint.mode))
+                        }
+                    }
                     requestCommand { repo.command(v.vin, CarAction.CLIMATE_ON, request) }
                 },
             )
@@ -144,4 +184,13 @@ internal fun WearClimateRows(
         val text = "Presets from your phone show here."
         if (smallCaption) WearCaption(text, small = true) else WearCaption(text)
     }
+}
+
+/** One seat's level as the switch sets it: off when the switch is off; the smart level when there is one; otherwise medium, if the seat has it. */
+private fun manualSeat(on: Boolean, auto: SeatLevel?, mode: SmartClimateMode, heatCap: Boolean, coolCap: Boolean): SeatLevel = when {
+    !on -> SeatLevel.OFF
+    auto != null && auto != SeatLevel.OFF -> auto
+    mode == SmartClimateMode.HEAT && heatCap -> SeatLevel.MED_HEAT
+    mode == SmartClimateMode.COOL && coolCap -> SeatLevel.MED_COOL
+    else -> SeatLevel.OFF
 }

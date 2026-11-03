@@ -128,6 +128,8 @@ object WatchSyncProtocol {
     const val PATH_COMMAND = "/bloo/command"
     /** Watch → phone: how the person felt about a smart climate plan on the watch (a [WatchClimateFeedback], JSON). */
     const val PATH_CLIMATE_FEEDBACK = "/bloo/climate_feedback"
+    /** A comfort choice the person made on the watch (seats, wheel, defrost), for the phone to learn from. */
+    const val PATH_COMFORT_CHOICE = "/bloo/comfort_choice"
     /** Watch → phone: a batch of the watch's own log lines, newline-separated, while advanced logging is on. */
     const val PATH_WATCH_LOG = "/bloo/watch_log"
 
@@ -194,3 +196,7 @@ data class WatchCommandResult(
 /** A feel answer sent from the watch: [deltaF] degrees warmer (positive) or cooler (negative) than the plan at [ambientF]. */
 @Serializable
 data class WatchClimateFeedback(val vin: String, val ambientF: Int, val deltaF: Int)
+
+/** A comfort choice made on the watch: the kind of day ([mode], a [SmartClimateMode] name) and the levels, as [comfortLevelsOf] reads them. */
+@Serializable
+data class WatchComfortChoice(val vin: String, val mode: String, val levels: List<Int>)
