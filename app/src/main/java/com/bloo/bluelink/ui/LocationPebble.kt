@@ -181,7 +181,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                     )
                 Box(slot) {
                     // Home car: the map covers this, and a tap that reaches it opens the map. Other cars: the same tap, with a label.
-                    MapPlaceholder(name = v.name, showLabel = false) { host?.open(v.vin) }
+                    MapSlot { host?.open(v.vin) }
                 }
                 MapFeatureRow(
                     features = listOfNotNull(
@@ -242,21 +242,11 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
 // --- Weather inside the Location pebble -----------------------------------
 
 /**
- * A Location card's slot, drawn under the shared map: the surface the map sits on while it is closed in this card, and a tap that opens the
- * map on this car. [showLabel] names the car's map for the cards the map is not in.
+ * The Location card's slot for the map: the surface the shared map sits on, with no placeholder of its own. A tap on it opens the map.
  */
 @Composable
-private fun MapPlaceholder(name: String, showLabel: Boolean, onOpen: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
+private fun MapSlot(onOpen: () -> Unit) {
     Box(
-        Modifier.fillMaxSize().background(scheme.surfaceContainer).clickable(role = Role.Button, onClick = onOpen),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (showLabel) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(AppIcons.DirectionsCar, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(28.dp))
-                RevealText("Show $name on the map", style = SecondaryTextStyle(), color = scheme.onSurfaceVariant)
-            }
-        }
-    }
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).clickable(role = Role.Button, onClick = onOpen),
+    )
 }
