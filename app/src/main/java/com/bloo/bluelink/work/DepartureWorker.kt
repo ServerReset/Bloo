@@ -17,6 +17,7 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.departureLastRuns
+import com.bloo.bluelink.data.isDriving
 import com.bloo.bluelink.data.departuresNow
 import com.bloo.bluelink.data.setDepartureLastRun
 import com.bloo.bluelink.data.smartClimateRequestFor

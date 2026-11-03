@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.CarCommandGate
+import com.bloo.bluelink.data.appendStart
 import com.bloo.bluelink.data.CarCommandIds
 import kotlinx.coroutines.flow.collectLatest
 import androidx.lifecycle.viewModelScope

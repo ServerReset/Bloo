@@ -19,6 +19,7 @@ import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.setTextClearPhoto
 import com.bloo.bluelink.data.learnClimate
 import com.bloo.bluelink.data.learnComfort
+import com.bloo.bluelink.data.setDepartures
 import com.bloo.bluelink.data.SmartClimateMode
 import com.bloo.bluelink.data.ClimateRequest
 import kotlinx.coroutines.flow.update
