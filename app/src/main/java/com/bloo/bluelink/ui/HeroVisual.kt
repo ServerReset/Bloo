@@ -159,9 +159,11 @@ internal fun HeroPhotoBackdrop(
      * the header and the readout land in the space above and below it. The caller animates it; this only lays it out.
      */
     clearT: Float = 0f,
+    /** True while the photo is inside the card (not floating): a cut-out is then clipped to the card like any other photo. */
+    contained: Boolean = false,
 ) {
     Box(Modifier.fillMaxWidth().padding(top = HeroTextClearTop * clearT, bottom = HeroTextClearBottom * clearT)) {
-        HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio)
+        HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio, contained = contained)
     }
 }
 
@@ -203,6 +205,8 @@ internal fun HeroVisual(
     corner: Dp = 18.dp,
     /** When set, size by aspect ratio instead of [height] (16:9 on the phone hero). */
     aspectRatio: Float? = null,
+    /** The photo sits inside the card (not floating), so even a cut-out is clipped to the card's corners. */
+    contained: Boolean = false,
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("HeroVisual")
     StartupTrace.once("hero-visual-${v.vin}", "HeroVisual composing for ${v.name}")
@@ -226,7 +230,9 @@ internal fun HeroVisual(
         val model: Any = rememberPhotoModel(imageUrl)
         // A transparent PNG renders edge-to-edge with no opaque box, so it blends seamlessly into
         // the pebble (fit, not crop, so the whole subject shows).
-        val transparent = isCutoutPhoto(imageUrl)
+        // A floating cut-out is drawn with no edge. Inside the card it is clipped to the card's corners, so it can't run past them.
+        val cutout = isCutoutPhoto(imageUrl)
+        val transparent = cutout && !contained
         // The photo arrives with a fade+slide+scale rather than popping (same language as
         // ReorderColumn's intro).
         val photoKey = remember(model) { model.toString() }
@@ -275,7 +281,7 @@ internal fun HeroVisual(
             AsyncImage(
                 model = imageRequest,
                 contentDescription = v.model,
-                contentScale = if (transparent) ContentScale.Fit else ContentScale.Crop,
+                contentScale = if (cutout) ContentScale.Fit else ContentScale.Crop,
                 onState = { state ->
                     if (state is AsyncImagePainter.State.Success) {
                         loadedFrom = state.result.dataSource
