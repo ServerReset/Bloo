@@ -78,6 +78,8 @@ data class UiState(
     val climateModels: Map<String, com.bloo.bluelink.data.ClimateModel> = emptyMap(),
     /** Per car: what smart comfort has learned from the person's own seat, wheel and defrost settings. */
     val comfortModels: Map<String, com.bloo.bluelink.data.ComfortModel> = emptyMap(),
+    /** Per car: which driver is driving (0 for the first). */
+    val activeDrivers: Map<String, Int> = emptyMap(),
     /** Per car: the two departures (ready time, days, target, comfort). */
     val departures: Map<String, com.bloo.bluelink.data.DepartureSchedule> = emptyMap(),
     /** Per car: the climate starts made, which the departure suggestions are learned from. */
@@ -271,6 +273,10 @@ data class UiState(
         shortcutSet?.contains("${cmd}_$vin") ?: true
 
     fun seatConfigFor(v: Vehicle): SeatConfig = seatConfigs[v.vin] ?: SeatConfig()
+
+    /** The learned comfort of the driver who is driving [vin] now. */
+    fun comfortModelOf(vin: String): com.bloo.bluelink.data.ComfortModel? =
+        comfortModels[com.bloo.bluelink.data.comfortKey(vin, activeDrivers[vin] ?: 0)]
 
     fun sectionsFor(v: Vehicle): List<String> = sectionOrders[v.vin] ?: DEFAULT_SECTIONS
 

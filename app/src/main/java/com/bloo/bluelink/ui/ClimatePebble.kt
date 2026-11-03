@@ -124,7 +124,7 @@ internal fun ClimatePebble(
         form.tempF = target; form.defrost = false; activePresetId = null
         // The seats, wheel and defrost follow the weather where the car is, for what this car has and what the person has taught it.
         val w = state.carWeather[v.vin] ?: state.homeWeather
-        val comfort = w?.let { smartComfort(it, comfortCapsOf(state.seatConfigFor(v)), state.comfortModels[v.vin]) }
+        val comfort = w?.let { smartComfort(it, comfortCapsOf(state.seatConfigFor(v)), state.comfortModelOf(v.vin)) }
         if (w != null && comfort != null) {
             SmartComfortLearning.noteSmart(v.vin, comfort, smartClimateMode(cToF(w.feelsLikeC).roundToInt()))
         }
@@ -354,6 +354,9 @@ internal fun ClimatePebble(
 
         ExpandVisibility(!climateOn) {
             DepartureSection(v, state, vm, fahrenheit)
+        }
+        ExpandVisibility(!climateOn) {
+            DriverPicker(v, state, vm)
         }
 
         ExpandVisibility(!climateOn) {

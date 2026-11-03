@@ -19,6 +19,7 @@ import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.setTextClearPhoto
 import com.bloo.bluelink.data.learnClimate
 import com.bloo.bluelink.data.learnComfort
+import com.bloo.bluelink.data.setActiveDriver
 import com.bloo.bluelink.data.setDepartures
 import com.bloo.bluelink.data.SmartClimateMode
 import com.bloo.bluelink.data.ClimateRequest
@@ -140,10 +141,18 @@ fun AppViewModel.setTextClearPhoto(v: Vehicle, value: Boolean) {
  * that kind of day move toward them, and the result is kept with the synced settings.
  */
 fun AppViewModel.learnComfort(v: Vehicle, mode: SmartClimateMode, req: ClimateRequest) {
+    val key = com.bloo.bluelink.data.comfortKey(v.vin, _state.value.activeDrivers[v.vin] ?: 0)
     viewModelScope.launch {
-        val next = settingsStore.learnComfort(v.vin, mode, com.bloo.bluelink.data.comfortLevelsOf(req, mode))
-        _state.update { it.copy(comfortModels = it.comfortModels + (v.vin to next)) }
+        val next = settingsStore.learnComfort(key, mode, com.bloo.bluelink.data.comfortLevelsOf(req, mode))
+        _state.update { it.copy(comfortModels = it.comfortModels + (key to next)) }
     }
+}
+
+/** Says who is driving [v] now: their own learned comfort is used from here on. */
+fun AppViewModel.setActiveDriver(v: Vehicle, driver: Int) {
+    val d = driver.coerceIn(0, com.bloo.bluelink.data.DRIVER_COUNT - 1)
+    _state.update { it.copy(activeDrivers = it.activeDrivers + (v.vin to d)) }
+    persist { setActiveDriver(v.vin, d) }
 }
 
 /** Changes one of a car's two departures, and keeps it with the synced settings. */

@@ -8,6 +8,7 @@ import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.climateModelNow
 import com.bloo.bluelink.data.comfortModelNow
+import com.bloo.bluelink.data.activeDriverNow
 import com.bloo.bluelink.data.seatConfig
 import com.bloo.bluelink.data.departuresNow
 import com.bloo.bluelink.data.learnComfort
@@ -123,7 +124,8 @@ class PhoneWatchSyncService : WearableListenerService() {
             }.getOrNull()?.let { c ->
                 scope.launch {
                     val mode = runCatching { com.bloo.bluelink.data.SmartClimateMode.valueOf(c.mode) }.getOrNull() ?: return@launch
-                    SettingsStore(applicationContext).learnComfort(c.vin, mode, c.levels.toIntArray())
+                    val store = SettingsStore(applicationContext)
+                    store.learnComfort(com.bloo.bluelink.data.comfortKey(c.vin, store.activeDriverNow(c.vin)), mode, c.levels.toIntArray())
                     com.bloo.bluelink.data.LearnedSettings.changed.tryEmit(Unit)
                     pushNow(applicationContext)
                 }
@@ -266,7 +268,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                     departures = snapshot.vehicles.associate { it.vin to SettingsStore(app).departuresNow(it.vin).encode() },
                     comfortCaps = snapshot.vehicles.associate { it.vin to com.bloo.bluelink.ui.comfortCapsOf(SettingsStore(app).seatConfig(it.vin)).encode() },
                     comfortModels = snapshot.vehicles.mapNotNull { v ->
-                        SettingsStore(app).comfortModelNow(v.vin)?.let { v.vin to it.encode() }
+                        SettingsStore(app).let { st -> st.comfortModelNow(com.bloo.bluelink.data.comfortKey(v.vin, st.activeDriverNow(v.vin)))?.let { v.vin to it.encode() } }
                     }.toMap(),
                     climateModels = snapshot.vehicles.mapNotNull { v ->
                         SettingsStore(app).climateModelNow(v.vin)?.let { v.vin to encodeClimateModel(it) }

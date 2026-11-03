@@ -25,6 +25,7 @@ import com.bloo.bluelink.data.snapshot
 import com.bloo.bluelink.data.textClearPhoto
 import com.bloo.bluelink.data.climateModel
 import com.bloo.bluelink.data.comfortModel
+import com.bloo.bluelink.data.activeDriver
 import com.bloo.bluelink.data.departures
 import com.bloo.bluelink.data.startHistory
 import com.bloo.bluelink.data.departureLastRuns
@@ -65,7 +66,14 @@ internal suspend fun AppViewModel.perCarConfig(
     val images = stored + auto
     val textClear = vehicles.perCar { settingsStore.textClearPhoto(it, prefs) }
     val climateModels = vehicles.perCar { settingsStore.climateModel(it, prefs) }
-    val comfortModels = vehicles.perCar { settingsStore.comfortModel(it, prefs) }
+    // Each driver's own learned comfort, keyed by car and driver; and which driver is driving.
+    val comfortModels = vehicles.flatMap { v ->
+        (0 until com.bloo.bluelink.data.DRIVER_COUNT).mapNotNull { d ->
+            val key = com.bloo.bluelink.data.comfortKey(v.vin, d)
+            settingsStore.comfortModel(key, prefs)?.let { key to it }
+        }
+    }.toMap()
+    val activeDrivers = vehicles.perCarAll { settingsStore.activeDriver(it, prefs) }
     val departures = vehicles.perCarAll { settingsStore.departures(it, prefs) }
     val startHistories = vehicles.perCarAll { settingsStore.startHistory(it, prefs) }
     val departureStarted = vehicles.perCarAll { settingsStore.departureLastRuns(it, prefs) }
@@ -90,6 +98,7 @@ internal suspend fun AppViewModel.perCarConfig(
                 textClearPhotos = textClear,
                 climateModels = climateModels,
                 comfortModels = comfortModels,
+                activeDrivers = activeDrivers,
                 departures = departures,
                 startHistories = startHistories,
                 departureStarted = departureStarted,

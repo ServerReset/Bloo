@@ -349,17 +349,27 @@ suspend fun SettingsStore.setClimateModel(vin: String, model: ClimateModel) {
 }
 
 /** What smart comfort has learned for a car, kept with the synced settings. Null until it has learned anything. */
-fun SettingsStore.comfortModel(vin: String, p: Preferences): ComfortModel? =
-    p[stringPreferencesKey("comfort_model_$vin")]?.let { ComfortModel.decode(it) }
+fun SettingsStore.comfortModel(key: String, p: Preferences): ComfortModel? =
+    p[stringPreferencesKey("comfort_model_$key")]?.let { ComfortModel.decode(it) }
+
+/** Which driver of a car is driving: 0 for the first. Synced, so every device follows the same choice. */
+fun SettingsStore.activeDriver(vin: String, p: Preferences): Int =
+    p[stringPreferencesKey("driver_$vin")]?.toIntOrNull()?.coerceIn(0, DRIVER_COUNT - 1) ?: 0
+
+suspend fun SettingsStore.activeDriverNow(vin: String): Int = activeDriver(vin, context.settingsDataStore.data.first())
+
+suspend fun SettingsStore.setActiveDriver(vin: String, driver: Int) {
+    editTracked { it[stringPreferencesKey("driver_$vin")] = driver.coerceIn(0, DRIVER_COUNT - 1).toString() }
+}
 
 /** What smart comfort has learned for a car, as stored right now. */
-suspend fun SettingsStore.comfortModelNow(vin: String): ComfortModel? =
-    comfortModel(vin, context.settingsDataStore.data.first())
+suspend fun SettingsStore.comfortModelNow(key: String): ComfortModel? =
+    comfortModel(key, context.settingsDataStore.data.first())
 
 /** Learns the person's own comfort settings for a car on a kind of day, writes the result, and returns it. */
-suspend fun SettingsStore.learnComfort(vin: String, mode: SmartClimateMode, levels: IntArray): ComfortModel {
-    val next = (comfortModelNow(vin) ?: ComfortModel()).learn(mode, levels)
-    editTracked { it[stringPreferencesKey("comfort_model_$vin")] = next.encode() }
+suspend fun SettingsStore.learnComfort(key: String, mode: SmartClimateMode, levels: IntArray): ComfortModel {
+    val next = (comfortModelNow(key) ?: ComfortModel()).learn(mode, levels)
+    editTracked { it[stringPreferencesKey("comfort_model_$key")] = next.encode() }
     return next
 }
 

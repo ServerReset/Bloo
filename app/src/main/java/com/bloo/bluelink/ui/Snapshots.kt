@@ -39,7 +39,7 @@ import com.bloo.bluelink.data.toGeoLocation
         val fix = status.toGeoLocation() ?: state.locations[v.vin]
         return VehicleSnapshot(
             comfortCaps = comfortCapsOf(state.seatConfigFor(v)).encode(),
-            comfortModel = state.comfortModels[v.vin]?.encode(),
+            comfortModel = state.comfortModelOf(v.vin)?.encode(),
             vin = v.vin,
             name = v.name,
             model = v.model,
