@@ -98,20 +98,22 @@ internal class CentralMap {
             com.bloo.bluelink.data.MapTiles.TILE_PX).toFloat()
         val ty = (-(com.bloo.bluelink.data.MapTiles.tileY(to.latitude, z) - com.bloo.bluelink.data.MapTiles.tileY(from.latitude, z)) *
             com.bloo.bluelink.data.MapTiles.TILE_PX).toFloat()
-        moveJob?.cancel()
+        glide?.cancel()
         val sx = mapState.panX
         val sy = mapState.panY
-        moveJob = mapScope.launch {
-            androidx.compose.animation.core.animate(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.tween(GlideMs, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-            ) { t, _ -> mapState.panTo(sx + (tx - sx) * t, sy + (ty - sy) * t) }
+        // A plain animator on the main thread: a coroutine on Dispatchers.Main has no frame clock, and crashed the app on the first tap.
+        glide = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = GlideMs.toLong()
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener { a ->
+                val t = a.animatedValue as Float
+                mapState.panTo(sx + (tx - sx) * t, sy + (ty - sy) * t)
+            }
+            start()
         }
     }
 
-    private val mapScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
-    private var moveJob: kotlinx.coroutines.Job? = null
+    private var glide: android.animation.ValueAnimator? = null
 
     /**
      * A car card's own copy of the map: it keeps its own pan and zoom, so it stays put while the big map opens and closes. It is centred on
