@@ -9,11 +9,24 @@ import kotlin.math.roundToInt
 @Serializable
 data class ClimateChoice(val ambientF: Int, val targetF: Int)
 
+/**
+ * How the person felt about the plan at a given outside temperature: [deltaF] degrees warmer (positive) or cooler (negative) than the plan
+ * was, or 0 for "that was right". Taken from the feel slider when a start is submitted, and from a plain start (which counts as right).
+ */
+@Serializable
+data class ClimateFeedback(val ambientF: Int, val deltaF: Int)
+
 /** The target smart climate sets, and the things that moved it, in words, so the person can see why it chose what it did. */
 data class SmartClimatePlan(val targetF: Int, val reasons: List<String>)
 
 /** How many hand-set choices are kept per car. Older ones fall away. */
 const val CLIMATE_CHOICES_KEPT = 40
+
+/** How many feel answers are kept per car. */
+const val CLIMATE_FEEDBACK_KEPT = 40
+
+/** The most the feel answers may move the plan, in °F, either way. */
+private const val FEEL_LIMIT_F = 4
 
 /** How close, in outside °F, a past choice must be to count as "at a similar temperature". */
 private const val SIMILAR_AMBIENT_F = 6
@@ -34,7 +47,12 @@ private const val TREND_F = 5
  * fall. The person's own past choices at a similar outside temperature pull it toward what they usually set. Every nudge is named in
  * [SmartClimatePlan.reasons], so the target is never a mystery.
  */
-fun smartClimatePlan(w: Weather, choices: List<ClimateChoice> = emptyList(), fahrenheit: Boolean = true): SmartClimatePlan {
+fun smartClimatePlan(
+    w: Weather,
+    choices: List<ClimateChoice> = emptyList(),
+    fahrenheit: Boolean = true,
+    feedback: List<ClimateFeedback> = emptyList(),
+): SmartClimatePlan {
     val reasons = mutableListOf<String>()
     val feelsF = cToF(w.feelsLikeC).roundToInt()
     val nowF = cToF(w.tempC)
@@ -85,6 +103,16 @@ fun smartClimatePlan(w: Weather, choices: List<ClimateChoice> = emptyList(), fah
         target = (model * 0.4 + learned * 0.6).roundToInt()
         reasons += "You usually set ${degLabel(learned.toString(), fahrenheit)} around here"
     }
+    // What the person said about the plan at a similar outside temperature: the average, taken as they felt it.
+    val felt = feedback.filter { abs(it.ambientF - feelsF) <= SIMILAR_AMBIENT_F }
+    if (felt.isNotEmpty()) {
+        val shift = (felt.sumOf { it.deltaF }.toDouble() / felt.size).roundToInt().coerceIn(-FEEL_LIMIT_F, FEEL_LIMIT_F)
+        if (shift != 0) {
+            target += shift
+            val word = if (shift > 0) "warmer" else "cooler"
+            reasons += "You wanted it ${abs(shift)}° $word around here"
+        }
+    }
     val range = CLIMATE_TEMP_RANGE_F
     return SmartClimatePlan(target.coerceIn(range.first, range.last), reasons)
 }
@@ -108,6 +136,25 @@ fun decodeClimateChoices(text: String): List<ClimateChoice> =
  */
 object ClimateChoices {
     private const val PREFS = "climate_choices"
+    private const val FEEL_PREFS = "climate_feedback"
+
+    /** The feel answers for [vin], the newest last. */
+    fun feedback(context: Context, vin: String): List<ClimateFeedback> =
+        decodeClimateFeedback(context.getSharedPreferences(FEEL_PREFS, Context.MODE_PRIVATE).getString(vin, "").orEmpty())
+
+    /** Keeps a feel answer, the newest last, trimmed to [CLIMATE_FEEDBACK_KEPT]. */
+    fun recordFeedback(context: Context, vin: String, ambientF: Int, deltaF: Int) {
+        val kept = (feedback(context, vin) + ClimateFeedback(ambientF, deltaF)).takeLast(CLIMATE_FEEDBACK_KEPT)
+        context.getSharedPreferences(FEEL_PREFS, Context.MODE_PRIVATE).edit()
+            .putString(vin, kept.joinToString(",") { "${it.ambientF}:${it.deltaF}" }).apply()
+    }
+
+    private fun decodeClimateFeedback(text: String): List<ClimateFeedback> =
+        text.split(",").mapNotNull { pair ->
+            val parts = pair.split(":")
+            if (parts.size != 2) return@mapNotNull null
+            ClimateFeedback(parts[0].toIntOrNull() ?: return@mapNotNull null, parts[1].toIntOrNull() ?: return@mapNotNull null)
+        }
 
     fun list(context: Context, vin: String): List<ClimateChoice> =
         decodeClimateChoices(prefs(context).getString(vin, "").orEmpty())

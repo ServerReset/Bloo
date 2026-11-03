@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -152,7 +153,9 @@ internal fun ClimatePebble(
     val weather = state.carWeather[v.vin] ?: state.homeWeather
     val climateContext = LocalContext.current
     // What smart climate would set right now: the weather, and the temperatures this person has chosen by hand before.
-    val smartPlan = weather?.let { smartClimatePlan(it, ClimateChoices.list(climateContext, v.vin), fahrenheit) }
+    val smartPlan = weather?.let {
+        smartClimatePlan(it, ClimateChoices.list(climateContext, v.vin), fahrenheit, ClimateChoices.feedback(climateContext, v.vin))
+    }
     val simpleMode = state.settingsMode != "advanced"
     // Mirrors Pebble()'s own expanded computation so this and the header Start button agree.
     val expanded = LocalForceExpanded.current || state.isPebbleExpanded(v.vin, "climate")
@@ -300,7 +303,16 @@ internal fun ClimatePebble(
                 plan = smartPlan,
                 fahrenheit = fahrenheit,
                 enabled = !pending && !climateOn,
-                onStartAtTarget = { target -> startAtTarget(target, currentReq) },
+                onStartAtTarget = { target ->
+                    // Starting on the plan as it stands counts as the plan being right.
+                    weather?.let { ClimateChoices.recordFeedback(climateContext, v.vin, ambientFahrenheit(it.tempC), 0) }
+                    startAtTarget(target, currentReq)
+                },
+                onSubmitFeel = { delta ->
+                    // The feel slider: what they wanted, against the plan, is kept, and the car starts at that setting.
+                    weather?.let { ClimateChoices.recordFeedback(climateContext, v.vin, ambientFahrenheit(it.tempC), delta) }
+                    smartPlan?.let { startAtTarget(it.targetF + delta, currentReq) }
+                },
                 onStartUnread = {
                     if (!pending) vm.startSmartClimate(v) { req ->
                         form.load(req); activePresetId = null; lastSent = req to System.currentTimeMillis()
@@ -351,6 +363,8 @@ private fun SmartClimateSection(
     fahrenheit: Boolean,
     enabled: Boolean,
     onStartAtTarget: (Int) -> Unit,
+    /** The feel slider's answer, in degrees from the plan (negative cooler, positive warmer), submitted with the start. */
+    onSubmitFeel: (Int) -> Unit,
     onStartUnread: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -361,6 +375,27 @@ private fun SmartClimateSection(
             onClick = { if (plan != null) onStartAtTarget(plan.targetF) else onStartUnread() },
             enabled = enabled,
         )
+        if (plan != null && ambientF != null) {
+            // How hot or cold they want it, against the plan. Submitting starts the car there and tells smart climate how it felt.
+            var feel by remember(plan.targetF) { mutableFloatStateOf(0f) }
+            val feelTarget = plan.targetF + feel.roundToInt()
+            androidx.compose.material3.Slider(
+                value = feel,
+                onValueChange = { feel = it.roundToInt().toFloat() },
+                valueRange = -4f..4f,
+                steps = 7,
+                enabled = enabled,
+            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                RevealMutedText(degLabel(feelTarget.toString(), fahrenheit), modifier = Modifier.weight(1f))
+                MorphActionButton(
+                    label = "Set",
+                    icon = Icons.Filled.AcUnit,
+                    onClick = { onSubmitFeel(feel.roundToInt()) },
+                    enabled = enabled,
+                )
+            }
+        }
         // Every factor that moved the target, one per line, so the number is never a mystery.
         RevealMutedText(plan?.reasons?.joinToString("\n") ?: "Sets the temperature for the car's weather.")
     }

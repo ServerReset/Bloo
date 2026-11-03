@@ -73,7 +73,6 @@ internal fun SeatSliders(seats: List<SeatSlider>) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         // Says how to use the sliders before anyone has to guess: the slider is the whole control.
         RevealText(
-            "Drag left to cool, right to warm.",
             style = SecondaryTextStyle(),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
