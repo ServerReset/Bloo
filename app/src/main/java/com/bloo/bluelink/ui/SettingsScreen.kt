@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.LocalInstantText
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -157,7 +159,7 @@ internal fun SettingsScreen(
             // Debug -- device info and the activity log together, for support troubleshooting. A
             // power-user card, so it only exists in Advanced mode.
             AnimatedVisibility(visibleState = advTransition1, enter = expandEnterSized(), exit = expandExitSized()) {
-            DebugCardContent(vm, clipboardScope, clipboard, state.aiAvailability)
+            CompositionLocalProvider(LocalInstantText provides true) { DebugCardContent(vm, clipboardScope, clipboard, state.aiAvailability) }
             }
             }
             item {

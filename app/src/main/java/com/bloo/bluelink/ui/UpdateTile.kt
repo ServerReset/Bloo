@@ -5,6 +5,8 @@ package com.bloo.bluelink.ui
  * body is the shared [UpdatePanel], the same one the Settings card shows.
  */
 
+import com.bloo.uicommon.LocalInstantText
+import androidx.compose.runtime.CompositionLocalProvider
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -71,7 +73,7 @@ internal fun UpdateAvailableTile(
                 headerAction = headerAction,
             ) {
                 // The header carries the primary action, so the body does not repeat it.
-                UpdatePanel(state, vm, hazeState, primaryInBody = false, showHeadline = true)
+                CompositionLocalProvider(LocalInstantText provides true) { UpdatePanel(state, vm, hazeState, primaryInBody = false, showHeadline = true) }
             }
         }
     }

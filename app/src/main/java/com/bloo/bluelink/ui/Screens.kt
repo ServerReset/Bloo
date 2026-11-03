@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.LocalInstantText
 import com.bloo.uicommon.softSpring
 import com.bloo.uicommon.lowPowerAwareSpring
 import androidx.compose.foundation.layout.offset
@@ -320,7 +321,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
                     LaunchedEffect(bootReauth) {
                         if (bootReauth) vm.promptDeviceLockForBoot(loginContext.findFragmentActivity())
                     }
-                    LoginScreen(
+                    CompositionLocalProvider(LocalInstantText provides true) { LoginScreen(
                         loading = loading,
                         onLogin = if (bootReauth) ({ user, password, pin, brand ->
                             vm.reauthAfterRestart(user, password, pin, brand, loginContext.findFragmentActivity())
@@ -342,7 +343,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
                                 )
                             }
                         }) else null,
-                    )
+                    ) }
                     kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
                     canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }
                 }

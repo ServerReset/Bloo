@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.uicommon.LocalInstantText
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -68,7 +70,7 @@ internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel, opaqueBackdrop:
     val visible by remember { androidx.compose.runtime.derivedStateOf { lockAlpha.value > 0.01f } }
     if (visible) {
         Box(Modifier.fillMaxSize().graphicsLayer { alpha = lockAlpha.value }) {
-            LockOverlay(vm, opaqueBackdrop)
+            CompositionLocalProvider(LocalInstantText provides true) { LockOverlay(vm, opaqueBackdrop) }
         }
     }
 }
