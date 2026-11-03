@@ -483,7 +483,12 @@ internal fun ExpandableMapLayer(
                             // 0 is off the top of the screen, 1 its place; the bounce takes it a little past 1 either way. It stays solid as it goes.
                             translationY = -(1f - chrome.value) * (windowSize.height * 0.15f + size.height + barGapPx)
                         }
-                        .onGloballyPositioned { c -> chromeInsets?.barBottom = c.positionOnScreen().y + c.size.height },
+                        // positionOnScreen reads the layout position only, so it leaves out the bar's slide-in offset above and the
+                        // sheet's drag offset. Add both, so the markers see where the bar is drawn, mid-motion as well as at rest.
+                        .onGloballyPositioned { c ->
+                            val slideY = -(1f - chrome.value) * (windowSize.height * 0.15f + c.size.height + barGapPx)
+                            chromeInsets?.barBottom = c.positionOnScreen().y + c.size.height + slideY + dragPx.value
+                        },
                 )
             }
 
