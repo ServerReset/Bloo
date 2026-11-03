@@ -587,10 +587,8 @@ internal fun BoxScope.CarIconLayer(
                     val limY = kotlin.math.max(0f, viewport.height / 2f - hh - edgeMarginPx)
                     val cx = m.x.coerceIn(-limX, limX)
                     val cy = m.y.coerceIn(-limY, limY)
-                    IntOffset(
-                        (cx - CarIconWidth.toPx() / 2f).roundToInt(),
-                        (cy - CarIconHeight.toPx() / 2f).roundToInt(),
-                    )
+                    // The tile is centre-aligned already, so its centre is the map's centre plus this offset: no half-size subtraction.
+                    IntOffset(cx.roundToInt(), cy.roundToInt())
                 }
                 .graphicsLayer {
                     // A follower in a pill is hidden: its photo is in the leader's pill instead.
@@ -644,8 +642,12 @@ private fun CarPillCluster(
         modifier.layout { measurable, constraints ->
             val p = measurable.measure(Constraints())
             val at = anchor()
+            // The anchor is from the map's centre, and this box is the whole map: place the pill's centre at centre plus anchor.
             layout(constraints.maxWidth, constraints.maxHeight) {
-                p.place((at.x - p.width / 2f).roundToInt(), (at.y - p.height / 2f).roundToInt())
+                p.place(
+                    (constraints.maxWidth / 2f + at.x - p.width / 2f).roundToInt(),
+                    (constraints.maxHeight / 2f + at.y - p.height / 2f).roundToInt(),
+                )
             }
         },
     ) {

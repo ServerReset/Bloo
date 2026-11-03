@@ -147,6 +147,8 @@ internal fun ExpandableMapLayer(
     /** Which car the bar shows, and how many cars there are (see MapTopBar). */
     carIndex: Int = 0,
     carCount: Int = 1,
+    prevBar: BarPreview? = null,
+    nextBar: BarPreview? = null,
     /** How far the bar is being dragged toward closing, 0 to 1 (see [CentralMap.dismissFade]). */
     onDismissDrag: (Float) -> Unit = {},
     onDismiss: () -> Unit,
@@ -467,6 +469,8 @@ internal fun ExpandableMapLayer(
                     onSwipeCar = onSwipeCar,
                     carIndex = carIndex,
                     carCount = carCount,
+                    prevBar = prevBar,
+                    nextBar = nextBar,
                     // No refresh button: pull the bar up to full tension and let go instead.
                     dragModifier = Modifier.pullToRefreshOrDismiss(
                         dragPx, pull, gapPx, scope, density, dragSpring, LocalHaptics.current, ::close,

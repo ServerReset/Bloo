@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -137,6 +138,9 @@ private val DetailsPanelCorner = 28.dp
 /** What the top bar shows: only its handle (no car selected), the selected car's single line, or that line with its details open. */
 internal enum class MapBarMode { Handle, Line, Details }
 
+/** What a neighbouring car's bar shows while the bar is being swiped toward it: its name, photo and charge. */
+internal class BarPreview(val name: String, val photo: String?, val charge: String?, val range: String?)
+
 /**
  * The bar's corner, between the pill it is as a handle or a line (radius half its height) and the rounded panel its details open into
  * ([DetailsPanelCorner]). [detailsT] is 0 for the pill and 1 for the panel; the value is animated by the caller.
@@ -177,6 +181,9 @@ internal fun MapTopBar(
     /** Which car the bar shows, and how many there are: a change of car slides the bar in from the side it came from. */
     carIndex: Int = 0,
     carCount: Int = 1,
+    /** The cars either side of this one, shown as the bar is swiped toward them. */
+    prevBar: BarPreview? = null,
+    nextBar: BarPreview? = null,
     /** The car's photo at the bar's start, or null for the car glyph. */
     photo: String? = null,
     /** The car's charge, and its range, at the bar's end. Null leaves that line out. */
@@ -221,6 +228,9 @@ internal fun MapTopBar(
     val latestSwipe = rememberUpdatedState(onSwipeCar)
     // A swipe runs its own motion; the car change it causes must not slide the bar a second time.
     val swipeHandled = remember { BooleanArray(1) }
+    // Which way the bar is being swiped (1 toward the next car, -1 toward the previous, 0 not at all). Written only when the direction
+    // changes, so the neighbour's bar is composed once per swipe, not once per frame.
+    var swipeSign by remember { mutableStateOf(0) }
     val prevIndex = remember { intArrayOf(carIndex) }
     LaunchedEffect(carIndex) {
         val before = prevIndex[0]
@@ -230,12 +240,48 @@ internal fun MapTopBar(
         slideX.snapTo(if (carIndex > before) screenWidthPx else -screenWidthPx)
         slideX.animateTo(0f, tween(260))
     }
+    Box(Modifier.fillMaxWidth()) {
+    // The neighbouring car's bar, drawn while the bar is swiped: it comes in from its side as this one goes off, so both move together.
+    if (swipeSign != 0) {
+        (if (swipeSign > 0) nextBar else prevBar)?.let { neighbour ->
+            GlassSurface(
+                shape = RoundedCornerShape(BlendCornerSize(detailsT)),
+                liquid = true,
+                modifier = Modifier.matchParentSize().graphicsLayer {
+                    translationX = slideX.value + (if (swipeSign > 0) screenWidthPx else -screenWidthPx)
+                },
+                hazeState = mapHazeState,
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = GapPage, vertical = GapRow),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(GapGroup),
+                ) {
+                    neighbour.photo?.let {
+                        AsyncImage(
+                            model = rememberPhotoModel(it),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(width = 48.dp, height = 36.dp).clip(RoundedCornerShape(10.dp)),
+                        )
+                    } ?: Icon(AppIcons.DirectionsCar, contentDescription = null, modifier = Modifier.size(24.dp))
+                    Box(Modifier.weight(1f)) {
+                        RevealText(neighbour.name, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
+                    neighbour.charge?.let {
+                        RevealText(it, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
     GlassSurface(
         // The corners ease between the pill and the rounded details panel on the same spring.
         shape = RoundedCornerShape(BlendCornerSize(detailsT)),
         // The bar is liquid glass: the refraction and specular sheen of the app's floating glass, drawn over the map behind it.
         liquid = true,
-        modifier = modifier.fillMaxWidth()
+        // The whole bar pulls up and down, the pill and its details alike, not only the handle.
+        modifier = modifier.fillMaxWidth().then(dragModifier)
             .pointerInput(Unit) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
@@ -250,10 +296,12 @@ internal fun MapTopBar(
                 val thresholdPx = 56.dp.toPx()
                 var total = 0f
                 detectHorizontalDragGestures(
-                    onDragStart = { total = 0f },
+                    onDragStart = { total = 0f; swipeSign = 0 },
                     onHorizontalDrag = { change, amount ->
                         change.consume()
                         total += amount
+                        val sign = if (total < 0f) 1 else -1
+                        if (sign != swipeSign) swipeSign = sign
                         barScope.launch { slideX.snapTo(total) }
                     },
                     onDragEnd = {
@@ -267,13 +315,16 @@ internal fun MapTopBar(
                         barScope.launch {
                             if (!canMove) {
                                 slideX.animateTo(0f, tween(180))
+                                swipeSign = 0
                                 return@launch
                             }
                             swipeHandled[0] = true
                             slideX.animateTo(-dir * screenWidthPx, tween(180))
+                            // The neighbour's bar was already drawn where the bar now comes to rest, so the new car takes its place
+                            // with no jump: the content changes off screen, then the bar is put back at rest, and the drawn copy goes.
                             latestSwipe.value(dir)
-                            slideX.snapTo(dir * screenWidthPx)
-                            slideX.animateTo(0f, tween(260))
+                            slideX.snapTo(0f)
+                            swipeSign = 0
                         }
                     },
                 )
@@ -289,7 +340,6 @@ internal fun MapTopBar(
             val latestSwipe = rememberUpdatedState(onSwipeCar)
             Row(
                 Modifier
-                    .then(dragModifier)
                     .then(if (selected) Modifier.clickable { onDetailsOpenChange(!detailsOpen) } else Modifier)
                     .layout { measurable, constraints ->
                         val p = lineProgress().coerceIn(0f, 1f)
@@ -410,6 +460,7 @@ internal fun MapTopBar(
                 }
             }
         }
+    }
     }
 }
 

@@ -120,6 +120,8 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         onDeselect = { centralMap.selectedVin = null },
         carIndex = vehicles.indexOfFirst { it.vin == barVehicle.vin }.coerceAtLeast(0),
         carCount = vehicles.size,
+        prevBar = barPreview(state.value, vehicles.getOrNull(vehicles.indexOfFirst { it.vin == barVehicle.vin } - 1), appearance.metricDistance),
+        nextBar = barPreview(state.value, vehicles.getOrNull(vehicles.indexOfFirst { it.vin == barVehicle.vin } + 1), appearance.metricDistance),
         // A swipe on the bar moves to the neighbouring car the same way a tap on its icon does: the bar, the map and the car page follow.
         onSwipeCar = { dir ->
             val list = state.value.vehicles
@@ -160,6 +162,12 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
             centralMap.closingTo = null
         },
     )
+}
+
+/** The bar's look for a neighbouring car, so a swipe can show it coming in. Null for no car on that side. */
+private fun barPreview(state: UiState, v: com.bloo.bluelink.data.Vehicle?, metric: Boolean): BarPreview? = v?.let {
+    val (percent, range) = mapChargeStats(state, it, metric)
+    BarPreview(it.name, state.imageUrls[it.vin], percent, range)
 }
 
 /** The longest the map waits for the car page to reach the car it collapses onto, before it collapses regardless. */

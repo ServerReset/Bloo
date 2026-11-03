@@ -51,7 +51,8 @@ internal fun BoxScope.DeviceMarker(
             .offset {
                 val at = mapScreenOffset(place.x, place.y, state.panX, state.panY, panWeight(), state.scale)
                 val pin = edge.pin(at.x, at.y, viewport)
-                IntOffset((pin.x - DotSize.toPx() / 2f).roundToInt(), (pin.y - DotSize.toPx() / 2f).roundToInt())
+                // Centre-aligned already: the offset is the centre's place from the map's centre.
+                IntOffset(pin.x.roundToInt(), pin.y.roundToInt())
             }
             .graphicsLayer {
                 val at = mapScreenOffset(place.x, place.y, state.panX, state.panY, panWeight(), state.scale)
