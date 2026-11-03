@@ -411,6 +411,7 @@ internal fun ExpandableMapLayer(
                     chromeInsets?.let {
                         it.mapTop = c.positionOnScreen().y
                         it.mapBottom = c.positionOnScreen().y + c.size.height
+                        it.mapCoords = c
                     }
                 },
             mapInputs,
@@ -502,6 +503,12 @@ internal fun ExpandableMapLayer(
                         .onGloballyPositioned { c ->
                             val slideY = -(1f - chrome.value) * (windowSize.height * 0.15f + c.size.height + barGapPx)
                             chromeInsets?.barBottom = c.positionOnScreen().y + c.size.height + slideY + dragPx.value
+                            // The same edge, measured inside the map's own coordinates: the markers read this one.
+                            val mc = chromeInsets?.mapCoords
+                            if (chromeInsets != null && mc != null && mc.isAttached && c.isAttached) {
+                                val bottomInMap = mc.localPositionOf(c, androidx.compose.ui.geometry.Offset(0f, c.size.height.toFloat())).y
+                                chromeInsets.barBottomInMap = bottomInMap + slideY + dragPx.value
+                            }
                         },
                 )
             }

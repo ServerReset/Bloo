@@ -469,7 +469,10 @@ internal fun edgePin(x: Float, y: Float, halfW: Float, halfTop: Float, halfBotto
     // How far past the edge the car is, in pixels, and how far through the morph it has got.
     val beyond = hypot(x, y) - hypot(edgeX, edgeY)
     val f = if (morphPx > 0f) (beyond / morphPx).coerceIn(0f, 1f) else 1f
-    return EdgePin(x + (edgeX - x) * f, y + (edgeY - y) * f, 1f - (1f - EdgePinScale) * f)
+    // Never past the window itself: a marker that has morphed in still stays inside the map's edges and below the bar.
+    val px = (x + (edgeX - x) * f).coerceIn(-halfW, halfW)
+    val py = (y + (edgeY - y) * f).coerceIn(-halfTop, halfBottom)
+    return EdgePin(px, py, 1f - (1f - EdgePinScale) * f)
 }
 
 /**

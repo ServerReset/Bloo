@@ -53,8 +53,14 @@ internal class MapChromeInsets {
     var barBottom by androidx.compose.runtime.mutableFloatStateOf(0f)
     var rowTop by androidx.compose.runtime.mutableFloatStateOf(0f)
 
+    /** The map's own layout coordinates: the bars are measured inside them, so the measurement is the map's own space, not the screen's. */
+    var mapCoords: androidx.compose.ui.layout.LayoutCoordinates? = null
+
+    /** The top bar's bottom edge, in pixels from the map's top, including its slide and the sheet's drag. */
+    var barBottomInMap by androidx.compose.runtime.mutableFloatStateOf(0f)
+
     /** How far the top bar comes down into the map, in pixels from the map's top. */
-    fun topPx(): Float = if (chromeOn) (barBottom - mapTop).coerceAtLeast(0f) else 0f
+    fun topPx(): Float = if (chromeOn) barBottomInMap.coerceAtLeast(0f) else 0f
 
     /** How far the bottom buttons come up into the map, in pixels from the map's bottom. */
     fun bottomPx(): Float = if (chromeOn) (mapBottom - rowTop).coerceAtLeast(0f) else 0f
