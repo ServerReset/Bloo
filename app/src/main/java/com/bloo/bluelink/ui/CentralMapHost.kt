@@ -118,6 +118,13 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         barSelected = centralMap.selectedVin != null,
         selectedIsExpanded = centralMap.selectedVin == null || centralMap.selectedVin == hostVehicle.vin,
         onDeselect = { centralMap.selectedVin = null },
+        // A swipe on the bar moves to the neighbouring car the same way a tap on its icon does: the bar, the map and the car page follow.
+        onSwipeCar = { dir ->
+            val list = state.value.vehicles
+            val cur = list.indexOfFirst { it.vin == barVehicle.vin }
+            val next = (cur + dir).coerceIn(0, list.lastIndex)
+            if (cur >= 0 && next != cur) centralMap.tapPin(list[next].vin)
+        },
         onDismissDrag = { centralMap.dismissFade = it },
         deviceLocation = deviceLocation,
         mapState = centralMap.mapState,

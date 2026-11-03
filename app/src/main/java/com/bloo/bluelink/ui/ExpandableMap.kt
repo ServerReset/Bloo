@@ -142,6 +142,8 @@ internal fun ExpandableMapLayer(
     /** True when the selected car is the one this map is on: its leaving the screen clears the selection. */
     selectedIsExpanded: Boolean = true,
     onDeselect: () -> Unit = {},
+    /** A sideways swipe on the top bar: -1 for the previous car, +1 for the next. */
+    onSwipeCar: (Int) -> Unit = {},
     /** How far the bar is being dragged toward closing, 0 to 1 (see [CentralMap.dismissFade]). */
     onDismissDrag: (Float) -> Unit = {},
     onDismiss: () -> Unit,
@@ -259,6 +261,17 @@ internal fun ExpandableMapLayer(
     // The bar shows while the map is open, and also while it is closed in its card once a car is selected by a tap on its icon.
     val barVisible = isExpanded || barSelected
     SideEffect { chromeInsets?.chromeOn = barVisible && chromeShown }
+    // Once the bars have settled after opening, log where they were measured, so an edge marker under the bar can be traced from a log.
+    LaunchedEffect(isExpanded, chromeShown) {
+        if (isExpanded && chromeShown) {
+            kotlinx.coroutines.delay(500)
+            chromeInsets?.let {
+                com.bloo.bluelink.data.AppLog.log(
+                    "Map chrome: mapTop=${it.mapTop} mapBottom=${it.mapBottom} barBottom=${it.barBottom} rowTop=${it.rowTop} topPx=${it.topPx()}",
+                )
+            }
+        }
+    }
     // Closed, the bar comes in on a selection and goes again when it is cleared (opening and closing run their own motion).
     LaunchedEffect(barSelected) {
         if (!isExpanded) chrome.animateTo(if (barSelected) 1f else 0f, tween(MapOpenMs))
@@ -447,6 +460,7 @@ internal fun ExpandableMapLayer(
                     chargeRange = chargeRange,
                     details = details,
                     mapHazeState = mapHazeState,
+                    onSwipeCar = onSwipeCar,
                     // No refresh button: pull the bar up to full tension and let go instead.
                     dragModifier = Modifier.pullToRefreshOrDismiss(
                         dragPx, pull, gapPx, scope, density, dragSpring, LocalHaptics.current, ::close,

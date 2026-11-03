@@ -21,6 +21,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.AnimatedVisibility
@@ -166,6 +168,8 @@ internal fun MapTopBar(
     mapHazeState: HazeState,
     modifier: Modifier = Modifier,
     dragModifier: Modifier,
+    /** A sideways swipe on the bar: -1 for the previous car, +1 for the next. */
+    onSwipeCar: (Int) -> Unit = {},
     /** The car's photo at the bar's start, or null for the car glyph. */
     photo: String? = null,
     /** The car's charge, and its range, at the bar's end. Null leaves that line out. */
@@ -225,9 +229,23 @@ internal fun MapTopBar(
         Column {
             // The header: the car at the start, the drag handle in the middle, its charge and range at the end. Its height and gutters
             // grow with the line, in layout, so the header never jumps between the handle and the line.
+            val latestSwipe = rememberUpdatedState(onSwipeCar)
             Row(
                 Modifier
                     .then(dragModifier)
+                    .pointerInput(Unit) {
+                        // A sideways swipe moves to the neighbouring car, the way a swipe moves between pages. The latest handler is read
+                        // through rememberUpdatedState, so the gesture never holds a stale car.
+                        val thresholdPx = 56.dp.toPx()
+                        var total = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { total = 0f },
+                            onHorizontalDrag = { change, amount -> change.consume(); total += amount },
+                            onDragEnd = {
+                                if (total <= -thresholdPx) latestSwipe.value(1) else if (total >= thresholdPx) latestSwipe.value(-1)
+                            },
+                        )
+                    }
                     .then(if (selected) Modifier.clickable { onDetailsOpenChange(!detailsOpen) } else Modifier)
                     .layout { measurable, constraints ->
                         val p = lineProgress().coerceIn(0f, 1f)
