@@ -353,6 +353,10 @@ internal fun ClimatePebble(
         }
 
         ExpandVisibility(!climateOn) {
+            DepartureSection(v, state, vm, fahrenheit)
+        }
+
+        ExpandVisibility(!climateOn) {
             ClimateControlsSection(
                 form = form,
                 fahrenheit = fahrenheit,

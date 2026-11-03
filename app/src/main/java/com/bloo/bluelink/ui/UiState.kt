@@ -78,6 +78,10 @@ data class UiState(
     val climateModels: Map<String, com.bloo.bluelink.data.ClimateModel> = emptyMap(),
     /** Per car: what smart comfort has learned from the person's own seat, wheel and defrost settings. */
     val comfortModels: Map<String, com.bloo.bluelink.data.ComfortModel> = emptyMap(),
+    /** Per car: the two departures (ready time, days, target, comfort). */
+    val departures: Map<String, com.bloo.bluelink.data.DepartureSchedule> = emptyMap(),
+    /** Per car: the climate starts made, which the departure suggestions are learned from. */
+    val startHistories: Map<String, List<com.bloo.bluelink.data.StartRecord>> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
     /**
      * Compact form of [placeNames] (street + ZIP) for space-constrained glance layouts. In-memory

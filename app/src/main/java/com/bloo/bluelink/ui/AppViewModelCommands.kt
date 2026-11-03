@@ -182,6 +182,20 @@ fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) = run {
     // A manual setting that differs from the smart comfort just chosen teaches the model what the person wanted.
     SmartComfortLearning.manualSend(v.vin, req)?.let { learnComfort(v, it, req) }
     startClimateSent(v, req)
+    // Every climate start the person makes is part of their pattern, so it is recorded for the departure suggestions.
+    val now = java.time.LocalDateTime.now()
+    val weather = _state.value.carWeather[v.vin] ?: _state.value.homeWeather
+    val record = com.bloo.bluelink.data.StartRecord(
+        epochDay = now.toLocalDate().toEpochDay(),
+        weekday = now.dayOfWeek.value - 1,
+        minute = now.hour * 60 + now.minute,
+        ambientF = weather?.let { com.bloo.bluelink.data.ambientFahrenheit(it.tempC) } ?: 0,
+    )
+    _state.update { st ->
+        val kept = (st.startHistories[v.vin].orEmpty() + record).takeLast(com.bloo.bluelink.data.StartRecord.KEPT)
+        st.copy(startHistories = st.startHistories + (v.vin to kept))
+    }
+    persist { appendStart(v.vin, record) }
 }
 
 private fun AppViewModel.startClimateSent(v: Vehicle, req: ClimateRequest) =

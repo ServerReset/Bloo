@@ -122,6 +122,7 @@ class MainActivity : FragmentActivity() {
         // cold start.
         lifecycleScope.launch(Dispatchers.Default) {
             AlertWorker.schedule(applicationContext)
+            com.bloo.bluelink.work.DepartureWorker.schedule(applicationContext)
             MainToMainSyncWorker.schedule(applicationContext)
             // A copy Play installed has no CI-build check to run -- Play updates it (see UpdateRuntime).
             if (com.bloo.bluelink.update.UpdateRuntime.usesGitHub(applicationContext)) {

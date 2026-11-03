@@ -144,3 +144,11 @@ fun AppViewModel.learnComfort(v: Vehicle, mode: SmartClimateMode, req: ClimateRe
         _state.update { it.copy(comfortModels = it.comfortModels + (v.vin to next)) }
     }
 }
+
+/** Changes one of a car's two departures, and keeps it with the synced settings. */
+fun AppViewModel.setDeparture(v: Vehicle, index: Int, slot: com.bloo.bluelink.data.DepartureSlot) {
+    val current = _state.value.departures[v.vin] ?: com.bloo.bluelink.data.DepartureSchedule()
+    val next = com.bloo.bluelink.data.DepartureSchedule(current.slots.mapIndexed { i, s -> if (i == index) slot else s })
+    _state.update { it.copy(departures = it.departures + (v.vin to next)) }
+    persist { setDepartures(v.vin, next) }
+}
