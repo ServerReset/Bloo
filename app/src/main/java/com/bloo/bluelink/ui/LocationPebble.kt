@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -189,9 +190,14 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                             .clickable(role = Role.Button) { host?.open(v.vin) },
                     )
                     // Only a card on screen builds its map: the others are off to the side of the pager, and building them costs time.
+                    // Read through derivedStateOf: the card recomposes only when it goes on or off screen, not on every move of its rectangle.
                     val screenNow = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
-                    val onScreen = host?.originBoundsFor(v.vin)?.value
-                        ?.overlaps(Rect(0f, 0f, screenNow.width.toFloat(), screenNow.height.toFloat())) == true
+                    val onScreen by remember(v.vin, screenNow) {
+                        androidx.compose.runtime.derivedStateOf {
+                            host?.originBoundsFor(v.vin)?.value
+                                ?.overlaps(Rect(0f, 0f, screenNow.width.toFloat(), screenNow.height.toFloat())) == true
+                        }
+                    }
                     if (onScreen) host?.CardContent(
                         Modifier.fillMaxSize(),
                         MapInputs(loc, state.deviceLocation, interactive = false, tileArea = windowSize, panWeight = { 1f }),
