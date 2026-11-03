@@ -67,6 +67,12 @@ internal fun WearClimatePebble(
             onSmart = { requestCommand { repo.command(v.vin, CarAction.CLIMATE_SMART) } },
             onPreset = { preset -> requestCommand { repo.command(v.vin, CarAction.CLIMATE_ON, preset.request) } },
         )
+        // The next departure the phone has set for this car, so the watch says when the car will be ready.
+        WearClimateChoices.departuresFor(v.vin).slots.withIndex().firstOrNull { it.value.enabled }?.let { (i, slot) ->
+            val hh = slot.minuteOfDay / 60
+            val mm = slot.minuteOfDay % 60
+            WearCaption(String.format(java.util.Locale.US, "Departure %d · ready %02d:%02d", i + 1, hh, mm), small = true)
+        }
         // Colder, normal or hotter than the smart plan on the standard slider; it opens on normal. Set starts the car there and tells
         // smart climate how it felt.
         hints[v.vin]?.let { hint ->

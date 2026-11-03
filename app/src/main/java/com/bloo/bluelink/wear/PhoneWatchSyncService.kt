@@ -9,6 +9,7 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.climateModelNow
 import com.bloo.bluelink.data.comfortModelNow
 import com.bloo.bluelink.data.seatConfig
+import com.bloo.bluelink.data.departuresNow
 import com.bloo.bluelink.data.learnComfort
 import com.bloo.bluelink.data.encodeClimateModel
 import com.bloo.bluelink.data.learnClimate
@@ -112,6 +113,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                 // The learned model takes the answer too, then the plan goes back with the learned numbers, so both devices agree.
                 scope.launch {
                     SettingsStore(applicationContext).learnClimate(f.vin, f.ambientF, f.deltaF)
+                    com.bloo.bluelink.data.LearnedSettings.changed.tryEmit(Unit)
                     pushNow(applicationContext)
                 }
             }
@@ -122,6 +124,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                 scope.launch {
                     val mode = runCatching { com.bloo.bluelink.data.SmartClimateMode.valueOf(c.mode) }.getOrNull() ?: return@launch
                     SettingsStore(applicationContext).learnComfort(c.vin, mode, c.levels.toIntArray())
+                    com.bloo.bluelink.data.LearnedSettings.changed.tryEmit(Unit)
                     pushNow(applicationContext)
                 }
             }
@@ -260,6 +263,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                     type = WatchType(appearance.fontChoice, appearance.classicHeadings),
                     climateFeedback = snapshot.vehicles.associate { it.vin to ClimateChoices.feedback(app, it.vin) }
                         .filterValues { it.isNotEmpty() },
+                    departures = snapshot.vehicles.associate { it.vin to SettingsStore(app).departuresNow(it.vin).encode() },
                     comfortCaps = snapshot.vehicles.associate { it.vin to com.bloo.bluelink.ui.comfortCapsOf(SettingsStore(app).seatConfig(it.vin)).encode() },
                     comfortModels = snapshot.vehicles.mapNotNull { v ->
                         SettingsStore(app).comfortModelNow(v.vin)?.let { v.vin to it.encode() }

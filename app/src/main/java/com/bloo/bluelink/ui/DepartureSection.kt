@@ -30,9 +30,14 @@ internal fun DepartureSection(v: Vehicle, state: UiState, vm: AppViewModel, fahr
     val history = state.startHistories[v.vin].orEmpty()
     val today = LocalDateTime.now().dayOfWeek.value - 1
     val suggested = suggestDeparture(history, today)
+    val startedToday = LocalDateTime.now().toLocalDate().toEpochDay()
+    val started = state.departureStarted[v.vin].orEmpty()
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         SectionLabel("Departures")
         schedule.slots.forEachIndexed { i, slot ->
+            if (slot.enabled && started.getOrElse(i) { -1L } == startedToday) {
+                RevealMutedText("Departure ${i + 1} started today: the car is warming up.")
+            }
             DepartureSlotEditor(
                 index = i,
                 slot = slot,

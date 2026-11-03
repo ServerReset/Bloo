@@ -82,6 +82,8 @@ data class UiState(
     val departures: Map<String, com.bloo.bluelink.data.DepartureSchedule> = emptyMap(),
     /** Per car: the climate starts made, which the departure suggestions are learned from. */
     val startHistories: Map<String, List<com.bloo.bluelink.data.StartRecord>> = emptyMap(),
+    /** Per car: each departure's last start day on this device (see [com.bloo.bluelink.data.DepartureSchedule]). */
+    val departureStarted: Map<String, List<Long>> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
     /**
      * Compact form of [placeNames] (street + ZIP) for space-constrained glance layouts. In-memory

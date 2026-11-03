@@ -263,6 +263,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         logStartup("AppViewModel constructed")
         // The advanced logging switch is read by the monitor itself (see DiagSettings); nothing here watches the UI state for it.
         mirrorPlayUpdates()
+        // Something learned on the watch changed the stored settings: the screen reads them again.
+        viewModelScope.launch { com.bloo.bluelink.data.LearnedSettings.changed.collect { refreshLocalCarConfig() } }
         bootstrapColdStart()
         startChargingPoll()
     }

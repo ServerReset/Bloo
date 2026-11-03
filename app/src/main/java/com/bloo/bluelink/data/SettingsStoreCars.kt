@@ -373,6 +373,10 @@ suspend fun SettingsStore.setDepartures(vin: String, schedule: DepartureSchedule
     editTracked { it[stringPreferencesKey("departures_$vin")] = schedule.encode() }
 }
 
+/** The start day of each departure the last time it ran on this device, from the preferences snapshot. */
+fun SettingsStore.departureLastRuns(vin: String, p: Preferences): List<Long> =
+    (p[stringPreferencesKey("departure_last_$vin")] ?: "").split(",").map { it.toLongOrNull() ?: -1L }
+
 /** The start day of each departure the last time it ran on this device. Not synced: each device runs its own departures. */
 suspend fun SettingsStore.departureLastRuns(vin: String): List<Long> =
     (context.settingsDataStore.data.first()[stringPreferencesKey("departure_last_$vin")] ?: "")
