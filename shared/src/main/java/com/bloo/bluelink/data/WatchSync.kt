@@ -21,6 +21,8 @@ data class WatchSyncPayload(
     val advancedLogging: Boolean = false,
     /** The phone's feel answers for each car, so the watch's smart climate plans from the same history. */
     val climateFeedback: Map<String, List<ClimateFeedback>> = emptyMap(),
+    /** What smart climate has learned for each car, as the short string [encodeClimateModel] writes: the same numbers on every device. */
+    val climateModels: Map<String, String> = emptyMap(),
     val watchUpdateApkUrl: String? = null,
     val watchUpdateNotes: String? = null,
     /**

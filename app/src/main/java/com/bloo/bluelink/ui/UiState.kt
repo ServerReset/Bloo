@@ -74,6 +74,8 @@ data class UiState(
     val imageUrls: Map<String, String> = emptyMap(),
     /** Per car: whether its name and charge sit clear of its photo. Absent until the user chooses (see [textClearPhoto]). */
     val textClearPhotos: Map<String, Boolean> = emptyMap(),
+    /** Per car: what smart climate has learned from the person's feel answers (see ClimateModel). */
+    val climateModels: Map<String, com.bloo.bluelink.data.ClimateModel> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
     /**
      * Compact form of [placeNames] (street + ZIP) for space-constrained glance layouts. In-memory

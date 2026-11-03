@@ -335,3 +335,25 @@ fun SettingsStore.textClearPhoto(vin: String, p: Preferences): Boolean? =
 suspend fun SettingsStore.setTextClearPhoto(vin: String, value: Boolean) {
     editTracked { it[stringPreferencesKey("text_clear_$vin")] = value.toString() }
 }
+
+/** What smart climate has learned for a car, kept with the synced settings. Null until it has learned anything. */
+fun SettingsStore.climateModel(vin: String, p: Preferences): ClimateModel? =
+    p[stringPreferencesKey("climate_model_$vin")]?.let { decodeClimateModel(it) }
+
+/** What smart climate has learned for a car, as stored right now. */
+suspend fun SettingsStore.climateModelNow(vin: String): ClimateModel? =
+    climateModel(vin, context.settingsDataStore.data.first())
+
+suspend fun SettingsStore.setClimateModel(vin: String, model: ClimateModel) {
+    editTracked { it[stringPreferencesKey("climate_model_$vin")] = encodeClimateModel(model) }
+}
+
+/**
+ * Learns one feel answer for a car from what is stored, writes the result, and returns it. Reading what is stored (not a copy in memory)
+ * means an answer from the watch and one from the phone both count, whichever arrives first.
+ */
+suspend fun SettingsStore.learnClimate(vin: String, ambientF: Int, deltaF: Int): ClimateModel {
+    val next = (climateModelNow(vin) ?: ClimateModel()).learn(ambientF, deltaF)
+    setClimateModel(vin, next)
+    return next
+}

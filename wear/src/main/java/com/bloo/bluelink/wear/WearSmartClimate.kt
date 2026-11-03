@@ -55,7 +55,10 @@ internal object WearSmartClimate {
 
     /** The plan for one car, weighing the person's own past starts for it. */
     private fun hintFor(vin: String, weather: Weather): Hint {
-        val plan = smartClimatePlan(weather, WearClimateChoices.choicesFor(vin), feedback = WearClimateChoices.feedbackFor(vin))
+        val plan = smartClimatePlan(
+            weather, WearClimateChoices.choicesFor(vin), feedback = WearClimateChoices.feedbackFor(vin),
+            model = WearClimateChoices.modelFor(vin),
+        )
         val feelsF = cToF(weather.feelsLikeC).roundToInt()
         return Hint(plan.targetF, ambientFahrenheit(weather.tempC), smartClimateMode(feelsF), System.currentTimeMillis())
     }

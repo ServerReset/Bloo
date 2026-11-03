@@ -3,6 +3,9 @@ package com.bloo.bluelink.wear
 import android.content.Context
 import com.bloo.bluelink.data.ClimateChoice
 import com.bloo.bluelink.data.ClimateFeedback
+import com.bloo.bluelink.data.ClimateModel
+import com.bloo.bluelink.data.decodeClimateModel
+import com.bloo.bluelink.data.learn
 import com.bloo.bluelink.data.WatchClimateFeedback
 import com.bloo.bluelink.data.WatchSyncProtocol
 import com.bloo.bluelink.data.decodeClimateChoices
@@ -41,12 +44,27 @@ internal object WearClimateChoices {
     /** The feel answers for [vin], oldest first: the phone's, plus any the watch has given since. */
     fun feedbackFor(vin: String): List<ClimateFeedback> = _feedback.value[vin].orEmpty()
 
+    private val _models = MutableStateFlow<Map<String, ClimateModel>>(emptyMap())
+
+    /** What smart climate has learned for [vin] (from the phone, or from the watch's own answers since), or null before any. */
+    fun modelFor(vin: String): ClimateModel? = _models.value[vin]
+
+    /** The phone's learned numbers arrived: kept, and any plan made from older ones is made again. */
+    fun applyModels(map: Map<String, String>) {
+        val decoded = map.mapValues { decodeClimateModel(it.value) }
+        if (decoded == _models.value) return
+        _models.value = decoded
+        WearSmartClimate.replan()
+    }
+
     /**
      * The person said how the plan felt on the watch: it is kept here (so the plan moves at once) and sent to the phone, which keeps it
      * with its own and sends the plan back.
      */
     fun recordFeedback(context: Context, vin: String, ambientF: Int, deltaF: Int) {
         _feedback.value = _feedback.value + (vin to (feedbackFor(vin) + ClimateFeedback(ambientF, deltaF)).takeLast(40))
+        // The model learns the answer at once, so the plan moves now; the phone learns the same answer and its numbers take over on sync.
+        _models.value = _models.value + (vin to (modelFor(vin) ?: ClimateModel()).learn(ambientF, deltaF))
         WearSmartClimate.replan()
         val bytes = Json.encodeToString(WatchClimateFeedback.serializer(), WatchClimateFeedback(vin, ambientF, deltaF)).encodeToByteArray()
         val app = context.applicationContext

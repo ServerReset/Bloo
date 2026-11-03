@@ -6,6 +6,9 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlooJson
 import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.climateModelNow
+import com.bloo.bluelink.data.encodeClimateModel
+import com.bloo.bluelink.data.learnClimate
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WatchCommandRequest
 import com.bloo.bluelink.data.WatchCommandResult
@@ -103,7 +106,11 @@ class PhoneWatchSyncService : WearableListenerService() {
                 json.decodeFromString(com.bloo.bluelink.data.WatchClimateFeedback.serializer(), messageEvent.data.decodeToString())
             }.getOrNull()?.let { f ->
                 ClimateChoices.recordFeedback(applicationContext, f.vin, f.ambientF, f.deltaF)
-                pushNow(applicationContext)
+                // The learned model takes the answer too, then the plan goes back with the learned numbers, so both devices agree.
+                scope.launch {
+                    SettingsStore(applicationContext).learnClimate(f.vin, f.ambientF, f.deltaF)
+                    pushNow(applicationContext)
+                }
             }
             // The watch's own log lines (advanced logging only), kept in the phone's activity log, marked as the watch's.
             WatchSyncProtocol.PATH_WATCH_LOG -> {
@@ -240,6 +247,9 @@ class PhoneWatchSyncService : WearableListenerService() {
                     type = WatchType(appearance.fontChoice, appearance.classicHeadings),
                     climateFeedback = snapshot.vehicles.associate { it.vin to ClimateChoices.feedback(app, it.vin) }
                         .filterValues { it.isNotEmpty() },
+                    climateModels = snapshot.vehicles.mapNotNull { v ->
+                        SettingsStore(app).climateModelNow(v.vin)?.let { v.vin to encodeClimateModel(it) }
+                    }.toMap(),
                     climateChoices = snapshot.vehicles.associate { it.vin to ClimateChoices.list(app, it.vin) }
                         .filterValues { it.isNotEmpty() },
                 )

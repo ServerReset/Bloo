@@ -59,6 +59,7 @@ internal suspend fun AppViewModel.perCarConfig(
     val auto = autoPictures(vehicles.filter { it.vin !in stored }, prefs)
     val images = stored + auto
     val textClear = vehicles.perCar { settingsStore.textClearPhoto(it, prefs) }
+    val climateModels = vehicles.perCar { settingsStore.climateModel(it, prefs) }
     val plates = vehicles.perCarAll { settingsStore.licensePlate(it, prefs) }.filterValues { it.isNotBlank() }
     val lastSvc = vehicles.perCar { settingsStore.lastServiceMiles(it, prefs) }
     val svcInterval = vehicles.perCar { settingsStore.serviceIntervalMiles(it, prefs) }
@@ -78,6 +79,7 @@ internal suspend fun AppViewModel.perCarConfig(
                 sectionOrders = sectionOrders,
                 imageUrls = images,
                 textClearPhotos = textClear,
+                climateModels = climateModels,
                 licensePlates = plates,
                 lastServiceMiles = lastSvc,
                 serviceIntervalMiles = svcInterval,

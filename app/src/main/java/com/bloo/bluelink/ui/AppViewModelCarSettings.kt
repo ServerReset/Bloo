@@ -17,6 +17,7 @@ import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setSectionOrder
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.setTextClearPhoto
+import com.bloo.bluelink.data.learnClimate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -111,6 +112,17 @@ fun AppViewModel.setHotspot(v: Vehicle, section: String) {
 fun AppViewModel.setSectionOrder(v: Vehicle, order: List<String>) {
     _state.update { it.copy(sectionOrders = it.sectionOrders.withCar(v.vin, order)) }
     persist { setSectionOrder(v.vin, order) }
+}
+
+/**
+ * A feel answer (or a plain start, which counts as right) moves what smart climate has learned for this car. It is written to the synced
+ * settings, and the screen takes the new numbers as soon as they are stored.
+ */
+fun AppViewModel.learnClimate(v: Vehicle, ambientF: Int, deltaF: Int) {
+    viewModelScope.launch {
+        val next = settingsStore.learnClimate(v.vin, ambientF, deltaF)
+        _state.update { it.copy(climateModels = it.climateModels + (v.vin to next)) }
+    }
 }
 
 /** Whether this car's name and charge sit clear of its photo, rather than over it. */

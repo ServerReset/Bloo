@@ -157,7 +157,10 @@ internal fun ClimatePebble(
     val climateContext = LocalContext.current
     // What smart climate would set right now: the weather, and the temperatures this person has chosen by hand before.
     val smartPlan = weather?.let {
-        smartClimatePlan(it, ClimateChoices.list(climateContext, v.vin), fahrenheit, ClimateChoices.feedback(climateContext, v.vin))
+        smartClimatePlan(
+            it, ClimateChoices.list(climateContext, v.vin), fahrenheit, ClimateChoices.feedback(climateContext, v.vin),
+            model = state.climateModels[v.vin],
+        )
     }
     val simpleMode = state.settingsMode != "advanced"
     // Mirrors Pebble()'s own expanded computation so this and the header Start button agree.
@@ -308,12 +311,18 @@ internal fun ClimatePebble(
                 enabled = !pending && !climateOn,
                 onStartAtTarget = { target ->
                     // Starting on the plan as it stands counts as the plan being right.
-                    weather?.let { ClimateChoices.recordFeedback(climateContext, v.vin, ambientFahrenheit(it.tempC), 0) }
+                    weather?.let {
+                        ClimateChoices.recordFeedback(climateContext, v.vin, ambientFahrenheit(it.tempC), 0)
+                        vm.learnClimate(v, ambientFahrenheit(it.tempC), 0)
+                    }
                     startAtTarget(target, currentReq)
                 },
                 onSubmitFeel = { delta ->
                     // The feel slider: what they wanted, against the plan, is kept, and the car starts at that setting.
-                    weather?.let { ClimateChoices.recordFeedback(climateContext, v.vin, ambientFahrenheit(it.tempC), delta) }
+                    weather?.let {
+                        ClimateChoices.recordFeedback(climateContext, v.vin, ambientFahrenheit(it.tempC), delta)
+                        vm.learnClimate(v, ambientFahrenheit(it.tempC), delta)
+                    }
                     smartPlan?.let { startAtTarget(it.targetF + delta, currentReq) }
                 },
                 onStartUnread = {

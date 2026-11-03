@@ -16,6 +16,45 @@ data class ClimateChoice(val ambientF: Int, val targetF: Int)
 @Serializable
 data class ClimateFeedback(val ambientF: Int, val deltaF: Int)
 
+/**
+ * What smart climate has learned about one car, in a few numbers: how many °F the person wants it warmer (+) or cooler (-) than the plan,
+ * for each kind of day (heating, cooling, comfortable), and how many answers went in. Learning keys on the outside temperature each answer
+ * was given at, which every device records the same way, so the numbers mean the same wherever they are read. Kept as one short string in
+ * the synced settings, so every device has the same model.
+ */
+data class ClimateModel(val heat: Double = 0.0, val cool: Double = 0.0, val hold: Double = 0.0, val seen: Int = 0)
+
+/** How much each new answer moves the learned number for its kind of day. */
+private const val LEARN_RATE = 0.3
+
+/** Learns one more answer: the number for the kind of day at [ambientF] moves toward what the person wanted, and stays within the limit. */
+fun ClimateModel.learn(ambientF: Int, deltaF: Int): ClimateModel {
+    fun move(bias: Double) = (bias + LEARN_RATE * (deltaF - bias)).coerceIn(-FEEL_LIMIT_F.toDouble(), FEEL_LIMIT_F.toDouble())
+    return when (smartClimateMode(ambientF)) {
+        SmartClimateMode.HEAT -> copy(heat = move(heat), seen = seen + 1)
+        SmartClimateMode.COOL -> copy(cool = move(cool), seen = seen + 1)
+        SmartClimateMode.HOLD -> copy(hold = move(hold), seen = seen + 1)
+    }
+}
+
+/** The learned shift, in whole °F, for the kind of day at [ambientF]. */
+fun ClimateModel.biasFor(ambientF: Int): Int = when (smartClimateMode(ambientF)) {
+    SmartClimateMode.HEAT -> heat
+    SmartClimateMode.COOL -> cool
+    SmartClimateMode.HOLD -> hold
+}.roundToInt().coerceIn(-FEEL_LIMIT_F, FEEL_LIMIT_F)
+
+/** Four numbers, comma-separated: the three shifts in hundredths of a degree, then how many answers went in. */
+fun encodeClimateModel(m: ClimateModel): String =
+    listOf((m.heat * 100).roundToInt(), (m.cool * 100).roundToInt(), (m.hold * 100).roundToInt(), m.seen).joinToString(",")
+
+/** Reads what [encodeClimateModel] wrote. Anything unreadable is a fresh model, so a bad value never breaks the plan. */
+fun decodeClimateModel(text: String): ClimateModel {
+    val p = text.split(",").mapNotNull { it.trim().toIntOrNull() }
+    if (p.size != 4) return ClimateModel()
+    return ClimateModel(p[0] / 100.0, p[1] / 100.0, p[2] / 100.0, p[3])
+}
+
 /** The target smart climate sets, and the things that moved it, in words, so the person can see why it chose what it did. */
 data class SmartClimatePlan(val targetF: Int, val reasons: List<String>)
 
@@ -62,6 +101,8 @@ fun smartClimatePlan(
     choices: List<ClimateChoice> = emptyList(),
     fahrenheit: Boolean = true,
     feedback: List<ClimateFeedback> = emptyList(),
+    /** What smart climate has learned for this car. When it has learned anything it is used in place of the raw answers. */
+    model: ClimateModel? = null,
 ): SmartClimatePlan {
     val reasons = mutableListOf<String>()
     val feelsF = cToF(w.feelsLikeC).roundToInt()
@@ -113,15 +154,19 @@ fun smartClimatePlan(
         target = (model * 0.4 + learned * 0.6).roundToInt()
         reasons += "You usually set ${degLabel(learned.toString(), fahrenheit)} around here"
     }
-    // What the person said about the plan at a similar outside temperature: the average, taken as they felt it.
-    val felt = feedback.filter { abs(it.ambientF - feelsF) <= SIMILAR_AMBIENT_F }
-    if (felt.isNotEmpty()) {
-        val shift = (felt.sumOf { it.deltaF }.toDouble() / felt.size).roundToInt().coerceIn(-FEEL_LIMIT_F, FEEL_LIMIT_F)
-        if (shift != 0) {
-            target += shift
-            val word = if (shift > 0) "warmer" else "cooler"
-            reasons += "You wanted it ${abs(shift)}° $word around here"
-        }
+    // What the person said about the plan: the learned numbers for this kind of day when there are any, otherwise the average of the
+    // recent answers at a similar outside temperature.
+    val ambient = ambientFahrenheit(w.tempC)
+    val shift: Int? = if (model != null && model.seen > 0) {
+        model.biasFor(ambient)
+    } else {
+        feedback.filter { abs(it.ambientF - feelsF) <= SIMILAR_AMBIENT_F }.takeIf { it.isNotEmpty() }
+            ?.let { felt -> (felt.sumOf { it.deltaF }.toDouble() / felt.size).roundToInt().coerceIn(-FEEL_LIMIT_F, FEEL_LIMIT_F) }
+    }
+    if (shift != null && shift != 0) {
+        target += shift
+        val word = if (shift > 0) "warmer" else "cooler"
+        reasons += "You wanted it ${abs(shift)}° $word around here"
     }
     val range = CLIMATE_TEMP_RANGE_F
     return SmartClimatePlan(target.coerceIn(range.first, range.last), reasons)
