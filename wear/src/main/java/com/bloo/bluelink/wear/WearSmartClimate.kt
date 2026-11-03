@@ -57,7 +57,7 @@ internal object WearSmartClimate {
     private fun hintFor(vin: String, weather: Weather): Hint {
         val plan = smartClimatePlan(
             weather, WearClimateChoices.choicesFor(vin), feedback = WearClimateChoices.feedbackFor(vin),
-            model = WearClimateChoices.modelFor(vin),
+            learned = WearClimateChoices.modelFor(vin),
         )
         val feelsF = cToF(weather.feelsLikeC).roundToInt()
         return Hint(plan.targetF, ambientFahrenheit(weather.tempC), smartClimateMode(feelsF), System.currentTimeMillis())

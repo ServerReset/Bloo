@@ -102,7 +102,7 @@ fun smartClimatePlan(
     fahrenheit: Boolean = true,
     feedback: List<ClimateFeedback> = emptyList(),
     /** What smart climate has learned for this car. When it has learned anything it is used in place of the raw answers. */
-    model: ClimateModel? = null,
+    learned: ClimateModel? = null,
 ): SmartClimatePlan {
     val reasons = mutableListOf<String>()
     val feelsF = cToF(w.feelsLikeC).roundToInt()
@@ -150,15 +150,15 @@ fun smartClimatePlan(
     var target = model
     val similar = choices.filter { abs(it.ambientF - feelsF) <= SIMILAR_AMBIENT_F }
     if (similar.isNotEmpty()) {
-        val learned = similar.map { it.targetF }.sorted()[similar.size / 2]
-        target = (model * 0.4 + learned * 0.6).roundToInt()
-        reasons += "You usually set ${degLabel(learned.toString(), fahrenheit)} around here"
+        val typical = similar.map { it.targetF }.sorted()[similar.size / 2]
+        target = (model * 0.4 + typical * 0.6).roundToInt()
+        reasons += "You usually set ${degLabel(typical.toString(), fahrenheit)} around here"
     }
     // What the person said about the plan: the learned numbers for this kind of day when there are any, otherwise the average of the
     // recent answers at a similar outside temperature.
     val ambient = ambientFahrenheit(w.tempC)
-    val shift: Int? = if (model != null && model.seen > 0) {
-        model.biasFor(ambient)
+    val shift: Int? = if (learned != null && learned.seen > 0) {
+        learned.biasFor(ambient)
     } else {
         feedback.filter { abs(it.ambientF - feelsF) <= SIMILAR_AMBIENT_F }.takeIf { it.isNotEmpty() }
             ?.let { felt -> (felt.sumOf { it.deltaF }.toDouble() / felt.size).roundToInt().coerceIn(-FEEL_LIMIT_F, FEEL_LIMIT_F) }

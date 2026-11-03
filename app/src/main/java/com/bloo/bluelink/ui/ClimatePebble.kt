@@ -159,7 +159,7 @@ internal fun ClimatePebble(
     val smartPlan = weather?.let {
         smartClimatePlan(
             it, ClimateChoices.list(climateContext, v.vin), fahrenheit, ClimateChoices.feedback(climateContext, v.vin),
-            model = state.climateModels[v.vin],
+            learned = state.climateModels[v.vin],
         )
     }
     val simpleMode = state.settingsMode != "advanced"
