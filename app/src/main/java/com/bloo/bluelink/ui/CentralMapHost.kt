@@ -45,6 +45,12 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         }
     }
     LaunchedEffect(centralMap.vin) { vm.setMapExpanded(centralMap.vin != null) }
+    // A car chosen on the map becomes the app's current car, so the car page swaps to it behind the map.
+    SideEffect {
+        centralMap.onCarChosen = { vin ->
+            state.value.vehicles.indexOfFirst { it.vin == vin }.takeIf { it >= 0 }?.let { vm.selectIndex(it) }
+        }
+    }
     // Closed, the map sits in the Location card of the car being looked at, so a swipe to another car brings it along.
     val currentIndex by vm.currentIndex.collectAsStateWithLifecycle()
     LaunchedEffect(currentIndex, state.value.vehicles) {

@@ -68,8 +68,14 @@ internal class CentralMap {
     }
 
     /** A tap on a car's icon: the bar shows that car, and the map pans to centre it from the anchor. */
+    /** Set by the host: the app's car page moves to a car that was chosen on the map (see [tapPin]). */
+    var onCarChosen: ((String) -> Unit)? = null
+
     fun tapPin(tapped: String) {
         selectedVin = tapped
+        // The car tapped is the one the map returns to when it closes, and the car page moves to it behind the map.
+        homeVin = tapped
+        onCarChosen?.invoke(tapped)
         val anchor = vin ?: return
         if (tapped == anchor) {
             mapState.recenter()
