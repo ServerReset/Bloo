@@ -165,6 +165,7 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
 }
 
 /** The bar's look for a neighbouring car, so a swipe can show it coming in. Null for no car on that side. */
+@Composable
 private fun barPreview(state: UiState, v: com.bloo.bluelink.data.Vehicle?, metric: Boolean): BarPreview? = v?.let {
     val (percent, range) = mapChargeStats(state, it, metric)
     BarPreview(it.name, state.imageUrls[it.vin], percent, range)

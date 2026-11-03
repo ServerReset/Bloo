@@ -23,6 +23,7 @@ import com.bloo.bluelink.data.sectionOrder
 import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.snapshot
 import com.bloo.bluelink.data.textClearPhoto
+import com.bloo.bluelink.data.climateModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
