@@ -5,6 +5,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.runtime.State
 import androidx.compose.material3.Text
+import com.bloo.uicommon.RevealText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -115,13 +116,13 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false, index: Int = 0) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
+            RevealText(
                 tripDate(trip.startdate),
                 modifier = Modifier.popIn(clock, 1, slots, pivot = textPivot),
                 style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, color = primaryColor,
             )
             trip.distance?.let {
-                Text(
+                RevealText(
                     formatTripDistance(it, metric),
                     modifier = Modifier.popIn(clock, 2, slots, pivot = textPivot),
                     style = PrimaryTextStyle(),
@@ -148,8 +149,8 @@ private const val TripStaggerMs = 90
 private fun TripStat(label: String, value: String, captionColor: Color, clock: State<Float>, slot: Int, slots: Int) {
     val pivot = TransformOrigin(0f, 0.5f)
     Column {
-        Text(label, modifier = Modifier.popIn(clock, slot, slots, pivot = pivot), style = SecondaryTextStyle(), color = captionColor, maxLines = 1)
-        Text(value, modifier = Modifier.popIn(clock, slot + 1, slots, pivot = pivot), style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
+        RevealText(label, modifier = Modifier.popIn(clock, slot, slots, pivot = pivot), style = SecondaryTextStyle(), color = captionColor, maxLines = 1)
+        RevealText(value, modifier = Modifier.popIn(clock, slot + 1, slots, pivot = pivot), style = SecondaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 

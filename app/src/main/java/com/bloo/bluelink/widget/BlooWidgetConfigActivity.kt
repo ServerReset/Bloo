@@ -355,8 +355,8 @@ private fun CarCard(car: VehicleSnapshot, photoUrl: String?, selected: Boolean, 
             }
         }
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Text(car.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(car.bigValue(), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, maxLines = 1)
+            RevealText(car.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            RevealText(car.bigValue(), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, maxLines = 1)
         }
     }
 }
@@ -383,8 +383,8 @@ private fun StripPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Choic
         }
         Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(car?.name ?: "Your car", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(car?.bigValue() ?: "82%", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+                RevealText(car?.name ?: "Your car", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                RevealText(car?.bigValue() ?: "82%", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
             }
             choice.stripControls.take(count).forEach { c ->
                 Spacer(Modifier.width(8.dp))

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.bloo.uicommon.RevealText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -111,11 +112,11 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
             Box(Modifier.fillMaxSize().padding(pad)) {
                 val header: @Composable () -> Unit = { PreviewHeader(car, choice, plan.nameSp * us) }
                 val value: @Composable () -> Unit = {
-                    Text(valueText, fontSize = (plan.valueSp * us).sp, fontWeight = FontWeight.Bold, color = levelColor, maxLines = 1, overflow = TextOverflow.Clip)
+                    RevealText(valueText, fontSize = (plan.valueSp * us).sp, fontWeight = FontWeight.Bold, color = levelColor, maxLines = 1, overflow = TextOverflow.Clip)
                 }
                 val status: @Composable () -> Unit = {
                     if (plan.showStatus) {
-                        Text(
+                        RevealText(
                             car?.stateLineOrParked() ?: "Locked · 210 mi", fontSize = (plan.statusSp * us).sp,
                             color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
@@ -148,7 +149,7 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
                         status()
                         if (plan.showDetails) car?.detailLine()?.let {
                             Spacer(Modifier.height(4.dp))
-                            Text(it, fontSize = (plan.detailSp * us).sp, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            RevealText(it, fontSize = (plan.detailSp * us).sp, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         if (plan.showBar && choice.extras) {
                             Spacer(Modifier.height(16.dp))
@@ -177,7 +178,7 @@ private fun PreviewHeader(car: VehicleSnapshot?, choice: Choice, nameSp: Float) 
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.DirectionsCar, null, tint = scheme.primary, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(6.dp))
-        Text(car?.name ?: "Your car", fontWeight = FontWeight.Bold, fontSize = nameSp.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        RevealText(car?.name ?: "Your car", fontWeight = FontWeight.Bold, fontSize = nameSp.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (choice.refresh) PreviewButton(Icons.Filled.Refresh, 32.dp, Modifier)
     }
 }
@@ -240,7 +241,7 @@ private fun PreviewChips(car: VehicleSnapshot?, max: Int) {
             Box(
                 Modifier.height(30.dp).clip(CircleShape).background(if (on) scheme.primaryContainer else scheme.secondaryContainer).padding(horizontal = 12.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text(text, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1) }
+            ) { RevealText(text, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1) }
         }
     }
 }

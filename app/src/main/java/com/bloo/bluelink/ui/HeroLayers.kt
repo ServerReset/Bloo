@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.material3.Text
+import com.bloo.uicommon.RevealText
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -213,7 +214,7 @@ internal fun HeroPhotoPreview(state: UiState, v: Vehicle, imageUrl: String?, met
                 reportNumbers = {},
                 clearOfText = clearOfText,
             )
-            Text(
+            RevealText(
                 v.name,
                 modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
                 style = MaterialTheme.typography.titleLarge,

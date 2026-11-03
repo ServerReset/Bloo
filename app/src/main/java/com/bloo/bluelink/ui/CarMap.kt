@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import com.bloo.uicommon.RevealText
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.geometry.Offset
@@ -663,7 +664,7 @@ private fun CarPillCluster(
                     CarPhotoTile(photo = photo, tint = tint, contentDescription = null, onClick = null, size = PillPhotoSize, glyphSize = 12.dp)
                 }
                 if (extra > 0) {
-                    Text("+$extra", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
+                    RevealText("+$extra", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
                 }
             }
         }

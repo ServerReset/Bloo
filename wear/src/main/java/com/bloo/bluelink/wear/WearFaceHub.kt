@@ -102,7 +102,7 @@ fun WearFaceHub(
 private fun HubLine(text: String, color: Color, hubSize: Dp) {
     val base = (hubSize.value * 0.15f).coerceIn(10f, 14f)
     val fit = if (text.length > 14) base * 14f / text.length else base
-    androidx.compose.material3.Text(
+    RevealText(
         text,
         style = MaterialTheme.typography.labelSmall.copy(
             fontSize = with(LocalDensity.current) { fit.coerceAtLeast(8f).dp.toSp() },
