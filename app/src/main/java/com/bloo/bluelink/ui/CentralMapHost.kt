@@ -118,6 +118,11 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         frostHaze = frostHaze,
         chromeInsets = centralMap.chromeInsets,
         onDismiss = {
+            // The map closes onto the car last chosen on it, and the app is on that car, whatever the pager settled on meanwhile.
+            centralMap.chosenVin?.let { chosen ->
+                centralMap.homeVin = chosen
+                state.value.vehicles.indexOfFirst { it.vin == chosen }.takeIf { it >= 0 }?.let { vm.selectIndex(it) }
+            }
             centralMap.selectedVin = null
             centralMap.vin = null
         },
