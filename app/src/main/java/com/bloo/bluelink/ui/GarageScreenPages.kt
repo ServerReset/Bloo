@@ -35,7 +35,7 @@ import com.bloo.uicommon.LocalHaptics
 internal val LocalPagerIdle = androidx.compose.runtime.staticCompositionLocalOf<State<Boolean>?> { null }
 
 /** The farthest (in pages) an external car selection is travelled to by an animated scroll; beyond it the pager jumps. */
-private const val MAX_ANIMATED_HOP = 3
+private const val MAX_ANIMATED_HOP = 16
 
 /*
  * The garage's layout, peeled out of GarageScreen: CollapsedGaragePager is the pager of cars (and

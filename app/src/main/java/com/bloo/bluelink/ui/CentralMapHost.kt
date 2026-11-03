@@ -1,6 +1,9 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.offset
@@ -81,7 +84,12 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     val windowSize = LocalWindowInfo.current.containerSize
     // Open, the map grows from the car's own card; until that card has been on screen, from a box in the middle, so the map always opens.
     val fallback = Rect(windowSize.width * 0.05f, windowSize.height * 0.35f, windowSize.width * 0.95f, windowSize.height * 0.6f)
-    val originBounds = if (openVin != null) centralMap.originBoundsFor(openVin).value ?: fallback else closedAt ?: return
+    // Opening grows from the card it was opened from; closing shrinks onto the card of the car chosen on it.
+    val originBounds = if (openVin != null && centralMap.closingTo == null) {
+        centralMap.originBoundsFor(openVin).value ?: fallback
+    } else {
+        centralMap.closingTo?.let { centralMap.originBoundsFor(it).value } ?: closedAt ?: return
+    }
 
     val locateHostVehicle = rememberLocateAction(vm, hostVehicle)
     // The bar describes the selected car: the one the map is on, or another whose pin was tapped. The map itself stays on the first.
@@ -117,6 +125,17 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         refreshing = state.value.isPending(hostVehicle.vin, CarCommandIds.LOCATE),
         frostHaze = frostHaze,
         chromeInsets = centralMap.chromeInsets,
+        beforeClose = {
+            // The car page moves to the chosen car behind the map; the map collapses onto its card once that card is on screen.
+            centralMap.chosenVin?.let { chosen ->
+                centralMap.closingTo = chosen
+                val screen = windowSize
+                withTimeoutOrNull(CloseWaitMs) {
+                    snapshotFlow { centralMap.originBoundsFor(chosen).value }
+                        .first { r -> r != null && r.overlaps(Rect(0f, 0f, screen.width.toFloat(), screen.height.toFloat())) }
+                }
+            }
+        },
         onDismiss = {
             // The map closes onto the car last chosen on it, and the app is on that car, whatever the pager settled on meanwhile.
             centralMap.chosenVin?.let { chosen ->
@@ -125,6 +144,10 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
             }
             centralMap.selectedVin = null
             centralMap.vin = null
+            centralMap.closingTo = null
         },
     )
 }
+
+/** The longest the map waits for the car page to reach the car it collapses onto, before it collapses regardless. */
+private const val CloseWaitMs = 1_500L

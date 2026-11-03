@@ -147,6 +147,8 @@ internal fun ExpandableMapLayer(
     onDismiss: () -> Unit,
     /** The map's measured chrome, written here so the markers' edge window follows the real bars (see [MapChromeInsets]). */
     chromeInsets: MapChromeInsets? = null,
+    /** Run before the map collapses: the host waits here until the card the map collapses onto is on screen. */
+    beforeClose: (suspend () -> Unit)? = null,
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("ExpandableMapLayer")
     val context = LocalContext.current
@@ -268,6 +270,7 @@ internal fun ExpandableMapLayer(
         onDismissDrag(1f)
         com.bloo.bluelink.perf.PerfMonitor.scope("map-close", 1_000)
         scope.launch {
+            beforeClose?.invoke()
             // One motion: the bar retreats up while the sheet shrinks, and the bar's width follows the sheet from the first frame.
             val retreat = launch {
                 if (plainMotion) {

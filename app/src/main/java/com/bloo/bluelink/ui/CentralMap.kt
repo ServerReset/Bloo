@@ -56,6 +56,9 @@ internal class CentralMap {
     /** The car the person last chose on the map (opened on, or tapped): the car the map and the app return to when it closes. */
     var chosenVin: String? = null
 
+    /** While the map is collapsing, the car whose card it collapses onto (its own card, once the car page has moved there). */
+    var closingTo by mutableStateOf<String?>(null)
+
     fun open(vin: String) {
         if (this.vin != null) return
         com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin")

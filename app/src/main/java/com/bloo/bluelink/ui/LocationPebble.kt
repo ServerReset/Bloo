@@ -188,7 +188,11 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer)
                             .clickable(role = Role.Button) { host?.open(v.vin) },
                     )
-                    host?.CardContent(
+                    // Only a card on screen builds its map: the others are off to the side of the pager, and building them costs time.
+                    val screenNow = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
+                    val onScreen = host?.originBoundsFor(v.vin)?.value
+                        ?.overlaps(Rect(0f, 0f, screenNow.width.toFloat(), screenNow.height.toFloat())) == true
+                    if (onScreen) host?.CardContent(
                         Modifier.fillMaxSize(),
                         MapInputs(loc, state.deviceLocation, interactive = false, tileArea = windowSize, panWeight = { 1f }),
                     )
