@@ -28,6 +28,16 @@ const val CLIMATE_FEEDBACK_KEPT = 40
 /** The most the feel answers may move the plan, in °F, either way. */
 private const val FEEL_LIMIT_F = 4
 
+/** How far one feel step moves the setting from the plan, in °F: colder, normal or hotter is one step either way. */
+const val FEEL_STEP_F = 2
+
+/** The feel slider's three answers: -1 colder, 0 normal, 1 hotter. */
+fun feelLabel(step: Int): String = when {
+    step < 0 -> "Colder"
+    step > 0 -> "Hotter"
+    else -> "Normal"
+}
+
 /** How close, in outside °F, a past choice must be to count as "at a similar temperature". */
 private const val SIMILAR_AMBIENT_F = 6
 

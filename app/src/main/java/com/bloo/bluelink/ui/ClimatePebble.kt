@@ -15,6 +15,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.AnimatedValue
+import com.bloo.uicommon.AnimatedSlider
+import com.bloo.bluelink.data.FEEL_STEP_F
+import com.bloo.bluelink.data.feelLabel
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.PrimaryTextStyle
@@ -377,21 +380,32 @@ private fun SmartClimateSection(
         )
         if (plan != null && ambientF != null) {
             // How hot or cold they want it, against the plan. Submitting starts the car there and tells smart climate how it felt.
+            // Colder, normal or hotter than the plan: three stops on the standard slider. It always opens on normal.
             var feel by remember(plan.targetF) { mutableFloatStateOf(0f) }
-            val feelTarget = plan.targetF + feel.roundToInt()
-            androidx.compose.material3.Slider(
+            val step = feel.roundToInt().coerceIn(-1, 1)
+            val feelTarget = plan.targetF + step * FEEL_STEP_F
+            val scheme = MaterialTheme.colorScheme
+            val haptics = com.bloo.uicommon.LocalHaptics.current
+            AnimatedSlider(
                 value = feel,
-                onValueChange = { feel = it.roundToInt().toFloat() },
-                valueRange = -4f..4f,
-                steps = 7,
+                onValueChange = { feel = it },
+                valueRange = -1f..1f,
+                steps = 1,
+                accent = scheme.primary,
+                inactiveColor = scheme.surfaceContainerHighest,
+                dotOnActive = scheme.onPrimary.copy(alpha = 0.7f),
+                dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
+                reduceMotion = com.bloo.uicommon.LocalReduceMotion.current,
+                onStepTick = { haptics?.tick() },
+                onSettle = { haptics?.click() },
                 enabled = enabled,
             )
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                RevealMutedText(degLabel(feelTarget.toString(), fahrenheit), modifier = Modifier.weight(1f))
+                RevealMutedText("${feelLabel(step)} · ${degLabel(feelTarget.toString(), fahrenheit)}", modifier = Modifier.weight(1f))
                 MorphActionButton(
                     label = "Set",
                     icon = Icons.Filled.AcUnit,
-                    onClick = { onSubmitFeel(feel.roundToInt()) },
+                    onClick = { onSubmitFeel(step * FEEL_STEP_F) },
                     enabled = enabled,
                 )
             }
