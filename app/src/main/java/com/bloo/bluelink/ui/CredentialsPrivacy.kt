@@ -36,8 +36,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import com.bloo.uicommon.LocalInstantText
-import androidx.compose.runtime.CompositionLocalProvider
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapRow
@@ -54,12 +52,6 @@ import com.bloo.uicommon.SecondaryTextStyle
  */
 @Composable
 internal fun CredentialsPrivacyNote(brandLabel: String?, modifier: Modifier = Modifier) {
-    // Credentials text reads at once: its entrance is off for the whole screen (see LocalInstantText).
-    CompositionLocalProvider(LocalInstantText provides true) { CredentialsPrivacyNoteBody(brandLabel, modifier) }
-}
-
-@Composable
-private fun CredentialsPrivacyNoteBody(brandLabel: String?, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -138,11 +130,6 @@ internal fun openPrivacyPage(context: Context, styled: Boolean) {
 
 @Composable
 internal fun PrivacyPolicyViewer(onClose: () -> Unit) {
-    CompositionLocalProvider(LocalInstantText provides true) { PrivacyPolicyViewerBody(onClose) }
-}
-
-@Composable
-private fun PrivacyPolicyViewerBody(onClose: () -> Unit) {
     val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
     var html by remember { mutableStateOf(PrivacyCopy.local(context)) }
