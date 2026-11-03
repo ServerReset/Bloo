@@ -265,7 +265,7 @@ internal fun ExpandableMapLayer(
     val barVisible = isExpanded || barSelected
     SideEffect { chromeInsets?.chromeOn = barVisible && chromeShown }
     // Once the bars have settled after opening, log where they were measured, so an edge marker under the bar can be traced from a log.
-    LaunchedEffect(isExpanded, chromeShown) {
+    LaunchedEffect(isExpanded, chromeShown, barDetailsOpen) {
         if (isExpanded && chromeShown) {
             kotlinx.coroutines.delay(500)
             chromeInsets?.let {
