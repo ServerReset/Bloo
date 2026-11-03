@@ -344,6 +344,7 @@ internal fun ExpandableMapLayer(
         val searchClearPx = with(density) { searchBarClearance(fallback = 132.dp).toPx() }
         val windowH = windowSize.height.toFloat()
         val mapInputs = MapInputs(location, deviceLocation, interactive = isExpanded, tileArea = windowSize, panWeight = { progress().coerceIn(0f, 1f) })
+    val mapLive by remember { androidx.compose.runtime.derivedStateOf { isExpanded || progress() > 0.001f } }
         // The cut, in layout: the map sits in a box that clips to the band it may show (see [visibleBand]), so the cut hides its taps as well.
         Box(
             Modifier
@@ -355,7 +356,9 @@ internal fun ExpandableMapLayer(
                 }
                 .clipToBounds(),
         ) {
-        map(
+        // The layer draws the map only while it is open or moving. Closed, the map is in its card (see LocationPebble), so the two never
+        // draw at once and the card's own pins stay the ones that get the touch.
+        if (mapLive) map(
             Modifier
                 .layout { measurable, constraints ->
                     val w = constraints.maxWidth.toFloat()

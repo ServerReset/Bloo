@@ -181,7 +181,17 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                     )
                 Box(slot) {
                     // Home car: the map covers this, and a tap that reaches it opens the map. Other cars: the same tap, with a label.
-                    MapSlot { host?.open(v.vin) }
+                    // The card's own map, of the shared map, centred on this car with every car on it. Tapping its empty part opens the map;
+                    // tapping one of its icons selects that car. Taps on the map's own icons go to them, not to the card.
+                    val windowSize = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
+                    Box(
+                        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer)
+                            .clickable(role = Role.Button) { host?.open(v.vin) },
+                    )
+                    host?.Content(
+                        Modifier.fillMaxSize(),
+                        MapInputs(loc, state.deviceLocation, interactive = false, tileArea = windowSize, panWeight = { 1f }),
+                    )
                 }
                 MapFeatureRow(
                     features = listOfNotNull(
@@ -241,12 +251,3 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
 
 // --- Weather inside the Location pebble -----------------------------------
 
-/**
- * The Location card's slot for the map: the surface the shared map sits on, with no placeholder of its own. A tap on it opens the map.
- */
-@Composable
-private fun MapSlot(onOpen: () -> Unit) {
-    Box(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).clickable(role = Role.Button, onClick = onOpen),
-    )
-}
